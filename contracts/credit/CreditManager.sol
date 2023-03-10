@@ -1,32 +1,42 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 // LIBRARIES
-import { Address } from "@openzeppelin/contracts/utils/Address.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
-import { ACLTrait } from "../core/ACLTrait.sol";
+import {ACLNonReentrantTrait} from "../core/ACLNonReentrantTrait.sol";
 
 // INTERFACES
-import { IAccountFactory } from "../interfaces/IAccountFactory.sol";
-import { ICreditAccount } from "../interfaces/ICreditAccount.sol";
-import { IPoolService } from "../interfaces/IPoolService.sol";
-import { IWETHGateway } from "../interfaces/IWETHGateway.sol";
-import { ICreditManagerV2, ClosureAction } from "../interfaces/ICreditManagerV2.sol";
-import { IAddressProvider } from "../interfaces/IAddressProvider.sol";
-import { IPriceOracleV2 } from "../interfaces/IPriceOracle.sol";
+import {IAccountFactory} from "@gearbox-protocol/core-v2/contracts/interfaces/IAccountFactory.sol";
+import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
+import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
+import {IPool4626} from "../interfaces/IPool4626.sol";
+import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
+import {ICreditManagerV2, ClosureAction, CollateralTokenData} from "../interfaces/ICreditManagerV2.sol";
+import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
+import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
+import {IPoolQuotaKeeper, QuotaUpdate, TokenLT, QuotaStatusChange} from "../interfaces/IPoolQuotaKeeper.sol";
+import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 // CONSTANTS
-import { RAY } from "../libraries/Constants.sol";
-import { PERCENTAGE_FACTOR } from "../libraries/PercentageMath.sol";
-import { DEFAULT_FEE_INTEREST, DEFAULT_FEE_LIQUIDATION, DEFAULT_LIQUIDATION_PREMIUM, LEVERAGE_DECIMALS, ALLOWANCE_THRESHOLD, UNIVERSAL_CONTRACT } from "../libraries/Constants.sol";
+import {RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {
+    DEFAULT_FEE_INTEREST,
+    DEFAULT_FEE_LIQUIDATION,
+    DEFAULT_LIQUIDATION_PREMIUM,
+    LEVERAGE_DECIMALS,
+    ALLOWANCE_THRESHOLD,
+    UNIVERSAL_CONTRACT
+} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 uint256 constant ADDR_BIT_SIZE = 160;
-uint256 constant INDEX_PRECISION = 10**9;
+uint256 constant INDEX_PRECISION = 10 ** 9;
 
 struct Slot1 {
     /// @dev Interest fee charged by the protocol: fee = interest accrued * feeInterest
@@ -52,15 +62,12 @@ struct Slot1 {
 /// @notice Encapsulates the business logic for managing Credit Accounts
 ///
 /// More info: https://dev.gearbox.fi/developers/credit/credit_manager
-contract CreditManager is ICreditManagerV2, ACLTrait {
+contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
     using SafeERC20 for IERC20;
     using Address for address payable;
     using SafeCast for uint256;
 
-    /// @dev used to protect against reentrancy. Bool is gas-optimal,
-    /// since there are other non-zero values packed into the same slot
-    bool private entered;
-
+    /// @dev True if current operation is emergency liquidaiton
     bool public emergencyLiquidation;
 
     /// @dev The maximal number of enabled tokens on a single Credit Account
@@ -82,10 +89,6 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
     address public immutable override underlying;
 
     /// @dev Address of the connected pool
-    /// @notice [DEPRECATED]: use pool() instead.
-    address public immutable override poolService;
-
-    /// @dev Address of the connected pool
     address public immutable override pool;
 
     /// @dev Address of WETH
@@ -97,9 +100,8 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
     /// @dev Address of the connected Credit Configurator
     address public creditConfigurator;
 
-    /// @dev Map of token's bit mask to its address and LT compressed into a single uint256
-    /// @notice Use collateralTokens(uint256 i) to get uncompressed values.
-    mapping(uint256 => uint256) internal collateralTokensCompressed;
+    /// @dev Map of token's bit mask to its address and LT parameters in a single-slot struct
+    mapping(uint256 => CollateralTokenData) internal collateralTokensData;
 
     /// @dev Total number of known collateral tokens.
     uint256 public collateralTokensCount;
@@ -120,10 +122,6 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
     ///         the bit at the position equal to token's index to 1
     mapping(address => uint256) public override enabledTokensMap;
 
-    /// @dev Maps Credit Accounts to their current cumulative drops in value during fast checks
-    /// See more details in fastCollateralCheck()
-    mapping(address => uint256) public cumulativeDropAtFastCheckRAY;
-
     /// @dev Maps allowed adapters to their respective target contracts.
     mapping(address => address) public override adapterToContract;
 
@@ -142,31 +140,32 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
     /// @notice See more at https://dev.gearbox.fi/docs/documentation/integrations/universal
     address public universalAdapter;
 
+    /// QUOTA-RELATED PARAMS
+
+    /// @dev Whether the CM supports quota-related logic
+    bool public immutable supportsQuotas;
+
+    /// @dev Mask of tokens to apply quotas for
+    uint256 public limitedTokenMask;
+
+    /// @dev Previously accrued and unrepaid interest on quotas.
+    ///      This does not always represent the most actual quota interest,
+    ///      since it continuously accrues for all active quotas. The accrued interest
+    ///      needs to be periodically cached to ensure that computations are correct
+    mapping(address => uint256) public cumulativeQuotaInterest;
+
     /// @dev contract version
-    uint256 public constant override version = 2;
+    uint256 public constant override version = 2_10;
 
     //
     // MODIFIERS
     //
 
-    /// @dev Protects against reentrancy.
-    /// @notice Custom ReentrancyGuard implementation is used to optimize storage reads.
-    modifier nonReentrant() {
-        if (entered) {
-            revert ReentrancyLockException();
-        }
-
-        entered = true;
-        _;
-        entered = false;
-    }
-
     /// @dev Restricts calls to Credit Facade or allowed adapters
     modifier adaptersOrCreditFacadeOnly() {
-        if (
-            adapterToContract[msg.sender] == address(0) &&
-            msg.sender != creditFacade
-        ) revert AdaptersOrCreditFacadeOnlyException(); //
+        if (adapterToContract[msg.sender] == address(0) && msg.sender != creditFacade) {
+            revert AdaptersOrCreditFacadeOnlyException();
+        } //
         _;
     }
 
@@ -178,8 +177,9 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
 
     /// @dev Restricts calls to Credit Configurator only
     modifier creditConfiguratorOnly() {
-        if (msg.sender != creditConfigurator)
+        if (msg.sender != creditConfigurator) {
             revert CreditConfiguratorOnlyException();
+        }
         _;
     }
 
@@ -190,17 +190,17 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
 
     /// @dev Constructor
     /// @param _pool Address of the pool to borrow funds from
-    constructor(address _pool)
-        ACLTrait(address(IPoolService(_pool).addressProvider()))
-    {
-        IAddressProvider addressProvider = IPoolService(_pool)
-            .addressProvider();
+    constructor(address _pool) ACLNonReentrantTrait(address(IPoolService(_pool).addressProvider())) {
+        IAddressProvider addressProvider = IPoolService(_pool).addressProvider();
 
         pool = _pool; // F:[CM-1]
-        poolService = _pool; // F:[CM-1]
 
         address _underlying = IPoolService(pool).underlyingToken(); // F:[CM-1]
         underlying = _underlying; // F:[CM-1]
+
+        try IPool4626(pool).supportsQuotas() returns (bool sq) {
+            supportsQuotas = sq;
+        } catch {}
 
         // The underlying is the first token added as collateral
         _addToken(_underlying); // F:[CM-1]
@@ -234,10 +234,8 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
     {
         // Takes a Credit Account from the factory and sets initial parameters
         // The Credit Account will be connected to this Credit Manager until closing
-        address creditAccount = _accountFactory.takeCreditAccount(
-            borrowedAmount,
-            IPoolService(pool).calcLinearCumulative_RAY()
-        ); // F:[CM-8]
+        address creditAccount =
+            _accountFactory.takeCreditAccount(borrowedAmount, IPoolService(pool).calcLinearCumulative_RAY()); // F:[CM-8]
 
         // Requests the pool to transfer tokens the Credit Account
         IPoolService(pool).lendCreditAccount(borrowedAmount, creditAccount); // F:[CM-8]
@@ -247,6 +245,8 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
 
         // Initializes the enabled token mask for Credit Account to 1 (only the underlying is enabled)
         enabledTokensMap[creditAccount] = 1; // F:[CM-8]
+
+        if (supportsQuotas) cumulativeQuotaInterest[creditAccount] = 1; // F: [CMQ-1]
 
         // Returns the address of the opened Credit Account
         return creditAccount; // F:[CM-8]
@@ -298,13 +298,16 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
         // If the payer is not an emergency liquidator, reverts
         if (paused()) {
             if (
-                canLiquidateWhilePaused[payer] &&
-                (closureActionType == ClosureAction.LIQUIDATE_ACCOUNT ||
-                    closureActionType ==
-                    ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT)
+                canLiquidateWhilePaused[payer]
+                    && (
+                        closureActionType == ClosureAction.LIQUIDATE_ACCOUNT
+                            || closureActionType == ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT
+                    )
             ) {
                 closureActionType = ClosureAction.LIQUIDATE_PAUSED; // F: [CM-12, 13]
-            } else revert("Pausable: paused"); // F:[CM-5]
+            } else {
+                revert("Pausable: paused");
+            } // F:[CM-5]
         }
 
         // Checks that the Credit Account exists for the borrower
@@ -325,22 +328,25 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
             uint256 profit;
             uint256 loss;
             uint256 borrowedAmountWithInterest;
-            (
-                borrowedAmount,
-                borrowedAmountWithInterest,
+            uint256 quotaInterest;
 
-            ) = calcCreditAccountAccruedInterest(creditAccount); // F:
+            if (supportsQuotas) {
+                TokenLT[] memory tokens = getLimitedTokens(creditAccount);
 
-            (amountToPool, remainingFunds, profit, loss) = calcClosePayments(
-                totalValue,
-                closureActionType,
-                borrowedAmount,
-                borrowedAmountWithInterest
-            ); // F:[CM-10,11,12]
+                quotaInterest = cumulativeQuotaInterest[creditAccount];
 
-            uint256 underlyingBalance = IERC20(underlying).balanceOf(
-                creditAccount
-            );
+                if (tokens.length > 0) {
+                    quotaInterest += poolQuotaKeeper().closeCreditAccount(creditAccount, tokens); // F: [CMQ-6]
+                }
+            }
+
+            (borrowedAmount, borrowedAmountWithInterest,) =
+                _calcCreditAccountAccruedInterest(creditAccount, quotaInterest); // F:
+
+            (amountToPool, remainingFunds, profit, loss) =
+                calcClosePayments(totalValue, closureActionType, borrowedAmount, borrowedAmountWithInterest); // F:[CM-10,11,12]
+
+            uint256 underlyingBalance = IERC20(underlying).balanceOf(creditAccount);
 
             // If there is an underlying surplus, transfers it to the "to" address
             if (underlyingBalance > amountToPool + remainingFunds + 1) {
@@ -357,21 +363,13 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
             } else {
                 unchecked {
                     IERC20(underlying).safeTransferFrom(
-                        payer,
-                        creditAccount,
-                        amountToPool + remainingFunds - underlyingBalance + 1
+                        payer, creditAccount, amountToPool + remainingFunds - underlyingBalance + 1
                     ); // F:[CM-11,13]
                 }
             }
 
             // Transfers the due funds to the pool
-            _safeTokenTransfer(
-                creditAccount,
-                underlying,
-                pool,
-                amountToPool,
-                false
-            ); // F:[CM-10,11,12,13]
+            _safeTokenTransfer(creditAccount, underlying, pool, amountToPool, false); // F:[CM-10,11,12,13]
 
             // Signals to the pool that debt has been repaid. The pool relies
             // on the Credit Manager to repay the debt correctly, and does not
@@ -381,18 +379,11 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
 
         // transfer remaining funds to the borrower [liquidations only]
         if (remainingFunds > 1) {
-            _safeTokenTransfer(
-                creditAccount,
-                underlying,
-                borrower,
-                remainingFunds,
-                false
-            ); // F:[CM-13,18]
+            _safeTokenTransfer(creditAccount, underlying, borrower, remainingFunds, false); // F:[CM-13,18]
         }
 
         // Tokens in skipTokenMask are disabled before transferring all assets
-        uint256 enabledTokensMask = enabledTokensMap[creditAccount] &
-            ~skipTokenMask; // F:[CM-14]
+        uint256 enabledTokensMask = enabledTokensMap[creditAccount] & ~skipTokenMask; // F:[CM-14]
         _transferAssetsTo(creditAccount, to, convertWETH, enabledTokensMask); // F:[CM-14,17,19]
 
         // Returns Credit Account to the factory
@@ -415,22 +406,15 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
     /// @param amount Amount to increase / decrease the principal by
     /// @param increase True to increase principal, false to decrease
     /// @return newBorrowedAmount The new debt principal
-    function manageDebt(
-        address creditAccount,
-        uint256 amount,
-        bool increase
-    )
+    function manageDebt(address creditAccount, uint256 amount, bool increase)
         external
         whenNotPaused // F:[CM-5]
         nonReentrant
         creditFacadeOnly // F:[CM-2]
         returns (uint256 newBorrowedAmount)
     {
-        (
-            uint256 borrowedAmount,
-            uint256 cumulativeIndexAtOpen_RAY,
-            uint256 cumulativeIndexNow_RAY
-        ) = _getCreditAccountParameters(creditAccount);
+        (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen_RAY, uint256 cumulativeIndexNow_RAY) =
+            _getCreditAccountParameters(creditAccount);
 
         uint256 newCumulativeIndex;
         if (increase) {
@@ -439,97 +423,115 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
             // Computes the new cumulative index to keep the interest
             // unchanged with different principal
 
-            newCumulativeIndex = _calcNewCumulativeIndex(
-                borrowedAmount,
-                amount,
-                cumulativeIndexNow_RAY,
-                cumulativeIndexAtOpen_RAY,
-                true
-            );
+            newCumulativeIndex =
+                _calcNewCumulativeIndex(borrowedAmount, amount, cumulativeIndexNow_RAY, cumulativeIndexAtOpen_RAY, true);
 
             // Requests the pool to lend additional funds to the Credit Account
             IPoolService(pool).lendCreditAccount(amount, creditAccount); // F:[CM-20]
         } else {
-            // Computes the interest accrued thus far
-            uint256 interestAccrued = (borrowedAmount *
-                cumulativeIndexNow_RAY) /
-                cumulativeIndexAtOpen_RAY -
-                borrowedAmount; // F:[CM-21]
+            // Decrease
+            uint256 amountRepaid = amount;
+            uint256 amountProfit = 0;
 
-            // Computes profit, taken as a percentage of the interest rate
-            uint256 profit = (interestAccrued * slot1.feeInterest) /
-                PERCENTAGE_FACTOR; // F:[CM-21]
-
-            if (amount >= interestAccrued + profit) {
-                // If the amount covers all of the interest and fees, they are
-                // paid first, and the remainder is used to pay the principal
-                newBorrowedAmount =
-                    borrowedAmount +
-                    interestAccrued +
-                    profit -
-                    amount;
-
-                // Pays the amount back to the pool
-                ICreditAccount(creditAccount).safeTransfer(
-                    underlying,
-                    pool,
-                    amount
-                ); // F:[CM-21]
-
-                // Signals the pool that the debt was partially repaid
-                IPoolService(pool).repayCreditAccount(
-                    amount - interestAccrued - profit,
-                    profit,
-                    0
-                ); // F:[CM-21]
-
-                // Since interest is fully repaid, the Credit Account's cumulativeIndexAtOpen
-                // is set to the current cumulative index - which means interest starts accruing
-                // on the new principal from zero
-                newCumulativeIndex = IPoolService(pool)
-                    .calcLinearCumulative_RAY(); // F:[CM-21]
-            } else {
-                // If the amount is not enough to cover interest and fees,
-                // it is split between the two pro-rata. Since the fee is the percentage
-                // of interest, this ensures that the new fee is consistent with the
-                // new pending interest
-                uint256 amountToInterest = (amount * PERCENTAGE_FACTOR) /
-                    (PERCENTAGE_FACTOR + slot1.feeInterest);
-                uint256 amountToFees = amount - amountToInterest;
-
-                // Since interest and fees are paid out first, the principal
-                // remains unchanged
-                newBorrowedAmount = borrowedAmount;
-
-                // Pays the amount back to the pool
-                ICreditAccount(creditAccount).safeTransfer(
-                    underlying,
-                    pool,
-                    amount
-                ); // F:[CM-21]
-
-                // Signals the pool that the debt was partially repaid
-                IPoolService(pool).repayCreditAccount(0, amountToFees, 0); // F:[CM-21]
-
-                // Since the interest was only repaid partially, we need to recompute the
-                // cumulativeIndexAtOpen, so that "borrowAmount * (indexNow / indexAtOpenNew - 1)"
-                // is equal to interestAccrued - amountToInterest
-
-                newCumulativeIndex = _calcNewCumulativeIndex(
-                    borrowedAmount,
-                    amountToInterest,
-                    cumulativeIndexNow_RAY,
-                    cumulativeIndexAtOpen_RAY,
-                    false
-                );
+            if (supportsQuotas) {
+                (amountRepaid, amountProfit) =
+                    _computeQuotasAmountDebtDecrease(creditAccount, amountRepaid, amountProfit);
             }
+
+            if (amountRepaid > 0) {
+                // Computes the interest accrued thus far
+                uint256 interestAccrued =
+                    (borrowedAmount * cumulativeIndexNow_RAY) / cumulativeIndexAtOpen_RAY - borrowedAmount; // F:[CM-21]
+
+                // Computes profit, taken as a percentage of the interest rate
+                uint256 profit = (interestAccrued * slot1.feeInterest) / PERCENTAGE_FACTOR; // F:[CM-21]
+
+                if (amountRepaid >= interestAccrued + profit) {
+                    // If the amount covers all of the interest and fees, they are
+                    // paid first, and the remainder is used to pay the principal
+
+                    amountRepaid -= interestAccrued + profit;
+                    newBorrowedAmount = borrowedAmount - amountRepaid; //  + interestAccrued + profit - amount;
+
+                    amountProfit += profit;
+
+                    // Since interest is fully repaid, the Credit Account's cumulativeIndexAtOpen
+                    // is set to the current cumulative index - which means interest starts accruing
+                    // on the new principal from zero
+                    newCumulativeIndex = cumulativeIndexNow_RAY; // F:[CM-21]
+                } else {
+                    // If the amount is not enough to cover interest and fees,
+                    // then the sum is split between dao fees and pool profits pro-rata. Since the fee is the percentage
+                    // of interest, this ensures that the new fee is consistent with the
+                    // new pending interest
+
+                    uint256 amountToPool = (amountRepaid * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + slot1.feeInterest);
+
+                    amountProfit += amountRepaid - amountToPool;
+                    amountRepaid = 0;
+
+                    // Since interest and fees are paid out first, the principal
+                    // remains unchanged
+                    newBorrowedAmount = borrowedAmount;
+
+                    // Since the interest was only repaid partially, we need to recompute the
+                    // cumulativeIndexAtOpen, so that "borrowAmount * (indexNow / indexAtOpenNew - 1)"
+                    // is equal to interestAccrued - amountToInterest
+                    newCumulativeIndex = _calcNewCumulativeIndex(
+                        borrowedAmount, amountToPool, cumulativeIndexNow_RAY, cumulativeIndexAtOpen_RAY, false
+                    );
+                }
+            } else {
+                newBorrowedAmount = borrowedAmount;
+                newCumulativeIndex = cumulativeIndexAtOpen_RAY;
+            }
+
+            // Pays the amount back to the pool
+            ICreditAccount(creditAccount).safeTransfer(underlying, pool, amount); // F:[CM-21]
+
+            // TODO: delete after tests or write Invaraiant test
+            require(borrowedAmount - newBorrowedAmount == amountRepaid, "Ooops, something was wring");
+
+            IPoolService(pool).repayCreditAccount(amountRepaid, amountProfit, 0); // F:[CM-21]
         }
         //
-        // Sets new parameters on the Credit Account
-        ICreditAccount(creditAccount).updateParameters(
-            newBorrowedAmount,
-            newCumulativeIndex
-        ); // F:[CM-20. 21]
+        // Sets new parameters on the Credit Account if they were changed
+        if (newBorrowedAmount != borrowedAmount || newCumulativeIndex != cumulativeIndexAtOpen_RAY) {
+            ICreditAccount(creditAccount).updateParameters(newBorrowedAmount, newCumulativeIndex); // F:[CM-20. 21]
+        }
+    }
+
+    function _computeQuotasAmountDebtDecrease(address creditAccount, uint256 _amountRepaid, uint256 _amountProfit)
+        internal
+        returns (uint256 amountRepaid, uint256 amountProfit)
+    {
+        amountRepaid = _amountRepaid;
+        amountProfit = _amountProfit;
+
+        uint16 fee = slot1.feeInterest;
+        uint256 quotaInterestAccrued = cumulativeQuotaInterest[creditAccount];
+
+        TokenLT[] memory tokens = getLimitedTokens(creditAccount);
+        if (tokens.length > 0) {
+            quotaInterestAccrued += poolQuotaKeeper().accrueQuotaInterest(creditAccount, tokens); // F: [CMQ-4,5]
+        }
+
+        if (quotaInterestAccrued > 2) {
+            uint256 quotaProfit = (quotaInterestAccrued * fee) / PERCENTAGE_FACTOR;
+
+            if (amountRepaid >= quotaInterestAccrued + quotaProfit) {
+                amountRepaid -= quotaInterestAccrued + quotaProfit; // F: [CMQ-5]
+                amountProfit += quotaProfit; // F: [CMQ-5]
+                cumulativeQuotaInterest[creditAccount] = 1; // F: [CMQ-5]
+            } else {
+                uint256 amountToPool = (amountRepaid * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + fee);
+
+                amountProfit += amountRepaid - amountToPool; // F: [CMQ-4]
+                amountRepaid = 0; // F: [CMQ-4]
+
+                cumulativeQuotaInterest[creditAccount] = quotaInterestAccrued - amountToPool + 1; // F: [CMQ-4]
+            }
+        }
     }
 
     /// @dev Calculates the new cumulative index when debt is updated
@@ -560,25 +562,21 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
 
             uint256 newBorrowedAmount = borrowedAmount + delta;
 
-            newCumulativeIndex = ((cumulativeIndexNow *
-                newBorrowedAmount *
-                INDEX_PRECISION) /
-                ((INDEX_PRECISION * cumulativeIndexNow * borrowedAmount) /
-                    cumulativeIndexOpen +
-                    INDEX_PRECISION *
-                    delta));
+            newCumulativeIndex = (
+                (cumulativeIndexNow * newBorrowedAmount * INDEX_PRECISION)
+                    / (
+                        (INDEX_PRECISION * cumulativeIndexNow * borrowedAmount) / cumulativeIndexOpen
+                            + INDEX_PRECISION * delta
+                    )
+            );
         } else {
             // In case of debt decrease, the principal is the same, but the interest is reduced exactly by delta
             // newCumulativeIndex is proven to be the solution to
             // borrowedAmount * (cumulativeIndexNow / cumulativeIndexOpen - 1) - delta ==
             // == borrowedAmount * (cumulativeIndexNow / newCumulativeIndex - 1)
 
-            newCumulativeIndex =
-                (INDEX_PRECISION * cumulativeIndexNow * cumulativeIndexOpen) /
-                (INDEX_PRECISION *
-                    cumulativeIndexNow -
-                    (INDEX_PRECISION * delta * cumulativeIndexOpen) /
-                    borrowedAmount);
+            newCumulativeIndex = (INDEX_PRECISION * cumulativeIndexNow * cumulativeIndexOpen)
+                / (INDEX_PRECISION * cumulativeIndexNow - (INDEX_PRECISION * delta * cumulativeIndexOpen) / borrowedAmount);
         }
     }
 
@@ -587,12 +585,7 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
     /// @param creditAccount Address of the Credit Account
     /// @param token Collateral token to add
     /// @param amount Amount to add
-    function addCollateral(
-        address payer,
-        address creditAccount,
-        address token,
-        uint256 amount
-    )
+    function addCollateral(address payer, address creditAccount, address token, uint256 amount)
         external
         whenNotPaused // F:[CM-5]
         nonReentrant
@@ -622,16 +615,11 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
     }
 
     /// @dev Requests the Credit Account to approve a collateral token to another contract.
-    /// @param borrower Borrower's address
+
     /// @param targetContract Spender to change allowance for
     /// @param token Collateral token to approve
     /// @param amount New allowance amount
-    function approveCreditAccount(
-        address borrower,
-        address targetContract,
-        address token,
-        uint256 amount
-    )
+    function approveCreditAccount(address targetContract, address token, uint256 amount)
         external
         override
         whenNotPausedOrEmergency // F:[CM-5]
@@ -640,9 +628,10 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
         // This function can only be called by connected adapters (must be a correct adapter/contract pair),
         // Credit Facade or Universal Adapter
         if (
-            (adapterToContract[msg.sender] != targetContract &&
-                msg.sender != creditFacade &&
-                msg.sender != universalAdapter) || targetContract == address(0)
+            (
+                adapterToContract[msg.sender] != targetContract && msg.sender != creditFacade
+                    && msg.sender != universalAdapter
+            ) || targetContract == address(0)
         ) {
             revert AdaptersOrCreditFacadeOnlyException(); // F:[CM-3,25]
         }
@@ -652,7 +641,9 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
         // sell them off
         if (tokenMasksMap(token) == 0) revert TokenNotAllowedException(); // F:
 
-        address creditAccount = getCreditAccountOrRevert(borrower); // F:[CM-6]
+        /// Token approval is multicall-only, so the Credit Account must
+        /// belong to the Credit Facade at this point
+        address creditAccount = getCreditAccountOrRevert(creditFacade); // F:[CM-6]
 
         // Attempts to set allowance directly to the required amount
         // If unsuccessful, assumes that the token requires setting allowance to zero first
@@ -665,28 +656,18 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
     /// @dev Internal function used to approve token from a Credit Account
     /// Uses Credit Account's execute to properly handle both ERC20-compliant and
     /// non-compliant (no returned value from "approve") tokens
-    function _approve(
-        address token,
-        address targetContract,
-        address creditAccount,
-        uint256 amount,
-        bool revertIfFailed
-    ) internal returns (bool) {
+    function _approve(address token, address targetContract, address creditAccount, uint256 amount, bool revertIfFailed)
+        internal
+        returns (bool)
+    {
         // Makes a low-level call to approve from the Credit Account
         // and parses the value. If nothing or true was returned,
         // assumes that the call succeeded
-        try
-            ICreditAccount(creditAccount).execute(
-                token,
-                abi.encodeWithSelector(
-                    IERC20.approve.selector,
-                    targetContract,
-                    amount
-                )
-            )
+        try ICreditAccount(creditAccount).execute(token, abi.encodeCall(IERC20.approve, (targetContract, amount)))
         returns (bytes memory result) {
-            if (result.length == 0 || abi.decode(result, (bool)) == true)
+            if (result.length == 0 || abi.decode(result, (bool)) == true) {
                 return true;
+            }
         } catch {}
 
         // On the first try, failure is allowed to handle tokens
@@ -698,14 +679,9 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
 
     /// @dev Requests a Credit Account to make a low-level call with provided data
     /// This is the intended pathway for state-changing interactions with 3rd-party protocols
-    /// @param borrower Borrower's address
     /// @param targetContract Contract to be called
     /// @param data Data to pass with the call
-    function executeOrder(
-        address borrower,
-        address targetContract,
-        bytes memory data
-    )
+    function executeOrder(address targetContract, bytes memory data)
         external
         override
         whenNotPausedOrEmergency // F:[CM-5]
@@ -715,18 +691,18 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
         // Checks that msg.sender is the adapter associated with the passed
         // target contract. The exception is the Universal Adapter, which
         // can potentially call any target.
-        if (
-            adapterToContract[msg.sender] != targetContract ||
-            targetContract == address(0)
-        ) {
-            if (msg.sender != universalAdapter)
-                revert TargetContractNotAllowedException(); // F:[CM-28]
+        if (adapterToContract[msg.sender] != targetContract || targetContract == address(0)) {
+            if (msg.sender != universalAdapter) {
+                revert TargetContractNotAllowedException();
+            } // F:[CM-28]
         }
 
-        address creditAccount = getCreditAccountOrRevert(borrower); // F:[CM-6]
+        /// Order execution is multicall-only, so the Credit Account must
+        /// belong to the Credit Facade at this point
+        address creditAccount = getCreditAccountOrRevert(creditFacade); // F:[CM-6]
 
         // Emits an event
-        emit ExecuteOrder(borrower, targetContract); // F:[CM-29]
+        emit ExecuteOrder(targetContract); // F:[CM-29]
 
         // Returned data is provided as-is to the caller;
         // It is expected that is is parsed and returned as a correct type
@@ -738,224 +714,144 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
     // COLLATERAL VALIDITY AND ACCOUNT HEALTH CHECKS
     //
 
-    /// @dev Enables a token on a Credit Account, including it
-    /// into account health and total value calculations
-    /// @param creditAccount Address of a Credit Account to enable the token for
-    /// @param token Address of the token to be enabled
-    function checkAndEnableToken(address creditAccount, address token)
+    /// @dev Enables a token on a Credit Account currently owned by the Credit Facade,
+    ///      including it into account health factor and total value calculations
+    /// @param token Address of the token to enable
+    function checkAndEnableToken(address token)
         external
         override
         whenNotPausedOrEmergency
         adaptersOrCreditFacadeOnly // F:[CM-3]
         nonReentrant
     {
-        _checkAndEnableToken(creditAccount, token); // F:[CM-30]
+        address creditAccount = getCreditAccountOrRevert(creditFacade);
+        _checkAndEnableToken(creditAccount, token);
     }
 
     /// @dev IMPLEMENTATION: checkAndEnableToken
-    /// @param creditAccount Address of a Credit Account to enable the token for
-    /// @param token Address of the token to be enabled
-    function _checkAndEnableToken(address creditAccount, address token)
-        internal
-    {
-        uint256 tokenMask = tokenMasksMap(token); // F:[CM-30,31]
-
-        // Checks that the token is valid collateral recognized by the system
-        // and that it is not forbidden
-        if (tokenMask == 0 || forbiddenTokenMask & tokenMask != 0)
+    function _checkAndEnableToken(address creditAccount, address token) internal virtual {
+        uint256 tokenMask = tokenMasksMap(token);
+        if (tokenMask == 0) {
             revert TokenNotAllowedException(); // F:[CM-30]
-
-        // Performs an inclusion check using token masks,
-        // to avoid accidentally disabling the token
-        if (enabledTokensMap[creditAccount] & tokenMask == 0)
-            enabledTokensMap[creditAccount] |= tokenMask; // F:[CM-31]
+        }
+        _changeEnabledTokens(creditAccount, tokenMask, 0);
     }
 
-    /// @dev Optimized health check for individual swap-like operations.
-    /// @notice Fast health check assumes that only two tokens (input and output)
-    ///         participate in the operation and computes a % change in weighted value between
-    ///         inbound and outbound collateral. The cumulative negative change across several
-    ///         swaps in sequence cannot be larger than feeLiquidation (a fee that the
-    ///         protocol is ready to waive if needed). Since this records a % change
-    ///         between just two tokens, the corresponding % change in TWV will always be smaller,
-    ///         which makes this check safe.
-    ///         More details at https://dev.gearbox.fi/docs/documentation/risk/fast-collateral-check#fast-check-protection
-    /// @param creditAccount Address of the Credit Account
-    /// @param tokenIn Address of the token spent by the swap
-    /// @param tokenOut Address of the token received from the swap
-    /// @param balanceInBefore Balance of tokenIn before the operation
-    /// @param balanceOutBefore Balance of tokenOut before the operation
-    function fastCollateralCheck(
-        address creditAccount,
-        address tokenIn,
-        address tokenOut,
-        uint256 balanceInBefore,
-        uint256 balanceOutBefore
-    )
-        external
-        override
-        adaptersOrCreditFacadeOnly // F:[CM-3]
-        nonReentrant
-    {
-        // Checks that inbound collateral is known and not forbidden
-        // Enables it if disabled, to include it into TWV
-        _checkAndEnableToken(creditAccount, tokenOut); // [CM-32]
-
-        uint256 balanceInAfter = IERC20(tokenIn).balanceOf(creditAccount); // F: [CM-34]
-        uint256 balanceOutAfter = IERC20(tokenOut).balanceOf(creditAccount); // F: [CM-34]
-
-        (uint256 amountInCollateral, uint256 amountOutCollateral) = slot1
-            .priceOracle
-            .fastCheck(
-                balanceInBefore - balanceInAfter,
-                tokenIn,
-                balanceOutAfter - balanceOutBefore,
-                tokenOut
-            ); // F:[CM-34]
-
-        // Disables tokenIn if the entire balance was spent by the operation
-        if (balanceInAfter <= 1) _disableToken(creditAccount, tokenIn); // F:[CM-33]
-
-        // Collateral values must be compared weighted by respective LTs,
-        // as otherwise a high-LT (e.g., underlying) token can be swapped
-        // to an equivalent amount of a low-LT asset. Without weighting, this would
-        // pass the check (since inbound and outbound values are equal),
-        // while the health factor of the account would be reduced severely.
-        amountOutCollateral *= liquidationThresholds(tokenOut); // F:[CM-34]
-        amountInCollateral *= liquidationThresholds(tokenIn); // F:[CM-34]
-
-        // If the value of inbound collateral is larger than inbound collateral
-        // a health check does not need to be performed;
-        // However, the number of enabled tokens needs to be checked against the limit,
-        // as a new collateral token was potentially enabled
-        if (amountOutCollateral >= amountInCollateral) {
-            _checkAndOptimizeEnabledTokens(creditAccount); // F:[CM-35]
-            return; // F:[CM-34]
-        }
-
-        // The new cumulative drop in value is computed in RAY format, for precision
-        uint256 cumulativeDropRAY = RAY -
-            ((amountOutCollateral * RAY) / amountInCollateral) +
-            cumulativeDropAtFastCheckRAY[creditAccount]; // F:[CM-36]
-
-        // If then new cumulative drop is less than feeLiquidation, the check is successful,
-        // otherwise, a full collateral check is required
-        if (
-            cumulativeDropRAY <=
-            (slot1.feeLiquidation * RAY) / PERCENTAGE_FACTOR
-        ) {
-            cumulativeDropAtFastCheckRAY[creditAccount] = cumulativeDropRAY; // F:[CM-36]
-            _checkAndOptimizeEnabledTokens(creditAccount); // F:[CM-37]
-            return;
-        }
-
-        // If a fast collateral check didn't pass, a full check is performed and
-        // the cumulative drop is reset back to 0 (1 for gas-efficiency).
-        _fullCollateralCheck(creditAccount); // F:[CM-34,36]
-        cumulativeDropAtFastCheckRAY[creditAccount] = 1; // F:[CM-36]
-    }
-
-    /// @dev Performs a full health check on an account, summing up
-    /// value of all enabled collateral tokens
+    /// @dev Performs a full health check on an account with a custom order of evaluated tokens and
+    ///      a custom minimal health factor
     /// @param creditAccount Address of the Credit Account to check
-    function fullCollateralCheck(address creditAccount)
+    /// @param collateralHints Array of token masks in the desired order of evaluation
+    /// @param minHealthFactor Minimal health factor of the account, in PERCENTAGE format
+    function fullCollateralCheck(address creditAccount, uint256[] memory collateralHints, uint16 minHealthFactor)
         external
-        override
-        adaptersOrCreditFacadeOnly // F:[CM-3]
+        adaptersOrCreditFacadeOnly
         nonReentrant
     {
-        _fullCollateralCheck(creditAccount);
+        if (minHealthFactor < PERCENTAGE_FACTOR) {
+            revert CustomHealthFactorTooLowException();
+        }
+
+        _fullCollateralCheck(creditAccount, collateralHints, minHealthFactor);
     }
 
     /// @dev IMPLEMENTATION: fullCollateralCheck
-    /// @param creditAccount Address of the Credit Account to check
-    function _fullCollateralCheck(address creditAccount) internal {
+    function _fullCollateralCheck(address creditAccount, uint256[] memory collateralHints, uint16 minHealthFactor)
+        internal
+        virtual
+    {
         IPriceOracleV2 _priceOracle = slot1.priceOracle;
 
         uint256 enabledTokenMask = enabledTokensMap[creditAccount];
+        uint256 checkedTokenMask = enabledTokenMask;
         uint256 borrowAmountPlusInterestRateUSD;
-        uint256 len;
-        unchecked {
+
+        uint256 twvUSD;
+
+        {
+            uint256 quotaInterest;
+            if (supportsQuotas) {
+                TokenLT[] memory tokens = getLimitedTokens(creditAccount);
+
+                if (tokens.length > 0) {
+                    /// If credit account has any connected token - then check that
+                    (twvUSD, quotaInterest) = poolQuotaKeeper().computeQuotedCollateralUSD(
+                        address(this), creditAccount, address(_priceOracle), tokens
+                    ); // F: [CMQ-8]
+
+                    checkedTokenMask = checkedTokenMask & (~limitedTokenMask);
+                }
+
+                quotaInterest += cumulativeQuotaInterest[creditAccount]; // F: [CMQ-8]
+            }
+
             // The total weighted value of a Credit Account has to be compared
             // with the entire debt sum, including interest and fees
-            (
-                ,
-                ,
-                uint256 borrowedAmountWithInterestAndFees
-            ) = calcCreditAccountAccruedInterest(creditAccount);
+            (,, uint256 borrowedAmountWithInterestAndFees) =
+                _calcCreditAccountAccruedInterest(creditAccount, quotaInterest);
 
             borrowAmountPlusInterestRateUSD = _priceOracle.convertToUSD(
-                borrowedAmountWithInterestAndFees * PERCENTAGE_FACTOR,
+                borrowedAmountWithInterestAndFees * minHealthFactor, // F: [CM-42]
                 underlying
             );
 
-            len = _getMaxIndex(enabledTokenMask) + 1;
+            // If quoted tokens fully cover the debt, we can stop here
+            // after performing some additional cleanup
+            if (twvUSD >= borrowAmountPlusInterestRateUSD) {
+                // F: [CMQ-9]
+                _afterFullCheck(creditAccount, enabledTokenMask, false);
+
+                return;
+            }
         }
 
+        _checkNonLimitedTokens(
+            creditAccount,
+            enabledTokenMask,
+            checkedTokenMask,
+            twvUSD,
+            borrowAmountPlusInterestRateUSD,
+            collateralHints,
+            _priceOracle
+        );
+    }
+
+    function _checkNonLimitedTokens(
+        address creditAccount,
+        uint256 enabledTokenMask,
+        uint256 checkedTokenMask,
+        uint256 twvUSD,
+        uint256 borrowAmountPlusInterestRateUSD,
+        uint256[] memory collateralHints,
+        IPriceOracleV2 _priceOracle
+    ) internal {
         uint256 tokenMask;
-        uint256 twvUSD;
         bool atLeastOneTokenWasDisabled;
 
-        for (uint256 i; i < len; ) {
-            // The order of evaluation is adjusted to optimize for
-            // farming, as it is the largest expected use case
-            // Since farming positions are at the end of the collateral token list
-            // the loop moves through token masks in descending order (except underlying, which is
-            // checked first)
+        uint256 len = collateralHints.length;
+        uint256 i;
+
+        // TODO: add test that we check all values and it's always reachable
+        while (checkedTokenMask != 0) {
             unchecked {
-                tokenMask = i == 0 ? 1 : 1 << (len - i);
+                tokenMask = (i < len) ? collateralHints[i] : 1 << (i - len); // F: [CM-68]
             }
 
             // CASE enabledTokenMask & tokenMask == 0 F:[CM-38]
-            if (enabledTokenMask & tokenMask != 0) {
-                (
-                    address token,
-                    uint16 liquidationThreshold
-                ) = collateralTokensByMask(tokenMask);
+            if (checkedTokenMask & tokenMask != 0) {
+                (address token, uint16 liquidationThreshold) = collateralTokensByMask(tokenMask);
                 uint256 balance = IERC20(token).balanceOf(creditAccount);
 
                 // Collateral calculations are only done if there is a non-zero balance
                 if (balance > 1) {
-                    twvUSD +=
-                        _priceOracle.convertToUSD(balance, token) *
-                        liquidationThreshold;
+                    twvUSD += _priceOracle.convertToUSD(balance, token) * liquidationThreshold;
 
                     // Full collateral check evaluates a Credit Account's health factor lazily;
                     // Once the TWV computed thus far exceeds the debt, the check is considered
                     // successful, and the function returns without evaluating any further collateral
                     if (twvUSD >= borrowAmountPlusInterestRateUSD) {
-                        // Since a full collateral check is usually called after an operation or MultiCall
-                        // involving many tokens, potentially many new tokens can be enabled. As such,
-                        // the function needs to check whether the enabled token limit is violated,
-                        // and disable any unused tokens, if so. Note that the number of enabled tokens
-                        // is calculated from the updated enabledTokenMask, so some of the unused tokens may have already
-                        // been disabled
-                        uint256 totalTokensEnabled = _calcEnabledTokens(
-                            enabledTokenMask
-                        );
-                        if (totalTokensEnabled > maxAllowedEnabledTokenLength) {
-                            unchecked {
-                                _optimizeEnabledTokens(
-                                    creditAccount,
-                                    enabledTokenMask,
-                                    totalTokensEnabled,
-                                    // At this stage in the function, at least underlying
-                                    // must have been processed, so it can be skipped
-                                    1,
-                                    // Since the function disables all unused tokens it finds
-                                    // and iterates in descending order,
-                                    // _optimizeEnabledTokens only needs to check up to len - i
-                                    len - i
-                                ); // F:[CM-41] where i=0
-                            }
-                        } else {
-                            // Saves enabledTokensMask if at least one token was disabled
-                            if (atLeastOneTokenWasDisabled) {
-                                enabledTokensMap[
-                                    creditAccount
-                                ] = enabledTokenMask; // F:[CM-39]
-                            }
-                        }
+                        // The _afterFullCheck hook does some cleanup, such as disabling
+                        // zero-balance tokens
+                        _afterFullCheck(creditAccount, enabledTokenMask, atLeastOneTokenWasDisabled);
 
                         return; // F:[CM-40]
                     }
@@ -963,11 +859,12 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
                     // bit in enabledTokenMask, which is then written into storage at the
                     // very end, to avoid redundant storage writes
                 } else {
-                    enabledTokenMask ^= tokenMask; // F:[CM-39]
+                    enabledTokenMask &= ~tokenMask; // F:[CM-39]
                     atLeastOneTokenWasDisabled = true; // F:[CM-39]
                 }
             }
 
+            checkedTokenMask = checkedTokenMask & (~tokenMask);
             unchecked {
                 ++i;
             }
@@ -975,44 +872,63 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
         revert NotEnoughCollateralException();
     }
 
-    /// @dev Checks that the number of enabled tokens on a Credit Account
-    ///      does not violate the maximal enabled token limit and tries
-    ///      to disable unused tokens if it does
-    /// @param creditAccount Account to check enabled tokens for
-    function checkAndOptimizeEnabledTokens(address creditAccount)
-        external
-        override
-        adaptersOrCreditFacadeOnly // F: [CM-2]
+    function _afterFullCheck(address creditAccount, uint256 enabledTokenMask, bool atLeastOneTokenWasDisabled)
+        internal
     {
-        _checkAndOptimizeEnabledTokens(creditAccount);
+        uint256 totalTokensEnabled = _calcEnabledTokens(enabledTokenMask);
+        if (totalTokensEnabled > maxAllowedEnabledTokenLength) {
+            revert TooManyEnabledTokensException();
+        } else {
+            // Saves enabledTokensMask if at least one token was disabled
+            if (atLeastOneTokenWasDisabled) {
+                enabledTokensMap[creditAccount] = enabledTokenMask; // F:[CM-39]
+            }
+        }
     }
 
-    /// @dev IMPLEMENTATION: checkAndOptimizeEnabledTokens
-    function _checkAndOptimizeEnabledTokens(address creditAccount) internal {
+    function getLimitedTokens(address creditAccount) public view returns (TokenLT[] memory tokens) {
+        uint256 limitMask = enabledTokensMap[creditAccount] & limitedTokenMask;
+
+        if (limitMask > 0) {
+            tokens = new TokenLT[](maxAllowedEnabledTokenLength + 1);
+
+            uint256 tokenMask = 2;
+
+            uint256 j;
+
+            while (tokenMask <= limitMask) {
+                if (limitMask & tokenMask != 0) {
+                    (address token, uint16 lt) = collateralTokensByMask(tokenMask);
+                    tokens[j] = TokenLT({token: token, lt: lt});
+                    ++j;
+                }
+
+                tokenMask = tokenMask << 1;
+            }
+        }
+    }
+
+    /// @dev Checks that the number of enabled tokens on a Credit Account
+    ///      does not violate the maximal enabled token limit
+    /// @param creditAccount Account to check enabled tokens for
+    function checkEnabledTokensLength(address creditAccount)
+        external
+        view
+        override
+        adaptersOrCreditFacadeOnly // F:[CM-3]
+    {
         uint256 enabledTokenMask = enabledTokensMap[creditAccount];
         uint256 totalTokensEnabled = _calcEnabledTokens(enabledTokenMask);
 
         if (totalTokensEnabled > maxAllowedEnabledTokenLength) {
-            uint256 maxIndex = _getMaxIndex(enabledTokenMask) + 1;
-
-            _optimizeEnabledTokens(
-                creditAccount,
-                enabledTokenMask,
-                totalTokensEnabled,
-                0,
-                maxIndex
-            );
+            revert TooManyEnabledTokensException();
         }
     }
 
     /// @dev Calculates the number of enabled tokens, based on the
     ///      provided token mask
     /// @param enabledTokenMask Bit mask encoding a set of enabled tokens
-    function _calcEnabledTokens(uint256 enabledTokenMask)
-        internal
-        pure
-        returns (uint256 totalTokensEnabled)
-    {
+    function _calcEnabledTokens(uint256 enabledTokenMask) internal pure returns (uint256 totalTokensEnabled) {
         // Bit mask is a number encoding enabled tokens as 1's;
         // Therefore, to count the number of enabled tokens, we simply
         // need to keep shifting the mask by one bit and checking if the rightmost bit is 1,
@@ -1027,76 +943,124 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
         }
     }
 
-    /// @dev Searches for tokens with zero balance among enabled tokens
-    ///      on a Credit Account and disables them, until the total number
-    ///      of enabled tokens is at maxAllowedEnabledTokenLength
-    /// @param creditAccount The Credit Account to optimize
-    /// @param enabledTokenMask Mask encoding the set of currentl enabled tokens
-    /// @param totalTokensEnabled The current number of enabled tokens
-    /// @param minIndex Inclusive lower bound of search range
-    /// @param maxIndex Non-inclusive upper bound of search range
-    function _optimizeEnabledTokens(
-        address creditAccount,
-        uint256 enabledTokenMask,
-        uint256 totalTokensEnabled,
-        uint256 minIndex,
-        uint256 maxIndex
-    ) internal {
-        // The whole block can be marked unchecked, since:
-        // - maxIndex < 256 at all times (i.e., tokenMask < 2 ** 256);
-        // - totalTokensEnabled does not go lower than maxAllowedEnabledTokenLength
-        //   (the function returns at that point)
-        unchecked {
-            for (uint256 i = minIndex; i < maxIndex; ) {
-                uint256 tokenMask = 1 << i;
-                if (enabledTokenMask & tokenMask != 0) {
-                    (address token, ) = collateralTokensByMask(tokenMask);
-                    uint256 balance = IERC20(token).balanceOf(creditAccount);
-
-                    if (balance <= 1) {
-                        enabledTokenMask ^= tokenMask;
-                        --totalTokensEnabled;
-                        if (
-                            totalTokensEnabled <= maxAllowedEnabledTokenLength
-                        ) {
-                            enabledTokensMap[creditAccount] = enabledTokenMask;
-                            return;
-                        }
-                    }
-                }
-
-                ++i;
-            }
-        }
-        revert TooManyEnabledTokensException();
-    }
-
-    /// @dev Disables a token on a credit account
+    /// @dev Disables a token on a Credit Account currently owned by the Credit Facade
+    ///      excluding it from account health factor and total value calculations
     /// @notice Usually called by adapters to disable spent tokens during a multicall,
     ///         but can also be called separately from the Credit Facade to remove
     ///         unwanted tokens
-    function disableToken(address creditAccount, address token)
+    /// @param token Address of the token to disable
+    /// @return True if token mask was changed and false otherwise
+    function disableToken(address token)
         external
         override
-        whenNotPausedOrEmergency // F:[CM-5]
+        whenNotPausedOrEmergency
         adaptersOrCreditFacadeOnly // F:[CM-3]
         nonReentrant
         returns (bool)
     {
+        address creditAccount = getCreditAccountOrRevert(creditFacade);
         return _disableToken(creditAccount, token);
     }
 
     /// @dev IMPLEMENTATION: disableToken
-    function _disableToken(address creditAccount, address token)
-        internal
-        returns (bool wasChanged)
-    {
-        // The enabled token mask encodes all enabled tokens as 1,
-        // therefore the corresponding bit is set to 0 to disable it
+    function _disableToken(address creditAccount, address token) internal virtual returns (bool wasChanged) {
         uint256 tokenMask = tokenMasksMap(token);
-        if (enabledTokensMap[creditAccount] & tokenMask != 0) {
-            enabledTokensMap[creditAccount] &= ~tokenMask; // F:[CM-46]
-            wasChanged = true;
+        (, wasChanged) = _changeEnabledTokens(creditAccount, 0, tokenMask);
+    }
+
+    /// @dev Changes enabled tokens for a Credit Account currently owned by the Credit Facade
+    /// @notice Can be used by adapters that enable/disable multiple tokens at the same time to reduce gas costs
+    /// @param tokensToEnable Tokens mask where 1's represent tokens that should be enabled
+    /// @param tokensToDisable Tokens mask where 1's represent tokens that should be disabled
+    /// @return wasEnabled True if at least one token was enabled and false otherwise
+    /// @return wasDisabled True if at least one token was disabled and false otherwise
+    function changeEnabledTokens(uint256 tokensToEnable, uint256 tokensToDisable)
+        external
+        override
+        whenNotPausedOrEmergency
+        adaptersOrCreditFacadeOnly // F:[CM-3]
+        nonReentrant
+        returns (bool wasEnabled, bool wasDisabled)
+    {
+        address creditAccount = getCreditAccountOrRevert(creditFacade);
+        return _changeEnabledTokens(creditAccount, tokensToEnable, tokensToDisable);
+    }
+
+    /// @dev IMPLEMENTATION: changeEnabledTokens
+    function _changeEnabledTokens(address creditAccount, uint256 tokensToEnable, uint256 tokensToDisable)
+        internal
+        virtual
+        returns (bool wasEnabled, bool wasDisabled)
+    {
+        // remove limited tokens as they can only enabled/disabled during quota updates
+        uint256 limitedTokens = limitedTokenMask;
+        tokensToEnable &= ~limitedTokens; // F:[CMQ-7]
+        tokensToDisable &= ~limitedTokens; // F:[CMQ-7]
+
+        // remove tokens on the intersection (otherwise return variables might be incorrect)
+        uint256 intersection = tokensToEnable & tokensToDisable;
+        tokensToEnable &= ~intersection; // F:[CM-33]
+        tokensToDisable &= ~intersection; // F:[CM-33]
+
+        // check that operation doesn't try to enable one of forbidden tokens
+        if (forbiddenTokenMask & tokensToEnable != 0) {
+            revert TokenNotAllowedException(); // F:[CM-30,32]
+        }
+
+        uint256 enabledTokens = enabledTokensMap[creditAccount];
+
+        wasEnabled = tokensToEnable & ~enabledTokens != 0;
+        if (wasEnabled) {
+            enabledTokens |= tokensToEnable; // F:[CM-31,34]
+        }
+
+        wasDisabled = tokensToDisable & enabledTokens != 0;
+        if (wasDisabled) {
+            enabledTokens &= ~tokensToDisable; // F:[CM-34,46]
+        }
+
+        if (wasEnabled || wasDisabled) enabledTokensMap[creditAccount] = enabledTokens;
+    }
+
+    //
+    // QUOTAS MANAGEMENT
+    //
+
+    /// @dev Updates credit account's quotas for multiple tokens
+    /// @param creditAccount Address of credit account
+    /// @param quotaUpdates Requested quota updates, see `QuotaUpdate`
+    function updateQuotas(address creditAccount, QuotaUpdate[] memory quotaUpdates)
+        external
+        override
+        creditFacadeOnly // F: [CMQ-3]
+    {
+        (uint256 caInterestChange, QuotaStatusChange[] memory statusChanges, bool statusWasChanged) =
+            poolQuotaKeeper().updateQuotas(creditAccount, quotaUpdates); // F: [CMQ-3]
+
+        cumulativeQuotaInterest[creditAccount] += caInterestChange; // F: [CMQ-3]
+
+        if (statusWasChanged) {
+            uint256 len = quotaUpdates.length;
+            uint256 enabledTokensMask = enabledTokensMap[creditAccount];
+
+            for (uint256 i = 0; i < len;) {
+                if (statusChanges[i] == QuotaStatusChange.ZERO_TO_POSITIVE) {
+                    enabledTokensMask |= tokenMasksMap(quotaUpdates[i].token); // F: [CMQ-3]
+                } else if (statusChanges[i] == QuotaStatusChange.POSITIVE_TO_ZERO) {
+                    enabledTokensMask &= ~tokenMasksMap(quotaUpdates[i].token); // F: [CMQ-3]
+                }
+
+                unchecked {
+                    ++i;
+                }
+            }
+
+            uint256 totalTokensEnabled = _calcEnabledTokens(enabledTokensMask);
+            if (totalTokensEnabled > maxAllowedEnabledTokenLength) {
+                revert TooManyEnabledTokensException(); // F: [CMQ-11]
+            }
+
+            enabledTokensMap[creditAccount] = enabledTokensMask; // F: [CMQ-3]
         }
     }
 
@@ -1137,12 +1101,9 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
     /// @param enabledTokensMask A bit mask encoding enabled tokens. All of the tokens included
     ///        in the mask will be transferred. If any tokens need to be skipped, they must be
     ///        excluded from the mask beforehand.
-    function _transferAssetsTo(
-        address creditAccount,
-        address to,
-        bool convertWETH,
-        uint256 enabledTokensMask
-    ) internal {
+    function _transferAssetsTo(address creditAccount, address to, bool convertWETH, uint256 enabledTokensMask)
+        internal
+    {
         // Since underlying should have been transferred to "to" before this function is called
         // (if there is a surplus), its tokenMask of 1 is skipped
         uint256 tokenMask = 2;
@@ -1154,7 +1115,7 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
             // enabledTokensMask & tokenMask == tokenMask when the token is enabled,
             // and 0 otherwise
             if (enabledTokensMask & tokenMask != 0) {
-                (address token, ) = collateralTokensByMask(tokenMask); // F:[CM-44]
+                (address token,) = collateralTokensByMask(tokenMask); // F:[CM-44]
                 uint256 amount = IERC20(token).balanceOf(creditAccount); // F:[CM-44]
                 if (amount > 1) {
                     // 1 is subtracted from amount to leave a non-zero value
@@ -1164,13 +1125,7 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
 
                     // F:[CM-44]
                     unchecked {
-                        _safeTokenTransfer(
-                            creditAccount,
-                            token,
-                            to,
-                            amount - 1,
-                            convertWETH
-                        ); // F:[CM-44]
+                        _safeTokenTransfer(creditAccount, token, to, amount - 1, convertWETH); // F:[CM-44]
                     }
                 }
             }
@@ -1187,19 +1142,11 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
     /// @param token Address of the token
     /// @param to Recipient address
     /// @param amount Amount to transfer
-    function _safeTokenTransfer(
-        address creditAccount,
-        address token,
-        address to,
-        uint256 amount,
-        bool convertToETH
-    ) internal {
+    function _safeTokenTransfer(address creditAccount, address token, address to, uint256 amount, bool convertToETH)
+        internal
+    {
         if (convertToETH && token == wethAddress) {
-            ICreditAccount(creditAccount).safeTransfer(
-                token,
-                wethGateway,
-                amount
-            ); // F:[CM-45]
+            ICreditAccount(creditAccount).safeTransfer(token, wethGateway, amount); // F:[CM-45]
             IWETHGateway(wethGateway).unwrapWETH(to, amount); // F:[CM-45]
         } else {
             ICreditAccount(creditAccount).safeTransfer(token, to, amount); // F:[CM-45]
@@ -1210,11 +1157,10 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
     ///      have an account already
     /// @param borrower The new owner of the Credit Account
     /// @param creditAccount The Credit Account address
-    function _safeCreditAccountSet(address borrower, address creditAccount)
-        internal
-    {
-        if (borrower == address(0) || creditAccounts[borrower] != address(0))
-            revert ZeroAddressOrUserAlreadyHasAccountException(); // F:[CM-7]
+    function _safeCreditAccountSet(address borrower, address creditAccount) internal {
+        if (borrower == address(0) || creditAccounts[borrower] != address(0)) {
+            revert ZeroAddressOrUserAlreadyHasAccountException();
+        } // F:[CM-7]
         creditAccounts[borrower] = creditAccount; // F:[CM-7]
     }
 
@@ -1240,30 +1186,17 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
         ClosureAction closureActionType,
         uint256 borrowedAmount,
         uint256 borrowedAmountWithInterest
-    )
-        public
-        view
-        override
-        returns (
-            uint256 amountToPool,
-            uint256 remainingFunds,
-            uint256 profit,
-            uint256 loss
-        )
-    {
+    ) public view override returns (uint256 amountToPool, uint256 remainingFunds, uint256 profit, uint256 loss) {
         // The amount to be paid to pool is computed with fees included
         // The pool will compute the amount of Diesel tokens to treasury
         // based on profit
-        amountToPool =
-            borrowedAmountWithInterest +
-            ((borrowedAmountWithInterest - borrowedAmount) *
-                slot1.feeInterest) /
-            PERCENTAGE_FACTOR; // F:[CM-43]
+        amountToPool = borrowedAmountWithInterest
+            + ((borrowedAmountWithInterest - borrowedAmount) * slot1.feeInterest) / PERCENTAGE_FACTOR; // F:[CM-43]
 
         if (
-            closureActionType == ClosureAction.LIQUIDATE_ACCOUNT ||
-            closureActionType == ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT ||
-            closureActionType == ClosureAction.LIQUIDATE_PAUSED
+            closureActionType == ClosureAction.LIQUIDATE_ACCOUNT
+                || closureActionType == ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT
+                || closureActionType == ClosureAction.LIQUIDATE_PAUSED
         ) {
             // LIQUIDATION CASE
             uint256 totalFunds;
@@ -1284,30 +1217,18 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
 
             if (closureActionType == ClosureAction.LIQUIDATE_ACCOUNT) {
                 // UNHEALTHY ACCOUNT CASE
-                totalFunds =
-                    (totalValue * slot1.liquidationDiscount) /
-                    PERCENTAGE_FACTOR; // F:[CM-43]
+                totalFunds = (totalValue * slot1.liquidationDiscount) / PERCENTAGE_FACTOR; // F:[CM-43]
 
-                amountToPool +=
-                    (totalValue * slot1.feeLiquidation) /
-                    PERCENTAGE_FACTOR; // F:[CM-43]
-            } else if (
-                closureActionType == ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT
-            ) {
+                amountToPool += (totalValue * slot1.feeLiquidation) / PERCENTAGE_FACTOR; // F:[CM-43]
+            } else if (closureActionType == ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT) {
                 // EXPIRED ACCOUNT CASE
-                totalFunds =
-                    (totalValue * slot1.liquidationDiscountExpired) /
-                    PERCENTAGE_FACTOR; // F:[CM-43]
+                totalFunds = (totalValue * slot1.liquidationDiscountExpired) / PERCENTAGE_FACTOR; // F:[CM-43]
 
-                amountToPool +=
-                    (totalValue * slot1.feeLiquidationExpired) /
-                    PERCENTAGE_FACTOR; // F:[CM-43]
+                amountToPool += (totalValue * slot1.feeLiquidationExpired) / PERCENTAGE_FACTOR; // F:[CM-43]
             } else {
                 // PAUSED CASE
                 totalFunds = totalValue; // F: [CM-43]
-                amountToPool +=
-                    (totalValue * slot1.feeLiquidation) /
-                    PERCENTAGE_FACTOR; // F:[CM-43]
+                amountToPool += (totalValue * slot1.feeLiquidation) / PERCENTAGE_FACTOR; // F:[CM-43]
             }
 
             // If there are any funds left after all respective payments (this
@@ -1354,11 +1275,7 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
 
     /// @dev Returns the collateral token at requested index and its liquidation threshold
     /// @param id The index of token to return
-    function collateralTokens(uint256 id)
-        public
-        view
-        returns (address token, uint16 liquidationThreshold)
-    {
+    function collateralTokens(uint256 id) public view returns (address token, uint16 liquidationThreshold) {
         // Collateral tokens are stored under their masks rather than
         // indicies, so this is simply a convenience function that wraps
         // the getter by mask
@@ -1378,28 +1295,44 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
             token = underlying; // F:[CM-47]
             liquidationThreshold = slot1.ltUnderlying;
         } else {
-            // The address and LT of a collateral token are compressed into a single uint256
-            // The first 160 bits of the number is the address, and any bits after that are interpreted as LT
-            uint256 collateralTokenCompressed = collateralTokensCompressed[
-                tokenMask
-            ]; // F:[CM-47]
+            CollateralTokenData memory tokenData = collateralTokensData[tokenMask]; // F:[CM-47]
 
-            // Unsafe downcasting is justified, since the right 160 bits of collateralTokenCompressed
-            // always stores the uint160 encoded address and the extra bits need to be cut
-            token = address(uint160(collateralTokenCompressed)); // F:[CM-47]
-            liquidationThreshold = (collateralTokenCompressed >> ADDR_BIT_SIZE)
-                .toUint16(); // F:[CM-47]
+            token = tokenData.token;
+
+            if (token == address(0)) {
+                revert TokenNotAllowedException();
+            }
+
+            if (block.timestamp < tokenData.timestampRampStart) {
+                liquidationThreshold = tokenData.ltInitial; // F:[CM-47]
+            } else if (block.timestamp < tokenData.timestampRampStart + tokenData.rampDuration) {
+                liquidationThreshold = _getRampingLiquidationThreshold(
+                    tokenData.ltInitial,
+                    tokenData.ltFinal,
+                    tokenData.timestampRampStart,
+                    tokenData.timestampRampStart + tokenData.rampDuration
+                );
+            } else {
+                liquidationThreshold = tokenData.ltFinal;
+            }
         }
+    }
+
+    function _getRampingLiquidationThreshold(
+        uint16 ltInitial,
+        uint16 ltFinal,
+        uint40 timestampRampStart,
+        uint40 timestampRampEnd
+    ) internal view returns (uint16) {
+        return uint16(
+            (ltInitial * (timestampRampEnd - block.timestamp) + ltFinal * (block.timestamp - timestampRampStart))
+                / (timestampRampEnd - timestampRampStart)
+        ); // F: [CM-72]
     }
 
     /// @dev Returns the address of a borrower's Credit Account, or reverts if there is none.
     /// @param borrower Borrower's address
-    function getCreditAccountOrRevert(address borrower)
-        public
-        view
-        override
-        returns (address result)
-    {
+    function getCreditAccountOrRevert(address borrower) public view override returns (address result) {
         result = creditAccounts[borrower]; // F:[CM-48]
         if (result == address(0)) revert HasNoOpenedAccountException(); // F:[CM-48]
     }
@@ -1410,36 +1343,50 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
     /// @return borrowedAmountWithInterest The debt principal + accrued interest
     /// @return borrowedAmountWithInterestAndFees The debt principal + accrued interest and protocol fees
     function calcCreditAccountAccruedInterest(address creditAccount)
-        public
+        external
         view
         override
-        returns (
-            uint256 borrowedAmount,
-            uint256 borrowedAmountWithInterest,
-            uint256 borrowedAmountWithInterestAndFees
-        )
+        returns (uint256 borrowedAmount, uint256 borrowedAmountWithInterest, uint256 borrowedAmountWithInterestAndFees)
+    {
+        uint256 quotaInterest;
+
+        if (supportsQuotas) {
+            TokenLT[] memory tokens = getLimitedTokens(creditAccount);
+
+            quotaInterest = cumulativeQuotaInterest[creditAccount];
+
+            if (tokens.length > 0) {
+                quotaInterest += poolQuotaKeeper().outstandingQuotaInterest(address(this), creditAccount, tokens); // F: [CMQ-10]
+            }
+        }
+
+        return _calcCreditAccountAccruedInterest(creditAccount, quotaInterest);
+    }
+
+    /// @dev IMPLEMENTATION: calcCreditAccountAccruedInterest
+    /// @param creditAccount Address of the Credit Account
+    /// @param quotaInterest Total quota premiums accrued, computed elsewhere
+    /// @return borrowedAmount The debt principal
+    /// @return borrowedAmountWithInterest The debt principal + accrued interest
+    /// @return borrowedAmountWithInterestAndFees The debt principal + accrued interest and protocol fees
+    function _calcCreditAccountAccruedInterest(address creditAccount, uint256 quotaInterest)
+        internal
+        view
+        returns (uint256 borrowedAmount, uint256 borrowedAmountWithInterest, uint256 borrowedAmountWithInterestAndFees)
     {
         uint256 cumulativeIndexAtOpen_RAY;
         uint256 cumulativeIndexNow_RAY;
-        (
-            borrowedAmount,
-            cumulativeIndexAtOpen_RAY,
-            cumulativeIndexNow_RAY
-        ) = _getCreditAccountParameters(creditAccount); // F:[CM-49]
+        (borrowedAmount, cumulativeIndexAtOpen_RAY, cumulativeIndexNow_RAY) = _getCreditAccountParameters(creditAccount); // F:[CM-49]
 
         // Interest is never stored and is always computed dynamically
         // as the difference between the current cumulative index of the pool
         // and the cumulative index recorded in the Credit Account
         borrowedAmountWithInterest =
-            (borrowedAmount * cumulativeIndexNow_RAY) /
-            cumulativeIndexAtOpen_RAY; // F:[CM-49]
+            (borrowedAmount * cumulativeIndexNow_RAY) / cumulativeIndexAtOpen_RAY + quotaInterest; // F:[CM-49]
 
         // Fees are computed as a percentage of interest
-        borrowedAmountWithInterestAndFees =
-            borrowedAmountWithInterest +
-            ((borrowedAmountWithInterest - borrowedAmount) *
-                slot1.feeInterest) /
-            PERCENTAGE_FACTOR; // F: [CM-49]
+        borrowedAmountWithInterestAndFees = borrowedAmountWithInterest
+            + ((borrowedAmountWithInterest - borrowedAmount) * slot1.feeInterest) / PERCENTAGE_FACTOR; // F: [CM-49]
     }
 
     /// @dev Returns the parameters of the Credit Account required to calculate debt
@@ -1452,26 +1399,16 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
     function _getCreditAccountParameters(address creditAccount)
         internal
         view
-        returns (
-            uint256 borrowedAmount,
-            uint256 cumulativeIndexAtOpen_RAY,
-            uint256 cumulativeIndexNow_RAY
-        )
+        returns (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen_RAY, uint256 cumulativeIndexNow_RAY)
     {
         borrowedAmount = ICreditAccount(creditAccount).borrowedAmount(); // F:[CM-49,50]
-        cumulativeIndexAtOpen_RAY = ICreditAccount(creditAccount)
-            .cumulativeIndexAtOpen(); // F:[CM-49,50]
+        cumulativeIndexAtOpen_RAY = ICreditAccount(creditAccount).cumulativeIndexAtOpen(); // F:[CM-49,50]
         cumulativeIndexNow_RAY = IPoolService(pool).calcLinearCumulative_RAY(); // F:[CM-49,50]
     }
 
     /// @dev Returns the liquidation threshold for the provided token
     /// @param token Token to retrieve the LT for
-    function liquidationThresholds(address token)
-        public
-        view
-        override
-        returns (uint16 lt)
-    {
+    function liquidationThresholds(address token) public view override returns (uint16 lt) {
         // Underlying is a special case and its LT is stored separately
         if (token == underlying) return slot1.ltUnderlying; // F:[CM-47]
 
@@ -1482,39 +1419,8 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
 
     /// @dev Returns the mask for the provided token
     /// @param token Token to returns the mask for
-    function tokenMasksMap(address token)
-        public
-        view
-        override
-        returns (uint256 mask)
-    {
+    function tokenMasksMap(address token) public view override returns (uint256 mask) {
         mask = (token == underlying) ? 1 : tokenMasksMapInternal[token];
-    }
-
-    /// @dev Returns the largest token index out of enabled tokens, based on a mask
-    /// @param mask Bit mask encoding enabled tokens
-    /// @return index Largest index out of the set of enabled tokens
-    function _getMaxIndex(uint256 mask) internal pure returns (uint256 index) {
-        if (mask == 1) return 0;
-
-        // Performs a binary search within the range of all token indices
-        // If right-shifting a mask by n turns it into 1, then n is the largest index
-
-        uint256 high = 256;
-        uint256 low = 1;
-
-        while (true) {
-            index = (high + low) >> 1;
-            uint256 testMask = 1 << index;
-
-            if (testMask & mask != 0 && (mask >> index == 1)) break;
-
-            if (testMask >= mask) {
-                high = index;
-            } else {
-                low = index;
-            }
-        }
     }
 
     /// @dev Returns the fee parameters of the Credit Manager
@@ -1551,6 +1457,16 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
         return slot1.priceOracle;
     }
 
+    /// @dev Address of the connected pool
+    /// @notice [DEPRECATED]: use pool() instead.
+    function poolService() external view returns (address) {
+        return pool;
+    }
+
+    function poolQuotaKeeper() public view returns (IPoolQuotaKeeper) {
+        return IPoolQuotaKeeper(IPool4626(pool).poolQuotaKeeper());
+    }
+
     //
     // CONFIGURATION
     //
@@ -1571,8 +1487,9 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
     /// @param token Address of the token to add
     function _addToken(address token) internal {
         // Checks that the token is not already known (has an associated token mask)
-        if (tokenMasksMapInternal[token] > 0)
-            revert TokenAlreadyAddedException(); // F:[CM-52]
+        if (tokenMasksMapInternal[token] > 0) {
+            revert TokenAlreadyAddedException();
+        } // F:[CM-52]
 
         // Checks that there aren't too many tokens
         // Since token masks are 256 bit numbers with each bit corresponding to 1 token,
@@ -1583,7 +1500,15 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
         // (i.e. 2 ** index or 1 << index)
         uint256 tokenMask = 1 << collateralTokensCount;
         tokenMasksMapInternal[token] = tokenMask; // F:[CM-53]
-        collateralTokensCompressed[tokenMask] = uint256(uint160(token)); // F:[CM-47]
+
+        collateralTokensData[tokenMask] = CollateralTokenData({
+            token: token,
+            ltInitial: 0,
+            ltFinal: 0,
+            timestampRampStart: type(uint40).max,
+            rampDuration: 0
+        }); // F:[CM-47]
+
         collateralTokensCount++; // F:[CM-47]
     }
 
@@ -1637,11 +1562,48 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
             uint256 tokenMask = tokenMasksMap(token); // F:[CM-47, 54]
             if (tokenMask == 0) revert TokenNotAllowedException();
 
-            // Token address and liquidation threshold are encoded into a single uint256
-            collateralTokensCompressed[tokenMask] =
-                (collateralTokensCompressed[tokenMask] & type(uint160).max) |
-                (uint256(liquidationThreshold) << 160); // F:[CM-47]
+            CollateralTokenData memory tokenData = collateralTokensData[tokenMask];
+
+            _setLTRampParams(tokenData, tokenMask, liquidationThreshold, liquidationThreshold, type(uint40).max, 0); // F:[CM-47]
         }
+    }
+
+    /// @dev Sets ramping parameters for a token's liquidation threshold
+    /// @notice Ramping parameters allow to decrease the LT gradually over a period of time
+    ///         which gives users/bots time to react and adjust their position for the new LT
+    /// @param token The collateral token to set the LT for
+    /// @param finalLT The final LT after ramping
+    /// @param timestampRampStart Timestamp when the LT starts ramping
+    /// @param rampDuration Duration of ramping
+    function rampLiquidationThreshold(address token, uint16 finalLT, uint40 timestampRampStart, uint24 rampDuration)
+        external
+        creditConfiguratorOnly
+    {
+        uint256 tokenMask = tokenMasksMap(token);
+
+        if (tokenMask == 0) revert TokenNotAllowedException();
+        if (tokenMask == 1) revert CannotRampLTForUnderlyingException();
+
+        CollateralTokenData memory tokenData = collateralTokensData[tokenMask];
+
+        _setLTRampParams(tokenData, tokenMask, tokenData.ltInitial, finalLT, timestampRampStart, rampDuration); // F: [CM-71]
+    }
+
+    /// @dev Internal function that sets the LT params
+    function _setLTRampParams(
+        CollateralTokenData memory tokenData,
+        uint256 tokenMask,
+        uint16 ltInitial,
+        uint16 ltFinal,
+        uint40 timestampRampStart,
+        uint24 rampDuration
+    ) internal {
+        tokenData.ltInitial = ltInitial;
+        tokenData.ltFinal = ltFinal;
+        tokenData.timestampRampStart = timestampRampStart;
+        tokenData.rampDuration = rampDuration;
+
+        collateralTokensData[tokenMask] = tokenData;
     }
 
     /// @dev Sets the forbidden token mask
@@ -1655,6 +1617,18 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
         creditConfiguratorOnly // F:[CM-4]
     {
         forbiddenTokenMask = _forbidMask; // F:[CM-55]
+    }
+
+    /// @dev Sets the limited token mask
+    /// @param _limitedTokenMask The new mask
+    /// @notice Limited tokens are counted as collateral not based on their balances,
+    ///         but instead based on their quotas set in the poolQuotaKeeper contract
+    ///         Tokens in the mask also incur additional interest based on their quotas
+    function setLimitedMask(uint256 _limitedTokenMask)
+        external
+        creditConfiguratorOnly // F: [CMQ-2]
+    {
+        limitedTokenMask = _limitedTokenMask; // F: [CMQ-2]
     }
 
     /// @dev Sets the maximal number of enabled tokens on a single Credit Account.
@@ -1672,10 +1646,7 @@ contract CreditManager is ICreditManagerV2, ACLTrait {
     /// @notice The function can be called with (adapter, address(0)) and (address(0), targetContract)
     ///         to disallow a particular target or adapter, since this would set values in respective
     ///         mappings to address(0).
-    function changeContractAllowance(address adapter, address targetContract)
-        external
-        creditConfiguratorOnly
-    {
+    function changeContractAllowance(address adapter, address targetContract) external creditConfiguratorOnly {
         if (adapter != address(0)) {
             adapterToContract[adapter] = targetContract; // F:[CM-56]
         }

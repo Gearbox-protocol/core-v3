@@ -3,14 +3,14 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import { RAY } from "../../../libraries/Constants.sol";
+import {RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
-import { IPoolService } from "../../../interfaces/IPoolService.sol";
+import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
 
-import { AddressProvider } from "../../../core/AddressProvider.sol";
+import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
 
 /**
  * @title Mock of pool service for CreditManager constracts testing
@@ -28,6 +28,7 @@ contract PoolServiceMock is IPoolService {
     uint256 public override expectedLiquidityLimit;
 
     address public override underlyingToken;
+    address public asset;
 
     // Credit Managers
     address[] public override creditManagers;
@@ -67,11 +68,23 @@ contract PoolServiceMock is IPoolService {
     // Paused flag
     bool public paused = false;
 
+    bool public supportsQuotas = false;
+    address public poolQuotaKeeper;
+
     constructor(address _addressProvider, address _underlyingToken) {
         addressProvider = AddressProvider(_addressProvider);
         underlyingToken = _underlyingToken;
+        asset = _underlyingToken;
         borrowAPY_RAY = RAY / 10;
         _cumulativeIndex_RAY = RAY;
+    }
+
+    function setPoolQuotaKeeper(address _poolQuotaKeeper) external {
+        poolQuotaKeeper = _poolQuotaKeeper;
+    }
+
+    function setSupportsQuotas(bool val) external {
+        supportsQuotas = val;
     }
 
     function setCumulative_RAY(uint256 cumulativeIndex_RAY) external {
@@ -82,10 +95,11 @@ contract PoolServiceMock is IPoolService {
         return _cumulativeIndex_RAY;
     }
 
-    function lendCreditAccount(uint256 borrowedAmount, address creditAccount)
-        external
-        override
-    {
+    function changeQuotaRevenue(int128) external {}
+
+    function updateQuotaRevenue(uint128) external {}
+
+    function lendCreditAccount(uint256 borrowedAmount, address creditAccount) external override {
         lendAmount = borrowedAmount;
         lendAccount = creditAccount;
 
@@ -93,21 +107,13 @@ contract PoolServiceMock is IPoolService {
         IERC20(underlyingToken).safeTransfer(creditAccount, borrowedAmount); // T:[PS-14]
     }
 
-    function repayCreditAccount(
-        uint256 borrowedAmount,
-        uint256 profit,
-        uint256 loss
-    ) external override {
+    function repayCreditAccount(uint256 borrowedAmount, uint256 profit, uint256 loss) external override {
         repayAmount = borrowedAmount;
         repayProfit = profit;
         repayLoss = loss;
     }
 
-    function addLiquidity(
-        uint256 amount,
-        address onBehalfOf,
-        uint256 referralCode
-    ) external override {}
+    function addLiquidity(uint256 amount, address onBehalfOf, uint256 referralCode) external override {}
 
     /**
      * @dev Removes liquidity from pool
@@ -121,11 +127,7 @@ contract PoolServiceMock is IPoolService {
      * @param amount Amount of tokens to be transfer
      * @param to Address to transfer liquidity
      */
-    function removeLiquidity(uint256 amount, address to)
-        external
-        override
-        returns (uint256)
-    {}
+    function removeLiquidity(uint256 amount, address to) external override returns (uint256) {}
 
     function expectedLiquidity() public pure override returns (uint256) {
         return 0; // T:[MPS-1]

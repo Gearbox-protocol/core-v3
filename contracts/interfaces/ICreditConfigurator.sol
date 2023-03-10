@@ -2,10 +2,11 @@
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
-import { IAddressProvider } from "./IAddressProvider.sol";
-import { CreditManager } from "../credit/CreditManager.sol";
-import { CreditFacade } from "../credit/CreditFacade.sol";
-import { IVersion } from "./IVersion.sol";
+
+import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
+import {CreditManager} from "../credit/CreditManager.sol";
+import {CreditFacade} from "../credit/CreditFacade.sol";
+import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 /// @dev A struct containing parameters for a recognized collateral token in the system
 struct CollateralToken {
@@ -25,15 +26,22 @@ struct CreditManagerOpts {
     CollateralToken[] collateralTokens;
     /// @dev Address of DegenNFT, address(0) if whitelisted mode is not used
     address degenNFT;
+    /// @dev Address of BlacklistHelper, address(0) if the underlying is not blacklistable
+    address blacklistHelper;
     /// @dev Whether the Credit Manager is connected to an expirable pool (and the CreditFacade is expirable)
     bool expirable;
 }
 
 interface ICreditConfiguratorEvents {
     /// @dev Emits when a collateral token's liquidation threshold is changed
-    event TokenLiquidationThresholdUpdated(
+    event TokenLiquidationThresholdUpdated(address indexed token, uint16 liquidityThreshold);
+
+    event TokenLiquidationThresholdRampScheduled(
         address indexed token,
-        uint16 liquidityThreshold
+        uint16 liquidationThresholdInitial,
+        uint16 liquidationThresholdFinal,
+        uint40 timestampRampStart,
+        uint40 timestampRampEnd
     );
 
     /// @dev Emits when a new or a previously forbidden token is allowed
@@ -47,6 +55,9 @@ interface ICreditConfiguratorEvents {
 
     /// @dev Emits when a 3rd-party contract is forbidden
     event ContractForbidden(address indexed protocol);
+
+    /// @dev Emits when a particular adapter for a target contract is forbidden
+    event AdapterForbidden(address indexed adapter);
 
     /// @dev Emits when debt principal limits are changed
     event LimitsUpdated(uint256 minBorrowedAmount, uint256 maxBorrowedAmount);
@@ -92,6 +103,12 @@ interface ICreditConfiguratorEvents {
 
     /// @dev Emits when an address is removed from the list of emergency liquidators
     event EmergencyLiquidatorRemoved(address);
+
+    /// @dev Emits when the bot list is updated in Credit Facade
+    event BotListUpdated(address);
+
+    /// @dev Emits when the token is set as limited
+    event TokenLimited(address);
 }
 
 /// @dev CreditConfigurator Exceptions
@@ -125,13 +142,15 @@ interface ICreditConfiguratorExceptions {
 
     /// @dev Thrown if attempting to forbid an adapter that is not allowed for the Credit Manager
     error ContractIsNotAnAllowedAdapterException();
+
+    /// @dev Thrown if attempting to forbid or migrate a target contract that is not allowed for the Credit Manager
+    error ContractIsNotAnAllowedTargetException();
+
+    /// @dev Thrown when attempting to limit a token that is not quotable in PoolQuotaKeeper
+    error TokenIsNotQuotedException();
 }
 
-interface ICreditConfigurator is
-    ICreditConfiguratorEvents,
-    ICreditConfiguratorExceptions,
-    IVersion
-{
+interface ICreditConfigurator is ICreditConfiguratorEvents, ICreditConfiguratorExceptions, IVersion {
     //
     // STATE-CHANGING FUNCTIONS
     //
@@ -139,14 +158,12 @@ interface ICreditConfigurator is
     /// @dev Adds token to the list of allowed collateral tokens, and sets the LT
     /// @param token Address of token to be added
     /// @param liquidationThreshold Liquidation threshold for account health calculations
-    function addCollateralToken(address token, uint16 liquidationThreshold)
-        external;
+    function addCollateralToken(address token, uint16 liquidationThreshold) external;
 
     /// @dev Sets a liquidation threshold for any token except the underlying
     /// @param token Token address
     /// @param liquidationThreshold in PERCENTAGE_FORMAT (100% = 10000)
-    function setLiquidationThreshold(address token, uint16 liquidationThreshold)
-        external;
+    function setLiquidationThreshold(address token, uint16 liquidationThreshold) external;
 
     /// @dev Allow a known collateral token if it was forbidden before.
     /// @param token Address of collateral token
@@ -169,11 +186,15 @@ interface ICreditConfigurator is
     /// @param targetContract Address of a contract to be forbidden
     function forbidContract(address targetContract) external;
 
+    /// @dev Forbids adapter (and only the adapter - the target contract is not affected)
+    /// @param adapter Address of adapter to disable
+    /// @notice Used to clean up orphaned adapters
+    function forbidAdapter(address adapter) external;
+
     /// @dev Sets borrowed amount limits in Credit Facade
     /// @param _minBorrowedAmount Minimum borrowed amount
     /// @param _maxBorrowedAmount Maximum borrowed amount
-    function setLimits(uint128 _minBorrowedAmount, uint128 _maxBorrowedAmount)
-        external;
+    function setLimits(uint128 _minBorrowedAmount, uint128 _maxBorrowedAmount) external;
 
     /// @dev Sets fees for creditManager
     /// @param _feeInterest Percent which protocol charges additionally for interest rate
@@ -196,8 +217,7 @@ interface ICreditConfigurator is
     /// @dev Upgrades the Credit Facade corresponding to the Credit Manager
     /// @param _creditFacade address of the new CreditFacade
     /// @param migrateParams Whether the previous CreditFacade's parameter need to be copied
-    function upgradeCreditFacade(address _creditFacade, bool migrateParams)
-        external;
+    function upgradeCreditFacade(address _creditFacade, bool migrateParams) external;
 
     /// @dev Upgrades the Credit Configurator for a connected Credit Manager
     /// @param _creditConfigurator New Credit Configurator's address
@@ -211,17 +231,6 @@ interface ICreditConfigurator is
     /// @dev Sets the maximal borrowed amount per block
     /// @param newLimit The new max borrowed amount per block
     function setLimitPerBlock(uint128 newLimit) external;
-
-    /// @dev Add the contract to a list of upgradeable contracts
-    /// @param addr Address of the contract to add to the list
-    /// @notice Upgradeable contracts are contracts with an upgradeable proxy
-    /// Or other practices and patterns potentially detrimental to security;
-    /// Contracts from the list have certain restrictions applied to them
-    function addContractToUpgradeable(address addr) external;
-
-    /// @dev Removes the contract from a list of upgradeable contracts
-    /// @param addr Address of the contract to remove from the list
-    function removeContractFromUpgradeable(address addr) external;
 
     /// @dev Sets expiration date in a CreditFacade connected
     /// To a CreditManager with an expirable pool

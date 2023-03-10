@@ -3,21 +3,22 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
-import { AddressProvider } from "../../core/AddressProvider.sol";
-import { IPriceOracleV2Ext } from "../../interfaces/IPriceOracle.sol";
-import { PriceFeedConfig } from "../../oracles/PriceOracle.sol";
-import { ACL } from "../../core/ACL.sol";
-import { ContractsRegister } from "../../core/ContractsRegister.sol";
-import { AccountFactory } from "../../core/AccountFactory.sol";
-import { GenesisFactory } from "../../factories/GenesisFactory.sol";
-import { PoolFactory, PoolOpts } from "../../factories/PoolFactory.sol";
+import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
+import {IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
+import {PriceFeedConfig} from "@gearbox-protocol/core-v2/contracts/oracles/PriceOracle.sol";
+import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
+import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
+import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
+import {GenesisFactory} from "@gearbox-protocol/core-v2/contracts/factories/GenesisFactory.sol";
+import {PoolFactory, PoolOpts} from "@gearbox-protocol/core-v2/contracts/factories/PoolFactory.sol";
 
-import { CreditManagerOpts, CollateralToken } from "../../credit/CreditConfigurator.sol";
-import { PoolServiceMock } from "../mocks/pool/PoolServiceMock.sol";
+import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfigurator.sol";
+import {PoolServiceMock} from "../mocks/pool/PoolServiceMock.sol";
+import {PoolQuotaKeeper} from "../../pool/PoolQuotaKeeper.sol";
 
 import "../lib/constants.sol";
 
-import { ITokenTestSuite } from "../interfaces/ITokenTestSuite.sol";
+import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 
 struct PoolCreditOpts {
     PoolOpts poolOpts;
@@ -38,6 +39,7 @@ contract PoolDeployer is DSTest {
     GenesisFactory public gp;
     AccountFactory public af;
     PoolServiceMock public poolMock;
+    PoolQuotaKeeper public poolQuotaKeeper;
     ContractsRegister public cr;
     ACL public acl;
 
@@ -87,5 +89,9 @@ contract PoolDeployer is DSTest {
         tokenTestSuite.mint(_underlying, address(poolMock), initialBalance);
 
         cr.addPool(address(poolMock));
+
+        poolQuotaKeeper = new PoolQuotaKeeper(payable(address(poolMock)));
+
+        poolMock.setPoolQuotaKeeper(address(poolQuotaKeeper));
     }
 }

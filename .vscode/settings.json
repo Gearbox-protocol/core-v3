@@ -3,7 +3,7 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[solidity]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+    "editor.defaultFormatter": "JuanBlanco.solidity"
   },
 
   "editor.defaultFormatter": "esbenp.prettier-vscode",
@@ -11,7 +11,7 @@
   "editor.tabSize": 2,
   "eslint.validate": ["javascript", "typescript"],
   "files.eol": "\n",
-  "solidity.formatter": "prettier",
+  "solidity.formatter": "forge",
   "solidity.packageDefaultDependenciesContractsDirectory": "contracts",
   "solidity.packageDefaultDependenciesDirectory": "node_modules",
   "solidity.remappings": [
@@ -19,6 +19,7 @@
     "@ensdomains/=node_modules/@ensdomains/",
     "@openzeppelin/=node_modules/@openzeppelin/contracts",
     "ds-test/=lib/ds-test/src/",
-    "hardhat/=node_modules/hardhat/"
+    "hardhat/=node_modules/hardhat/",
+    "@gearbox-protocol=node_modules/@gearbox-protocol/"
   ]
 }

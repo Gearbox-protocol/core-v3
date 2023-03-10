@@ -3,55 +3,59 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
-import { IAddressProvider } from "../../interfaces/IAddressProvider.sol";
-import { ACL } from "../../core/ACL.sol";
+import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
+import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 
-import { AccountFactory } from "../../core/AccountFactory.sol";
-import { ICreditAccount } from "../../interfaces/ICreditAccount.sol";
-import { ICreditManagerV2, ICreditManagerV2Events, ICreditManagerV2Exceptions, ClosureAction } from "../../interfaces/ICreditManagerV2.sol";
+import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
+import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
+import {
+    ICreditManagerV2,
+    ICreditManagerV2Events,
+    ICreditManagerV2Exceptions,
+    ClosureAction,
+    CollateralTokenData
+} from "../../interfaces/ICreditManagerV2.sol";
 
-import { IPriceOracleV2, IPriceOracleV2Ext } from "../../interfaces/IPriceOracle.sol";
+import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 
-import { CreditManager, UNIVERSAL_CONTRACT } from "../../credit/CreditManager.sol";
+import {CreditManager, UNIVERSAL_CONTRACT} from "../../credit/CreditManager.sol";
 
-import { IPoolService } from "../../interfaces/IPoolService.sol";
+import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
 
-import { IWETH } from "../../interfaces/external/IWETH.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { ERC20Mock } from "../mocks/token/ERC20Mock.sol";
-import { PercentageMath, PERCENTAGE_FACTOR } from "../../libraries/PercentageMath.sol";
+import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // TESTS
 
 import "../lib/constants.sol";
 
-import { BalanceHelper } from "../helpers/BalanceHelper.sol";
+import {BalanceHelper} from "../helpers/BalanceHelper.sol";
 
 // EXCEPTIONS
 
 // MOCKS
-import { PriceFeedMock } from "../mocks/oracles/PriceFeedMock.sol";
-import { PoolServiceMock } from "../mocks/pool/PoolServiceMock.sol";
-import { TargetContractMock } from "../mocks/adapters/TargetContractMock.sol";
-import { ERC20ApproveRestrictedRevert, ERC20ApproveRestrictedFalse } from "../mocks/token/ERC20ApproveRestricted.sol";
+import {PriceFeedMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/oracles/PriceFeedMock.sol";
+import {PoolServiceMock} from "../mocks/pool/PoolServiceMock.sol";
+import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
+import {
+    ERC20ApproveRestrictedRevert,
+    ERC20ApproveRestrictedFalse
+} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20ApproveRestricted.sol";
 
 // SUITES
-import { TokensTestSuite } from "../suites/TokensTestSuite.sol";
-import { Tokens } from "../config/Tokens.sol";
-import { CreditManagerTestSuite } from "../suites/CreditManagerTestSuite.sol";
-import { GenesisFactory } from "../../factories/GenesisFactory.sol";
-import { CreditManagerTestInternal } from "../mocks/credit/CreditManagerTestInternal.sol";
+import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
+import {Tokens} from "../config/Tokens.sol";
+import {CreditManagerTestSuite} from "../suites/CreditManagerTestSuite.sol";
+import {GenesisFactory} from "@gearbox-protocol/core-v2/contracts/factories/GenesisFactory.sol";
+import {CreditManagerTestInternal} from "../mocks/credit/CreditManagerTestInternal.sol";
 
-import { CreditConfig } from "../config/CreditConfig.sol";
+import {CreditConfig} from "../config/CreditConfig.sol";
 
 /// @title AddressRepository
 /// @notice Stores addresses of deployed contracts
-contract CreditManagerTest is
-    DSTest,
-    ICreditManagerV2Events,
-    ICreditManagerV2Exceptions,
-    BalanceHelper
-{
+contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Exceptions, BalanceHelper {
     CheatCodes evm = CheatCodes(HEVM_ADDRESS);
 
     CreditManagerTestSuite cms;
@@ -71,7 +75,7 @@ contract CreditManagerTest is
     function setUp() public {
         tokenTestSuite = new TokensTestSuite();
 
-        tokenTestSuite.topUpWETH{ value: 100 * WAD }();
+        tokenTestSuite.topUpWETH{value: 100 * WAD}();
         _connectCreditManagerSuite(Tokens.DAI, false);
     }
 
@@ -80,7 +84,7 @@ contract CreditManagerTest is
 
     function _connectCreditManagerSuite(Tokens t, bool internalSuite) internal {
         creditConfig = new CreditConfig(tokenTestSuite, t);
-        cms = new CreditManagerTestSuite(creditConfig, internalSuite);
+        cms = new CreditManagerTestSuite(creditConfig, internalSuite, false);
 
         gp = cms.gp();
         acl = cms.acl();
@@ -109,21 +113,16 @@ contract CreditManagerTest is
         return cms.openCreditAccount();
     }
 
-    function expectTokenIsEnabled(Tokens t, bool expectedState) internal {
-        address creditAccount = creditManager.getCreditAccountOrRevert(USER);
-
-        bool state = creditManager.tokenMasksMap(tokenTestSuite.addressOf(t)) &
-            creditManager.enabledTokensMap(creditAccount) !=
-            0;
+    function expectTokenIsEnabled(address creditAccount, Tokens t, bool expectedState) internal {
+        bool state = creditManager.tokenMasksMap(tokenTestSuite.addressOf(t))
+            & creditManager.enabledTokensMap(creditAccount) != 0;
         assertTrue(
             state == expectedState,
             string(
                 abi.encodePacked(
                     "Token ",
                     tokenTestSuite.symbols(t),
-                    state
-                        ? " enabled as not expetcted"
-                        : " not enabled as expected "
+                    state ? " enabled as not expected" : " not enabled as expected "
                 )
             )
         );
@@ -132,72 +131,51 @@ contract CreditManagerTest is
     function expectFullCollateralCheck() internal {
         address creditAccount = creditManager.getCreditAccountOrRevert(USER);
 
-        (, , uint256 borrowedAmountWithInterestAndFees) = creditManager
-            .calcCreditAccountAccruedInterest(creditAccount);
+        (,, uint256 borrowedAmountWithInterestAndFees) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
 
         evm.expectCall(
             address(priceOracle),
             abi.encodeWithSelector(
-                IPriceOracleV2.convertToUSD.selector,
-                borrowedAmountWithInterestAndFees * PERCENTAGE_FACTOR,
-                underlying
+                IPriceOracleV2.convertToUSD.selector, borrowedAmountWithInterestAndFees * PERCENTAGE_FACTOR, underlying
             )
         );
     }
 
-    function mintBalance(
-        Tokens t,
-        uint256 amount,
-        bool enable
-    ) internal {
-        address creditAccount = creditManager.getCreditAccountOrRevert(USER);
-
+    function mintBalance(address creditAccount, Tokens t, uint256 amount, bool enable) internal {
         tokenTestSuite.mint(t, creditAccount, amount);
         if (enable) {
-            creditManager.checkAndEnableToken(
-                creditAccount,
-                tokenTestSuite.addressOf(t)
-            );
+            creditManager.checkAndEnableToken(tokenTestSuite.addressOf(t));
         }
     }
 
     function isTokenEnabled(Tokens t) internal view returns (bool) {
         address creditAccount = creditManager.getCreditAccountOrRevert(USER);
-        return
-            creditManager.enabledTokensMap(creditAccount) &
-                creditManager.tokenMasksMap(tokenTestSuite.addressOf(t)) !=
-            0;
+        return creditManager.enabledTokensMap(creditAccount) & creditManager.tokenMasksMap(tokenTestSuite.addressOf(t))
+            != 0;
     }
 
-    function _addAndEnableTokens(
-        address creditAccount,
-        uint256 numTokens,
-        uint256 balance
-    ) internal {
+    function _addAndEnableTokens(address creditAccount, uint256 numTokens, uint256 balance) internal {
         for (uint256 i = 0; i < numTokens; i++) {
             ERC20Mock t = new ERC20Mock("new token", "nt", 18);
             PriceFeedMock pf = new PriceFeedMock(10**8, 8);
 
             evm.startPrank(CONFIGURATOR);
             creditManager.addToken(address(t));
-            IPriceOracleV2Ext(address(priceOracle)).addPriceFeed(
-                address(t),
-                address(pf)
-            );
+            IPriceOracleV2Ext(address(priceOracle)).addPriceFeed(address(t), address(pf));
             creditManager.setLiquidationThreshold(address(t), 8000);
             evm.stopPrank();
 
             t.mint(creditAccount, balance);
 
-            creditManager.checkAndEnableToken(creditAccount, address(t));
+            creditManager.checkAndEnableToken(address(t));
         }
     }
 
-    function _getRandomBits(
-        uint256 ones,
-        uint256 zeros,
-        uint256 randomValue
-    ) internal pure returns (bool[] memory result, uint256 breakPoint) {
+    function _getRandomBits(uint256 ones, uint256 zeros, uint256 randomValue)
+        internal
+        pure
+        returns (bool[] memory result, uint256 breakPoint)
+    {
         if ((ones + zeros) == 0) {
             result = new bool[](0);
             breakPoint = 0;
@@ -211,8 +189,7 @@ contract CreditManagerTest is
         uint256 i = 0;
 
         while (onesCurrent + zerosCurrent > 0) {
-            uint256 rand = uint256(keccak256(abi.encodePacked(randomValue))) %
-                (onesCurrent + zerosCurrent);
+            uint256 rand = uint256(keccak256(abi.encodePacked(randomValue))) % (onesCurrent + zerosCurrent);
             if (rand < onesCurrent) {
                 result[i] = true;
                 onesCurrent--;
@@ -225,9 +202,7 @@ contract CreditManagerTest is
         }
 
         if (ones > 0) {
-            uint256 breakpointCounter = (uint256(
-                keccak256(abi.encodePacked(randomValue))
-            ) % (ones)) + 1;
+            uint256 breakpointCounter = (uint256(keccak256(abi.encodePacked(randomValue))) % (ones)) + 1;
 
             for (uint256 j = 0; j < result.length; j++) {
                 if (result[j]) {
@@ -243,28 +218,20 @@ contract CreditManagerTest is
     }
 
     function enableTokensMoreThanLimit(address creditAccount) internal {
-        uint256 maxAllowedEnabledTokenLength = creditManager
-            .maxAllowedEnabledTokenLength();
+        uint256 maxAllowedEnabledTokenLength = creditManager.maxAllowedEnabledTokenLength();
         _addAndEnableTokens(creditAccount, maxAllowedEnabledTokenLength, 2);
     }
 
     function prepareForEnabledUnderlyingCase(address creditAccount) internal {
-        uint256 daiBalance = tokenTestSuite.balanceOf(
-            Tokens.DAI,
-            creditAccount
-        );
+        uint256 daiBalance = tokenTestSuite.balanceOf(Tokens.DAI, creditAccount);
 
         tokenTestSuite.burn(Tokens.DAI, creditAccount, daiBalance);
 
         tokenTestSuite.mint(Tokens.USDC, creditAccount, daiBalance * 10);
 
-        creditManager.checkAndEnableToken(
-            creditAccount,
-            tokenTestSuite.addressOf(Tokens.USDC)
-        );
+        creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.USDC));
 
-        uint256 maxAllowedEnabledTokenLength = creditManager
-            .maxAllowedEnabledTokenLength();
+        uint256 maxAllowedEnabledTokenLength = creditManager.maxAllowedEnabledTokenLength();
         _addAndEnableTokens(creditAccount, maxAllowedEnabledTokenLength - 1, 2);
     }
 
@@ -284,10 +251,7 @@ contract CreditManagerTest is
         if (enabledTokensNum != zeroTokensNum) {
             // When there are more enabled tokens than zero tokens, we have a breakpoint other than underlying
 
-            uint256 daiBalance = tokenTestSuite.balanceOf(
-                Tokens.DAI,
-                creditAccount
-            );
+            uint256 daiBalance = tokenTestSuite.balanceOf(Tokens.DAI, creditAccount);
             tokenTestSuite.burn(Tokens.DAI, creditAccount, daiBalance);
             setBreakpoint = true;
         } else {
@@ -313,11 +277,7 @@ contract CreditManagerTest is
         return enabledTokensNum;
     }
 
-    function calcEnabledTokens(address creditAccount)
-        internal
-        view
-        returns (uint256)
-    {
+    function calcEnabledTokens(address creditAccount) internal view returns (uint256) {
         uint256 enabledMask = creditManager.enabledTokensMap(creditAccount);
 
         uint256 tokensEnabled;
@@ -339,6 +299,15 @@ contract CreditManagerTest is
         return tokensEnabled;
     }
 
+    function _openAccountAndTransferToCF() internal returns (address creditAccount) {
+        (,,, creditAccount) = _openCreditAccount();
+        creditManager.transferAccountOwnership(USER, address(this));
+    }
+
+    function _baseFullCollateralCheck(address creditAccount) internal {
+        creditManager.fullCollateralCheck(creditAccount, new uint256[](0), 10000);
+    }
+
     ///
     ///
     ///  TESTS
@@ -348,31 +317,15 @@ contract CreditManagerTest is
     function test_CM_01_constructor_sets_correct_values() public {
         creditManager = new CreditManager(address(poolMock));
 
-        assertEq(
-            address(creditManager.poolService()),
-            address(poolMock),
-            "Incorrect poolSerivice"
-        );
+        assertEq(address(creditManager.poolService()), address(poolMock), "Incorrect poolSerivice");
 
-        assertEq(
-            address(creditManager.pool()),
-            address(poolMock),
-            "Incorrect pool"
-        );
+        assertEq(address(creditManager.pool()), address(poolMock), "Incorrect pool");
 
-        assertEq(
-            creditManager.underlying(),
-            tokenTestSuite.addressOf(Tokens.DAI),
-            "Incorrect underlying"
-        );
+        assertEq(creditManager.underlying(), tokenTestSuite.addressOf(Tokens.DAI), "Incorrect underlying");
 
         (address token, uint16 lt) = creditManager.collateralTokens(0);
 
-        assertEq(
-            token,
-            tokenTestSuite.addressOf(Tokens.DAI),
-            "Incorrect underlying"
-        );
+        assertEq(token, tokenTestSuite.addressOf(Tokens.DAI), "Incorrect underlying");
 
         assertEq(
             creditManager.tokenMasksMap(tokenTestSuite.addressOf(Tokens.DAI)),
@@ -382,29 +335,13 @@ contract CreditManagerTest is
 
         assertEq(lt, 0, "Incorrect LT for underlying");
 
-        assertEq(
-            creditManager.wethAddress(),
-            addressProvider.getWethToken(),
-            "Incorrect WETH token"
-        );
+        assertEq(creditManager.wethAddress(), addressProvider.getWethToken(), "Incorrect WETH token");
 
-        assertEq(
-            address(creditManager.wethGateway()),
-            addressProvider.getWETHGateway(),
-            "Incorrect WETH Gateway"
-        );
+        assertEq(address(creditManager.wethGateway()), addressProvider.getWETHGateway(), "Incorrect WETH Gateway");
 
-        assertEq(
-            address(creditManager.priceOracle()),
-            addressProvider.getPriceOracle(),
-            "Incorrect Price oracle"
-        );
+        assertEq(address(creditManager.priceOracle()), addressProvider.getPriceOracle(), "Incorrect Price oracle");
 
-        assertEq(
-            address(creditManager.creditConfigurator()),
-            address(this),
-            "Incorrect creditConfigurator"
-        );
+        assertEq(address(creditManager.creditConfigurator()), address(this), "Incorrect creditConfigurator");
     }
 
     /// @dev [CM-2]:credit account management functions revert if were called non-creditFacade
@@ -415,9 +352,7 @@ contract CreditManagerTest is
     /// - addCollateral
     /// - transferOwnership
     /// All these functions have creditFacadeOnly modifier
-    function test_CM_02_credit_account_management_functions_revert_if_not_called_by_creditFacadeCall()
-        public
-    {
+    function test_CM_02_credit_account_management_functions_revert_if_not_called_by_creditFacadeCall() public {
         assertEq(creditManager.creditFacade(), address(this));
 
         evm.startPrank(USER);
@@ -427,25 +362,14 @@ contract CreditManagerTest is
 
         evm.expectRevert(CreditFacadeOnlyException.selector);
         creditManager.closeCreditAccount(
-            DUMB_ADDRESS,
-            ClosureAction.LIQUIDATE_ACCOUNT,
-            0,
-            DUMB_ADDRESS,
-            DUMB_ADDRESS,
-            type(uint256).max,
-            false
+            DUMB_ADDRESS, ClosureAction.LIQUIDATE_ACCOUNT, 0, DUMB_ADDRESS, DUMB_ADDRESS, type(uint256).max, false
         );
 
         evm.expectRevert(CreditFacadeOnlyException.selector);
         creditManager.manageDebt(DUMB_ADDRESS, 100, true);
 
         evm.expectRevert(CreditFacadeOnlyException.selector);
-        creditManager.addCollateral(
-            DUMB_ADDRESS,
-            DUMB_ADDRESS,
-            DUMB_ADDRESS,
-            100
-        );
+        creditManager.addCollateral(DUMB_ADDRESS, DUMB_ADDRESS, DUMB_ADDRESS, 100);
 
         evm.expectRevert(CreditFacadeOnlyException.selector);
         creditManager.transferAccountOwnership(DUMB_ADDRESS, DUMB_ADDRESS);
@@ -461,43 +385,34 @@ contract CreditManagerTest is
     /// - approveCreditAccount
     /// - executeOrder
     /// - checkAndEnableToken
-    /// - fastCollateralCheck
     /// - fullCollateralCheck
-    function test_CM_03_credit_account_execution_functions_revert_if_not_called_by_creditFacade()
-        public
-    {
+    /// - disableToken
+    /// - changeEnabledTokens
+    function test_CM_03_credit_account_execution_functions_revert_if_not_called_by_creditFacade_or_adapters() public {
         assertEq(creditManager.creditFacade(), address(this));
 
         evm.startPrank(USER);
 
         evm.expectRevert(AdaptersOrCreditFacadeOnlyException.selector);
-        creditManager.approveCreditAccount(
-            DUMB_ADDRESS,
-            DUMB_ADDRESS,
-            DUMB_ADDRESS,
-            100
-        );
+        creditManager.approveCreditAccount(DUMB_ADDRESS, DUMB_ADDRESS, 100);
 
         evm.expectRevert(TargetContractNotAllowedException.selector);
-        creditManager.executeOrder(DUMB_ADDRESS, DUMB_ADDRESS, bytes("0"));
+        creditManager.executeOrder(DUMB_ADDRESS, bytes("0"));
 
         evm.expectRevert(AdaptersOrCreditFacadeOnlyException.selector);
-        creditManager.checkAndEnableToken(DUMB_ADDRESS, DUMB_ADDRESS);
+        creditManager.checkAndEnableToken(DUMB_ADDRESS);
 
         evm.expectRevert(AdaptersOrCreditFacadeOnlyException.selector);
-        creditManager.fastCollateralCheck(
-            DUMB_ADDRESS,
-            DUMB_ADDRESS,
-            DUMB_ADDRESS,
-            0,
-            0
-        );
+        creditManager.fullCollateralCheck(DUMB_ADDRESS, new uint256[](0), 10000);
 
         evm.expectRevert(AdaptersOrCreditFacadeOnlyException.selector);
-        creditManager.fullCollateralCheck(DUMB_ADDRESS);
+        creditManager.checkEnabledTokensLength(DUMB_ADDRESS);
 
         evm.expectRevert(AdaptersOrCreditFacadeOnlyException.selector);
-        creditManager.checkAndOptimizeEnabledTokens(DUMB_ADDRESS);
+        creditManager.disableToken(DUMB_ADDRESS);
+
+        evm.expectRevert(AdaptersOrCreditFacadeOnlyException.selector);
+        creditManager.changeEnabledTokens(0, 0);
 
         evm.stopPrank();
     }
@@ -513,9 +428,7 @@ contract CreditManagerTest is
     /// - setConfigurator
     /// - addEmergencyLiquidator
     /// - removeEmergenceLiquidator
-    function test_CM_04_credit_account_configurator_functions_revert_if_not_called_by_creditConfigurator()
-        public
-    {
+    function test_CM_04_credit_account_configurator_functions_revert_if_not_called_by_creditConfigurator() public {
         assertEq(creditManager.creditFacade(), address(this));
 
         evm.startPrank(USER);
@@ -580,81 +493,64 @@ contract CreditManagerTest is
 
         evm.expectRevert(bytes(PAUSABLE_ERROR));
         creditManager.closeCreditAccount(
-            DUMB_ADDRESS,
-            ClosureAction.LIQUIDATE_ACCOUNT,
-            0,
-            DUMB_ADDRESS,
-            DUMB_ADDRESS,
-            type(uint256).max,
-            false
+            DUMB_ADDRESS, ClosureAction.LIQUIDATE_ACCOUNT, 0, DUMB_ADDRESS, DUMB_ADDRESS, type(uint256).max, false
         );
 
         evm.expectRevert(bytes(PAUSABLE_ERROR));
         creditManager.manageDebt(DUMB_ADDRESS, 100, true);
 
         evm.expectRevert(bytes(PAUSABLE_ERROR));
-        creditManager.addCollateral(
-            DUMB_ADDRESS,
-            DUMB_ADDRESS,
-            DUMB_ADDRESS,
-            100
-        );
+        creditManager.addCollateral(DUMB_ADDRESS, DUMB_ADDRESS, DUMB_ADDRESS, 100);
 
         evm.expectRevert(bytes(PAUSABLE_ERROR));
         creditManager.transferAccountOwnership(DUMB_ADDRESS, DUMB_ADDRESS);
 
         evm.expectRevert(bytes(PAUSABLE_ERROR));
-        creditManager.approveCreditAccount(
-            DUMB_ADDRESS,
-            DUMB_ADDRESS,
-            DUMB_ADDRESS,
-            100
-        );
+        creditManager.approveCreditAccount(DUMB_ADDRESS, DUMB_ADDRESS, 100);
 
         evm.expectRevert(bytes(PAUSABLE_ERROR));
-        creditManager.executeOrder(DUMB_ADDRESS, DUMB_ADDRESS, bytes("dd"));
+        creditManager.executeOrder(DUMB_ADDRESS, bytes("dd"));
     }
 
     //
     // REVERTS IF CREDIT ACCOUNT NOT EXISTS
     //
 
-    /// @dev [CM-6]: management function reverts if account not exists
+    /// @dev [CM-6A]: management function reverts if account not exists
     /// Functions list:
     /// - getCreditAccountOrRevert
     /// - closeCreditAccount
     /// - transferOwnership
 
-    function test_CM_06_openCreditAccount_sets_correct_values_and_transfers_tokens_from_pool()
-        public
-    {
+    function test_CM_06A_management_functions_revert_if_account_does_not_exist() public {
         evm.expectRevert(HasNoOpenedAccountException.selector);
         creditManager.getCreditAccountOrRevert(USER);
 
         evm.expectRevert(HasNoOpenedAccountException.selector);
         creditManager.closeCreditAccount(
-            USER,
-            ClosureAction.LIQUIDATE_ACCOUNT,
-            0,
-            DUMB_ADDRESS,
-            DUMB_ADDRESS,
-            type(uint256).max,
-            false
+            USER, ClosureAction.LIQUIDATE_ACCOUNT, 0, DUMB_ADDRESS, DUMB_ADDRESS, type(uint256).max, false
         );
 
         evm.expectRevert(HasNoOpenedAccountException.selector);
         creditManager.transferAccountOwnership(USER, DUMB_ADDRESS);
+    }
 
+    /// @dev [CM-6A]: multicall-only functions revert when the Credit Facade has no account
+    /// Functions list:
+    /// - executeOrder
+    /// - approveCreditAccount
+    function test_CM_06B_multicall_only_functions_revert_when_CF_has_no_account() public {
         address token = tokenTestSuite.addressOf(Tokens.DAI);
 
         evm.expectRevert(HasNoOpenedAccountException.selector);
-        creditManager.approveCreditAccount(USER, DUMB_ADDRESS, token, 100);
+        creditManager.approveCreditAccount(DUMB_ADDRESS, token, 100);
 
         evm.prank(CONFIGURATOR);
-        creditManager.changeContractAllowance(address(this), DUMB_ADDRESS);
+        creditManager.changeContractAllowance(ADAPTER, DUMB_ADDRESS);
 
+        evm.prank(ADAPTER);
         evm.expectRevert(HasNoOpenedAccountException.selector);
-        creditManager.executeOrder(USER, DUMB_ADDRESS, bytes("dd"));
+        creditManager.executeOrder(DUMB_ADDRESS, bytes("dd"));
     }
 
     ///
@@ -662,9 +558,7 @@ contract CreditManagerTest is
     ///
 
     /// @dev [CM-7]: openCreditAccount reverts if zero address or address exists
-    function test_CM_07_openCreditAccount_reverts_if_zero_address_or_address_exists()
-        public
-    {
+    function test_CM_07_openCreditAccount_reverts_if_zero_address_or_address_exists() public {
         // Zero address case
         evm.expectRevert(ZeroAddressOrUserAlreadyHasAccountException.selector);
         creditManager.openCreditAccount(1, address(0));
@@ -675,63 +569,26 @@ contract CreditManagerTest is
     }
 
     /// @dev [CM-8]: openCreditAccount sets correct values and transfers tokens from pool
-    function test_CM_08_openCreditAccount_sets_correct_values_and_transfers_tokens_from_pool()
-        public
-    {
-        address expectedCreditAccount = AccountFactory(
-            addressProvider.getAccountFactory()
-        ).head();
+    function test_CM_08_openCreditAccount_sets_correct_values_and_transfers_tokens_from_pool() public {
+        address expectedCreditAccount = AccountFactory(addressProvider.getAccountFactory()).head();
 
         uint256 blockAtOpen = block.number;
         uint256 cumulativeAtOpen = 1012;
         poolMock.setCumulative_RAY(cumulativeAtOpen);
 
         // Existing address case
-        address creditAccount = creditManager.openCreditAccount(
-            DAI_ACCOUNT_AMOUNT,
-            USER
-        );
+        address creditAccount = creditManager.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER);
+        assertEq(creditAccount, expectedCreditAccount, "Incorrecct credit account address");
         assertEq(
-            creditAccount,
-            expectedCreditAccount,
-            "Incorrecct credit account address"
+            ICreditAccount(creditAccount).borrowedAmount(), DAI_ACCOUNT_AMOUNT, "Incorrect borrowed amount set in CA"
         );
-        assertEq(
-            ICreditAccount(creditAccount).borrowedAmount(),
-            DAI_ACCOUNT_AMOUNT,
-            "Incorrect borrowed amount set in CA"
-        );
-        assertEq(
-            ICreditAccount(creditAccount).since(),
-            blockAtOpen,
-            "Incorrect since set in CA"
-        );
-        assertEq(
-            ICreditAccount(creditAccount).cumulativeIndexAtOpen(),
-            cumulativeAtOpen,
-            "Incorrect since set in CA"
-        );
+        assertEq(ICreditAccount(creditAccount).since(), blockAtOpen, "Incorrect since set in CA");
+        assertEq(ICreditAccount(creditAccount).cumulativeIndexAtOpen(), cumulativeAtOpen, "Incorrect since set in CA");
         expectBalance(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT);
-        assertEq(
-            poolMock.lendAmount(),
-            DAI_ACCOUNT_AMOUNT,
-            "Incorrect DAI_ACCOUNT_AMOUNT in Pool call"
-        );
-        assertEq(
-            poolMock.lendAccount(),
-            creditAccount,
-            "Incorrect credit account in lendCreditAccount call"
-        );
-        assertEq(
-            creditManager.creditAccounts(USER),
-            creditAccount,
-            "Credit account is not associated with user"
-        );
-        assertEq(
-            creditManager.enabledTokensMap(creditAccount),
-            1,
-            "Incorrect enabled token mask"
-        );
+        assertEq(poolMock.lendAmount(), DAI_ACCOUNT_AMOUNT, "Incorrect DAI_ACCOUNT_AMOUNT in Pool call");
+        assertEq(poolMock.lendAccount(), creditAccount, "Incorrect credit account in lendCreditAccount call");
+        assertEq(creditManager.creditAccounts(USER), creditAccount, "Credit account is not associated with user");
+        assertEq(creditManager.enabledTokensMap(creditAccount), 1, "Incorrect enabled token mask");
     }
 
     //
@@ -740,19 +597,11 @@ contract CreditManagerTest is
 
     /// @dev [CM-9]: closeCreditAccount returns credit account to factory and
     /// remove borrower from creditAccounts mapping
-    function test_CM_09_close_credit_account_returns_credit_account_and_remove_borrower_from_map()
-        public
-    {
-        (
-            uint256 borrowedAmount,
-            ,
-            ,
-            address creditAccount
-        ) = _openCreditAccount();
+    function test_CM_09_close_credit_account_returns_credit_account_and_remove_borrower_from_map() public {
+        (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
 
         assertTrue(
-            creditAccount !=
-                AccountFactory(addressProvider.getAccountFactory()).tail(),
+            creditAccount != AccountFactory(addressProvider.getAccountFactory()).tail(),
             "credit account is already in tail!"
         );
 
@@ -762,15 +611,7 @@ contract CreditManagerTest is
         // Increase block number cause it's forbidden to close credit account in the same block
         evm.roll(block.number + 1);
 
-        creditManager.closeCreditAccount(
-            USER,
-            ClosureAction.CLOSE_ACCOUNT,
-            0,
-            USER,
-            USER,
-            0,
-            false
-        );
+        creditManager.closeCreditAccount(USER, ClosureAction.CLOSE_ACCOUNT, 0, USER, USER, 0, false);
 
         assertEq(
             creditAccount,
@@ -789,29 +630,18 @@ contract CreditManagerTest is
     /// Underlying balance: > amountToPool
     /// Send all assets: false
     ///
-    function test_CM_10_close_credit_account_returns_underlying_token_if_not_liquidated()
-        public
-    {
-        (
-            uint256 borrowedAmount,
-            uint256 cumulativeIndexAtOpen,
-            uint256 cumulativeIndexAtClose,
-            address creditAccount
-        ) = _openCreditAccount();
+    function test_CM_10_close_credit_account_returns_underlying_token_if_not_liquidated() public {
+        (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen, uint256 cumulativeIndexAtClose, address creditAccount) =
+            _openCreditAccount();
 
-        uint256 poolBalanceBefore = tokenTestSuite.balanceOf(
-            Tokens.DAI,
-            address(poolMock)
-        );
+        uint256 poolBalanceBefore = tokenTestSuite.balanceOf(Tokens.DAI, address(poolMock));
 
         // Transfer additional borrowedAmount. After that underluying token balance = 2 * borrowedAmount
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
 
-        uint256 interestAccrued = (borrowedAmount * cumulativeIndexAtClose) /
-            cumulativeIndexAtOpen -
-            borrowedAmount;
+        uint256 interestAccrued = (borrowedAmount * cumulativeIndexAtClose) / cumulativeIndexAtOpen - borrowedAmount;
 
-        (uint16 feeInterest, , , , ) = creditManager.fees();
+        (uint16 feeInterest,,,,) = creditManager.fees();
 
         uint256 profit = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR;
 
@@ -819,40 +649,19 @@ contract CreditManagerTest is
 
         evm.expectCall(
             address(poolMock),
-            abi.encodeWithSelector(
-                IPoolService.repayCreditAccount.selector,
-                borrowedAmount,
-                profit,
-                0
-            )
+            abi.encodeWithSelector(IPoolService.repayCreditAccount.selector, borrowedAmount, profit, 0)
         );
 
-        uint256 remainingFunds = creditManager.closeCreditAccount(
-            USER,
-            ClosureAction.CLOSE_ACCOUNT,
-            0,
-            USER,
-            FRIEND,
-            0,
-            false
-        );
+        uint256 remainingFunds =
+            creditManager.closeCreditAccount(USER, ClosureAction.CLOSE_ACCOUNT, 0, USER, FRIEND, 0, false);
 
         assertEq(remainingFunds, 0, "Remaining funds is not zero!");
 
         expectBalance(Tokens.DAI, creditAccount, 1);
 
-        expectBalance(
-            Tokens.DAI,
-            address(poolMock),
-            poolBalanceBefore + amountToPool
-        );
+        expectBalance(Tokens.DAI, address(poolMock), poolBalanceBefore + amountToPool);
 
-        expectBalance(
-            Tokens.DAI,
-            FRIEND,
-            2 * borrowedAmount - amountToPool - 1,
-            "Incorrect amount were paid back"
-        );
+        expectBalance(Tokens.DAI, FRIEND, 2 * borrowedAmount - amountToPool - 1, "Incorrect amount were paid back");
     }
 
     /// @dev [CM-11]: closeCreditAccount sets correct values and transfers tokens from pool
@@ -862,29 +671,18 @@ contract CreditManagerTest is
     /// Underlying balance: < amountToPool
     /// Send all assets: false
     ///
-    function test_CM_11_close_credit_account_charges_caller_if_underlying_token_not_enough()
-        public
-    {
-        (
-            uint256 borrowedAmount,
-            uint256 cumulativeIndexAtOpen,
-            uint256 cumulativeIndexAtClose,
-            address creditAccount
-        ) = _openCreditAccount();
+    function test_CM_11_close_credit_account_charges_caller_if_underlying_token_not_enough() public {
+        (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen, uint256 cumulativeIndexAtClose, address creditAccount) =
+            _openCreditAccount();
 
-        uint256 poolBalanceBefore = tokenTestSuite.balanceOf(
-            Tokens.DAI,
-            address(poolMock)
-        );
+        uint256 poolBalanceBefore = tokenTestSuite.balanceOf(Tokens.DAI, address(poolMock));
 
         // Transfer funds to USER account to be able to cover extra cost
         tokenTestSuite.mint(Tokens.DAI, USER, borrowedAmount);
 
-        uint256 interestAccrued = (borrowedAmount * cumulativeIndexAtClose) /
-            cumulativeIndexAtOpen -
-            borrowedAmount;
+        uint256 interestAccrued = (borrowedAmount * cumulativeIndexAtClose) / cumulativeIndexAtOpen - borrowedAmount;
 
-        (uint16 feeInterest, , , , ) = creditManager.fees();
+        (uint16 feeInterest,,,,) = creditManager.fees();
 
         uint256 profit = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR;
 
@@ -892,45 +690,19 @@ contract CreditManagerTest is
 
         evm.expectCall(
             address(poolMock),
-            abi.encodeWithSelector(
-                IPoolService.repayCreditAccount.selector,
-                borrowedAmount,
-                profit,
-                0
-            )
+            abi.encodeWithSelector(IPoolService.repayCreditAccount.selector, borrowedAmount, profit, 0)
         );
 
-        uint256 remainingFunds = creditManager.closeCreditAccount(
-            USER,
-            ClosureAction.CLOSE_ACCOUNT,
-            0,
-            USER,
-            FRIEND,
-            0,
-            false
-        );
+        uint256 remainingFunds =
+            creditManager.closeCreditAccount(USER, ClosureAction.CLOSE_ACCOUNT, 0, USER, FRIEND, 0, false);
 
         assertEq(remainingFunds, 0, "Remaining funds is not zero!");
 
-        expectBalance(
-            Tokens.DAI,
-            creditAccount,
-            1,
-            "Credit account balance != 1"
-        );
+        expectBalance(Tokens.DAI, creditAccount, 1, "Credit account balance != 1");
 
-        expectBalance(
-            Tokens.DAI,
-            address(poolMock),
-            poolBalanceBefore + amountToPool
-        );
+        expectBalance(Tokens.DAI, address(poolMock), poolBalanceBefore + amountToPool);
 
-        expectBalance(
-            Tokens.DAI,
-            USER,
-            2 * borrowedAmount - amountToPool - 1,
-            "Incorrect amount were paid back"
-        );
+        expectBalance(Tokens.DAI, USER, 2 * borrowedAmount - amountToPool - 1, "Incorrect amount were paid back");
 
         expectBalance(Tokens.DAI, FRIEND, 0, "Incorrect amount were paid back");
     }
@@ -943,26 +715,13 @@ contract CreditManagerTest is
     /// Send all assets: false
     /// Remaining funds: 0
     ///
-    function test_CM_12_close_credit_account_charges_caller_if_underlying_token_not_enough()
-        public
-    {
-        (
-            ,
-            ,
-            uint16 liquidationDiscount,
-            ,
-            uint16 liquidationDiscountExpired
-        ) = creditManager.fees();
+    function test_CM_12_close_credit_account_charges_caller_if_underlying_token_not_enough() public {
+        (,, uint16 liquidationDiscount,, uint16 liquidationDiscountExpired) = creditManager.fees();
 
         for (uint256 i = 0; i < 3; i++) {
-            uint256 friendBalanceBefore = tokenTestSuite.balanceOf(
-                Tokens.DAI,
-                FRIEND
-            );
+            uint256 friendBalanceBefore = tokenTestSuite.balanceOf(Tokens.DAI, FRIEND);
 
-            ClosureAction action = i == 0
-                ? ClosureAction.LIQUIDATE_ACCOUNT
-                : ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT;
+            ClosureAction action = i == 0 ? ClosureAction.LIQUIDATE_ACCOUNT : ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT;
 
             (
                 uint256 borrowedAmount,
@@ -980,23 +739,15 @@ contract CreditManagerTest is
                 evm.stopPrank();
             }
 
-            uint256 poolBalanceBefore = tokenTestSuite.balanceOf(
-                Tokens.DAI,
-                address(poolMock)
-            );
+            uint256 poolBalanceBefore = tokenTestSuite.balanceOf(Tokens.DAI, address(poolMock));
 
             uint256 totalValue = borrowedAmount;
 
-            uint256 interestAccrued = (borrowedAmount *
-                cumulativeIndexAtClose) /
-                cumulativeIndexAtOpen -
-                borrowedAmount;
+            uint256 interestAccrued = (borrowedAmount * cumulativeIndexAtClose) / cumulativeIndexAtOpen - borrowedAmount;
 
             uint256 discount = i == 2
                 ? PERCENTAGE_FACTOR
-                : action == ClosureAction.LIQUIDATE_ACCOUNT
-                ? liquidationDiscount
-                : liquidationDiscountExpired;
+                : action == ClosureAction.LIQUIDATE_ACCOUNT ? liquidationDiscount : liquidationDiscountExpired;
 
             uint256 amountToPool = (totalValue * discount) / PERCENTAGE_FACTOR;
 
@@ -1005,48 +756,25 @@ contract CreditManagerTest is
 
                 evm.expectCall(
                     address(poolMock),
-                    abi.encodeWithSelector(
-                        IPoolService.repayCreditAccount.selector,
-                        borrowedAmount,
-                        0,
-                        loss
-                    )
+                    abi.encodeWithSelector(IPoolService.repayCreditAccount.selector, borrowedAmount, 0, loss)
                 );
             }
             {
-                uint256 remainingFunds = creditManager.closeCreditAccount(
-                    USER,
-                    action,
-                    totalValue,
-                    LIQUIDATOR,
-                    FRIEND,
-                    0,
-                    false
-                );
+                uint256 remainingFunds =
+                    creditManager.closeCreditAccount(USER, action, totalValue, LIQUIDATOR, FRIEND, 0, false);
 
                 assertEq(remainingFunds, 0, "Remaining funds is not zero!");
             }
 
-            expectBalance(
-                Tokens.DAI,
-                creditAccount,
-                1,
-                "Credit account balance != 1"
-            );
+            expectBalance(Tokens.DAI, creditAccount, 1, "Credit account balance != 1");
 
-            expectBalance(
-                Tokens.DAI,
-                address(poolMock),
-                poolBalanceBefore + amountToPool
-            );
+            expectBalance(Tokens.DAI, address(poolMock), poolBalanceBefore + amountToPool);
 
             expectBalance(
                 Tokens.DAI,
                 FRIEND,
-                friendBalanceBefore +
-                    (borrowedAmount * (PERCENTAGE_FACTOR - discount)) /
-                    PERCENTAGE_FACTOR -
-                    (i == 2 ? 0 : 1),
+                friendBalanceBefore + (borrowedAmount * (PERCENTAGE_FACTOR - discount)) / PERCENTAGE_FACTOR
+                    - (i == 2 ? 0 : 1),
                 "Incorrect amount were paid to liqiudator friend address"
             );
         }
@@ -1061,9 +789,7 @@ contract CreditManagerTest is
     /// Remaining funds: >0
     ///
 
-    function test_CM_13_close_credit_account_charges_caller_if_underlying_token_not_enough()
-        public
-    {
+    function test_CM_13_close_credit_account_charges_caller_if_underlying_token_not_enough() public {
         for (uint256 i = 0; i < 3; i++) {
             setUp();
 
@@ -1074,80 +800,51 @@ contract CreditManagerTest is
                 address creditAccount
             ) = _openCreditAccount();
 
-            uint256 poolBalanceBefore = tokenTestSuite.balanceOf(
-                Tokens.DAI,
-                address(poolMock)
-            );
+            uint256 poolBalanceBefore = tokenTestSuite.balanceOf(Tokens.DAI, address(poolMock));
             uint256 expectedRemainingFunds = 100 * WAD;
 
             uint256 profit;
             uint256 amountToPool;
             uint256 totalValue;
             {
-                uint256 interestAccrued = (borrowedAmount *
-                    cumulativeIndexAtClose) /
-                    cumulativeIndexAtOpen -
-                    borrowedAmount;
+                uint256 interestAccrued =
+                    (borrowedAmount * cumulativeIndexAtClose) / cumulativeIndexAtOpen - borrowedAmount;
 
                 uint16 feeInterest;
                 uint16 feeLiquidation;
                 uint16 liquidationDiscount;
 
                 {
-                    (feeInterest, , , , ) = creditManager.fees();
+                    (feeInterest,,,,) = creditManager.fees();
                 }
 
                 {
                     uint16 feeLiquidationNormal;
                     uint16 feeLiquidationExpired;
 
-                    (
-                        ,
-                        feeLiquidationNormal,
-                        ,
-                        feeLiquidationExpired,
+                    (, feeLiquidationNormal,, feeLiquidationExpired,) = creditManager.fees();
 
-                    ) = creditManager.fees();
-
-                    feeLiquidation = (i == 0 || i == 2)
-                        ? feeLiquidationNormal
-                        : feeLiquidationExpired;
+                    feeLiquidation = (i == 0 || i == 2) ? feeLiquidationNormal : feeLiquidationExpired;
                 }
 
                 {
                     uint16 liquidationDiscountNormal;
                     uint16 liquidationDiscountExpired;
 
-                    (
-                        feeInterest,
-                        ,
-                        liquidationDiscountNormal,
-                        ,
-                        liquidationDiscountExpired
-                    ) = creditManager.fees();
+                    (feeInterest,, liquidationDiscountNormal,, liquidationDiscountExpired) = creditManager.fees();
 
-                    liquidationDiscount = i == 0
-                        ? liquidationDiscountNormal
-                        : i == 1
-                        ? liquidationDiscountExpired
-                        : PERCENTAGE_FACTOR;
+                    liquidationDiscount =
+                        i == 0 ? liquidationDiscountNormal : i == 1 ? liquidationDiscountExpired : PERCENTAGE_FACTOR;
                 }
 
-                uint256 profitInterest = (interestAccrued * feeInterest) /
-                    PERCENTAGE_FACTOR;
+                uint256 profitInterest = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR;
 
-                amountToPool =
-                    borrowedAmount +
-                    interestAccrued +
-                    profitInterest;
+                amountToPool = borrowedAmount + interestAccrued + profitInterest;
 
-                totalValue =
-                    ((amountToPool + expectedRemainingFunds) *
-                        PERCENTAGE_FACTOR) /
-                    (liquidationDiscount - feeLiquidation);
+                totalValue = ((amountToPool + expectedRemainingFunds) * PERCENTAGE_FACTOR)
+                    / (liquidationDiscount - feeLiquidation);
 
-                uint256 profitLiquidation = (totalValue * feeLiquidation) /
-                    PERCENTAGE_FACTOR;
+                uint256 profitLiquidation = (totalValue * feeLiquidation) / PERCENTAGE_FACTOR;
 
                 amountToPool += profitLiquidation;
 
@@ -1157,19 +854,9 @@ contract CreditManagerTest is
             tokenTestSuite.mint(Tokens.DAI, LIQUIDATOR, totalValue);
             expectBalance(Tokens.DAI, USER, 0, "USER has non-zero balance");
             expectBalance(Tokens.DAI, FRIEND, 0, "FRIEND has non-zero balance");
-            expectBalance(
-                Tokens.DAI,
-                LIQUIDATOR,
-                totalValue,
-                "LIQUIDATOR has incorrect initial balance"
-            );
+            expectBalance(Tokens.DAI, LIQUIDATOR, totalValue, "LIQUIDATOR has incorrect initial balance");
 
-            expectBalance(
-                Tokens.DAI,
-                creditAccount,
-                borrowedAmount,
-                "creditAccount has incorrect initial balance"
-            );
+            expectBalance(Tokens.DAI, creditAccount, borrowedAmount, "creditAccount has incorrect initial balance");
 
             if (i == 2) {
                 evm.startPrank(CONFIGURATOR);
@@ -1182,19 +869,12 @@ contract CreditManagerTest is
 
             evm.expectCall(
                 address(poolMock),
-                abi.encodeWithSelector(
-                    IPoolService.repayCreditAccount.selector,
-                    borrowedAmount,
-                    profit,
-                    0
-                )
+                abi.encodeWithSelector(IPoolService.repayCreditAccount.selector, borrowedAmount, profit, 0)
             );
 
             uint256 remainingFunds = creditManager.closeCreditAccount(
                 USER,
-                i == 0
-                    ? ClosureAction.LIQUIDATE_ACCOUNT
-                    : ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT,
+                i == 0 ? ClosureAction.LIQUIDATE_ACCOUNT : ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT,
                 totalValue,
                 LIQUIDATOR,
                 FRIEND,
@@ -1202,30 +882,12 @@ contract CreditManagerTest is
                 false
             );
 
-            assertLe(
-                expectedRemainingFunds - remainingFunds,
-                2,
-                "Incorrect remaining funds"
-            );
+            assertLe(expectedRemainingFunds - remainingFunds, 2, "Incorrect remaining funds");
 
-            expectBalance(
-                Tokens.DAI,
-                creditAccount,
-                1,
-                "Credit account balance != 1"
-            );
-            expectBalance(
-                Tokens.DAI,
-                USER,
-                remainingFunds,
-                "USER get incorrect amount as remaning funds"
-            );
+            expectBalance(Tokens.DAI, creditAccount, 1, "Credit account balance != 1");
+            expectBalance(Tokens.DAI, USER, remainingFunds, "USER get incorrect amount as remaning funds");
 
-            expectBalance(
-                Tokens.DAI,
-                address(poolMock),
-                poolBalanceBefore + amountToPool
-            );
+            expectBalance(Tokens.DAI, address(poolMock), poolBalanceBefore + amountToPool);
 
             expectBalance(
                 Tokens.DAI,
@@ -1245,55 +907,31 @@ contract CreditManagerTest is
     /// Remaining funds: >0
     ///
 
-    function test_CM_14_close_credit_account_with_nonzero_skipTokenMask_sends_correct_tokens()
-        public
-    {
-        (
-            uint256 borrowedAmount,
-            ,
-            ,
-            address creditAccount
-        ) = _openCreditAccount();
+    function test_CM_14_close_credit_account_with_nonzero_skipTokenMask_sends_correct_tokens() public {
+        (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
+        creditManager.transferAccountOwnership(USER, address(this));
 
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
         tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
-        creditManager.checkAndEnableToken(
-            creditAccount,
-            tokenTestSuite.addressOf(Tokens.WETH)
-        );
+        creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.WETH));
 
         tokenTestSuite.mint(Tokens.USDC, creditAccount, USDC_EXCHANGE_AMOUNT);
-        creditManager.checkAndEnableToken(
-            creditAccount,
-            tokenTestSuite.addressOf(Tokens.USDC)
-        );
+        creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.USDC));
 
         tokenTestSuite.mint(Tokens.LINK, creditAccount, LINK_EXCHANGE_AMOUNT);
-        creditManager.checkAndEnableToken(
-            creditAccount,
-            tokenTestSuite.addressOf(Tokens.LINK)
-        );
+        creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.LINK));
 
-        expectTokenIsEnabled(Tokens.WETH, true);
-        expectTokenIsEnabled(Tokens.USDC, true);
-        expectTokenIsEnabled(Tokens.LINK, true);
+        expectTokenIsEnabled(creditAccount, Tokens.WETH, true);
+        expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
+        expectTokenIsEnabled(creditAccount, Tokens.LINK, true);
 
-        uint256 wethTokenMask = creditManager.tokenMasksMap(
-            tokenTestSuite.addressOf(Tokens.WETH)
-        );
+        uint256 wethTokenMask = creditManager.tokenMasksMap(tokenTestSuite.addressOf(Tokens.WETH));
 
-        uint256 usdcTokenMask = creditManager.tokenMasksMap(
-            tokenTestSuite.addressOf(Tokens.USDC)
-        );
+        uint256 usdcTokenMask = creditManager.tokenMasksMap(tokenTestSuite.addressOf(Tokens.USDC));
 
+        creditManager.transferAccountOwnership(address(this), USER);
         creditManager.closeCreditAccount(
-            USER,
-            ClosureAction.CLOSE_ACCOUNT,
-            0,
-            USER,
-            FRIEND,
-            wethTokenMask | usdcTokenMask,
-            false
+            USER, ClosureAction.CLOSE_ACCOUNT, 0, USER, FRIEND, wethTokenMask | usdcTokenMask, false
         );
 
         expectBalance(Tokens.WETH, FRIEND, 0);
@@ -1308,41 +946,25 @@ contract CreditManagerTest is
     /// @dev [CM-16]: closeCreditAccount sends ETH for WETH creditManger to borrower
     /// CASE: CLOSURE
     /// Underlying token: WETH
-    function test_CM_16_close_weth_credit_account_sends_eth_to_borrower()
-        public
-    {
+    function test_CM_16_close_weth_credit_account_sends_eth_to_borrower() public {
         // It takes "clean" address which doesn't holds any assets
 
         _connectCreditManagerSuite(Tokens.WETH, false);
 
         /// CLOSURE CASE
-        (
-            uint256 borrowedAmount,
-            uint256 cumulativeIndexAtOpen,
-            uint256 cumulativeIndexAtClose,
-            address creditAccount
-        ) = _openCreditAccount();
+        (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen, uint256 cumulativeIndexAtClose, address creditAccount) =
+            _openCreditAccount();
 
         // Transfer additional borrowedAmount. After that underluying token balance = 2 * borrowedAmount
         tokenTestSuite.mint(Tokens.WETH, creditAccount, borrowedAmount);
 
-        creditManager.closeCreditAccount(
-            USER,
-            ClosureAction.CLOSE_ACCOUNT,
-            0,
-            USER,
-            USER,
-            0,
-            true
-        );
+        creditManager.closeCreditAccount(USER, ClosureAction.CLOSE_ACCOUNT, 0, USER, USER, 0, true);
 
         expectBalance(Tokens.WETH, creditAccount, 1);
 
-        uint256 interestAccrued = (borrowedAmount * cumulativeIndexAtClose) /
-            cumulativeIndexAtOpen -
-            borrowedAmount;
+        uint256 interestAccrued = (borrowedAmount * cumulativeIndexAtClose) / cumulativeIndexAtOpen - borrowedAmount;
 
-        (uint16 feeInterest, , , , ) = creditManager.fees();
+        (uint16 feeInterest,,,,) = creditManager.fees();
 
         uint256 profit = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR;
 
@@ -1354,36 +976,21 @@ contract CreditManagerTest is
     /// @dev [CM-17]: closeCreditAccount sends ETH for WETH creditManger to borrower
     /// CASE: CLOSURE
     /// Underlying token: DAI
-    function test_CM_17_close_dai_credit_account_sends_eth_to_borrower()
-        public
-    {
+    function test_CM_17_close_dai_credit_account_sends_eth_to_borrower() public {
         /// CLOSURE CASE
-        (
-            uint256 borrowedAmount,
-            ,
-            ,
-            address creditAccount
-        ) = _openCreditAccount();
+        (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
+        creditManager.transferAccountOwnership(USER, address(this));
 
         // Transfer additional borrowedAmount. After that underluying token balance = 2 * borrowedAmount
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
 
         // Adds WETH to test how it would be converted
         tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
-        creditManager.checkAndEnableToken(
-            creditAccount,
-            tokenTestSuite.addressOf(Tokens.WETH)
-        );
 
-        creditManager.closeCreditAccount(
-            USER,
-            ClosureAction.CLOSE_ACCOUNT,
-            0,
-            USER,
-            USER,
-            0,
-            true
-        );
+        creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.WETH));
+
+        creditManager.transferAccountOwnership(address(this), USER);
+        creditManager.closeCreditAccount(USER, ClosureAction.CLOSE_ACCOUNT, 0, USER, USER, 0, true);
 
         expectBalance(Tokens.WETH, creditAccount, 1);
 
@@ -1392,26 +999,19 @@ contract CreditManagerTest is
 
     /// @dev [CM-18]: closeCreditAccount sends ETH for WETH creditManger to borrower
     /// CASE: LIQUIDATION
-    function test_CM_18_close_credit_account_sends_eth_to_liquidator_and_weth_to_borrower()
-        public
-    {
+    function test_CM_18_close_credit_account_sends_eth_to_liquidator_and_weth_to_borrower() public {
         /// Store USER ETH balance
 
         uint256 userBalanceBefore = tokenTestSuite.balanceOf(Tokens.WETH, USER);
 
-        (, , uint16 liquidationDiscount, , ) = creditManager.fees();
+        (,, uint16 liquidationDiscount,,) = creditManager.fees();
 
         // It takes "clean" address which doesn't holds any assets
 
         _connectCreditManagerSuite(Tokens.WETH, false);
 
         /// CLOSURE CASE
-        (
-            uint256 borrowedAmount,
-            ,
-            ,
-            address creditAccount
-        ) = _openCreditAccount();
+        (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
 
         // Transfer additional borrowedAmount. After that underluying token balance = 2 * borrowedAmount
         tokenTestSuite.mint(Tokens.WETH, creditAccount, borrowedAmount);
@@ -1419,36 +1019,19 @@ contract CreditManagerTest is
         uint256 totalValue = borrowedAmount * 2;
 
         uint256 remainingFunds = creditManager.closeCreditAccount(
-            USER,
-            ClosureAction.LIQUIDATE_ACCOUNT,
-            totalValue,
-            LIQUIDATOR,
-            FRIEND,
-            0,
-            true
+            USER, ClosureAction.LIQUIDATE_ACCOUNT, totalValue, LIQUIDATOR, FRIEND, 0, true
         );
 
         // checks that no eth were sent to USER account
         expectEthBalance(USER, 0);
 
-        expectBalance(
-            Tokens.WETH,
-            creditAccount,
-            1,
-            "Credit account balance != 1"
-        );
+        expectBalance(Tokens.WETH, creditAccount, 1, "Credit account balance != 1");
 
-        expectBalance(
-            Tokens.WETH,
-            USER,
-            userBalanceBefore + remainingFunds,
-            "Incorrect amount were paid back"
-        );
+        expectBalance(Tokens.WETH, USER, userBalanceBefore + remainingFunds, "Incorrect amount were paid back");
 
         expectEthBalance(
             FRIEND,
-            (totalValue * (PERCENTAGE_FACTOR - liquidationDiscount)) /
-                PERCENTAGE_FACTOR,
+            (totalValue * (PERCENTAGE_FACTOR - liquidationDiscount)) / PERCENTAGE_FACTOR,
             "Incorrect amount were paid to liqiudator friend address"
         );
     }
@@ -1456,44 +1039,27 @@ contract CreditManagerTest is
     /// @dev [CM-19]: closeCreditAccount sends ETH for WETH creditManger to borrower
     /// CASE: LIQUIDATION
     /// Underlying token: DAI
-    function test_CM_19_close_dai_credit_account_sends_eth_to_liquidator()
-        public
-    {
+    function test_CM_19_close_dai_credit_account_sends_eth_to_liquidator() public {
         /// CLOSURE CASE
-        (
-            uint256 borrowedAmount,
-            ,
-            ,
-            address creditAccount
-        ) = _openCreditAccount();
+        (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
+        creditManager.transferAccountOwnership(USER, address(this));
 
         // Transfer additional borrowedAmount. After that underluying token balance = 2 * borrowedAmount
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
 
         // Adds WETH to test how it would be converted
         tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
-        creditManager.checkAndEnableToken(
-            creditAccount,
-            tokenTestSuite.addressOf(Tokens.WETH)
-        );
 
+        creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.WETH));
+
+        creditManager.transferAccountOwnership(address(this), USER);
         creditManager.closeCreditAccount(
-            USER,
-            ClosureAction.LIQUIDATE_ACCOUNT,
-            borrowedAmount,
-            LIQUIDATOR,
-            FRIEND,
-            0,
-            true
+            USER, ClosureAction.LIQUIDATE_ACCOUNT, borrowedAmount, LIQUIDATOR, FRIEND, 0, true
         );
 
         expectBalance(Tokens.WETH, creditAccount, 1);
 
-        expectEthBalance(
-            FRIEND,
-            WETH_EXCHANGE_AMOUNT - 1,
-            "Incorrect amount were paid to liqiudator friend address"
-        );
+        expectEthBalance(FRIEND, WETH_EXCHANGE_AMOUNT - 1, "Incorrect amount were paid to liqiudator friend address");
     }
 
     //
@@ -1501,84 +1067,43 @@ contract CreditManagerTest is
     //
 
     /// @dev [CM-20]: manageDebt correctly increases debt
-    function test_CM_20_manageDebt_correctly_increases_debt(uint128 amount)
-        public
-    {
-        (
-            uint256 borrowedAmount,
-            uint256 cumulativeIndexAtOpen,
-            ,
-            address creditAccount
-        ) = cms.openCreditAccount(1);
+    function test_CM_20_manageDebt_correctly_increases_debt(uint128 amount) public {
+        (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen,, address creditAccount) = cms.openCreditAccount(1);
 
         tokenTestSuite.mint(Tokens.DAI, address(poolMock), amount);
 
         poolMock.setCumulative_RAY(cumulativeIndexAtOpen * 2);
 
-        uint256 expectedNewCulumativeIndex = (2 *
-            cumulativeIndexAtOpen *
-            (borrowedAmount + amount)) / (2 * borrowedAmount + amount);
+        uint256 expectedNewCulumativeIndex =
+            (2 * cumulativeIndexAtOpen * (borrowedAmount + amount)) / (2 * borrowedAmount + amount);
 
-        uint256 newBorrowedAmount = creditManager.manageDebt(
-            creditAccount,
-            amount,
-            true
-        );
+        uint256 newBorrowedAmount = creditManager.manageDebt(creditAccount, amount, true);
 
-        assertEq(
-            newBorrowedAmount,
-            borrowedAmount + amount,
-            "Incorrect returned newBorrowedAmount"
-        );
+        assertEq(newBorrowedAmount, borrowedAmount + amount, "Incorrect returned newBorrowedAmount");
 
         assertLe(
-            (ICreditAccount(creditAccount).cumulativeIndexAtOpen() * (10**6)) /
-                expectedNewCulumativeIndex,
-            10**6,
+            (ICreditAccount(creditAccount).cumulativeIndexAtOpen() * (10 ** 6)) / expectedNewCulumativeIndex,
+            10 ** 6,
             "Incorrect cumulative index"
         );
 
-        assertEq(
-            ICreditAccount(creditAccount).borrowedAmount(),
-            newBorrowedAmount,
-            "Incorrect borrowedAmount"
-        );
+        assertEq(ICreditAccount(creditAccount).borrowedAmount(), newBorrowedAmount, "Incorrect borrowedAmount");
 
-        expectBalance(
-            Tokens.DAI,
-            creditAccount,
-            newBorrowedAmount,
-            "Incorrect balance on credit account"
-        );
+        expectBalance(Tokens.DAI, creditAccount, newBorrowedAmount, "Incorrect balance on credit account");
 
         assertEq(poolMock.lendAmount(), amount, "Incorrect lend amount");
 
-        assertEq(
-            poolMock.lendAccount(),
-            creditAccount,
-            "Incorrect lend account"
-        );
+        assertEq(poolMock.lendAccount(), creditAccount, "Incorrect lend account");
     }
 
     /// @dev [CM-21]: manageDebt correctly decreases debt
-    function test_CM_21_manageDebt_correctly_decreases_debt(uint128 amount)
-        public
-    {
-        tokenTestSuite.mint(
-            Tokens.DAI,
-            address(poolMock),
-            (uint256(type(uint128).max) * 14) / 10
-        );
+    function test_CM_21_manageDebt_correctly_decreases_debt(uint128 amount) public {
+        tokenTestSuite.mint(Tokens.DAI, address(poolMock), (uint256(type(uint128).max) * 14) / 10);
 
-        (
-            uint256 borrowedAmount,
-            uint256 cumulativeIndexAtOpen,
-            uint256 cumulativeIndexNow,
-            address creditAccount
-        ) = cms.openCreditAccount((uint256(type(uint128).max) * 14) / 10);
+        (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen, uint256 cumulativeIndexNow, address creditAccount) =
+            cms.openCreditAccount((uint256(type(uint128).max) * 14) / 10);
 
-        (, , uint256 totalDebt) = creditManager
-            .calcCreditAccountAccruedInterest(creditAccount);
+        (,, uint256 totalDebt) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
 
         uint256 expectedInterestAndFees;
         uint256 expectedBorrowAmount;
@@ -1590,48 +1115,27 @@ contract CreditManagerTest is
             expectedBorrowAmount = borrowedAmount;
         }
 
-        uint256 newBorrowedAmount = creditManager.manageDebt(
-            creditAccount,
-            amount,
-            false
-        );
+        uint256 newBorrowedAmount = creditManager.manageDebt(creditAccount, amount, false);
 
-        assertEq(
-            newBorrowedAmount,
-            expectedBorrowAmount,
-            "Incorrect returned newBorrowedAmount"
-        );
+        assertEq(newBorrowedAmount, expectedBorrowAmount, "Incorrect returned newBorrowedAmount");
 
         if (amount >= totalDebt - borrowedAmount) {
-            (, , uint256 newTotalDebt) = creditManager
-                .calcCreditAccountAccruedInterest(creditAccount);
+            (,, uint256 newTotalDebt) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
 
             assertEq(newTotalDebt, newBorrowedAmount, "Incorrect new interest");
         } else {
-            (, , uint256 newTotalDebt) = creditManager
-                .calcCreditAccountAccruedInterest(creditAccount);
+            (,, uint256 newTotalDebt) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
 
             assertLt(
-                (RAY * (newTotalDebt - newBorrowedAmount)) /
-                    expectedInterestAndFees -
-                    RAY,
+                (RAY * (newTotalDebt - newBorrowedAmount)) / expectedInterestAndFees - RAY,
                 10000,
                 "Incorrect new interest"
             );
         }
 
-        assertEq(
-            ICreditAccount(creditAccount).borrowedAmount(),
-            newBorrowedAmount,
-            "Incorrect borrowedAmount"
-        );
+        assertEq(ICreditAccount(creditAccount).borrowedAmount(), newBorrowedAmount, "Incorrect borrowedAmount");
 
-        expectBalance(
-            Tokens.DAI,
-            creditAccount,
-            borrowedAmount - amount,
-            "Incorrect balance on credit account"
-        );
+        expectBalance(Tokens.DAI, creditAccount, borrowedAmount - amount, "Incorrect balance on credit account");
 
         if (amount >= totalDebt - borrowedAmount) {
             assertEq(
@@ -1645,22 +1149,13 @@ contract CreditManagerTest is
             );
 
             {
-                (uint256 feeInterest, , , , ) = creditManager.fees();
-                amount = uint128(
-                    (uint256(amount) * PERCENTAGE_FACTOR) /
-                        (PERCENTAGE_FACTOR + feeInterest)
-                );
+                (uint256 feeInterest,,,,) = creditManager.fees();
+                amount = uint128((uint256(amount) * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest));
             }
 
             assertEq(
                 ICreditAccount(creditAccount).cumulativeIndexAtOpen(),
-                cmi.calcNewCumulativeIndex(
-                    borrowedAmount,
-                    amount,
-                    cumulativeIndexNow,
-                    cumulativeIndexAtOpen,
-                    false
-                ),
+                cmi.calcNewCumulativeIndex(borrowedAmount, amount, cumulativeIndexNow, cumulativeIndexAtOpen, false),
                 "Incorrect cumulativeIndexAtOpen"
             );
         }
@@ -1672,35 +1167,23 @@ contract CreditManagerTest is
 
     /// @dev [CM-22]: add collateral transfers money and enables token
 
-    function test_CM_22_add_collateral_transfers_money_and_enables_token()
-        public
-    {
-        (, , , address creditAccount) = _openCreditAccount();
+    function test_CM_22_add_collateral_transfers_money_and_enables_token() public {
+        (,,, address creditAccount) = _openCreditAccount();
 
         tokenTestSuite.mint(Tokens.WETH, FRIEND, WETH_EXCHANGE_AMOUNT);
         tokenTestSuite.approve(Tokens.WETH, FRIEND, address(creditManager));
 
         expectBalance(Tokens.WETH, creditAccount, 0, "Non-zero WETH balance");
 
-        expectTokenIsEnabled(Tokens.WETH, false);
+        expectTokenIsEnabled(creditAccount, Tokens.WETH, false);
 
-        creditManager.addCollateral(
-            FRIEND,
-            creditAccount,
-            tokenTestSuite.addressOf(Tokens.WETH),
-            WETH_EXCHANGE_AMOUNT
-        );
+        creditManager.addCollateral(FRIEND, creditAccount, tokenTestSuite.addressOf(Tokens.WETH), WETH_EXCHANGE_AMOUNT);
 
-        expectBalance(
-            Tokens.WETH,
-            creditAccount,
-            WETH_EXCHANGE_AMOUNT,
-            "Non-zero WETH balance"
-        );
+        expectBalance(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT, "Non-zero WETH balance");
 
         expectBalance(Tokens.WETH, FRIEND, 0, "Incorrect FRIEND balance");
 
-        expectTokenIsEnabled(Tokens.WETH, true);
+        expectTokenIsEnabled(creditAccount, Tokens.WETH, true);
     }
 
     //
@@ -1709,9 +1192,7 @@ contract CreditManagerTest is
 
     /// @dev [CM-23]: transferAccountOwnership reverts if to equals 0 or creditAccount is linked with "to" address
 
-    function test_CM_23_transferAccountOwnership_reverts_if_to_equals_zero_or_account_exists()
-        public
-    {
+    function test_CM_23_transferAccountOwnership_reverts_if_to_equals_zero_or_account_exists() public {
         _openCreditAccount();
 
         creditManager.openCreditAccount(1, FRIEND);
@@ -1725,24 +1206,14 @@ contract CreditManagerTest is
 
     /// @dev [CM-24]: transferAccountOwnership changes creditAccounts map properly
 
-    function test_CM_24_transferAccountOwnership_changes_creditAccounts_map_properly()
-        public
-    {
-        (, , , address creditAccount) = _openCreditAccount();
+    function test_CM_24_transferAccountOwnership_changes_creditAccounts_map_properly() public {
+        (,,, address creditAccount) = _openCreditAccount();
 
         creditManager.transferAccountOwnership(USER, FRIEND);
 
-        assertEq(
-            creditManager.creditAccounts(USER),
-            address(0),
-            "From account wasn't deleted"
-        );
+        assertEq(creditManager.creditAccounts(USER), address(0), "From account wasn't deleted");
 
-        assertEq(
-            creditManager.creditAccounts(FRIEND),
-            creditAccount,
-            "To account isn't correct"
-        );
+        assertEq(creditManager.creditAccounts(FRIEND), creditAccount, "To account isn't correct");
 
         evm.expectRevert(HasNoOpenedAccountException.selector);
         creditManager.getCreditAccountOrRevert(USER);
@@ -1753,10 +1224,8 @@ contract CreditManagerTest is
     //
 
     /// @dev [CM-25]: approveCreditAccount reverts if adapter is not connected with target contract
-    function test_CM_25_approveCreditAccount_reverts_if_adapter_isnt_connected_with_contract_or_0()
-        public
-    {
-        _openCreditAccount();
+    function test_CM_25_approveCreditAccount_reverts_if_adapter_isnt_connected_with_contract_or_0() public {
+        _openAccountAndTransferToCF();
 
         evm.prank(CONFIGURATOR);
         creditManager.changeContractAllowance(DUMB_ADDRESS, FRIEND);
@@ -1764,124 +1233,64 @@ contract CreditManagerTest is
         evm.expectRevert(AdaptersOrCreditFacadeOnlyException.selector);
 
         evm.prank(DUMB_ADDRESS);
-        creditManager.approveCreditAccount(
-            USER,
-            DUMB_ADDRESS,
-            DUMB_ADDRESS,
-            100
-        );
+        creditManager.approveCreditAccount(DUMB_ADDRESS, DUMB_ADDRESS, 100);
 
         // Address 0 case
         evm.expectRevert(AdaptersOrCreditFacadeOnlyException.selector);
         evm.prank(DUMB_ADDRESS);
-        creditManager.approveCreditAccount(USER, address(0), DUMB_ADDRESS, 100);
+        creditManager.approveCreditAccount(address(0), DUMB_ADDRESS, 100);
     }
 
     /// @dev [CM-25A]: approveCreditAccount reverts if the token is not added
-    function test_CM_25A_approveCreditAccount_reverts_if_the_token_is_not_added()
-        public
-    {
-        _openCreditAccount();
+    function test_CM_25A_approveCreditAccount_reverts_if_the_token_is_not_added() public {
+        _openAccountAndTransferToCF();
 
         evm.expectRevert(TokenNotAllowedException.selector);
 
-        creditManager.approveCreditAccount(
-            USER,
-            DUMB_ADDRESS,
-            DUMB_ADDRESS,
-            100
-        );
+        creditManager.approveCreditAccount(DUMB_ADDRESS, DUMB_ADDRESS, 100);
     }
 
     /// @dev [CM-26]: approveCreditAccount approves with desired allowance
-    function test_CM_26_approveCreditAccount_approves_with_desired_allowance()
-        public
-    {
-        (, , , address creditAccount) = _openCreditAccount();
+    function test_CM_26_approveCreditAccount_approves_with_desired_allowance() public {
+        address creditAccount = _openAccountAndTransferToCF();
 
         // Case, when current allowance > ALLOWANCE_THRESHOLD
         tokenTestSuite.approve(Tokens.DAI, creditAccount, DUMB_ADDRESS, 200);
-        creditManager.approveCreditAccount(
-            USER,
-            DUMB_ADDRESS,
-            tokenTestSuite.addressOf(Tokens.DAI),
-            DAI_EXCHANGE_AMOUNT
-        );
+        creditManager.approveCreditAccount(DUMB_ADDRESS, tokenTestSuite.addressOf(Tokens.DAI), DAI_EXCHANGE_AMOUNT);
 
-        expectAllowance(
-            Tokens.DAI,
-            creditAccount,
-            DUMB_ADDRESS,
-            DAI_EXCHANGE_AMOUNT
-        );
+        expectAllowance(Tokens.DAI, creditAccount, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
     }
 
     /// @dev [CM-27A]: approveCreditAccount works for ERC20 that revert if allowance > 0 before approve
-    function test_CM_27A_approveCreditAccount_works_for_ERC20_with_approve_restrictions()
-        public
-    {
-        (, , , address creditAccount) = _openCreditAccount();
+    function test_CM_27A_approveCreditAccount_works_for_ERC20_with_approve_restrictions() public {
+        address creditAccount = _openAccountAndTransferToCF();
 
-        address approveRevertToken = address(
-            new ERC20ApproveRestrictedRevert()
-        );
+        address approveRevertToken = address(new ERC20ApproveRestrictedRevert());
 
         evm.prank(CONFIGURATOR);
         creditManager.addToken(approveRevertToken);
 
-        creditManager.approveCreditAccount(
-            USER,
-            DUMB_ADDRESS,
-            approveRevertToken,
-            DAI_EXCHANGE_AMOUNT
-        );
+        creditManager.approveCreditAccount(DUMB_ADDRESS, approveRevertToken, DAI_EXCHANGE_AMOUNT);
 
-        creditManager.approveCreditAccount(
-            USER,
-            DUMB_ADDRESS,
-            approveRevertToken,
-            2 * DAI_EXCHANGE_AMOUNT
-        );
+        creditManager.approveCreditAccount(DUMB_ADDRESS, approveRevertToken, 2 * DAI_EXCHANGE_AMOUNT);
 
-        expectAllowance(
-            approveRevertToken,
-            creditAccount,
-            DUMB_ADDRESS,
-            2 * DAI_EXCHANGE_AMOUNT
-        );
+        expectAllowance(approveRevertToken, creditAccount, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
     }
 
-    /// @dev [CM-27B]: approveCreditAccount works for ERC20 that returns false if allowance > 0 before approve
-    function test_CM_27B_approveCreditAccount_works_for_ERC20_with_approve_restrictions()
-        public
-    {
-        (, , , address creditAccount) = _openCreditAccount();
+    // /// @dev [CM-27B]: approveCreditAccount works for ERC20 that returns false if allowance > 0 before approve
+    function test_CM_27B_approveCreditAccount_works_for_ERC20_with_approve_restrictions() public {
+        address creditAccount = _openAccountAndTransferToCF();
 
         address approveFalseToken = address(new ERC20ApproveRestrictedFalse());
 
         evm.prank(CONFIGURATOR);
         creditManager.addToken(approveFalseToken);
 
-        creditManager.approveCreditAccount(
-            USER,
-            DUMB_ADDRESS,
-            approveFalseToken,
-            DAI_EXCHANGE_AMOUNT
-        );
+        creditManager.approveCreditAccount(DUMB_ADDRESS, approveFalseToken, DAI_EXCHANGE_AMOUNT);
 
-        creditManager.approveCreditAccount(
-            USER,
-            DUMB_ADDRESS,
-            approveFalseToken,
-            2 * DAI_EXCHANGE_AMOUNT
-        );
+        creditManager.approveCreditAccount(DUMB_ADDRESS, approveFalseToken, 2 * DAI_EXCHANGE_AMOUNT);
 
-        expectAllowance(
-            approveFalseToken,
-            creditAccount,
-            DUMB_ADDRESS,
-            2 * DAI_EXCHANGE_AMOUNT
-        );
+        expectAllowance(approveFalseToken, creditAccount, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
     }
 
     //
@@ -1889,10 +1298,8 @@ contract CreditManagerTest is
     //
 
     /// @dev [CM-28]: executeOrder reverts if adapter is not connected with target contract
-    function test_CM_28_executeOrder_reverts_if_adapter_is_not_connected_with_target_contract()
-        public
-    {
-        _openCreditAccount();
+    function test_CM_28_executeOrder_reverts_if_adapter_is_not_connected_with_target_contract() public {
+        _openAccountAndTransferToCF();
 
         evm.prank(CONFIGURATOR);
         creditManager.changeContractAllowance(ADAPTER, FRIEND);
@@ -1901,14 +1308,12 @@ contract CreditManagerTest is
         evm.expectRevert(TargetContractNotAllowedException.selector);
 
         evm.prank(ADAPTER);
-        creditManager.executeOrder(USER, DUMB_ADDRESS, bytes("Hello, world!"));
+        creditManager.executeOrder(DUMB_ADDRESS, bytes("Hello, world!"));
     }
 
     /// @dev [CM-29]: executeOrder calls credit account method and emit event
-    function test_CM_29_executeOrder_calls_credit_account_method_and_emit_event()
-        public
-    {
-        (, , , address creditAccount) = _openCreditAccount();
+    function test_CM_29_executeOrder_calls_credit_account_method_and_emit_event() public {
+        address creditAccount = _openAccountAndTransferToCF();
 
         TargetContractMock targetMock = new TargetContractMock();
 
@@ -1918,22 +1323,15 @@ contract CreditManagerTest is
         bytes memory callData = bytes("Hello, world!");
 
         // we emit the event we expect to see.
-        evm.expectEmit(true, true, false, false);
-        emit ExecuteOrder(USER, address(targetMock));
+        evm.expectEmit(true, false, false, false);
+        emit ExecuteOrder(address(targetMock));
 
         // stack trace check
-        evm.expectCall(
-            creditAccount,
-            abi.encodeWithSignature(
-                "execute(address,bytes)",
-                address(targetMock),
-                callData
-            )
-        );
+        evm.expectCall(creditAccount, abi.encodeWithSignature("execute(address,bytes)", address(targetMock), callData));
         evm.expectCall(address(targetMock), callData);
 
         evm.prank(ADAPTER);
-        creditManager.executeOrder(USER, address(targetMock), callData);
+        creditManager.executeOrder(address(targetMock), callData);
 
         assertEq0(targetMock.callData(), callData, "Incorrect calldata");
     }
@@ -1943,16 +1341,14 @@ contract CreditManagerTest is
     //
 
     /// @dev [CM-30]: checkAndEnableToken reverts for token for token not in list and for forbidden token
-    function test_CM_30_checkAndEnableToken_reverts_for_token_for_token_not_in_list_and_for_forbidden_token()
-        public
-    {
-        (, , , address creditAccount) = _openCreditAccount();
+    function test_CM_30_checkAndEnableToken_reverts_for_token_for_token_not_in_list_and_for_forbidden_token() public {
+        _openAccountAndTransferToCF();
 
         // Case: token is not in list
         evm.expectRevert(TokenNotAllowedException.selector);
-        creditManager.checkAndEnableToken(creditAccount, DUMB_ADDRESS);
+        creditManager.checkAndEnableToken(DUMB_ADDRESS);
 
-        // Case: token is frobidden
+        // Case: token is forbidden
         address token = tokenTestSuite.addressOf(Tokens.USDC);
         uint256 tokenMask = creditManager.tokenMasksMap(token);
 
@@ -1960,421 +1356,135 @@ contract CreditManagerTest is
         creditManager.setForbidMask(tokenMask);
 
         evm.expectRevert(TokenNotAllowedException.selector);
-        creditManager.checkAndEnableToken(creditAccount, token);
+        creditManager.checkAndEnableToken(token);
     }
 
     /// @dev [CM-31]: checkAndEnableToken enables token for creditAccount
-    function test_CM_31_checkAndEnableToken_enables_token_for_creditAccount()
-        public
-    {
-        (, , , address creditAccount) = _openCreditAccount();
+    function test_CM_31_checkAndEnableToken_enables_token_for_creditAccount() public {
+        address creditAccount = _openAccountAndTransferToCF();
 
         // Case: token is not enbaled before
         address token = tokenTestSuite.addressOf(Tokens.USDC);
 
-        expectTokenIsEnabled(Tokens.USDC, false);
+        expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
 
-        creditManager.checkAndEnableToken(creditAccount, token);
-        expectTokenIsEnabled(Tokens.USDC, true);
+        creditManager.checkAndEnableToken(token);
+        expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
 
         // Case: token is already enabled
-        creditManager.checkAndEnableToken(creditAccount, token);
-        expectTokenIsEnabled(Tokens.USDC, true);
+        creditManager.checkAndEnableToken(token);
+        expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
     }
 
     //
-    // FAST COLLATERAL CHECK
+    // CHANGE ENABLED TOKENS
     //
 
-    /// @dev [CM-32]: fastCollateralCheck enables tokenOut and reverts if it's forbidden
-    function test_CM_32_fastCollateralCheck_enables_tokenOut_and_reverts_if_its_unkown_or_forbidden()
-        public
-    {
-        (, , , address creditAccount) = _openCreditAccount();
+    /// @dev [CM-32]: changeEnabledTokens reverts on enabling forbidden tokens
+    function test_CM_32_changeEnabledTokens_reverts_on_enabling_forbidden_tokens() public {
+        _openAccountAndTransferToCF();
 
-        address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
+        address token = tokenTestSuite.addressOf(Tokens.USDC);
+        uint256 tokenMask = creditManager.tokenMasksMap(token);
 
-        tokenTestSuite.mint(Tokens.USDC, creditAccount, USDC_EXCHANGE_AMOUNT);
-
-        expectTokenIsEnabled(Tokens.USDC, false);
-
-        creditManager.fastCollateralCheck(
-            creditAccount,
-            usdcToken,
-            usdcToken,
-            2 * USDC_EXCHANGE_AMOUNT,
-            0
-        );
-
-        expectTokenIsEnabled(Tokens.USDC, true);
+        evm.prank(CONFIGURATOR);
+        creditManager.setForbidMask(tokenMask);
 
         evm.expectRevert(TokenNotAllowedException.selector);
-        creditManager.fastCollateralCheck(
-            creditAccount,
-            usdcToken,
-            DUMB_ADDRESS,
-            2 * USDC_EXCHANGE_AMOUNT,
-            0
-        );
-
-        address forbiddenToken = tokenTestSuite.addressOf(Tokens.WETH);
-        uint256 forbiddenMask = creditManager.tokenMasksMap(forbiddenToken);
-
-        evm.prank(CONFIGURATOR);
-        creditManager.setForbidMask(forbiddenMask);
-
-        evm.expectRevert(TokenNotAllowedException.selector);
-        creditManager.fastCollateralCheck(
-            creditAccount,
-            usdcToken,
-            forbiddenToken,
-            2 * USDC_EXCHANGE_AMOUNT,
-            0
-        );
+        creditManager.changeEnabledTokens(tokenMask, 0);
     }
 
-    /// @dev [CM-33]: fastCollateralCheck disable tokens with zero balance
-    function test_CM_33_fastCollateralCheck_disable_tokens_with_zero_balance(
-        uint8 balanceAfter
+    /// @dev [CM-33]: changeEnabledTokens ignores tokens on intersection of toEnable and toDisable
+    function test_CM_33_changeEnabledTokens_ignores_tokens_on_intersection() public {
+        address creditAccount = _openAccountAndTransferToCF();
+
+        address token = tokenTestSuite.addressOf(Tokens.USDC);
+        uint256 tokenMask = creditManager.tokenMasksMap(token);
+
+        (bool wasEnabled, bool wasDisabled) = creditManager.changeEnabledTokens(tokenMask, tokenMask);
+        expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
+        assertTrue(!wasEnabled);
+        assertTrue(!wasDisabled);
+
+        creditManager.checkAndEnableToken(token);
+        expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
+
+        (wasEnabled, wasDisabled) = creditManager.changeEnabledTokens(tokenMask, tokenMask);
+        expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
+        assertTrue(!wasEnabled);
+        assertTrue(!wasDisabled);
+    }
+
+    /// @dev [CM-34] changeEnabledTokens enables and disables tokens for credit account
+    function test_CM_34_changeEnabledTokens_enables_and_disables_tokens_for_credit_account() public {
+        address creditAccount = _openAccountAndTransferToCF();
+
+        address token = tokenTestSuite.addressOf(Tokens.USDC);
+        uint256 tokenMask = creditManager.tokenMasksMap(token);
+
+        (bool wasEnabled, bool wasDisabled) = creditManager.changeEnabledTokens(tokenMask, 0);
+        expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
+        assertTrue(wasEnabled);
+        assertTrue(!wasDisabled);
+
+        (wasEnabled, wasDisabled) = creditManager.changeEnabledTokens(0, tokenMask);
+        expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
+        assertTrue(!wasEnabled);
+        assertTrue(wasDisabled);
+    }
+
+    /// @dev [CM-35] changeEnabledTokens fuzzing test
+    function test_CM_35_changeEnabledTokens_fuzzing_test(
+        bool enableUsdc,
+        bool disableUsdc,
+        bool enableWeth,
+        bool disableWeth,
+        bool enableLink,
+        bool disableLink,
+        bool forbidLink
     ) public {
-        evm.assume(balanceAfter <= 1);
+        address creditAccount = _openAccountAndTransferToCF();
 
-        (, , , address creditAccount) = _openCreditAccount();
+        if (disableUsdc) creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.USDC));
+        if (disableWeth) creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.WETH));
+        if (disableLink) creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.LINK));
 
-        address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
+        uint256 tokensToEnable;
+        uint256 tokensToDisable;
+        bool mustRevert;
+        {
+            uint256 usdcMask = creditManager.tokenMasksMap(tokenTestSuite.addressOf(Tokens.USDC));
+            uint256 wethMask = creditManager.tokenMasksMap(tokenTestSuite.addressOf(Tokens.WETH));
+            uint256 linkMask = creditManager.tokenMasksMap(tokenTestSuite.addressOf(Tokens.LINK));
 
-        tokenTestSuite.mint(Tokens.USDC, creditAccount, balanceAfter);
+            tokensToEnable = 0;
+            if (enableUsdc) tokensToEnable |= usdcMask;
+            if (enableWeth) tokensToEnable |= wethMask;
+            if (enableLink) tokensToEnable |= linkMask;
 
-        creditManager.checkAndEnableToken(creditAccount, usdcToken);
+            tokensToDisable = 0;
+            if (disableUsdc) tokensToDisable |= usdcMask;
+            if (disableWeth) tokensToDisable |= wethMask;
+            if (disableLink) tokensToDisable |= linkMask;
 
-        expectTokenIsEnabled(Tokens.USDC, true);
-
-        creditManager.fastCollateralCheck(
-            creditAccount,
-            usdcToken,
-            tokenTestSuite.addressOf(Tokens.DAI),
-            USDC_EXCHANGE_AMOUNT,
-            0
-        );
-        expectTokenIsEnabled(Tokens.USDC, false);
-    }
-
-    /// @dev [CM-34]: fastCollateralCheck is passed if collateralOut >= collarteralIn
-    function test_CM_34_fastCollateralCheck_is_passed_if_collateralOut_gte_collarteralIn()
-        public
-    {
-        (, , , address creditAccount) = _openCreditAccount();
-        address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
-
-        uint256 underlyingBalanceBefore = IERC20(underlying).balanceOf(
-            creditAccount
-        );
-
-        assertEq(
-            creditManager.cumulativeDropAtFastCheckRAY(creditAccount),
-            0,
-            "cumulativeDropAtFastCheck is not 0"
-        );
-
-        // without these LT setting, the test would not pass
-
-        evm.prank(CONFIGURATOR);
-        creditManager.setLiquidationThreshold(usdcToken, 4000);
-
-        evm.prank(CONFIGURATOR);
-        creditManager.setLiquidationThreshold(underlying, 5000);
-
-        evm.expectCall(
-            usdcToken,
-            abi.encodeWithSelector(IERC20.balanceOf.selector)
-        );
-        evm.expectCall(
-            underlying,
-            abi.encodeWithSelector(IERC20.balanceOf.selector)
-        );
-
-        // It passes tesk withou LT check, cause it just get 1 USDC additionally
-        creditManager.fastCollateralCheck(
-            creditAccount,
-            usdcToken,
-            underlying,
-            5000 * (10**6), // imitates that we've paid 4000 USDC
-            underlyingBalanceBefore - 4000 * WAD // imitates that we've get 5000 DAI
-        );
-
-        // it shlould not change cumulativeDropAtFastCheck if passed through line:
-        //  if (amountOutCollateral >= amountInCollateral) return;
-
-        assertEq(
-            creditManager.cumulativeDropAtFastCheckRAY(creditAccount),
-            0,
-            "cumulativeDropAtFastCheck was changed"
-        );
-    }
-
-    /// @dev [CM-35]: fastCollateralCheck reverts if more enabled tokens than allowed collateralOut >= collarteralIn w/o LT check
-    function test_CM_35_fastCollateralCheck_reverts_if_more_enabled_tokens_than_allowed_if_collateralOut_gte_collarteralIn_wo_lt_check()
-        public
-    {
-        (, , , address creditAccount) = _openCreditAccount();
-        address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
-
-        uint256 underlyingBalanceBefore = IERC20(underlying).balanceOf(
-            creditAccount
-        );
-
-        assertEq(
-            creditManager.cumulativeDropAtFastCheckRAY(creditAccount),
-            0,
-            "cumulativeDropAtFastCheck is not 0"
-        );
-
-        enableTokensMoreThanLimit(creditAccount);
-        evm.expectRevert(TooManyEnabledTokensException.selector);
-        // It passes tesk withou LT check, cause it just get 1 USDC additionally
-        creditManager.fastCollateralCheck(
-            creditAccount,
-            underlying,
-            usdcToken,
-            underlyingBalanceBefore,
-            0
-        );
-    }
-
-    /// @dev [CM-36]: fastCollateralCheck is passed with cumulative drop <= feeLiquidation
-    function test_CM_36_fastCollateralCheck_is_passed_with_cumulative_drop_lte_feeLiquidation(
-        uint256 desiredDrop
-    ) public {
-        (, uint16 feeLiquidation, , , ) = creditManager.fees();
-
-        evm.assume(
-            desiredDrop > 0 &&
-                desiredDrop < (feeLiquidation * WAD) / PERCENTAGE_FACTOR
-        );
-        // uint16 desiredDrop = 50; // 0.5%
-
-        (, , , address creditAccount) = _openCreditAccount();
-        address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
-        uint256 underlyingBalanceBefore = IERC20(underlying).balanceOf(
-            creditAccount
-        );
-
-        /// Set USDC LT to be the same as DAI, to remove it from calculation
-
-        uint16 underlyingLT = creditManager.liquidationThresholds(underlying);
-
-        evm.prank(CONFIGURATOR);
-        creditManager.setLiquidationThreshold(usdcToken, underlyingLT);
-
-        uint256 expectedAmountInCollateral = creditManager
-            .priceOracle()
-            .convertToUSD(underlyingBalanceBefore, underlying);
-
-        uint256 amountOutCollateralNeeded = ((RAY - desiredDrop) *
-            expectedAmountInCollateral) / RAY;
-
-        uint256 amountOutNeeded = creditManager.priceOracle().convertFromUSD(
-            amountOutCollateralNeeded,
-            usdcToken
-        );
-
-        tokenTestSuite.mint(Tokens.USDC, creditAccount, amountOutNeeded);
-
-        // we add LINK tokens not to be reverted in case of fullCollateral check
-
-        tokenTestSuite.mint(
-            Tokens.LINK,
-            creditAccount,
-            creditManager.priceOracle().convertFromUSD(
-                underlyingBalanceBefore,
-                tokenTestSuite.addressOf(Tokens.LINK)
-            )
-        );
-
-        creditManager.checkAndEnableToken(
-            creditAccount,
-            tokenTestSuite.addressOf(Tokens.LINK)
-        );
-
-        // we set it one more time to elimimate side effect of rounding
-        amountOutCollateralNeeded = creditManager.priceOracle().convertToUSD(
-            amountOutNeeded,
-            usdcToken
-        );
-
-        // we set it one more time to elimimate side effect of rounding
-        desiredDrop =
-            RAY -
-            ((amountOutCollateralNeeded * RAY) / expectedAmountInCollateral);
-
-        tokenTestSuite.burn(Tokens.DAI, creditAccount, underlyingBalanceBefore);
-
-        uint256 n = feeLiquidation / desiredDrop + 2;
-
-        uint256 cumulativeDrop;
-        for (uint256 i = 0; i < n; i++) {
-            cumulativeDrop += desiredDrop;
-
-            if (cumulativeDrop > (feeLiquidation * RAY) / PERCENTAGE_FACTOR) {
-                expectFullCollateralCheck();
-                cumulativeDrop = 1;
+            if (forbidLink) {
+                evm.prank(CONFIGURATOR);
+                creditManager.setForbidMask(linkMask);
             }
 
-            // It passes task without LT check, cause it just get 1 USDC additionally
-            creditManager.fastCollateralCheck(
-                creditAccount,
-                underlying,
-                usdcToken,
-                underlyingBalanceBefore,
-                0
-            );
-
-            assertEq(
-                creditManager.cumulativeDropAtFastCheckRAY(creditAccount),
-                cumulativeDrop,
-                "Incorrect cumulative drop"
-            );
+            mustRevert = forbidLink && enableLink && !disableLink;
         }
-    }
 
-    /// @dev [CM-36A]: fastCollateralCheck correctly optimizes enabled tokens
-    function test_CM_36A_fastCollateralCheck_correctly_optimizes_enabled_tokens()
-        public
-    {
-        uint256 randomValue = uint256(keccak256(abi.encodePacked(gasleft())));
+        if (mustRevert) evm.expectRevert(TokenNotAllowedException.selector);
+        (bool enabled, bool disabled) = creditManager.changeEnabledTokens(tokensToEnable, tokensToDisable);
+        if (mustRevert) return;
 
-        for (
-            uint256 enabledTokens = 0;
-            enabledTokens < 40;
-            enabledTokens += 8
-        ) {
-            uint256 startIndex = enabledTokens > 12 ? enabledTokens - 12 : 0;
+        expectTokenIsEnabled(creditAccount, Tokens.USDC, enableUsdc);
+        expectTokenIsEnabled(creditAccount, Tokens.WETH, enableWeth);
+        expectTokenIsEnabled(creditAccount, Tokens.LINK, enableLink);
 
-            for (
-                uint256 zeroBalanceTokens = startIndex;
-                zeroBalanceTokens <= enabledTokens;
-                zeroBalanceTokens++
-            ) {
-                setUp();
-
-                uint256 maxTokens = creditManager
-                    .maxAllowedEnabledTokenLength();
-
-                if (enabledTokens + 1 - zeroBalanceTokens > 12) {
-                    continue;
-                }
-
-                (
-                    bool[] memory tokenTypes,
-                    uint256 breakpointIdx
-                ) = _getRandomBits(
-                        enabledTokens - zeroBalanceTokens,
-                        zeroBalanceTokens,
-                        randomValue
-                    );
-
-                (
-                    uint256 borrowedAmount,
-                    ,
-                    ,
-                    address creditAccount
-                ) = _openCreditAccount();
-
-                tokenTestSuite.mint(
-                    Tokens.DAI,
-                    creditAccount,
-                    borrowedAmount * 100
-                );
-
-                prepareForEnabledTokenOptimization(
-                    creditAccount,
-                    tokenTypes,
-                    enabledTokens,
-                    zeroBalanceTokens,
-                    breakpointIdx
-                );
-
-                uint256 expectedEnabledTokens = enabledTokens;
-
-                if (expectedEnabledTokens >= maxTokens) {
-                    expectedEnabledTokens = maxTokens;
-                }
-
-                if (enabledTokens == zeroBalanceTokens) {
-                    expectedEnabledTokens = expectedEnabledTokens == maxTokens
-                        ? maxTokens
-                        : expectedEnabledTokens + 1;
-                }
-
-                uint256 daiBalance = tokenTestSuite.balanceOf(
-                    Tokens.DAI,
-                    creditAccount
-                );
-
-                creditManager.fastCollateralCheck(
-                    creditAccount,
-                    underlying,
-                    underlying,
-                    daiBalance,
-                    daiBalance
-                );
-
-                assertEq(
-                    calcEnabledTokens(creditAccount),
-                    expectedEnabledTokens,
-                    "Incorrect number of tokens enabled"
-                );
-            }
-        }
-    }
-
-    /// @dev [CM-37]: fastCollateralCheck reverts if more enabled tokens than allowed collateralOut < collarteralIn
-    function test_CM_37_fastCollateralCheck_reverts_if_more_enabled_tokens_than_allowed_if_collateralOut_lt_collarteralIn_wo_lt_check()
-        public
-    {
-        (, , , address creditAccount) = _openCreditAccount();
-        address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
-
-        uint256 underlyingBalanceBefore = IERC20(underlying).balanceOf(
-            creditAccount
-        );
-
-        assertEq(
-            creditManager.cumulativeDropAtFastCheckRAY(creditAccount),
-            0,
-            "cumulativeDropAtFastCheck is not 0"
-        );
-
-        // We set the same LT's
-        evm.prank(CONFIGURATOR);
-        creditManager.setLiquidationThreshold(underlying, 9000);
-
-        evm.prank(CONFIGURATOR);
-        creditManager.setLiquidationThreshold(usdcToken, 9000);
-
-        // And imitate the swap 1000 DAI -> 999 USDC
-        tokenTestSuite.burn(
-            Tokens.DAI, // $1000 of underlying
-            creditAccount,
-            1000 * WAD
-        );
-
-        tokenTestSuite.mint(
-            Tokens.USDC, // $999 of USDC comes. it drops 0.1% which is less than feeLiquidation
-            creditAccount,
-            999 * (10**6)
-        );
-
-        enableTokensMoreThanLimit(creditAccount);
-        evm.expectRevert(TooManyEnabledTokensException.selector);
-        // It passes tesk withou LT check, cause it just get 1 USDC additionally
-        creditManager.fastCollateralCheck(
-            creditAccount,
-            underlying,
-            usdcToken,
-            (underlyingBalanceBefore),
-            0
-        );
+        assertTrue(enabled == (enableUsdc && !disableUsdc || enableWeth && !disableWeth || enableLink && !disableLink));
+        assertTrue(disabled == (!enableUsdc && disableUsdc || !enableWeth && disableWeth || !enableLink && disableLink));
     }
 
     //
@@ -2382,66 +1492,46 @@ contract CreditManagerTest is
     //
 
     /// @dev [CM-38]: fullCollateralCheck skips tokens is they are not enabled
-    function test_CM_38_fullCollateralCheck_skips_tokens_is_they_are_not_enabled()
-        public
-    {
-        (, , , address creditAccount) = _openCreditAccount();
+    function test_CM_38_fullCollateralCheck_skips_tokens_is_they_are_not_enabled() public {
+        address creditAccount = _openAccountAndTransferToCF();
 
         tokenTestSuite.mint(Tokens.USDC, creditAccount, USDC_ACCOUNT_AMOUNT);
 
         evm.expectRevert(NotEnoughCollateralException.selector);
-        creditManager.fullCollateralCheck(creditAccount);
+        _baseFullCollateralCheck(creditAccount);
 
         // fullCollateralCheck doesn't revert when token is enabled
-        creditManager.checkAndEnableToken(
-            creditAccount,
-            tokenTestSuite.addressOf(Tokens.USDC)
-        );
+        creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.USDC));
 
-        creditManager.fullCollateralCheck(creditAccount);
+        _baseFullCollateralCheck(creditAccount);
     }
 
     /// @dev [CM-39]: fullCollateralCheck diables tokens if they have zero balance
-    function test_CM_39_fullCollateralCheck_diables_tokens_if_they_have_zero_balance()
-        public
-    {
-        (
-            uint256 borrowedAmount,
-            uint256 cumulativeIndexAtOpen,
-            uint256 cumulativeIndexNow,
-            address creditAccount
-        ) = _openCreditAccount();
+    function test_CM_39_fullCollateralCheck_diables_tokens_if_they_have_zero_balance() public {
+        (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen, uint256 cumulativeIndexNow, address creditAccount) =
+            _openCreditAccount();
+        creditManager.transferAccountOwnership(USER, address(this));
 
-        uint256 amountToRepayInWETH = (((borrowedAmount *
-            cumulativeIndexNow *
-            PERCENTAGE_FACTOR) / cumulativeIndexAtOpen) * (10**8)) /
-            tokenTestSuite.prices(Tokens.WETH) /
-            creditManager.liquidationThresholds(
-                tokenTestSuite.addressOf(Tokens.WETH)
-            );
+        uint256 amountToRepayInLINK = (
+            ((borrowedAmount * cumulativeIndexNow * PERCENTAGE_FACTOR) / cumulativeIndexAtOpen) * (10 ** 8)
+        ) / tokenTestSuite.prices(Tokens.LINK)
+            / creditManager.liquidationThresholds(tokenTestSuite.addressOf(Tokens.LINK));
 
-        tokenTestSuite.mint(Tokens.WETH, creditAccount, amountToRepayInWETH);
+        tokenTestSuite.mint(Tokens.LINK, creditAccount, amountToRepayInLINK);
 
         // Enable WETH and LINK token. WETH should be disabled adter fullCollateralCheck
-        creditManager.checkAndEnableToken(
-            creditAccount,
-            tokenTestSuite.addressOf(Tokens.LINK)
-        );
-        creditManager.checkAndEnableToken(
-            creditAccount,
-            tokenTestSuite.addressOf(Tokens.WETH)
-        );
+        creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.LINK));
+        creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.WETH));
 
-        creditManager.fullCollateralCheck(creditAccount);
+        _baseFullCollateralCheck(creditAccount);
 
-        expectTokenIsEnabled(Tokens.LINK, false);
-        expectTokenIsEnabled(Tokens.WETH, true);
+        expectTokenIsEnabled(creditAccount, Tokens.LINK, true);
+        expectTokenIsEnabled(creditAccount, Tokens.WETH, false);
     }
 
     /// @dev [CM-40]: fullCollateralCheck breaks loop if total >= borrowAmountPlusInterestRateUSD and pass the check
-    function test_CM_40_fullCollateralCheck_breaks_loop_if_total_gte_borrowAmountPlusInterestRateUSD_and_pass_the_check()
-        public
-    {
+    function test_CM_40_fullCollateralCheck_breaks_loop_if_total_gte_borrowAmountPlusInterestRateUSD_and_pass_the_check(
+    ) public {
         evm.startPrank(CONFIGURATOR);
 
         CreditManager cm = new CreditManager(address(poolMock));
@@ -2453,6 +1543,7 @@ contract CreditManagerTest is
         evm.stopPrank();
 
         address creditAccount = cm.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER);
+        cm.transferAccountOwnership(USER, address(this));
 
         address revertToken = DUMB_ADDRESS;
         address linkToken = tokenTestSuite.addressOf(Tokens.LINK);
@@ -2463,31 +1554,26 @@ contract CreditManagerTest is
         // If fullCollateralCheck doesn't revert, it means that the break works
         evm.startPrank(CONFIGURATOR);
 
-        cm.addToken(revertToken);
         cm.addToken(linkToken);
+        cm.addToken(revertToken);
         cm.setLiquidationThreshold(linkToken, creditConfig.lt(Tokens.LINK));
 
         evm.stopPrank();
 
-        cm.checkAndEnableToken(creditAccount, revertToken);
-        cm.checkAndEnableToken(creditAccount, linkToken);
+        cm.checkAndEnableToken(revertToken);
+        cm.checkAndEnableToken(linkToken);
 
         // We add WAD for rounding compensation
-        uint256 amountToRepayInLINK = ((DAI_ACCOUNT_AMOUNT + WAD) *
-            PERCENTAGE_FACTOR *
-            (10**8)) /
-            creditConfig.lt(Tokens.LINK) /
-            tokenTestSuite.prices(Tokens.LINK);
+        uint256 amountToRepayInLINK = ((DAI_ACCOUNT_AMOUNT + WAD) * PERCENTAGE_FACTOR * (10 ** 8))
+            / creditConfig.lt(Tokens.LINK) / tokenTestSuite.prices(Tokens.LINK);
 
         tokenTestSuite.mint(Tokens.LINK, creditAccount, amountToRepayInLINK);
 
-        cm.fullCollateralCheck(creditAccount);
+        cm.fullCollateralCheck(creditAccount, new uint256[](0), 10000);
     }
 
     /// @dev [CM-41]: fullCollateralCheck reverts if CA has more than allowed enabled tokens
-    function test_CM_41_fullCollateralCheck_reverts_if_CA_has_more_than_allowed_enabled_tokens()
-        public
-    {
+    function test_CM_41_fullCollateralCheck_reverts_if_CA_has_more_than_allowed_enabled_tokens() public {
         evm.startPrank(CONFIGURATOR);
 
         // We use clean CreditManager to have only one underlying token for testing
@@ -2500,110 +1586,30 @@ contract CreditManagerTest is
         creditManager.setLiquidationThreshold(poolMock.underlyingToken(), 9300);
         evm.stopPrank();
 
-        address creditAccount = creditManager.openCreditAccount(
-            DAI_ACCOUNT_AMOUNT,
-            USER
-        );
+        address creditAccount = creditManager.openCreditAccount(DAI_ACCOUNT_AMOUNT, address(this));
         tokenTestSuite.mint(Tokens.DAI, creditAccount, 2 * DAI_ACCOUNT_AMOUNT);
 
         enableTokensMoreThanLimit(creditAccount);
         evm.expectRevert(TooManyEnabledTokensException.selector);
 
-        creditManager.fullCollateralCheck(creditAccount);
+        _baseFullCollateralCheck(creditAccount);
     }
 
     /// @dev [CM-41A]: fullCollateralCheck correctly disables the underlying when needed
-    function test_CM_41A_fullCollateralCheck_correctly_disables_the_underlying_when_needed()
-        public
-    {
-        address creditAccount = creditManager.openCreditAccount(
-            DAI_ACCOUNT_AMOUNT,
-            USER
-        );
+    function test_CM_41A_fullCollateralCheck_correctly_disables_the_underlying_when_needed() public {
+        address creditAccount = creditManager.openCreditAccount(DAI_ACCOUNT_AMOUNT, address(this));
 
         prepareForEnabledUnderlyingCase(creditAccount);
 
-        creditManager.fullCollateralCheck(creditAccount);
+        _baseFullCollateralCheck(creditAccount);
 
-        expectTokenIsEnabled(Tokens.DAI, false);
+        expectTokenIsEnabled(creditAccount, Tokens.DAI, false);
 
         assertEq(
             calcEnabledTokens(creditAccount),
             creditManager.maxAllowedEnabledTokenLength(),
             "Incorrect number of tokens enabled"
         );
-    }
-
-    /// @dev [CM-41B]: fullCollateralCheck correctly optimizes number of enabled tokens
-    function test_CM_41B_fullCollateralCheck_correctly_optimizes_enabled_tokens()
-        public
-    {
-        uint256 randomValue = uint256(keccak256(abi.encodePacked(gasleft())));
-
-        for (
-            uint256 enabledTokens = 0;
-            enabledTokens < 40;
-            enabledTokens += 8
-        ) {
-            uint256 startIndex = enabledTokens > 12 ? enabledTokens - 12 : 0;
-
-            for (
-                uint256 zeroBalanceTokens = startIndex;
-                zeroBalanceTokens <= enabledTokens;
-                zeroBalanceTokens++
-            ) {
-                setUp();
-
-                uint256 maxTokens = creditManager
-                    .maxAllowedEnabledTokenLength();
-
-                if (enabledTokens + 1 - zeroBalanceTokens > 12) {
-                    continue;
-                }
-
-                (
-                    bool[] memory tokenTypes,
-                    uint256 breakpointIdx
-                ) = _getRandomBits(
-                        enabledTokens - zeroBalanceTokens,
-                        zeroBalanceTokens,
-                        randomValue
-                    );
-
-                (
-                    uint256 borrowedAmount,
-                    ,
-                    ,
-                    address creditAccount
-                ) = _openCreditAccount();
-
-                tokenTestSuite.mint(
-                    Tokens.DAI,
-                    creditAccount,
-                    borrowedAmount * 100
-                );
-
-                uint256 enabledTokensLeftAfterFullCheck = prepareForEnabledTokenOptimization(
-                        creditAccount,
-                        tokenTypes,
-                        enabledTokens,
-                        zeroBalanceTokens,
-                        breakpointIdx
-                    );
-
-                if (enabledTokensLeftAfterFullCheck > maxTokens) {
-                    enabledTokensLeftAfterFullCheck = maxTokens;
-                }
-
-                creditManager.fullCollateralCheck(creditAccount);
-
-                assertEq(
-                    calcEnabledTokens(creditAccount),
-                    enabledTokensLeftAfterFullCheck,
-                    "Incorrect number of tokens enabled"
-                );
-            }
-        }
     }
 
     /// @dev [CM-42]: fullCollateralCheck fuzzing test
@@ -2615,62 +1621,60 @@ contract CreditManagerTest is
         uint128 wethBalance,
         bool enableUSDC,
         bool enableLINK,
-        bool enableWETH
+        bool enableWETH,
+        uint16 minHealthFactor
     ) public {
         evm.assume(borrowedAmount > WAD);
 
+        minHealthFactor = 10000 + (minHealthFactor % 20000);
+
         tokenTestSuite.mint(Tokens.DAI, address(poolMock), borrowedAmount);
 
-        (, , , address creditAccount) = cms.openCreditAccount(borrowedAmount);
+        (,,, address creditAccount) = cms.openCreditAccount(borrowedAmount);
+        creditManager.transferAccountOwnership(USER, address(this));
 
         if (daiBalance > borrowedAmount) {
-            tokenTestSuite.mint(
-                Tokens.DAI,
-                creditAccount,
-                daiBalance - borrowedAmount
-            );
+            tokenTestSuite.mint(Tokens.DAI, creditAccount, daiBalance - borrowedAmount);
         } else {
-            tokenTestSuite.burn(
-                Tokens.DAI,
-                creditAccount,
-                borrowedAmount - daiBalance
-            );
+            tokenTestSuite.burn(Tokens.DAI, creditAccount, borrowedAmount - daiBalance);
         }
 
         expectBalance(Tokens.DAI, creditAccount, daiBalance);
 
-        mintBalance(Tokens.USDC, usdcBalance, enableUSDC);
-        mintBalance(Tokens.LINK, linkBalance, enableLINK);
-        mintBalance(Tokens.WETH, wethBalance, enableWETH);
+        mintBalance(creditAccount, Tokens.USDC, usdcBalance, enableUSDC);
+        mintBalance(creditAccount, Tokens.LINK, linkBalance, enableLINK);
+        mintBalance(creditAccount, Tokens.WETH, wethBalance, enableWETH);
 
-        uint256 twvUSD = (tokenTestSuite.balanceOf(Tokens.DAI, creditAccount) *
-            tokenTestSuite.prices(Tokens.DAI) *
-            creditConfig.lt(Tokens.DAI)) / WAD;
+        uint256 twvUSD = (
+            tokenTestSuite.balanceOf(Tokens.DAI, creditAccount) * tokenTestSuite.prices(Tokens.DAI)
+                * creditConfig.lt(Tokens.DAI)
+        ) / WAD;
 
         twvUSD += !enableUSDC
             ? 0
-            : (tokenTestSuite.balanceOf(Tokens.USDC, creditAccount) *
-                tokenTestSuite.prices(Tokens.USDC) *
-                creditConfig.lt(Tokens.USDC)) / (10**6);
+            : (
+                tokenTestSuite.balanceOf(Tokens.USDC, creditAccount) * tokenTestSuite.prices(Tokens.USDC)
+                    * creditConfig.lt(Tokens.USDC)
+            ) / (10 ** 6);
 
         twvUSD += !enableLINK
             ? 0
-            : (tokenTestSuite.balanceOf(Tokens.LINK, creditAccount) *
-                tokenTestSuite.prices(Tokens.LINK) *
-                creditConfig.lt(Tokens.LINK)) / WAD;
+            : (
+                tokenTestSuite.balanceOf(Tokens.LINK, creditAccount) * tokenTestSuite.prices(Tokens.LINK)
+                    * creditConfig.lt(Tokens.LINK)
+            ) / WAD;
 
         twvUSD += !enableWETH
             ? 0
-            : (tokenTestSuite.balanceOf(Tokens.WETH, creditAccount) *
-                tokenTestSuite.prices(Tokens.WETH) *
-                creditConfig.lt(Tokens.WETH)) / WAD;
+            : (
+                tokenTestSuite.balanceOf(Tokens.WETH, creditAccount) * tokenTestSuite.prices(Tokens.WETH)
+                    * creditConfig.lt(Tokens.WETH)
+            ) / WAD;
 
-        (, , uint256 borrowedAmountWithInterestAndFees) = creditManager
-            .calcCreditAccountAccruedInterest(creditAccount);
+        (,, uint256 borrowedAmountWithInterestAndFees) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
 
-        uint256 debtUSD = (borrowedAmountWithInterestAndFees *
-            PERCENTAGE_FACTOR *
-            tokenTestSuite.prices(Tokens.DAI)) / WAD;
+        uint256 debtUSD =
+            (borrowedAmountWithInterestAndFees * minHealthFactor * tokenTestSuite.prices(Tokens.DAI)) / WAD;
 
         bool shouldRevert = twvUSD < debtUSD;
 
@@ -2678,13 +1682,12 @@ contract CreditManagerTest is
             evm.expectRevert(NotEnoughCollateralException.selector);
         }
 
-        creditManager.fullCollateralCheck(creditAccount);
+        creditManager.fullCollateralCheck(creditAccount, new uint256[](0), minHealthFactor);
     }
 
     //
     // CALC CLOSE PAYMENT PURE
     //
-
     struct CalcClosePaymentsPureTestCase {
         string name;
         uint256 totalValue;
@@ -2812,38 +1815,20 @@ contract CreditManagerTest is
         ];
 
         for (uint256 i = 0; i < cases.length; i++) {
-            (
-                uint256 amountToPool,
-                uint256 remainingFunds,
-                uint256 profit,
-                uint256 loss
-            ) = creditManager.calcClosePayments(
-                    cases[i].totalValue,
-                    cases[i].closureActionType,
-                    cases[i].borrowedAmount,
-                    cases[i].borrowedAmountWithInterest
-                );
+            (uint256 amountToPool, uint256 remainingFunds, uint256 profit, uint256 loss) = creditManager
+                .calcClosePayments(
+                cases[i].totalValue,
+                cases[i].closureActionType,
+                cases[i].borrowedAmount,
+                cases[i].borrowedAmountWithInterest
+            );
 
+            assertEq(amountToPool, cases[i].amountToPool, string(abi.encodePacked(cases[i].name, ": amountToPool")));
             assertEq(
-                amountToPool,
-                cases[i].amountToPool,
-                string(abi.encodePacked(cases[i].name, ": amountToPool"))
+                remainingFunds, cases[i].remainingFunds, string(abi.encodePacked(cases[i].name, ": remainingFunds"))
             );
-            assertEq(
-                remainingFunds,
-                cases[i].remainingFunds,
-                string(abi.encodePacked(cases[i].name, ": remainingFunds"))
-            );
-            assertEq(
-                profit,
-                cases[i].profit,
-                string(abi.encodePacked(cases[i].name, ": profit"))
-            );
-            assertEq(
-                loss,
-                cases[i].loss,
-                string(abi.encodePacked(cases[i].name, ": loss"))
-            );
+            assertEq(profit, cases[i].profit, string(abi.encodePacked(cases[i].name, ": profit")));
+            assertEq(loss, cases[i].loss, string(abi.encodePacked(cases[i].name, ": loss")));
         }
     }
 
@@ -2852,9 +1837,7 @@ contract CreditManagerTest is
     //
 
     /// @dev [CM-44]: _transferAssetsTo sends all tokens except underlying one and not-enabled to provided address
-    function test_CM_44_transferAssetsTo_sends_all_tokens_except_underlying_one_to_provided_address()
-        public
-    {
+    function test_CM_44_transferAssetsTo_sends_all_tokens_except_underlying_one_to_provided_address() public {
         // It enables  CreditManagerTestInternal for some test cases
         _connectCreditManagerSuite(Tokens.DAI, true);
 
@@ -2866,53 +1849,23 @@ contract CreditManagerTest is
             bool convertToETH = i > 0;
 
             address friend = friends[i];
-            (
-                uint256 borrowedAmount,
-                ,
-                ,
-                address creditAccount
-            ) = _openCreditAccount();
+            (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
+            creditManager.transferAccountOwnership(USER, address(this));
 
-            CreditManagerTestInternal cmi = CreditManagerTestInternal(
-                address(creditManager)
-            );
+            CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
 
-            tokenTestSuite.mint(
-                Tokens.USDC,
-                creditAccount,
-                USDC_EXCHANGE_AMOUNT
-            );
-            tokenTestSuite.mint(
-                Tokens.WETH,
-                creditAccount,
-                WETH_EXCHANGE_AMOUNT
-            );
-            tokenTestSuite.mint(
-                Tokens.LINK,
-                creditAccount,
-                LINK_EXCHANGE_AMOUNT
-            );
+            tokenTestSuite.mint(Tokens.USDC, creditAccount, USDC_EXCHANGE_AMOUNT);
+            tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
+            tokenTestSuite.mint(Tokens.LINK, creditAccount, LINK_EXCHANGE_AMOUNT);
 
             address wethTokenAddr = tokenTestSuite.addressOf(Tokens.WETH);
-            creditManager.checkAndEnableToken(creditAccount, wethTokenAddr);
+            creditManager.checkAndEnableToken(wethTokenAddr);
 
-            uint256 enabledTokenMask = creditManager.enabledTokensMap(
-                creditAccount
-            );
+            uint256 enabledTokenMask = creditManager.enabledTokensMap(creditAccount);
 
-            cmi.transferAssetsTo(
-                creditAccount,
-                friend,
-                convertToETH,
-                enabledTokenMask
-            );
+            cmi.transferAssetsTo(creditAccount, friend, convertToETH, enabledTokenMask);
 
-            expectBalance(
-                Tokens.DAI,
-                creditAccount,
-                borrowedAmount,
-                "Underlying assets were transffered!"
-            );
+            expectBalance(Tokens.DAI, creditAccount, borrowedAmount, "Underlying assets were transffered!");
 
             expectBalance(Tokens.DAI, friend, 0);
 
@@ -2932,15 +1885,8 @@ contract CreditManagerTest is
 
             expectBalance(Tokens.LINK, friend, 0);
 
-            creditManager.closeCreditAccount(
-                USER,
-                ClosureAction.LIQUIDATE_ACCOUNT,
-                0,
-                LIQUIDATOR,
-                friend,
-                0,
-                false
-            );
+            creditManager.transferAccountOwnership(address(this), USER);
+            creditManager.closeCreditAccount(USER, ClosureAction.LIQUIDATE_ACCOUNT, 0, LIQUIDATOR, friend, 0, false);
         }
     }
 
@@ -2963,31 +1909,17 @@ contract CreditManagerTest is
             bool convertToETH = i > 0;
 
             address friend = friends[i];
-            (, , , address creditAccount) = _openCreditAccount();
+            (,,, address creditAccount) = _openCreditAccount();
 
-            CreditManagerTestInternal cmi = CreditManagerTestInternal(
-                address(creditManager)
-            );
+            CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
 
-            tokenTestSuite.mint(
-                Tokens.WETH,
-                creditAccount,
-                WETH_EXCHANGE_AMOUNT
-            );
+            tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
 
             cmi.safeTokenTransfer(
-                creditAccount,
-                tokenTestSuite.addressOf(Tokens.WETH),
-                friend,
-                WETH_TRANSFER,
-                convertToETH
+                creditAccount, tokenTestSuite.addressOf(Tokens.WETH), friend, WETH_TRANSFER, convertToETH
             );
 
-            expectBalance(
-                Tokens.WETH,
-                creditAccount,
-                WETH_EXCHANGE_AMOUNT - WETH_TRANSFER
-            );
+            expectBalance(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT - WETH_TRANSFER);
 
             if (convertToETH) {
                 expectEthBalance(friend, WETH_TRANSFER);
@@ -2995,15 +1927,7 @@ contract CreditManagerTest is
                 expectBalance(Tokens.WETH, friend, WETH_TRANSFER);
             }
 
-            creditManager.closeCreditAccount(
-                USER,
-                ClosureAction.LIQUIDATE_ACCOUNT,
-                0,
-                LIQUIDATOR,
-                friend,
-                0,
-                false
-            );
+            creditManager.closeCreditAccount(USER, ClosureAction.LIQUIDATE_ACCOUNT, 0, LIQUIDATOR, friend, 0, false);
         }
     }
 
@@ -3012,35 +1936,28 @@ contract CreditManagerTest is
     //
 
     /// @dev [CM-46]: _disableToken disabale tokens and do not enable it if called twice
-    function test_CM_46__disableToken_disabale_tokens_and_do_not_enable_it_if_called_twice()
-        public
-    {
+    function test_CM_46__disableToken_disabale_tokens_and_do_not_enable_it_if_called_twice() public {
         // It enables  CreditManagerTestInternal for some test cases
         _connectCreditManagerSuite(Tokens.DAI, true);
 
-        (, , , address creditAccount) = _openCreditAccount();
+        address creditAccount = _openAccountAndTransferToCF();
 
         address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
-        creditManager.checkAndEnableToken(creditAccount, usdcToken);
+        creditManager.checkAndEnableToken(usdcToken);
 
-        expectTokenIsEnabled(Tokens.USDC, true);
+        expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
 
-        CreditManagerTestInternal cmi = CreditManagerTestInternal(
-            address(creditManager)
-        );
+        CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
 
-        cmi.disableToken(creditAccount, usdcToken);
-        expectTokenIsEnabled(Tokens.USDC, false);
+        cmi.disableToken(usdcToken);
+        expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
 
-        cmi.disableToken(creditAccount, usdcToken);
-        expectTokenIsEnabled(Tokens.USDC, false);
+        cmi.disableToken(usdcToken);
+        expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
     }
 
     /// @dev [CM-47]: collateralTokens works as expected
-    function test_CM_47_collateralTokens_works_as_expected(
-        address newToken,
-        uint16 newLT
-    ) public {
+    function test_CM_47_collateralTokens_works_as_expected(address newToken, uint16 newLT) public {
         evm.assume(newToken != underlying && newToken != address(0));
 
         evm.startPrank(CONFIGURATOR);
@@ -3084,16 +2001,10 @@ contract CreditManagerTest is
     //
 
     /// @dev [CM-48]: getCreditAccountOrRevert reverts if borrower has no account
-    function test_CM_48_getCreditAccountOrRevert_reverts_if_borrower_has_no_account()
-        public
-    {
-        (, , , address creditAccount) = _openCreditAccount();
+    function test_CM_48_getCreditAccountOrRevert_reverts_if_borrower_has_no_account() public {
+        (,,, address creditAccount) = _openCreditAccount();
 
-        assertEq(
-            creditManager.getCreditAccountOrRevert(USER),
-            creditAccount,
-            "Incorrect credit account"
-        );
+        assertEq(creditManager.getCreditAccountOrRevert(USER), creditAccount, "Incorrect credit account");
 
         evm.expectRevert(HasNoOpenedAccountException.selector);
         creditManager.getCreditAccountOrRevert(DUMB_ADDRESS);
@@ -3104,41 +2015,29 @@ contract CreditManagerTest is
     //
 
     /// @dev [CM-49]: calcCreditAccountAccruedInterest computes correctly
-    function test_CM_49_calcCreditAccountAccruedInterest_computes_correctly(
-        uint128 amount
-    ) public {
+    function test_CM_49_calcCreditAccountAccruedInterest_computes_correctly(uint128 amount) public {
         tokenTestSuite.mint(Tokens.DAI, address(poolMock), amount);
-        (, , , address creditAccount) = cms.openCreditAccount(amount);
+        (,,, address creditAccount) = cms.openCreditAccount(amount);
 
         uint256 expectedBorrowedAmount = amount;
 
-        uint256 cumulativeIndexAtOpen = ICreditAccount(creditAccount)
-            .cumulativeIndexAtOpen();
+        uint256 cumulativeIndexAtOpen = ICreditAccount(creditAccount).cumulativeIndexAtOpen();
 
         uint256 cumulativeIndexNow = poolMock._cumulativeIndex_RAY();
-        uint256 expectedBorrowedAmountWithInterest = (expectedBorrowedAmount *
-            cumulativeIndexNow) / cumulativeIndexAtOpen;
+        uint256 expectedBorrowedAmountWithInterest =
+            (expectedBorrowedAmount * cumulativeIndexNow) / cumulativeIndexAtOpen;
 
-        (uint256 feeInterest, , , , ) = creditManager.fees();
+        (uint256 feeInterest,,,,) = creditManager.fees();
 
-        uint256 expectedFee = ((expectedBorrowedAmountWithInterest -
-            expectedBorrowedAmount) * feeInterest) / PERCENTAGE_FACTOR;
+        uint256 expectedFee =
+            ((expectedBorrowedAmountWithInterest - expectedBorrowedAmount) * feeInterest) / PERCENTAGE_FACTOR;
 
-        (
-            uint256 borrowedAmount,
-            uint256 borrowedAmountWithInterest,
-            uint256 borrowedAmountWithInterestAndFees
-        ) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        (uint256 borrowedAmount, uint256 borrowedAmountWithInterest, uint256 borrowedAmountWithInterestAndFees) =
+            creditManager.calcCreditAccountAccruedInterest(creditAccount);
 
+        assertEq(borrowedAmount, expectedBorrowedAmount, "Incorrect borrowed amount");
         assertEq(
-            borrowedAmount,
-            expectedBorrowedAmount,
-            "Incorrect borrowed amount"
-        );
-        assertEq(
-            borrowedAmountWithInterest,
-            expectedBorrowedAmountWithInterest,
-            "Incorrect borrowed amount with interest"
+            borrowedAmountWithInterest, expectedBorrowedAmountWithInterest, "Incorrect borrowed amount with interest"
         );
         assertEq(
             borrowedAmountWithInterestAndFees,
@@ -3152,42 +2051,23 @@ contract CreditManagerTest is
     //
 
     /// @dev [CM-50]: getCreditAccountParameters return correct values
-    function test_CM_50_getCreditAccountParameters_return_correct_values()
-        public
-    {
+    function test_CM_50_getCreditAccountParameters_return_correct_values() public {
         // It enables  CreditManagerTestInternal for some test cases
         _connectCreditManagerSuite(Tokens.DAI, true);
 
-        (, , , address creditAccount) = _openCreditAccount();
+        (,,, address creditAccount) = _openCreditAccount();
 
-        uint256 expectedBorrowedAmount = ICreditAccount(creditAccount)
-            .borrowedAmount();
-        uint256 expectedCumulativeIndexAtOpen = ICreditAccount(creditAccount)
-            .cumulativeIndexAtOpen();
+        uint256 expectedBorrowedAmount = ICreditAccount(creditAccount).borrowedAmount();
+        uint256 expectedCumulativeIndexAtOpen = ICreditAccount(creditAccount).cumulativeIndexAtOpen();
 
-        CreditManagerTestInternal cmi = CreditManagerTestInternal(
-            address(creditManager)
-        );
+        CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
 
-        (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen, ) = cmi
-            .getCreditAccountParameters(creditAccount);
+        (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen,) = cmi.getCreditAccountParameters(creditAccount);
 
-        assertEq(
-            borrowedAmount,
-            expectedBorrowedAmount,
-            "Incorrect borrowed amount"
-        );
-        assertEq(
-            cumulativeIndexAtOpen,
-            expectedCumulativeIndexAtOpen,
-            "Incorrect cumulativeIndexAtOpen"
-        );
+        assertEq(borrowedAmount, expectedBorrowedAmount, "Incorrect borrowed amount");
+        assertEq(cumulativeIndexAtOpen, expectedCumulativeIndexAtOpen, "Incorrect cumulativeIndexAtOpen");
 
-        assertEq(
-            cumulativeIndexAtOpen,
-            expectedCumulativeIndexAtOpen,
-            "cumulativeIndexAtOpen"
-        );
+        assertEq(cumulativeIndexAtOpen, expectedCumulativeIndexAtOpen, "cumulativeIndexAtOpen");
     }
 
     //
@@ -3204,11 +2084,7 @@ contract CreditManagerTest is
 
         evm.prank(CONFIGURATOR);
         creditManager.setParams(
-            s_feeInterest,
-            s_feeLiquidation,
-            s_liquidationPremium,
-            s_feeLiquidationExpired,
-            s_liquidationPremiumExpired
+            s_feeInterest, s_feeLiquidation, s_liquidationPremium, s_feeLiquidationExpired, s_liquidationPremiumExpired
         );
         (
             uint16 feeInterest,
@@ -3220,21 +2096,9 @@ contract CreditManagerTest is
 
         assertEq(feeInterest, s_feeInterest, "Incorrect feeInterest");
         assertEq(feeLiquidation, s_feeLiquidation, "Incorrect feeLiquidation");
-        assertEq(
-            liquidationDiscount,
-            s_liquidationPremium,
-            "Incorrect liquidationDiscount"
-        );
-        assertEq(
-            feeLiquidationExpired,
-            s_feeLiquidationExpired,
-            "Incorrect feeLiquidationExpired"
-        );
-        assertEq(
-            liquidationPremiumExpired,
-            s_liquidationPremiumExpired,
-            "Incorrect liquidationPremiumExpired"
-        );
+        assertEq(liquidationDiscount, s_liquidationPremium, "Incorrect liquidationDiscount");
+        assertEq(feeLiquidationExpired, s_feeLiquidationExpired, "Incorrect feeLiquidationExpired");
+        assertEq(liquidationPremiumExpired, s_liquidationPremiumExpired, "Incorrect liquidationPremiumExpired");
     }
 
     //
@@ -3242,18 +2106,14 @@ contract CreditManagerTest is
     //
 
     /// @dev [CM-52]: addToken reverts if token exists and if collateralTokens > 256
-    function test_CM_52_addToken_reverts_if_token_exists_and_if_collateralTokens_more_256()
-        public
-    {
+    function test_CM_52_addToken_reverts_if_token_exists_and_if_collateralTokens_more_256() public {
         evm.startPrank(CONFIGURATOR);
 
         evm.expectRevert(TokenAlreadyAddedException.selector);
         creditManager.addToken(underlying);
 
         for (uint256 i = creditManager.collateralTokensCount(); i < 256; i++) {
-            creditManager.addToken(
-                address(uint160(uint256(keccak256(abi.encodePacked(i)))))
-            );
+            creditManager.addToken(address(uint160(uint256(keccak256(abi.encodePacked(i))))));
         }
 
         evm.expectRevert(TooManyTokensException.selector);
@@ -3263,25 +2123,15 @@ contract CreditManagerTest is
     }
 
     /// @dev [CM-53]: addToken adds token and set tokenMaskMap correctly
-    function test_CM_53_addToken_adds_token_and_set_tokenMaskMap_correctly()
-        public
-    {
+    function test_CM_53_addToken_adds_token_and_set_tokenMaskMap_correctly() public {
         uint256 count = creditManager.collateralTokensCount();
 
         evm.prank(CONFIGURATOR);
         creditManager.addToken(DUMB_ADDRESS);
 
-        assertEq(
-            creditManager.collateralTokensCount(),
-            count + 1,
-            "collateralTokensCount want incremented"
-        );
+        assertEq(creditManager.collateralTokensCount(), count + 1, "collateralTokensCount want incremented");
 
-        assertEq(
-            creditManager.tokenMasksMap(DUMB_ADDRESS),
-            1 << count,
-            "tokenMaskMap was set incorrectly"
-        );
+        assertEq(creditManager.tokenMasksMap(DUMB_ADDRESS), 1 << count, "tokenMaskMap was set incorrectly");
     }
 
     //
@@ -3289,9 +2139,7 @@ contract CreditManagerTest is
     //
 
     /// @dev [CM-54]: setLiquidationThreshold reverts for unknown token
-    function test_CM_54_setLiquidationThreshold_reverts_for_unknown_token()
-        public
-    {
+    function test_CM_54_setLiquidationThreshold_reverts_for_unknown_token() public {
         evm.prank(CONFIGURATOR);
         evm.expectRevert(TokenNotAllowedException.selector);
         creditManager.setLiquidationThreshold(DUMB_ADDRESS, 1200);
@@ -3304,19 +2152,12 @@ contract CreditManagerTest is
     function test_CM_55_setForbidMask_sets_forbidMask_correctly() public {
         uint256 expectedForbidMask = 244;
 
-        assertTrue(
-            creditManager.forbiddenTokenMask() != expectedForbidMask,
-            "expectedForbidMask is already the same"
-        );
+        assertTrue(creditManager.forbiddenTokenMask() != expectedForbidMask, "expectedForbidMask is already the same");
 
         evm.prank(CONFIGURATOR);
         creditManager.setForbidMask(expectedForbidMask);
 
-        assertEq(
-            creditManager.forbiddenTokenMask(),
-            expectedForbidMask,
-            "ForbidMask is not set correctly"
-        );
+        assertEq(creditManager.forbiddenTokenMask(), expectedForbidMask, "ForbidMask is not set correctly");
     }
 
     //
@@ -3324,43 +2165,24 @@ contract CreditManagerTest is
     //
 
     /// @dev [CM-56]: changeContractAllowance updates adapterToContract
-    function test_CM_56_changeContractAllowance_updates_adapterToContract()
-        public
-    {
+    function test_CM_56_changeContractAllowance_updates_adapterToContract() public {
         assertTrue(
-            creditManager.adapterToContract(ADAPTER) != DUMB_ADDRESS,
-            "adapterToContract(ADAPTER) is already the same"
+            creditManager.adapterToContract(ADAPTER) != DUMB_ADDRESS, "adapterToContract(ADAPTER) is already the same"
         );
 
         evm.prank(CONFIGURATOR);
         creditManager.changeContractAllowance(ADAPTER, DUMB_ADDRESS);
 
-        assertEq(
-            creditManager.adapterToContract(ADAPTER),
-            DUMB_ADDRESS,
-            "adapterToContract is not set correctly"
-        );
+        assertEq(creditManager.adapterToContract(ADAPTER), DUMB_ADDRESS, "adapterToContract is not set correctly");
 
-        assertEq(
-            creditManager.contractToAdapter(DUMB_ADDRESS),
-            ADAPTER,
-            "adapterToContract is not set correctly"
-        );
+        assertEq(creditManager.contractToAdapter(DUMB_ADDRESS), ADAPTER, "adapterToContract is not set correctly");
 
         evm.prank(CONFIGURATOR);
         creditManager.changeContractAllowance(ADAPTER, address(0));
 
-        assertEq(
-            creditManager.adapterToContract(ADAPTER),
-            address(0),
-            "adapterToContract is not set correctly"
-        );
+        assertEq(creditManager.adapterToContract(ADAPTER), address(0), "adapterToContract is not set correctly");
 
-        assertEq(
-            creditManager.contractToAdapter(address(0)),
-            address(0),
-            "adapterToContract is not set correctly"
-        );
+        assertEq(creditManager.contractToAdapter(address(0)), address(0), "adapterToContract is not set correctly");
 
         evm.prank(CONFIGURATOR);
         creditManager.changeContractAllowance(ADAPTER, DUMB_ADDRESS);
@@ -3368,35 +2190,19 @@ contract CreditManagerTest is
         evm.prank(CONFIGURATOR);
         creditManager.changeContractAllowance(address(0), DUMB_ADDRESS);
 
-        assertEq(
-            creditManager.adapterToContract(address(0)),
-            address(0),
-            "adapterToContract is not set correctly"
-        );
+        assertEq(creditManager.adapterToContract(address(0)), address(0), "adapterToContract is not set correctly");
 
-        assertEq(
-            creditManager.contractToAdapter(DUMB_ADDRESS),
-            address(0),
-            "adapterToContract is not set correctly"
-        );
+        assertEq(creditManager.contractToAdapter(DUMB_ADDRESS), address(0), "adapterToContract is not set correctly");
 
         evm.prank(CONFIGURATOR);
         creditManager.changeContractAllowance(ADAPTER, UNIVERSAL_CONTRACT);
 
-        assertEq(
-            creditManager.universalAdapter(),
-            ADAPTER,
-            "Universal adapter is not correctly set"
-        );
+        assertEq(creditManager.universalAdapter(), ADAPTER, "Universal adapter is not correctly set");
 
         evm.prank(CONFIGURATOR);
         creditManager.changeContractAllowance(address(0), UNIVERSAL_CONTRACT);
 
-        assertEq(
-            creditManager.universalAdapter(),
-            address(0),
-            "Universal adapter is not correctly set"
-        );
+        assertEq(creditManager.universalAdapter(), address(0), "Universal adapter is not correctly set");
     }
 
     //
@@ -3404,39 +2210,23 @@ contract CreditManagerTest is
     //
 
     /// @dev [CM-57A]: upgradeCreditFacade updates Credit Facade correctly
-    function test_CM_57A_upgradeCreditFacade_updates_contract_correctly()
-        public
-    {
-        assertTrue(
-            creditManager.creditFacade() != DUMB_ADDRESS,
-            "creditFacade( is already the same"
-        );
+    function test_CM_57A_upgradeCreditFacade_updates_contract_correctly() public {
+        assertTrue(creditManager.creditFacade() != DUMB_ADDRESS, "creditFacade( is already the same");
 
         evm.prank(CONFIGURATOR);
         creditManager.upgradeCreditFacade(DUMB_ADDRESS);
 
-        assertEq(
-            creditManager.creditFacade(),
-            DUMB_ADDRESS,
-            "creditFacade is not set correctly"
-        );
+        assertEq(creditManager.creditFacade(), DUMB_ADDRESS, "creditFacade is not set correctly");
     }
 
     /// @dev [CM-57B]: upgradePriceOracle updates contract correctly
     function test_CM_57_upgradePriceOracle_updates_contract_correctly() public {
-        assertTrue(
-            address(creditManager.priceOracle()) != DUMB_ADDRESS2,
-            "priceOracle is already the same"
-        );
+        assertTrue(address(creditManager.priceOracle()) != DUMB_ADDRESS2, "priceOracle is already the same");
 
         evm.prank(CONFIGURATOR);
         creditManager.upgradePriceOracle(DUMB_ADDRESS2);
 
-        assertEq(
-            address(creditManager.priceOracle()),
-            DUMB_ADDRESS2,
-            "priceOracle is not set correctly"
-        );
+        assertEq(address(creditManager.priceOracle()), DUMB_ADDRESS2, "priceOracle is not set correctly");
     }
 
     //
@@ -3444,13 +2234,8 @@ contract CreditManagerTest is
     //
 
     /// @dev [CM-58]: setConfigurator sets creditConfigurator correctly and emits event
-    function test_CM_58_setConfigurator_sets_creditConfigurator_correctly_and_emits_event()
-        public
-    {
-        assertTrue(
-            creditManager.creditConfigurator() != DUMB_ADDRESS,
-            "creditConfigurator is already the same"
-        );
+    function test_CM_58_setConfigurator_sets_creditConfigurator_correctly_and_emits_event() public {
+        assertTrue(creditManager.creditConfigurator() != DUMB_ADDRESS, "creditConfigurator is already the same");
 
         evm.prank(CONFIGURATOR);
 
@@ -3459,53 +2244,39 @@ contract CreditManagerTest is
 
         creditManager.setConfigurator(DUMB_ADDRESS);
 
-        assertEq(
-            creditManager.creditConfigurator(),
-            DUMB_ADDRESS,
-            "creditConfigurator is not set correctly"
-        );
+        assertEq(creditManager.creditConfigurator(), DUMB_ADDRESS, "creditConfigurator is not set correctly");
     }
 
-    /// @dev [CM-59]: _getTokenIndexByAddress works properly
-    function test_CM_59_getMaxIndex_works_properly(uint256 noise) public {
-        CreditManagerTestInternal cm = new CreditManagerTestInternal(
-            address(poolMock)
-        );
+    // /// @dev [CM-59]: _getTokenIndexByAddress works properly
+    // function test_CM_59_getMaxIndex_works_properly(uint256 noise) public {
+    //     CreditManagerTestInternal cm = new CreditManagerTestInternal(
+    //         address(poolMock)
+    //     );
 
-        for (uint256 i = 0; i < 256; i++) {
-            uint256 mask = 1 << i;
-            if (mask > noise) mask |= noise;
-            uint256 value = cm.getMaxIndex(mask);
-            assertEq(i, value, "Incorrect result");
-        }
-    }
+    //     for (uint256 i = 0; i < 256; i++) {
+    //         uint256 mask = 1 << i;
+    //         if (mask > noise) mask |= noise;
+    //         uint256 value = cm.getMaxIndex(mask);
+    //         assertEq(i, value, "Incorrect result");
+    //     }
+    // }
 
     /// @dev [CM-60]: CreditManager allows approveCreditAccount and executeOrder for universal adapter
-    function test_CM_60_universal_adapter_can_call_adapter_restricted_functions()
-        public
-    {
+    function test_CM_60_universal_adapter_can_call_adapter_restricted_functions() public {
         TargetContractMock targetMock = new TargetContractMock();
 
         evm.prank(CONFIGURATOR);
-        creditManager.changeContractAllowance(
-            ADAPTER,
-            UNIVERSAL_CONTRACT_ADDRESS
-        );
+        creditManager.changeContractAllowance(ADAPTER, UNIVERSAL_CONTRACT_ADDRESS);
 
-        _openCreditAccount();
+        _openAccountAndTransferToCF();
 
         evm.prank(ADAPTER);
-        creditManager.approveCreditAccount(
-            USER,
-            DUMB_ADDRESS,
-            underlying,
-            type(uint256).max
-        );
+        creditManager.approveCreditAccount(DUMB_ADDRESS, underlying, type(uint256).max);
 
         bytes memory callData = bytes("Hello");
 
         evm.prank(ADAPTER);
-        creditManager.executeOrder(USER, address(targetMock), callData);
+        creditManager.executeOrder(address(targetMock), callData);
     }
 
     /// @dev [CM-61]: setMaxEnabledToken correctly sets value
@@ -3513,11 +2284,7 @@ contract CreditManagerTest is
         evm.prank(CONFIGURATOR);
         creditManager.setMaxEnabledTokens(255);
 
-        assertEq(
-            creditManager.maxAllowedEnabledTokenLength(),
-            255,
-            "Incorrect max enabled tokens"
-        );
+        assertEq(creditManager.maxAllowedEnabledTokenLength(), 255, "Incorrect max enabled tokens");
     }
 
     //
@@ -3529,10 +2296,7 @@ contract CreditManagerTest is
         evm.prank(CONFIGURATOR);
         creditManager.addEmergencyLiquidator(DUMB_ADDRESS);
 
-        assertTrue(
-            creditManager.canLiquidateWhilePaused(DUMB_ADDRESS),
-            "Value was not set"
-        );
+        assertTrue(creditManager.canLiquidateWhilePaused(DUMB_ADDRESS), "Value was not set");
     }
 
     /// @dev [CM-63]: removeEmergencyLiquidator correctly sets value
@@ -3543,53 +2307,30 @@ contract CreditManagerTest is
         evm.prank(CONFIGURATOR);
         creditManager.removeEmergencyLiquidator(DUMB_ADDRESS);
 
-        assertTrue(
-            !creditManager.canLiquidateWhilePaused(DUMB_ADDRESS),
-            "Value was is still set"
-        );
+        assertTrue(!creditManager.canLiquidateWhilePaused(DUMB_ADDRESS), "Value was is still set");
     }
 
     /// @dev [CM-64]: closeCreditAccount reverts when attempting to liquidate while paused,
     /// and the payer is not set as emergency liquidator
 
-    function test_CM_64_closeCreditAccount_reverts_when_paused_and_liquidator_not_privileged()
-        public
-    {
+    function test_CM_64_closeCreditAccount_reverts_when_paused_and_liquidator_not_privileged() public {
         evm.prank(CONFIGURATOR);
         creditManager.pause();
 
         evm.expectRevert("Pausable: paused");
-        creditManager.closeCreditAccount(
-            USER,
-            ClosureAction.LIQUIDATE_ACCOUNT,
-            0,
-            LIQUIDATOR,
-            FRIEND,
-            0,
-            false
-        );
+        creditManager.closeCreditAccount(USER, ClosureAction.LIQUIDATE_ACCOUNT, 0, LIQUIDATOR, FRIEND, 0, false);
     }
 
     /// @dev [CM-65]: Emergency liquidator can't close an account instead of liquidating
 
-    function test_CM_65_closeCreditAccount_reverts_when_paused_and_liquidator_tries_to_close()
-        public
-    {
+    function test_CM_65_closeCreditAccount_reverts_when_paused_and_liquidator_tries_to_close() public {
         evm.startPrank(CONFIGURATOR);
         creditManager.pause();
         creditManager.addEmergencyLiquidator(LIQUIDATOR);
         evm.stopPrank();
 
         evm.expectRevert("Pausable: paused");
-        creditManager.closeCreditAccount(
-            USER,
-            ClosureAction.CLOSE_ACCOUNT,
-            0,
-            LIQUIDATOR,
-            FRIEND,
-            0,
-            false
-        );
+        creditManager.closeCreditAccount(USER, ClosureAction.CLOSE_ACCOUNT, 0, LIQUIDATOR, FRIEND, 0, false);
     }
 
     /// @dev [CM-66]: calcNewCumulativeIndex works correctly for various values
@@ -3601,7 +2342,7 @@ contract CreditManagerTest is
         bool isIncrease
     ) public {
         evm.assume(borrowedAmount > 100);
-        evm.assume(uint256(borrowedAmount) + uint256(delta) <= 2**128 - 1);
+        evm.assume(uint256(borrowedAmount) + uint256(delta) <= 2 ** 128 - 1);
 
         indexNow = indexNow < RAY ? indexNow + RAY : indexNow;
         indexAtOpen = indexAtOpen < RAY ? indexAtOpen + RAY : indexNow;
@@ -3610,9 +2351,7 @@ contract CreditManagerTest is
         evm.assume(indexNow >= indexAtOpen);
         evm.assume(indexNow - indexAtOpen < 10 * RAY);
 
-        uint256 interest = uint256(
-            (borrowedAmount * indexNow) / indexAtOpen - borrowedAmount
-        );
+        uint256 interest = uint256((borrowedAmount * indexNow) / indexAtOpen - borrowedAmount);
 
         evm.assume(interest > 1);
 
@@ -3623,40 +2362,19 @@ contract CreditManagerTest is
         );
 
         if (isIncrease) {
-            uint256 newIndex = cmi.calcNewCumulativeIndex(
-                borrowedAmount,
-                delta,
-                indexNow,
-                indexAtOpen,
-                true
-            );
+            uint256 newIndex = cmi.calcNewCumulativeIndex(borrowedAmount, delta, indexNow, indexAtOpen, true);
 
-            uint256 newInterestError = ((borrowedAmount + delta) * indexNow) /
-                newIndex -
-                (borrowedAmount + delta) -
-                ((borrowedAmount * indexNow) / indexAtOpen - borrowedAmount);
+            uint256 newInterestError = ((borrowedAmount + delta) * indexNow) / newIndex - (borrowedAmount + delta)
+                - ((borrowedAmount * indexNow) / indexAtOpen - borrowedAmount);
 
-            uint256 newTotalDebt = ((borrowedAmount + delta) * indexNow) /
-                newIndex;
+            uint256 newTotalDebt = ((borrowedAmount + delta) * indexNow) / newIndex;
 
-            assertLe(
-                (RAY * newInterestError) / newTotalDebt,
-                10000,
-                "Interest error is larger than 10 ** -23"
-            );
+            assertLe((RAY * newInterestError) / newTotalDebt, 10000, "Interest error is larger than 10 ** -23");
         } else {
-            uint256 newIndex = cmi.calcNewCumulativeIndex(
-                borrowedAmount,
-                delta,
-                indexNow,
-                indexAtOpen,
-                false
-            );
+            uint256 newIndex = cmi.calcNewCumulativeIndex(borrowedAmount, delta, indexNow, indexAtOpen, false);
 
             uint256 newTotalDebt = ((borrowedAmount * indexNow) / newIndex);
-            uint256 newInterestError = newTotalDebt -
-                borrowedAmount -
-                (interest - delta);
+            uint256 newInterestError = newTotalDebt - borrowedAmount - (interest - delta);
 
             emit log_uint(indexNow);
             emit log_uint(indexAtOpen);
@@ -3667,34 +2385,22 @@ contract CreditManagerTest is
             emit log_uint(borrowedAmount);
             emit log_uint(newInterestError);
 
-            assertLe(
-                (RAY * newInterestError) / newTotalDebt,
-                10000,
-                "Interest error is larger than 10 ** -23"
-            );
+            assertLe((RAY * newInterestError) / newTotalDebt, 10000, "Interest error is larger than 10 ** -23");
         }
     }
 
     /// @dev [CM-67]: checkEmergencyPausable returns pause state and enable emergencyLiquidation if needed
-    function test_CM_67_checkEmergencyPausable_returns_pause_state_and_enable_emergencyLiquidation_if_needed()
-        public
-    {
+    function test_CM_67_checkEmergencyPausable_returns_pause_state_and_enable_emergencyLiquidation_if_needed() public {
         bool p = creditManager.checkEmergencyPausable(DUMB_ADDRESS, true);
         assertTrue(!p, "Incorrect paused() value for non-paused state");
-        assertTrue(
-            !creditManager.emergencyLiquidation(),
-            "Emergency liquidation true when expected false"
-        );
+        assertTrue(!creditManager.emergencyLiquidation(), "Emergency liquidation true when expected false");
 
         evm.prank(CONFIGURATOR);
         creditManager.pause();
 
         p = creditManager.checkEmergencyPausable(DUMB_ADDRESS, true);
         assertTrue(p, "Incorrect paused() value for paused state");
-        assertTrue(
-            !creditManager.emergencyLiquidation(),
-            "Emergency liquidation true when expected false"
-        );
+        assertTrue(!creditManager.emergencyLiquidation(), "Emergency liquidation true when expected false");
 
         evm.prank(CONFIGURATOR);
         creditManager.unpause();
@@ -3703,26 +2409,129 @@ contract CreditManagerTest is
         creditManager.addEmergencyLiquidator(DUMB_ADDRESS);
         p = creditManager.checkEmergencyPausable(DUMB_ADDRESS, true);
         assertTrue(!p, "Incorrect paused() value for non-paused state");
-        assertTrue(
-            !creditManager.emergencyLiquidation(),
-            "Emergency liquidation true when expected false"
-        );
+        assertTrue(!creditManager.emergencyLiquidation(), "Emergency liquidation true when expected false");
 
         evm.prank(CONFIGURATOR);
         creditManager.pause();
 
         p = creditManager.checkEmergencyPausable(DUMB_ADDRESS, true);
         assertTrue(p, "Incorrect paused() value for paused state");
-        assertTrue(
-            creditManager.emergencyLiquidation(),
-            "Emergency liquidation flase when expected true"
-        );
+        assertTrue(creditManager.emergencyLiquidation(), "Emergency liquidation flase when expected true");
 
         p = creditManager.checkEmergencyPausable(DUMB_ADDRESS, false);
         assertTrue(p, "Incorrect paused() value for paused state");
-        assertTrue(
-            !creditManager.emergencyLiquidation(),
-            "Emergency liquidation true when expected false"
-        );
+        assertTrue(!creditManager.emergencyLiquidation(), "Emergency liquidation true when expected false");
+    }
+
+    /// @dev [CM-68]: fullCollateralCheck checks tokens in correct order
+    function test_CM_68_fullCollateralCheck_is_evaluated_in_order_of_hints() public {
+        _connectCreditManagerSuite(Tokens.DAI, true);
+
+        address creditAccount = _openAccountAndTransferToCF();
+
+        CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
+
+        tokenTestSuite.mint(Tokens.USDC, creditAccount, USDC_ACCOUNT_AMOUNT);
+        tokenTestSuite.mint(Tokens.USDT, creditAccount, 10);
+        tokenTestSuite.mint(Tokens.LINK, creditAccount, 10);
+
+        creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.USDC));
+        creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.USDT));
+        creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.LINK));
+
+        uint256[] memory collateralHints = new uint256[](2);
+        collateralHints[0] = cmi.tokenMasksMap(tokenTestSuite.addressOf(Tokens.USDT));
+        collateralHints[1] = cmi.tokenMasksMap(tokenTestSuite.addressOf(Tokens.LINK));
+
+        cmi.fullCollateralCheck(creditAccount, collateralHints, PERCENTAGE_FACTOR);
+
+        assertEq(cmi.fullCheckOrder(0), tokenTestSuite.addressOf(Tokens.USDT), "Token order incorrect");
+
+        assertEq(cmi.fullCheckOrder(1), tokenTestSuite.addressOf(Tokens.LINK), "Token order incorrect");
+
+        assertEq(cmi.fullCheckOrder(2), tokenTestSuite.addressOf(Tokens.DAI), "Token order incorrect");
+
+        assertEq(cmi.fullCheckOrder(3), tokenTestSuite.addressOf(Tokens.USDC), "Token order incorrect");
+    }
+
+    /// @dev [CM-70]: fullCollateralCheck reverts when an illegal mask is passed in collateralHints
+    function test_CM_70_fullCollateralCheck_reverts_for_illegal_mask_in_hints() public {
+        (,,, address creditAccount) = _openCreditAccount();
+
+        evm.expectRevert(TokenNotAllowedException.selector);
+
+        uint256[] memory ch = new uint256[](1);
+        ch[0] = 3;
+
+        creditManager.fullCollateralCheck(creditAccount, ch, PERCENTAGE_FACTOR);
+    }
+
+    /// @dev [CM-71]: rampLiquidationThreshold correctly updates the internal struct
+    function test_CM_71_rampLiquidationThreshold_correctly_updates_parameters() public {
+        _connectCreditManagerSuite(Tokens.DAI, true);
+
+        address usdc = tokenTestSuite.addressOf(Tokens.USDC);
+
+        CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
+
+        evm.prank(CONFIGURATOR);
+        cmi.rampLiquidationThreshold(usdc, 8500, uint40(block.timestamp), 3600 * 24 * 7);
+
+        CollateralTokenData memory cd = cmi.collateralTokensDataExt(cmi.tokenMasksMap(usdc));
+
+        assertEq(uint256(cd.ltInitial), creditConfig.lt(Tokens.USDC), "Incorrect initial LT");
+
+        assertEq(uint256(cd.ltFinal), 8500, "Incorrect final LT");
+
+        assertEq(uint256(cd.timestampRampStart), block.timestamp, "Incorrect timestamp start");
+
+        assertEq(uint256(cd.rampDuration), 3600 * 24 * 7, "Incorrect ramp duration");
+    }
+
+    /// @dev [CM-72]: Ramping liquidation threshold fuzzing
+    function test_CM_72_liquidation_ramping_fuzzing(
+        uint16 initialLT,
+        uint16 newLT,
+        uint24 duration,
+        uint256 timestampCheck
+    ) public {
+        initialLT = 1000 + (initialLT % (DEFAULT_UNDERLYING_LT - 999));
+        newLT = 1000 + (newLT % (DEFAULT_UNDERLYING_LT - 999));
+        duration = 3600 + (duration % (3600 * 24 * 90 - 3600));
+
+        timestampCheck = block.timestamp + (timestampCheck % (duration + 1));
+
+        address usdc = tokenTestSuite.addressOf(Tokens.USDC);
+
+        uint256 timestampStart = block.timestamp;
+
+        evm.startPrank(CONFIGURATOR);
+        creditManager.setLiquidationThreshold(usdc, initialLT);
+        creditManager.rampLiquidationThreshold(usdc, newLT, uint40(block.timestamp), duration);
+
+        assertEq(creditManager.liquidationThresholds(usdc), initialLT, "LT at ramping start incorrect");
+
+        uint16 expectedLT;
+        if (newLT >= initialLT) {
+            expectedLT = uint16(
+                uint256(initialLT)
+                    + (uint256(newLT - initialLT) * (timestampCheck - timestampStart)) / uint256(duration)
+            );
+        } else {
+            expectedLT = uint16(
+                uint256(initialLT)
+                    - (uint256(initialLT - newLT) * (timestampCheck - timestampStart)) / uint256(duration)
+            );
+        }
+
+        evm.warp(timestampCheck);
+        uint16 actualLT = creditManager.liquidationThresholds(usdc);
+        uint16 diff = actualLT > expectedLT ? actualLT - expectedLT : expectedLT - actualLT;
+
+        assertLe(diff, 1, "LT off by more than 1");
+
+        evm.warp(timestampStart + duration + 1);
+
+        assertEq(creditManager.liquidationThresholds(usdc), newLT, "LT at ramping end incorrect");
     }
 }
