@@ -14,15 +14,6 @@ library Errors {
     string public constant REGISTERED_POOLS_ONLY = "RP";
 
     //
-    // POOL
-    //
-    string public constant POOL_CONNECTED_CREDIT_MANAGERS_ONLY = "PS0";
-    string public constant POOL_INCOMPATIBLE_CREDIT_ACCOUNT_MANAGER = "PS1";
-    string public constant POOL_MORE_THAN_EXPECTED_LIQUIDITY_LIMIT = "PS2";
-    string public constant POOL_INCORRECT_WITHDRAW_FEE = "PS3";
-    string public constant POOL_CANT_ADD_CREDIT_MANAGER_TWICE = "PS4";
-
-    //
     // ACCOUNT FACTORY
     //
     string public constant AF_CANT_CLOSE_CREDIT_ACCOUNT_IN_THE_SAME_BLOCK = "AF1";
