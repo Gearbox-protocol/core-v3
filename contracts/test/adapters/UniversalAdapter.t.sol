@@ -3,13 +3,15 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
+import {UNIVERSAL_CONTRACT} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
+import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
+
 import {UniversalAdapter, RevocationPair} from "../../adapters/UniversalAdapter.sol";
 import {CreditFacade} from "../../credit/CreditFacade.sol";
 import {ICreditManagerV2} from "../../interfaces/ICreditManagerV2.sol";
 import {ZeroAddressException} from "../../interfaces/IErrors.sol";
 import {IAdapterExceptions} from "../../interfaces/adapters/IAdapter.sol";
-import {UNIVERSAL_CONTRACT} from "../../libraries/Constants.sol";
-import {MultiCall} from "../../libraries/MultiCall.sol";
 
 // CONSTANTS
 import {CONFIGURATOR, USER} from "../lib/constants.sol";
@@ -20,7 +22,6 @@ import {CreditFacadeTestHelper} from "../helpers/CreditFacadeTestHelper.sol";
 
 // MOCKS
 import {AdapterMock} from "../mocks/adapters/AdapterMock.sol";
-import {TargetContractMock} from "../mocks/adapters/TargetContractMock.sol";
 
 // SUITES
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
