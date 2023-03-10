@@ -17,7 +17,7 @@
   "solidity.remappings": [
     "@chainlink/=node_modules/@chainlink/",
     "@ensdomains/=node_modules/@ensdomains/",
-    "@openzeppelin/=node_modules/@openzeppelin/contracts",
+    "@openzeppelin/=node_modules/@openzeppelin/",
     "ds-test/=lib/ds-test/src/",
     "hardhat/=node_modules/hardhat/",
     "@gearbox-protocol=node_modules/@gearbox-protocol/"
