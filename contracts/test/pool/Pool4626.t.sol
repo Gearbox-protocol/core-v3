@@ -1313,8 +1313,11 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
     // [P4-16]: updateBorrowRate correctly updates parameters
     function test_P4_16_updateBorrowRate_correct() public {
+        uint256 quotaInterestPerYear = addLiquidity / 4;
         for (uint256 i; i < 2; ++i) {
             bool supportQuotas = i == 1;
+            string memory testName = supportQuotas ? "Test with supportQuotas=true" : "Test with supportQuotas=false";
+
             _setUpTestCase(Tokens.DAI, 0, 50_00, addLiquidity, 2 * RAY, 0, supportQuotas);
 
             if (supportQuotas) {
@@ -1328,7 +1331,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                 QuotaUpdate[] memory qu = new QuotaUpdate[](1);
                 qu[0] = QuotaUpdate({
                     token: tokenTestSuite.addressOf(Tokens.LINK),
-                    quotaChange: int96(int256(addLiquidity / 4))
+                    quotaChange: int96(int256(quotaInterestPerYear))
                 });
 
                 cmMock.updateQuotas(DUMB_ADDRESS, qu);
@@ -1344,20 +1347,32 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
             evm.warp(block.timestamp + timeWarp);
 
             uint256 expectedInterest = ((addLiquidity / 2) * borrowRate) / RAY;
-            uint256 expectedLiquidity = addLiquidity + expectedInterest + (supportQuotas ? addLiquidity / 4 : 0);
+            uint256 expectedLiquidity = addLiquidity + expectedInterest + (supportQuotas ? quotaInterestPerYear : 0);
 
             uint256 expectedBorrowRate = psts.linearIRModel().calcBorrowRate(expectedLiquidity, addLiquidity / 2);
 
             _updateBorrowrate();
 
-            assertEq(pool.expectedLiquidity(), expectedLiquidity, "Expected liquidity was not updated correctly");
-
-            assertEq(uint256(pool.timestampLU()), block.timestamp, "Timestamp was not updated correctly");
-
-            assertEq(pool.borrowRate(), expectedBorrowRate, "Borrow rate was not updated correctly");
+            assertEq(
+                pool.expectedLiquidity(),
+                expectedLiquidity,
+                _testCaseErr(testName, "Expected liquidity was not updated correctly")
+            );
 
             assertEq(
-                pool.calcLinearCumulative_RAY(), pool.cumulativeIndexLU_RAY(), "Index value was not updated correctly"
+                uint256(pool.timestampLU()),
+                block.timestamp,
+                _testCaseErr(testName, "Timestamp was not updated correctly")
+            );
+
+            assertEq(
+                pool.borrowRate(), expectedBorrowRate, _testCaseErr(testName, "Borrow rate was not updated correctly")
+            );
+
+            assertEq(
+                pool.calcLinearCumulative_RAY(),
+                pool.cumulativeIndexLU_RAY(),
+                _testCaseErr(testName, "Index value was not updated correctly")
             );
         }
     }
