@@ -16,7 +16,6 @@ struct UserVotes {
 }
 
 struct GaugeOpts {
-    address addressProvider;
     address pool;
     address gearStaking;
 }

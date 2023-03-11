@@ -3,7 +3,8 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
-import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
+import {IPool4626} from "../../../interfaces/IPool4626.sol";
+import {IPoolQuotaKeeper, QuotaUpdate, QuotaStatusChange} from "../../../interfaces/IPoolQuotaKeeper.sol";
 import "../../lib/constants.sol";
 
 contract CreditManagerMockForPoolTest {
@@ -29,7 +30,7 @@ contract CreditManagerMockForPoolTest {
      * @param ca Credit account address
      */
     function lendCreditAccount(uint256 borrowedAmount, address ca) external {
-        IPoolService(poolService).lendCreditAccount(borrowedAmount, ca);
+        IPool4626(poolService).lendCreditAccount(borrowedAmount, ca);
     }
 
     /**
@@ -37,10 +38,17 @@ contract CreditManagerMockForPoolTest {
      * mints/burns diesel tokens
      */
     function repayCreditAccount(uint256 borrowedAmount, uint256 profit, uint256 loss) external {
-        IPoolService(poolService).repayCreditAccount(borrowedAmount, profit, loss);
+        IPool4626(poolService).repayCreditAccount(borrowedAmount, profit, loss);
     }
 
     function getCreditAccountOrRevert(address) public view returns (address result) {
         result = creditAccount;
+    }
+
+    function updateQuotas(address _creditAccount, QuotaUpdate[] memory quotaUpdates)
+        external
+        returns (uint256 caQuotaInterestChange, QuotaStatusChange[] memory statusChanges, bool statusWasChanged)
+    {
+        return IPoolQuotaKeeper(IPool4626(pool).poolQuotaKeeper()).updateQuotas(_creditAccount, quotaUpdates);
     }
 }

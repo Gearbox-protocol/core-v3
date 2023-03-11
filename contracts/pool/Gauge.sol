@@ -56,16 +56,14 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
 
     /// @dev Constructor
     /// @param opts Gauge options
-    ///             * addressProvider - the AddressProvder contract
-    ///             * pool - Address of the associated pool
-    ///             * vote
-    constructor(GaugeOpts memory opts) ACLNonReentrantTrait(opts.addressProvider) {
+
+    constructor(GaugeOpts memory opts) ACLNonReentrantTrait(address(Pool4626(opts.pool).addressProvider())) {
         // Additional check that receiver is not address(0)
-        if (opts.addressProvider == address(0) || opts.pool == address(0)) {
+        if (opts.pool == address(0)) {
             revert ZeroAddressException(); // F:[P4-02]
         }
 
-        addressProvider = opts.addressProvider; // F:[P4-01]
+        addressProvider = address(Pool4626(opts.pool).addressProvider()); // F:[P4-01]
         pool = Pool4626(payable(opts.pool)); // F:[P4-01]
         voter = IGearStaking(opts.gearStaking);
         epochLU = voter.getCurrentEpoch();
