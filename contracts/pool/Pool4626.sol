@@ -584,10 +584,6 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
     }
 
     function _updateQuotaRevenue(uint128 _newQuotaRevenue) internal {
-        if (lastQuotaRevenueUpdate == 0) {
-            lastQuotaRevenueUpdate = uint40(block.timestamp);
-        }
-
         _expectedLiquidityLU += _calcOutstandingQuotaRevenue();
 
         lastQuotaRevenueUpdate = uint40(block.timestamp);
