@@ -23,6 +23,8 @@ import "../lib/constants.sol";
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 import {Pool4626} from "../../pool/Pool4626.sol";
 import {PoolQuotaKeeper} from "../../pool/PoolQuotaKeeper.sol";
+import {GaugeMock} from "../mocks/pool/GaugeMock.sol";
+import {GaugeOpts} from "../../interfaces/IGauge.sol";
 
 import {Pool4626_USDT} from "../../pool/Pool4626_USDT.sol";
 
@@ -47,6 +49,7 @@ contract PoolServiceTestSuite {
     DieselToken public dieselToken;
     LinearInterestRateModel public linearIRModel;
     PoolQuotaKeeper public poolQuotaKeeper;
+    GaugeMock public gaugeMock;
 
     address public treasury;
 
@@ -139,7 +142,13 @@ contract PoolServiceTestSuite {
     function _deployAndConnectPoolQuotaKeeper() internal {
         poolQuotaKeeper = new PoolQuotaKeeper(address(pool4626));
 
-        evm.prank(CONFIGURATOR);
+        // evm.prank(CONFIGURATOR);
         pool4626.connectPoolQuotaManager(address(poolQuotaKeeper));
+
+        GaugeOpts memory gOpts = GaugeOpts({pool: address(pool4626), gearStaking: address(0)});
+        gaugeMock = new GaugeMock(gOpts);
+
+        // evm.prank(CONFIGURATOR);
+        poolQuotaKeeper.setGauge(address(gaugeMock));
     }
 }

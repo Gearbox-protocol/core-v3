@@ -113,7 +113,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
 
     modifier poolQuotaKeeperOnly() {
         /// TODO: udpate exception
-        if (msg.sender == poolQuotaKeeper) revert PoolQuotaKeeperOnly(); // F:[P4-5]
+        if (msg.sender != poolQuotaKeeper) revert PoolQuotaKeeperOnly(); // F:[P4-5]
         _;
     }
 
@@ -377,7 +377,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
     /// @dev See {IERC4626-previewWithdraw}.
     function previewWithdraw(uint256 assets) public view override (ERC4626, IERC4626) returns (uint256) {
         return _convertToShares(
-            _amountWithFee(assets) * PERCENTAGE_FACTOR / (PERCENTAGE_FACTOR - withdrawFee), Math.Rounding.Up
+            (_amountWithFee(assets) * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR - withdrawFee), Math.Rounding.Up
         );
     }
 

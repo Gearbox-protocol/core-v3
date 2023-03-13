@@ -6,6 +6,8 @@ pragma solidity ^0.8.10;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import {IPoolQuotaKeeper, QuotaUpdate, QuotaStatusChange} from "../../interfaces/IPoolQuotaKeeper.sol";
+
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {Pool4626} from "../../pool/Pool4626.sol";
@@ -30,6 +32,7 @@ import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
 import {Tokens} from "../config/Tokens.sol";
 import {BalanceHelper} from "../helpers/BalanceHelper.sol";
 import {ERC20FeeMock} from "../mocks/token/ERC20FeeMock.sol";
+import {PoolQuotaKeeper} from "../../pool/PoolQuotaKeeper.sol";
 
 // TEST
 import "../lib/constants.sol";
@@ -56,6 +59,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
     CheatCodes evm = CheatCodes(HEVM_ADDRESS);
 
     PoolServiceTestSuite psts;
+    PoolQuotaKeeper pqk;
 
     /*
      * @dev Emitted when `value` tokens are moved from one account (`from`) to
@@ -89,6 +93,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         underlying = address(psts.underlying());
         cmMock = psts.cmMock();
         acl = psts.acl();
+        pqk = psts.poolQuotaKeeper();
     }
 
     //
@@ -154,7 +159,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         pool.mint(availableLiquidity, INITIAL_LP);
 
         evm.prank(INITIAL_LP);
-        pool.burn(availableLiquidity * (dieselRate - RAY) / dieselRate);
+        pool.burn((availableLiquidity * (dieselRate - RAY)) / dieselRate);
 
         // assertEq(pool.expectedLiquidityLU(), availableLiquidity * dieselRate / RAY, "ExpectedLU is not correct!");
         assertEq(pool.convertToAssets(RAY), dieselRate, "Incorrect diesel rate!");
@@ -330,9 +335,9 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                 /// PARAMS
                 amountToDeposit: addLiquidity,
                 /// EXPECTED VALUES
-                expectedShares: (addLiquidity * 40 / 100) / 2,
-                expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity * 40 / 100,
-                expectedLiquidityAfter: addLiquidity + addLiquidity * 40 / 100
+                expectedShares: ((addLiquidity * 40) / 100) / 2,
+                expectedAvailableLiquidity: addLiquidity / 2 + (addLiquidity * 40) / 100,
+                expectedLiquidityAfter: addLiquidity + (addLiquidity * 40) / 100
             })
         ];
 
@@ -452,7 +457,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                 desiredShares: addLiquidity / 2,
                 /// EXPECTED VALUES
                 /// fee token makes impact on how much tokens will be wiotdrawn from user
-                expectedAssetsWithdrawal: addLiquidity * 100 / 40,
+                expectedAssetsWithdrawal: (addLiquidity * 100) / 40,
                 expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity,
                 expectedLiquidityAfter: addLiquidity * 2
             })
@@ -612,10 +617,10 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                 // EXPECTED VALUES:
                 //
                 // Depends on dieselRate
-                expectedSharesBurnt: addLiquidity / 8 * 100 / 99,
-                expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity - addLiquidity / 4 * 100 / 99,
-                expectedLiquidityAfter: addLiquidity * 2 - addLiquidity / 4 * 100 / 99,
-                expectedTreasury: addLiquidity / 4 * 1 / 99
+                expectedSharesBurnt: ((addLiquidity / 8) * 100) / 99,
+                expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity - ((addLiquidity / 4) * 100) / 99,
+                expectedLiquidityAfter: addLiquidity * 2 - ((addLiquidity / 4) * 100) / 99,
+                expectedTreasury: ((addLiquidity / 4) * 1) / 99
             }),
             WithdrawTestCase({
                 name: "Fee token with 0 withdraw fee",
@@ -635,9 +640,9 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                 // EXPECTED VALUES:
                 //
                 // Depends on dieselRate
-                expectedSharesBurnt: addLiquidity / 8 * 100 / 40,
-                expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity - addLiquidity / 4 * 100 / 40,
-                expectedLiquidityAfter: addLiquidity * 2 - addLiquidity / 4 * 100 / 40,
+                expectedSharesBurnt: ((addLiquidity / 8) * 100) / 40,
+                expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity - ((addLiquidity / 4) * 100) / 40,
+                expectedLiquidityAfter: addLiquidity * 2 - ((addLiquidity / 4) * 100) / 40,
                 expectedTreasury: 0
             }),
             WithdrawTestCase({
@@ -658,11 +663,11 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                 // EXPECTED VALUES:
                 //
                 // addLiquidity /2 * 1/2 (rate) * 1 / (100%-1%) / feeToken
-                expectedSharesBurnt: addLiquidity / 8 * 100 / 99 * 100 / 40 + 1,
+                expectedSharesBurnt: ((((addLiquidity / 8) * 100) / 99) * 100) / 40 + 1,
                 // availableLiquidityBefore: addLiqudity /2 (cause 50% utilisation)
-                expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity - addLiquidity / 4 * 100 / 40 * 100 / 99 - 1,
-                expectedLiquidityAfter: addLiquidity * 2 - addLiquidity / 4 * 100 / 40 * 100 / 99 - 1,
-                expectedTreasury: addLiquidity / 4 * 1 / 99 + 1
+                expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity - ((((addLiquidity / 4) * 100) / 40) * 100) / 99 - 1,
+                expectedLiquidityAfter: addLiquidity * 2 - ((((addLiquidity / 4) * 100) / 40) * 100) / 99 - 1,
+                expectedTreasury: ((addLiquidity / 4) * 1) / 99 + 1
             })
         ];
 
@@ -810,10 +815,10 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                 // EXPECTED VALUES:
                 //
                 // Depends on dieselRate
-                expectedAssetsDelivered: addLiquidity / 2 * 99 / 100,
+                expectedAssetsDelivered: ((addLiquidity / 2) * 99) / 100,
                 expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity - addLiquidity / 2,
                 expectedLiquidityAfter: addLiquidity * 2 - addLiquidity / 2,
-                expectedTreasury: addLiquidity / 2 * 1 / 100
+                expectedTreasury: ((addLiquidity / 2) * 1) / 100
             }),
             RedeemTestCase({
                 name: "Fee token with 0 withdraw fee",
@@ -833,7 +838,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                 // EXPECTED VALUES:
                 //
                 // Depends on dieselRate
-                expectedAssetsDelivered: addLiquidity / 2 * 40 / 100,
+                expectedAssetsDelivered: ((addLiquidity / 2) * 40) / 100,
                 expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity - addLiquidity / 2,
                 expectedLiquidityAfter: addLiquidity * 2 - addLiquidity / 2,
                 expectedTreasury: 0
@@ -856,11 +861,11 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                 // EXPECTED VALUES:
                 //
                 // addLiquidity /2 * 1/2 (rate) * 1 / (100%-1%) / feeToken
-                expectedAssetsDelivered: addLiquidity / 2 * 99 / 100 * 40 / 100,
+                expectedAssetsDelivered: ((((addLiquidity / 2) * 99) / 100) * 40) / 100,
                 // availableLiquidityBefore: addLiqudity /2 (cause 50% utilisation)
                 expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity - addLiquidity / 2,
                 expectedLiquidityAfter: addLiquidity * 2 - addLiquidity / 2,
-                expectedTreasury: addLiquidity / 2 * 40 / 100 * 1 / 100
+                expectedTreasury: ((((addLiquidity / 2) * 40) / 100) * 1) / 100
             })
         ];
         /// @dev a represents allowance, 0 means required amount +1, 1 means inlimited allowance
@@ -956,7 +961,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         expectBalance(address(pool), USER, addLiquidity, "SETUP: Incorrect USER balance");
 
         /// Initial lp provided 1/2 AL + 1AL from USER
-        assertEq(pool.totalSupply(), addLiquidity * 3 / 2, "SETUP: Incorrect total supply");
+        assertEq(pool.totalSupply(), (addLiquidity * 3) / 2, "SETUP: Incorrect total supply");
 
         uint256 borrowRate = pool.borrowRate();
         uint256 dieselRate = pool.convertToAssets(RAY);
@@ -966,11 +971,11 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         evm.prank(USER);
         pool.burn(addLiquidity / 4);
 
-        expectBalance(address(pool), USER, addLiquidity * 3 / 4, "Incorrect USER balance");
+        expectBalance(address(pool), USER, (addLiquidity * 3) / 4, "Incorrect USER balance");
 
         assertEq(pool.borrowRate(), borrowRate, "Incorrect borrow rate");
         /// Before burn totalSupply was 150% * AL, after 125% * LP
-        assertEq(pool.convertToAssets(RAY), dieselRate * 150 / 125, "Incorrect diesel rate");
+        assertEq(pool.convertToAssets(RAY), (dieselRate * 150) / 125, "Incorrect diesel rate");
         assertEq(pool.availableLiquidity(), availableLiquidity, "Incorrect available liquidity");
         assertEq(pool.expectedLiquidity(), expectedLiquidity, "Incorrect expected liquidity");
     }
@@ -1121,15 +1126,15 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                 sharesInTreasury: addLiquidity / 4,
                 // PARAMS
                 borrowAmount: addLiquidity / 2,
-                profit: addLiquidity * 1 / 10,
+                profit: (addLiquidity * 1) / 10,
                 loss: 0,
                 // EXPECTED VALUES:
                 //
                 // addLiqudity + new minted diesel tokens for 10% with rate 2:1
-                expectedTotalSupply: addLiquidity + addLiquidity * 1 / 10 / 2,
-                expectedAvailableLiquidity: 2 * addLiquidity - addLiquidity + addLiquidity / 2 + addLiquidity * 1 / 10,
+                expectedTotalSupply: addLiquidity + (addLiquidity * 1) / 10 / 2,
+                expectedAvailableLiquidity: 2 * addLiquidity - addLiquidity + addLiquidity / 2 + (addLiquidity * 1) / 10,
                 // added profit here
-                expectedLiquidityAfter: 2 * addLiquidity + addLiquidity * 1 / 10,
+                expectedLiquidityAfter: 2 * addLiquidity + (addLiquidity * 1) / 10,
                 expectedTreasury: 0,
                 uncoveredLoss: 0
             }),
@@ -1147,13 +1152,13 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                 // PARAMS
                 borrowAmount: addLiquidity / 2,
                 profit: 0,
-                loss: addLiquidity * 1 / 10,
+                loss: (addLiquidity * 1) / 10,
                 // EXPECTED VALUES:
                 //
                 // with covered loss, the system should burn DAO shares based on current rate
-                expectedTotalSupply: addLiquidity - addLiquidity * 1 / 10 / 2,
-                expectedAvailableLiquidity: 2 * addLiquidity - addLiquidity + addLiquidity / 2 - addLiquidity * 1 / 10,
-                expectedLiquidityAfter: 2 * addLiquidity - addLiquidity * 1 / 10,
+                expectedTotalSupply: addLiquidity - (addLiquidity * 1) / 10 / 2,
+                expectedAvailableLiquidity: 2 * addLiquidity - addLiquidity + addLiquidity / 2 - (addLiquidity * 1) / 10,
+                expectedLiquidityAfter: 2 * addLiquidity - (addLiquidity * 1) / 10,
                 expectedTreasury: 0,
                 uncoveredLoss: 0
             }),
@@ -1171,15 +1176,15 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                 // PARAMS
                 borrowAmount: addLiquidity / 2,
                 profit: 0,
-                loss: addLiquidity * 1 / 10,
+                loss: (addLiquidity * 1) / 10,
                 // EXPECTED VALUES:
                 //
                 // Depends on dieselRate
                 expectedTotalSupply: addLiquidity,
-                expectedAvailableLiquidity: 2 * addLiquidity - addLiquidity + addLiquidity / 2 - addLiquidity * 1 / 10,
-                expectedLiquidityAfter: 2 * addLiquidity - addLiquidity * 1 / 10,
+                expectedAvailableLiquidity: 2 * addLiquidity - addLiquidity + addLiquidity / 2 - (addLiquidity * 1) / 10,
+                expectedLiquidityAfter: 2 * addLiquidity - (addLiquidity * 1) / 10,
                 expectedTreasury: 0,
-                uncoveredLoss: addLiquidity * 1 / 10
+                uncoveredLoss: (addLiquidity * 1) / 10
             }),
             RepayTestCase({
                 name: "profit: 0, loss: 20% (partially covered)",
@@ -1191,19 +1196,19 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                 dieselRate: 2 * RAY,
                 // No borrowing on start
                 borrowBefore: addLiquidity,
-                sharesInTreasury: addLiquidity * 1 / 10 / 2,
+                sharesInTreasury: (addLiquidity * 1) / 10 / 2,
                 // PARAMS
                 borrowAmount: addLiquidity / 2,
                 profit: 0,
-                loss: addLiquidity * 2 / 10,
+                loss: (addLiquidity * 2) / 10,
                 // EXPECTED VALUES:
                 //
                 // Depends on dieselRate
-                expectedTotalSupply: addLiquidity - addLiquidity * 1 / 10 / 2,
-                expectedAvailableLiquidity: 2 * addLiquidity - addLiquidity + addLiquidity / 2 - addLiquidity * 2 / 10,
-                expectedLiquidityAfter: 2 * addLiquidity - addLiquidity * 2 / 10,
+                expectedTotalSupply: addLiquidity - (addLiquidity * 1) / 10 / 2,
+                expectedAvailableLiquidity: 2 * addLiquidity - addLiquidity + addLiquidity / 2 - (addLiquidity * 2) / 10,
+                expectedLiquidityAfter: 2 * addLiquidity - (addLiquidity * 2) / 10,
                 expectedTreasury: 0,
-                uncoveredLoss: addLiquidity * 1 / 10
+                uncoveredLoss: (addLiquidity * 1) / 10
             })
         ];
         for (uint256 i; i < cases.length; ++i) {
@@ -1308,27 +1313,68 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
     // [P4-16]: updateBorrowRate correctly updates parameters
     function test_P4_16_updateBorrowRate_correct() public {
-        _setUpTestCase(Tokens.DAI, 0, 50_00, addLiquidity, 2 * RAY, 0, false);
+        uint256 quotaInterestPerYear = addLiquidity / 4;
+        for (uint256 i; i < 2; ++i) {
+            bool supportQuotas = i == 1;
+            string memory testName = supportQuotas ? "Test with supportQuotas=true" : "Test with supportQuotas=false";
 
-        uint256 borrowRate = pool.borrowRate();
-        uint256 timeWarp = 365 days;
+            _setUpTestCase(Tokens.DAI, 0, 50_00, addLiquidity, 2 * RAY, 0, supportQuotas);
 
-        evm.warp(block.timestamp + timeWarp);
+            if (supportQuotas) {
+                evm.startPrank(CONFIGURATOR);
+                psts.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 100_00);
 
-        uint256 expectedInterest = ((addLiquidity / 2) * borrowRate) / RAY;
-        uint256 expectedLiquidity = addLiquidity + expectedInterest;
+                pqk.addCreditManager(address(cmMock));
 
-        uint256 expectedBorrowRate = psts.linearIRModel().calcBorrowRate(expectedLiquidity, addLiquidity / 2);
+                pqk.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), uint96(WAD * 100_000));
 
-        _updateBorrowrate();
+                QuotaUpdate[] memory qu = new QuotaUpdate[](1);
+                qu[0] = QuotaUpdate({
+                    token: tokenTestSuite.addressOf(Tokens.LINK),
+                    quotaChange: int96(int256(quotaInterestPerYear))
+                });
 
-        assertEq(pool.expectedLiquidity(), expectedLiquidity, "Expected liquidity was not updated correctly");
+                cmMock.updateQuotas(DUMB_ADDRESS, qu);
 
-        assertEq(uint256(pool.timestampLU()), block.timestamp, "Timestamp was not updated correctly");
+                psts.gaugeMock().updateEpoch();
 
-        assertEq(pool.borrowRate(), expectedBorrowRate, "Borrow rate was not updated correctly");
+                evm.stopPrank();
+            }
 
-        assertEq(pool.calcLinearCumulative_RAY(), pool.cumulativeIndexLU_RAY(), "Index value was not updated correctly");
+            uint256 borrowRate = pool.borrowRate();
+            uint256 timeWarp = 365 days;
+
+            evm.warp(block.timestamp + timeWarp);
+
+            uint256 expectedInterest = ((addLiquidity / 2) * borrowRate) / RAY;
+            uint256 expectedLiquidity = addLiquidity + expectedInterest + (supportQuotas ? quotaInterestPerYear : 0);
+
+            uint256 expectedBorrowRate = psts.linearIRModel().calcBorrowRate(expectedLiquidity, addLiquidity / 2);
+
+            _updateBorrowrate();
+
+            assertEq(
+                pool.expectedLiquidity(),
+                expectedLiquidity,
+                _testCaseErr(testName, "Expected liquidity was not updated correctly")
+            );
+
+            assertEq(
+                uint256(pool.timestampLU()),
+                block.timestamp,
+                _testCaseErr(testName, "Timestamp was not updated correctly")
+            );
+
+            assertEq(
+                pool.borrowRate(), expectedBorrowRate, _testCaseErr(testName, "Borrow rate was not updated correctly")
+            );
+
+            assertEq(
+                pool.calcLinearCumulative_RAY(),
+                pool.cumulativeIndexLU_RAY(),
+                _testCaseErr(testName, "Index value was not updated correctly")
+            );
+        }
     }
 
     // // [P4-11]: connectCreditManager, forbidCreditManagerToBorrow, newInterestRateModel, setExpecetedLiquidityLimit reverts if called with non-configurator

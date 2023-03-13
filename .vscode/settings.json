@@ -3,7 +3,7 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[solidity]": {
-    "editor.defaultFormatter": "JuanBlanco.solidity"
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
 
   "editor.defaultFormatter": "esbenp.prettier-vscode",

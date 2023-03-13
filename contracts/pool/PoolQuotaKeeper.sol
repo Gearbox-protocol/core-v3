@@ -459,7 +459,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
     /// @dev Sets an upper limit on quotas for a token
     /// @param token Address of token to set the limit for
     /// @param limit The limit to set
-    function setTokenLimit(address token, uint96 limit) external configuratorOnly {
+    function setTokenLimit(address token, uint96 limit) external controllerOnly {
         totalQuotas[token].limit = limit;
 
         emit TokenLimitSet(token, limit);

@@ -28,10 +28,10 @@ interface IInterestRateModel is IInterestRateModelExceptions, IVersion {
 
     function availableToBorrow(uint256 expectedLiquidity, uint256 availableLiquidity) external view returns (uint256);
 
-    function U_Optimal_WAD() external view returns (uint256);
+    function U_1_WAD() external view returns (uint256);
 
     // Uoptimal[0 external view returns (uint256);1] in Wad
-    function U_Reserve_WAD() external view returns (uint256);
+    function U_2_WAD() external view returns (uint256);
 
     // R_base in Ray
     function R_base_RAY() external view returns (uint256);
