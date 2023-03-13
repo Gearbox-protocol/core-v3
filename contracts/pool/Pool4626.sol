@@ -57,7 +57,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
     bool public immutable supportsQuotas;
 
     /// @dev Contract version
-    uint256 public constant override version = 2_10;
+    uint256 public constant override version = 3_00;
 
     // [SLOT #1]
 
@@ -182,7 +182,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
     /// @dev See {IERC4626-deposit}.
     function deposit(uint256 assets, address receiver)
         public
-        override (ERC4626, IERC4626)
+        override(ERC4626, IERC4626)
         whenNotPaused // F:[P4-4]
         nonReentrant
         nonZeroAddress(receiver)
@@ -212,7 +212,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
     /// In this case, the shares will be minted without requiring any assets to be deposited.
     function mint(uint256 shares, address receiver)
         public
-        override (ERC4626, IERC4626)
+        override(ERC4626, IERC4626)
         whenNotPaused // F:[P4-4]
         nonReentrant
         nonZeroAddress(receiver)
@@ -246,7 +246,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
     /// @dev  See {IERC4626-withdraw}.
     function withdraw(uint256 assets, address receiver, address owner)
         public
-        override (ERC4626, IERC4626)
+        override(ERC4626, IERC4626)
         whenNotPaused // F:[P4-4]
         nonReentrant
         nonZeroAddress(receiver)
@@ -260,7 +260,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
     /// @dev See {IERC4626-redeem}.
     function redeem(uint256 shares, address receiver, address owner)
         public
-        override (ERC4626, IERC4626)
+        override(ERC4626, IERC4626)
         whenNotPaused // F:[P4-4]
         nonReentrant
         nonZeroAddress(receiver)
@@ -342,47 +342,47 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
     }
 
     /// @dev See {IERC4626-totalAssets}.
-    function totalAssets() public view override (ERC4626, IERC4626) returns (uint256 assets) {
+    function totalAssets() public view override(ERC4626, IERC4626) returns (uint256 assets) {
         return expectedLiquidity();
     }
 
     /// @dev See {IERC4626-maxDeposit}.
-    function maxDeposit(address) public view override (ERC4626, IERC4626) returns (uint256) {
+    function maxDeposit(address) public view override(ERC4626, IERC4626) returns (uint256) {
         return (_expectedLiquidityLimit == type(uint128).max)
             ? type(uint256).max
             : _amountWithFee(_expectedLiquidityLimit - expectedLiquidity());
     }
 
     /// @dev See {IERC4626-previewDeposit}.
-    function previewDeposit(uint256 assets) public view override (ERC4626, IERC4626) returns (uint256) {
+    function previewDeposit(uint256 assets) public view override(ERC4626, IERC4626) returns (uint256) {
         return _convertToShares(_amountMinusFee(assets), Math.Rounding.Down); // TODO: add fee parameter
     }
 
     /// @dev See {IERC4626-maxMint}.
-    function maxMint(address) public view override (ERC4626, IERC4626) returns (uint256) {
+    function maxMint(address) public view override(ERC4626, IERC4626) returns (uint256) {
         uint128 limit = _expectedLiquidityLimit;
         return (limit == type(uint128).max) ? type(uint256).max : previewMint(limit - expectedLiquidity());
     }
 
     ///  @dev See {IERC4626-previewMint}.
-    function previewMint(uint256 shares) public view override (ERC4626, IERC4626) returns (uint256) {
+    function previewMint(uint256 shares) public view override(ERC4626, IERC4626) returns (uint256) {
         return _amountWithFee(_convertToAssets(shares, Math.Rounding.Up)); // We need to round up shares.mulDivUp(totalAssets(), supply);
     }
 
     /// @dev See {IERC4626-maxWithdraw}.
-    function maxWithdraw(address owner) public view override (ERC4626, IERC4626) returns (uint256) {
+    function maxWithdraw(address owner) public view override(ERC4626, IERC4626) returns (uint256) {
         return availableLiquidity().min(previewWithdraw(balanceOf(owner)));
     }
 
     /// @dev See {IERC4626-previewWithdraw}.
-    function previewWithdraw(uint256 assets) public view override (ERC4626, IERC4626) returns (uint256) {
+    function previewWithdraw(uint256 assets) public view override(ERC4626, IERC4626) returns (uint256) {
         return _convertToShares(
             (_amountWithFee(assets) * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR - withdrawFee), Math.Rounding.Up
         );
     }
 
     /// @dev See {IERC4626-maxRedeem}.
-    function maxRedeem(address owner) public view override (ERC4626, IERC4626) returns (uint256 shares) {
+    function maxRedeem(address owner) public view override(ERC4626, IERC4626) returns (uint256 shares) {
         shares = balanceOf(owner);
         uint256 assets = _convertToAssets(shares, Math.Rounding.Down);
         uint256 assetsAvailable = availableLiquidity();
@@ -392,7 +392,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
     }
 
     /// @dev See {IERC4626-previewRedeem}.
-    function previewRedeem(uint256 shares) public view override (ERC4626, IERC4626) returns (uint256 assets) {
+    function previewRedeem(uint256 shares) public view override(ERC4626, IERC4626) returns (uint256 assets) {
         assets = _calcDeliveredAsstes(_convertToAssets(shares, Math.Rounding.Down));
     }
 

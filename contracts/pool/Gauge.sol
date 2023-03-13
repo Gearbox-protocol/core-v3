@@ -50,6 +50,9 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
     /// @dev Epoch when the gauge was last updated
     uint16 public epochLU;
 
+    /// @dev Contract version
+    uint256 public constant version = 3_00;
+
     //
     // CONSTRUCTOR
     //

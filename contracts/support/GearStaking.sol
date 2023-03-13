@@ -38,6 +38,9 @@ contract GearStaking is ACLNonReentrantTrait, IGearStaking {
     /// @dev Timestamp of the first epoch of voting
     uint256 immutable firstEpochTimestamp;
 
+    /// @dev Contract version
+    uint256 public constant override version = 3_00;
+
     constructor(address _addressProvider, uint256 _firstEpochTimestamp) ACLNonReentrantTrait(_addressProvider) {
         gear = IERC20(IAddressProvider(_addressProvider).getGearToken());
         firstEpochTimestamp = _firstEpochTimestamp;

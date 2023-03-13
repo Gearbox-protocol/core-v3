@@ -66,7 +66,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     EnumerableSet.AddressSet private allowedContractsSet;
 
     /// @dev Contract version
-    uint256 public constant version = 2;
+    uint256 public constant version = 3_00;
 
     /// @dev Constructor has a special role in credit management deployment
     /// This is where the initial configuration is performed.

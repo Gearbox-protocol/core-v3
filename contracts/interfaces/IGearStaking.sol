@@ -3,6 +3,8 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
+import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+
 enum VotingContractStatus {
     NOT_ALLOWED,
     ALLOWED,
@@ -42,7 +44,7 @@ interface IGearStakingEvents {
     event GearWithdrawalClaimed(address indexed user, address to, uint256 amount);
 }
 
-interface IGearStaking is IGearStakingEvents, IGearStakingExceptions {
+interface IGearStaking is IGearStakingEvents, IGearStakingExceptions, IVersion {
     /// @dev Returns the current global voting epoch
     function getCurrentEpoch() external view returns (uint16);
 

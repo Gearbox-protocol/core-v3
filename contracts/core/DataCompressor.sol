@@ -48,7 +48,7 @@ contract DataCompressor is IDataCompressor {
     address public immutable WETHToken;
 
     // Contract version
-    uint256 public constant version = 2;
+    uint256 public constant version = 3_00;
 
     /// @dev Prevents function usage for target contracts that are not Gearbox pools
     modifier targetIsRegisteredPool(address pool) {

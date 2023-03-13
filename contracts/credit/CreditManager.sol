@@ -155,7 +155,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
     mapping(address => uint256) public cumulativeQuotaInterest;
 
     /// @dev contract version
-    uint256 public constant override version = 2_10;
+    uint256 public constant override version = 3_00;
 
     //
     // MODIFIERS
