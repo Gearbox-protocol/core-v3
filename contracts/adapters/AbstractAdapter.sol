@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Holdings, 2022
+// (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -51,30 +51,33 @@ abstract contract AbstractAdapter is IAdapter {
         return creditManager.getCreditAccountOrRevert(_creditFacade()); // F: [AA-4]
     }
 
-    /// @dev Executes an arbitrary call from the Credit Account to the target contract
-    /// @param callData Data to call the target contract with
-    /// @return result Call output
-    function _execute(bytes memory callData) internal returns (bytes memory result) {
-        return creditManager.executeOrder(targetContract, callData); // F: [AA-6,9]
+    /// @dev Checks if token is registered as collateral token in the Credit Manager
+    /// @param token Token to check
+    /// @return tokenMask Collateral token mask
+    function _checkToken(address token) internal view returns (uint256 tokenMask) {
+        tokenMask = creditManager.tokenMasksMap(token); // F: [AA-6]
+        if (tokenMask == 0) {
+            revert TokenIsNotInAllowedList(token); // F: [AA-6]
+        }
     }
 
     /// @dev Approves the target contract to spend given token from the Credit Account
     /// @param token Token to be approved
     /// @param amount Amount to be approved
     function _approveToken(address token, uint256 amount) internal {
-        creditManager.approveCreditAccount(targetContract, token, amount); // F: [AA-6,10]
+        creditManager.approveCreditAccount(targetContract, token, amount); // F: [AA-7, AA-8]
     }
 
     /// @dev Enables a token in the Credit Account
     /// @param token Address of the token to enable
     function _enableToken(address token) internal {
-        creditManager.checkAndEnableToken(token); // F: [AA-6,11]
+        creditManager.checkAndEnableToken(token); // F: [AA-7, AA-9]
     }
 
     /// @dev Disables a token in the Credit Account
     /// @param token Address of the token to disable
     function _disableToken(address token) internal {
-        creditManager.disableToken(token); // F: [AA-6,12]
+        creditManager.disableToken(token); // F: [AA-7, AA-10]
     }
 
     /// @dev Changes enabled tokens in the Credit Account
@@ -84,7 +87,14 @@ abstract contract AbstractAdapter is IAdapter {
     ///      determined in the adapter constructor, thus saving gas by avoiding querying them during execution
     ///      and combining multiple enable/disable operations into a single one
     function _changeEnabledTokens(uint256 tokensToEnable, uint256 tokensToDisable) internal {
-        creditManager.changeEnabledTokens(tokensToEnable, tokensToDisable); // F: [AA-6,13]
+        creditManager.changeEnabledTokens(tokensToEnable, tokensToDisable); // F: [AA-7, AA-11]
+    }
+
+    /// @dev Executes an arbitrary call from the Credit Account to the target contract
+    /// @param callData Data to call the target contract with
+    /// @return result Call output
+    function _execute(bytes memory callData) internal returns (bytes memory result) {
+        return creditManager.executeOrder(targetContract, callData); // F: [AA-7, AA-12]
     }
 
     /// @dev Executes a swap operation on the target contract from the Credit Account
@@ -99,7 +109,7 @@ abstract contract AbstractAdapter is IAdapter {
         internal
         returns (bytes memory result)
     {
-        return _executeSwap(tokenIn, tokenOut, callData, disableTokenIn, false); // F: [AA-6,7]
+        return _executeSwap(tokenIn, tokenOut, callData, disableTokenIn, false); // F: [AA-7, AA-13]
     }
 
     /// @dev Executes a swap operation on the target contract from the Credit Account
@@ -114,7 +124,7 @@ abstract contract AbstractAdapter is IAdapter {
         internal
         returns (bytes memory result)
     {
-        return _executeSwap(tokenIn, tokenOut, callData, disableTokenIn, true); // F: [AA-6,8]
+        return _executeSwap(tokenIn, tokenOut, callData, disableTokenIn, true); // F: [AA-7, AA-14]
     }
 
     /// @dev Implementation of `_executeSwap...` operations
@@ -128,18 +138,18 @@ abstract contract AbstractAdapter is IAdapter {
         bool allowTokenIn
     ) private returns (bytes memory result) {
         if (allowTokenIn) {
-            _approveToken(tokenIn, type(uint256).max); // F: [AA-8]
+            _approveToken(tokenIn, type(uint256).max); // F: [AA-14]
         }
 
-        result = _execute(callData); // F: [AA-7,8]
+        result = _execute(callData); // F: [AA-13, AA-14]
 
         if (allowTokenIn) {
-            _approveToken(tokenIn, 1); // F: [AA-8]
+            _approveToken(tokenIn, 1); // F: [AA-14]
         }
 
         if (disableTokenIn) {
-            _disableToken(tokenIn); // F: [AA-7,8]
+            _disableToken(tokenIn); // F: [AA-13, AA-14]
         }
-        _enableToken(tokenOut); // F: [AA-7,8]
+        _enableToken(tokenOut); // F: [AA-13, AA-14]
     }
 }
