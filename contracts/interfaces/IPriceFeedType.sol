@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+// Gearbox Protocol. Generalized leverage for DeFi protocols
+// (c) Gearbox Holdings, 2023
+pragma solidity ^0.8.17;
 
 enum PriceFeedType {
     CHAINLINK_ORACLE,
@@ -13,7 +15,6 @@ enum PriceFeedType {
     BOUNDED_ORACLE,
     COMPOSITE_ORACLE,
     AAVE_ORACLE,
-    EULER_ORACLE,
     COMPOUND_ORACLE,
     BALANCER_STABLE_LP_ORACLE,
     BALANCER_WEIGHTED_LP_ORACLE

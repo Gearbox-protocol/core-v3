@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Holdings, 2022
+// (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
 import {ICreditManagerV2} from "../ICreditManagerV2.sol";
@@ -25,7 +25,6 @@ enum AdapterType {
     BALANCER_VAULT,
     AAVE_V2_LENDING_POOL,
     AAVE_V2_WRAPPED_ATOKEN,
-    EULER_V1_ETOKEN,
     COMPOUND_V2_CERC20,
     COMPOUND_V2_CETHER
 }
