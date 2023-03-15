@@ -4,7 +4,7 @@
 pragma solidity ^0.8.10;
 
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
-import {PoolService} from "@gearbox-protocol/core-v2/contracts/pool/PoolService.sol";
+import {Pool4626} from "../pool/Pool4626.sol";
 import {CreditManager} from "../credit/CreditManager.sol";
 import {CreditFacade} from "../credit/CreditFacade.sol";
 import {CreditConfigurator, CreditManagerOpts} from "../credit/CreditConfigurator.sol";
@@ -23,14 +23,14 @@ contract CreditManagerFactoryBase is ContractUpgrader {
     CreditManager public creditManager;
     CreditFacade public creditFacade;
     CreditConfigurator public creditConfigurator;
-    PoolService public immutable pool;
+    Pool4626 public immutable pool;
 
     Adapter[] public adapters;
 
     constructor(address _pool, CreditManagerOpts memory opts, uint256 salt)
-        ContractUpgrader(address(PoolService(_pool).addressProvider()))
+        ContractUpgrader(address(Pool4626(_pool).addressProvider()))
     {
-        pool = PoolService(_pool);
+        pool = Pool4626(_pool);
 
         creditManager = new CreditManager(_pool);
         creditFacade = new CreditFacade(
@@ -113,7 +113,7 @@ contract CreditManagerFactoryBase is ContractUpgrader {
 
         cr.addCreditManager(address(creditManager)); // T:[PD-2]
 
-        pool.connectCreditManager(address(creditManager));
+        pool.setCreditManagerLimit(address(creditManager), pool.expectedLiquidityLimit());
 
         _postInstall();
     }
