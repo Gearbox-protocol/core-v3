@@ -8,10 +8,12 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 import {CreditFacade} from "../../credit/CreditFacade.sol";
 
+import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
 import {ICreditFacade, MultiCall} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditFacade.sol";
 import {ICreditManagerV2, ICreditManagerV2Events} from "../../interfaces/ICreditManagerV2.sol";
 import {ICreditFacadeEvents, ICreditFacadeExceptions} from "../../interfaces/ICreditFacade.sol";
+import {IPool4626} from "../../interfaces/IPool4626.sol";
 
 import "../lib/constants.sol";
 import {BalanceHelper} from "../helpers/BalanceHelper.sol";
@@ -95,18 +97,24 @@ contract AbstractAdapterTest is
 
     /// @dev [AA-1]: AbstractAdapter constructor sets correct values
     function test_AA_01_constructor_sets_correct_values() public {
-        assertEq(address(adapterMock.creditManager()), address(creditManager), "Incorrect Credit Manager");
+        assertEq(address(adapterMock.creditManager()), address(creditManager), "Incorrect credit manager");
+
+        assertEq(
+            address(adapterMock.addressProvider()),
+            IPool4626(creditManager.pool()).addressProvider(),
+            "Incorrect address provider"
+        );
 
         assertEq(adapterMock.targetContract(), address(targetMock), "Incorrect target contract");
     }
 
-    /// @dev [AA-2]: AbstractAdapter constructor reverts when passed a zero-address
+    /// @dev [AA-2]: AbstractAdapter constructor reverts when passed zero-address as target contract
     function test_AA_02_constructor_reverts_on_zero_address() public {
-        evm.expectRevert(ZeroAddressException.selector);
-        AdapterMock am = new AdapterMock(address(0), address(0));
+        evm.expectRevert();
+        new AdapterMock(address(0), address(0));
 
         evm.expectRevert(ZeroAddressException.selector);
-        am = new AdapterMock(address(creditManager), address(0));
+        new AdapterMock(address(creditManager), address(0));
     }
 
     /// @dev [AA-3]: AbstractAdapter uses correct credit facade

@@ -3,6 +3,7 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
+import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {ICreditManagerV2} from "../ICreditManagerV2.sol";
 
 enum AdapterType {
@@ -44,6 +45,9 @@ interface IAdapter is IAdapterExceptions {
 
     /// @notice Address of the contract the adapter is interacting with
     function targetContract() external view returns (address);
+
+    /// @notice Address provider
+    function addressProvider() external view returns (IAddressProvider);
 
     /// @notice Adapter type
     function _gearboxAdapterType() external pure returns (AdapterType);

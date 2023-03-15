@@ -3,29 +3,37 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
+import {ACLNonReentrantTrait} from "../core/ACLNonReentrantTrait.sol";
 import {IAdapter} from "../interfaces/adapters/IAdapter.sol";
+import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
+import {IPool4626} from "../interfaces/IPool4626.sol";
 import {ZeroAddressException} from "../interfaces/IErrors.sol";
 
 /// @title Abstract adapter
 /// @dev Inheriting adapters MUST use provided internal functions to perform all operations with credit accounts
-abstract contract AbstractAdapter is IAdapter {
+abstract contract AbstractAdapter is IAdapter, ACLNonReentrantTrait {
     /// @notice Credit Manager the adapter is connected to
     ICreditManagerV2 public immutable override creditManager;
+
+    /// @notice Address provider
+    IAddressProvider public immutable override addressProvider;
+
     /// @notice Address of the contract the adapter is interacting with
     address public immutable override targetContract;
 
     /// @notice Constructor
     /// @param _creditManager Credit Manager to connect this adapter to
     /// @param _targetContract Address of the contract this adapter should interact with
-    constructor(address _creditManager, address _targetContract) {
-        if (_creditManager == address(0) || _targetContract == address(0)) {
-            revert ZeroAddressException();
-        } // F: [AA-2]
+    constructor(address _creditManager, address _targetContract)
+        ACLNonReentrantTrait(IPool4626(ICreditManagerV2(_creditManager).pool()).addressProvider())
+    {
+        if (_targetContract == address(0)) {
+            revert ZeroAddressException(); // F: [AA-2]
+        }
 
         creditManager = ICreditManagerV2(_creditManager); // F: [AA-1]
+        addressProvider = IAddressProvider(IPool4626(creditManager.pool()).addressProvider()); // F: [AA-1]
         targetContract = _targetContract; // F: [AA-1]
     }
 
