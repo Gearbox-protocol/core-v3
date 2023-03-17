@@ -8,16 +8,19 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 import {CreditFacade} from "../../credit/CreditFacade.sol";
 
+import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
 import {ICreditFacade, MultiCall} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditFacade.sol";
 import {ICreditManagerV2, ICreditManagerV2Events} from "../../interfaces/ICreditManagerV2.sol";
 import {ICreditFacadeEvents, ICreditFacadeExceptions} from "../../interfaces/ICreditFacade.sol";
+import {IPool4626} from "../../interfaces/IPool4626.sol";
 
 import "../lib/constants.sol";
 import {BalanceHelper} from "../helpers/BalanceHelper.sol";
 import {CreditFacadeTestHelper} from "../helpers/CreditFacadeTestHelper.sol";
 
 // EXCEPTIONS
+import {IAdapterExceptions} from "../../interfaces/adapters/IAdapter.sol";
 import {ZeroAddressException} from "../../interfaces/IErrors.sol";
 import {ICreditManagerV2Exceptions} from "../../interfaces/ICreditManagerV2.sol";
 
@@ -94,18 +97,24 @@ contract AbstractAdapterTest is
 
     /// @dev [AA-1]: AbstractAdapter constructor sets correct values
     function test_AA_01_constructor_sets_correct_values() public {
-        assertEq(address(adapterMock.creditManager()), address(creditManager), "Incorrect Credit Manager");
+        assertEq(address(adapterMock.creditManager()), address(creditManager), "Incorrect credit manager");
+
+        assertEq(
+            address(adapterMock.addressProvider()),
+            IPool4626(creditManager.pool()).addressProvider(),
+            "Incorrect address provider"
+        );
 
         assertEq(adapterMock.targetContract(), address(targetMock), "Incorrect target contract");
     }
 
-    /// @dev [AA-2]: AbstractAdapter constructor reverts when passed a zero-address
+    /// @dev [AA-2]: AbstractAdapter constructor reverts when passed zero-address as target contract
     function test_AA_02_constructor_reverts_on_zero_address() public {
-        evm.expectRevert(ZeroAddressException.selector);
-        AdapterMock am = new AdapterMock(address(0), address(0));
+        evm.expectRevert();
+        new AdapterMock(address(0), address(0));
 
         evm.expectRevert(ZeroAddressException.selector);
-        am = new AdapterMock(address(creditManager), address(0));
+        new AdapterMock(address(creditManager), address(0));
     }
 
     /// @dev [AA-3]: AbstractAdapter uses correct credit facade
@@ -132,8 +141,20 @@ contract AbstractAdapterTest is
         adapterMock.execute(DUMB_CALLDATA);
     }
 
-    /// @dev [AA-6]: AbstractAdapter functions revert if user has no credit account
-    function test_AA_06_adapter_reverts_if_user_has_no_credit_account() public {
+    /// @dev [AA-6]: AbstractAdapter _checkToken works correctly
+    function test_AA_06_checkToken_works_correctly() public {
+        assertEq(
+            adapterMock.checkToken(tokenTestSuite.addressOf(Tokens.DAI)),
+            creditManager.tokenMasksMap(tokenTestSuite.addressOf(Tokens.DAI))
+        );
+
+        address token = address(0xdead);
+        evm.expectRevert(abi.encodeWithSelector(IAdapterExceptions.TokenIsNotInAllowedList.selector, token));
+        adapterMock.checkToken(address(0xdead));
+    }
+
+    /// @dev [AA-7]: AbstractAdapter functions revert if user has no credit account
+    function test_AA_07_adapter_reverts_if_user_has_no_credit_account() public {
         evm.expectRevert(HasNoOpenedAccountException.selector);
         adapterMock.creditAccount();
 
@@ -206,8 +227,88 @@ contract AbstractAdapterTest is
         }
     }
 
-    /// @dev [AA-7]: _executeSwapNoApprove correctly passes parameters to CreditManager
-    function test_AA_07_executeSwapNoApprove_correctly_passes_to_credit_manager() public {
+    /// @dev [AA-8]: _approveToken correctly passes parameters to CreditManager
+    function test_AA_08_approveToken_correctly_passes_to_credit_manager() public {
+        _openTestCreditAccount();
+
+        evm.expectCall(
+            address(creditManager),
+            abi.encodeCall(ICreditManagerV2.approveCreditAccount, (address(targetMock), usdc, 10))
+        );
+
+        evm.prank(USER);
+        creditFacade.multicall(
+            multicallBuilder(
+                MultiCall({target: address(adapterMock), callData: abi.encodeCall(adapterMock.approveToken, (usdc, 10))})
+            )
+        );
+    }
+
+    /// @dev [AA-9]: _enableToken correctly passes parameters to CreditManager
+    function test_AA_09_enableToken_correctly_passes_to_credit_manager() public {
+        _openTestCreditAccount();
+
+        evm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV2.checkAndEnableToken, (usdc)));
+
+        evm.prank(USER);
+        creditFacade.multicall(
+            multicallBuilder(
+                MultiCall({target: address(adapterMock), callData: abi.encodeCall(adapterMock.enableToken, (usdc))})
+            )
+        );
+    }
+
+    /// @dev [AA-10]: _disableToken correctly passes parameters to CreditManager
+    function test_AA_10_disableToken_correctly_passes_to_credit_manager() public {
+        _openTestCreditAccount();
+
+        evm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV2.disableToken, (usdc)));
+
+        evm.prank(USER);
+        creditFacade.multicall(
+            multicallBuilder(
+                MultiCall({target: address(adapterMock), callData: abi.encodeCall(adapterMock.disableToken, (usdc))})
+            )
+        );
+    }
+
+    /// @dev [AA-11]: _changeEnabledTokens correctly passes parameters to CreditManager
+    function test_AA_11_changeEnabledTokens_correctly_passes_to_credit_manager() public {
+        _openTestCreditAccount();
+
+        evm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV2.changeEnabledTokens, (1, 2)));
+
+        evm.prank(USER);
+        creditFacade.multicall(
+            multicallBuilder(
+                MultiCall({
+                    target: address(adapterMock),
+                    callData: abi.encodeCall(adapterMock.changeEnabledTokens, (1, 2))
+                })
+            )
+        );
+    }
+
+    /// @dev [AA-12]: _execute correctly passes parameters to CreditManager
+    function test_AA_12_execute_correctly_passes_to_credit_manager() public {
+        _openTestCreditAccount();
+
+        bytes memory DUMB_CALLDATA = abi.encodeWithSignature("hello(string)", "world");
+
+        evm.expectCall(
+            address(creditManager), abi.encodeCall(ICreditManagerV2.executeOrder, (address(targetMock), DUMB_CALLDATA))
+        );
+
+        evm.prank(USER);
+        creditFacade.multicall(
+            multicallBuilder(
+                MultiCall({target: address(adapterMock), callData: abi.encodeCall(adapterMock.execute, DUMB_CALLDATA)})
+            )
+        );
+    }
+
+    /// @dev [AA-13]: _executeSwapNoApprove correctly passes parameters to CreditManager
+    function test_AA_13_executeSwapNoApprove_correctly_passes_to_credit_manager() public {
         _openTestCreditAccount();
 
         bytes memory DUMB_CALLDATA = abi.encodeWithSignature("hello(string)", "world");
@@ -236,8 +337,8 @@ contract AbstractAdapterTest is
         }
     }
 
-    /// @dev [AA-8]: _executeSwapSafeApprove correctly passes parameters to CreditManager and sets allowance
-    function test_AA_08_executeSwapSafeApprove_correctly_passes_to_credit_manager() public {
+    /// @dev [AA-14]: _executeSwapSafeApprove correctly passes parameters to CreditManager and sets allowance
+    function test_AA_14_executeSwapSafeApprove_correctly_passes_to_credit_manager() public {
         (address ca,) = _openTestCreditAccount();
 
         bytes memory DUMB_CALLDATA = abi.encodeWithSignature("hello(string)", "world");
@@ -276,85 +377,5 @@ contract AbstractAdapterTest is
 
             assertEq(IERC20(usdc).allowance(ca, address(targetMock)), 1, "Incorrect allowance set");
         }
-    }
-
-    /// @dev [AA-9]: _execute correctly passes parameters to CreditManager
-    function test_AA_09_execute_correctly_passes_to_credit_manager() public {
-        _openTestCreditAccount();
-
-        bytes memory DUMB_CALLDATA = abi.encodeWithSignature("hello(string)", "world");
-
-        evm.expectCall(
-            address(creditManager), abi.encodeCall(ICreditManagerV2.executeOrder, (address(targetMock), DUMB_CALLDATA))
-        );
-
-        evm.prank(USER);
-        creditFacade.multicall(
-            multicallBuilder(
-                MultiCall({target: address(adapterMock), callData: abi.encodeCall(adapterMock.execute, DUMB_CALLDATA)})
-            )
-        );
-    }
-
-    /// @dev [AA-10]: _approveToken correctly passes parameters to CreditManager
-    function test_AA_10_approveToken_correctly_passes_to_credit_manager() public {
-        _openTestCreditAccount();
-
-        evm.expectCall(
-            address(creditManager),
-            abi.encodeCall(ICreditManagerV2.approveCreditAccount, (address(targetMock), usdc, 10))
-        );
-
-        evm.prank(USER);
-        creditFacade.multicall(
-            multicallBuilder(
-                MultiCall({target: address(adapterMock), callData: abi.encodeCall(adapterMock.approveToken, (usdc, 10))})
-            )
-        );
-    }
-
-    /// @dev [AA-11]: _enableToken correctly passes parameters to CreditManager
-    function test_AA_11_enableToken_correctly_passes_to_credit_manager() public {
-        _openTestCreditAccount();
-
-        evm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV2.checkAndEnableToken, (usdc)));
-
-        evm.prank(USER);
-        creditFacade.multicall(
-            multicallBuilder(
-                MultiCall({target: address(adapterMock), callData: abi.encodeCall(adapterMock.enableToken, (usdc))})
-            )
-        );
-    }
-
-    /// @dev [AA-12]: _disableToken correctly passes parameters to CreditManager
-    function test_AA_12_disableToken_correctly_passes_to_credit_manager() public {
-        _openTestCreditAccount();
-
-        evm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV2.disableToken, (usdc)));
-
-        evm.prank(USER);
-        creditFacade.multicall(
-            multicallBuilder(
-                MultiCall({target: address(adapterMock), callData: abi.encodeCall(adapterMock.disableToken, (usdc))})
-            )
-        );
-    }
-
-    /// @dev [AA-13]: _changeEnabledTokens correctly passes parameters to CreditManager
-    function test_AA_13_changeEnabledTokens_correctly_passes_to_credit_manager() public {
-        _openTestCreditAccount();
-
-        evm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV2.changeEnabledTokens, (1, 2)));
-
-        evm.prank(USER);
-        creditFacade.multicall(
-            multicallBuilder(
-                MultiCall({
-                    target: address(adapterMock),
-                    callData: abi.encodeCall(adapterMock.changeEnabledTokens, (1, 2))
-                })
-            )
-        );
     }
 }

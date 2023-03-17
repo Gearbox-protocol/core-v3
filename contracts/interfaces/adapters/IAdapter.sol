@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Holdings, 2022
+// (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
+import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {ICreditManagerV2} from "../ICreditManagerV2.sol";
 
 enum AdapterType {
@@ -25,7 +26,6 @@ enum AdapterType {
     BALANCER_VAULT,
     AAVE_V2_LENDING_POOL,
     AAVE_V2_WRAPPED_ATOKEN,
-    EULER_V1_ETOKEN,
     COMPOUND_V2_CERC20,
     COMPOUND_V2_CETHER
 }
@@ -45,6 +45,9 @@ interface IAdapter is IAdapterExceptions {
 
     /// @notice Address of the contract the adapter is interacting with
     function targetContract() external view returns (address);
+
+    /// @notice Address provider
+    function addressProvider() external view returns (IAddressProvider);
 
     /// @notice Adapter type
     function _gearboxAdapterType() external pure returns (AdapterType);
