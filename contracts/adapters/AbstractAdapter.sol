@@ -120,7 +120,7 @@ abstract contract AbstractAdapter is IAdapter, ACLNonReentrantTrait {
         internal
         returns (bytes memory result)
     {
-        _checkToken(tokenIn); // F: [AA-13, AA-15]
+        _checkToken(tokenIn); // F: [AA-15]
         result = _executeSwap(tokenIn, tokenOut, callData, disableTokenIn); // F: [AA-7, AA-13]
     }
 
