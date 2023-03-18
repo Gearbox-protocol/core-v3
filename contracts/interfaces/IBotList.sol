@@ -3,6 +3,8 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
+import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+
 struct BotFunding {
     uint72 remainingFunds;
     uint72 maxWeeklyAllowance;
@@ -39,7 +41,7 @@ interface IBotListEvents {
 }
 
 /// @title IBotList
-interface IBotList is IBotListEvents, IBotListExceptions {
+interface IBotList is IBotListEvents, IBotListExceptions, IVersion {
     /// @dev Sets approval from msg.sender to bot
     function setBotStatus(address bot, bool status) external;
 

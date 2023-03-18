@@ -3,6 +3,9 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
+import {IGearStaking} from "./IGearStaking.sol";
+import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+
 struct QuotaRateParams {
     uint16 minRiskRate;
     uint16 maxRate;
@@ -44,7 +47,10 @@ interface IGaugeEvents {
 
 /// @title IGauge
 
-interface IGauge is IGaugeEvents, IGaugeExceptions {
+interface IGauge is IGaugeEvents, IGaugeExceptions, IVersion {
+    /// @dev Returns the main voting contract
+    function voter() external view returns (IGearStaking);
+
     /// @dev Rolls the new epoch and updates all quota rates
     function updateEpoch() external;
 

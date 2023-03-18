@@ -3,6 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
+import {IGauge} from "./IGauge.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 enum QuotaStatusChange {
@@ -106,6 +107,9 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IPoolQuotaKeeperExceptions
     //
     // GETTERS
     //
+
+    /// @dev Returns the gauge address
+    function gauge() external view returns (IGauge);
 
     /// @dev Returns quota rate in PERCENTAGE FORMAT
     function getQuotaRate(address) external view returns (uint16);

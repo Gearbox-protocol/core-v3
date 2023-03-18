@@ -3,6 +3,8 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
+import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+
 interface IBlacklistHelperEvents {
     /// @dev Emitted when a borrower's claimable balance is increased
     event ClaimableAdded(address indexed underlying, address indexed holder, uint256 amount);
@@ -28,7 +30,7 @@ interface IBlacklistHelperExceptions {
     error NothingToClaimException();
 }
 
-interface IBlacklistHelper is IBlacklistHelperEvents, IBlacklistHelperExceptions {
+interface IBlacklistHelper is IBlacklistHelperEvents, IBlacklistHelperExceptions, IVersion {
     /// @dev Returns whether the account is blacklisted for a particular underlying
     function isBlacklisted(address underlying, address account) external view returns (bool);
 

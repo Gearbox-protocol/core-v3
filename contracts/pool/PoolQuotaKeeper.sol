@@ -72,7 +72,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
     IGauge public gauge;
 
     /// @dev Contract version
-    uint256 public constant override version = 2_10;
+    uint256 public constant override version = 3_00;
 
     /// @dev Reverts if the function is called by non-gauge
     modifier gaugeOnly() {

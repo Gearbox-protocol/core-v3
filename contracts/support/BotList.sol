@@ -38,6 +38,9 @@ contract BotList is ACLNonReentrantTrait, IBotList {
     /// @dev Address of the DAO treasury
     address public immutable treasury;
 
+    /// @dev Contract version
+    uint256 public constant override version = 3_00;
+
     constructor(address _addressProvider) ACLNonReentrantTrait(_addressProvider) {
         treasury = IAddressProvider(_addressProvider).getTreasuryContract();
     }

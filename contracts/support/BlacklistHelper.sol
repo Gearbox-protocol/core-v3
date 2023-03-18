@@ -36,6 +36,9 @@ contract BlacklistHelper is ACLNonReentrantTrait, IBlacklistHelper {
     /// @dev mapping from (underlying, account) to amount available to claim
     mapping(address => mapping(address => uint256)) public claimable;
 
+    /// @dev Contract version
+    uint256 public constant override version = 3_00;
+
     /// @dev Restricts calls to Credit Facades only
     modifier creditFacadeOnly() {
         if (!isSupportedCreditFacade[msg.sender]) {

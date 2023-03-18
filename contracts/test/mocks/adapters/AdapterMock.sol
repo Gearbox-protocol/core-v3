@@ -24,24 +24,8 @@ contract AdapterMock is AbstractAdapter {
         return _creditAccount();
     }
 
-    function executeSwapNoApprove(address tokenIn, address tokenOut, bytes memory callData, bool disableTokenIn)
-        external
-        creditFacadeOnly
-        returns (bytes memory result)
-    {
-        return _executeSwapNoApprove(tokenIn, tokenOut, callData, disableTokenIn);
-    }
-
-    function executeSwapSafeApprove(address tokenIn, address tokenOut, bytes memory callData, bool disableTokenIn)
-        external
-        creditFacadeOnly
-        returns (bytes memory result)
-    {
-        return _executeSwapSafeApprove(tokenIn, tokenOut, callData, disableTokenIn);
-    }
-
-    function execute(bytes memory callData) external creditFacadeOnly returns (bytes memory result) {
-        result = _execute(callData);
+    function checkToken(address token) external view returns (uint256 tokenMask) {
+        return _checkToken(token);
     }
 
     function approveToken(address token, uint256 amount) external creditFacadeOnly {
@@ -58,6 +42,26 @@ contract AdapterMock is AbstractAdapter {
 
     function changeEnabledTokens(uint256 tokensToEnable, uint256 tokensToDisable) external creditFacadeOnly {
         _changeEnabledTokens(tokensToEnable, tokensToDisable);
+    }
+
+    function execute(bytes memory callData) external creditFacadeOnly returns (bytes memory result) {
+        result = _execute(callData);
+    }
+
+    function executeSwapNoApprove(address tokenIn, address tokenOut, bytes memory callData, bool disableTokenIn)
+        external
+        creditFacadeOnly
+        returns (bytes memory result)
+    {
+        return _executeSwapNoApprove(tokenIn, tokenOut, callData, disableTokenIn);
+    }
+
+    function executeSwapSafeApprove(address tokenIn, address tokenOut, bytes memory callData, bool disableTokenIn)
+        external
+        creditFacadeOnly
+        returns (bytes memory result)
+    {
+        return _executeSwapSafeApprove(tokenIn, tokenOut, callData, disableTokenIn);
     }
 
     fallback() external creditFacadeOnly {
