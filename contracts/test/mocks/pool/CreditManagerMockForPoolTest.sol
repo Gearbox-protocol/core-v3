@@ -15,10 +15,10 @@ contract CreditManagerMockForPoolTest {
     address public creditAccount = DUMB_ADDRESS;
 
     constructor(address _poolService) {
-        poolService = _poolService;
+        changePoolService(_poolService);
     }
 
-    function changePoolService(address newPool) external {
+    function changePoolService(address newPool) public {
         poolService = newPool;
         pool = newPool;
     }

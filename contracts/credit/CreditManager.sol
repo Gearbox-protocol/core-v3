@@ -1019,7 +1019,9 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
             enabledTokens &= ~tokensToDisable; // F:[CM-34,46]
         }
 
-        if (wasEnabled || wasDisabled) enabledTokensMap[creditAccount] = enabledTokens;
+        if (wasEnabled || wasDisabled) {
+            enabledTokensMap[creditAccount] = enabledTokens;
+        }
     }
 
     //
@@ -1199,37 +1201,28 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
                 || closureActionType == ClosureAction.LIQUIDATE_PAUSED
         ) {
             // LIQUIDATION CASE
-            uint256 totalFunds;
 
             // During liquidation, totalValue of the account is discounted
             // by (1 - liquidationPremium). This means that totalValue * liquidationPremium
             // is removed from all calculations and can be claimed by the liquidator at the end of transaction
 
             // The liquidation premium depends on liquidation type:
-            // * For normal unhealthy account liquidations, usual premium applies
+            // * For normal unhealthy account or emergency liquidations, usual premium applies
             // * For expiry liquidations, the premium is typically reduced,
             //   since the account does not risk bad debt, so the liquidation
             //   is not as urgent
-            // * For emergency (paused) liquidations, there is not premium.
-            //   This is done in order to preserve fairness, as emergency liquidator
-            //   is a priviledged role. Any compensation to the emergency liquidator must
-            //   be coordinated with the DAO out of band.
 
-            if (closureActionType == ClosureAction.LIQUIDATE_ACCOUNT) {
-                // UNHEALTHY ACCOUNT CASE
-                totalFunds = (totalValue * slot1.liquidationDiscount) / PERCENTAGE_FACTOR; // F:[CM-43]
+            // UNHEALTHY ACCOUNT CASE
+            uint256 totalFunds = (
+                totalValue
+                    * (
+                        closureActionType == ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT
+                            ? slot1.liquidationDiscountExpired
+                            : slot1.liquidationDiscount
+                    )
+            ) / PERCENTAGE_FACTOR; // F:[CM-43]
 
-                amountToPool += (totalValue * slot1.feeLiquidation) / PERCENTAGE_FACTOR; // F:[CM-43]
-            } else if (closureActionType == ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT) {
-                // EXPIRED ACCOUNT CASE
-                totalFunds = (totalValue * slot1.liquidationDiscountExpired) / PERCENTAGE_FACTOR; // F:[CM-43]
-
-                amountToPool += (totalValue * slot1.feeLiquidationExpired) / PERCENTAGE_FACTOR; // F:[CM-43]
-            } else {
-                // PAUSED CASE
-                totalFunds = totalValue; // F: [CM-43]
-                amountToPool += (totalValue * slot1.feeLiquidation) / PERCENTAGE_FACTOR; // F:[CM-43]
-            }
+            amountToPool += (totalValue * slot1.feeLiquidation) / PERCENTAGE_FACTOR; // F:[CM-43]
 
             // If there are any funds left after all respective payments (this
             // includes the liquidation premium, since totalFunds is already

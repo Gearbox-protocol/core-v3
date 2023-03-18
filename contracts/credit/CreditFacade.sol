@@ -346,6 +346,7 @@ contract CreditFacade is ICreditFacade, ReentrancyGuard {
         } // F:[FA-15]
 
         if (emergencyLiquidation) {
+            // totalValue = totalValue * (PERCENTAGE_FACTOR - emergencyPreimum) / PERCENTAGE_FACTOR;
             _checkIfEmergencyLiquidator(false);
         }
 

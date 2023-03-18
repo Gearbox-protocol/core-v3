@@ -7,6 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IPoolQuotaKeeper, QuotaUpdate, QuotaStatusChange} from "../../interfaces/IPoolQuotaKeeper.sol";
+import {LinearInterestRateModel} from "../../pool/LinearInterestRateModel.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -1359,6 +1360,14 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                 _testCaseErr(testName, "Expected liquidity was not updated correctly")
             );
 
+            // should not take quota interest
+
+            assertEq(
+                pool.expectedLiquidityLU(),
+                addLiquidity + expectedInterest,
+                _testCaseErr(testName, "ExpectedLU liquidity was not updated correctly")
+            );
+
             assertEq(
                 uint256(pool.timestampLU()),
                 block.timestamp,
@@ -1377,79 +1386,494 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         }
     }
 
-    // // [P4-11]: connectCreditManager, forbidCreditManagerToBorrow, newInterestRateModel, setExpecetedLiquidityLimit reverts if called with non-configurator
-    // function test_PX_11_admin_functions_revert_on_non_admin() public {
-    //     evm.startPrank(USER);
+    // [P4-17]: updateBorrowRate correctly updates parameters
+    function test_P4_17_changeQuotaRevenue_and_updateQuotaRevenue_updates_quotaRevenue_correctly() public {
+        address POOL_QUOTA_KEEPER = DUMB_ADDRESS;
 
-    //     evm.expectRevert(CallerNotControllerException.selector);
-    //     pool.setCreditManagerLimit(DUMB_ADDRESS, 1);
+        evm.prank(CONFIGURATOR);
+        pool.connectPoolQuotaManager(POOL_QUOTA_KEEPER);
 
-    //     evm.expectRevert(CallerNotConfiguratorException.selector);
-    //     pool.updateInterestRateModel(DUMB_ADDRESS);
+        uint96 qu1 = uint96(WAD * 10);
 
-    //     evm.expectRevert(CallerNotControllerException.selector);
-    //     pool.setExpectedLiquidityLimit(0);
+        assertEq(pool.lastQuotaRevenueUpdate(), 0, "SETUP: Incorrect lastQuotaRevenuUpdate");
 
-    //     evm.stopPrank();
-    // }
+        assertEq(pool.quotaRevenue(), 0, "SETUP: Incorrect quotaRevenue");
+        assertEq(pool.expectedLiquidityLU(), 0, "SETUP: Incorrect expectedLiquidityLU");
 
-    // // [P4-12]: connectCreditManager reverts if another pool is setup in CreditManager
-    // function test_PX_12_connectCreditManager_fails_on_incompatible_CM() public {
-    //     cmMock.changePoolService(DUMB_ADDRESS);
+        evm.prank(POOL_QUOTA_KEEPER);
+        pool.updateQuotaRevenue(qu1);
 
-    //     evm.expectRevert(IPool4626Exceptions.IncompatibleCreditManagerException.selector);
+        assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "#1: Incorrect lastQuotaRevenuUpdate");
+        assertEq(pool.quotaRevenue(), qu1, "#1: Incorrect quotaRevenue");
 
-    //     evm.prank(CONFIGURATOR);
-    //     pool.setCreditManagerLimit(address(cmMock), 1);
-    // }
+        assertEq(pool.expectedLiquidityLU(), 0, "#1: Incorrect expectedLiquidityLU");
 
-    // // [P4-11]: connectCreditManager adds CreditManager correctly and emits event
-    // function test_PX_13_CM_is_connected_correctly() public {
-    //     // assertEq(pool.creditManagersCount(), 0);
-    //     // evm.expectEmit(true, false, false, false);
-    //     // emit NewCreditManagerConnected(address(cmMock));
-    //     // evm.prank(CONFIGURATOR);
-    //     // pool.connectCreditManager(address(cmMock));
-    //     // assertEq(pool.creditManagersCount(), 1);
-    //     // assertTrue(pool.creditManagersCanBorrow(address(cmMock)));
-    //     // assertTrue(pool.creditManagersCanRepay(address(cmMock)));
-    // }
+        uint256 year = 365 days;
 
-    // // [P4-12]: lendCreditAccount, repayCreditAccount reverts if called non-CreditManager
-    // function test_PX_14_CA_can_be_lent_repaid_only_by_CM() public {
-    //     evm.startPrank(USER);
+        evm.warp(block.timestamp + year);
 
-    //     evm.expectRevert(IPool4626Exceptions.CreditManagerCantBorrowException.selector);
-    //     pool.lendCreditAccount(0, DUMB_ADDRESS);
+        uint96 qu2 = uint96(WAD * 15);
 
-    //     evm.expectRevert(IPool4626Exceptions.CreditManagerCantBorrowException.selector);
-    //     pool.lendCreditAccount(10, DUMB_ADDRESS);
+        evm.prank(POOL_QUOTA_KEEPER);
+        pool.updateQuotaRevenue(qu2);
 
-    //     evm.expectRevert(IPool4626Exceptions.CreditManagerOnlyException.selector);
-    //     pool.repayCreditAccount(0, 0, 0);
+        assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "#2: Incorrect lastQuotaRevenuUpdate");
+        assertEq(pool.quotaRevenue(), qu2, "#2: Incorrect quotaRevenue");
 
-    //     evm.stopPrank();
-    // }
+        assertEq(pool.expectedLiquidityLU(), qu1 / PERCENTAGE_FACTOR, "#2: Incorrect expectedLiquidityLU");
 
-    // // [P4-13]: lendCreditAccount reverts of creditManagers was disallowed by forbidCreditManagerToBorrow
-    // function test_PX_13_lendCreditAccount_reverts_on_forbidden_CM() public {
-    //     _connectAndSetLimit();
+        evm.warp(block.timestamp + year);
 
-    //     evm.prank(USER);
-    //     pool.deposit(addLiquidity, USER);
+        uint96 dqu = uint96(WAD * 5);
 
-    //     cmMock.lendCreditAccount(addLiquidity / 2, DUMB_ADDRESS);
+        evm.prank(POOL_QUOTA_KEEPER);
+        pool.changeQuotaRevenue(-int96(dqu));
 
-    //     // evm.expectEmit(false, false, false, true);
-    //     // emit BorrowForbidden(address(cmMock));
+        assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "#3: Incorrect lastQuotaRevenuUpdate");
+        assertEq(pool.quotaRevenue(), qu2 - dqu, "#3: Incorrect quotaRevenue");
 
-    //     evm.prank(CONFIGURATOR);
-    //     pool.setCreditManagerLimit(address(cmMock), 0);
+        assertEq(pool.expectedLiquidityLU(), (qu1 + qu2) / PERCENTAGE_FACTOR, "#3: Incorrect expectedLiquidityLU");
+    }
 
-    //     evm.expectRevert(IPool4626Exceptions.CreditManagerCantBorrowException.selector);
-    //     cmMock.lendCreditAccount(addLiquidity / 2, DUMB_ADDRESS);
-    // }
+    // [P4-18]: connectCreditManager, forbidCreditManagerToBorrow, newInterestRateModel, setExpecetedLiquidityLimit reverts if called with non-configurator
+    function test_P4_18_admin_functions_revert_on_non_admin() public {
+        evm.startPrank(USER);
 
+        evm.expectRevert(CallerNotControllerException.selector);
+        pool.setCreditManagerLimit(DUMB_ADDRESS, 1);
+
+        evm.expectRevert(CallerNotConfiguratorException.selector);
+        pool.updateInterestRateModel(DUMB_ADDRESS);
+
+        evm.expectRevert(CallerNotConfiguratorException.selector);
+        pool.connectPoolQuotaManager(DUMB_ADDRESS);
+
+        evm.expectRevert(CallerNotControllerException.selector);
+        pool.setExpectedLiquidityLimit(0);
+
+        evm.expectRevert(CallerNotControllerException.selector);
+        pool.setTotalBorrowedLimit(0);
+
+        evm.expectRevert(CallerNotControllerException.selector);
+        pool.setWithdrawFee(0);
+
+        evm.stopPrank();
+    }
+
+    // [P4-19]: setCreditManagerLimit reverts if not in register
+    function test_P4_19_connectCreditManager_reverts_if_not_in_register() public {
+        evm.expectRevert(IPool4626Exceptions.CreditManagerNotRegsiterException.selector);
+
+        evm.prank(CONFIGURATOR);
+        pool.setCreditManagerLimit(DUMB_ADDRESS, 1);
+    }
+
+    // [P4-20]: setCreditManagerLimit reverts if another pool is setup in CreditManager
+    function test_P4_20_connectCreditManager_fails_on_incompatible_CM() public {
+        cmMock.changePoolService(DUMB_ADDRESS);
+
+        evm.expectRevert(IPool4626Exceptions.IncompatibleCreditManagerException.selector);
+
+        evm.prank(CONFIGURATOR);
+        pool.setCreditManagerLimit(address(cmMock), 1);
+    }
+
+    // [P4-21]: setCreditManagerLimit connects manager first time, then update limit only
+    function test_P4_21_setCreditManagerLimit_connects_manager_first_time_then_update_limit_only() public {
+        address[] memory cms = pool.creditManagers();
+        assertEq(cms.length, 0, "Credit manager is already connected!");
+
+        evm.expectEmit(true, true, false, false);
+        emit NewCreditManagerConnected(address(cmMock));
+
+        evm.expectEmit(true, true, false, true);
+        emit BorrowLimitChanged(address(cmMock), 230);
+
+        evm.prank(CONFIGURATOR);
+        pool.setCreditManagerLimit(address(cmMock), 230);
+
+        cms = pool.creditManagers();
+        assertEq(cms.length, 1, "#1: Credit manager is already connected!");
+        assertEq(cms[0], address(cmMock), "#1: Credit manager is not connected!");
+
+        assertEq(pool.creditManagerLimit(address(cmMock)), 230, "#1: Incorrect CM limit");
+
+        evm.expectEmit(true, true, false, true);
+        emit BorrowLimitChanged(address(cmMock), 150);
+
+        evm.prank(CONFIGURATOR);
+        pool.setCreditManagerLimit(address(cmMock), 150);
+
+        cms = pool.creditManagers();
+        assertEq(cms.length, 1, "#2: Credit manager is already connected!");
+        assertEq(cms[0], address(cmMock), "#2: Credit manager is not connected!");
+        assertEq(pool.creditManagerLimit(address(cmMock)), 150, "#2: Incorrect CM limit");
+
+        evm.prank(CONFIGURATOR);
+        pool.setCreditManagerLimit(address(cmMock), type(uint256).max);
+
+        assertEq(pool.creditManagerLimit(address(cmMock)), type(uint256).max, "#3: Incorrect CM limit");
+    }
+
+    // [P4-22]: updateInterestRateModel changes interest rate model & emit event
+    function test_P4_22_updateInterestRateModel_works_correctly_and_emits_event() public {
+        _setUpTestCase(Tokens.DAI, 0, 50_00, addLiquidity, 2 * RAY, 0, false);
+
+        uint256 expectedLiquidity = pool.expectedLiquidity();
+        uint256 availableLiquidity = pool.availableLiquidity();
+
+        LinearInterestRateModel newIR = new LinearInterestRateModel(
+            8000,
+            9000,
+            200,
+            500,
+            4000,
+            7500,
+            false
+        );
+
+        evm.expectEmit(true, false, false, false);
+        emit NewInterestRateModel(address(newIR));
+
+        evm.prank(CONFIGURATOR);
+        pool.updateInterestRateModel(address(newIR));
+
+        assertEq(address(pool.interestRateModel()), address(newIR), "Interest rate model was not set correctly");
+
+        // Add elUpdate
+
+        evm.prank(CONFIGURATOR);
+        pool.updateInterestRateModel(address(newIR));
+
+        assertEq(
+            newIR.calcBorrowRate(expectedLiquidity, availableLiquidity), pool.borrowRate(), "Borrow rate does not match"
+        );
+    }
+
+    // [P4-23]: connectPoolQuotaManager updates quotaRevenue and emits event
+    function test_P4_23_connectPoolQuotaManager_updates_quotaRevenue_and_emits_event() public {
+        Pool4626Opts memory opts = Pool4626Opts({
+            addressProvider: address(psts.addressProvider()),
+            underlyingToken: tokenTestSuite.addressOf(Tokens.DAI),
+            interestRateModel: address(irm),
+            expectedLiquidityLimit: type(uint256).max,
+            supportsQuotas: true
+        });
+
+        pool = new Pool4626(opts);
+
+        address POOL_QUOTA_KEEPER = DUMB_ADDRESS;
+
+        evm.prank(CONFIGURATOR);
+        pool.connectPoolQuotaManager(POOL_QUOTA_KEEPER);
+
+        uint96 qu = uint96(WAD * 10);
+
+        evm.expectEmit(true, true, false, false);
+        emit NewPoolQuotaKeeper(POOL_QUOTA_KEEPER);
+
+        evm.prank(CONFIGURATOR);
+        pool.connectPoolQuotaManager(POOL_QUOTA_KEEPER);
+
+        assertEq(pool.poolQuotaKeeper(), POOL_QUOTA_KEEPER, "Incorrect Pool QuotaKeeper");
+
+        evm.prank(POOL_QUOTA_KEEPER);
+        pool.updateQuotaRevenue(qu);
+
+        uint256 year = 365 days;
+
+        evm.warp(block.timestamp + year);
+
+        address POOL_QUOTA_KEEPER2 = DUMB_ADDRESS2;
+
+        evm.expectEmit(true, true, false, false);
+        emit NewPoolQuotaKeeper(POOL_QUOTA_KEEPER2);
+
+        evm.prank(CONFIGURATOR);
+        pool.connectPoolQuotaManager(POOL_QUOTA_KEEPER2);
+
+        assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "Incorrect lastQuotaRevenuUpdate");
+        assertEq(pool.quotaRevenue(), qu, "#1: Incorrect quotaRevenue");
+
+        assertEq(pool.expectedLiquidityLU(), qu / PERCENTAGE_FACTOR, "Incorrect expectedLiquidityLU");
+    }
+
+    // [P4-24]: setExpectedLiquidityLimit() sets limit & emits event
+    function test_P4_24_setExpectedLiquidityLimit_correct_and_emits_event() public {
+        evm.expectEmit(false, false, false, true);
+        emit NewExpectedLiquidityLimit(10005);
+
+        evm.prank(CONFIGURATOR);
+        pool.setExpectedLiquidityLimit(10005);
+
+        assertEq(pool.expectedLiquidityLimit(), 10005, "expectedLiquidityLimit not set correctly");
+    }
+
+    // [P4-25]: setTotalBorrowedLimit sets limit & emits event
+    function test_P4_25_setTotalBorrowedLimit_correct_and_emits_event() public {
+        evm.expectEmit(false, false, false, true);
+        emit NewTotalBorrowedLimit(10005);
+
+        evm.prank(CONFIGURATOR);
+        pool.setTotalBorrowedLimit(10005);
+
+        assertEq(pool.totalBorrowedLimit(), 10005, "totalBorrowedLimit not set correctly");
+    }
+
+    // [P4-26]: setWithdrawFee works correctly
+    function test_P4_26_setWithdrawFee_works_correctly() public {
+        evm.expectRevert(IPool4626Exceptions.IncorrectWithdrawalFeeException.selector);
+
+        evm.prank(CONFIGURATOR);
+        pool.setWithdrawFee(101);
+
+        evm.expectEmit(false, false, false, true);
+        emit NewWithdrawFee(50);
+
+        evm.prank(CONFIGURATOR);
+        pool.setWithdrawFee(50);
+
+        assertEq(pool.withdrawFee(), 50, "withdrawFee not set correctly");
+    }
+
+    struct CreditManagerBorrowTestCase {
+        string name;
+        /// SETUP
+        uint256 u2;
+        bool isBorrowingMoreU2Forbidden;
+        uint256 borrowBefore1;
+        uint256 borrowBefore2;
+        /// PARAMS
+        uint256 totalBorrowLimit;
+        uint256 cmBorrowLimit;
+        /// EXPECTED VALUES
+        uint256 expectedCanBorrow;
+    }
+
+    // [P4-27]: creditManagerCanBorrow computes availabel borrow correctly
+    function test_P4_27_creditManagerCanBorrow_computes_available_borrow_amount_correctly() public {
+        uint256 initialLiquidity = 10 * addLiquidity;
+        CreditManagerBorrowTestCase[5] memory cases = [
+            CreditManagerBorrowTestCase({
+                name: "Non-limit linear model, totalBorrowed > totalLimit",
+                // POOL SETUP
+                u2: 9000,
+                isBorrowingMoreU2Forbidden: false,
+                borrowBefore1: addLiquidity,
+                borrowBefore2: addLiquidity,
+                totalBorrowLimit: addLiquidity,
+                cmBorrowLimit: 5 * addLiquidity,
+                /// EXPECTED VALUES
+                expectedCanBorrow: 0
+            }),
+            CreditManagerBorrowTestCase({
+                name: "Non-limit linear model, cmBorrowLimit < totalLimit",
+                // POOL SETUP
+                u2: 9000,
+                isBorrowingMoreU2Forbidden: false,
+                borrowBefore1: addLiquidity,
+                borrowBefore2: addLiquidity,
+                totalBorrowLimit: 10 * addLiquidity,
+                cmBorrowLimit: 5 * addLiquidity,
+                /// EXPECTED VALUES
+                expectedCanBorrow: 4 * addLiquidity
+            }),
+            CreditManagerBorrowTestCase({
+                name: "Non-limit linear model, cmBorrowLimit > totalLimit",
+                // POOL SETUP
+                u2: 9000,
+                isBorrowingMoreU2Forbidden: false,
+                borrowBefore1: addLiquidity,
+                borrowBefore2: addLiquidity,
+                totalBorrowLimit: 4 * addLiquidity,
+                cmBorrowLimit: 5 * addLiquidity,
+                /// EXPECTED VALUES
+                expectedCanBorrow: 2 * addLiquidity
+            }),
+            CreditManagerBorrowTestCase({
+                name: "Limit linear model",
+                // POOL SETUP
+                u2: 6000,
+                isBorrowingMoreU2Forbidden: true,
+                borrowBefore1: 4 * addLiquidity,
+                borrowBefore2: addLiquidity,
+                totalBorrowLimit: 8 * addLiquidity,
+                cmBorrowLimit: 5 * addLiquidity,
+                /// EXPECTED VALUES
+                expectedCanBorrow: addLiquidity
+            }),
+            CreditManagerBorrowTestCase({
+                name: "Non-limit linear model, cmBorrowed < cmBorrowLimit",
+                // POOL SETUP
+                u2: 9000,
+                isBorrowingMoreU2Forbidden: false,
+                borrowBefore1: addLiquidity,
+                borrowBefore2: 5 * addLiquidity,
+                totalBorrowLimit: 10 * addLiquidity,
+                cmBorrowLimit: addLiquidity,
+                /// EXPECTED VALUES
+                expectedCanBorrow: 0
+            })
+        ];
+
+        for (uint256 i; i < cases.length; ++i) {
+            CreditManagerBorrowTestCase memory testCase = cases[i];
+
+            _setUp(Tokens.DAI, false);
+
+            _initPoolLiquidity(initialLiquidity, RAY);
+
+            LinearInterestRateModel newIR = new LinearInterestRateModel(
+                5000,
+                testCase.u2,
+                200,
+                500,
+                4000,
+                7500,
+                testCase.isBorrowingMoreU2Forbidden
+            );
+
+            CreditManagerMockForPoolTest cmMock2 = new CreditManagerMockForPoolTest(
+                    address(pool)
+                );
+
+            evm.startPrank(CONFIGURATOR);
+            psts.cr().addCreditManager(address(cmMock2));
+
+            pool.updateInterestRateModel(address(newIR));
+            pool.setTotalBorrowedLimit(type(uint256).max);
+            pool.setCreditManagerLimit(address(cmMock), type(uint128).max);
+            pool.setCreditManagerLimit(address(cmMock2), type(uint128).max);
+
+            cmMock.lendCreditAccount(testCase.borrowBefore1, DUMB_ADDRESS);
+            cmMock2.lendCreditAccount(testCase.borrowBefore2, DUMB_ADDRESS);
+
+            pool.setTotalBorrowedLimit(testCase.totalBorrowLimit);
+
+            pool.setCreditManagerLimit(address(cmMock2), testCase.cmBorrowLimit);
+
+            evm.stopPrank();
+
+            assertEq(
+                pool.creditManagerCanBorrow(address(cmMock2)),
+                testCase.expectedCanBorrow,
+                _testCaseErr(testCase.name, "Incorrect creditManagerCanBorrow return value")
+            );
+        }
+    }
+
+    struct SupplyRateTestCase {
+        string name;
+        /// SETUP
+        uint256 initialLiquidity;
+        uint16 utilisation;
+        uint16 withdrawFee;
+        // supportQuotas is true of quotaRevenue >0
+        uint128 quotaRevenue;
+        uint256 expectedSupplyRate;
+    }
+
+    // [P4-28]: supplyRate computes rates correctly
+    function test_P4_28_supplyRate_computes_rates_correctly() public {
+        SupplyRateTestCase[5] memory cases = [
+            SupplyRateTestCase({
+                name: "normal pool with zero debt and zero supply",
+                /// SETUP
+                initialLiquidity: 0,
+                utilisation: 0,
+                withdrawFee: 0,
+                quotaRevenue: 0,
+                expectedSupplyRate: irm.calcBorrowRate(0, 0, false)
+            }),
+            SupplyRateTestCase({
+                name: "normal pool with zero debt and non-zero supply",
+                /// SETUP
+                initialLiquidity: addLiquidity,
+                utilisation: 0,
+                withdrawFee: 0,
+                quotaRevenue: 0,
+                expectedSupplyRate: 0
+            }),
+            SupplyRateTestCase({
+                name: "normal pool with 50% utilisation debt",
+                /// SETUP
+                initialLiquidity: addLiquidity,
+                utilisation: 50_00,
+                withdrawFee: 0,
+                quotaRevenue: 0,
+                // borrow rate will be distributed to all LPs (dieselRate =1), so supply is a half
+                expectedSupplyRate: irm.calcBorrowRate(200, 100, false) / 2
+            }),
+            SupplyRateTestCase({
+                name: "normal pool with 50% utilisation debt and withdrawFee",
+                /// SETUP
+                initialLiquidity: addLiquidity,
+                utilisation: 50_00,
+                withdrawFee: 50,
+                quotaRevenue: 0,
+                // borrow rate will be distributed to all LPs (dieselRate =1), so supply is a half and -1% for withdrawFee
+                expectedSupplyRate: ((irm.calcBorrowRate(200, 100, false) / 2) * 995) / 1000
+            }),
+            SupplyRateTestCase({
+                name: "normal pool with 50% utilisation debt, withdrawFee and quotas",
+                /// SETUP
+                initialLiquidity: addLiquidity,
+                utilisation: 50_00,
+                withdrawFee: 1_00,
+                quotaRevenue: uint128(addLiquidity) * 45_50,
+                // borrow rate will be distributed to all LPs (dieselRate =1), so supply is a half and -1% for withdrawFee
+                expectedSupplyRate: (((irm.calcBorrowRate(200, 100, false) / 2 + (45_50 * RAY) / PERCENTAGE_FACTOR)) * 99) / 100
+            })
+        ];
+
+        for (uint256 i; i < cases.length; ++i) {
+            SupplyRateTestCase memory testCase = cases[i];
+
+            bool supportQuotas = testCase.quotaRevenue > 0;
+            _setUpTestCase(
+                Tokens.DAI, 0, testCase.utilisation, testCase.initialLiquidity, RAY, testCase.withdrawFee, supportQuotas
+            );
+
+            if (supportQuotas) {
+                address POOL_QUOTA_KEEPER = DUMB_ADDRESS;
+
+                evm.prank(CONFIGURATOR);
+                pool.connectPoolQuotaManager(POOL_QUOTA_KEEPER);
+
+                evm.prank(CONFIGURATOR);
+                pool.connectPoolQuotaManager(POOL_QUOTA_KEEPER);
+
+                evm.prank(POOL_QUOTA_KEEPER);
+                pool.updateQuotaRevenue(testCase.quotaRevenue);
+            }
+
+            assertEq(
+                pool.supplyRate(), testCase.expectedSupplyRate, _testCaseErr(testCase.name, "Incorrect supply rate")
+            );
+
+            if (pool.totalSupply() > 0) {
+                uint256 depositAmount = addLiquidity / 10;
+                uint256 sharesGot = pool.previewDeposit(depositAmount);
+
+                evm.warp(block.timestamp + 365 days);
+
+                uint256 depositInAYear = pool.previewRedeem(sharesGot);
+
+                assertEq(
+                    pool.supplyRate(), testCase.expectedSupplyRate, _testCaseErr(testCase.name, "Incorrect supply rate")
+                );
+
+                uint256 expectedDepositInAYear = (depositAmount * (PERCENTAGE_FACTOR - testCase.withdrawFee))
+                    / PERCENTAGE_FACTOR + (depositAmount * testCase.expectedSupplyRate) / RAY;
+
+                assertEq(
+                    depositInAYear, expectedDepositInAYear, _testCaseErr(testCase.name, "Incorrect deposit growth")
+                );
+            }
+        }
+    }
+
+    // 10000000000000000
     // // [P4-23]: fromDiesel / toDiesel works correctly
     // function test_PX_23_diesel_conversion_is_correct() public {
     //     _connectAndSetLimit();
@@ -1476,61 +1900,6 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
     //     );
     // }
 
-    // // [P4-24]: updateInterestRateModel changes interest rate model & emit event
-    // function test_PX_24_updateInterestRateModel_works_correctly_and_emits_event() public {
-    //     LinearInterestRateModel newIR = new LinearInterestRateModel(
-    //         8000,
-    //         9000,
-    //         200,
-    //         500,
-    //         4000,
-    //         7500,
-    //         false
-    //     );
-
-    //     evm.expectEmit(true, false, false, false);
-    //     emit NewInterestRateModel(address(newIR));
-
-    //     evm.prank(CONFIGURATOR);
-    //     pool.updateInterestRateModel(address(newIR));
-
-    //     assertEq(address(pool.interestRateModel()), address(newIR), "Interest rate model was not set correctly");
-    // }
-
-    // // [P4-25]: updateInterestRateModel correctly computes new borrow rate
-    // function test_PX_25_updateInterestRateModel_correctly_computes_new_borrow_rate() public {
-    //     LinearInterestRateModel newIR = new LinearInterestRateModel(
-    //         8000,
-    //         9000,
-    //         200,
-    //         500,
-    //         4000,
-    //         7500,
-    //         false
-    //     );
-
-    //     _connectAndSetLimit();
-
-    //     evm.prank(USER);
-    //     pool.deposit(addLiquidity, USER);
-
-    //     address ca = cmMock.getCreditAccountOrRevert(DUMB_ADDRESS);
-
-    //     cmMock.lendCreditAccount(addLiquidity / 2, ca);
-
-    //     uint256 expectedLiquidity = pool.expectedLiquidity();
-    //     uint256 availableLiquidity = pool.availableLiquidity();
-
-    //     evm.prank(CONFIGURATOR);
-    //     pool.updateInterestRateModel(address(newIR));
-
-    //     assertEq(
-    //         newIR.calcBorrowRate(expectedLiquidity, availableLiquidity),
-    //         pool.borrowRate(),
-    //         "Borrow rate does not match"
-    //     );
-    // }
-
     // // [P4-28]: expectedLiquidity() computes correctly
     // function test_PX_28_expectedLiquidity_correct() public {
     //     _connectAndSetLimit();
@@ -1551,72 +1920,6 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
     //     uint256 expectedLiquidity = pool.expectedLiquidityLU() + expectedInterest;
 
     //     assertEq(pool.expectedLiquidity(), expectedLiquidity, "Index value was not updated correctly");
-    // }
-
-    // // [P4-29]: setExpectedLiquidityLimit() sets limit & emits event
-    // function test_PX_29_setExpectedLiquidityLimit_correct_and_emits_event() public {
-    //     evm.expectEmit(false, false, false, true);
-    //     emit NewExpectedLiquidityLimit(10000);
-
-    //     evm.prank(CONFIGURATOR);
-    //     pool.setExpectedLiquidityLimit(10000);
-
-    //     assertEq(pool.expectedLiquidityLimit(), 10000, "expectedLiquidityLimit not set correctly");
-    // }
-
-    // // [P4-30]: addLiquidity reverts above expectedLiquidityLimit
-    // function test_PX_30_addLiquidity_reverts_above_liquidity_limit() public {
-    //     _connectAndSetLimit();
-
-    //     evm.prank(CONFIGURATOR);
-    //     pool.setExpectedLiquidityLimit(10000);
-
-    //     evm.expectRevert(IPool4626Exceptions.ExpectedLiquidityLimitException.selector);
-
-    //     evm.prank(USER);
-    //     pool.deposit(addLiquidity, USER);
-    // }
-
-    // // [P4-31]: setWithdrawFee reverts on fee > 1%
-    // function test_PX_31_setWithdrawFee_reverts_on_fee_too_lage() public {
-    //     evm.expectRevert(IPool4626Exceptions.IncorrectWithdrawalFeeException.selector);
-
-    //     evm.prank(CONFIGURATOR);
-    //     pool.setWithdrawFee(101);
-    // }
-
-    // // [P4-32]: setWithdrawFee changes fee and emits event
-    // function test_PX_32_setWithdrawFee_correct_and_emits_event() public {
-    //     evm.expectEmit(false, false, false, true);
-    //     emit NewWithdrawFee(50);
-
-    //     evm.prank(CONFIGURATOR);
-    //     pool.setWithdrawFee(50);
-
-    //     assertEq(pool.withdrawFee(), 50, "withdrawFee not set correctly");
-    // }
-
-    // // [P4-33]: removeLiqudity correctly takes withdrawal fee
-    // function test_PX_33_removeLiquidity_takes_withdrawal_fee() public {
-    //     address treasury = psts.treasury();
-
-    //     _connectAndSetLimit();
-
-    //     evm.startPrank(CONFIGURATOR);
-    //     pool.setWithdrawFee(50);
-    //     evm.stopPrank();
-
-    //     evm.startPrank(USER);
-    //     pool.deposit(addLiquidity, USER);
-
-    //     uint256 balanceBefore = tokenTestSuite.balanceOf(underlying, USER);
-
-    //     pool.redeem(addLiquidity, USER, USER);
-    //     evm.stopPrank();
-
-    //     expectBalance(underlying, treasury, (addLiquidity * 50) / 10000, "Incorrect balance in treasury");
-
-    //     expectBalance(underlying, USER, balanceBefore + (addLiquidity * 9950) / 10000, "Incorrect balance for user");
     // }
 
     // // [P4-35]: updateInterestRateModel reverts on zero address

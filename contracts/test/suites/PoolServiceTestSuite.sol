@@ -42,6 +42,7 @@ contract PoolServiceTestSuite {
     WETHMock public weth;
 
     AddressProvider public addressProvider;
+    ContractsRegister public cr;
     TestPoolService public poolService;
     Pool4626 public pool4626;
     CreditManagerMockForPoolTest public cmMock;
@@ -71,7 +72,7 @@ contract PoolServiceTestSuite {
         addressProvider = new AddressProvider();
         addressProvider.setACL(address(acl));
         addressProvider.setTreasuryContract(DUMB_ADDRESS2);
-        ContractsRegister cr = new ContractsRegister(address(addressProvider));
+        cr = new ContractsRegister(address(addressProvider));
         addressProvider.setContractsRegister(address(cr));
         treasury = DUMB_ADDRESS2;
         addressProvider.setWethToken(address(weth));
@@ -126,8 +127,6 @@ contract PoolServiceTestSuite {
         evm.startPrank(CONFIGURATOR);
 
         cmMock = new CreditManagerMockForPoolTest(newPool);
-
-        cmMock.changePoolService(newPool);
 
         cr.addPool(newPool);
         cr.addCreditManager(address(cmMock));

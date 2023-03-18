@@ -31,6 +31,8 @@ import {Errors} from "@gearbox-protocol/core-v2/contracts/libraries/Errors.sol";
 // EXCEPTIONS
 import {ZeroAddressException} from "../interfaces/IErrors.sol";
 
+import "forge-std/console.sol";
+
 struct CreditManagerDebt {
     uint128 totalBorrowed;
     uint128 limit;
@@ -393,22 +395,22 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
 
     /// @dev See {IERC4626-previewRedeem}.
     function previewRedeem(uint256 shares) public view override (ERC4626, IERC4626) returns (uint256 assets) {
-        assets = _calcDeliveredAsstes(_convertToAssets(shares, Math.Rounding.Down));
+        assets = _calcDeliveredAsstes(_convertToAssets(shares, Math.Rounding.Down)); // F:[P4-28]
     }
 
     /// @dev Computes how much assets will de delivered takling intio account token fees & withdraw fee
     function _calcDeliveredAsstes(uint256 assetsSpent) internal view returns (uint256) {
-        uint256 assetsDelivered = assetsSpent;
+        uint256 assetsDelivered = assetsSpent; // F:[P4-28]
 
         if (withdrawFee > 0) {
             unchecked {
-                /// It's safe because we made a check that assetsDelivered < uint128, and withDrawFee is < 10K
-                uint256 withdrawFeeAmount = (assetsDelivered * withdrawFee) / PERCENTAGE_FACTOR;
-                assetsDelivered -= withdrawFeeAmount;
+                /// It's safe because we made a check that assetsDelivered < uint128, and withdrawFee is < 10K
+                uint256 withdrawFeeAmount = (assetsDelivered * withdrawFee) / PERCENTAGE_FACTOR; // F:[P4-28]
+                assetsDelivered -= withdrawFeeAmount; // F:[P4-28]
             }
         }
 
-        return _amountMinusFee(assetsDelivered);
+        return _amountMinusFee(assetsDelivered); // F:[P4-28]
     }
 
     /// @return Amount of money that should be in the pool
@@ -432,7 +434,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
     function _calcOutstandingQuotaRevenue() internal view returns (uint128) {
         return uint128(
             (quotaRevenue * (block.timestamp - lastQuotaRevenueUpdate)) / (SECONDS_PER_YEAR * PERCENTAGE_FACTOR)
-        );
+        ); // F:[P4-17]
     }
 
     /// @dev Returns available liquidity in the pool (pool balance)
@@ -553,12 +555,12 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
     ) internal {
         uint128 updatedExpectedLiquidityLU = uint128(
             int128(_expectedLiquidityLU + uint128(_calcBaseInterestAccrued())) + int128(expectedLiquidityChanged)
-        );
+        ); // F:[P4-16]
 
-        _expectedLiquidityLU = updatedExpectedLiquidityLU;
+        _expectedLiquidityLU = updatedExpectedLiquidityLU; // F:[P4-16]
 
         // Update cumulativeIndex
-        cumulativeIndexLU_RAY = uint128(calcLinearCumulative_RAY());
+        cumulativeIndexLU_RAY = uint128(calcLinearCumulative_RAY()); // TODO: add check
 
         // update borrow APY
         // TODO: add case to check with quotas
@@ -570,24 +572,24 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
                     : uint256(int256(availableLiquidity()) + availableLiquidityChanged),
                 checkOptimalBorrowing
             )
-        );
-        timestampLU = uint64(block.timestamp);
+        ); // F:[P4-16]
+        timestampLU = uint64(block.timestamp); // F:[P4-16]
     }
 
     /// POOL QUOTA KEEPER ONLY
     function changeQuotaRevenue(int128 _quotaRevenueChange) external override poolQuotaKeeperOnly {
-        _updateQuotaRevenue(uint128(int128(quotaRevenue) + _quotaRevenueChange));
+        _updateQuotaRevenue(uint128(int128(quotaRevenue) + _quotaRevenueChange)); // F:[P4-17]
     }
 
     function updateQuotaRevenue(uint128 newQuotaRevenue) external override poolQuotaKeeperOnly {
-        _updateQuotaRevenue(newQuotaRevenue);
+        _updateQuotaRevenue(newQuotaRevenue); // F:[P4-17]
     }
 
     function _updateQuotaRevenue(uint128 _newQuotaRevenue) internal {
-        _expectedLiquidityLU += _calcOutstandingQuotaRevenue();
+        _expectedLiquidityLU += _calcOutstandingQuotaRevenue(); // F:[P4-17]
 
-        lastQuotaRevenueUpdate = uint40(block.timestamp);
-        quotaRevenue = _newQuotaRevenue;
+        lastQuotaRevenueUpdate = uint40(block.timestamp); // F:[P4-17]
+        quotaRevenue = _newQuotaRevenue; // F:[P4-17]
     }
 
     // GETTERS
@@ -595,6 +597,15 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
     /// @dev Calculates the current borrow rate, RAY format
     function borrowRate() external view returns (uint256) {
         return uint256(_borrowRate);
+    }
+
+    function supplyRate() external view returns (uint256) {
+        return totalSupply() == 0
+            ? uint256(_borrowRate)
+            : (
+                ((uint256(_borrowRate) * _totalBorrowed) + (quotaRevenue * RAY) / PERCENTAGE_FACTOR)
+                    * (PERCENTAGE_FACTOR - withdrawFee)
+            ) / totalSupply() / PERCENTAGE_FACTOR; // F:[P4-28]
     }
 
     ///  @dev Total borrowed amount (includes principal only)
@@ -606,98 +617,102 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
     // CONFIGURATION
     //
 
-    // TODO: Add function to set pool quota keeper
-
     /// @dev Forbids a Credit Manager to borrow
     /// @param _creditManager Address of the Credit Manager
     function setCreditManagerLimit(address _creditManager, uint256 _limit)
         external
-        controllerOnly
+        controllerOnly // F:[P4-18]
         nonZeroAddress(_creditManager)
     {
         /// Reverts if _creditManager is not registered in ContractRE#gister
         if (!ContractsRegister(AddressProvider(addressProvider).getContractsRegister()).isCreditManager(_creditManager))
         {
-            revert CreditManagerNotRegsiterException();
+            revert CreditManagerNotRegsiterException(); // F:[P4-19]
         }
 
         /// Checks if creditManager is already in list
         if (!creditManagerSet.contains(_creditManager)) {
             /// Reverts if c redit manager has different underlying asset
             if (address(this) != ICreditManagerV2(_creditManager).pool()) {
-                revert IncompatibleCreditManagerException();
+                revert IncompatibleCreditManagerException(); // F:[P4-20]
             }
 
-            creditManagerSet.add(_creditManager);
-            emit NewCreditManagerConnected(_creditManager);
+            creditManagerSet.add(_creditManager); // F:[P4-21]
+            emit NewCreditManagerConnected(_creditManager); // F:[P4-21]
         }
 
-        CreditManagerDebt storage cmDebt = creditManagersDebt[_creditManager];
-        cmDebt.limit = _convertToU128(_limit);
-        emit BorrowLimitChanged(_creditManager, _limit);
+        CreditManagerDebt storage cmDebt = creditManagersDebt[_creditManager]; // F:[P4-21]
+        cmDebt.limit = _convertToU128(_limit); // F:[P4-21]
+        emit BorrowLimitChanged(_creditManager, _limit); // F:[P4-21]
     }
 
     /// @dev Sets the new interest rate model for the pool
     /// @param _interestRateModel Address of the new interest rate model contract
     function updateInterestRateModel(address _interestRateModel)
         public
-        configuratorOnly // T:[PS-9]
+        configuratorOnly // F:[P4-18]
         nonZeroAddress(_interestRateModel)
     {
-        interestRateModel = IInterestRateModel(_interestRateModel);
+        interestRateModel = IInterestRateModel(_interestRateModel); // F:[P4-22]
 
-        _updateBaseParameters(0, 0, false);
+        _updateBaseParameters(0, 0, false); // F:[P4-22]
 
-        emit NewInterestRateModel(_interestRateModel); // F:[P4-03]
+        emit NewInterestRateModel(_interestRateModel); // F:[P4-22]
     }
 
     /// @dev Sets the new pool quota keeper
     /// @param _poolQuotaKeeper Address of the new poolQuotaKeeper copntract
     function connectPoolQuotaManager(address _poolQuotaKeeper)
         public
-        configuratorOnly // T:[PS-9]
+        configuratorOnly // F:[P4-18]
         nonZeroAddress(_poolQuotaKeeper)
     {
         if (poolQuotaKeeper != address(0)) {
-            _updateQuotaRevenue(quotaRevenue);
+            _updateQuotaRevenue(quotaRevenue); // F:[P4-23]
         }
 
-        poolQuotaKeeper = _poolQuotaKeeper;
+        poolQuotaKeeper = _poolQuotaKeeper; // F:[P4-23]
 
-        emit NewPoolQuotaKeeper(_poolQuotaKeeper); // F:[P4-03]
+        emit NewPoolQuotaKeeper(_poolQuotaKeeper); // F:[P4-03,23]
     }
 
     /// @dev Sets a new expected liquidity limit
     /// @param limit New expected liquidity limit
-    function setExpectedLiquidityLimit(uint256 limit) external controllerOnly {
-        _setExpectedLiquidityLimit(limit); // F:[P4-7]
+    function setExpectedLiquidityLimit(uint256 limit)
+        external
+        controllerOnly // F:[P4-18]
+    {
+        _setExpectedLiquidityLimit(limit); // F:[P4-7,24]
     }
 
     function _setExpectedLiquidityLimit(uint256 limit) internal {
-        _expectedLiquidityLimit = _convertToU128(limit);
-        emit NewExpectedLiquidityLimit(limit); // F:[P4-03]
+        _expectedLiquidityLimit = _convertToU128(limit); // F:[P4-24]
+        emit NewExpectedLiquidityLimit(limit); // F:[P4-03,24]
     }
 
-    function setTotalBorrowedLimit(uint256 limit) external controllerOnly {
-        _setTotalBorrowedLimit(limit);
+    function setTotalBorrowedLimit(uint256 limit)
+        external
+        controllerOnly // F:[P4-18]
+    {
+        _setTotalBorrowedLimit(limit); // F:[P4-25]
     }
 
     function _setTotalBorrowedLimit(uint256 limit) internal {
-        _totalBorrowedLimit = _convertToU128(limit);
-        emit NewTotalBorrowedLimit(limit); // F:[P4-03]
+        _totalBorrowedLimit = _convertToU128(limit); // F:[P4-25]
+        emit NewTotalBorrowedLimit(limit); // F:[P4-03,25]
     }
 
     /// @dev Sets a new withdrawal fee
     /// @param _withdrawFee The new fee amount, in bp
     function setWithdrawFee(uint16 _withdrawFee)
         public
-        controllerOnly // T:[PS-9]
+        controllerOnly // F:[P4-18]
     {
         if (_withdrawFee > MAX_WITHDRAW_FEE) {
-            revert IncorrectWithdrawalFeeException();
+            revert IncorrectWithdrawalFeeException(); // F:[P4-26]
         }
-        withdrawFee = _withdrawFee; // T:[PS-33]
-        emit NewWithdrawFee(_withdrawFee); // T:[PS-33]
+        withdrawFee = _withdrawFee; // F:[P4-26]
+        emit NewWithdrawFee(_withdrawFee); // F:[P4-26]
     }
 
     //
@@ -715,33 +730,33 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
 
     /// @dev Borrow limit for particular credit manager
     function creditManagerLimit(address _creditManager) external view returns (uint256) {
-        CreditManagerDebt storage cmDebt = creditManagersDebt[_creditManager];
-        return _convertToU256(cmDebt.limit);
+        CreditManagerDebt storage cmDebt = creditManagersDebt[_creditManager]; // F:[P4-21]
+        return _convertToU256(cmDebt.limit); // F:[P4-21]
     }
 
     /// @dev How much current credit manager can borrow
     function creditManagerCanBorrow(address _creditManager) external view returns (uint256 canBorrow) {
-        if (_totalBorrowed > _totalBorrowedLimit) return 0;
+        if (_totalBorrowed > _totalBorrowedLimit) return 0; // F:[P4-27]
         unchecked {
             canBorrow =
                 _totalBorrowedLimit == type(uint128).max ? type(uint256).max : _totalBorrowedLimit - _totalBorrowed;
-        }
+        } // F:[P4-27]
 
-        uint256 available = interestRateModel.availableToBorrow(availableLiquidity(), expectedLiquidity());
+        uint256 available = interestRateModel.availableToBorrow(expectedLiquidity(), availableLiquidity()); // F:[P4-27]
 
         if (canBorrow > available) {
-            canBorrow = available;
+            canBorrow = available; // F:[P4-27]
         }
 
         CreditManagerDebt memory cmDebt = creditManagersDebt[_creditManager];
         if (cmDebt.totalBorrowed >= cmDebt.limit) {
-            return 0;
+            return 0; // F:[P4-27]
         }
 
         unchecked {
             uint256 cmLimit = cmDebt.limit - cmDebt.totalBorrowed;
             if (canBorrow > cmLimit) {
-                canBorrow = cmLimit;
+                canBorrow = cmLimit; // F:[P4-27]
             }
         }
     }

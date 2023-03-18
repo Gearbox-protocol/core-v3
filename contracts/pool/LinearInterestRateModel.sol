@@ -166,7 +166,7 @@ contract LinearInterestRateModel is IInterestRateModel {
                 ? 0
                 : (WAD * (expectedLiquidity - availableLiquidity)) / expectedLiquidity;
 
-            return (U_WAD < U_2_WAD) ? ((U_2_WAD - U_WAD) * expectedLiquidity) / PERCENTAGE_FACTOR : 0;
+            return (U_WAD < U_2_WAD) ? ((U_2_WAD - U_WAD) * expectedLiquidity) / WAD : 0;
         } else {
             return availableLiquidity;
         }
