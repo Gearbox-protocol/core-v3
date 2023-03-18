@@ -72,12 +72,14 @@ abstract contract AbstractAdapter is IAdapter, ACLNonReentrantTrait {
     /// @dev Approves the target contract to spend given token from the Credit Account
     /// @param token Token to be approved
     /// @param amount Amount to be approved
+    /// @dev Reverts if token is not registered as collateral token in the Credit Manager
     function _approveToken(address token, uint256 amount) internal {
         creditManager.approveCreditAccount(targetContract, token, amount); // F: [AA-7, AA-8]
     }
 
     /// @dev Enables a token in the Credit Account
     /// @param token Address of the token to enable
+    /// @dev Reverts if token is not registered as collateral token in the Credit Manager
     function _enableToken(address token) internal {
         creditManager.checkAndEnableToken(token); // F: [AA-7, AA-9]
     }
@@ -113,11 +115,13 @@ abstract contract AbstractAdapter is IAdapter, ACLNonReentrantTrait {
     /// @param disableTokenIn Whether the input token should be disabled afterwards
     ///        (for operations that spend the entire balance)
     /// @return result Call output
+    /// @dev Reverts if tokenIn or tokenOut are not registered as collateral in the Credit Manager
     function _executeSwapNoApprove(address tokenIn, address tokenOut, bytes memory callData, bool disableTokenIn)
         internal
         returns (bytes memory result)
     {
-        return _executeSwap(tokenIn, tokenOut, callData, disableTokenIn); // F: [AA-7, AA-13]
+        _checkToken(tokenIn); // F: [AA-13, AA-15]
+        result = _executeSwap(tokenIn, tokenOut, callData, disableTokenIn); // F: [AA-7, AA-13]
     }
 
     /// @dev Executes a swap operation on the target contract from the Credit Account
@@ -128,11 +132,12 @@ abstract contract AbstractAdapter is IAdapter, ACLNonReentrantTrait {
     /// @param disableTokenIn Whether the input token should be disabled afterwards
     ///        (for operations that spend the entire balance)
     /// @return result Call output
+    /// @dev Reverts if tokenIn or tokenOut are not registered as collateral in the Credit Manager
     function _executeSwapSafeApprove(address tokenIn, address tokenOut, bytes memory callData, bool disableTokenIn)
         internal
         returns (bytes memory result)
     {
-        _approveToken(tokenIn, type(uint256).max); // F: [AA-14]
+        _approveToken(tokenIn, type(uint256).max); // F: [AA-14, AA-15]
         result = _executeSwap(tokenIn, tokenOut, callData, disableTokenIn); // F: [AA-7, AA-14]
         _approveToken(tokenIn, 1); // F: [AA-14]
     }
@@ -148,6 +153,6 @@ abstract contract AbstractAdapter is IAdapter, ACLNonReentrantTrait {
         if (disableTokenIn) {
             _disableToken(tokenIn); // F: [AA-13, AA-14]
         }
-        _enableToken(tokenOut); // F: [AA-13, AA-14]
+        _enableToken(tokenOut); // F: [AA-13, AA-14, AA-15]
     }
 }
