@@ -75,7 +75,7 @@ abstract contract LPPriceFeed is ILPPriceFeed, PriceFeedChecker, ACLNonReentrant
     function setLimiter(uint256 _lowerBound)
         external
         override
-        configuratorOnly // F:[LPF-4]
+        controllerOnly // F:[LPF-4]
     {
         _setLimiter(_lowerBound); // F:[LPF-4,5]
     }
