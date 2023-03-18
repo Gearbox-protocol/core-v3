@@ -31,8 +31,6 @@ import {Errors} from "@gearbox-protocol/core-v2/contracts/libraries/Errors.sol";
 // EXCEPTIONS
 import {ZeroAddressException} from "../interfaces/IErrors.sol";
 
-import "forge-std/console.sol";
-
 struct CreditManagerDebt {
     uint128 totalBorrowed;
     uint128 limit;

@@ -35,6 +35,8 @@ import {
     UNIVERSAL_CONTRACT
 } from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
+import "forge-std/console.sol";
+
 uint256 constant ADDR_BIT_SIZE = 160;
 uint256 constant INDEX_PRECISION = 10 ** 9;
 
@@ -296,19 +298,9 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         // If the contract is paused and the payer is the emergency liquidator,
         // changes closure action to LIQUIDATE_PAUSED, so that the premium is nullified
         // If the payer is not an emergency liquidator, reverts
-        if (paused()) {
-            if (
-                canLiquidateWhilePaused[payer]
-                    && (
-                        closureActionType == ClosureAction.LIQUIDATE_ACCOUNT
-                            || closureActionType == ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT
-                    )
-            ) {
-                closureActionType = ClosureAction.LIQUIDATE_PAUSED; // F: [CM-12, 13]
-            } else {
-                revert("Pausable: paused");
-            } // F:[CM-5]
-        }
+        if (paused() && (closureActionType == ClosureAction.CLOSE_ACCOUNT || !canLiquidateWhilePaused[payer])) {
+            revert("Pausable: paused");
+        } // F:[CM-5]
 
         // Checks that the Credit Account exists for the borrower
         address creditAccount = getCreditAccountOrRevert(borrower); // F:[CM-6, 9, 10]
@@ -1198,7 +1190,6 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         if (
             closureActionType == ClosureAction.LIQUIDATE_ACCOUNT
                 || closureActionType == ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT
-                || closureActionType == ClosureAction.LIQUIDATE_PAUSED
         ) {
             // LIQUIDATION CASE
 
@@ -1212,17 +1203,23 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
             //   since the account does not risk bad debt, so the liquidation
             //   is not as urgent
 
-            // UNHEALTHY ACCOUNT CASE
             uint256 totalFunds = (
                 totalValue
                     * (
-                        closureActionType == ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT
-                            ? slot1.liquidationDiscountExpired
-                            : slot1.liquidationDiscount
+                        closureActionType == ClosureAction.LIQUIDATE_ACCOUNT
+                            ? slot1.liquidationDiscount
+                            : slot1.liquidationDiscountExpired
                     )
             ) / PERCENTAGE_FACTOR; // F:[CM-43]
 
-            amountToPool += (totalValue * slot1.feeLiquidation) / PERCENTAGE_FACTOR; // F:[CM-43]
+            amountToPool += (
+                totalValue
+                    * (
+                        closureActionType == ClosureAction.LIQUIDATE_ACCOUNT
+                            ? slot1.feeLiquidation
+                            : slot1.feeLiquidationExpired
+                    )
+            ) / PERCENTAGE_FACTOR; // F:[CM-43]
 
             // If there are any funds left after all respective payments (this
             // includes the liquidation premium, since totalFunds is already

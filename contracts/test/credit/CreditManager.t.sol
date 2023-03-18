@@ -721,7 +721,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
         for (uint256 i = 0; i < 3; i++) {
             uint256 friendBalanceBefore = tokenTestSuite.balanceOf(Tokens.DAI, FRIEND);
 
-            ClosureAction action = i == 0 ? ClosureAction.LIQUIDATE_ACCOUNT : ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT;
+            ClosureAction action = i == 1 ? ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT : ClosureAction.LIQUIDATE_ACCOUNT;
 
             (
                 uint256 borrowedAmount,
@@ -745,9 +745,8 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
 
             uint256 interestAccrued = (borrowedAmount * cumulativeIndexAtClose) / cumulativeIndexAtOpen - borrowedAmount;
 
-            uint256 discount = i == 2
-                ? PERCENTAGE_FACTOR
-                : action == ClosureAction.LIQUIDATE_ACCOUNT ? liquidationDiscount : liquidationDiscountExpired;
+            uint256 discount =
+                action == ClosureAction.LIQUIDATE_ACCOUNT ? liquidationDiscount : liquidationDiscountExpired;
 
             uint256 amountToPool = (totalValue * discount) / PERCENTAGE_FACTOR;
 
@@ -833,8 +832,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
 
                     (feeInterest,, liquidationDiscountNormal,, liquidationDiscountExpired) = creditManager.fees();
 
-                    liquidationDiscount =
-                        i == 0 ? liquidationDiscountNormal : i == 1 ? liquidationDiscountExpired : PERCENTAGE_FACTOR;
+                    liquidationDiscount = i == 1 ? liquidationDiscountExpired : liquidationDiscountNormal;
                 }
 
                 uint256 profitInterest = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR;
@@ -874,7 +872,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
 
             uint256 remainingFunds = creditManager.closeCreditAccount(
                 USER,
-                i == 0 ? ClosureAction.LIQUIDATE_ACCOUNT : ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT,
+                i == 1 ? ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT : ClosureAction.LIQUIDATE_ACCOUNT,
                 totalValue,
                 LIQUIDATOR,
                 FRIEND,
@@ -1712,7 +1710,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
             9800 // liquidationPremiumExpired: 2%
         );
 
-        CalcClosePaymentsPureTestCase[9] memory cases = [
+        CalcClosePaymentsPureTestCase[7] memory cases = [
             CalcClosePaymentsPureTestCase({
                 name: "CLOSURE",
                 totalValue: 0,
@@ -1789,29 +1787,29 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
                 remainingFunds: 0, // 0, cause it's loss
                 profit: 0,
                 loss: 920
-            }),
-            CalcClosePaymentsPureTestCase({
-                name: "LIQUIDATION WHILE PAUSED WITH REMAINING FUNDS",
-                totalValue: 2000,
-                closureActionType: ClosureAction.LIQUIDATE_PAUSED,
-                borrowedAmount: 1000,
-                borrowedAmountWithInterest: 1100,
-                amountToPool: 1150, // amountToPool = 1100 + 100 * 10%  + 2000 * 2% = 1150
-                remainingFunds: 849, //remainingFunds: 2000 - 1150 - 1 = 869
-                profit: 50,
-                loss: 0
-            }),
-            CalcClosePaymentsPureTestCase({
-                name: "LIQUIDATION OF EXPIRED WITH LOSS",
-                totalValue: 1000,
-                closureActionType: ClosureAction.LIQUIDATE_PAUSED,
-                borrowedAmount: 900,
-                borrowedAmountWithInterest: 1900,
-                amountToPool: 1000, // amountToPool =  1900 + 1000 * 10% + 1000 * 2% = 2020, totalFunds = 1000 * 98% = 980, So, amount to pool would be 980
-                remainingFunds: 0, // 0, cause it's loss
-                profit: 0,
-                loss: 900
             })
+            // CalcClosePaymentsPureTestCase({
+            //     name: "LIQUIDATION WHILE PAUSED WITH REMAINING FUNDS",
+            //     totalValue: 2000,
+            //     closureActionType: ClosureAction.LIQUIDATE_PAUSED,
+            //     borrowedAmount: 1000,
+            //     borrowedAmountWithInterest: 1100,
+            //     amountToPool: 1150, // amountToPool = 1100 + 100 * 10%  + 2000 * 2% = 1150
+            //     remainingFunds: 849, //remainingFunds: 2000 - 1150 - 1 = 869
+            //     profit: 50,
+            //     loss: 0
+            // }),
+            // CalcClosePaymentsPureTestCase({
+            //     name: "LIQUIDATION OF EXPIRED WITH LOSS",
+            //     totalValue: 1000,
+            //     closureActionType: ClosureAction.LIQUIDATE_PAUSED,
+            //     borrowedAmount: 900,
+            //     borrowedAmountWithInterest: 1900,
+            //     amountToPool: 1000, // amountToPool =  1900 + 1000 * 10% + 1000 * 2% = 2020, totalFunds = 1000 * 98% = 980, So, amount to pool would be 980
+            //     remainingFunds: 0, // 0, cause it's loss
+            //     profit: 0,
+            //     loss: 900
+            // })
         ];
 
         for (uint256 i = 0; i < cases.length; i++) {

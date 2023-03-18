@@ -10,8 +10,7 @@ import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.
 enum ClosureAction {
     CLOSE_ACCOUNT,
     LIQUIDATE_ACCOUNT,
-    LIQUIDATE_EXPIRED_ACCOUNT,
-    LIQUIDATE_PAUSED
+    LIQUIDATE_EXPIRED_ACCOUNT
 }
 
 struct CollateralTokenData {
