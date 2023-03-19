@@ -19,6 +19,7 @@ import {ICreditManagerV2, ClosureAction} from "../interfaces/ICreditManagerV2.so
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IDegenNFT} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
+import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
 import {IBlacklistHelper} from "../interfaces/IBlacklistHelper.sol";
 import {IBotList} from "../interfaces/IBotList.sol";
 
@@ -87,6 +88,9 @@ contract CreditFacade is ICreditFacade, ReentrancyGuard {
     /// @dev Address of WETH
     address public immutable wethAddress;
 
+    /// @dev Address of WETH Gateway
+    IWETHGateway public immutable wethGateway;
+
     /// @dev Address of the DegenNFT that gatekeeps account openings in whitelisted mode
     address public immutable override degenNFT;
 
@@ -121,6 +125,7 @@ contract CreditFacade is ICreditFacade, ReentrancyGuard {
         creditManager = ICreditManagerV2(_creditManager); // F:[FA-1A]
         underlying = ICreditManagerV2(_creditManager).underlying(); // F:[FA-1A]
         wethAddress = ICreditManagerV2(_creditManager).wethAddress(); // F:[FA-1A]
+        wethGateway = IWETHGateway(ICreditManagerV2(_creditManager).wethGateway());
 
         degenNFT = _degenNFT; // F:[FA-1A]
         whitelisted = _degenNFT != address(0); // F:[FA-1A]
@@ -441,6 +446,11 @@ contract CreditFacade is ICreditFacade, ReentrancyGuard {
         /// borrower can recover funds to a different address
         if (helperBalance > 0 && remainingFunds > 1) {
             _increaseClaimableBalance(borrower, helperBalance);
+        }
+
+        // TODO: add test
+        if (convertWETH) {
+            wethGateway.withdrawTo(to);
         }
     }
 
