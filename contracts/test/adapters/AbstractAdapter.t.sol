@@ -141,16 +141,16 @@ contract AbstractAdapterTest is
         adapterMock.execute(DUMB_CALLDATA);
     }
 
-    /// @dev [AA-6]: AbstractAdapter _checkToken works correctly
-    function test_AA_06_checkToken_works_correctly() public {
+    /// @dev [AA-6]: AbstractAdapter _getMaskOrRevert works correctly
+    function test_AA_06_getMaskOrRevert_works_correctly() public {
         assertEq(
-            adapterMock.checkToken(tokenTestSuite.addressOf(Tokens.DAI)),
+            adapterMock.getMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI)),
             creditManager.tokenMasksMap(tokenTestSuite.addressOf(Tokens.DAI))
         );
 
         address token = address(0xdead);
         evm.expectRevert(abi.encodeWithSelector(IAdapterExceptions.TokenIsNotInAllowedList.selector, token));
-        adapterMock.checkToken(address(0xdead));
+        adapterMock.getMaskOrRevert(address(0xdead));
     }
 
     /// @dev [AA-7]: AbstractAdapter functions revert if user has no credit account

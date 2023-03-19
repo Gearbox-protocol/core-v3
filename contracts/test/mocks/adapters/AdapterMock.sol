@@ -24,8 +24,8 @@ contract AdapterMock is AbstractAdapter {
         return _creditAccount();
     }
 
-    function checkToken(address token) external view returns (uint256 tokenMask) {
-        return _checkToken(token);
+    function getMaskOrRevert(address token) external view returns (uint256 tokenMask) {
+        return _getMaskOrRevert(token);
     }
 
     function approveToken(address token, uint256 amount) external creditFacadeOnly {
