@@ -57,9 +57,7 @@ contract UniversalAdapter is AbstractAdapter, IUniversalAdapter {
     // /// @param to Token recipient
     // /// @param amount Amount to withdraw
     // function withdrawTo(address token, address to, uint256 amount) external creditFacadeOnly {
-    //     if (creditManager.tokenMasksMap(token) == 0) {
-    //         revert("Token is not allowed");
-    //     }
+    //     _getMaskOrRevert(token);
     //     creditManager.executeOrder(token, abi.encodeCall(IERC20.transfer, (to, amount)));
     // }
 }
