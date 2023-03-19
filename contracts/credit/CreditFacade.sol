@@ -290,6 +290,11 @@ contract CreditFacade is ICreditFacade, ReentrancyGuard {
             msg.sender, ClosureAction.CLOSE_ACCOUNT, 0, msg.sender, to, skipTokenMask, convertWETH
         ); // F:[FA-2, 12]
 
+        // TODO: add test
+        if (convertWETH) {
+            wethGateway.withdrawTo(to);
+        }
+
         // Emits a CloseCreditAccount event
         emit CloseCreditAccount(msg.sender, to); // F:[FA-12]
     }

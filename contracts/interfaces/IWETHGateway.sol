@@ -18,10 +18,7 @@ interface IWETHGateway {
         external
         returns (uint256 shares);
 
-    function redeem(address pool, uint256 shares, address receiver, address owner)
-        external
-        payable
-        returns (uint256 assets);
+    function redeem(address pool, uint256 shares, address receiver, address owner) external returns (uint256 assets);
 
     function depositFor(address to, uint256 amount) external;
 

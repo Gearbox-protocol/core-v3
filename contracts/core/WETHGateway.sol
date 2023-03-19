@@ -132,7 +132,6 @@ contract WETHGateway is IWETHGateway, ReentrancyGuard {
 
     function redeem(address pool, uint256 shares, address receiver, address owner)
         external
-        payable
         override
         wethPoolOnly(pool)
         unwrapAndTransferWethTo(receiver)
