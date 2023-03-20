@@ -3,6 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -20,7 +21,7 @@ import {Errors} from "@gearbox-protocol/core-v2/contracts/libraries/Errors.sol";
 
 /// @title WETHGateway
 /// @notice Used for converting ETH <> WETH
-contract WETHGateway is IWETHGateway {
+contract WETHGateway is IWETHGateway, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using Address for address payable;
 
@@ -31,6 +32,8 @@ contract WETHGateway is IWETHGateway {
 
     address public immutable weth;
     ContractsRegister internal immutable cr;
+
+    mapping(address => uint256) public override balanceOf;
 
     // Contract version
     uint256 public constant version = 3_00;
@@ -43,8 +46,8 @@ contract WETHGateway is IWETHGateway {
     }
 
     /// @dev Checks that credit manager is registered
-    modifier creditManagerOnly(address creditManager) {
-        if (!cr.isCreditManager(creditManager)) revert RegisteredCreditManagersOnly(); // T:[WG-3]
+    modifier creditManagerOnly() {
+        if (!cr.isCreditManager(msg.sender)) revert RegisteredCreditManagersOnly(); // T:[WG-3]
 
         _;
     }
@@ -129,7 +132,6 @@ contract WETHGateway is IWETHGateway {
 
     function redeem(address pool, uint256 shares, address receiver, address owner)
         external
-        payable
         override
         wethPoolOnly(pool)
         unwrapAndTransferWethTo(receiver)
@@ -138,50 +140,18 @@ contract WETHGateway is IWETHGateway {
         return IPool4626(pool).redeem(shares, address(this), owner);
     }
 
-    /// FOR POOLS V1
+    // CREDIT MANAGERS
 
-    /// @dev convert ETH to WETH and add liqudity to the pool
-    /// @param pool Address of PoolService contract to add liquidity to. This pool must have WETH as an underlying.
-    /// @param onBehalfOf The address that will receive the diesel token.
-    /// @param referralCode Code used to log the transaction facilitator, for potential rewards. 0 if non-applicable.
-    function addLiquidityETH(address pool, address onBehalfOf, uint16 referralCode)
-        external
-        payable
-        override
-        wethPoolOnly(pool) // T:[WG-1, 2]
-    {
-        IWETH(weth).deposit{value: msg.value}(); // T:[WG-8]
-
-        _checkAllowance(pool, msg.value); // T:[WG-8]
-        IPoolService(pool).addLiquidity(msg.value, onBehalfOf, referralCode); // T:[WG-8]
+    function depositFor(address to, uint256 amount) external override creditManagerOnly {
+        balanceOf[to] += amount;
     }
 
-    /// @dev Removes liquidity from the pool and converts WETH to ETH
-    ///       - burns lp's diesel (LP) tokens
-    ///       - unwraps WETH to ETH and sends to the LP
-    /// @param pool Address of PoolService contract to withdraw liquidity from. This pool must have WETH as an underlying.
-    /// @param amount Amount of Diesel tokens to send.
-    /// @param to Address to transfer ETH to.
-    function removeLiquidityETH(address pool, uint256 amount, address payable to)
-        external
-        override
-        wethPoolOnly(pool) // T:[WG-1, 2]
-    {
-        IERC20(IPoolService(pool).dieselToken()).safeTransferFrom(msg.sender, address(this), amount); // T: [WG-9]
-
-        uint256 amountGet = IPoolService(pool).removeLiquidity(amount, address(this)); // T: [WG-9]
-        _unwrapWETH(to, amountGet); // T: [WG-9]
-    }
-
-    /// @dev Converts WETH to ETH, and sends to the passed address
-    /// @param to Address to send ETH to
-    /// @param amount Amount of WETH to unwrap
-    function unwrapWETH(address to, uint256 amount)
-        external
-        override
-        creditManagerOnly(msg.sender) // T:[WG-5]
-    {
-        _unwrapWETH(to, amount); // T: [WG-7]
+    function withdrawTo(address owner) external override nonReentrant {
+        uint256 balance = balanceOf[owner];
+        if (balance > 1) {
+            balanceOf[owner] = 1;
+            _unwrapWETH(owner, balance - 1);
+        }
     }
 
     /// @dev Internal implementation for unwrapETH

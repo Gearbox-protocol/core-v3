@@ -1141,7 +1141,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
     {
         if (convertToETH && token == wethAddress) {
             ICreditAccount(creditAccount).safeTransfer(token, wethGateway, amount); // F:[CM-45]
-            IWETHGateway(wethGateway).unwrapWETH(to, amount); // F:[CM-45]
+            IWETHGateway(wethGateway).depositFor(to, amount); // F:[CM-45]
         } else {
             ICreditAccount(creditAccount).safeTransfer(token, to, amount); // F:[CM-45]
         }

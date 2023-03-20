@@ -52,7 +52,7 @@ import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
 import {Tokens} from "../config/Tokens.sol";
 import {CreditManagerTestSuite} from "../suites/CreditManagerTestSuite.sol";
-import {GenesisFactory} from "@gearbox-protocol/core-v2/contracts/factories/GenesisFactory.sol";
+import {GenesisFactory} from "../../factories/GenesisFactory.sol";
 import {CreditManagerTestInternal} from "../mocks/credit/CreditManagerTestInternal.sol";
 
 import {CreditConfig} from "../config/CreditConfig.sol";

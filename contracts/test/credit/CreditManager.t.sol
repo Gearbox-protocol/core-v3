@@ -17,6 +17,7 @@ import {
 } from "../../interfaces/ICreditManagerV2.sol";
 
 import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
+import {IWETHGateway} from "../../interfaces/IWETHGateway.sol";
 
 import {CreditManager, UNIVERSAL_CONTRACT} from "../../credit/CreditManager.sol";
 
@@ -48,7 +49,7 @@ import {
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
 import {Tokens} from "../config/Tokens.sol";
 import {CreditManagerTestSuite} from "../suites/CreditManagerTestSuite.sol";
-import {GenesisFactory} from "@gearbox-protocol/core-v2/contracts/factories/GenesisFactory.sol";
+import {GenesisFactory} from "../../factories/GenesisFactory.sol";
 import {CreditManagerTestInternal} from "../mocks/credit/CreditManagerTestInternal.sol";
 
 import {CreditConfig} from "../config/CreditConfig.sol";
@@ -67,6 +68,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
     CreditManager creditManager;
     PoolServiceMock poolMock;
     IPriceOracleV2 priceOracle;
+    IWETHGateway wethGateway;
     ACL acl;
     address underlying;
 
@@ -98,6 +100,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
 
         priceOracle = creditManager.priceOracle();
         underlying = creditManager.underlying();
+        wethGateway = IWETHGateway(creditManager.wethGateway());
     }
 
     /// @dev Opens credit account for testing management functions
@@ -968,7 +971,11 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
 
         uint256 amountToPool = borrowedAmount + interestAccrued + profit;
 
-        expectEthBalance(USER, 2 * borrowedAmount - amountToPool - 1);
+        assertEq(
+            wethGateway.balanceOf(USER),
+            2 * borrowedAmount - amountToPool - 1,
+            "Incorrect amount deposited on wethGateway"
+        );
     }
 
     /// @dev [CM-17]: closeCreditAccount sends ETH for WETH creditManger to borrower
@@ -992,7 +999,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
 
         expectBalance(Tokens.WETH, creditAccount, 1);
 
-        expectEthBalance(USER, WETH_EXCHANGE_AMOUNT - 1);
+        assertEq(wethGateway.balanceOf(USER), WETH_EXCHANGE_AMOUNT - 1, "Incorrect amount deposited on wethGateway");
     }
 
     /// @dev [CM-18]: closeCreditAccount sends ETH for WETH creditManger to borrower
@@ -1027,8 +1034,8 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
 
         expectBalance(Tokens.WETH, USER, userBalanceBefore + remainingFunds, "Incorrect amount were paid back");
 
-        expectEthBalance(
-            FRIEND,
+        assertEq(
+            wethGateway.balanceOf(FRIEND),
             (totalValue * (PERCENTAGE_FACTOR - liquidationDiscount)) / PERCENTAGE_FACTOR,
             "Incorrect amount were paid to liqiudator friend address"
         );
@@ -1057,7 +1064,11 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
 
         expectBalance(Tokens.WETH, creditAccount, 1);
 
-        expectEthBalance(FRIEND, WETH_EXCHANGE_AMOUNT - 1, "Incorrect amount were paid to liqiudator friend address");
+        assertEq(
+            wethGateway.balanceOf(FRIEND),
+            WETH_EXCHANGE_AMOUNT - 1,
+            "Incorrect amount were paid to liqiudator friend address"
+        );
     }
 
     //
@@ -1874,7 +1885,11 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
             expectBalance(Tokens.WETH, creditAccount, 1);
 
             if (convertToETH) {
-                expectEthBalance(friend, WETH_EXCHANGE_AMOUNT - 1);
+                assertEq(
+                    wethGateway.balanceOf(friend),
+                    WETH_EXCHANGE_AMOUNT - 1,
+                    "Incorrect amount were sent to friend address"
+                );
             } else {
                 expectBalance(Tokens.WETH, friend, WETH_EXCHANGE_AMOUNT - 1);
             }
@@ -1920,7 +1935,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
             expectBalance(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT - WETH_TRANSFER);
 
             if (convertToETH) {
-                expectEthBalance(friend, WETH_TRANSFER);
+                assertEq(wethGateway.balanceOf(friend), WETH_TRANSFER, "Incorrect amount were sent to friend address");
             } else {
                 expectBalance(Tokens.WETH, friend, WETH_TRANSFER);
             }
