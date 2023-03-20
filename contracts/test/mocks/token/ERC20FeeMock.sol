@@ -16,7 +16,7 @@ contract ERC20FeeMock is IUSDT, ERC20Mock {
 
     constructor(string memory name_, string memory symbol_, uint8 decimals_) ERC20Mock(name_, symbol_, decimals_) {}
 
-    function transfer(address recipient, uint256 amount) public virtual override (ERC20, IERC20) returns (bool) {
+    function transfer(address recipient, uint256 amount) public virtual override(ERC20, IERC20) returns (bool) {
         uint256 fee = _computeFee(amount);
         _transfer(_msgSender(), recipient, amount - fee);
         if (fee > 0) _transfer(_msgSender(), owner(), fee);
@@ -26,7 +26,7 @@ contract ERC20FeeMock is IUSDT, ERC20Mock {
     function transferFrom(address sender, address recipient, uint256 amount)
         public
         virtual
-        override (ERC20, IERC20)
+        override(ERC20, IERC20)
         returns (bool)
     {
         uint256 fee = _computeFee(amount);
