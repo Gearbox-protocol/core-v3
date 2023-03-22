@@ -4,7 +4,7 @@
 pragma solidity ^0.8.10;
 
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {QuotaUpdate} from "./IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeper, QuotaUpdate, TokenLT} from "./IPoolQuotaKeeper.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 enum ClosureAction {
@@ -191,22 +191,6 @@ interface ICreditManagerV2 is ICreditManagerV2Events, ICreditManagerV2Exceptions
     /// @param token Address of the token to enable
     function checkAndEnableToken(address token) external;
 
-    // /// @dev Performs a full health check on an account, summing up
-    // /// value of all enabled collateral tokens
-    // /// @param creditAccount Address of the Credit Account to check
-    // function fullCollateralCheck(address creditAccount) external;
-
-    // /// @dev Performs a full health check on an account with a custom
-    // ///      order of evaluated tokens
-    // /// @param creditAccount Address of the Credit Account to check
-    // /// @param collateralHints Array of token masks in the desired order of evaluation
-    // /// @notice Full collateral check with hints will first evaluate limited tokens as normal (this is done in PoolQuotaKeeper),
-    // ///         then evaluate the hinted tokens in the order of hints, and then will move on to other tokens if the check is still not satisfied
-    // function fullCollateralCheck(
-    //     address creditAccount,
-    //     uint256[] memory collateralHints
-    // ) external;
-
     /// @dev Performs a full health check on an account with a custom order of evaluated tokens and
     ///      a custom minimal health factor
     /// @param creditAccount Address of the Credit Account to check
@@ -243,16 +227,6 @@ interface ICreditManagerV2 is ICreditManagerV2Events, ICreditManagerV2Exceptions
     //
     // QUOTAS MANAGEMENT
     //
-
-    // /// @dev Updates credit account's quota for given token
-    // /// @param creditAccount Address of credit account
-    // /// @param token Address of the token to change the quota for
-    // /// @param quotaChange Requested quota change in pool's underlying asset units
-    // function updateQuota(
-    //     address creditAccount,
-    //     address token,
-    //     int96 quotaChange
-    // ) external;
 
     /// @dev Updates credit account's quotas for multiple tokens
     /// @param creditAccount Address of credit account
@@ -314,6 +288,9 @@ interface ICreditManagerV2 is ICreditManagerV2Events, ICreditManagerV2Exceptions
         view
         returns (address token, uint16 liquidationThreshold);
 
+    /// @dev Returns the array of quoted tokens that are enabled on the account
+    function getLimitedTokens(address creditAccount) external view returns (TokenLT[] memory tokens);
+
     /// @dev Total number of known collateral tokens.
     function collateralTokensCount() external view returns (uint256);
 
@@ -323,6 +300,9 @@ interface ICreditManagerV2 is ICreditManagerV2Events, ICreditManagerV2Exceptions
 
     /// @dev Bit mask encoding a set of forbidden tokens
     function forbiddenTokenMask() external view returns (uint256);
+
+    /// @dev Mask of tokens to apply quotas for
+    function limitedTokenMask() external view returns (uint256);
 
     /// @dev Maps allowed adapters to their respective target contracts.
     function adapterToContract(address adapter) external view returns (address);
@@ -339,6 +319,12 @@ interface ICreditManagerV2 is ICreditManagerV2Events, ICreditManagerV2Exceptions
     /// @dev Address of the connected pool
     /// @notice [DEPRECATED]: use pool() instead.
     function poolService() external view returns (address);
+
+    /// @dev Returns the current pool quota keeper connected to the pool
+    function poolQuotaKeeper() external view returns (IPoolQuotaKeeper);
+
+    /// @dev Whether the Credit Manager supports quotas
+    function supportsQuotas() external view returns (bool);
 
     /// @dev A map from borrower addresses to Credit Account addresses
     function creditAccounts(address borrower) external view returns (address);

@@ -17,6 +17,7 @@ import {QuotaUpdate} from "../interfaces/IPoolQuotaKeeper.sol";
 import {ICreditFacade, ICreditFacadeExtended, FullCheckParams} from "../interfaces/ICreditFacade.sol";
 import {ICreditManagerV2, ClosureAction} from "../interfaces/ICreditManagerV2.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
+import {IPoolQuotaKeeper, TokenLT} from "../interfaces/IPoolQuotaKeeper.sol";
 import {IDegenNFT} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
@@ -1125,8 +1126,20 @@ contract CreditFacade is ICreditFacade, ReentrancyGuard {
         view
         returns (uint256 totalUSD, uint256 twvUSD)
     {
-        uint256 tokenMask = 1;
         uint256 enabledTokensMask = creditManager.enabledTokensMap(creditAccount); // F:[FA-41]
+        uint256 limitedTokenMask = creditManager.limitedTokenMask();
+
+        if (creditManager.supportsQuotas()) {
+            TokenLT[] memory tokens = creditManager.getLimitedTokens(creditAccount);
+
+            if (tokens.length > 0) {
+                (twvUSD,) = creditManager.poolQuotaKeeper().computeQuotedCollateralUSD(
+                    address(creditManager), creditAccount, address(priceOracle), tokens
+                );
+            }
+        }
+
+        uint256 tokenMask = 1;
 
         while (tokenMask <= enabledTokensMask) {
             if (enabledTokensMask & tokenMask != 0) {
@@ -1139,7 +1152,10 @@ contract CreditFacade is ICreditFacade, ReentrancyGuard {
                     unchecked {
                         totalUSD += value; // F:[FA-41]
                     }
-                    twvUSD += value * liquidationThreshold; // F:[FA-41]
+
+                    if (tokenMask & limitedTokenMask == 0) {
+                        twvUSD += value * liquidationThreshold; // F:[FA-41]
+                    }
                 }
             } // T:[FA-41]
 

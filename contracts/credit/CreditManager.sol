@@ -145,10 +145,10 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
     /// QUOTA-RELATED PARAMS
 
     /// @dev Whether the CM supports quota-related logic
-    bool public immutable supportsQuotas;
+    bool public immutable override supportsQuotas;
 
     /// @dev Mask of tokens to apply quotas for
-    uint256 public limitedTokenMask;
+    uint256 public override limitedTokenMask;
 
     /// @dev Previously accrued and unrepaid interest on quotas.
     ///      This does not always represent the most actual quota interest,
@@ -885,6 +885,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         }
     }
 
+    /// @dev Returns the array of quoted tokens that are enabled on the account
     function getLimitedTokens(address creditAccount) public view returns (TokenLT[] memory tokens) {
         uint256 limitMask = enabledTokensMap[creditAccount] & limitedTokenMask;
 
