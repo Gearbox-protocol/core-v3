@@ -90,6 +90,10 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IPoolQuotaKeeperExceptions
     /// @param tokensLT Array of all active quoted tokens on the account
     function closeCreditAccount(address creditAccount, TokenLT[] memory tokensLT) external returns (uint256);
 
+    /// @dev Sets limits for a number of tokens to zero, preventing further quota increases
+    /// @notice Triggered by the Credit Manager when there is loss during liquidation
+    function setLimitsToZero(TokenLT[] memory tokensLT) external;
+
     /// @dev Computes the accrued quota interest and updates interest indexes
     /// @param creditAccount Address of the Credit Account to accrue interest for
     /// @param tokensLT Array of all active quoted tokens on the account

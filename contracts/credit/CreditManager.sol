@@ -295,9 +295,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         creditFacadeOnly // F:[CM-2]
         returns (uint256 remainingFunds)
     {
-        // If the contract is paused and the payer is the emergency liquidator,
-        // changes closure action to LIQUIDATE_PAUSED, so that the premium is nullified
-        // If the payer is not an emergency liquidator, reverts
+        // If the contract is paused and the payer is not an emergency liquidator, reverts
         if (paused() && (closureActionType == ClosureAction.CLOSE_ACCOUNT || !canLiquidateWhilePaused[payer])) {
             revert("Pausable: paused");
         } // F:[CM-5]
@@ -320,23 +318,32 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
             uint256 profit;
             uint256 loss;
             uint256 borrowedAmountWithInterest;
-            uint256 quotaInterest;
+            TokenLT[] memory tokens;
 
             if (supportsQuotas) {
-                TokenLT[] memory tokens = getLimitedTokens(creditAccount);
+                tokens = getLimitedTokens(creditAccount);
 
-                quotaInterest = cumulativeQuotaInterest[creditAccount];
+                uint256 quotaInterest = cumulativeQuotaInterest[creditAccount];
 
                 if (tokens.length > 0) {
                     quotaInterest += poolQuotaKeeper().closeCreditAccount(creditAccount, tokens); // F: [CMQ-6]
                 }
-            }
 
-            (borrowedAmount, borrowedAmountWithInterest,) =
-                _calcCreditAccountAccruedInterest(creditAccount, quotaInterest); // F:
+                (borrowedAmount, borrowedAmountWithInterest,) =
+                    _calcCreditAccountAccruedInterest(creditAccount, quotaInterest); // F: [CMQ-6]
+            } else {
+                (borrowedAmount, borrowedAmountWithInterest,) = _calcCreditAccountAccruedInterest(creditAccount, 0); // F: [CMQ-6]
+            }
 
             (amountToPool, remainingFunds, profit, loss) =
                 calcClosePayments(totalValue, closureActionType, borrowedAmount, borrowedAmountWithInterest); // F:[CM-10,11,12]
+
+            // If there is loss, quota limits for assets on the account are set to 0 automatically
+            // This prevents further exposure to the tokens, since the loss may have occured due to
+            // an exploit or price feed deviation
+            if (supportsQuotas && loss > 0) {
+                poolQuotaKeeper().setLimitsToZero(tokens); // F: [CMQ-12]
+            }
 
             uint256 underlyingBalance = IERC20(underlying).balanceOf(creditAccount);
 

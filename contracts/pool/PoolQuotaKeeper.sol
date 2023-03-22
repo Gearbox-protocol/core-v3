@@ -65,7 +65,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
     /// @dev Timestamp of the last time quota rates were batch-updated
     uint256 lastQuotaRateUpdate;
 
-    /// @dev Mapping from (user, token) to per-account quota parameters
+    /// @dev Mapping from (credit manager, user, token) to per-account quota parameters
     mapping(address => mapping(address => mapping(address => AccountQuota))) internal quotas;
 
     /// @dev Address of the gauge that determines quota rates
@@ -199,7 +199,9 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
         int128 quotaRevenueChange;
 
         uint256 len = tokensLT.length;
-        for (uint256 i; i < len;) {
+        uint256 i;
+
+        while (i < len && tokensLT[i].token != address(0)) {
             address token = tokensLT[i].token;
 
             (int128 qic, uint256 caqi) = _removeQuota(msg.sender, creditAccount, token); // F: [CMQ-06]
@@ -211,7 +213,6 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
             }
         }
 
-        /// TODO: check side effect of updating expectedLiquidity
         pool.changeQuotaRevenue(quotaRevenueChange);
     }
 
@@ -236,6 +237,22 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
         return (-int128(uint128(quoted)) * int16(tq.rate), caQuotaInterestChange); // F: [CMQ-06]
     }
 
+    /// @dev Sets limits for a number of tokens to zero, preventing further quota increases
+    /// @notice Triggered by the Credit Manager when there is loss during liquidation
+    function setLimitsToZero(TokenLT[] memory tokensLT) external creditManagerOnly {
+        uint256 len = tokensLT.length;
+        uint256 i;
+
+        while (i < len && tokensLT[i].token != address(0)) {
+            address token = tokensLT[i].token;
+            totalQuotas[token].limit = 1; // F: [CMQ-12]
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
     /// @dev Computes the accrued quota interest and updates interest indexes
     /// @param creditAccount Address of the Credit Account to accrue interest for
     /// @param tokensLT Array of all active quoted tokens on the account
@@ -246,8 +263,9 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
         returns (uint256 caQuotaInterestChange)
     {
         uint256 len = tokensLT.length;
+        uint256 i;
 
-        for (uint256 i; i < len;) {
+        while (i < len && tokensLT[i].token != address(0)) {
             address token = tokensLT[i].token;
             AccountQuota storage q = quotas[msg.sender][creditAccount][token];
 
@@ -325,8 +343,9 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
         returns (uint256 caQuotaInterestChange)
     {
         uint256 len = tokensLT.length;
+        uint256 i;
 
-        for (uint256 i; i < len;) {
+        while (i < len && tokensLT[i].token != address(0)) {
             address token = tokensLT[i].token;
             AccountQuota storage q = quotas[creditManager][creditAccount][token];
 
@@ -360,7 +379,6 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
         TokenLT[] memory tokens
     ) external view override returns (uint256 value, uint256 totalQuotaInterest) {
         uint256 i;
-
         uint256 len = tokens.length;
         while (i < len && tokens[i].token != address(0)) {
             (uint256 currentUSD, uint256 outstandingInterest) =
