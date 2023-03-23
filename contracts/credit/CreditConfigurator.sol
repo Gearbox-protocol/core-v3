@@ -241,7 +241,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
             creditManager.rampLiquidationThreshold(token, liquidationThresholdFinal, timestampRampStart, rampDuration);
             emit TokenLiquidationThresholdRampScheduled(
                 token, currentLT, liquidationThresholdFinal, timestampRampStart, timestampRampStart + rampDuration
-                );
+            );
         }
     }
 
@@ -543,7 +543,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
                 PERCENTAGE_FACTOR - _liquidationDiscount,
                 _feeLiquidationExpired,
                 PERCENTAGE_FACTOR - _liquidationDiscountExpired
-                ); // FT:[CC-1A,26]
+            ); // FT:[CC-1A,26]
         }
     }
 
@@ -690,6 +690,28 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         }
     }
 
+    /// @dev Sets the max cumulative loss, which is a threshold of total loss that triggers a system pause
+    function setMaxCumulativeLoss(uint128 _maxCumulativeLoss)
+        external
+        configuratorOnly // F: [CC-02]
+    {
+        (, uint128 maxCumulativeLossCurrent) = creditFacade().lossParams();
+
+        if (_maxCumulativeLoss != maxCumulativeLossCurrent) {
+            creditFacade().setMaxCumulativeLoss(_maxCumulativeLoss);
+            emit NewMaxCumulativeLoss(_maxCumulativeLoss);
+        }
+    }
+
+    /// @dev Resets the current cumulative loss
+    function resetCumulativeLoss()
+        external
+        configuratorOnly // F: [CC-02]
+    {
+        creditFacade().resetCumulativeLoss();
+        emit CumulativeLossReset();
+    }
+
     /// @dev Sets the maximal borrowed amount per block
     /// @param newLimit The new max borrowed amount per block
     function setLimitPerBlock(uint128 newLimit)
@@ -764,10 +786,13 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         }
     }
 
+    /// @dev Sets the bot list contract
+    /// @param botList The address of the new bot list
     function setBotList(address botList) external configuratorOnly {
         _setBotList(botList);
     }
 
+    /// @dev IMPLEMENTATION: setBotList
     function _setBotList(address botList) internal {
         address currentBotList = creditFacade().botList();
 

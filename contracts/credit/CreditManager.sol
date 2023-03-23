@@ -293,7 +293,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         override
         nonReentrant
         creditFacadeOnly // F:[CM-2]
-        returns (uint256 remainingFunds)
+        returns (uint256 remainingFunds, uint256 loss)
     {
         // If the contract is paused and the payer is not an emergency liquidator, reverts
         if (paused() && (closureActionType == ClosureAction.CLOSE_ACCOUNT || !canLiquidateWhilePaused[payer])) {
@@ -316,7 +316,6 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
 
         {
             uint256 profit;
-            uint256 loss;
             uint256 borrowedAmountWithInterest;
             TokenLT[] memory tokens;
 
@@ -1703,5 +1702,11 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
     {
         creditConfigurator = _creditConfigurator; // F:[CM-58]
         emit NewConfigurator(_creditConfigurator); // F:[CM-58]
+    }
+
+    /// @dev Pauses the Credit Manager when triggered by the Credit Facade;
+    ///      Used as a circuit breaker on too much loss suffered by the pool.
+    function creditFacadePause() external creditFacadeOnly {
+        _pause();
     }
 }

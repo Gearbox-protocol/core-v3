@@ -655,10 +655,12 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
             abi.encodeWithSelector(IPoolService.repayCreditAccount.selector, borrowedAmount, profit, 0)
         );
 
-        uint256 remainingFunds =
+        (uint256 remainingFunds, uint256 loss) =
             creditManager.closeCreditAccount(USER, ClosureAction.CLOSE_ACCOUNT, 0, USER, FRIEND, 0, false);
 
         assertEq(remainingFunds, 0, "Remaining funds is not zero!");
+
+        assertEq(loss, 0, "Loss is not zero");
 
         expectBalance(Tokens.DAI, creditAccount, 1);
 
@@ -696,10 +698,12 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
             abi.encodeWithSelector(IPoolService.repayCreditAccount.selector, borrowedAmount, profit, 0)
         );
 
-        uint256 remainingFunds =
+        (uint256 remainingFunds, uint256 loss) =
             creditManager.closeCreditAccount(USER, ClosureAction.CLOSE_ACCOUNT, 0, USER, FRIEND, 0, false);
 
         assertEq(remainingFunds, 0, "Remaining funds is not zero!");
+
+        assertEq(loss, 0, "Loss is not zero");
 
         expectBalance(Tokens.DAI, creditAccount, 1, "Credit account balance != 1");
 
@@ -762,7 +766,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
                 );
             }
             {
-                uint256 remainingFunds =
+                (uint256 remainingFunds,) =
                     creditManager.closeCreditAccount(USER, action, totalValue, LIQUIDATOR, FRIEND, 0, false);
 
                 assertEq(remainingFunds, 0, "Remaining funds is not zero!");
@@ -873,22 +877,31 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
                 abi.encodeWithSelector(IPoolService.repayCreditAccount.selector, borrowedAmount, profit, 0)
             );
 
-            uint256 remainingFunds = creditManager.closeCreditAccount(
-                USER,
-                i == 1 ? ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT : ClosureAction.LIQUIDATE_ACCOUNT,
-                totalValue,
-                LIQUIDATOR,
-                FRIEND,
-                0,
-                false
-            );
+            uint256 remainingFunds;
 
-            assertLe(expectedRemainingFunds - remainingFunds, 2, "Incorrect remaining funds");
+            {
+                uint256 loss;
+                (remainingFunds, loss) = creditManager.closeCreditAccount(
+                    USER,
+                    i == 1 ? ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT : ClosureAction.LIQUIDATE_ACCOUNT,
+                    totalValue,
+                    LIQUIDATOR,
+                    FRIEND,
+                    0,
+                    false
+                );
 
-            expectBalance(Tokens.DAI, creditAccount, 1, "Credit account balance != 1");
-            expectBalance(Tokens.DAI, USER, remainingFunds, "USER get incorrect amount as remaning funds");
+                assertLe(expectedRemainingFunds - remainingFunds, 2, "Incorrect remaining funds");
 
-            expectBalance(Tokens.DAI, address(poolMock), poolBalanceBefore + amountToPool);
+                assertEq(loss, 0, "Loss can't be positive with remaining funds");
+            }
+
+            {
+                expectBalance(Tokens.DAI, creditAccount, 1, "Credit account balance != 1");
+                expectBalance(Tokens.DAI, USER, remainingFunds, "USER get incorrect amount as remaning funds");
+
+                expectBalance(Tokens.DAI, address(poolMock), poolBalanceBefore + amountToPool);
+            }
 
             expectBalance(
                 Tokens.DAI,
@@ -1023,7 +1036,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
 
         uint256 totalValue = borrowedAmount * 2;
 
-        uint256 remainingFunds = creditManager.closeCreditAccount(
+        (uint256 remainingFunds,) = creditManager.closeCreditAccount(
             USER, ClosureAction.LIQUIDATE_ACCOUNT, totalValue, LIQUIDATOR, FRIEND, 0, true
         );
 

@@ -295,7 +295,7 @@ contract CreditConfiguratorTest is
             DEFAULT_LIQUIDATION_PREMIUM,
             DEFAULT_FEE_LIQUIDATION_EXPIRED,
             DEFAULT_LIQUIDATION_PREMIUM_EXPIRED
-            );
+        );
 
         evm.expectEmit(true, false, false, false);
         emit TokenAllowed(usdcToken);
@@ -352,6 +352,12 @@ contract CreditConfiguratorTest is
 
         evm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.setBotList(FRIEND);
+
+        evm.expectRevert(CallerNotConfiguratorException.selector);
+        creditConfigurator.setMaxCumulativeLoss(0);
+
+        evm.expectRevert(CallerNotConfiguratorException.selector);
+        creditConfigurator.resetCumulativeLoss();
 
         evm.stopPrank();
     }
@@ -849,7 +855,7 @@ contract CreditConfiguratorTest is
             newLiquidationPremium,
             newFeeLiquidationExpired,
             newLiquidationPremiumExpired
-            );
+        );
 
         evm.prank(CONFIGURATOR);
         creditConfigurator.setFees(
@@ -1246,7 +1252,7 @@ contract CreditConfiguratorTest is
         evm.expectEmit(true, false, false, true);
         emit TokenLiquidationThresholdRampScheduled(
             usdc, initialLT, 8900, uint40(block.timestamp + 5), uint40(block.timestamp + 1005)
-            );
+        );
 
         evm.prank(CONFIGURATOR);
         creditConfigurator.rampLiquidationThreshold(usdc, 8900, uint40(block.timestamp + 5), 1000);

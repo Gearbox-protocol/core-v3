@@ -185,6 +185,9 @@ interface ICreditFacadeExceptions is ICreditManagerV2Exceptions {
 
     /// @dev Thrown if botMulticall is called by an address that is not a bot for a specified borrower
     error NotApprovedBotException();
+
+    /// @dev Thrown when the pool receives less funds than borrowAmountWithInterest on account closure
+    error LiquiditySanityCheckException();
 }
 
 interface ICreditFacade is ICreditFacadeEvents, ICreditFacadeExceptions, IVersion {
@@ -291,23 +294,6 @@ interface ICreditFacade is ICreditFacadeEvents, ICreditFacadeExceptions, IVersio
         MultiCall[] calldata calls
     ) external payable;
 
-    // /// @dev Increases debt for msg.sender's Credit Account
-    // /// - Borrows the requested amount from the pool
-    // /// - Updates the CA's borrowAmount / cumulativeIndexOpen
-    // ///   to correctly compute interest going forward
-    // /// - Performs a full collateral check
-    // ///
-    // /// @param amount Amount to borrow
-    // function increaseDebt(uint256 amount) external;
-
-    // /// @dev Decrease debt
-    // /// - Decreases the debt by paying the requested amount + accrued interest + fees back to the pool
-    // /// - It's also include to this payment interest accrued at the moment and fees
-    // /// - Updates cunulativeIndex to cumulativeIndex now
-    // ///
-    // /// @param amount Amount to increase borrowed amount
-    // function decreaseDebt(uint256 amount) external;
-
     /// @dev Adds collateral to borrower's credit account
     /// @param onBehalfOf Address of the borrower whose account is funded
     /// @param token Address of a collateral token
@@ -332,16 +318,6 @@ interface ICreditFacade is ICreditFacadeEvents, ICreditFacadeExceptions, IVersio
     /// @dev Returns true if the borrower has an open Credit Account
     /// @param borrower Borrower address
     function hasOpenedCreditAccount(address borrower) external view returns (bool);
-
-    // /// @dev Sets token allowance from msg.sender's Credit Account to a connected target contract
-    // /// @param targetContract Contract to set allowance to. Cannot be in the list of upgradeable contracts
-    // /// @param token Token address
-    // /// @param amount Allowance amount
-    // function approve(
-    //     address targetContract,
-    //     address token,
-    //     uint256 amount
-    // ) external;
 
     /// @dev Approves account transfer from another user to msg.sender
     /// @param from Address for which account transfers are allowed/forbidden
@@ -409,6 +385,10 @@ interface ICreditFacade is ICreditFacadeEvents, ICreditFacadeExceptions, IVersio
     /// @return minBorrowedAmount Minimal borrowed amount per credit account
     /// @return maxBorrowedAmount Maximal borrowed amount per credit account
     function limits() external view returns (uint128 minBorrowedAmount, uint128 maxBorrowedAmount);
+
+    /// @return currentCumulativeLoss The total amount of loss accumulated since last reset
+    /// @return maxCumulativeLoss The maximal amount of loss accumulated before the Credit Manager is paused
+    function lossParams() external view returns (uint128 currentCumulativeLoss, uint128 maxCumulativeLoss);
 
     /// @dev Address of the DegenNFT that gatekeeps account openings in whitelisted mode
     function degenNFT() external view returns (address);

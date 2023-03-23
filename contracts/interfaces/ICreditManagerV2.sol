@@ -136,7 +136,7 @@ interface ICreditManagerV2 is ICreditManagerV2Events, ICreditManagerV2Exceptions
         address to,
         uint256 skipTokenMask,
         bool convertWETH
-    ) external returns (uint256 remainingFunds);
+    ) external returns (uint256 remainingFunds, uint256 loss);
 
     /// @dev Manages debt size for borrower:
     ///
@@ -388,4 +388,12 @@ interface ICreditManagerV2 is ICreditManagerV2Events, ICreditManagerV2Exceptions
 
     /// @dev Paused() state
     function checkEmergencyPausable(address caller, bool state) external returns (bool);
+
+    //
+    // CREDIT FACADE EMERGENCY
+    //
+
+    /// @dev Pauses the Credit Manager when triggered by the Credit Facade
+    ///      Used as a circuit breaker on too much loss suffered by the pool
+    function creditFacadePause() external;
 }
