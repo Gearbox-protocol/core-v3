@@ -1639,7 +1639,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
     struct CreditManagerBorrowTestCase {
         string name;
         /// SETUP
-        uint256 u2;
+        uint16 u2;
         bool isBorrowingMoreU2Forbidden;
         uint256 borrowBefore1;
         uint256 borrowBefore2;
