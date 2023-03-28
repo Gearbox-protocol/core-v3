@@ -35,11 +35,11 @@ import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
 
 // EXCEPTIONS
 import {
-    ZeroAddressException,
     AddressIsNotContractException,
     IncorrectPriceFeedException,
     IncorrectTokenContractException,
-    CallerNotPausableAdminException
+    CallerNotPausableAdminException,
+    TokenNotAllowedException
 } from "../interfaces/IErrors.sol";
 import {ICreditManagerV2, ICreditManagerV2Exceptions} from "../interfaces/ICreditManagerV2.sol";
 
@@ -161,9 +161,8 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
 
     /// @dev Makes all sanity checks and adds the token to the collateral token list
     /// @param token Address of token to be added
-    function addCollateralToken(address token) internal {
+    function addCollateralToken(address token) internal nonZeroAddress(token) {
         // Checks that token != address(0)
-        if (token == address(0)) revert ZeroAddressException(); // F:[CC-3]
 
         if (!token.isContract()) revert AddressIsNotContractException(token); // F:[CC-3]
 
@@ -328,7 +327,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         // tokenMask can't be 1, since this mask is reserved for underlying
 
         if (tokenMask == 0 || tokenMask == 1) {
-            revert ICreditManagerV2Exceptions.TokenNotAllowedException();
+            revert TokenNotAllowedException();
         } // F:[CC-7]
     }
 
@@ -349,9 +348,8 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     }
 
     /// @dev IMPLEMENTATION: allowContract
-    function _allowContract(address targetContract, address adapter) internal {
+    function _allowContract(address targetContract, address adapter) internal nonZeroAddress(targetContract) {
         // Checks that targetContract or adapter != address(0)
-        if (targetContract == address(0)) revert ZeroAddressException(); // F:[CC-12]
 
         if (!targetContract.isContract() && (targetContract != UNIVERSAL_CONTRACT)) {
             revert AddressIsNotContractException(targetContract);
@@ -397,10 +395,8 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         external
         override
         controllerOnly // F:[CC-2B]
+        nonZeroAddress(targetContract) // F:[CC-12]
     {
-        // Checks that targetContract is not address(0)
-        if (targetContract == address(0)) revert ZeroAddressException(); // F:[CC-12]
-
         // Checks that targetContract has a connected adapter
         address adapter = creditManager.contractToAdapter(targetContract);
         if (adapter == address(0)) {
@@ -423,10 +419,12 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     ///      Useful to remove "orphaned" adapters, i.e. adapters that were replaced but still point
     ///      to the contract for some reason. This allows users to still execute actions through the old adapter,
     ///      even though that is not intended.
-    function forbidAdapter(address adapter) external override configuratorOnly {
-        /// Sanity check that zero address was not passed
-        if (adapter == address(0)) revert ZeroAddressException(); // F: [CC-40]
-
+    function forbidAdapter(address adapter)
+        external
+        override
+        configuratorOnly
+        nonZeroAddress(adapter) // F: [CC-40]
+    {
         /// If the adapter already has no linked target contract, then there is nothing to change
         address targetContract = creditManager.adapterToContract(adapter);
         if (targetContract == address(0)) {
@@ -652,10 +650,11 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
 
     /// @dev Performs sanity checks that the address is a contract compatible
     /// with the current Credit Manager
-    function _revertIfContractIncompatible(address _contract) internal view {
-        // Checks that the address is not zero address
-        if (_contract == address(0)) revert ZeroAddressException(); // F:[CC-12,29]
-
+    function _revertIfContractIncompatible(address _contract)
+        internal
+        view
+        nonZeroAddress(_contract) // F:[CC-12,29]
+    {
         // Checks that the address is a contract
         if (!_contract.isContract()) {
             revert AddressIsNotContractException(_contract);
@@ -768,12 +767,8 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         _setBotList(botList);
     }
 
-    function _setBotList(address botList) internal {
+    function _setBotList(address botList) internal nonZeroAddress(botList) {
         address currentBotList = creditFacade().botList();
-
-        if (botList == address(0)) {
-            revert ZeroAddressException();
-        }
 
         if (botList != currentBotList) {
             creditFacade().setBotList(botList);

@@ -45,7 +45,7 @@ contract LinearInterestRateModelTest is DSTest {
     // TESTS
     //
 
-    // [LIM-1]:start parameters are correct
+    // [LIM-1]: start parameters are correct
     function test_LIM_01_start_parameters_correct() public {
         (uint16 U_1, uint16 U_2, uint16 R_base, uint16 R_slope1, uint16 R_slope2, uint16 R_slope3) =
             irm.getModelParameters();
@@ -71,7 +71,7 @@ contract LinearInterestRateModelTest is DSTest {
     }
 
     // [LIM-2]: linear model constructor reverts for incorrect params
-    function test_LIM_02_deposit_adds_liquidity_correctly() public {
+    function test_LIM_02_linear_model_constructor_reverts_for_incorrect_params() public {
         // adds liqudity to mint initial diesel tokens to change 1:1 rate
 
         IncorrectParamCase[8] memory cases = [
@@ -193,7 +193,7 @@ contract LinearInterestRateModelTest is DSTest {
     }
 
     // [LIM-3]: linear model computes available to borrow and borrow rate correctly
-    function test_LIM_03_deposit_adds_liquidity_correctly() public {
+    function test_LIM_03_linear_model_computes_available_to_borrow_and_borrow_rate_correctly() public {
         // adds liqudity to mint initial diesel tokens to change 1:1 rate
 
         LinearCalculationsCase[12] memory cases = [

@@ -23,13 +23,14 @@ import {ACLNonReentrantTrait} from "../core/ACLNonReentrantTrait.sol";
 import {IInterestRateModel} from "../interfaces/IInterestRateModel.sol";
 import {IPool4626, Pool4626Opts} from "../interfaces/IPool4626.sol";
 import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
+import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
 
 import {RAY, SECONDS_PER_YEAR, MAX_WITHDRAW_FEE} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 import {Errors} from "@gearbox-protocol/core-v2/contracts/libraries/Errors.sol";
 
 // EXCEPTIONS
-import {ZeroAddressException} from "../interfaces/IErrors.sol";
+import {ZeroAddressException, CreditManagerNotRegsiterException} from "../interfaces/IErrors.sol";
 
 struct CreditManagerDebt {
     uint128 totalBorrowed;
@@ -45,7 +46,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
     using Address for address payable;
 
     /// @dev Address provider
-    address public immutable override addressProvider;
+    AddressProvider public immutable override addressProvider;
 
     /// @dev Address of the protocol treasury
     address public immutable treasury;
@@ -112,7 +113,6 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
     EnumerableSet.AddressSet internal creditManagerSet;
 
     modifier poolQuotaKeeperOnly() {
-        /// TODO: udpate exception
         if (msg.sender != poolQuotaKeeper) revert PoolQuotaKeeperOnly(); // F:[P4-5]
         _;
     }
@@ -122,11 +122,6 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
             /// todo: add correct exception ??
             revert CreditManagerOnlyException();
         }
-        _;
-    }
-
-    modifier nonZeroAddress(address addr) {
-        if (addr == address(0)) revert ZeroAddressException(); // F:[P4-2]
         _;
     }
 
@@ -155,7 +150,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
         nonZeroAddress(opts.underlyingToken) // F:[P4-02]
         nonZeroAddress(opts.interestRateModel) // F:[P4-02]
     {
-        addressProvider = opts.addressProvider; // F:[P4-01]
+        addressProvider = AddressProvider(opts.addressProvider); // F:[P4-01]
         underlyingToken = opts.underlyingToken; // F:[P4-01]
 
         treasury = AddressProvider(opts.addressProvider).getTreasuryContract(); // F:[P4-01]
@@ -661,10 +656,16 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
     /// @dev Sets the new pool quota keeper
     /// @param _poolQuotaKeeper Address of the new poolQuotaKeeper copntract
     function connectPoolQuotaManager(address _poolQuotaKeeper)
-        public
+        external
+        override
         configuratorOnly // F:[P4-18]
         nonZeroAddress(_poolQuotaKeeper)
     {
+        // TODO: add test
+        if (address(IPoolQuotaKeeper(_poolQuotaKeeper).pool()) != address(this)) {
+            revert IncompatiblePoolQuotaKeeper();
+        }
+
         if (poolQuotaKeeper != address(0)) {
             _updateQuotaRevenue(quotaRevenue); // F:[P4-23]
         }

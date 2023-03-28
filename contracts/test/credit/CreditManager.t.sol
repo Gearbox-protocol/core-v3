@@ -35,6 +35,7 @@ import "../lib/constants.sol";
 import {BalanceHelper} from "../helpers/BalanceHelper.sol";
 
 // EXCEPTIONS
+import {TokenAlreadyAddedException} from "../../interfaces/IErrors.sol";
 
 // MOCKS
 import {PriceFeedMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/oracles/PriceFeedMock.sol";
@@ -53,6 +54,9 @@ import {GenesisFactory} from "../../factories/GenesisFactory.sol";
 import {CreditManagerTestInternal} from "../mocks/credit/CreditManagerTestInternal.sol";
 
 import {CreditConfig} from "../config/CreditConfig.sol";
+
+// EXCEPTIONS
+import {TokenNotAllowedException} from "../../interfaces/IErrors.sol";
 
 /// @title AddressRepository
 /// @notice Stores addresses of deployed contracts

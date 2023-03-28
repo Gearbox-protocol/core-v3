@@ -28,7 +28,8 @@ import {
     IncorrectTokenContractException,
     CallerNotPausableAdminException,
     CallerNotUnPausableAdminException,
-    CallerNotControllerException
+    CallerNotControllerException,
+    TokenNotAllowedException
 } from "../../interfaces/IErrors.sol";
 import {ICreditManagerV2Exceptions} from "../../interfaces/ICreditManagerV2.sol";
 
@@ -475,16 +476,16 @@ contract CreditConfiguratorTest is
     function test_CC_07_allowToken_and_forbidToken_reverts_for_unknown_or_underlying_token() public {
         evm.startPrank(CONFIGURATOR);
 
-        evm.expectRevert(ICreditManagerV2Exceptions.TokenNotAllowedException.selector);
+        evm.expectRevert(TokenNotAllowedException.selector);
         creditConfigurator.allowToken(DUMB_ADDRESS);
 
-        evm.expectRevert(ICreditManagerV2Exceptions.TokenNotAllowedException.selector);
+        evm.expectRevert(TokenNotAllowedException.selector);
         creditConfigurator.allowToken(underlying);
 
-        evm.expectRevert(ICreditManagerV2Exceptions.TokenNotAllowedException.selector);
+        evm.expectRevert(TokenNotAllowedException.selector);
         creditConfigurator.forbidToken(DUMB_ADDRESS);
 
-        evm.expectRevert(ICreditManagerV2Exceptions.TokenNotAllowedException.selector);
+        evm.expectRevert(TokenNotAllowedException.selector);
         creditConfigurator.forbidToken(underlying);
 
         evm.stopPrank();

@@ -9,6 +9,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
+import {IPool4626Exceptions} from "../../../interfaces/IPool4626.sol";
 
 import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
 
@@ -17,7 +18,7 @@ import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressP
  * @notice Used for testing purposes only.
  * @author Gearbox
  */
-contract PoolServiceMock is IPoolService {
+contract PoolServiceMock is IPoolService, IPool4626Exceptions {
     using SafeERC20 for IERC20;
 
     // Address repository
@@ -70,6 +71,11 @@ contract PoolServiceMock is IPoolService {
 
     bool public supportsQuotas = false;
     address public poolQuotaKeeper;
+
+    modifier poolQuotaKeeperOnly() {
+        if (msg.sender != poolQuotaKeeper) revert PoolQuotaKeeperOnly(); // F:[P4-5]
+        _;
+    }
 
     constructor(address _addressProvider, address _underlyingToken) {
         addressProvider = AddressProvider(_addressProvider);
@@ -206,6 +212,10 @@ contract PoolServiceMock is IPoolService {
     function setExpectedLiquidityLimit(uint256 num) external {}
 
     function setWithdrawFee(uint256 num) external {}
+
+    function connectPoolQuotaManager(address _poolQuotaKeeper) external {
+        poolQuotaKeeper = _poolQuotaKeeper;
+    }
 
     //    function calcCumulativeIndexAtBorrowMore(
     //        uint256 amount,

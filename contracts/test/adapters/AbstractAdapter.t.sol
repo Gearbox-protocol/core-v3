@@ -34,6 +34,9 @@ import {Tokens} from "../config/Tokens.sol";
 import {CreditFacadeTestSuite} from "../suites/CreditFacadeTestSuite.sol";
 import {CreditConfig} from "../config/CreditConfig.sol";
 
+// EXCEPTIONS
+import {TokenNotAllowedException} from "../../interfaces/IErrors.sol";
+
 uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
 uint16 constant REFERRAL_CODE = 23;
 
@@ -101,7 +104,7 @@ contract AbstractAdapterTest is
 
         assertEq(
             address(adapterMock.addressProvider()),
-            IPool4626(creditManager.pool()).addressProvider(),
+            address(IPool4626(creditManager.pool()).addressProvider()),
             "Incorrect address provider"
         );
 

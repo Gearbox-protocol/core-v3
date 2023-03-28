@@ -11,8 +11,16 @@ error ZeroAddressException();
 /// @dev Thrown on attempting to call a non-implemented function
 error NotImplementedException();
 
+error CreditManagerNotRegsiterException();
+
 /// @dev Thrown on attempting to set an EOA as an important contract in the system
 error AddressIsNotContractException(address);
+
+/// @dev Thrown on attempting to add a token that is already in a collateral list
+error TokenAlreadyAddedException();
+
+/// @dev Thrown on attempting to receive a token that is not a collateral token or was forbidden
+error TokenNotAllowedException();
 
 /// @dev Thrown on attempting to use a non-ERC20 contract or an EOA as a token
 error IncorrectTokenContractException();
@@ -23,6 +31,9 @@ error IncorrectPriceFeedException();
 
 /// @dev Thrown on attempting to call an access restricted function as a non-Configurator
 error CallerNotConfiguratorException();
+
+/// @dev Thrown on attempting to call an access restricted function as a non-CreditManager
+error CallerNotCreditManagerException();
 
 /// @dev Thrown on attempting to call an access restricted function as a non-Configurator
 error CallerNotControllerException();

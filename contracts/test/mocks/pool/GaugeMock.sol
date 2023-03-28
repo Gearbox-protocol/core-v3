@@ -16,17 +16,15 @@ import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/Contra
 
 // interfaces
 
-import {IPoolQuotaKeeper, QuotaRateUpdate} from "../../../interfaces/IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeper} from "../../../interfaces/IPoolQuotaKeeper.sol";
 import {IGearStaking} from "../../../interfaces/IGearStaking.sol";
 
 import {RAY, SECONDS_PER_YEAR, MAX_WITHDRAW_FEE} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 import {Errors} from "@gearbox-protocol/core-v2/contracts/libraries/Errors.sol";
 import {Pool4626} from "../../../pool/Pool4626.sol";
-import {GaugeOpts} from "../../../interfaces/IGauge.sol";
 
-// EXCEPTIONS
-import {ZeroAddressException} from "../../../interfaces/IErrors.sol";
+import "forge-std/console.sol";
 
 /// @title Gauge fore new 4626 pools
 contract GaugeMock is ACLNonReentrantTrait {
@@ -47,18 +45,10 @@ contract GaugeMock is ACLNonReentrantTrait {
     //
 
     /// @dev Constructor
-    /// @param opts Gauge options
-    ///             * addressProvider - the AddressProvder contract
-    ///             * pool - Address of the associated pool
-    ///             * vote
-    constructor(GaugeOpts memory opts) ACLNonReentrantTrait(address(Pool4626(opts.pool).addressProvider())) {
-        // Additional check that receiver is not address(0)
-        if (opts.pool == address(0)) {
-            revert ZeroAddressException(); // F:[P4-02]
-        }
 
-        addressProvider = address(Pool4626(opts.pool).addressProvider()); // F:[P4-01]
-        pool = Pool4626(payable(opts.pool)); // F:[P4-01]
+    constructor(address _pool) ACLNonReentrantTrait(address(Pool4626(_pool).addressProvider())) nonZeroAddress(_pool) {
+        addressProvider = address(Pool4626(_pool).addressProvider()); // F:[P4-01]
+        pool = Pool4626(payable(_pool)); // F:[P4-01]
     }
 
     /// @dev Rolls the new epoch and updates all quota rates
@@ -66,24 +56,19 @@ contract GaugeMock is ACLNonReentrantTrait {
         /// compute all compounded rates
         IPoolQuotaKeeper keeper = IPoolQuotaKeeper(pool.poolQuotaKeeper());
 
-        /// update rates & cumulative indexes
-        address[] memory tokens = keeper.quotedTokens();
-        uint256 len = tokens.length;
-        QuotaRateUpdate[] memory qUpdates = new QuotaRateUpdate[](len);
+        // /// update rates & cumulative indexes
+        // address[] memory tokens = keeper.quotedTokens();
+        // uint256 len = tokens.length;
+        // uint16[] memory rateUpdates = new uint16[](len);
 
-        for (uint256 i; i < len;) {
-            address token = tokens[i];
+        // unchecked {
+        //     for (uint256 i; i < len; ++i) {
+        //         address token = tokens[i];
+        //         rateUpdates[i] = rates[token];
+        //     }
+        // }
 
-            uint16 newRate = rates[token];
-
-            qUpdates[i] = QuotaRateUpdate({token: token, rate: newRate});
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        keeper.updateRates(qUpdates);
+        keeper.updateRates();
     }
 
     function addQuotaToken(address token, uint16 _rate) external configuratorOnly {
@@ -94,5 +79,16 @@ contract GaugeMock is ACLNonReentrantTrait {
 
     function changeQuotaTokenRateParams(address token, uint16 _rate) external configuratorOnly {
         rates[token] = _rate;
+    }
+
+    function getRates(address[] memory tokens) external view returns (uint16[] memory result) {
+        uint256 len = tokens.length;
+        result = new uint16[](len);
+        unchecked {
+            for (uint256 i; i < len; ++i) {
+                address token = tokens[i];
+                result[i] = rates[token];
+            }
+        }
     }
 }
