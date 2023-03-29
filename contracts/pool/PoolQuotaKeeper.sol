@@ -3,55 +3,51 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-
-import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
-import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 
 import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
+import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
+
 import {ACLNonReentrantTrait} from "../core/ACLNonReentrantTrait.sol";
 
-import {Pool4626} from "./Pool4626.sol";
+import {Quotas} from "../libraries/Quotas.sol";
+
+import {IPool4626} from "../interfaces/IPool4626.sol";
 import {
-    IPoolQuotaKeeper,
-    QuotaUpdate,
-    QuotaRateUpdate,
-    TokenLT,
-    QuotaStatusChange,
-    TokenQuotaParams,
-    AccountQuota
+    IPoolQuotaKeeper, QuotaUpdate, TokenLT, TokenQuotaParams, AccountQuota
 } from "../interfaces/IPoolQuotaKeeper.sol";
-import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
 import {IGauge} from "../interfaces/IGauge.sol";
+import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
 
 import {RAY, SECONDS_PER_YEAR, MAX_WITHDRAW_FEE} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
-import {Errors} from "@gearbox-protocol/core-v2/contracts/libraries/Errors.sol";
 
 // EXCEPTIONS
-import {ZeroAddressException} from "../interfaces/IErrors.sol";
+import {
+    ZeroAddressException,
+    CreditManagerNotRegsiterException,
+    CallerNotCreditManagerException,
+    TokenAlreadyAddedException,
+    TokenNotAllowedException
+} from "../interfaces/IErrors.sol";
+
+import "forge-std/console.sol";
 
 uint192 constant RAY_DIVIDED_BY_PERCENTAGE = uint192(RAY / PERCENTAGE_FACTOR);
-uint192 constant SECONDS_PER_YEAR_192 = uint192(SECONDS_PER_YEAR);
 
-/// @title Core pool contract compatible with ERC4626
-/// @notice Implements pool & diesel token business logic
-
+/// @title Manage pool accountQuotas
 contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using Quotas for TokenQuotaParams;
 
     /// @dev Address provider
     address public immutable underlying;
 
     /// @dev Address of the protocol treasury
-    Pool4626 public immutable pool;
+    IPool4626 public immutable override pool;
 
     /// @dev The list of all Credit Managers
     EnumerableSet.AddressSet internal creditManagerSet;
@@ -60,30 +56,33 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
     EnumerableSet.AddressSet internal quotaTokensSet;
 
     /// @dev Mapping from token address to its respective quota parameters
-    mapping(address => TokenQuotaParams) public totalQuotas;
-
-    /// @dev Timestamp of the last time quota rates were batch-updated
-    uint256 lastQuotaRateUpdate;
+    mapping(address => TokenQuotaParams) public totalQuotaParams;
 
     /// @dev Mapping from (user, token) to per-account quota parameters
-    mapping(address => mapping(address => mapping(address => AccountQuota))) internal quotas;
+    mapping(address => mapping(address => mapping(address => AccountQuota))) internal accountQuotas;
+
+    /// @dev Mapping for cached token masks
+    mapping(address => mapping(address => uint256)) internal tokenMaskCached;
 
     /// @dev Address of the gauge that determines quota rates
-    IGauge public gauge;
+    address public gauge;
+
+    /// @dev Timestamp of the last time quota rates were batch-updated
+    uint40 public lastQuotaRateUpdate;
 
     /// @dev Contract version
     uint256 public constant override version = 3_00;
 
     /// @dev Reverts if the function is called by non-gauge
     modifier gaugeOnly() {
-        if (msg.sender != address(gauge)) revert GaugeOnlyException();
+        if (msg.sender != gauge) revert GaugeOnlyException(); // F:[PQK-3]
         _;
     }
 
     /// @dev Reverts if the function is called by non-Credit Manager
     modifier creditManagerOnly() {
         if (!creditManagerSet.contains(msg.sender)) {
-            revert CreditManagerOnlyException();
+            revert CallerNotCreditManagerException(); // F:[PQK-4]
         }
         _;
     }
@@ -94,37 +93,34 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
 
     /// @dev Constructor
     /// @param _pool Pool address
-    constructor(address _pool) ACLNonReentrantTrait(address(Pool4626(_pool).addressProvider())) {
-        // Additional check that receiver is not address(0)
-        if (_pool == address(0)) {
-            revert ZeroAddressException(); // F:[P4-02]
-        }
-        pool = Pool4626(_pool);
-        underlying = Pool4626(_pool).asset();
+    constructor(address _pool) ACLNonReentrantTrait(address(IPool4626(_pool).addressProvider())) {
+        pool = IPool4626(_pool); // F:[PQK-1]
+        underlying = IPool4626(_pool).asset(); // F:[PQK-1]
     }
 
-    /// @dev Updates credit account's quotas for multiple tokens
+    /// @dev Updates credit account's accountQuotas for multiple tokens
     /// @param creditAccount Address of credit account
     /// @param quotaUpdates Requested quota updates, see `QuotaUpdate`
-    function updateQuotas(address creditAccount, QuotaUpdate[] memory quotaUpdates)
+    function updateQuotas(address creditAccount, QuotaUpdate[] memory quotaUpdates, uint256 enableTokenMask)
         external
         override
-        creditManagerOnly
-        returns (uint256 caQuotaInterestChange, QuotaStatusChange[] memory statusChanges, bool statusWasChanged)
+        creditManagerOnly // F:[PQK-4]
+        returns (uint256 caQuotaInterestChange, uint256 enableTokenMaskUpdated)
     {
+        enableTokenMaskUpdated = enableTokenMask;
         uint256 len = quotaUpdates.length;
         int128 quotaRevenueChange;
-
-        statusChanges = new QuotaStatusChange[](len);
+        int128 qic;
+        uint256 cap;
 
         for (uint256 i; i < len;) {
-            (int128 qic, uint256 cap, QuotaStatusChange statusChange) =
-                _updateQuota(msg.sender, creditAccount, quotaUpdates[i].token, quotaUpdates[i].quotaChange); // F: [CMQ-03]
+            (qic, cap, enableTokenMaskUpdated) = _updateQuota(
+                msg.sender, creditAccount, quotaUpdates[i].token, quotaUpdates[i].quotaChange, enableTokenMaskUpdated
+            ); // F:[CMQ-03]
 
             quotaRevenueChange += qic;
             caQuotaInterestChange += cap;
-            statusChanges[i] = statusChange;
-            statusWasChanged = statusWasChanged || (statusChange != QuotaStatusChange.NOT_CHANGED); // F: [CMQ-03]
+
             unchecked {
                 ++i;
             }
@@ -135,65 +131,22 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
         }
     }
 
-    /// @dev Update function for a single quoted token
-    function _updateQuota(address creditManager, address creditAccount, address token, int96 quotaChange)
-        internal
-        returns (int128 quotaRevenueChange, uint256 caQuotaInterestChange, QuotaStatusChange statusChange)
-    {
-        TokenQuotaParams storage q = totalQuotas[token];
-
-        if (q.cumulativeIndexLU_RAY == 0) {
-            revert TokenIsNotQuotedException();
+    function getTokenMask(address creditManager, address token) internal returns (uint256 mask) {
+        mask = tokenMaskCached[creditManager][token];
+        if (mask == 0) {
+            mask = ICreditManagerV2(creditManager).tokenMasksMap(token);
+            if (mask == 0) revert TokenNotAllowedException();
+            tokenMaskCached[creditManager][token] = mask;
         }
-
-        AccountQuota storage quota = quotas[creditManager][creditAccount][token];
-        int96 change;
-        uint96 totalQuoted = q.totalQuoted;
-        uint192 cumulativeIndexNow = _cumulativeIndexNow(q); // F: [CMQ-03]
-
-        if (quota.quota > 1) {
-            caQuotaInterestChange =
-                _computeOutstandingQuotaInterest(quota.quota, cumulativeIndexNow, quota.cumulativeIndexLU); // F: [CMQ-03]
-        }
-
-        quota.cumulativeIndexLU = cumulativeIndexNow;
-
-        if (quotaChange > 0) {
-            uint96 limit = q.limit;
-            if (totalQuoted > limit) {
-                return (0, caQuotaInterestChange, QuotaStatusChange.NOT_CHANGED);
-            }
-            change = (totalQuoted + uint96(quotaChange) > limit)
-                ? int96(limit - totalQuoted) // F: [CMQ-08,10]
-                : quotaChange;
-            q.totalQuoted = totalQuoted + uint96(change);
-
-            if (quota.quota <= 1 && change > 0) {
-                statusChange = QuotaStatusChange.ZERO_TO_POSITIVE; // F: [CMQ-03]
-            }
-
-            quota.quota += uint96(change);
-        } else {
-            change = quotaChange;
-            q.totalQuoted = uint96(int96(totalQuoted) + change);
-
-            if (quota.quota <= uint96(-change) + 1) {
-                statusChange = QuotaStatusChange.POSITIVE_TO_ZERO; // F: [CMQ-03]
-            }
-
-            quota.quota -= uint96(-change); // F: [CMQ-03]
-        }
-
-        return (change * int16(q.rate), caQuotaInterestChange, statusChange); // F: [CMQ-03]
     }
 
-    /// @dev Updates all quotas to zero when closing a credit account, and computes the final quota interest change
+    /// @dev Updates all accountQuotas to zero when closing a credit account, and computes the final quota interest change
     /// @param creditAccount Address of the Credit Account being closed
     /// @param tokensLT Array of all active quoted tokens on the account
     function closeCreditAccount(address creditAccount, TokenLT[] memory tokensLT)
         external
         override
-        creditManagerOnly
+        creditManagerOnly // F:[PQK-4]
         returns (uint256 totalInterest)
     {
         int128 quotaRevenueChange;
@@ -202,10 +155,10 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
         for (uint256 i; i < len;) {
             address token = tokensLT[i].token;
 
-            (int128 qic, uint256 caqi) = _removeQuota(msg.sender, creditAccount, token); // F: [CMQ-06]
+            (int128 qic, uint256 caqi) = _removeQuota(msg.sender, creditAccount, token); // F:[CMQ-06]
 
-            quotaRevenueChange += qic; // F: [CMQ-06]
-            totalInterest += caqi; // F: [CMQ-06]
+            quotaRevenueChange += qic; // F:[CMQ-06]
+            totalInterest += caqi; // F:[CMQ-06]
             unchecked {
                 ++i;
             }
@@ -215,25 +168,94 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
         pool.changeQuotaRevenue(quotaRevenueChange);
     }
 
+    /// @dev Update function for a single quoted token
+    function _updateQuota(
+        address creditManager,
+        address creditAccount,
+        address token,
+        int96 quotaChange,
+        uint256 enableTokenMask
+    ) internal returns (int128 quotaRevenueChange, uint256 caQuotaInterestChange, uint256 enableTokenMaskUpdated) {
+        TokenQuotaParams storage tq = totalQuotaParams[token];
+
+        if (!tq.isTokenRegistered()) {
+            revert TokenIsNotQuotedException();
+        }
+
+        enableTokenMaskUpdated = enableTokenMask;
+
+        AccountQuota storage accountQuota = accountQuotas[creditManager][creditAccount][token];
+
+        uint96 quoted = accountQuota.quota;
+
+        caQuotaInterestChange = _updateAccountQuotaInterest(tq, accountQuota, quoted);
+
+        uint96 change;
+        if (quotaChange > 0) {
+            uint96 maxQuotaAllowed = tq.limit - tq.totalQuoted;
+
+            if (maxQuotaAllowed == 0) {
+                return (0, caQuotaInterestChange, enableTokenMaskUpdated);
+            }
+
+            change = uint96(quotaChange);
+            change = change > maxQuotaAllowed ? maxQuotaAllowed : change; // F:[CMQ-08,10]
+
+            // if quota was 0 and change > 0, we enable token
+            if (quoted <= 1) {
+                enableTokenMaskUpdated |= getTokenMask(creditManager, token);
+            }
+
+            accountQuota.quota += change;
+            tq.totalQuoted += change;
+
+            quotaRevenueChange = int128(int16(tq.rate)) * int96(change);
+        } else {
+            change = uint96(-quotaChange);
+
+            tq.totalQuoted -= change;
+            accountQuota.quota -= change; // F:[CMQ-03]
+
+            if (accountQuota.quota <= 1) {
+                enableTokenMaskUpdated &= ~getTokenMask(creditManager, token); // F:[CMQ-03]
+            }
+
+            quotaRevenueChange = -int128(int16(tq.rate)) * int96(change);
+        }
+    }
+
     /// @dev Internal function to zero the quota for a single quoted token
     function _removeQuota(address creditManager, address creditAccount, address token)
         internal
         returns (int128 quotaRevenueChange, uint256 caQuotaInterestChange)
     {
-        AccountQuota storage quota = quotas[creditManager][creditAccount][token];
-        uint96 quoted = quota.quota;
+        AccountQuota storage accountQuota = accountQuotas[creditManager][creditAccount][token];
+        uint96 quoted = accountQuota.quota;
 
         if (quoted <= 1) return (0, 0);
 
-        TokenQuotaParams storage tq = totalQuotas[token];
-        uint192 cumulativeIndexNow = _cumulativeIndexNow(tq);
+        TokenQuotaParams storage tq = totalQuotaParams[token];
 
-        caQuotaInterestChange = _computeOutstandingQuotaInterest(quoted, cumulativeIndexNow, quota.cumulativeIndexLU); // F: [CMQ-06]
-        quota.cumulativeIndexLU = 0; // F: [CMQ-06]
+        caQuotaInterestChange = _updateAccountQuotaInterest(tq, accountQuota, quoted); // F:[CMQ-06]
+        accountQuota.quota = 1; // F:[CMQ-06]
+
         tq.totalQuoted -= quoted;
-        quota.quota = 1; // F: [CMQ-06]
 
-        return (-int128(uint128(quoted)) * int16(tq.rate), caQuotaInterestChange); // F: [CMQ-06]
+        return (-int128(uint128(quoted)) * int16(tq.rate), caQuotaInterestChange); // F:[CMQ-06]
+    }
+
+    function _updateAccountQuotaInterest(TokenQuotaParams storage tq, AccountQuota storage accountQuota, uint96 quoted)
+        internal
+        returns (uint256 caQuotaInterestChange)
+    {
+        uint192 cumulativeIndexNow = _cumulativeIndexNow(tq); // F:[CMQ-03]
+
+        if (quoted > 1) {
+            caQuotaInterestChange =
+                _computeOutstandingQuotaInterest(quoted, cumulativeIndexNow, accountQuota.cumulativeIndexLU); // F:[CMQ-03]
+        }
+
+        accountQuota.cumulativeIndexLU = cumulativeIndexNow;
     }
 
     /// @dev Computes the accrued quota interest and updates interest indexes
@@ -242,75 +264,24 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
     function accrueQuotaInterest(address creditAccount, TokenLT[] memory tokensLT)
         external
         override
-        creditManagerOnly
+        creditManagerOnly // F:[PQK-4]
         returns (uint256 caQuotaInterestChange)
     {
         uint256 len = tokensLT.length;
 
         for (uint256 i; i < len;) {
             address token = tokensLT[i].token;
-            AccountQuota storage q = quotas[msg.sender][creditAccount][token];
+            AccountQuota storage accountQuota = accountQuotas[msg.sender][creditAccount][token];
 
-            uint96 quoted = q.quota;
+            uint96 quoted = accountQuota.quota;
             if (quoted > 1) {
-                TokenQuotaParams storage tq = totalQuotas[token];
-                uint192 cumulativeIndexNow = _cumulativeIndexNow(tq);
-                caQuotaInterestChange +=
-                    _computeOutstandingQuotaInterest(q.quota, cumulativeIndexNow, q.cumulativeIndexLU);
-                q.cumulativeIndexLU = cumulativeIndexNow;
+                TokenQuotaParams storage tq = totalQuotaParams[token];
+                caQuotaInterestChange += _updateAccountQuotaInterest(tq, accountQuota, quoted);
             }
             unchecked {
                 ++i;
             }
         }
-    }
-
-    /// @dev Batch updates the quota rates and changes the combined quota revenue
-    /// @param qUpdates Array of new rates for all quoted tokens
-    function updateRates(QuotaRateUpdate[] memory qUpdates) external override gaugeOnly {
-        uint256 len = qUpdates.length;
-
-        if (len != quotaTokensSet.length()) {
-            /// add needed tokens
-        }
-
-        uint256 deltaTimestamp_RAY = RAY * (block.timestamp - lastQuotaRateUpdate);
-        uint128 quotaRevenue;
-        for (uint256 i; i < len;) {
-            address token = qUpdates[i].token;
-            TokenQuotaParams storage tq = totalQuotas[token];
-            uint16 rate = qUpdates[i].rate;
-
-            tq.cumulativeIndexLU_RAY = uint192(
-                (
-                    uint256(tq.cumulativeIndexLU_RAY)
-                        * (RAY + (rate * deltaTimestamp_RAY) / PERCENTAGE_FACTOR / SECONDS_PER_YEAR)
-                ) / RAY
-            );
-            tq.rate = rate;
-
-            quotaRevenue += rate * tq.totalQuoted;
-            emit QuotaRateUpdated(token, rate);
-
-            unchecked {
-                ++i;
-            }
-        }
-        pool.updateQuotaRevenue(quotaRevenue);
-        lastQuotaRateUpdate = block.timestamp;
-    }
-
-    /// @dev Registers a new quoted token in the keeper
-    function addQuotaToken(address token) external gaugeOnly {
-        TokenQuotaParams storage qp = totalQuotas[token];
-        if (qp.cumulativeIndexLU_RAY != 0) {
-            revert QuotedTokenIsAlreadyAdded();
-        }
-
-        quotaTokensSet.add(token);
-
-        qp.cumulativeIndexLU_RAY = uint192(RAY);
-        qp.rate = 0;
     }
 
     //
@@ -328,14 +299,14 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
 
         for (uint256 i; i < len;) {
             address token = tokensLT[i].token;
-            AccountQuota storage q = quotas[creditManager][creditAccount][token];
+            AccountQuota storage q = accountQuotas[creditManager][creditAccount][token];
 
             uint96 quoted = q.quota;
             if (quoted > 1) {
-                TokenQuotaParams storage tq = totalQuotas[token];
+                TokenQuotaParams storage tq = totalQuotaParams[token];
                 uint192 cumulativeIndexNow = _cumulativeIndexNow(tq);
                 caQuotaInterestChange +=
-                    _computeOutstandingQuotaInterest(q.quota, cumulativeIndexNow, q.cumulativeIndexLU); // F: [CMQ-10]
+                    _computeOutstandingQuotaInterest(quoted, cumulativeIndexNow, q.cumulativeIndexLU); // F:[CMQ-10]
             }
             unchecked {
                 ++i;
@@ -364,10 +335,10 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
         uint256 len = tokens.length;
         while (i < len && tokens[i].token != address(0)) {
             (uint256 currentUSD, uint256 outstandingInterest) =
-                _getCollateralValue(creditManager, creditAccount, tokens[i].token, _priceOracle); // F: [CMQ-8]
+                _getCollateralValue(creditManager, creditAccount, tokens[i].token, _priceOracle); // F:[CMQ-8]
 
-            value += currentUSD * tokens[i].lt; // F: [CMQ-8]
-            totalQuotaInterest += outstandingInterest; // F: [CMQ-8]
+            value += currentUSD * tokens[i].lt; // F:[CMQ-8]
+            totalQuotaInterest += outstandingInterest; // F:[CMQ-8]
 
             unchecked {
                 ++i;
@@ -381,40 +352,34 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
         view
         returns (uint256 value, uint256 interest)
     {
-        AccountQuota storage q = quotas[creditManager][creditAccount][token];
+        AccountQuota storage q = accountQuotas[creditManager][creditAccount][token];
 
-        if (q.quota > 1) {
-            uint256 quotaValueUSD = IPriceOracleV2(_priceOracle).convertToUSD(q.quota, underlying); // F: [CMQ-8]
+        uint96 quoted = q.quota;
+
+        if (quoted > 1) {
+            uint256 quotaValueUSD = IPriceOracleV2(_priceOracle).convertToUSD(quoted, underlying); // F:[CMQ-8]
             uint256 balance = IERC20(token).balanceOf(creditAccount);
             if (balance > 1) {
-                value = IPriceOracleV2(_priceOracle).convertToUSD(balance, token); // F: [CMQ-8]
-                if (value > quotaValueUSD) value = quotaValueUSD; // F: [CMQ-8]
+                value = IPriceOracleV2(_priceOracle).convertToUSD(balance, token); // F:[CMQ-8]
+                if (value > quotaValueUSD) value = quotaValueUSD; // F:[CMQ-8]
             }
 
-            interest = _computeOutstandingQuotaInterest(q.quota, cumulativeIndex(token), q.cumulativeIndexLU); // F: [CMQ-8]
+            interest = _computeOutstandingQuotaInterest(quoted, cumulativeIndex(token), q.cumulativeIndexLU); // F:[CMQ-8]
         }
     }
 
     /// @dev Returns cumulative index in RAY for a quoted token. Returns 0 for non-quoted tokens.
     function cumulativeIndex(address token) public view override returns (uint192) {
-        return _cumulativeIndexNow(totalQuotas[token]);
+        return _cumulativeIndexNow(totalQuotaParams[token]);
     }
 
     function _cumulativeIndexNow(TokenQuotaParams storage tq) internal view returns (uint192) {
-        return (
-            tq.cumulativeIndexLU_RAY
-                * uint192(
-                    (
-                        RAY
-                            + (RAY_DIVIDED_BY_PERCENTAGE * (block.timestamp - lastQuotaRateUpdate) * tq.rate) / SECONDS_PER_YEAR
-                    )
-                )
-        ) / uint192(RAY);
+        return tq.cumulativeIndexSince(lastQuotaRateUpdate);
     }
 
     /// @dev Returns quota rate in PERCENTAGE FORMAT
     function getQuotaRate(address token) external view override returns (uint16) {
-        return totalQuotas[token].rate;
+        return totalQuotaParams[token].rate;
     }
 
     /// @dev Returns an array of all quoted tokens
@@ -433,7 +398,61 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
         view
         returns (AccountQuota memory)
     {
-        return quotas[creditManager][creditAccount][token];
+        return accountQuotas[creditManager][creditAccount][token];
+    }
+
+    //
+    // ASSET MANAGEMENT (VIA GAUGE)
+    //
+
+    /// @dev Registers a new quoted token in the keeper
+    function addQuotaToken(address token)
+        external
+        gaugeOnly // F:[PQK-3]
+    {
+        if (quotaTokensSet.contains(token)) {
+            revert TokenAlreadyAddedException(); // F:[PQK-6]
+        }
+
+        quotaTokensSet.add(token); // F:[PQK-5]
+
+        TokenQuotaParams storage qp = totalQuotaParams[token]; // F:[PQK-5]
+        qp.cumulativeIndexLU_RAY = uint192(RAY); // F:[PQK-5]
+
+        emit NewQuotaTokenAdded(token); // F:[PQK-5]
+    }
+
+    /// @dev Batch updates the quota rates and changes the combined quota revenue
+    function updateRates()
+        external
+        override
+        gaugeOnly // F:[PQK-3]
+    {
+        address[] memory tokens = quotaTokensSet.values();
+        uint16[] memory rates = IGauge(gauge).getRates(tokens); // F:[PQK-7]
+
+        uint256 timeFromLastUpdate = block.timestamp - lastQuotaRateUpdate;
+        uint128 quotaRevenue;
+
+        uint256 len = tokens.length;
+        for (uint256 i; i < len;) {
+            address token = tokens[i];
+            uint16 rate = rates[i];
+
+            TokenQuotaParams storage tq = totalQuotaParams[token];
+
+            tq.cumulativeIndexLU_RAY = tq.calcLinearCumulativeIndex(rate, timeFromLastUpdate); // F:[PQK-7]
+            tq.rate = rate; // F:[PQK-7]
+
+            quotaRevenue += rate * tq.totalQuoted;
+            emit QuotaRateUpdated(token, rate); // F:[PQK-7]
+
+            unchecked {
+                ++i;
+            }
+        }
+        pool.updateQuotaRevenue(quotaRevenue); // F:[PQK-7]
+        lastQuotaRateUpdate = uint40(block.timestamp); // F:[PQK-7]
     }
 
     //
@@ -441,27 +460,50 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
     //
 
     /// @dev Sets a new gauge contract to compute quota rates
-    /// @param newGauge The new contract's address
-    function setGauge(address newGauge) external configuratorOnly {
-        gauge = IGauge(newGauge);
-
-        emit GaugeUpdated(newGauge);
+    /// @param _gauge The new contract's address
+    function setGauge(address _gauge)
+        external
+        configuratorOnly // F:[PQK-2]
+    {
+        if (gauge != _gauge) {
+            gauge = _gauge;
+            lastQuotaRateUpdate = uint40(block.timestamp);
+            emit GaugeUpdated(_gauge);
+        }
     }
 
     /// @dev Adds a new Credit Manager to the set of allowed CM's
-    /// @param creditManager Address of the new Credit Manager
-    function addCreditManager(address creditManager) external configuratorOnly {
-        creditManagerSet.add(creditManager);
+    /// @param _creditManager Address of the new Credit Manager
+    function addCreditManager(address _creditManager)
+        external
+        configuratorOnly // F:[PQK-2]
+        nonZeroAddress(_creditManager)
+    {
+        if (
+            !ContractsRegister(AddressProvider(pool.addressProvider()).getContractsRegister()).isCreditManager(
+                _creditManager
+            )
+        ) {
+            revert CreditManagerNotRegsiterException(); // F:[P4-19]
+        }
 
-        emit CreditManagerAdded(creditManager);
+        /// Checks if creditManager is already in list
+        if (!creditManagerSet.contains(_creditManager)) {
+            creditManagerSet.add(_creditManager); //
+            emit CreditManagerAdded(_creditManager);
+        }
     }
 
-    /// @dev Sets an upper limit on quotas for a token
+    /// @dev Sets an upper limit on accountQuotas for a token
     /// @param token Address of token to set the limit for
     /// @param limit The limit to set
-    function setTokenLimit(address token, uint96 limit) external controllerOnly {
-        totalQuotas[token].limit = limit;
-
-        emit TokenLimitSet(token, limit);
+    function setTokenLimit(address token, uint96 limit)
+        external
+        controllerOnly // F:[PQK-2]
+    {
+        if (totalQuotaParams[token].limit != limit) {
+            totalQuotaParams[token].limit = limit;
+            emit TokenLimitSet(token, limit);
+        }
     }
 }

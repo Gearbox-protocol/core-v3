@@ -4,6 +4,7 @@
 pragma solidity ^0.8.10;
 
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 struct Pool4626Opts {
@@ -21,10 +22,10 @@ interface IPool4626Exceptions {
     error CreditManagerOnlyException();
     error IncorrectWithdrawalFeeException();
     error ZeroAssetsException();
-
+    error IncompatiblePoolQuotaKeeper();
     error PoolQuotaKeeperOnly();
     error IncompatibleCreditManagerException();
-    error CreditManagerNotRegsiterException();
+
     error AdditionalYieldPoolException();
 }
 
@@ -142,5 +143,8 @@ interface IPool4626 is IPool4626Events, IPool4626Exceptions, IERC4626, IVersion 
     function totalBorrowedLimit() external view returns (uint256);
 
     /// @dev Address provider
-    function addressProvider() external view returns (address);
+    function addressProvider() external view returns (AddressProvider);
+
+    // @dev Connects pool quota manager
+    function connectPoolQuotaManager(address) external;
 }

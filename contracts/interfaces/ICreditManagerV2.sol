@@ -53,18 +53,11 @@ interface ICreditManagerV2Exceptions {
     /// @dev Thrown on failing a full collateral check after an operation
     error NotEnoughCollateralException();
 
-    /// @dev Thrown on attempting to receive a token that is not a collateral token
-    ///      or was forbidden
-    error TokenNotAllowedException();
-
     /// @dev Thrown if an attempt to approve a collateral token to a target contract failed
     error AllowanceFailedException();
 
     /// @dev Thrown on attempting to perform an action for an address that owns no Credit Account
     error HasNoOpenedAccountException();
-
-    /// @dev Thrown on attempting to add a token that is already in a collateral list
-    error TokenAlreadyAddedException();
 
     /// @dev Thrown on configurator attempting to add more than 256 collateral tokens
     error TooManyTokensException();

@@ -14,6 +14,7 @@ import {PoolFactory, PoolOpts} from "@gearbox-protocol/core-v2/contracts/factori
 
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfigurator.sol";
 import {PoolServiceMock} from "../mocks/pool/PoolServiceMock.sol";
+import {GaugeMock} from "../mocks/pool/GaugeMock.sol";
 import {PoolQuotaKeeper} from "../../pool/PoolQuotaKeeper.sol";
 
 import "../lib/constants.sol";
@@ -40,6 +41,7 @@ contract PoolDeployer is DSTest {
     AccountFactory public af;
     PoolServiceMock public poolMock;
     PoolQuotaKeeper public poolQuotaKeeper;
+    GaugeMock public gaugeMock;
     ContractsRegister public cr;
     ACL public acl;
 
@@ -91,6 +93,12 @@ contract PoolDeployer is DSTest {
         cr.addPool(address(poolMock));
 
         poolQuotaKeeper = new PoolQuotaKeeper(payable(address(poolMock)));
+
+        gaugeMock = new GaugeMock(address(poolMock));
+
+        evm.label(address(gaugeMock), "Gauge");
+
+        poolQuotaKeeper.setGauge(address(gaugeMock));
 
         poolMock.setPoolQuotaKeeper(address(poolQuotaKeeper));
     }
