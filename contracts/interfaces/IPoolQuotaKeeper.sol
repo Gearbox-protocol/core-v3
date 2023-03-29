@@ -33,10 +33,7 @@ struct AccountQuota {
 
 interface IPoolQuotaKeeperExceptions {
     /// @dev Thrown when a gauge-only function is called by non-gauge
-    error GaugeOnlyException();
-
-    /// @dev Thrown when a Credit Manager-only function is called by non-Credit Manager
-    error CreditManagerOnlyException();
+    error CallerNotGaugeException();
 
     /// @dev Thrown when attempting to set a quota for a token that is not quoted
     error TokenIsNotQuotedException();

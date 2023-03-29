@@ -10,7 +10,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
-import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
+import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
 import {IPool4626} from "../interfaces/IPool4626.sol";
@@ -19,36 +19,30 @@ import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWE
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
 import {Errors} from "@gearbox-protocol/core-v2/contracts/libraries/Errors.sol";
 
+import {
+    RegisteredPoolOnlyException,
+    ZeroAddressException,
+    WethPoolsOnlyException,
+    ReceiveIsNotAllowedException
+} from "../interfaces/IErrors.sol";
+
 /// @title WETHGateway
 /// @notice Used for converting ETH <> WETH
-contract WETHGateway is IWETHGateway, ReentrancyGuard {
+contract WETHGateway is IWETHGateway, ReentrancyGuard, ContractsRegisterTrait {
     using SafeERC20 for IERC20;
     using Address for address payable;
 
-    error RegisteredPoolsOnlyException();
-    error WethPoolsOnlyException();
-    error RegisteredCreditManagersOnly();
-    error ReceiveIsNotAllowedException();
-
     address public immutable weth;
-    ContractsRegister internal immutable cr;
 
-    mapping(address => uint256) public override balanceOf;
+    mapping(address => uint256) public override(IWETHGateway) balanceOf;
 
     // Contract version
     uint256 public constant version = 3_00;
 
     /// @dev Checks that the pool is registered and the underlying token is WETH
     modifier wethPoolOnly(address pool) {
-        if (!cr.isPool(pool)) revert RegisteredPoolsOnlyException(); // T:[WG-1]
+        if (!isRegisteredPool(pool)) revert RegisteredPoolOnlyException(); // T:[WG-1]
         if (IPoolService(pool).underlyingToken() != weth) revert WethPoolsOnlyException(); // T:[WG-2]
-        _;
-    }
-
-    /// @dev Checks that credit manager is registered
-    modifier creditManagerOnly() {
-        if (!cr.isCreditManager(msg.sender)) revert RegisteredCreditManagersOnly(); // T:[WG-3]
-
         _;
     }
 
@@ -72,10 +66,9 @@ contract WETHGateway is IWETHGateway, ReentrancyGuard {
 
     /// @dev Constructor
     /// @param addressProvider Address Repository for upgradable contract model
-    constructor(address addressProvider) {
-        require(addressProvider != address(0), Errors.ZERO_ADDRESS_IS_NOT_ALLOWED);
+    constructor(address addressProvider) ContractsRegisterTrait(addressProvider) {
+        if (addressProvider == address(0)) revert ZeroAddressException();
         weth = AddressProvider(addressProvider).getWethToken();
-        cr = ContractsRegister(AddressProvider(addressProvider).getContractsRegister());
     }
 
     /// FOR POOLS V3
@@ -142,7 +135,7 @@ contract WETHGateway is IWETHGateway, ReentrancyGuard {
 
     // CREDIT MANAGERS
 
-    function depositFor(address to, uint256 amount) external override creditManagerOnly {
+    function depositFor(address to, uint256 amount) external override registeredCreditManagerOnly(msg.sender) {
         balanceOf[to] += amount;
     }
 

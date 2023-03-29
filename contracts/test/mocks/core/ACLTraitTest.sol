@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
-import {ACLNonReentrantTrait} from "../../../core/ACLNonReentrantTrait.sol";
+import {ACLNonReentrantTrait} from "../../../traits/ACLNonReentrantTrait.sol";
 
 /**
  * @title Pausable Trait Test

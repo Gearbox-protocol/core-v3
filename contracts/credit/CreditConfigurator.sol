@@ -22,7 +22,7 @@ import {
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // CONTRACTS
-import {ACLNonReentrantTrait} from "../core/ACLNonReentrantTrait.sol";
+import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {CreditFacade} from "./CreditFacade.sol";
 import {CreditManager} from "./CreditManager.sol";
 

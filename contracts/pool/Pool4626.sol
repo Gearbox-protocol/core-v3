@@ -17,8 +17,9 @@ import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWE
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
-import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
-import {ACLNonReentrantTrait} from "../core/ACLNonReentrantTrait.sol";
+
+import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
+import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
 import {IInterestRateModel} from "../interfaces/IInterestRateModel.sol";
 import {IPool4626, Pool4626Opts} from "../interfaces/IPool4626.sol";
@@ -30,7 +31,11 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 import {Errors} from "@gearbox-protocol/core-v2/contracts/libraries/Errors.sol";
 
 // EXCEPTIONS
-import {ZeroAddressException, CreditManagerNotRegsiterException} from "../interfaces/IErrors.sol";
+import {
+    ZeroAddressException,
+    IncompatibleCreditManagerException,
+    CallerNotCreditManagerException
+} from "../interfaces/IErrors.sol";
 
 struct CreditManagerDebt {
     uint128 totalBorrowed;
@@ -39,7 +44,7 @@ struct CreditManagerDebt {
 
 /// @title Core pool contract compatible with ERC4626
 /// @notice Implements pool & diesel token business logic
-contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
+contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegisterTrait {
     using Math for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
@@ -120,7 +125,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
     modifier creditManagerWithActiveDebtOnly() {
         if (creditManagersDebt[msg.sender].totalBorrowed == 0) {
             /// todo: add correct exception ??
-            revert CreditManagerOnlyException();
+            revert CallerNotCreditManagerException();
         }
         _;
     }
@@ -133,6 +138,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
     /// @param opts Core pool options
     constructor(Pool4626Opts memory opts)
         ACLNonReentrantTrait(opts.addressProvider)
+        ContractsRegisterTrait(opts.addressProvider)
         ERC4626(IERC20(opts.underlyingToken))
         ERC20(
             string(
@@ -488,7 +494,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
 
         uint128 cmTotalBorrowed = cmDebt.totalBorrowed;
         if (cmTotalBorrowed == 0) {
-            revert CreditManagerOnlyException(); // F:[P4-13]
+            revert CallerNotCreditManagerException(); // F:[P4-13]
         }
 
         // For fee surplus we mint tokens for treasury
@@ -616,13 +622,8 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait {
         external
         controllerOnly // F:[P4-18]
         nonZeroAddress(_creditManager)
+        registeredCreditManagerOnly(_creditManager)
     {
-        /// Reverts if _creditManager is not registered in ContractRE#gister
-        if (!ContractsRegister(AddressProvider(addressProvider).getContractsRegister()).isCreditManager(_creditManager))
-        {
-            revert CreditManagerNotRegsiterException(); // F:[P4-19]
-        }
-
         /// Checks if creditManager is already in list
         if (!creditManagerSet.contains(_creditManager)) {
             /// Reverts if c redit manager has different underlying asset

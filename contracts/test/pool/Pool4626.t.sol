@@ -47,7 +47,9 @@ import {
     CallerNotConfiguratorException,
     CallerNotControllerException,
     ZeroAddressException,
-    CreditManagerNotRegsiterException
+    RegisteredCreditManagerOnlyException,
+    CallerNotCreditManagerException,
+    IncompatibleCreditManagerException
 } from "../../interfaces/IErrors.sol";
 
 uint256 constant fee = 6000;
@@ -1053,14 +1055,14 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         _setUpTestCase(Tokens.DAI, 0, 0, addLiquidity, 2 * RAY, 0, false);
 
         /// Case for unknown CM
-        evm.expectRevert(IPool4626Exceptions.CreditManagerOnlyException.selector);
+        evm.expectRevert(CallerNotCreditManagerException.selector);
         evm.prank(USER);
         pool.repayCreditAccount(1, 0, 0);
 
         /// Case for CM with zero debt
         assertEq(pool.creditManagerBorrowed(address(cmMock)), 0, "SETUP: Incorrect CM limit");
 
-        evm.expectRevert(IPool4626Exceptions.CreditManagerOnlyException.selector);
+        evm.expectRevert(CallerNotCreditManagerException.selector);
         cmMock.repayCreditAccount(1, 0, 0);
     }
 
@@ -1461,7 +1463,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
     // [P4-19]: setCreditManagerLimit reverts if not in register
     function test_P4_19_connectCreditManager_reverts_if_not_in_register() public {
-        evm.expectRevert(CreditManagerNotRegsiterException.selector);
+        evm.expectRevert(RegisteredCreditManagerOnlyException.selector);
 
         evm.prank(CONFIGURATOR);
         pool.setCreditManagerLimit(DUMB_ADDRESS, 1);
@@ -1471,7 +1473,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
     function test_P4_20_connectCreditManager_fails_on_incompatible_CM() public {
         cmMock.changePoolService(DUMB_ADDRESS);
 
-        evm.expectRevert(IPool4626Exceptions.IncompatibleCreditManagerException.selector);
+        evm.expectRevert(IncompatibleCreditManagerException.selector);
 
         evm.prank(CONFIGURATOR);
         pool.setCreditManagerLimit(address(cmMock), 1);

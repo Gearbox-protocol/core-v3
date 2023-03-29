@@ -16,7 +16,7 @@ import {
     VotingContractStatus
 } from "../interfaces/IGearStaking.sol";
 
-import {ACLNonReentrantTrait} from "../core/ACLNonReentrantTrait.sol";
+import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 
 uint256 constant EPOCH_LENGTH = 7 days;
 

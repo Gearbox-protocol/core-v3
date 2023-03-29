@@ -21,7 +21,7 @@ import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.
 
 import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
-
+import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 import {
     CreditAccountData,
     CreditManagerData,
@@ -37,7 +37,7 @@ import {ZeroAddressException} from "../interfaces/IErrors.sol";
 /// @title Data compressor
 /// @notice Collects data from various contracts for use in the dApp
 /// Do not use for data from any onchain activities
-contract DataCompressor is IDataCompressor {
+contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
     /// @dev Address of the AddressProvider
     AddressProvider public immutable addressProvider;
 
@@ -50,21 +50,7 @@ contract DataCompressor is IDataCompressor {
     // Contract version
     uint256 public constant version = 3_00;
 
-    /// @dev Prevents function usage for target contracts that are not Gearbox pools
-    modifier targetIsRegisteredPool(address pool) {
-        if (!contractsRegister.isPool(pool)) revert NotPoolException(); // T:[WG-1]
-        _;
-    }
-
-    /// @dev Prevents function usage for target contracts that are not Gearbox Credit Managers
-    modifier targetIsRegisteredCreditManager(address creditManager) {
-        if (!contractsRegister.isCreditManager(creditManager)) {
-            revert NotCreditManagerException();
-        } // T:[WG-3]
-        _;
-    }
-
-    constructor(address _addressProvider) {
+    constructor(address _addressProvider) ContractsRegisterTrait(_addressProvider) {
         if (_addressProvider == address(0)) revert ZeroAddressException();
 
         addressProvider = AddressProvider(_addressProvider);
@@ -113,7 +99,7 @@ contract DataCompressor is IDataCompressor {
     function hasOpenedCreditAccount(address _creditManager, address borrower)
         public
         view
-        targetIsRegisteredCreditManager(_creditManager)
+        registeredCreditManagerOnly(_creditManager)
         returns (bool)
     {
         return _hasOpenedCreditAccount(_creditManager, borrower);
@@ -338,7 +324,7 @@ contract DataCompressor is IDataCompressor {
 
     /// @dev Returns PoolData for a particular pool
     /// @param _pool Pool address
-    function getPoolData(address _pool) public view targetIsRegisteredPool(_pool) returns (PoolData memory result) {
+    function getPoolData(address _pool) public view registeredPoolOnly(_pool) returns (PoolData memory result) {
         IPoolService pool = IPoolService(_pool);
         result.version = uint8(pool.version());
 
@@ -390,7 +376,7 @@ contract DataCompressor is IDataCompressor {
     function getAdapter(address _creditManager, address _allowedContract)
         external
         view
-        targetIsRegisteredCreditManager(_creditManager)
+        registeredCreditManagerOnly(_creditManager)
         returns (address adapter)
     {
         (uint8 ver,, ICreditFilter creditFilter, ICreditManagerV2 creditManagerV2,,) =
@@ -410,7 +396,7 @@ contract DataCompressor is IDataCompressor {
     function getCreditContracts(address _creditManager)
         internal
         view
-        targetIsRegisteredCreditManager(_creditManager)
+        registeredCreditManagerOnly(_creditManager)
         returns (
             uint8 ver,
             ICreditManager creditManager,

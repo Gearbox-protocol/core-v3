@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 /// @dev Common contract exceptions
 
@@ -11,7 +11,13 @@ error ZeroAddressException();
 /// @dev Thrown on attempting to call a non-implemented function
 error NotImplementedException();
 
-error CreditManagerNotRegsiterException();
+error RegisteredCreditManagerOnlyException();
+error RegisteredPoolOnlyException();
+
+error WethPoolsOnlyException();
+error ReceiveIsNotAllowedException();
+
+error IncompatibleCreditManagerException();
 
 /// @dev Thrown on attempting to set an EOA as an important contract in the system
 error AddressIsNotContractException(address);

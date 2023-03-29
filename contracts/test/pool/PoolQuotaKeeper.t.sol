@@ -14,6 +14,7 @@ import {
     TokenQuotaParams
 } from "../../interfaces/IPoolQuotaKeeper.sol";
 import {IGauge} from "../../interfaces/IGauge.sol";
+import {IPool4626} from "../../interfaces/IPool4626.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -42,9 +43,10 @@ import {
     CallerNotConfiguratorException,
     CallerNotControllerException,
     ZeroAddressException,
-    CreditManagerNotRegsiterException,
     CallerNotCreditManagerException,
-    TokenAlreadyAddedException
+    TokenAlreadyAddedException,
+    RegisteredCreditManagerOnlyException,
+    IncompatibleCreditManagerException
 } from "../../interfaces/IErrors.sol";
 
 import "forge-std/console.sol";
@@ -120,10 +122,10 @@ contract PoolQuotaKeeperTest is DSTest, BalanceHelper, IPoolQuotaKeeperEvents {
     function test_PQK_03_gaugeOnly_funcitons_reverts_if_called_by_non_gauge() public {
         evm.startPrank(USER);
 
-        evm.expectRevert(IPoolQuotaKeeperExceptions.GaugeOnlyException.selector);
+        evm.expectRevert(IPoolQuotaKeeperExceptions.CallerNotGaugeException.selector);
         pqk.addQuotaToken(DUMB_ADDRESS);
 
-        evm.expectRevert(IPoolQuotaKeeperExceptions.GaugeOnlyException.selector);
+        evm.expectRevert(IPoolQuotaKeeperExceptions.CallerNotGaugeException.selector);
         pqk.updateRates();
 
         evm.stopPrank();
@@ -189,49 +191,187 @@ contract PoolQuotaKeeperTest is DSTest, BalanceHelper, IPoolQuotaKeeperEvents {
         address DAI = tokenTestSuite.addressOf(Tokens.DAI);
         address USDC = tokenTestSuite.addressOf(Tokens.USDC);
 
-        console.log(pqk.lastQuotaRateUpdate());
-        console.log(block.timestamp);
+        uint16 DAI_QUOTA_RATE = 20_00;
+        uint16 USDC_QUOTA_RATE = 45_00;
+
+        for (uint256 caseIndex; caseIndex < 2; ++caseIndex) {
+            string memory caseName = caseIndex == 1 ? "With totalQuoted" : "Without totalQuotae";
+
+            setUp();
+            evm.prank(CONFIGURATOR);
+            gaugeMock.addQuotaToken(DAI, DAI_QUOTA_RATE);
+
+            evm.prank(CONFIGURATOR);
+            gaugeMock.addQuotaToken(USDC, USDC_QUOTA_RATE);
+
+            int96 daiQuota;
+            int96 usdcQuota;
+
+            if (caseIndex == 1) {
+                evm.startPrank(CONFIGURATOR);
+                pqk.addCreditManager(address(cmMock));
+
+                pqk.setTokenLimit(DAI, uint96(100_000 * WAD));
+                pqk.setTokenLimit(USDC, uint96(100_000 * WAD));
+
+                cmMock.addToken(DAI, 1);
+                cmMock.addToken(USDC, 2);
+
+                evm.stopPrank();
+
+                daiQuota = int96(uint96(100 * WAD));
+                usdcQuota = int96(uint96(200 * WAD));
+
+                QuotaUpdate[] memory quotaUpdates = new QuotaUpdate[](2);
+
+                quotaUpdates[0] = QuotaUpdate({token: DAI, quotaChange: daiQuota});
+                quotaUpdates[1] = QuotaUpdate({token: USDC, quotaChange: usdcQuota});
+
+                cmMock.updateQuotas(DUMB_ADDRESS, quotaUpdates, 0);
+            }
+
+            evm.warp(block.timestamp + 365 days);
+            address[] memory tokens = new address[](2);
+            tokens[0] = DAI;
+            tokens[1] = USDC;
+            evm.expectCall(address(gaugeMock), abi.encodeCall(IGauge.getRates, tokens));
+
+            evm.expectEmit(true, true, false, true);
+            emit QuotaRateUpdated(DAI, DAI_QUOTA_RATE);
+
+            evm.expectEmit(true, true, false, true);
+            emit QuotaRateUpdated(USDC, USDC_QUOTA_RATE);
+
+            uint96 expectedQuotaRevenue =
+                uint96(DAI_QUOTA_RATE * uint96(daiQuota) + USDC_QUOTA_RATE * uint96(usdcQuota));
+
+            evm.expectCall(address(pool), abi.encodeCall(IPool4626.updateQuotaRevenue, expectedQuotaRevenue));
+
+            gaugeMock.updateEpoch();
+
+            (uint96 totalQuoted, uint96 limit, uint16 rate, uint192 cumulativeIndexLU_RAY) = pqk.totalQuotaParams(DAI);
+
+            assertEq(rate, DAI_QUOTA_RATE, _testCaseErr(caseName, "Incorrect DAI rate"));
+            assertEq(
+                cumulativeIndexLU_RAY,
+                RAY * (PERCENTAGE_FACTOR + DAI_QUOTA_RATE) / PERCENTAGE_FACTOR,
+                _testCaseErr(caseName, "Incorrect DAI cumulativeIndexLU")
+            );
+
+            (totalQuoted, limit, rate, cumulativeIndexLU_RAY) = pqk.totalQuotaParams(USDC);
+
+            assertEq(rate, USDC_QUOTA_RATE, _testCaseErr(caseName, "Incorrect USDC rate"));
+            assertEq(
+                cumulativeIndexLU_RAY,
+                RAY * (PERCENTAGE_FACTOR + USDC_QUOTA_RATE) / PERCENTAGE_FACTOR,
+                _testCaseErr(caseName, "Incorrect USDC cumulativeIndexLU")
+            );
+
+            assertEq(
+                pqk.lastQuotaRateUpdate(),
+                block.timestamp,
+                _testCaseErr(caseName, "Incorect lastQuotaRateUpdate timestamp")
+            );
+
+            assertEq(pool.quotaRevenue(), expectedQuotaRevenue, _testCaseErr(caseName, "Incorect expectedQuotaRevenue"));
+        }
+    }
+
+    // [PQK-8]: setGauge works as expected
+    function test_PQK_08_setGauge_works_as_expected() public {
+        pqk = new PoolQuotaKeeper(address(pool));
+
+        evm.startPrank(CONFIGURATOR);
+
+        assertEq(pqk.gauge(), address(0), "SETUP: incorrect address at start");
+
+        evm.warp(block.timestamp + 2 days);
+
+        evm.expectEmit(true, true, false, false);
+        emit GaugeUpdated(address(gaugeMock));
+
+        pqk.setGauge(address(gaugeMock));
+
+        uint256 gaugeUpdateTimestamp = block.timestamp;
+
+        evm.warp(block.timestamp + 2 days);
+
+        assertEq(pqk.gauge(), address(gaugeMock), "gauge address wasnt updated");
+        assertEq(pqk.lastQuotaRateUpdate(), gaugeUpdateTimestamp, "lastQuotaRateUpdate wasnt updated");
+
+        // IF address the same, the function updates nothing
+        pqk.setGauge(address(gaugeMock));
+        assertEq(pqk.lastQuotaRateUpdate(), gaugeUpdateTimestamp, "lastQuotaRateUpdate was unexpectedly updated");
+
+        evm.stopPrank();
+    }
+
+    // [PQK-9]: addCreditManager works as expected
+    function test_PQK_09_addCreditManager_reverts_for_non_cm_contract() public {
+        evm.prank(CONFIGURATOR);
+
+        evm.expectRevert(RegisteredCreditManagerOnlyException.selector);
+        pqk.addCreditManager(DUMB_ADDRESS);
+
+        cmMock.changePoolService(DUMB_ADDRESS);
+
+        evm.expectRevert(IncompatibleCreditManagerException.selector);
 
         evm.prank(CONFIGURATOR);
-        gaugeMock.addQuotaToken(DAI, 20_00);
+        pqk.addCreditManager(address(cmMock));
+    }
+
+    // [PQK-10]: addCreditManager works as expected
+    function test_PQK_10_addCreditManager_works_as_expected() public {
+        pqk = new PoolQuotaKeeper(address(pool));
+
+        address[] memory managers = pqk.creditManagers();
+
+        assertEq(managers.length, 0, "SETUP: at least one creditmanager is unexpectedly connected");
+
+        evm.expectEmit(true, true, false, false);
+        emit CreditManagerAdded(address(cmMock));
 
         evm.prank(CONFIGURATOR);
-        gaugeMock.addQuotaToken(USDC, 40_00);
+        pqk.addCreditManager(address(cmMock));
 
-        evm.warp(block.timestamp + 365 days);
+        managers = pqk.creditManagers();
+        assertEq(managers.length, 1, "Incorrect length of connected managers");
+        assertEq(managers[0], address(cmMock), "Incorrect address was added to creditManagerSet");
 
-        address[] memory tokens = new address[](2);
-        tokens[0] = DAI;
-        tokens[1] = USDC;
-        evm.expectCall(address(gaugeMock), abi.encodeCall(IGauge.getRates, tokens));
+        // check that funciton works correctly for another one step
+        evm.prank(CONFIGURATOR);
+        pqk.addCreditManager(address(cmMock));
+
+        managers = pqk.creditManagers();
+        assertEq(managers.length, 1, "Incorrect length of connected managers");
+        assertEq(managers[0], address(cmMock), "Incorrect address was added to creditManagerSet");
+    }
+
+    // [PQK-11]: setTokenLimit reverts for unregistered token
+    function test_PQK_11_reverts_for_unregistered_token() public {
+        evm.expectRevert(IPoolQuotaKeeperExceptions.TokenIsNotQuotedException.selector);
+        evm.prank(CONFIGURATOR);
+
+        pqk.setTokenLimit(DUMB_ADDRESS, 1);
+    }
+
+    // [PQK-12]: setTokenLimit works as expected
+    function test_PQK_12_setTokenLimit_works_as_expected() public {
+        uint96 limit = 435_223_999;
+
+        evm.prank(CONFIGURATOR);
+        gaugeMock.addQuotaToken(DUMB_ADDRESS, 11);
+
+        evm.prank(CONFIGURATOR);
 
         evm.expectEmit(true, true, false, true);
-        emit QuotaRateUpdated(DAI, 20_00);
+        emit TokenLimitSet(DUMB_ADDRESS, limit);
 
-        evm.expectEmit(true, true, false, true);
-        emit QuotaRateUpdated(USDC, 40_00);
+        pqk.setTokenLimit(DUMB_ADDRESS, limit);
 
-        gaugeMock.updateEpoch();
+        (, uint96 limitSet,,) = pqk.totalQuotaParams(DUMB_ADDRESS);
 
-        (uint96 totalQuoted, uint96 limit, uint16 rate, uint192 cumulativeIndexLU_RAY) = pqk.totalQuotaParams(DAI);
-
-        assertEq(rate, 20_00, "Incorrect DAI rate");
-        assertEq(cumulativeIndexLU_RAY, RAY * 12 / 10, "Incorrect DAI cumulativeIndexLU");
-
-        (totalQuoted, limit, rate, cumulativeIndexLU_RAY) = pqk.totalQuotaParams(USDC);
-
-        assertEq(rate, 40_00, "Incorrect USDC rate");
-        assertEq(cumulativeIndexLU_RAY, RAY * 14 / 10, "Incorrect USDC cumulativeIndexLU");
-
-        // address gauge = pqk.gauge();
-        // evm.prank(gauge);
-        // pqk.addQuotaToken(DUMB_ADDRESS);
-
-        // evm.prank(gauge);
-        // pqk.addQuotaToken(DUMB_ADDRESS2);
-
-        // evm.prank(gauge);
-        // evm.expectRevert(IPoolQuotaKeeperExceptions.IncorrectQuotaRateUpdateLengthException.selector);
-        // pqk.updateRates();
+        assertEq(limitSet, limit, "Incorrect limit was set");
     }
 }

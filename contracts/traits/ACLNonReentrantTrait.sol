@@ -5,7 +5,6 @@ pragma solidity ^0.8.10;
 
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
-import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 import {IACL} from "@gearbox-protocol/core-v2/contracts/interfaces/IACL.sol";
 import {
     ZeroAddressException,

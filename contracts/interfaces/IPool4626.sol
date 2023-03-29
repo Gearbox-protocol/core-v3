@@ -19,12 +19,11 @@ interface IPool4626Exceptions {
     error ExpectedLiquidityLimitException();
 
     error CreditManagerCantBorrowException();
-    error CreditManagerOnlyException();
+
     error IncorrectWithdrawalFeeException();
     error ZeroAssetsException();
     error IncompatiblePoolQuotaKeeper();
     error PoolQuotaKeeperOnly();
-    error IncompatibleCreditManagerException();
 
     error AdditionalYieldPoolException();
 }

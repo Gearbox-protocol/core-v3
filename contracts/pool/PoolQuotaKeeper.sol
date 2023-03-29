@@ -8,10 +8,10 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
-import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 
-import {ACLNonReentrantTrait} from "../core/ACLNonReentrantTrait.sol";
+import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
+import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
 import {Quotas} from "../libraries/Quotas.sol";
 
@@ -28,10 +28,10 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 // EXCEPTIONS
 import {
     ZeroAddressException,
-    CreditManagerNotRegsiterException,
     CallerNotCreditManagerException,
     TokenAlreadyAddedException,
-    TokenNotAllowedException
+    TokenNotAllowedException,
+    IncompatibleCreditManagerException
 } from "../interfaces/IErrors.sol";
 
 import "forge-std/console.sol";
@@ -39,7 +39,7 @@ import "forge-std/console.sol";
 uint192 constant RAY_DIVIDED_BY_PERCENTAGE = uint192(RAY / PERCENTAGE_FACTOR);
 
 /// @title Manage pool accountQuotas
-contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
+contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsRegisterTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using Quotas for TokenQuotaParams;
 
@@ -75,7 +75,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
 
     /// @dev Reverts if the function is called by non-gauge
     modifier gaugeOnly() {
-        if (msg.sender != gauge) revert GaugeOnlyException(); // F:[PQK-3]
+        if (msg.sender != gauge) revert CallerNotGaugeException(); // F:[PQK-3]
         _;
     }
 
@@ -93,7 +93,10 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
 
     /// @dev Constructor
     /// @param _pool Pool address
-    constructor(address _pool) ACLNonReentrantTrait(address(IPool4626(_pool).addressProvider())) {
+    constructor(address _pool)
+        ACLNonReentrantTrait(address(IPool4626(_pool).addressProvider()))
+        ContractsRegisterTrait(address(IPool4626(_pool).addressProvider()))
+    {
         pool = IPool4626(_pool); // F:[PQK-1]
         underlying = IPool4626(_pool).asset(); // F:[PQK-1]
     }
@@ -401,6 +404,11 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
         return accountQuotas[creditManager][creditAccount][token];
     }
 
+    /// @dev Returns list of connected credit managers
+    function creditManagers() external view returns (address[] memory) {
+        return creditManagerSet.values(); // F:[PQK-10]
+    }
+
     //
     // ASSET MANAGEMENT (VIA GAUGE)
     //
@@ -445,12 +453,14 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
             tq.rate = rate; // F:[PQK-7]
 
             quotaRevenue += rate * tq.totalQuoted;
+
             emit QuotaRateUpdated(token, rate); // F:[PQK-7]
 
             unchecked {
                 ++i;
             }
         }
+
         pool.updateQuotaRevenue(quotaRevenue); // F:[PQK-7]
         lastQuotaRateUpdate = uint40(block.timestamp); // F:[PQK-7]
     }
@@ -466,9 +476,9 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
         configuratorOnly // F:[PQK-2]
     {
         if (gauge != _gauge) {
-            gauge = _gauge;
-            lastQuotaRateUpdate = uint40(block.timestamp);
-            emit GaugeUpdated(_gauge);
+            gauge = _gauge; // F:[PQK-8]
+            lastQuotaRateUpdate = uint40(block.timestamp); // F:[PQK-8]
+            emit GaugeUpdated(_gauge); // F:[PQK-8]
         }
     }
 
@@ -478,19 +488,16 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
         external
         configuratorOnly // F:[PQK-2]
         nonZeroAddress(_creditManager)
+        registeredCreditManagerOnly(_creditManager) // F:[PQK-9]
     {
-        if (
-            !ContractsRegister(AddressProvider(pool.addressProvider()).getContractsRegister()).isCreditManager(
-                _creditManager
-            )
-        ) {
-            revert CreditManagerNotRegsiterException(); // F:[P4-19]
+        if (ICreditManagerV2(_creditManager).pool() != address(pool)) {
+            revert IncompatibleCreditManagerException(); // F:[PQK-9]
         }
 
         /// Checks if creditManager is already in list
         if (!creditManagerSet.contains(_creditManager)) {
-            creditManagerSet.add(_creditManager); //
-            emit CreditManagerAdded(_creditManager);
+            creditManagerSet.add(_creditManager); // F:[PQK-10]
+            emit CreditManagerAdded(_creditManager); // F:[PQK-10]
         }
     }
 
@@ -501,9 +508,15 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
         external
         controllerOnly // F:[PQK-2]
     {
-        if (totalQuotaParams[token].limit != limit) {
-            totalQuotaParams[token].limit = limit;
-            emit TokenLimitSet(token, limit);
+        TokenQuotaParams storage tq = totalQuotaParams[token];
+
+        if (!tq.isTokenRegistered()) {
+            revert TokenIsNotQuotedException(); // F:[PQK-11]
+        }
+
+        if (tq.limit != limit) {
+            tq.limit = limit; // F:[PQK-12]
+            emit TokenLimitSet(token, limit); // F:[PQK-12]
         }
     }
 }
