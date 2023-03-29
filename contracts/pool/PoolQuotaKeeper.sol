@@ -188,7 +188,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
 
         uint96 quoted = accountQuota.quota;
 
-        caQuotaInterestChange = _updateAccountQuota(tq, accountQuota, quoted);
+        caQuotaInterestChange = _updateAccountQuotaInterest(tq, accountQuota, quoted);
 
         uint96 change;
         if (quotaChange > 0) {
@@ -236,7 +236,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
 
         TokenQuotaParams storage tq = totalQuotaParams[token];
 
-        caQuotaInterestChange = _updateAccountQuota(tq, accountQuota, quoted); // F:[CMQ-06]
+        caQuotaInterestChange = _updateAccountQuotaInterest(tq, accountQuota, quoted); // F:[CMQ-06]
         accountQuota.quota = 1; // F:[CMQ-06]
 
         tq.totalQuoted -= quoted;
@@ -244,7 +244,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
         return (-int128(uint128(quoted)) * int16(tq.rate), caQuotaInterestChange); // F:[CMQ-06]
     }
 
-    function _updateAccountQuota(TokenQuotaParams storage tq, AccountQuota storage accountQuota, uint96 quoted)
+    function _updateAccountQuotaInterest(TokenQuotaParams storage tq, AccountQuota storage accountQuota, uint96 quoted)
         internal
         returns (uint256 caQuotaInterestChange)
     {
@@ -276,7 +276,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
             uint96 quoted = accountQuota.quota;
             if (quoted > 1) {
                 TokenQuotaParams storage tq = totalQuotaParams[token];
-                caQuotaInterestChange += _updateAccountQuota(tq, accountQuota, quoted);
+                caQuotaInterestChange += _updateAccountQuotaInterest(tq, accountQuota, quoted);
             }
             unchecked {
                 ++i;
@@ -405,9 +405,6 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
     // ASSET MANAGEMENT (VIA GAUGE)
     //
 
-    /// @dev Batch updates the quota rates and changes the combined quota revenue
-    /// @param qUpdates Array of new rates for all quoted tokens
-
     /// @dev Registers a new quoted token in the keeper
     function addQuotaToken(address token)
         external
@@ -425,6 +422,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
         emit NewQuotaTokenAdded(token); // F:[PQK-5]
     }
 
+    /// @dev Batch updates the quota rates and changes the combined quota revenue
     function updateRates()
         external
         override
@@ -453,8 +451,8 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
                 ++i;
             }
         }
-        pool.updateQuotaRevenue(quotaRevenue);
-        lastQuotaRateUpdate = uint40(block.timestamp);
+        pool.updateQuotaRevenue(quotaRevenue); // F:[PQK-7]
+        lastQuotaRateUpdate = uint40(block.timestamp); // F:[PQK-7]
     }
 
     //
