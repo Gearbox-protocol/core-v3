@@ -73,7 +73,7 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
     /// @dev Reverts if the function is called by an address other than the voter
     modifier onlyVoter() {
         if (msg.sender != address(voter)) {
-            revert OnlyVoterException();
+            revert CallerNotVoterException();
         }
         _;
     }

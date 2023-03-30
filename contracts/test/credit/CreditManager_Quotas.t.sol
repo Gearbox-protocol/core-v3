@@ -179,7 +179,7 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV2Events, BalanceHelpe
 
         uint256 limitedTokenMask = creditManager.limitedTokenMask();
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setLimitedMask(limitedTokenMask | usdcMask);
 
         evm.prank(CONFIGURATOR);

@@ -76,7 +76,7 @@ contract PoolServiceMock is IPoolService {
     address public poolQuotaKeeper;
 
     modifier poolQuotaKeeperOnly() {
-        if (msg.sender != poolQuotaKeeper) revert PoolQuotaKeeperOnly(); // F:[P4-5]
+        if (msg.sender != poolQuotaKeeper) revert CallerNotPoolQuotaKeeperException(); // F:[P4-5]
         _;
     }
 

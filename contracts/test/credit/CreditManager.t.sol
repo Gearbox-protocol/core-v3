@@ -439,37 +439,37 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
 
         evm.startPrank(USER);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.addToken(DUMB_ADDRESS);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setParams(0, 0, 0, 0, 0);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setLiquidationThreshold(DUMB_ADDRESS, 0);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setForbidMask(0);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.changeContractAllowance(DUMB_ADDRESS, DUMB_ADDRESS);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.upgradeCreditFacade(DUMB_ADDRESS);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.upgradePriceOracle(DUMB_ADDRESS);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setConfigurator(DUMB_ADDRESS);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setMaxEnabledTokens(255);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.addEmergencyLiquidator(DUMB_ADDRESS);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.removeEmergencyLiquidator(DUMB_ADDRESS);
 
         evm.stopPrank();

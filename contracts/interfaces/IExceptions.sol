@@ -35,6 +35,10 @@ error IncorrectTokenContractException();
 ///      correct price feed
 error IncorrectPriceFeedException();
 
+///
+/// ACCESS
+///
+
 /// @dev Thrown on attempting to call an access restricted function as a non-Configurator
 error CallerNotConfiguratorException();
 
@@ -49,6 +53,14 @@ error CallerNotPausableAdminException();
 
 /// @dev Thrown on attempting to pause a contract as a non-Unpausable admin
 error CallerNotUnPausableAdminException();
+
+/// @dev Thrown when a gauge-only function is called by non-gauge
+error CallerNotGaugeException();
+
+error CallerNotPoolQuotaKeeperException();
+
+/// @dev Thrown when `vote` or `unvote` are called from non-voter address
+error CallerNotVoterException();
 
 error TokenIsNotAddedToCreditManagerException(address token);
 
@@ -164,10 +176,6 @@ error AdaptersOrCreditFacadeOnlyException();
 ///      the connected Credit Facade
 error CreditFacadeOnlyException();
 
-/// @dev Thrown if an access-restricted function is called by an address that is not
-///      the connected Credit Configurator
-error CreditConfiguratorOnlyException();
-
 /// @dev Thrown on attempting to open a Credit Account for or transfer a Credit Account
 ///      to the zero address or an address that already owns a Credit Account
 error ZeroAddressOrUserAlreadyHasAccountException();
@@ -205,8 +213,6 @@ error CannotRampLTForUnderlyingException();
 error CustomHealthFactorTooLowException();
 
 // interface IGaugeExceptions {
-/// @dev Thrown when `vote` or `unvote` are called from non-voter address
-error OnlyVoterException();
 
 // interface IGearStakingExceptions {
 /// @dev Thrown when attempting to vote in a non-approved contract
@@ -228,15 +234,10 @@ error CreditManagerCantBorrowException();
 error IncorrectWithdrawalFeeException();
 error ZeroAssetsException();
 error IncompatiblePoolQuotaKeeper();
-error PoolQuotaKeeperOnly();
 
 error AdditionalYieldPoolException();
 
 // interface IPoolQuotaKeeperExceptions {
-/// @dev Thrown when a gauge-only function is called by non-gauge
-error CallerNotGaugeException();
-
-error IncorrectQuotaRateUpdateLengthException();
 
 // interface IBotListExceptions {
 /// @dev Thrown when attempting to pass a zero amount to a funding-related operation

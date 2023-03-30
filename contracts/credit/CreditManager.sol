@@ -183,7 +183,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
     /// @dev Restricts calls to Credit Configurator only
     modifier creditConfiguratorOnly() {
         if (msg.sender != creditConfigurator) {
-            revert CreditConfiguratorOnlyException();
+            revert CallerNotConfiguratorException();
         }
         _;
     }

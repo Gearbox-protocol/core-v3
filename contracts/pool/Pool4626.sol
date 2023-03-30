@@ -114,7 +114,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
     EnumerableSet.AddressSet internal creditManagerSet;
 
     modifier poolQuotaKeeperOnly() {
-        if (msg.sender != poolQuotaKeeper) revert PoolQuotaKeeperOnly(); // F:[P4-5]
+        if (msg.sender != poolQuotaKeeper) revert CallerNotPoolQuotaKeeperException(); // F:[P4-5]
         _;
     }
 

@@ -1676,15 +1676,15 @@ contract CreditFacadeTest is
 
     /// @dev [FA-44]: setContractToAdapter reverts if called non-configurator
     function test_FA_44_config_functions_revert_if_called_non_configurator() public {
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         evm.prank(USER);
         creditFacade.setIncreaseDebtForbidden(false);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         evm.prank(USER);
         creditFacade.setLimitPerBlock(100);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         evm.prank(USER);
         creditFacade.setBotList(FRIEND);
     }

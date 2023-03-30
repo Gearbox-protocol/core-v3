@@ -106,7 +106,7 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
     /// @dev Restricts actions for users with opened credit accounts only
     modifier creditConfiguratorOnly() {
         if (msg.sender != creditManager.creditConfigurator()) {
-            revert CreditConfiguratorOnlyException();
+            revert CallerNotConfiguratorException();
         }
 
         _;
