@@ -34,6 +34,9 @@ import {Tokens} from "../config/Tokens.sol";
 import {CreditFacadeTestSuite} from "../suites/CreditFacadeTestSuite.sol";
 import {CreditConfig} from "../config/CreditConfig.sol";
 
+// EXCEPTIONS
+import {TokenNotAllowedException} from "../../interfaces/IErrors.sol";
+
 uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
 uint16 constant REFERRAL_CODE = 23;
 
@@ -101,7 +104,7 @@ contract AbstractAdapterTest is
 
         assertEq(
             address(adapterMock.addressProvider()),
-            IPool4626(creditManager.pool()).addressProvider(),
+            address(IPool4626(creditManager.pool()).addressProvider()),
             "Incorrect address provider"
         );
 
@@ -148,8 +151,7 @@ contract AbstractAdapterTest is
             creditManager.tokenMasksMap(tokenTestSuite.addressOf(Tokens.DAI))
         );
 
-        address token = address(0xdead);
-        evm.expectRevert(abi.encodeWithSelector(IAdapterExceptions.TokenIsNotInAllowedList.selector, token));
+        evm.expectRevert(IAdapterExceptions.TokenNotAllowedException.selector);
         adapterMock.getMaskOrRevert(address(0xdead));
     }
 
@@ -403,13 +405,8 @@ contract AbstractAdapterTest is
                     );
                 }
 
-                if (sa == 0 && ti == 1) {
-                    evm.expectRevert(abi.encodeWithSelector(IAdapterExceptions.TokenIsNotInAllowedList.selector, TOKEN));
-                } else {
-                    evm.expectRevert(TokenNotAllowedException.selector);
-                }
-
                 evm.prank(USER);
+                evm.expectRevert(TokenNotAllowedException.selector);
                 creditFacade.multicall(multicallBuilder(MultiCall({target: address(adapterMock), callData: callData})));
             }
         }

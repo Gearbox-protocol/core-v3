@@ -4,7 +4,7 @@
 pragma solidity ^0.8.10;
 
 import {IPool4626} from "../../../interfaces/IPool4626.sol";
-import {IPoolQuotaKeeper, QuotaUpdate, QuotaStatusChange} from "../../../interfaces/IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeper, QuotaUpdate} from "../../../interfaces/IPoolQuotaKeeper.sol";
 import "../../lib/constants.sol";
 
 contract CreditManagerMockForPoolTest {
@@ -13,6 +13,8 @@ contract CreditManagerMockForPoolTest {
     address public underlying;
 
     address public creditAccount = DUMB_ADDRESS;
+
+    mapping(address => uint256) public tokenMasksMap;
 
     constructor(address _poolService) {
         changePoolService(_poolService);
@@ -45,10 +47,16 @@ contract CreditManagerMockForPoolTest {
         result = creditAccount;
     }
 
-    function updateQuotas(address _creditAccount, QuotaUpdate[] memory quotaUpdates)
+    function updateQuotas(address _creditAccount, QuotaUpdate[] memory quotaUpdates, uint256 enableTokenMask)
         external
-        returns (uint256 caQuotaInterestChange, QuotaStatusChange[] memory statusChanges, bool statusWasChanged)
+        returns (uint256 caQuotaInterestChange, uint256 enableTokenMaskUpdated)
     {
-        return IPoolQuotaKeeper(IPool4626(pool).poolQuotaKeeper()).updateQuotas(_creditAccount, quotaUpdates);
+        return IPoolQuotaKeeper(IPool4626(pool).poolQuotaKeeper()).updateQuotas(
+            _creditAccount, quotaUpdates, enableTokenMask
+        );
+    }
+
+    function addToken(address token, uint256 mask) external {
+        tokenMasksMap[token] = mask;
     }
 }

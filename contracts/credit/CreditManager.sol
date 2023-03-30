@@ -20,7 +20,7 @@ import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
 import {ICreditManagerV2, ClosureAction, CollateralTokenData} from "../interfaces/ICreditManagerV2.sol";
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {IPoolQuotaKeeper, QuotaUpdate, TokenLT, QuotaStatusChange} from "../interfaces/IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeper, QuotaUpdate, TokenLT} from "../interfaces/IPoolQuotaKeeper.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 // CONSTANTS
@@ -34,6 +34,9 @@ import {
     ALLOWANCE_THRESHOLD,
     UNIVERSAL_CONTRACT
 } from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+
+// EXCEPTIONS
+import {TokenAlreadyAddedException, TokenNotAllowedException} from "../interfaces/IErrors.sol";
 
 import "forge-std/console.sol";
 
@@ -192,7 +195,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
 
     /// @dev Constructor
     /// @param _pool Address of the pool to borrow funds from
-    constructor(address _pool) ACLNonReentrantTrait(address(IPoolService(_pool).addressProvider())) {
+    constructor(address _pool) ACLNonReentrantTrait(address(IPool4626(_pool).addressProvider())) {
         IAddressProvider addressProvider = IPoolService(_pool).addressProvider();
 
         pool = _pool; // F:[CM-1]
@@ -322,7 +325,9 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
             if (supportsQuotas) {
                 tokens = getLimitedTokens(creditAccount);
 
-                uint256 quotaInterest = cumulativeQuotaInterest[creditAccount];
+
+                // TODO: Check that it never breaks
+                quotaInterest = cumulativeQuotaInterest[creditAccount] - 1;
 
                 if (tokens.length > 0) {
                     quotaInterest += poolQuotaKeeper().closeCreditAccount(creditAccount, tokens); // F: [CMQ-6]
@@ -506,7 +511,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         amountRepaid = _amountRepaid;
         amountProfit = _amountProfit;
 
-        uint16 fee = slot1.feeInterest;
+        uint16 feeInterest = slot1.feeInterest;
         uint256 quotaInterestAccrued = cumulativeQuotaInterest[creditAccount];
 
         TokenLT[] memory tokens = getLimitedTokens(creditAccount);
@@ -515,19 +520,22 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         }
 
         if (quotaInterestAccrued > 2) {
-            uint256 quotaProfit = (quotaInterestAccrued * fee) / PERCENTAGE_FACTOR;
+            uint256 quotaProfit = (quotaInterestAccrued * feeInterest) / PERCENTAGE_FACTOR;
 
             if (amountRepaid >= quotaInterestAccrued + quotaProfit) {
                 amountRepaid -= quotaInterestAccrued + quotaProfit; // F: [CMQ-5]
                 amountProfit += quotaProfit; // F: [CMQ-5]
                 cumulativeQuotaInterest[creditAccount] = 1; // F: [CMQ-5]
             } else {
-                uint256 amountToPool = (amountRepaid * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + fee);
+                uint256 amountToPool = (amountRepaid * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
 
                 amountProfit += amountRepaid - amountToPool; // F: [CMQ-4]
                 amountRepaid = 0; // F: [CMQ-4]
 
-                cumulativeQuotaInterest[creditAccount] = quotaInterestAccrued - amountToPool + 1; // F: [CMQ-4]
+                uint256 newCumulativeQuotaInterest = quotaInterestAccrued - amountToPool;
+
+                cumulativeQuotaInterest[creditAccount] =
+                    newCumulativeQuotaInterest == 0 ? 1 : newCumulativeQuotaInterest; // F: [CMQ-4]
             }
         }
     }
@@ -895,14 +903,16 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
 
             uint256 j;
 
-            while (tokenMask <= limitMask) {
-                if (limitMask & tokenMask != 0) {
-                    (address token, uint16 lt) = collateralTokensByMask(tokenMask);
-                    tokens[j] = TokenLT({token: token, lt: lt});
-                    ++j;
-                }
+            unchecked {
+                while (tokenMask <= limitMask) {
+                    if (limitMask & tokenMask != 0) {
+                        (address token, uint16 lt) = collateralTokensByMask(tokenMask);
+                        tokens[j] = TokenLT({token: token, lt: lt});
+                        ++j;
+                    }
 
-                tokenMask = tokenMask << 1;
+                    tokenMask = tokenMask << 1;
+                }
             }
         }
     }
@@ -1035,34 +1045,17 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         override
         creditFacadeOnly // F: [CMQ-3]
     {
-        (uint256 caInterestChange, QuotaStatusChange[] memory statusChanges, bool statusWasChanged) =
-            poolQuotaKeeper().updateQuotas(creditAccount, quotaUpdates); // F: [CMQ-3]
+        (uint256 caInterestChange, uint256 enabledTokensMask) =
+            poolQuotaKeeper().updateQuotas(creditAccount, quotaUpdates, enabledTokensMap[creditAccount]); // F: [CMQ-3]
 
         cumulativeQuotaInterest[creditAccount] += caInterestChange; // F: [CMQ-3]
 
-        if (statusWasChanged) {
-            uint256 len = quotaUpdates.length;
-            uint256 enabledTokensMask = enabledTokensMap[creditAccount];
-
-            for (uint256 i = 0; i < len;) {
-                if (statusChanges[i] == QuotaStatusChange.ZERO_TO_POSITIVE) {
-                    enabledTokensMask |= tokenMasksMap(quotaUpdates[i].token); // F: [CMQ-3]
-                } else if (statusChanges[i] == QuotaStatusChange.POSITIVE_TO_ZERO) {
-                    enabledTokensMask &= ~tokenMasksMap(quotaUpdates[i].token); // F: [CMQ-3]
-                }
-
-                unchecked {
-                    ++i;
-                }
-            }
-
-            uint256 totalTokensEnabled = _calcEnabledTokens(enabledTokensMask);
-            if (totalTokensEnabled > maxAllowedEnabledTokenLength) {
-                revert TooManyEnabledTokensException(); // F: [CMQ-11]
-            }
-
-            enabledTokensMap[creditAccount] = enabledTokensMask; // F: [CMQ-3]
+        uint256 totalTokensEnabled = _calcEnabledTokens(enabledTokensMask);
+        if (totalTokensEnabled > maxAllowedEnabledTokenLength) {
+            revert TooManyEnabledTokensException(); // F: [CMQ-11]
         }
+
+        enabledTokensMap[creditAccount] = enabledTokensMask; // F: [CMQ-3]
     }
 
     /// @dev Checks if the contract is paused; if true, checks that the caller is emergency liquidator

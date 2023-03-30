@@ -15,8 +15,8 @@ import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/Contra
 import {ACLNonReentrantTrait} from "../core/ACLNonReentrantTrait.sol";
 
 // interfaces
-import {IGauge, GaugeOpts, QuotaRateParams, UserVotes} from "../interfaces/IGauge.sol";
-import {IPoolQuotaKeeper, QuotaRateUpdate} from "../interfaces/IPoolQuotaKeeper.sol";
+import {IGauge, QuotaRateParams, UserVotes} from "../interfaces/IGauge.sol";
+import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
 import {IGearStaking} from "../interfaces/IGearStaking.sol";
 
 import {RAY, SECONDS_PER_YEAR, MAX_WITHDRAW_FEE} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
@@ -58,17 +58,17 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
     //
 
     /// @dev Constructor
-    /// @param opts Gauge options
 
-    constructor(GaugeOpts memory opts) ACLNonReentrantTrait(address(Pool4626(opts.pool).addressProvider())) {
+    constructor(address _pool, address _gearStaking)
+        ACLNonReentrantTrait(address(Pool4626(_pool).addressProvider()))
+        nonZeroAddress(_pool)
+        nonZeroAddress(_gearStaking)
+    {
         // Additional check that receiver is not address(0)
-        if (opts.pool == address(0)) {
-            revert ZeroAddressException(); // F:[P4-02]
-        }
 
-        addressProvider = address(Pool4626(opts.pool).addressProvider()); // F:[P4-01]
-        pool = Pool4626(payable(opts.pool)); // F:[P4-01]
-        voter = IGearStaking(opts.gearStaking);
+        addressProvider = address(Pool4626(_pool).addressProvider()); // F:[P4-01]
+        pool = Pool4626(_pool); // F:[P4-01]
+        voter = IGearStaking(_gearStaking);
         epochLU = voter.getCurrentEpoch();
     }
 
@@ -92,37 +92,34 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
             epochLU = epochNow;
 
             /// compute all compounded rates
-            IPoolQuotaKeeper keeper = IPoolQuotaKeeper(pool.poolQuotaKeeper());
 
-            /// update rates & cumulative indexes
-            address[] memory tokens = keeper.quotedTokens();
-            uint256 len = tokens.length;
-            QuotaRateUpdate[] memory qUpdates = new QuotaRateUpdate[](len);
+            IPoolQuotaKeeper(pool.poolQuotaKeeper()).updateRates();
+        }
+    }
 
-            for (uint256 i; i < len;) {
-                address token = tokens[i];
+    function getRates(address[] memory tokens) external view override returns (uint16[] memory rates) {
+        uint256 len = tokens.length;
+        rates = new uint16[](len);
 
-                QuotaRateParams storage qrp = quotaRateParams[token];
+        for (uint256 i; i < len;) {
+            address token = tokens[i];
 
-                uint96 votesLpSide = qrp.totalVotesLpSide;
-                uint96 votesCaSide = qrp.totalVotesCaSide;
+            QuotaRateParams storage qrp = quotaRateParams[token];
 
-                uint96 totalVotes = votesLpSide + votesCaSide;
+            uint96 votesLpSide = qrp.totalVotesLpSide;
+            uint96 votesCaSide = qrp.totalVotesCaSide;
 
-                uint16 newRate = uint16(
-                    totalVotes == 0
-                        ? qrp.minRiskRate
-                        : (qrp.minRiskRate * votesCaSide + qrp.maxRate * votesLpSide) / totalVotes
-                );
+            uint96 totalVotes = votesLpSide + votesCaSide;
 
-                qUpdates[i] = QuotaRateUpdate({token: token, rate: newRate});
+            rates[i] = uint16(
+                totalVotes == 0
+                    ? qrp.minRiskRate
+                    : (qrp.minRiskRate * votesCaSide + qrp.maxRate * votesLpSide) / totalVotes
+            );
 
-                unchecked {
-                    ++i;
-                }
+            unchecked {
+                ++i;
             }
-
-            keeper.updateRates(qUpdates);
         }
     }
 

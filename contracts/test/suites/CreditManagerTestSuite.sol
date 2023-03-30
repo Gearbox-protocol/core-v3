@@ -7,7 +7,6 @@ import {CreditManager} from "../../credit/CreditManager.sol";
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfigurator.sol";
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
-import {QuotaRateUpdate} from "../../interfaces/IPoolQuotaKeeper.sol";
 
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
@@ -18,6 +17,8 @@ import {CreditManagerTestInternal} from "../mocks/credit/CreditManagerTestIntern
 import {PoolDeployer} from "./PoolDeployer.sol";
 import {ICreditConfig} from "../interfaces/ICreditConfig.sol";
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
+
+import "forge-std/console.sol";
 
 /// @title CreditManagerTestSuite
 /// @notice Deploys contract for unit testing of CreditManager.sol
@@ -89,7 +90,7 @@ contract CreditManagerTestSuite is PoolDeployer {
 
         if (supportsQuotas) {
             poolQuotaKeeper.addCreditManager(address(creditManager));
-            poolQuotaKeeper.setGauge(CONFIGURATOR);
+            // poolQuotaKeeper.setGauge(CONFIGURATOR);
         }
 
         // Approve USER & LIQUIDATOR to credit manager
@@ -159,21 +160,10 @@ contract CreditManagerTestSuite is PoolDeployer {
         require(supportsQuotas, "Test suite does not support quotas");
 
         evm.startPrank(CONFIGURATOR);
-        poolQuotaKeeper.addQuotaToken(token);
+        gaugeMock.addQuotaToken(token, rate);
         poolQuotaKeeper.setTokenLimit(token, limit);
 
-        address[] memory quotedTokens = poolQuotaKeeper.quotedTokens();
-
-        QuotaRateUpdate[] memory rateUpdates = new QuotaRateUpdate[](
-            quotedTokens.length
-        );
-
-        for (uint256 i = 0; i < quotedTokens.length; ++i) {
-            uint16 rateToSet = token == quotedTokens[i] ? rate : poolQuotaKeeper.getQuotaRate(quotedTokens[i]);
-            rateUpdates[i] = QuotaRateUpdate({token: quotedTokens[i], rate: rateToSet});
-        }
-
-        poolQuotaKeeper.updateRates(rateUpdates);
+        gaugeMock.updateEpoch();
 
         uint256 tokenMask = creditManager.tokenMasksMap(token);
         uint256 limitedMask = creditManager.limitedTokenMask();

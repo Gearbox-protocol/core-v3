@@ -26,12 +26,9 @@ abstract contract AbstractAdapter is IAdapter, ACLNonReentrantTrait {
     /// @param _creditManager Credit Manager to connect this adapter to
     /// @param _targetContract Address of the contract this adapter should interact with
     constructor(address _creditManager, address _targetContract)
-        ACLNonReentrantTrait(IPool4626(ICreditManagerV2(_creditManager).pool()).addressProvider())
+        ACLNonReentrantTrait(address(IPool4626(ICreditManagerV2(_creditManager).pool()).addressProvider()))
+        nonZeroAddress(_targetContract) // F: [AA-2]
     {
-        if (_targetContract == address(0)) {
-            revert ZeroAddressException(); // F: [AA-2]
-        }
-
         creditManager = ICreditManagerV2(_creditManager); // F: [AA-1]
         addressProvider = IAddressProvider(IPool4626(creditManager.pool()).addressProvider()); // F: [AA-1]
         targetContract = _targetContract; // F: [AA-1]
@@ -66,7 +63,7 @@ abstract contract AbstractAdapter is IAdapter, ACLNonReentrantTrait {
     function _getMaskOrRevert(address token) internal view returns (uint256 tokenMask) {
         tokenMask = creditManager.tokenMasksMap(token); // F: [AA-6]
         if (tokenMask == 0) {
-            revert TokenIsNotInAllowedList(token); // F: [AA-6]
+            revert TokenNotAllowedException(); // F: [AA-6]
         }
     }
 
