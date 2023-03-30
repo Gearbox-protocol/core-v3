@@ -137,7 +137,7 @@ contract AbstractAdapterTest is
         bytes memory DUMB_CALLDATA = abi.encodeWithSignature("hello(string)", "world");
 
         evm.prank(USER);
-        evm.expectRevert(CreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotCreditFacadeException.selector);
         adapterMock.execute(DUMB_CALLDATA);
     }
 

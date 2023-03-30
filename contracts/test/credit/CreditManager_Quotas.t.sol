@@ -207,7 +207,7 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV2Events, BalanceHelpe
 
         uint256 enabledTokenMask = creditManager.enabledTokensMap(creditAccount);
 
-        evm.expectRevert(CreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotCreditFacadeException.selector);
         evm.prank(FRIEND);
         creditManager.updateQuotas(creditAccount, quotaUpdates);
 

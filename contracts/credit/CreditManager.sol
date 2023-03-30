@@ -176,7 +176,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
 
     /// @dev Restricts calls to Credit Facade only
     modifier creditFacadeOnly() {
-        if (msg.sender != creditFacade) revert CreditFacadeOnlyException();
+        if (msg.sender != creditFacade) revert CallerNotCreditFacadeException();
         _;
     }
 

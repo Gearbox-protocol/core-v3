@@ -40,7 +40,7 @@ abstract contract AbstractAdapter is IAdapter, ACLNonReentrantTrait {
     ///      of inheriting adapters that perform actions on account MUST have this modifier
     modifier creditFacadeOnly() {
         if (msg.sender != _creditFacade()) {
-            revert CreditFacadeOnlyException(); // F: [AA-5]
+            revert CallerNotCreditFacadeException(); // F: [AA-5]
         }
         _;
     }

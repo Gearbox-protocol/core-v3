@@ -363,24 +363,24 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
 
         evm.startPrank(USER);
 
-        evm.expectRevert(CreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.openCreditAccount(200000, address(this));
 
-        evm.expectRevert(CreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.closeCreditAccount(
             DUMB_ADDRESS, ClosureAction.LIQUIDATE_ACCOUNT, 0, DUMB_ADDRESS, DUMB_ADDRESS, type(uint256).max, false
         );
 
-        evm.expectRevert(CreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.manageDebt(DUMB_ADDRESS, 100, true);
 
-        evm.expectRevert(CreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.addCollateral(DUMB_ADDRESS, DUMB_ADDRESS, DUMB_ADDRESS, 100);
 
-        evm.expectRevert(CreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.transferAccountOwnership(DUMB_ADDRESS, DUMB_ADDRESS);
 
-        evm.expectRevert(CreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.checkEmergencyPausable(DUMB_ADDRESS, true);
 
         evm.stopPrank();

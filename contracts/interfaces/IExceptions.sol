@@ -45,6 +45,10 @@ error CallerNotConfiguratorException();
 /// @dev Thrown on attempting to call an access restricted function as a non-CreditManager
 error CallerNotCreditManagerException();
 
+/// @dev Thrown if an access-restricted function is called by an address that is not
+///      the connected Credit Facade
+error CallerNotCreditFacadeException();
+
 /// @dev Thrown on attempting to call an access restricted function as a non-Configurator
 error CallerNotControllerException();
 
@@ -61,8 +65,6 @@ error CallerNotPoolQuotaKeeperException();
 
 /// @dev Thrown when `vote` or `unvote` are called from non-voter address
 error CallerNotVoterException();
-
-error TokenIsNotAddedToCreditManagerException(address token);
 
 /// interface ICreditConfiguratorExceptions {
 
@@ -171,10 +173,6 @@ error NotApprovedBotException();
 /// @dev Thrown if an access-restricted function is called by an address that is not
 ///      the connected Credit Facade, or an allowed adapter
 error AdaptersOrCreditFacadeOnlyException();
-
-/// @dev Thrown if an access-restricted function is called by an address that is not
-///      the connected Credit Facade
-error CreditFacadeOnlyException();
 
 /// @dev Thrown on attempting to open a Credit Account for or transfer a Credit Account
 ///      to the zero address or an address that already owns a Credit Account

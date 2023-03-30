@@ -96,7 +96,7 @@ contract UniversalAdapterTest is BalanceHelper, CreditFacadeTestHelper {
     /// @notice [UA-2]: UniversalAdapter `revokeAllowances` reverts if called not from multicall
     function test_UA_02_revokeAllowances_reverts_if_called_not_from_multicall() public {
         evm.prank(USER);
-        evm.expectRevert(CreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotCreditFacadeException.selector);
         universalAdapter.revokeAdapterAllowances(new RevocationPair[](0));
     }
 

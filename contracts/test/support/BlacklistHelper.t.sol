@@ -120,7 +120,7 @@ contract BlacklistHelperTest is IBlacklistHelperEvents, DSTest {
 
         assertEq(blacklistHelper.claimable(usdc, USER), 10000);
 
-        evm.expectRevert(CreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotCreditFacadeException.selector);
         evm.prank(DUMB_ADDRESS);
         blacklistHelper.addClaimable(usdc, USER, 10000);
     }

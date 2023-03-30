@@ -45,7 +45,7 @@ contract BlacklistHelper is ACLNonReentrantTrait, IBlacklistHelper {
     /// @dev Restricts calls to Credit Facades only
     modifier creditFacadeOnly() {
         if (!isSupportedCreditFacade[msg.sender]) {
-            revert CreditFacadeOnlyException();
+            revert CallerNotCreditFacadeException();
         }
         _;
     }
