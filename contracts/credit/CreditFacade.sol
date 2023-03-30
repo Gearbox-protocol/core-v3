@@ -479,18 +479,20 @@ contract CreditFacade is ICreditFacade, ReentrancyGuard {
 
         uint256 availableLiquidityAfter = _getAvailableLiquidity();
 
-        if (reportedLoss > 0 || (availableLiquidityAfter < availableLiquidityBefore + borrowAmountWithInterest)) {
+        unchecked {
             uint256 availableLoss = availableLiquidityAfter < availableLiquidityBefore + borrowAmountWithInterest
                 ? availableLiquidityBefore + borrowAmountWithInterest - availableLiquidityAfter
                 : 0;
 
-            uint256 loss = reportedLoss > availableLoss ? reportedLoss : availableLoss;
+            if (reportedLoss > 0 || availableLoss > 0) {
+                uint256 loss = reportedLoss > availableLoss ? reportedLoss : availableLoss;
 
-            params.isIncreaseDebtForbidden = true; // F: [FA-15A]
+                params.isIncreaseDebtForbidden = true; // F: [FA-15A]
 
-            lossParams.currentCumulativeLoss += loss.toUint128();
-            if (lossParams.currentCumulativeLoss > lossParams.maxCumulativeLoss) {
-                _pauseCreditManager(); // F: [FA-15B]
+                lossParams.currentCumulativeLoss += loss.toUint128();
+                if (lossParams.currentCumulativeLoss > lossParams.maxCumulativeLoss) {
+                    _pauseCreditManager(); // F: [FA-15B]
+                }
             }
         }
 
