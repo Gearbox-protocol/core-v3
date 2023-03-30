@@ -12,7 +12,7 @@ import {CreditManager, UNIVERSAL_CONTRACT} from "../../credit/CreditManager.sol"
 import "../lib/constants.sol";
 
 // EXCEPTIONS
-import {CallerNotPausableAdminException} from "../../interfaces/IErrors.sol";
+import {CallerNotPausableAdminException} from "../../interfaces/IExceptions.sol";
 
 // MOCKS
 import {PoolServiceMock} from "../mocks/pool/PoolServiceMock.sol";

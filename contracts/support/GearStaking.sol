@@ -18,6 +18,9 @@ import {
 
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 
+// EXCEPTIONS
+import "../interfaces/IExceptions.sol";
+
 uint256 constant EPOCH_LENGTH = 7 days;
 
 contract GearStaking is ACLNonReentrantTrait, IGearStaking {

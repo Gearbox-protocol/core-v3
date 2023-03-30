@@ -10,7 +10,7 @@ import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks
 import {UniversalAdapter, RevocationPair} from "../../adapters/UniversalAdapter.sol";
 import {CreditFacade} from "../../credit/CreditFacade.sol";
 import {ICreditManagerV2} from "../../interfaces/ICreditManagerV2.sol";
-import {ZeroAddressException} from "../../interfaces/IErrors.sol";
+import {ZeroAddressException} from "../../interfaces/IExceptions.sol";
 import {IAdapterExceptions} from "../../interfaces/adapters/IAdapter.sol";
 
 // CONSTANTS

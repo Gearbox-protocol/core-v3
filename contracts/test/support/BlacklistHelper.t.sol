@@ -20,8 +20,10 @@ import {Tokens} from "../config/Tokens.sol";
 // EXCEPTIONS
 
 import {
-    ZeroAddressException, CallerNotConfiguratorException, NotImplementedException
-} from "../../interfaces/IErrors.sol";
+    ZeroAddressException,
+    CallerNotConfiguratorException,
+    NotImplementedException
+} from "../../interfaces/IExceptions.sol";
 
 /// @title LPPriceFeedTest
 /// @notice Designed for unit test purposes only

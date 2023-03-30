@@ -9,16 +9,17 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
-import {IPool4626Exceptions} from "../../../interfaces/IPool4626.sol";
-
 import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
+
+// EXCEPTIONS
+import "../../../interfaces/IExceptions.sol";
 
 /**
  * @title Mock of pool service for CreditManager constracts testing
  * @notice Used for testing purposes only.
  * @author Gearbox
  */
-contract PoolServiceMock is IPoolService, IPool4626Exceptions {
+contract PoolServiceMock is IPoolService {
     using SafeERC20 for IERC20;
 
     // Address repository

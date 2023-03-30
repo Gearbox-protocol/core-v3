@@ -12,7 +12,7 @@ import {
     CallerNotPausableAdminException,
     CallerNotUnPausableAdminException,
     CallerNotControllerException
-} from "../interfaces/IErrors.sol";
+} from "../interfaces/IExceptions.sol";
 
 /// @title ACL Trait
 /// @notice Utility class for ACL consumers

@@ -32,7 +32,7 @@ import {
 } from "@gearbox-protocol/core-v2/contracts/libraries/Types.sol";
 
 // EXCEPTIONS
-import {ZeroAddressException} from "../interfaces/IErrors.sol";
+import {ZeroAddressException} from "../interfaces/IExceptions.sol";
 
 /// @title Data compressor
 /// @notice Collects data from various contracts for use in the dApp

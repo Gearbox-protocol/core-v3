@@ -34,14 +34,8 @@ import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/I
 import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
 
 // EXCEPTIONS
-import {
-    AddressIsNotContractException,
-    IncorrectPriceFeedException,
-    IncorrectTokenContractException,
-    CallerNotPausableAdminException,
-    TokenNotAllowedException
-} from "../interfaces/IErrors.sol";
-import {ICreditManagerV2, ICreditManagerV2Exceptions} from "../interfaces/ICreditManagerV2.sol";
+import "../interfaces/IExceptions.sol";
+import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
 
 /// @title CreditConfigurator
 /// @notice This contract is used to configure CreditManagers and is the only one with the priviledge

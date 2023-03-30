@@ -18,11 +18,6 @@ struct UserVotes {
     uint96 votesCaSide;
 }
 
-interface IGaugeExceptions {
-    /// @dev Thrown when `vote` or `unvote` are called from non-voter address
-    error OnlyVoterException();
-}
-
 interface IGaugeEvents {
     /// @dev Emits when a user submits a vote
     event VoteFor(address indexed user, address indexed token, uint96 votes, bool lpSide);
@@ -42,7 +37,7 @@ interface IGaugeEvents {
 
 /// @title IGauge
 
-interface IGauge is IGaugeEvents, IGaugeExceptions, IVersion {
+interface IGauge is IGaugeEvents, IVersion {
     /// @dev Returns the main voting contract
     function voter() external view returns (IGearStaking);
 

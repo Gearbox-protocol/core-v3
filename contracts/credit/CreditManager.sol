@@ -36,7 +36,7 @@ import {
 } from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // EXCEPTIONS
-import {TokenAlreadyAddedException, TokenNotAllowedException} from "../interfaces/IErrors.sol";
+import "../interfaces/IExceptions.sol";
 
 import "forge-std/console.sol";
 

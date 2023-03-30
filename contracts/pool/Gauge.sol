@@ -20,11 +20,10 @@ import {IGearStaking} from "../interfaces/IGearStaking.sol";
 
 import {RAY, SECONDS_PER_YEAR, MAX_WITHDRAW_FEE} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
-import {Errors} from "@gearbox-protocol/core-v2/contracts/libraries/Errors.sol";
 import {Pool4626} from "./Pool4626.sol";
 
 // EXCEPTIONS
-import {ZeroAddressException} from "../interfaces/IErrors.sol";
+import "../interfaces/IExceptions.sol";
 
 /// @title Gauge fore new 4626 pools
 contract Gauge is IGauge, ACLNonReentrantTrait {

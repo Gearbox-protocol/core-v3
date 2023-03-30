@@ -16,7 +16,7 @@ import {BotList} from "../../support/BotList.sol";
 
 import {ICreditFacade, ICreditFacadeExtended} from "../../interfaces/ICreditFacade.sol";
 import {ICreditManagerV2, ICreditManagerV2Events, ClosureAction} from "../../interfaces/ICreditManagerV2.sol";
-import {ICreditFacadeEvents, ICreditFacadeExceptions} from "../../interfaces/ICreditFacade.sol";
+import {ICreditFacadeEvents} from "../../interfaces/ICreditFacade.sol";
 import {IDegenNFT, IDegenNFTExceptions} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
 import {IBlacklistHelper} from "../../interfaces/IBlacklistHelper.sol";
 
@@ -41,8 +41,7 @@ import {BalanceHelper} from "../helpers/BalanceHelper.sol";
 import {CreditFacadeTestHelper} from "../helpers/CreditFacadeTestHelper.sol";
 
 // EXCEPTIONS
-import {ZeroAddressException} from "../../interfaces/IErrors.sol";
-import {ICreditManagerV2Exceptions} from "../../interfaces/ICreditManagerV2.sol";
+import "../../interfaces/IExceptions.sol";
 
 // MOCKS
 import {AdapterMock} from "../mocks/adapters/AdapterMock.sol";
@@ -65,8 +64,7 @@ contract CreditFacadeTest is
     BalanceHelper,
     CreditFacadeTestHelper,
     ICreditManagerV2Events,
-    ICreditFacadeEvents,
-    ICreditFacadeExceptions
+    ICreditFacadeEvents
 {
     using CreditFacadeCalls for CreditFacadeMulticaller;
 
@@ -189,13 +187,11 @@ contract CreditFacadeTest is
 
     /// @dev [FA-2]: functions reverts if borrower has no account
     function test_FA_02_functions_reverts_if_borrower_has_no_account() public {
-        bytes4 NO_CREDIT_ACCOUNT_EXCEPTION = ICreditManagerV2Exceptions.HasNoOpenedAccountException.selector;
-
-        evm.expectRevert(NO_CREDIT_ACCOUNT_EXCEPTION);
+        evm.expectRevert(HasNoOpenedAccountException.selector);
         evm.prank(USER);
         creditFacade.closeCreditAccount(FRIEND, 0, false, multicallBuilder());
 
-        evm.expectRevert(NO_CREDIT_ACCOUNT_EXCEPTION);
+        evm.expectRevert(HasNoOpenedAccountException.selector);
         evm.prank(USER);
         creditFacade.closeCreditAccount(
             FRIEND,
@@ -211,21 +207,21 @@ contract CreditFacadeTest is
             )
         );
 
-        evm.expectRevert(NO_CREDIT_ACCOUNT_EXCEPTION);
+        evm.expectRevert(HasNoOpenedAccountException.selector);
         evm.prank(USER);
         creditFacade.liquidateCreditAccount(USER, DUMB_ADDRESS, 0, false, multicallBuilder());
 
-        evm.expectRevert(NO_CREDIT_ACCOUNT_EXCEPTION);
+        evm.expectRevert(HasNoOpenedAccountException.selector);
         creditFacade.addCollateral(USER, underlying, 1);
 
-        evm.expectRevert(NO_CREDIT_ACCOUNT_EXCEPTION);
+        evm.expectRevert(HasNoOpenedAccountException.selector);
         evm.prank(USER);
         creditFacade.multicall(multicallBuilder());
 
         evm.prank(CONFIGURATOR);
         creditConfigurator.allowContract(address(targetMock), address(adapterMock));
 
-        evm.expectRevert(NO_CREDIT_ACCOUNT_EXCEPTION);
+        evm.expectRevert(HasNoOpenedAccountException.selector);
         evm.prank(USER);
         creditFacade.transferAccountOwnership(FRIEND);
     }
@@ -615,7 +611,7 @@ contract CreditFacadeTest is
             twvUSD < (borrowedAmountUSD * (PERCENTAGE_FACTOR - DEFAULT_UNDERLYING_LT)) / PERCENTAGE_FACTOR;
 
         if (shouldRevert) {
-            evm.expectRevert(ICreditManagerV2Exceptions.NotEnoughCollateralException.selector);
+            evm.expectRevert(NotEnoughCollateralException.selector);
         }
 
         evm.prank(USER);

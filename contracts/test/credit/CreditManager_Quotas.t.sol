@@ -11,17 +11,10 @@ import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICr
 import {
     ICreditManagerV2,
     ICreditManagerV2Events,
-    ICreditManagerV2Exceptions,
     ClosureAction,
     CollateralTokenData
 } from "../../interfaces/ICreditManagerV2.sol";
-import {
-    IPoolQuotaKeeper,
-    QuotaUpdate,
-    TokenLT,
-    IPoolQuotaKeeperExceptions,
-    AccountQuota
-} from "../../interfaces/IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeper, QuotaUpdate, TokenLT, AccountQuota} from "../../interfaces/IPoolQuotaKeeper.sol";
 import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 
 import {CreditManager, UNIVERSAL_CONTRACT} from "../../credit/CreditManager.sol";
@@ -34,7 +27,6 @@ import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ER
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // TESTS
-
 import "../lib/constants.sol";
 
 import {BalanceHelper} from "../helpers/BalanceHelper.sol";
@@ -54,15 +46,12 @@ import {CreditManagerTestInternal} from "../mocks/credit/CreditManagerTestIntern
 
 import {CreditConfig} from "../config/CreditConfig.sol";
 
+// EXCEPTIONS
+import "../../interfaces/IExceptions.sol";
+
 import "forge-std/console.sol";
 
-contract CreditManagerQuotasTest is
-    DSTest,
-    ICreditManagerV2Events,
-    ICreditManagerV2Exceptions,
-    IPoolQuotaKeeperExceptions,
-    BalanceHelper
-{
+contract CreditManagerQuotasTest is DSTest, ICreditManagerV2Events, BalanceHelper {
     CheatCodes evm = CheatCodes(HEVM_ADDRESS);
 
     CreditManagerTestSuite cms;

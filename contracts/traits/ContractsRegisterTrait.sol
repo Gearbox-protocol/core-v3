@@ -10,7 +10,7 @@ import {
     ZeroAddressException,
     RegisteredCreditManagerOnlyException,
     RegisteredPoolOnlyException
-} from "../interfaces/IErrors.sol";
+} from "../interfaces/IExceptions.sol";
 
 /// @title ContractsRegister Trait
 /// @notice Trait enables checks for registered pools & creditManagers

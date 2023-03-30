@@ -11,7 +11,7 @@ import {AbstractAdapter} from "./AbstractAdapter.sol";
 import {AdapterType} from "../interfaces/adapters/IAdapter.sol";
 import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
 import {IUniversalAdapter, RevocationPair} from "../interfaces/adapters/IUniversalAdapter.sol";
-import {ZeroAddressException} from "../interfaces/IErrors.sol";
+import {ZeroAddressException} from "../interfaces/IExceptions.sol";
 
 /// @title Universal adapter
 /// @notice Implements the initial version of universal adapter, which handles allowance revocations

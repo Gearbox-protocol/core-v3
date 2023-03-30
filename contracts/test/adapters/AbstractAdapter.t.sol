@@ -12,7 +12,7 @@ import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/I
 import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
 import {ICreditFacade, MultiCall} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditFacade.sol";
 import {ICreditManagerV2, ICreditManagerV2Events} from "../../interfaces/ICreditManagerV2.sol";
-import {ICreditFacadeEvents, ICreditFacadeExceptions} from "../../interfaces/ICreditFacade.sol";
+import {ICreditFacadeEvents} from "../../interfaces/ICreditFacade.sol";
 import {IPool4626} from "../../interfaces/IPool4626.sol";
 
 import "../lib/constants.sol";
@@ -21,8 +21,7 @@ import {CreditFacadeTestHelper} from "../helpers/CreditFacadeTestHelper.sol";
 
 // EXCEPTIONS
 import {IAdapterExceptions} from "../../interfaces/adapters/IAdapter.sol";
-import {ZeroAddressException} from "../../interfaces/IErrors.sol";
-import {ICreditManagerV2Exceptions} from "../../interfaces/ICreditManagerV2.sol";
+import "../../interfaces/IExceptions.sol";
 
 // MOCKS
 import {AdapterMock} from "../mocks/adapters/AdapterMock.sol";
@@ -35,7 +34,7 @@ import {CreditFacadeTestSuite} from "../suites/CreditFacadeTestSuite.sol";
 import {CreditConfig} from "../config/CreditConfig.sol";
 
 // EXCEPTIONS
-import {TokenNotAllowedException} from "../../interfaces/IErrors.sol";
+import "../../interfaces/IExceptions.sol";
 
 uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
 uint16 constant REFERRAL_CODE = 23;
@@ -47,8 +46,7 @@ contract AbstractAdapterTest is
     BalanceHelper,
     CreditFacadeTestHelper,
     ICreditManagerV2Events,
-    ICreditFacadeEvents,
-    ICreditFacadeExceptions
+    ICreditFacadeEvents
 {
     AccountFactory accountFactory;
 

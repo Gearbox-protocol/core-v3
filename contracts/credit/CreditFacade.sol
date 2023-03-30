@@ -25,9 +25,11 @@ import {IBlacklistHelper} from "../interfaces/IBlacklistHelper.sol";
 import {IBotList} from "../interfaces/IBotList.sol";
 
 // CONSTANTS
-
 import {LEVERAGE_DECIMALS} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+
+// EXCEPTIONS
+import "../interfaces/IExceptions.sol";
 
 struct Params {
     /// @dev Maximal amount of new debt that can be taken per block

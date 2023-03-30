@@ -31,11 +31,7 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 import {Errors} from "@gearbox-protocol/core-v2/contracts/libraries/Errors.sol";
 
 // EXCEPTIONS
-import {
-    ZeroAddressException,
-    IncompatibleCreditManagerException,
-    CallerNotCreditManagerException
-} from "../interfaces/IErrors.sol";
+import "../interfaces/IExceptions.sol";
 
 struct CreditManagerDebt {
     uint128 totalBorrowed;

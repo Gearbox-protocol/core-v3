@@ -24,7 +24,7 @@ import {
     ZeroAddressException,
     WethPoolsOnlyException,
     ReceiveIsNotAllowedException
-} from "../interfaces/IErrors.sol";
+} from "../interfaces/IExceptions.sol";
 
 /// @title WETHGateway
 /// @notice Used for converting ETH <> WETH

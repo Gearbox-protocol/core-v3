@@ -9,7 +9,6 @@ import {
     IPoolQuotaKeeper,
     QuotaUpdate,
     IPoolQuotaKeeperEvents,
-    IPoolQuotaKeeperExceptions,
     TokenLT,
     TokenQuotaParams
 } from "../../interfaces/IPoolQuotaKeeper.sol";
@@ -39,15 +38,7 @@ import "../lib/StringUtils.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // EXCEPTIONS
-import {
-    CallerNotConfiguratorException,
-    CallerNotControllerException,
-    ZeroAddressException,
-    CallerNotCreditManagerException,
-    TokenAlreadyAddedException,
-    RegisteredCreditManagerOnlyException,
-    IncompatibleCreditManagerException
-} from "../../interfaces/IErrors.sol";
+import "../../interfaces/IExceptions.sol";
 
 import "forge-std/console.sol";
 
@@ -122,10 +113,10 @@ contract PoolQuotaKeeperTest is DSTest, BalanceHelper, IPoolQuotaKeeperEvents {
     function test_PQK_03_gaugeOnly_funcitons_reverts_if_called_by_non_gauge() public {
         evm.startPrank(USER);
 
-        evm.expectRevert(IPoolQuotaKeeperExceptions.CallerNotGaugeException.selector);
+        evm.expectRevert(CallerNotGaugeException.selector);
         pqk.addQuotaToken(DUMB_ADDRESS);
 
-        evm.expectRevert(IPoolQuotaKeeperExceptions.CallerNotGaugeException.selector);
+        evm.expectRevert(CallerNotGaugeException.selector);
         pqk.updateRates();
 
         evm.stopPrank();
@@ -350,7 +341,7 @@ contract PoolQuotaKeeperTest is DSTest, BalanceHelper, IPoolQuotaKeeperEvents {
 
     // [PQK-11]: setTokenLimit reverts for unregistered token
     function test_PQK_11_reverts_for_unregistered_token() public {
-        evm.expectRevert(IPoolQuotaKeeperExceptions.TokenIsNotQuotedException.selector);
+        evm.expectRevert(TokenIsNotQuotedException.selector);
         evm.prank(CONFIGURATOR);
 
         pqk.setTokenLimit(DUMB_ADDRESS, 1);
@@ -373,5 +364,176 @@ contract PoolQuotaKeeperTest is DSTest, BalanceHelper, IPoolQuotaKeeperEvents {
         (, uint96 limitSet,,) = pqk.totalQuotaParams(DUMB_ADDRESS);
 
         assertEq(limitSet, limit, "Incorrect limit was set");
+    }
+
+    // [PQK-13]: updateQuotas reverts for unregistered token
+    function test_PQK_13_updateQuotas_reverts_for_unregistered_token() public {
+        QuotaUpdate[] memory quotaUpdates = new QuotaUpdate[](1);
+        quotaUpdates[0] =
+            QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.LINK), quotaChange: int96(uint96(100 * WAD))});
+
+        evm.prank(CONFIGURATOR);
+        pqk.addCreditManager(address(cmMock));
+
+        evm.expectRevert(TokenIsNotQuotedException.selector);
+        cmMock.updateQuotas(DUMB_ADDRESS, quotaUpdates, 0);
+    }
+
+    struct QuotaTest {
+        Tokens token;
+        int96 change;
+        uint256 limit;
+        uint16 rate;
+        uint256 expectedTotalQuotedAfter;
+    }
+
+    struct QuotaTestInAYear {
+        Tokens token;
+        int96 change;
+        uint256 expectedTotalQuotedAfter;
+    }
+
+    struct UpdateQuotasTestCase {
+        string name;
+        /// SETUP
+        uint256 quotaLen;
+        QuotaTest[2] initialQuotas;
+        uint256 initialEnabledTokens;
+        /// expected
+        int128 expectedQuotaRevenueChange;
+        uint256 expectedCaQuotaInterestChange;
+        uint256 expectedEnableTokenMaskUpdated;
+        // In 1 YEAR
+        QuotaTestInAYear[2] quotasInAYear;
+        /// expected in 1 YEAR
+        int128 expectedInAYearQuotaRevenueChange;
+        uint256 expectedInAYearCaQuotaInterestChange;
+        uint256 expectedInAYearEnableTokenMaskUpdated;
+    }
+
+    // [PQK-14]: updateQuotas works as expected
+    function test_PQK_14_updateQuotas_works_as_expected() public {
+        UpdateQuotasTestCase[1] memory cases = [
+            UpdateQuotasTestCase({
+                name: "Quota simple test",
+                /// SETUP
+                quotaLen: 2,
+                initialQuotas: [
+                    QuotaTest({token: Tokens.DAI, change: 100, limit: 10_000, rate: 10_00, expectedTotalQuotedAfter: 100}),
+                    QuotaTest({token: Tokens.USDC, change: 150, limit: 1_000, rate: 20_00, expectedTotalQuotedAfter: 150})
+                ],
+                initialEnabledTokens: 0,
+                /// expected
+                expectedQuotaRevenueChange: 0,
+                expectedCaQuotaInterestChange: 0,
+                expectedEnableTokenMaskUpdated: 3,
+                // In 1 YEAR
+                quotasInAYear: [
+                    QuotaTestInAYear({token: Tokens.DAI, change: 100, expectedTotalQuotedAfter: 200}),
+                    QuotaTestInAYear({token: Tokens.USDC, change: -100, expectedTotalQuotedAfter: 50})
+                ],
+                expectedInAYearQuotaRevenueChange: 0,
+                expectedInAYearCaQuotaInterestChange: 0,
+                expectedInAYearEnableTokenMaskUpdated: 3
+            })
+        ];
+        for (uint256 i; i < cases.length; ++i) {
+            UpdateQuotasTestCase memory testCase = cases[i];
+
+            setUp();
+            evm.startPrank(CONFIGURATOR);
+
+            pqk.addCreditManager(address(cmMock));
+
+            QuotaUpdate[] memory quotaUpdates = new QuotaUpdate[](testCase.quotaLen);
+
+            for (uint256 j; j < testCase.quotaLen; ++j) {
+                address token = tokenTestSuite.addressOf(testCase.initialQuotas[j].token);
+                cmMock.addToken(token, 1 << (j));
+                gaugeMock.addQuotaToken(token, testCase.initialQuotas[j].rate);
+                pqk.setTokenLimit(token, uint96(testCase.initialQuotas[j].limit));
+
+                quotaUpdates[j] = QuotaUpdate({token: token, quotaChange: testCase.initialQuotas[j].change});
+            }
+
+            evm.stopPrank();
+
+            int128 quBefore = int128(pool.quotaRevenue());
+
+            /// UPDATE QUOTAS
+
+            (uint256 caQuotaInterestChange, uint256 enableTokenMaskUpdated) =
+                cmMock.updateQuotas(DUMB_ADDRESS, quotaUpdates, testCase.initialEnabledTokens);
+
+            assertEq(
+                enableTokenMaskUpdated,
+                testCase.expectedEnableTokenMaskUpdated,
+                _testCaseErr(testCase.name, "Incorrece enable token mask")
+            );
+
+            assertEq(
+                caQuotaInterestChange,
+                testCase.expectedCaQuotaInterestChange,
+                _testCaseErr(testCase.name, "Incorrece caQuotaInterestChange")
+            );
+
+            assertEq(
+                quBefore - int128(pool.quotaRevenue()),
+                testCase.expectedQuotaRevenueChange,
+                _testCaseErr(testCase.name, "Incorrece QuotaRevenueChange")
+            );
+
+            for (uint256 j; j < testCase.quotaLen; ++j) {
+                address token = tokenTestSuite.addressOf(testCase.initialQuotas[j].token);
+                (uint96 totalQuoted,,,) = pqk.totalQuotaParams(token);
+
+                assertEq(
+                    totalQuoted,
+                    testCase.initialQuotas[j].expectedTotalQuotedAfter,
+                    _testCaseErr(testCase.name, "Incorrect expectedTotalQuotedAfter")
+                );
+            }
+            evm.warp(block.timestamp + 365 days);
+
+            for (uint256 j; j < testCase.quotaLen; ++j) {
+                address token = tokenTestSuite.addressOf(testCase.quotasInAYear[j].token);
+
+                quotaUpdates[j] = QuotaUpdate({token: token, quotaChange: testCase.quotasInAYear[j].change});
+            }
+
+            uint256 enableTokenMaskUpdatedInAYear;
+
+            (caQuotaInterestChange, enableTokenMaskUpdatedInAYear) =
+                cmMock.updateQuotas(DUMB_ADDRESS, quotaUpdates, enableTokenMaskUpdated);
+
+            assertEq(
+                enableTokenMaskUpdatedInAYear,
+                testCase.expectedInAYearEnableTokenMaskUpdated,
+                _testCaseErr(testCase.name, "Incorrect enable token mask in a year")
+            );
+
+            assertEq(
+                caQuotaInterestChange,
+                testCase.expectedInAYearCaQuotaInterestChange,
+                _testCaseErr(testCase.name, "Incorrect caQuotaInterestChange in a year")
+            );
+
+            assertEq(
+                quBefore - int128(pool.quotaRevenue()),
+                testCase.expectedInAYearQuotaRevenueChange,
+                _testCaseErr(testCase.name, "Incorrect QuotaRevenueChange in a year")
+            );
+
+            for (uint256 j; j < testCase.quotaLen; ++j) {
+                address token = tokenTestSuite.addressOf(testCase.initialQuotas[j].token);
+                (uint96 totalQuoted,,,) = pqk.totalQuotaParams(token);
+
+                assertEq(
+                    totalQuoted,
+                    testCase.quotasInAYear[j].expectedTotalQuotedAfter,
+                    _testCaseErr(testCase.name, "Incorrect expectedTotalQuotedAfter in a year")
+                );
+            }
+        }
     }
 }

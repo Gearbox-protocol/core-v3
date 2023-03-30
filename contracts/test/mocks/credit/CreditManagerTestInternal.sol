@@ -11,6 +11,9 @@ import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPr
 import {IPoolQuotaKeeper, QuotaUpdate, TokenLT} from "../../../interfaces/IPoolQuotaKeeper.sol";
 import {CollateralTokenData} from "../../../interfaces/ICreditManagerV2.sol";
 
+// EXCEPTIONS
+import "../../../interfaces/IExceptions.sol";
+
 /// @title Credit Manager Internal
 /// @notice It encapsulates business logic for managing credit accounts
 ///

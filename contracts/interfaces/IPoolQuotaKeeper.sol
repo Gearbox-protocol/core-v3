@@ -31,16 +31,6 @@ struct AccountQuota {
     uint192 cumulativeIndexLU;
 }
 
-interface IPoolQuotaKeeperExceptions {
-    /// @dev Thrown when a gauge-only function is called by non-gauge
-    error CallerNotGaugeException();
-
-    /// @dev Thrown when attempting to set a quota for a token that is not quoted
-    error TokenIsNotQuotedException();
-
-    error IncorrectQuotaRateUpdateLengthException();
-}
-
 interface IPoolQuotaKeeperEvents {
     /// @dev Emits when CA's quota for token is changed
     event AccountQuotaChanged(address creditAccount, address token, uint96 oldQuota, uint96 newQuota);
@@ -65,7 +55,7 @@ interface IPoolQuotaKeeperEvents {
 }
 
 /// @title Pool Quotas Interface
-interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IPoolQuotaKeeperExceptions, IVersion {
+interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
     /// @dev Updates credit account's quotas for multiple tokens
     /// @param creditAccount Address of credit account
     /// @param quotaUpdates Requested quota updates, see `QuotaUpdate`

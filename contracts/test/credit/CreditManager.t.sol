@@ -11,7 +11,6 @@ import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICr
 import {
     ICreditManagerV2,
     ICreditManagerV2Events,
-    ICreditManagerV2Exceptions,
     ClosureAction,
     CollateralTokenData
 } from "../../interfaces/ICreditManagerV2.sol";
@@ -35,7 +34,7 @@ import "../lib/constants.sol";
 import {BalanceHelper} from "../helpers/BalanceHelper.sol";
 
 // EXCEPTIONS
-import {TokenAlreadyAddedException} from "../../interfaces/IErrors.sol";
+import {TokenAlreadyAddedException} from "../../interfaces/IExceptions.sol";
 
 // MOCKS
 import {PriceFeedMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/oracles/PriceFeedMock.sol";
@@ -56,11 +55,11 @@ import {CreditManagerTestInternal} from "../mocks/credit/CreditManagerTestIntern
 import {CreditConfig} from "../config/CreditConfig.sol";
 
 // EXCEPTIONS
-import {TokenNotAllowedException} from "../../interfaces/IErrors.sol";
+import "../../interfaces/IExceptions.sol";
 
 /// @title AddressRepository
 /// @notice Stores addresses of deployed contracts
-contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Exceptions, BalanceHelper {
+contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
     CheatCodes evm = CheatCodes(HEVM_ADDRESS);
 
     CreditManagerTestSuite cms;

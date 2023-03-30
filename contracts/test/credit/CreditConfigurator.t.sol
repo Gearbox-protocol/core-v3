@@ -19,19 +19,8 @@ import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {AddressList} from "@gearbox-protocol/core-v2/contracts/libraries/AddressList.sol";
 
 // EXCEPTIONS
-import {ICreditConfiguratorExceptions} from "../../interfaces/ICreditConfigurator.sol";
-import {
-    ZeroAddressException,
-    AddressIsNotContractException,
-    CallerNotConfiguratorException,
-    IncorrectPriceFeedException,
-    IncorrectTokenContractException,
-    CallerNotPausableAdminException,
-    CallerNotUnPausableAdminException,
-    CallerNotControllerException,
-    TokenNotAllowedException
-} from "../../interfaces/IErrors.sol";
-import {ICreditManagerV2Exceptions} from "../../interfaces/ICreditManagerV2.sol";
+
+import "../../interfaces/IExceptions.sol";
 
 // TEST
 import "../lib/constants.sol";
@@ -50,12 +39,7 @@ import {CollateralTokensItem} from "../config/CreditConfig.sol";
 
 /// @title CreditConfiguratorTest
 /// @notice Designed for unit test purposes only
-contract CreditConfiguratorTest is
-    DSTest,
-    ICreditManagerV2Events,
-    ICreditConfiguratorEvents,
-    ICreditConfiguratorExceptions
-{
+contract CreditConfiguratorTest is DSTest, ICreditManagerV2Events, ICreditConfiguratorEvents {
     using AddressList for address[];
 
     CheatCodes evm = CheatCodes(HEVM_ADDRESS);

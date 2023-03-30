@@ -15,19 +15,6 @@ struct Pool4626Opts {
     bool supportsQuotas;
 }
 
-interface IPool4626Exceptions {
-    error ExpectedLiquidityLimitException();
-
-    error CreditManagerCantBorrowException();
-
-    error IncorrectWithdrawalFeeException();
-    error ZeroAssetsException();
-    error IncompatiblePoolQuotaKeeper();
-    error PoolQuotaKeeperOnly();
-
-    error AdditionalYieldPoolException();
-}
-
 interface IPool4626Events {
     /// @dev Emits on new liquidity being added to the pool
     event DepositReferral(address indexed sender, address indexed onBehalfOf, uint256 amount, uint16 referralCode);
@@ -68,7 +55,7 @@ interface IPool4626Events {
 ///   - Managing diesel tokens & diesel rates
 ///   - Taking/repaying Credit Manager debt
 /// More: https://dev.gearbox.fi/developers/pool/abstractpoolservice
-interface IPool4626 is IPool4626Events, IPool4626Exceptions, IERC4626, IVersion {
+interface IPool4626 is IPool4626Events, IERC4626, IVersion {
     function depositReferral(uint256 assets, address receiver, uint16 referralCode) external returns (uint256 shares);
 
     function burn(uint256 shares) external;

@@ -9,7 +9,7 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 import {PriceFeedType, IPriceFeedType} from "../interfaces/IPriceFeedType.sol";
 
 // EXCEPTIONS
-import {NotImplementedException} from "../interfaces/IErrors.sol";
+import {NotImplementedException} from "../interfaces/IExceptions.sol";
 
 /// @title Price feed that composes an base asset-denominated price feed with a USD one
 /// @notice Used for better price tracking for correlated assets (such as stETH or WBTC) or on networks where

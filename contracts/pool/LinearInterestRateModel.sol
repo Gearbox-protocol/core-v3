@@ -7,6 +7,9 @@ import {WAD, RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 import {IInterestRateModel} from "../interfaces/IInterestRateModel.sol";
 
+// EXCEPTIONS
+import "../interfaces/IExceptions.sol";
+
 /// @title Linear Interest Rate Model
 contract LinearInterestRateModel is IInterestRateModel {
     // reverts if borrow more than U2 if flag is set

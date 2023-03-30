@@ -26,13 +26,7 @@ import {RAY, SECONDS_PER_YEAR, MAX_WITHDRAW_FEE} from "@gearbox-protocol/core-v2
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // EXCEPTIONS
-import {
-    ZeroAddressException,
-    CallerNotCreditManagerException,
-    TokenAlreadyAddedException,
-    TokenNotAllowedException,
-    IncompatibleCreditManagerException
-} from "../interfaces/IErrors.sol";
+import "../interfaces/IExceptions.sol";
 
 import "forge-std/console.sol";
 
@@ -182,7 +176,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         TokenQuotaParams storage tq = totalQuotaParams[token];
 
         if (!tq.isTokenRegistered()) {
-            revert TokenIsNotQuotedException();
+            revert TokenIsNotQuotedException(); // F:[PQK-13]
         }
 
         enableTokenMaskUpdated = enableTokenMask;
