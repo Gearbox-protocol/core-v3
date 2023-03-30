@@ -610,7 +610,7 @@ contract CreditManagerQuotasTest is
         assertLe(diff, 2, "Total debt not equal");
     }
 
-    /// @dev [CMQ-11] updateQuotas reverts on too many enabled tokens
+    /// @dev [CMQ-11]: updateQuotas reverts on too many enabled tokens
     function test_CMQ_11_updateQuotas_reverts_on_too_many_tokens_enabled() public {
         (,,, address creditAccount) = _openCreditAccount();
 
@@ -620,5 +620,45 @@ contract CreditManagerQuotasTest is
 
         evm.expectRevert(TooManyEnabledTokensException.selector);
         creditManager.updateQuotas(creditAccount, quotaUpdates);
+    }
+
+    /// @dev [CMQ-12]: Credit Manager zeroes limits on quoted tokens upon incurring a loss
+    function test_CMQ_12_creditManager_triggers_limit_zeroing_on_loss() public {
+        _makeTokenLimited(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
+
+        (,,, address creditAccount) = _openCreditAccount();
+
+        QuotaUpdate[] memory quotaUpdates = new QuotaUpdate[](2);
+
+        quotaUpdates[0] =
+            QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.LINK), quotaChange: int96(uint96(100 * WAD))});
+        quotaUpdates[1] =
+            QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.USDT), quotaChange: int96(uint96(200 * WAD))});
+
+        creditManager.updateQuotas(creditAccount, quotaUpdates);
+
+        TokenLT[] memory quotedTokens = new TokenLT[](creditManager.maxAllowedEnabledTokenLength() + 1);
+
+        quotedTokens[1] = TokenLT({
+            token: tokenTestSuite.addressOf(Tokens.LINK),
+            lt: creditManager.liquidationThresholds(tokenTestSuite.addressOf(Tokens.LINK))
+        });
+
+        quotedTokens[0] = TokenLT({
+            token: tokenTestSuite.addressOf(Tokens.USDT),
+            lt: creditManager.liquidationThresholds(tokenTestSuite.addressOf(Tokens.USDT))
+        });
+
+        evm.expectCall(address(poolQuotaKeeper), abi.encodeCall(IPoolQuotaKeeper.setLimitsToZero, (quotedTokens)));
+
+        creditManager.closeCreditAccount(USER, ClosureAction.LIQUIDATE_ACCOUNT, 0, USER, USER, 0, false);
+
+        for (uint256 i = 0; i < quotedTokens.length; ++i) {
+            if (quotedTokens[i].token == address(0)) continue;
+
+            (, uint96 limit,,) = poolQuotaKeeper.totalQuotas(quotedTokens[i].token);
+
+            assertEq(limit, 1, "Limit was not zeroed");
+        }
     }
 }

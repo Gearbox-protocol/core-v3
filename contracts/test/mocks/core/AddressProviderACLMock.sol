@@ -20,6 +20,8 @@ contract AddressProviderACLMock {
 
     address public owner;
 
+    address public getGearToken;
+
     constructor() {
         getACL = address(this);
         getPriceOracle = address(this);
@@ -30,6 +32,10 @@ contract AddressProviderACLMock {
 
     function setPriceFeed(address token, address feed) external {
         priceFeeds[token] = feed;
+    }
+
+    function setGearToken(address gearToken) external {
+        getGearToken = gearToken;
     }
 
     receive() external payable {}

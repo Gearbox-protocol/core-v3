@@ -42,6 +42,9 @@ interface IGearStakingEvents {
 
     /// @dev Emits when the user claims a mature withdrawal from staked GEAR
     event GearWithdrawalClaimed(address indexed user, address to, uint256 amount);
+
+    /// @dev Emits when the configurator adds or removes a voting contract
+    event VotingContractStatusUpdated(address indexed votingContract, VotingContractStatus status);
 }
 
 interface IGearStaking is IGearStakingEvents, IGearStakingExceptions, IVersion {
@@ -92,6 +95,12 @@ interface IGearStaking is IGearStakingEvents, IGearStakingExceptions, IVersion {
 
     /// @dev The amount available to the user for voting or withdrawal
     function availableBalance(address user) external view returns (uint256);
+
+    /// @dev Returns the amounts withdrawable now and over the next 4 epochs
+    function getWithdrawableAmounts(address user)
+        external
+        view
+        returns (uint256 withdrawableNow, uint256[4] memory withdrawableInEpochs);
 
     /// @dev Mapping of address to their status as allowed voting contract
     function allowedVotingContract(address c) external view returns (VotingContractStatus);

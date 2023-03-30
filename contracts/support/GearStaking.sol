@@ -62,6 +62,50 @@ contract GearStaking is ACLNonReentrantTrait, IGearStaking {
         return uint256(voteLockData[user].available);
     }
 
+    /// @dev Returns the amounts withdrawable now and over the next 4 epochs
+    function getWithdrawableAmounts(address user)
+        external
+        view
+        returns (uint256 withdrawableNow, uint256[4] memory withdrawableInEpochs)
+    {
+        uint16 epochNow = getCurrentEpoch();
+
+        WithdrawalData memory wd = withdrawalData[user];
+
+        if (epochNow > wd.epochLU) {
+            if (
+                wd.withdrawalsPerEpoch[0] + wd.withdrawalsPerEpoch[1] + wd.withdrawalsPerEpoch[2]
+                    + wd.withdrawalsPerEpoch[3] > 0
+            ) {
+                uint16 epochDiff = epochNow - wd.epochLU;
+
+                for (uint256 i = 0; i < 4;) {
+                    if (i < epochDiff) {
+                        withdrawableNow += wd.withdrawalsPerEpoch[i];
+                    }
+
+                    if (epochDiff < 4 && i < 4 - epochDiff) {
+                        withdrawableInEpochs[i] = wd.withdrawalsPerEpoch[i + epochDiff];
+                    } else {
+                        withdrawableInEpochs[i] = 0;
+                    }
+
+                    unchecked {
+                        ++i;
+                    }
+                }
+            }
+        } else {
+            for (uint256 i = 0; i < 4;) {
+                withdrawableInEpochs[i] = uint256(wd.withdrawalsPerEpoch[i]);
+
+                unchecked {
+                    ++i;
+                }
+            }
+        }
+    }
+
     /// @dev Deposits an amount of GEAR into staked GEAR. Optionally, performs a sequence of vote changes according to
     ///      the passed `votes` array
     /// @param amount Amount of GEAR to deposit into staked GEAR
@@ -227,5 +271,7 @@ contract GearStaking is ACLNonReentrantTrait, IGearStaking {
     ///               * UNVOTE_ONLY - can only unvote
     function setVotingContractStatus(address votingContract, VotingContractStatus status) external configuratorOnly {
         allowedVotingContract[votingContract] = status;
+
+        emit VotingContractStatusUpdated(votingContract, status);
     }
 }

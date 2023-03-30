@@ -148,10 +148,10 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
     /// QUOTA-RELATED PARAMS
 
     /// @dev Whether the CM supports quota-related logic
-    bool public immutable supportsQuotas;
+    bool public immutable override supportsQuotas;
 
     /// @dev Mask of tokens to apply quotas for
-    uint256 public limitedTokenMask;
+    uint256 public override limitedTokenMask;
 
     /// @dev Previously accrued and unrepaid interest on quotas.
     ///      This does not always represent the most actual quota interest,
@@ -296,11 +296,9 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         override
         nonReentrant
         creditFacadeOnly // F:[CM-2]
-        returns (uint256 remainingFunds)
+        returns (uint256 remainingFunds, uint256 loss)
     {
-        // If the contract is paused and the payer is the emergency liquidator,
-        // changes closure action to LIQUIDATE_PAUSED, so that the premium is nullified
-        // If the payer is not an emergency liquidator, reverts
+        // If the contract is paused and the payer is not an emergency liquidator, reverts
         if (paused() && (closureActionType == ClosureAction.CLOSE_ACCOUNT || !canLiquidateWhilePaused[payer])) {
             revert("Pausable: paused");
         } // F:[CM-5]
@@ -321,12 +319,12 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
 
         {
             uint256 profit;
-            uint256 loss;
             uint256 borrowedAmountWithInterest;
-            uint256 quotaInterest;
+            TokenLT[] memory tokens;
 
             if (supportsQuotas) {
-                TokenLT[] memory tokens = getLimitedTokens(creditAccount);
+                tokens = getLimitedTokens(creditAccount);
+
 
                 // TODO: Check that it never breaks
                 quotaInterest = cumulativeQuotaInterest[creditAccount] - 1;
@@ -334,13 +332,22 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
                 if (tokens.length > 0) {
                     quotaInterest += poolQuotaKeeper().closeCreditAccount(creditAccount, tokens); // F: [CMQ-6]
                 }
-            }
 
-            (borrowedAmount, borrowedAmountWithInterest,) =
-                _calcCreditAccountAccruedInterest(creditAccount, quotaInterest); // F:
+                (borrowedAmount, borrowedAmountWithInterest,) =
+                    _calcCreditAccountAccruedInterest(creditAccount, quotaInterest); // F: [CMQ-6]
+            } else {
+                (borrowedAmount, borrowedAmountWithInterest,) = _calcCreditAccountAccruedInterest(creditAccount, 0); // F: [CMQ-6]
+            }
 
             (amountToPool, remainingFunds, profit, loss) =
                 calcClosePayments(totalValue, closureActionType, borrowedAmount, borrowedAmountWithInterest); // F:[CM-10,11,12]
+
+            // If there is loss, quota limits for assets on the account are set to 0 automatically
+            // This prevents further exposure to the tokens, since the loss may have occured due to
+            // an exploit or price feed deviation
+            if (supportsQuotas && loss > 0) {
+                poolQuotaKeeper().setLimitsToZero(tokens); // F: [CMQ-12]
+            }
 
             uint256 underlyingBalance = IERC20(underlying).balanceOf(creditAccount);
 
@@ -885,6 +892,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         }
     }
 
+    /// @dev Returns the array of quoted tokens that are enabled on the account
     function getLimitedTokens(address creditAccount) public view returns (TokenLT[] memory tokens) {
         uint256 limitMask = enabledTokensMap[creditAccount] & limitedTokenMask;
 
@@ -1687,5 +1695,11 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
     {
         creditConfigurator = _creditConfigurator; // F:[CM-58]
         emit NewConfigurator(_creditConfigurator); // F:[CM-58]
+    }
+
+    /// @dev Pauses the Credit Manager when triggered by the Credit Facade;
+    ///      Used as a circuit breaker on too much loss suffered by the pool.
+    function creditFacadePause() external creditFacadeOnly {
+        _pause();
     }
 }
