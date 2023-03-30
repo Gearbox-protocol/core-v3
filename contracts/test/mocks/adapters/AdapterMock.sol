@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {AbstractAdapter} from "../../../adapters/AbstractAdapter.sol";
-import {AdapterType} from "../../../interfaces/adapters/IAdapter.sol";
+import {AdapterType} from "../../../interfaces/IAdapter.sol";
 
 /// @title Adapter Mock
 contract AdapterMock is AbstractAdapter {

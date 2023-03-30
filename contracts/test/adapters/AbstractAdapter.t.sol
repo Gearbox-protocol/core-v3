@@ -20,7 +20,6 @@ import {BalanceHelper} from "../helpers/BalanceHelper.sol";
 import {CreditFacadeTestHelper} from "../helpers/CreditFacadeTestHelper.sol";
 
 // EXCEPTIONS
-import {IAdapterExceptions} from "../../interfaces/adapters/IAdapter.sol";
 import "../../interfaces/IExceptions.sol";
 
 // MOCKS
@@ -150,7 +149,7 @@ contract AbstractAdapterTest is
         );
 
         address token = address(0xdead);
-        evm.expectRevert(abi.encodeWithSelector(IAdapterExceptions.TokenIsNotInAllowedList.selector, token));
+        evm.expectRevert(abi.encodeWithSelector(TokenIsNotInAllowedList.selector, token));
         adapterMock.getMaskOrRevert(address(0xdead));
     }
 
@@ -405,7 +404,7 @@ contract AbstractAdapterTest is
                 }
 
                 if (sa == 0 && ti == 1) {
-                    evm.expectRevert(abi.encodeWithSelector(IAdapterExceptions.TokenIsNotInAllowedList.selector, TOKEN));
+                    evm.expectRevert(abi.encodeWithSelector(TokenIsNotInAllowedList.selector, TOKEN));
                 } else {
                     evm.expectRevert(TokenNotAllowedException.selector);
                 }

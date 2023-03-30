@@ -237,3 +237,23 @@ error AdditionalYieldPoolException();
 error CallerNotGaugeException();
 
 error IncorrectQuotaRateUpdateLengthException();
+
+// interface IBotListExceptions {
+/// @dev Thrown when attempting to pass a zero amount to a funding-related operation
+error AmountCantBeZeroException();
+
+/// @dev Thrown when attempting to fund a bot that is forbidden or not directly allowed by the user
+error InvalidBotException();
+
+// interface IBlacklistHelperExceptions {
+
+/// @dev Thrown when attempting to add a Credit Facade that has non-blacklistable underlying
+error CreditFacadeNonBlacklistable();
+
+/// @dev Thrown when attempting to claim funds without having anything claimable
+error NothingToClaimException();
+// }
+
+// interface IAdapterExceptions {
+/// @notice Thrown when adapter tries to use a token that's not a collateral token of the connected Credit Manager
+error TokenIsNotInAllowedList(address);

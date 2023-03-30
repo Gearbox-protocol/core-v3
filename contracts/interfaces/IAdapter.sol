@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
-import {ICreditManagerV2} from "../ICreditManagerV2.sol";
+import {ICreditManagerV2} from "./ICreditManagerV2.sol";
 
 enum AdapterType {
     ABSTRACT,
@@ -30,16 +30,8 @@ enum AdapterType {
     COMPOUND_V2_CETHER
 }
 
-interface IAdapterExceptions {
-    /// @notice Thrown when adapter tries to use a token that's not a collateral token of the connected Credit Manager
-    error TokenIsNotInAllowedList(address);
-
-    /// @notice Thrown when caller of a `creditFacadeOnly` function is not the Credit Facade
-    error CreditFacadeOnlyException();
-}
-
 /// @title Adapter interface
-interface IAdapter is IAdapterExceptions {
+interface IAdapter {
     /// @notice Credit Manager the adapter is connected to
     function creditManager() external view returns (ICreditManagerV2);
 

@@ -4,11 +4,11 @@
 pragma solidity ^0.8.17;
 
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
-import {IAdapter} from "../interfaces/adapters/IAdapter.sol";
+import {IAdapter} from "../interfaces/IAdapter.sol";
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
 import {IPool4626} from "../interfaces/IPool4626.sol";
-import {ZeroAddressException} from "../interfaces/IExceptions.sol";
+import "../interfaces/IExceptions.sol";
 
 /// @title Abstract adapter
 /// @dev Inheriting adapters MUST use provided internal functions to perform all operations with credit accounts

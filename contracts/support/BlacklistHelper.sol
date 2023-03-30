@@ -10,6 +10,9 @@ import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {IBlacklistHelper} from "../interfaces/IBlacklistHelper.sol";
 import {ICreditFacade} from "../interfaces/ICreditFacade.sol";
 
+// EXCEPTIONS
+import "../interfaces/IExceptions.sol";
+
 interface IBlacklistableUSDC {
     function isBlacklisted(address _account) external view returns (bool);
 }

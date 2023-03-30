@@ -4,7 +4,7 @@
 pragma solidity ^0.8.10;
 
 import {BlacklistHelper} from "../../support/BlacklistHelper.sol";
-import {IBlacklistHelperEvents, IBlacklistHelperExceptions} from "../../interfaces/IBlacklistHelper.sol";
+import {IBlacklistHelperEvents} from "../../interfaces/IBlacklistHelper.sol";
 
 // TEST
 import "../lib/constants.sol";
@@ -19,15 +19,11 @@ import {Tokens} from "../config/Tokens.sol";
 
 // EXCEPTIONS
 
-import {
-    ZeroAddressException,
-    CallerNotConfiguratorException,
-    NotImplementedException
-} from "../../interfaces/IExceptions.sol";
+import "../../interfaces/IExceptions.sol";
 
 /// @title LPPriceFeedTest
 /// @notice Designed for unit test purposes only
-contract BlacklistHelperTest is IBlacklistHelperEvents, IBlacklistHelperExceptions, DSTest {
+contract BlacklistHelperTest is IBlacklistHelperEvents, DSTest {
     CheatCodes evm = CheatCodes(HEVM_ADDRESS);
 
     AddressProviderACLMock public addressProvider;
