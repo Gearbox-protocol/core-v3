@@ -325,9 +325,8 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
             if (supportsQuotas) {
                 tokens = getLimitedTokens(creditAccount);
 
-
                 // TODO: Check that it never breaks
-                quotaInterest = cumulativeQuotaInterest[creditAccount] - 1;
+                uint256 quotaInterest = cumulativeQuotaInterest[creditAccount] - 1;
 
                 if (tokens.length > 0) {
                     quotaInterest += poolQuotaKeeper().closeCreditAccount(creditAccount, tokens); // F: [CMQ-6]
@@ -1343,7 +1342,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         if (supportsQuotas) {
             TokenLT[] memory tokens = getLimitedTokens(creditAccount);
 
-            quotaInterest = cumulativeQuotaInterest[creditAccount];
+            quotaInterest = cumulativeQuotaInterest[creditAccount] - 1;
 
             if (tokens.length > 0) {
                 quotaInterest += poolQuotaKeeper().outstandingQuotaInterest(address(this), creditAccount, tokens); // F: [CMQ-10]

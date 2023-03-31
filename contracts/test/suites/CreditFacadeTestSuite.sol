@@ -36,15 +36,19 @@ contract CreditFacadeTestSuite is PoolDeployer {
 
     uint256 public creditAccountAmount;
 
-    constructor(ICreditConfig creditConfig)
+    ICreditConfig creditConfig;
+
+    constructor(ICreditConfig _creditConfig)
         PoolDeployer(
-            creditConfig.tokenTestSuite(),
-            creditConfig.underlying(),
-            creditConfig.wethToken(),
-            10 * creditConfig.getAccountAmount(),
-            creditConfig.getPriceFeeds()
+            _creditConfig.tokenTestSuite(),
+            _creditConfig.underlying(),
+            _creditConfig.wethToken(),
+            10 * _creditConfig.getAccountAmount(),
+            _creditConfig.getPriceFeeds()
         )
     {
+        creditConfig = _creditConfig;
+
         minBorrowedAmount = creditConfig.minBorrowedAmount();
         maxBorrowedAmount = creditConfig.maxBorrowedAmount();
 
@@ -150,5 +154,36 @@ contract CreditFacadeTestSuite is PoolDeployer {
         blacklistHelper.addCreditFacade(address(creditFacade));
 
         evm.stopPrank();
+    }
+
+    function testFacadeWithQuotas() external {
+        poolMock.setSupportsQuotas(true);
+
+        CreditManagerFactoryBase cmf = new CreditManagerFactoryBase(
+            address(poolMock),
+            creditConfig.getCreditOpts(),
+            0
+        );
+
+        creditManager = cmf.creditManager();
+        creditFacade = cmf.creditFacade();
+        creditConfigurator = cmf.creditConfigurator();
+
+        assertTrue(creditManager.supportsQuotas(), "Credit Manager does not support quotas");
+
+        evm.startPrank(CONFIGURATOR);
+        cr.addCreditManager(address(creditManager));
+        poolQuotaKeeper.addCreditManager(address(creditManager));
+        evm.stopPrank();
+
+        evm.label(address(poolMock), "Pool");
+        evm.label(address(creditFacade), "CreditFacade");
+        evm.label(address(creditManager), "CreditManager");
+        evm.label(address(creditConfigurator), "CreditConfigurator");
+
+        evm.prank(USER);
+        IERC20(underlying).approve(address(creditManager), type(uint256).max);
+        evm.prank(FRIEND);
+        IERC20(underlying).approve(address(creditManager), type(uint256).max);
     }
 }
