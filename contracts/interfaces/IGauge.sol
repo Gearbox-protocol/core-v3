@@ -18,11 +18,6 @@ struct UserVotes {
     uint96 votesCaSide;
 }
 
-struct GaugeOpts {
-    address pool;
-    address gearStaking;
-}
-
 interface IGaugeExceptions {
     /// @dev Thrown when `vote` or `unvote` are called from non-voter address
     error OnlyVoterException();
@@ -69,4 +64,9 @@ interface IGauge is IGaugeEvents, IGaugeExceptions, IVersion {
     ///                  * token - address of the token to unvote from
     ///                  * lpSide - whether the side unvoted from is LP side
     function unvote(address user, uint96 votes, bytes memory extraData) external;
+
+    //
+    // GETTERS
+    //
+    function getRates(address[] memory tokens) external view returns (uint16[] memory rates);
 }

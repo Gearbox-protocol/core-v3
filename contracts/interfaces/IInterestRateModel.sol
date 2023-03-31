@@ -7,7 +7,7 @@ import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.
 
 interface IInterestRateModelExceptions {
     error IncorrectParameterException();
-    error BorrowingMoreOptimalForbiddenException();
+    error BorrowingMoreU2ForbiddenException();
 }
 
 interface IInterestRateModel is IInterestRateModelExceptions, IVersion {

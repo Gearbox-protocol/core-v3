@@ -6,8 +6,9 @@ pragma solidity ^0.8.10;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {ACLNonReentrantTrait} from "../core/ACLNonReentrantTrait.sol";
+
 
 //  DATA
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
@@ -18,7 +19,8 @@ import {QuotaUpdate} from "../interfaces/IPoolQuotaKeeper.sol";
 import {ICreditFacade, ICreditFacadeExtended, FullCheckParams} from "../interfaces/ICreditFacade.sol";
 import {ICreditManagerV2, ClosureAction} from "../interfaces/ICreditManagerV2.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {IPoolQuotaKeeper, TokenLT} from "../interfaces/IPoolQuotaKeeper.sol";
+
+
 import {IPool4626} from "../interfaces/IPool4626.sol";
 import {IDegenNFT} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
@@ -30,9 +32,6 @@ import {IBotList} from "../interfaces/IBotList.sol";
 
 import {LEVERAGE_DECIMALS} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
-
-// EXCEPTIONS
-import {ZeroAddressException} from "../interfaces/IErrors.sol";
 
 struct Params {
     /// @dev Maximal amount of new debt that can be taken per block
@@ -64,7 +63,7 @@ struct CumulativeLossParams {
 /// - Through CreditFacade, which provides all the required account management function: open / close / liquidate / manageDebt,
 /// as well as Multicalls that allow to perform multiple actions within a single transaction, with a single health check
 /// - Through adapters, which call the Credit Manager directly, but only allow interactions with specific target contracts
-contract CreditFacade is ICreditFacade, ReentrancyGuard {
+contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using Address for address;
     using SafeCast for uint256;
@@ -93,11 +92,11 @@ contract CreditFacade is ICreditFacade, ReentrancyGuard {
     /// @dev Address of the underlying token
     address public immutable underlying;
 
-    /// @dev A map that stores whether a user allows a transfer of an account from another user to themselves
-    mapping(address => mapping(address => bool)) public override transfersAllowed;
-
     /// @dev Contract containing the list of approval statuses for borrowers / bots
     address public botList;
+
+    /// @dev A map that stores whether a user allows a transfer of an account from another user to themselves
+    mapping(address => mapping(address => bool)) public override transfersAllowed;
 
     /// @dev Address of WETH
     address public immutable wethAddress;
@@ -132,10 +131,10 @@ contract CreditFacade is ICreditFacade, ReentrancyGuard {
     /// @param _blacklistHelper address of the funds recovery contract for blacklistable underlyings.
     ///                         Must be address(0) is the underlying is not blacklistable
     /// @param _expirable Whether the CreditFacade can expire and implements expiration-related logic
-    constructor(address _creditManager, address _degenNFT, address _blacklistHelper, bool _expirable) {
-        // Additional check that _creditManager is not address(0)
-        if (_creditManager == address(0)) revert ZeroAddressException(); // F:[FA-1]
-
+    constructor(address _creditManager, address _degenNFT, address _blacklistHelper, bool _expirable)
+        ACLNonReentrantTrait(address(IPool4626(ICreditManagerV2(_creditManager).pool()).addressProvider()))
+        nonZeroAddress(_creditManager)
+    {
         creditManager = ICreditManagerV2(_creditManager); // F:[FA-1A]
         underlying = ICreditManagerV2(_creditManager).underlying(); // F:[FA-1A]
         wethAddress = ICreditManagerV2(_creditManager).wethAddress(); // F:[FA-1A]
@@ -352,12 +351,9 @@ contract CreditFacade is ICreditFacade, ReentrancyGuard {
         uint256 skipTokenMask,
         bool convertWETH,
         MultiCall[] calldata calls
-    ) external payable override nonReentrant {
+    ) external payable override nonReentrant nonZeroAddress(to) {
         // Checks that the CA exists to revert early for late liquidations and save gas
         address creditAccount = _getCreditAccountOrRevert(borrower); // F:[FA-2]
-
-        // Checks that the to address is not zero
-        if (to == address(0)) revert ZeroAddressException(); // F:[FA-16A]
 
         // Checks that the account hf < 1 and computes the totalValue
         // before the multicall
@@ -408,12 +404,9 @@ contract CreditFacade is ICreditFacade, ReentrancyGuard {
         uint256 skipTokenMask,
         bool convertWETH,
         MultiCall[] calldata calls
-    ) external payable override nonReentrant {
+    ) external payable override nonReentrant nonZeroAddress(to) {
         // Checks that the CA exists to revert early for late liquidations and save gas
         address creditAccount = _getCreditAccountOrRevert(borrower);
-
-        // Checks that the to address is not zero
-        if (to == address(0)) revert ZeroAddressException();
 
         // Checks that this Credit Facade is expired and reverts if not
         if (!_isExpired()) {

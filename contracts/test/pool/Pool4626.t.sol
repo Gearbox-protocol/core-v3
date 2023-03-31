@@ -6,7 +6,7 @@ pragma solidity ^0.8.10;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import {IPoolQuotaKeeper, QuotaUpdate, QuotaStatusChange} from "../../interfaces/IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeper, QuotaUpdate} from "../../interfaces/IPoolQuotaKeeper.sol";
 import {LinearInterestRateModel} from "../../pool/LinearInterestRateModel.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -46,7 +46,8 @@ import "forge-std/console.sol";
 import {
     CallerNotConfiguratorException,
     CallerNotControllerException,
-    ZeroAddressException
+    ZeroAddressException,
+    CreditManagerNotRegsiterException
 } from "../../interfaces/IErrors.sol";
 
 uint256 constant fee = 6000;
@@ -136,11 +137,11 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         assertEq(pool.borrowRate(), irm.calcBorrowRate(PERCENTAGE_FACTOR, utilisation, false));
     }
 
-    function _mulFee(uint256 amount, uint256 _fee) internal returns (uint256) {
+    function _mulFee(uint256 amount, uint256 _fee) internal pure returns (uint256) {
         return (amount * (PERCENTAGE_FACTOR - _fee)) / PERCENTAGE_FACTOR;
     }
 
-    function _divFee(uint256 amount, uint256 _fee) internal returns (uint256) {
+    function _divFee(uint256 amount, uint256 _fee) internal pure returns (uint256) {
         return (amount * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR - _fee);
     }
 
@@ -178,7 +179,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
     function test_P4_01_start_parameters_correct() public {
         assertEq(pool.name(), "diesel DAI", "Symbol incorrectly set up");
         assertEq(pool.symbol(), "dDAI", "Symbol incorrectly set up");
-        assertEq(pool.addressProvider(), address(psts.addressProvider()), "Incorrect address provider");
+        assertEq(address(pool.addressProvider()), address(psts.addressProvider()), "Incorrect address provider");
 
         assertEq(pool.asset(), underlying, "Incorrect underlying provider");
         assertEq(pool.underlyingToken(), underlying, "Incorrect underlying provider");
@@ -874,8 +875,6 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         for (uint256 i; i < cases.length; ++i) {
             RedeemTestCase memory testCase = cases[i];
             for (uint256 approveCase; approveCase < 2; ++approveCase) {
-                bool feeToken = i == 1;
-
                 _setUpTestCase(
                     testCase.asset,
                     testCase.tokenFee,
@@ -1327,6 +1326,8 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
                 pqk.addCreditManager(address(cmMock));
 
+                cmMock.addToken(tokenTestSuite.addressOf(Tokens.LINK), 2);
+
                 pqk.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), uint96(WAD * 100_000));
 
                 QuotaUpdate[] memory qu = new QuotaUpdate[](1);
@@ -1335,7 +1336,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                     quotaChange: int96(int256(quotaInterestPerYear))
                 });
 
-                cmMock.updateQuotas(DUMB_ADDRESS, qu);
+                cmMock.updateQuotas(DUMB_ADDRESS, qu, 0);
 
                 psts.gaugeMock().updateEpoch();
 
@@ -1388,10 +1389,8 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
     // [P4-17]: updateBorrowRate correctly updates parameters
     function test_P4_17_changeQuotaRevenue_and_updateQuotaRevenue_updates_quotaRevenue_correctly() public {
-        address POOL_QUOTA_KEEPER = DUMB_ADDRESS;
-
-        evm.prank(CONFIGURATOR);
-        pool.connectPoolQuotaManager(POOL_QUOTA_KEEPER);
+        _setUp(Tokens.DAI, true);
+        address POOL_QUOTA_KEEPER = address(pqk);
 
         uint96 qu1 = uint96(WAD * 10);
 
@@ -1462,7 +1461,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
     // [P4-19]: setCreditManagerLimit reverts if not in register
     function test_P4_19_connectCreditManager_reverts_if_not_in_register() public {
-        evm.expectRevert(IPool4626Exceptions.CreditManagerNotRegsiterException.selector);
+        evm.expectRevert(CreditManagerNotRegsiterException.selector);
 
         evm.prank(CONFIGURATOR);
         pool.setCreditManagerLimit(DUMB_ADDRESS, 1);
@@ -1562,18 +1561,17 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
         pool = new Pool4626(opts);
 
-        address POOL_QUOTA_KEEPER = DUMB_ADDRESS;
+        pqk = new PoolQuotaKeeper(address(pool));
 
-        evm.prank(CONFIGURATOR);
-        pool.connectPoolQuotaManager(POOL_QUOTA_KEEPER);
-
-        uint96 qu = uint96(WAD * 10);
+        address POOL_QUOTA_KEEPER = address(pqk);
 
         evm.expectEmit(true, true, false, false);
         emit NewPoolQuotaKeeper(POOL_QUOTA_KEEPER);
 
         evm.prank(CONFIGURATOR);
         pool.connectPoolQuotaManager(POOL_QUOTA_KEEPER);
+
+        uint96 qu = uint96(WAD * 10);
 
         assertEq(pool.poolQuotaKeeper(), POOL_QUOTA_KEEPER, "Incorrect Pool QuotaKeeper");
 
@@ -1584,7 +1582,9 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
         evm.warp(block.timestamp + year);
 
-        address POOL_QUOTA_KEEPER2 = DUMB_ADDRESS2;
+        PoolQuotaKeeper pqk2 = new PoolQuotaKeeper(address(pool));
+
+        address POOL_QUOTA_KEEPER2 = address(pqk2);
 
         evm.expectEmit(true, true, false, false);
         emit NewPoolQuotaKeeper(POOL_QUOTA_KEEPER2);
@@ -1639,7 +1639,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
     struct CreditManagerBorrowTestCase {
         string name;
         /// SETUP
-        uint256 u2;
+        uint16 u2;
         bool isBorrowingMoreU2Forbidden;
         uint256 borrowBefore1;
         uint256 borrowBefore2;
@@ -1835,7 +1835,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
             );
 
             if (supportQuotas) {
-                address POOL_QUOTA_KEEPER = DUMB_ADDRESS;
+                address POOL_QUOTA_KEEPER = address(pqk);
 
                 evm.prank(CONFIGURATOR);
                 pool.connectPoolQuotaManager(POOL_QUOTA_KEEPER);

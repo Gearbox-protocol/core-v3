@@ -3,14 +3,8 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
-import {IGauge} from "./IGauge.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
-
-enum QuotaStatusChange {
-    NOT_CHANGED,
-    ZERO_TO_POSITIVE,
-    POSITIVE_TO_ZERO
-}
+import {IPool4626} from "./IPool4626.sol";
 
 /// @notice Quota update params
 /// @param token Address of the token to change the quota for
@@ -18,11 +12,6 @@ enum QuotaStatusChange {
 struct QuotaUpdate {
     address token;
     int96 quotaChange;
-}
-
-struct QuotaRateUpdate {
-    address token;
-    uint16 rate;
 }
 
 struct TokenLT {
@@ -43,9 +32,6 @@ struct AccountQuota {
 }
 
 interface IPoolQuotaKeeperExceptions {
-    /// @dev Thrown when attempting to add a quoted token that is already added
-    error QuotedTokenIsAlreadyAdded();
-
     /// @dev Thrown when a gauge-only function is called by non-gauge
     error GaugeOnlyException();
 
@@ -54,6 +40,8 @@ interface IPoolQuotaKeeperExceptions {
 
     /// @dev Thrown when attempting to set a quota for a token that is not quoted
     error TokenIsNotQuotedException();
+
+    error IncorrectQuotaRateUpdateLengthException();
 }
 
 interface IPoolQuotaKeeperEvents {
@@ -72,6 +60,9 @@ interface IPoolQuotaKeeperEvents {
     /// @dev Emits when a new Credit Manager is allowed in PoolQuotaKeeper
     event CreditManagerAdded(address indexed creditManager);
 
+    /// @dev Emits when a new token added to PoolQuotaKeeper
+    event NewQuotaTokenAdded(address indexed token);
+
     /// @dev Emits when a new limit is set for a token
     event TokenLimitSet(address indexed token, uint96 limit);
 }
@@ -81,9 +72,9 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IPoolQuotaKeeperExceptions
     /// @dev Updates credit account's quotas for multiple tokens
     /// @param creditAccount Address of credit account
     /// @param quotaUpdates Requested quota updates, see `QuotaUpdate`
-    function updateQuotas(address creditAccount, QuotaUpdate[] memory quotaUpdates)
+    function updateQuotas(address creditAccount, QuotaUpdate[] memory quotaUpdates, uint256 enableTokenMask)
         external
-        returns (uint256, QuotaStatusChange[] memory, bool);
+        returns (uint256 caQuotaInterestChange, uint256 enableTokenMaskUpdated);
 
     /// @dev Updates all quotas to zero when closing a credit account, and computes the final quota interest change
     /// @param creditAccount Address of the Credit Account being closed
@@ -101,19 +92,23 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IPoolQuotaKeeperExceptions
         external
         returns (uint256 caQuotaInterestChange);
 
-    /// @dev Batch updates the quota rates and changes the combined quota revenue
-    /// @param qUpdates Array of new rates for all quoted tokens
-    function updateRates(QuotaRateUpdate[] memory qUpdates) external;
+    /// @dev Gauge management
 
     /// @dev Registers a new quoted token in the keeper
     function addQuotaToken(address token) external;
+
+    /// @dev Batch updates the quota rates and changes the combined quota revenue
+    function updateRates() external;
 
     //
     // GETTERS
     //
 
     /// @dev Returns the gauge address
-    function gauge() external view returns (IGauge);
+    function pool() external view returns (IPool4626);
+
+    /// @dev Returns the gauge address
+    function gauge() external view returns (address);
 
     /// @dev Returns quota rate in PERCENTAGE FORMAT
     function getQuotaRate(address) external view returns (uint16);

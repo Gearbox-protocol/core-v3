@@ -5,6 +5,7 @@ pragma solidity ^0.8.10;
 
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
+import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 import {IACL} from "@gearbox-protocol/core-v2/contracts/interfaces/IACL.sol";
 import {
     ZeroAddressException,
@@ -63,11 +64,14 @@ abstract contract ACLNonReentrantTrait is Pausable {
 
     event NewController(address indexed newController);
 
+    modifier nonZeroAddress(address addr) {
+        if (addr == address(0)) revert ZeroAddressException(); // F:[P4-2]
+        _;
+    }
+
     /// @dev constructor
     /// @param addressProvider Address of address repository
-    constructor(address addressProvider) {
-        if (addressProvider == address(0)) revert ZeroAddressException(); // F:[AA-2]
-
+    constructor(address addressProvider) nonZeroAddress(addressProvider) {
         _acl = IACL(AddressProvider(addressProvider).getACL());
         controller = IACL(AddressProvider(addressProvider).getACL()).owner();
     }
@@ -93,6 +97,11 @@ abstract contract ACLNonReentrantTrait is Pausable {
         }
         _;
     }
+
+    // modifier registeredCreditManagerOnly(address creditManager) {
+    //     if (!_cr.isCreditManager(creditManager)) revert();
+    //     _;
+    // }
 
     ///@dev Pause contract
     function pause() external {
