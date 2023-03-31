@@ -9,7 +9,6 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {ACLNonReentrantTrait} from "../core/ACLNonReentrantTrait.sol";
 
-
 //  DATA
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 import {Balance, BalanceOps} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
@@ -20,8 +19,8 @@ import {ICreditFacade, ICreditFacadeExtended, FullCheckParams} from "../interfac
 import {ICreditManagerV2, ClosureAction} from "../interfaces/ICreditManagerV2.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 
-
 import {IPool4626} from "../interfaces/IPool4626.sol";
+import {TokenLT} from "../interfaces/IPoolQuotaKeeper.sol";
 import {IDegenNFT} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";

@@ -16,8 +16,6 @@ import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfigurato
 import {PoolServiceMock} from "../mocks/pool/PoolServiceMock.sol";
 import {GaugeMock} from "../mocks/pool/GaugeMock.sol";
 import {PoolQuotaKeeper} from "../../pool/PoolQuotaKeeper.sol";
-import {GaugeMock} from "../mocks/pool/GaugeMock.sol";
-import {GaugeOpts} from "../../interfaces/IGauge.sol";
 
 import "../lib/constants.sol";
 
@@ -103,11 +101,5 @@ contract PoolDeployer is DSTest {
         poolQuotaKeeper.setGauge(address(gaugeMock));
 
         poolMock.setPoolQuotaKeeper(address(poolQuotaKeeper));
-
-        GaugeOpts memory gopts = GaugeOpts({pool: address(poolMock), gearStaking: address(0)});
-
-        gaugeMock = new GaugeMock(gopts);
-
-        poolQuotaKeeper.setGauge(address(gaugeMock));
     }
 }

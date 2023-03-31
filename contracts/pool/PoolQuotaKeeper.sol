@@ -267,7 +267,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait {
 
         while (i < len && tokensLT[i].token != address(0)) {
             address token = tokensLT[i].token;
-            totalQuotas[token].limit = 1; // F: [CMQ-12]
+            totalQuotaParams[token].limit = 1; // F: [CMQ-12]
 
             unchecked {
                 ++i;

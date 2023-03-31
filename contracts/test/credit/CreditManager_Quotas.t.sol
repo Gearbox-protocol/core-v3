@@ -624,6 +624,7 @@ contract CreditManagerQuotasTest is
 
     /// @dev [CMQ-12]: Credit Manager zeroes limits on quoted tokens upon incurring a loss
     function test_CMQ_12_creditManager_triggers_limit_zeroing_on_loss() public {
+        _makeTokenLimited(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _makeTokenLimited(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
         (,,, address creditAccount) = _openCreditAccount();
@@ -656,7 +657,7 @@ contract CreditManagerQuotasTest is
         for (uint256 i = 0; i < quotedTokens.length; ++i) {
             if (quotedTokens[i].token == address(0)) continue;
 
-            (, uint96 limit,,) = poolQuotaKeeper.totalQuotas(quotedTokens[i].token);
+            (, uint96 limit,,) = poolQuotaKeeper.totalQuotaParams(quotedTokens[i].token);
 
             assertEq(limit, 1, "Limit was not zeroed");
         }
