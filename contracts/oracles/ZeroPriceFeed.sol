@@ -7,7 +7,7 @@ import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/Ag
 import {IPriceFeedType, PriceFeedType} from "../interfaces/IPriceFeedType.sol";
 
 // EXCEPTIONS
-import {NotImplementedException} from "../interfaces/IErrors.sol";
+import {NotImplementedException} from "../interfaces/IExceptions.sol";
 
 /// @title Pricefeed which always returns 0
 /// @notice Used for collateral tokens that do not have a valid USD price feed

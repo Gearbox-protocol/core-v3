@@ -9,7 +9,7 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 import {PriceFeedType, IPriceFeedType} from "../interfaces/IPriceFeedType.sol";
 
 // EXCEPTIONS
-import {NotImplementedException} from "../interfaces/IErrors.sol";
+import {NotImplementedException} from "../interfaces/IExceptions.sol";
 
 interface ChainlinkReadableAggregator {
     function aggregator() external view returns (address);

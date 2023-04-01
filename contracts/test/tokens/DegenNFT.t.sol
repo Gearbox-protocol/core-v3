@@ -18,7 +18,7 @@ import "../lib/constants.sol";
 import {CreditFacadeTestHelper} from "../helpers/CreditFacadeTestHelper.sol";
 
 // EXCEPTIONS
-import {NotImplementedException, CallerNotConfiguratorException} from "../../interfaces/IErrors.sol";
+import {NotImplementedException, CallerNotConfiguratorException} from "../../interfaces/IExceptions.sol";
 
 // SUITES
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";

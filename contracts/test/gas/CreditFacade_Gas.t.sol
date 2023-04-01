@@ -14,9 +14,9 @@ import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFa
 
 import {BotList} from "../../support/BotList.sol";
 
-import {ICreditFacade, ICreditFacadeExtended} from "../../interfaces/ICreditFacade.sol";
+import {ICreditFacade, ICreditFacadeExtended, ICreditFacadeEvents} from "../../interfaces/ICreditFacade.sol";
 import {ICreditManagerV2, ICreditManagerV2Events, ClosureAction} from "../../interfaces/ICreditManagerV2.sol";
-import {ICreditFacadeEvents, ICreditFacadeExceptions} from "../../interfaces/ICreditFacade.sol";
+
 import {IDegenNFT, IDegenNFTExceptions} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
 import {IBlacklistHelper} from "../../interfaces/IBlacklistHelper.sol";
 import {QuotaUpdate} from "../../interfaces/IPoolQuotaKeeper.sol";
@@ -42,8 +42,7 @@ import {BalanceHelper} from "../helpers/BalanceHelper.sol";
 import {CreditFacadeTestHelper} from "../helpers/CreditFacadeTestHelper.sol";
 
 // EXCEPTIONS
-import {ZeroAddressException} from "../../interfaces/IErrors.sol";
-import {ICreditManagerV2Exceptions} from "../../interfaces/ICreditManagerV2.sol";
+import "../../interfaces/IExceptions.sol";
 
 // MOCKS
 import {AdapterMock} from "../mocks/adapters/AdapterMock.sol";
@@ -66,8 +65,7 @@ contract CreditFacadeTest is
     BalanceHelper,
     CreditFacadeTestHelper,
     ICreditManagerV2Events,
-    ICreditFacadeEvents,
-    ICreditFacadeExceptions
+    ICreditFacadeEvents
 {
     using CreditFacadeCalls for CreditFacadeMulticaller;
 
@@ -201,7 +199,7 @@ contract CreditFacadeTest is
 
         emit log_string(
             string(abi.encodePacked("Gas spent - opening an account with adding collateral and executing one swap: "))
-        );
+            );
         emit log_uint(gasSpent);
     }
 
@@ -243,7 +241,7 @@ contract CreditFacadeTest is
 
         emit log_string(
             string(abi.encodePacked("Gas spent - opening an account with adding collateral and executing two swaps: "))
-        );
+            );
         emit log_uint(gasSpent);
     }
 
@@ -289,7 +287,7 @@ contract CreditFacadeTest is
             string(
                 abi.encodePacked("Gas spent - opening an account with adding quoted collateral and updating 1 quota: ")
             )
-        );
+            );
         emit log_uint(gasSpent);
     }
 
@@ -341,7 +339,7 @@ contract CreditFacadeTest is
 
         emit log_string(
             string(abi.encodePacked("Gas spent - opening an account with swapping into quoted collateral: "))
-        );
+            );
         emit log_uint(gasSpent);
     }
 
@@ -673,7 +671,7 @@ contract CreditFacadeTest is
                     "Gas spent - multicall with a single swap into quoted collateral and updating quotas: "
                 )
             )
-        );
+            );
         emit log_uint(gasSpent);
     }
 
@@ -968,7 +966,7 @@ contract CreditFacadeTest is
 
         emit log_string(
             string(abi.encodePacked("Gas spent - liquidateCreditAccount with underlying and quoted token: "))
-        );
+            );
         emit log_uint(gasSpent);
     }
 }

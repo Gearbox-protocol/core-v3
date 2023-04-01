@@ -5,11 +5,11 @@ pragma solidity ^0.8.10;
 
 import {ILPPriceFeed} from "../interfaces/ILPPriceFeed.sol";
 import {PriceFeedChecker} from "./PriceFeedChecker.sol";
-import {ACLNonReentrantTrait} from "../core/ACLNonReentrantTrait.sol";
+import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // EXCEPTIONS
-import {NotImplementedException} from "../interfaces/IErrors.sol";
+import "../interfaces/IExceptions.sol";
 
 /// @title Abstract PriceFeed for an LP token
 /// @notice For most pools/vaults, the LP token price depends on Chainlink prices of pool assets and the pool's

@@ -9,7 +9,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
-import {ACLNonReentrantTrait} from "../core/ACLNonReentrantTrait.sol";
+import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 
 // INTERFACES
 import {IAccountFactory} from "@gearbox-protocol/core-v2/contracts/interfaces/IAccountFactory.sol";
@@ -36,7 +36,7 @@ import {
 } from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // EXCEPTIONS
-import {TokenAlreadyAddedException, TokenNotAllowedException} from "../interfaces/IErrors.sol";
+import "../interfaces/IExceptions.sol";
 
 import "forge-std/console.sol";
 
@@ -176,14 +176,14 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
 
     /// @dev Restricts calls to Credit Facade only
     modifier creditFacadeOnly() {
-        if (msg.sender != creditFacade) revert CreditFacadeOnlyException();
+        if (msg.sender != creditFacade) revert CallerNotCreditFacadeException();
         _;
     }
 
     /// @dev Restricts calls to Credit Configurator only
     modifier creditConfiguratorOnly() {
         if (msg.sender != creditConfigurator) {
-            revert CreditConfiguratorOnlyException();
+            revert CallerNotConfiguratorException();
         }
         _;
     }
@@ -235,6 +235,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         whenNotPaused // F:[CM-5]
         nonReentrant
         creditFacadeOnly // F:[CM-2]
+        nonZeroAddress(onBehalfOf) // TODO: Add test
         returns (address)
     {
         // Takes a Credit Account from the factory and sets initial parameters
@@ -612,6 +613,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         whenNotPausedOrEmergency // F:[CM-5]
         nonReentrant
         creditFacadeOnly // F:[CM-2]
+        nonZeroAddress(to) // TODO: Add test
     {
         address creditAccount = getCreditAccountOrRevert(from); // F:[CM-6]
         delete creditAccounts[from]; // F:[CM-24]
@@ -1151,8 +1153,8 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
     /// @param borrower The new owner of the Credit Account
     /// @param creditAccount The Credit Account address
     function _safeCreditAccountSet(address borrower, address creditAccount) internal {
-        if (borrower == address(0) || creditAccounts[borrower] != address(0)) {
-            revert ZeroAddressOrUserAlreadyHasAccountException();
+        if (creditAccounts[borrower] != address(0)) {
+            revert UserAlreadyHasAccountException();
         } // F:[CM-7]
         creditAccounts[borrower] = creditAccount; // F:[CM-7]
     }

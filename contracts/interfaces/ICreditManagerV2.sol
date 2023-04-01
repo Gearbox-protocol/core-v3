@@ -29,60 +29,10 @@ interface ICreditManagerV2Events {
     event NewConfigurator(address indexed newConfigurator);
 }
 
-interface ICreditManagerV2Exceptions {
-    /// @dev Thrown if an access-restricted function is called by an address that is not
-    ///      the connected Credit Facade, or an allowed adapter
-    error AdaptersOrCreditFacadeOnlyException();
-
-    /// @dev Thrown if an access-restricted function is called by an address that is not
-    ///      the connected Credit Facade
-    error CreditFacadeOnlyException();
-
-    /// @dev Thrown if an access-restricted function is called by an address that is not
-    ///      the connected Credit Configurator
-    error CreditConfiguratorOnlyException();
-
-    /// @dev Thrown on attempting to open a Credit Account for or transfer a Credit Account
-    ///      to the zero address or an address that already owns a Credit Account
-    error ZeroAddressOrUserAlreadyHasAccountException();
-
-    /// @dev Thrown on attempting to execute an order to an address that is not an allowed
-    ///      target contract
-    error TargetContractNotAllowedException();
-
-    /// @dev Thrown on failing a full collateral check after an operation
-    error NotEnoughCollateralException();
-
-    /// @dev Thrown if an attempt to approve a collateral token to a target contract failed
-    error AllowanceFailedException();
-
-    /// @dev Thrown on attempting to perform an action for an address that owns no Credit Account
-    error HasNoOpenedAccountException();
-
-    /// @dev Thrown on configurator attempting to add more than 256 collateral tokens
-    error TooManyTokensException();
-
-    /// @dev Thrown if more than the maximal number of tokens were enabled on a Credit Account,
-    ///      and there are not enough unused token to disable
-    error TooManyEnabledTokensException();
-
-    /// @dev Thrown when a reentrancy into the contract is attempted
-    // error ReentrancyLockException();
-
-    /// @dev Thrown when attempting to perform a quota-related operation on a non-quota CM
-    error CMDoesNotSupportQuotasException();
-
-    /// @dev Thrown when attempting to ramp LT for underlying
-    error CannotRampLTForUnderlyingException();
-
-    /// @dev Thrown when a custom HF parameter lower than 10000 is passed into a full collateral check
-    error CustomHealthFactorTooLowException();
-}
-
 /// @notice All Credit Manager functions are access-restricted and can only be called
 ///         by the Credit Facade or allowed adapters. Users are not allowed to
 ///         interact with the Credit Manager directly
-interface ICreditManagerV2 is ICreditManagerV2Events, ICreditManagerV2Exceptions, IVersion {
+interface ICreditManagerV2 is ICreditManagerV2Events, IVersion {
     //
     // CREDIT ACCOUNT MANAGEMENT
     //

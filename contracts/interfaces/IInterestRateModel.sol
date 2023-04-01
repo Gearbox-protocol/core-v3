@@ -5,12 +5,7 @@ pragma solidity ^0.8.10;
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
-interface IInterestRateModelExceptions {
-    error IncorrectParameterException();
-    error BorrowingMoreU2ForbiddenException();
-}
-
-interface IInterestRateModel is IInterestRateModelExceptions, IVersion {
+interface IInterestRateModel is IVersion {
     /// @dev Returns the borrow rate calculated based on expectedLiquidity and availableLiquidity
     /// @param expectedLiquidity Expected liquidity in the pool
     /// @param availableLiquidity Available liquidity in the pool

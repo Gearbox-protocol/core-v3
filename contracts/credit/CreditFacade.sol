@@ -6,8 +6,9 @@ pragma solidity ^0.8.10;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+
+import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
-import {ACLNonReentrantTrait} from "../core/ACLNonReentrantTrait.sol";
 
 //  DATA
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
@@ -28,9 +29,11 @@ import {IBlacklistHelper} from "../interfaces/IBlacklistHelper.sol";
 import {IBotList} from "../interfaces/IBotList.sol";
 
 // CONSTANTS
-
 import {LEVERAGE_DECIMALS} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+
+// EXCEPTIONS
+import "../interfaces/IExceptions.sol";
 
 struct Params {
     /// @dev Maximal amount of new debt that can be taken per block
@@ -118,7 +121,7 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
     /// @dev Restricts actions for users with opened credit accounts only
     modifier creditConfiguratorOnly() {
         if (msg.sender != creditManager.creditConfigurator()) {
-            revert CreditConfiguratorOnlyException();
+            revert CallerNotConfiguratorException();
         }
 
         _;

@@ -28,11 +28,6 @@ struct MultiVote {
     bytes extraData;
 }
 
-interface IGearStakingExceptions {
-    /// @dev Thrown when attempting to vote in a non-approved contract
-    error VotingContractNotAllowedException();
-}
-
 interface IGearStakingEvents {
     /// @dev Emits when the user deposits GEAR into staked GEAR
     event GearDeposited(address indexed user, uint256 amount);
@@ -47,7 +42,7 @@ interface IGearStakingEvents {
     event VotingContractStatusUpdated(address indexed votingContract, VotingContractStatus status);
 }
 
-interface IGearStaking is IGearStakingEvents, IGearStakingExceptions, IVersion {
+interface IGearStaking is IGearStakingEvents, IVersion {
     /// @dev Returns the current global voting epoch
     function getCurrentEpoch() external view returns (uint16);
 

@@ -22,7 +22,7 @@ import {
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // CONTRACTS
-import {ACLNonReentrantTrait} from "../core/ACLNonReentrantTrait.sol";
+import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {CreditFacade} from "./CreditFacade.sol";
 import {CreditManager} from "./CreditManager.sol";
 
@@ -34,14 +34,8 @@ import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/I
 import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
 
 // EXCEPTIONS
-import {
-    AddressIsNotContractException,
-    IncorrectPriceFeedException,
-    IncorrectTokenContractException,
-    CallerNotPausableAdminException,
-    TokenNotAllowedException
-} from "../interfaces/IErrors.sol";
-import {ICreditManagerV2, ICreditManagerV2Exceptions} from "../interfaces/ICreditManagerV2.sol";
+import "../interfaces/IExceptions.sol";
+import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
 
 /// @title CreditConfigurator
 /// @notice This contract is used to configure CreditManagers and is the only one with the priviledge
@@ -240,7 +234,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
             creditManager.rampLiquidationThreshold(token, liquidationThresholdFinal, timestampRampStart, rampDuration);
             emit TokenLiquidationThresholdRampScheduled(
                 token, currentLT, liquidationThresholdFinal, timestampRampStart, timestampRampStart + rampDuration
-            );
+                );
         }
     }
 
@@ -541,7 +535,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
                 PERCENTAGE_FACTOR - _liquidationDiscount,
                 _feeLiquidationExpired,
                 PERCENTAGE_FACTOR - _liquidationDiscountExpired
-            ); // FT:[CC-1A,26]
+                ); // FT:[CC-1A,26]
         }
     }
 
@@ -791,9 +785,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         _setBotList(botList);
     }
 
-
     function _setBotList(address botList) internal nonZeroAddress(botList) {
-
         address currentBotList = creditFacade().botList();
 
         if (botList != currentBotList) {

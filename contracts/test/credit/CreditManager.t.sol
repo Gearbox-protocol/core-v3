@@ -11,7 +11,6 @@ import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICr
 import {
     ICreditManagerV2,
     ICreditManagerV2Events,
-    ICreditManagerV2Exceptions,
     ClosureAction,
     CollateralTokenData
 } from "../../interfaces/ICreditManagerV2.sol";
@@ -35,7 +34,7 @@ import "../lib/constants.sol";
 import {BalanceHelper} from "../helpers/BalanceHelper.sol";
 
 // EXCEPTIONS
-import {TokenAlreadyAddedException} from "../../interfaces/IErrors.sol";
+import {TokenAlreadyAddedException} from "../../interfaces/IExceptions.sol";
 
 // MOCKS
 import {PriceFeedMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/oracles/PriceFeedMock.sol";
@@ -56,11 +55,11 @@ import {CreditManagerTestInternal} from "../mocks/credit/CreditManagerTestIntern
 import {CreditConfig} from "../config/CreditConfig.sol";
 
 // EXCEPTIONS
-import {TokenNotAllowedException} from "../../interfaces/IErrors.sol";
+import "../../interfaces/IExceptions.sol";
 
 /// @title AddressRepository
 /// @notice Stores addresses of deployed contracts
-contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Exceptions, BalanceHelper {
+contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
     CheatCodes evm = CheatCodes(HEVM_ADDRESS);
 
     CreditManagerTestSuite cms;
@@ -364,24 +363,24 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
 
         evm.startPrank(USER);
 
-        evm.expectRevert(CreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.openCreditAccount(200000, address(this));
 
-        evm.expectRevert(CreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.closeCreditAccount(
             DUMB_ADDRESS, ClosureAction.LIQUIDATE_ACCOUNT, 0, DUMB_ADDRESS, DUMB_ADDRESS, type(uint256).max, false
         );
 
-        evm.expectRevert(CreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.manageDebt(DUMB_ADDRESS, 100, true);
 
-        evm.expectRevert(CreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.addCollateral(DUMB_ADDRESS, DUMB_ADDRESS, DUMB_ADDRESS, 100);
 
-        evm.expectRevert(CreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.transferAccountOwnership(DUMB_ADDRESS, DUMB_ADDRESS);
 
-        evm.expectRevert(CreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.checkEmergencyPausable(DUMB_ADDRESS, true);
 
         evm.stopPrank();
@@ -440,37 +439,37 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
 
         evm.startPrank(USER);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.addToken(DUMB_ADDRESS);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setParams(0, 0, 0, 0, 0);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setLiquidationThreshold(DUMB_ADDRESS, 0);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setForbidMask(0);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.changeContractAllowance(DUMB_ADDRESS, DUMB_ADDRESS);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.upgradeCreditFacade(DUMB_ADDRESS);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.upgradePriceOracle(DUMB_ADDRESS);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setConfigurator(DUMB_ADDRESS);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setMaxEnabledTokens(255);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.addEmergencyLiquidator(DUMB_ADDRESS);
 
-        evm.expectRevert(CreditConfiguratorOnlyException.selector);
+        evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.removeEmergencyLiquidator(DUMB_ADDRESS);
 
         evm.stopPrank();
@@ -567,11 +566,11 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
     /// @dev [CM-7]: openCreditAccount reverts if zero address or address exists
     function test_CM_07_openCreditAccount_reverts_if_zero_address_or_address_exists() public {
         // Zero address case
-        evm.expectRevert(ZeroAddressOrUserAlreadyHasAccountException.selector);
+        evm.expectRevert(ZeroAddressException.selector);
         creditManager.openCreditAccount(1, address(0));
         // Existing address case
         creditManager.openCreditAccount(1, USER);
-        evm.expectRevert(ZeroAddressOrUserAlreadyHasAccountException.selector);
+        evm.expectRevert(UserAlreadyHasAccountException.selector);
         creditManager.openCreditAccount(1, USER);
     }
 
@@ -1223,10 +1222,10 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, ICreditManagerV2Ex
 
         creditManager.openCreditAccount(1, FRIEND);
         // address(0) case
-        evm.expectRevert(ZeroAddressOrUserAlreadyHasAccountException.selector);
+        evm.expectRevert(ZeroAddressException.selector);
         creditManager.transferAccountOwnership(USER, address(0));
         // Existing account case
-        evm.expectRevert(ZeroAddressOrUserAlreadyHasAccountException.selector);
+        evm.expectRevert(UserAlreadyHasAccountException.selector);
         creditManager.transferAccountOwnership(FRIEND, USER);
     }
 

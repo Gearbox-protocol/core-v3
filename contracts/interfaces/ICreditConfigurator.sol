@@ -118,45 +118,8 @@ interface ICreditConfiguratorEvents {
 }
 
 /// @dev CreditConfigurator Exceptions
-interface ICreditConfiguratorExceptions {
-    /// @dev Thrown if the underlying's LT is set directly
-    /// @notice Underlying LT is derived from fee parameters and is set automatically
-    ///         on updating fees
-    error SetLTForUnderlyingException();
 
-    /// @dev Thrown if the newly set LT if zero or greater than the underlying's LT
-    error IncorrectLiquidationThresholdException();
-
-    /// @dev Thrown if feeInterest or (liquidationPremium + feeLiquidation) is out of [0%..100%] range (encoded as [0..10000])
-    error IncorrectFeesException();
-
-    /// @dev Thrown if borrowing limits are incorrect: minLimit > maxLimit or maxLimit > blockLimit
-    error IncorrectLimitsException();
-
-    /// @dev Thrown if the new expiration date is less than the current expiration date or block.timestamp
-    error IncorrectExpirationDateException();
-
-    /// @dev Thrown if address of CreditManager or CreditFacade are being set as a target for an adapter
-    error CreditManagerOrFacadeUsedAsTargetContractsException();
-
-    /// @dev Thrown if an adapter that is already linked to a contract is being connected to another
-    error AdapterUsedTwiceException();
-
-    /// @dev Thrown if a contract (adapter or Credit Facade) set in a Credit Configurator returns a wrong Credit Manager
-    ///      or retrieving the Credit Manager from it fails
-    error IncompatibleContractException();
-
-    /// @dev Thrown if attempting to forbid an adapter that is not allowed for the Credit Manager
-    error ContractIsNotAnAllowedAdapterException();
-
-    /// @dev Thrown if attempting to forbid or migrate a target contract that is not allowed for the Credit Manager
-    error ContractIsNotAnAllowedTargetException();
-
-    /// @dev Thrown when attempting to limit a token that is not quotable in PoolQuotaKeeper
-    error TokenIsNotQuotedException();
-}
-
-interface ICreditConfigurator is ICreditConfiguratorEvents, ICreditConfiguratorExceptions, IVersion {
+interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
     //
     // STATE-CHANGING FUNCTIONS
     //

@@ -19,18 +19,7 @@ interface IBlacklistHelperEvents {
     event CreditFacadeRemoved(address indexed creditFacade);
 }
 
-interface IBlacklistHelperExceptions {
-    /// @dev Thrown when an access-restricted function is called by non-CreditFacade
-    error CreditFacadeOnlyException();
-
-    /// @dev Thrown when attempting to add a Credit Facade that has non-blacklistable underlying
-    error CreditFacadeNonBlacklistable();
-
-    /// @dev Thrown when attempting to claim funds without having anything claimable
-    error NothingToClaimException();
-}
-
-interface IBlacklistHelper is IBlacklistHelperEvents, IBlacklistHelperExceptions, IVersion {
+interface IBlacklistHelper is IBlacklistHelperEvents, IVersion {
     /// @dev Returns whether the account is blacklisted for a particular underlying
     function isBlacklisted(address underlying, address account) external view returns (bool);
 

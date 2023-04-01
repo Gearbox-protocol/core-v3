@@ -6,9 +6,12 @@ pragma solidity ^0.8.10;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {ACLNonReentrantTrait} from "../core/ACLNonReentrantTrait.sol";
+import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {IBlacklistHelper} from "../interfaces/IBlacklistHelper.sol";
 import {ICreditFacade} from "../interfaces/ICreditFacade.sol";
+
+// EXCEPTIONS
+import "../interfaces/IExceptions.sol";
 
 interface IBlacklistableUSDC {
     function isBlacklisted(address _account) external view returns (bool);
@@ -42,7 +45,7 @@ contract BlacklistHelper is ACLNonReentrantTrait, IBlacklistHelper {
     /// @dev Restricts calls to Credit Facades only
     modifier creditFacadeOnly() {
         if (!isSupportedCreditFacade[msg.sender]) {
-            revert CreditFacadeOnlyException();
+            revert CallerNotCreditFacadeException();
         }
         _;
     }

@@ -3,12 +3,12 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {ACLNonReentrantTrait} from "../core/ACLNonReentrantTrait.sol";
-import {IAdapter} from "../interfaces/adapters/IAdapter.sol";
+import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
+import {IAdapter} from "../interfaces/IAdapter.sol";
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
 import {IPool4626} from "../interfaces/IPool4626.sol";
-import {ZeroAddressException} from "../interfaces/IErrors.sol";
+import "../interfaces/IExceptions.sol";
 
 /// @title Abstract adapter
 /// @dev Inheriting adapters MUST use provided internal functions to perform all operations with credit accounts
@@ -40,7 +40,7 @@ abstract contract AbstractAdapter is IAdapter, ACLNonReentrantTrait {
     ///      of inheriting adapters that perform actions on account MUST have this modifier
     modifier creditFacadeOnly() {
         if (msg.sender != _creditFacade()) {
-            revert CreditFacadeOnlyException(); // F: [AA-5]
+            revert CallerNotCreditFacadeException(); // F: [AA-5]
         }
         _;
     }

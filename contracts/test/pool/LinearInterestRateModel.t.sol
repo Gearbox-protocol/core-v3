@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
-import {IInterestRateModelExceptions, IInterestRateModel} from "../../interfaces/IInterestRateModel.sol";
+import {IInterestRateModel} from "../../interfaces/IInterestRateModel.sol";
 import {LinearInterestRateModel} from "../../pool/LinearInterestRateModel.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -12,6 +12,9 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import "../lib/constants.sol";
 import "../lib/StringUtils.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+
+// EXCEPTIONS
+import "../../interfaces/IExceptions.sol";
 
 import "forge-std/console.sol";
 
@@ -160,7 +163,7 @@ contract LinearInterestRateModelTest is DSTest {
         for (uint256 i; i < cases.length; ++i) {
             IncorrectParamCase memory testCase = cases[i];
 
-            evm.expectRevert(IInterestRateModelExceptions.IncorrectParameterException.selector);
+            evm.expectRevert(IncorrectParameterException.selector);
             irm = new LinearInterestRateModel(
             testCase.U_1,
              testCase.U_2,
@@ -456,7 +459,7 @@ contract LinearInterestRateModelTest is DSTest {
         );
 
             if (testCase.expectedRevert) {
-                evm.expectRevert(IInterestRateModelExceptions.BorrowingMoreU2ForbiddenException.selector);
+                evm.expectRevert(BorrowingMoreU2ForbiddenException.selector);
             }
 
             irm.calcBorrowRate(testCase.expectedLiquidity, testCase.availableLiquidity, true);

@@ -1,0 +1,261 @@
+// SPDX-License-Identifier: MIT
+// Gearbox Protocol. Generalized leverage for DeFi protocols
+// (c) Gearbox Holdings, 2022
+pragma solidity ^0.8.17;
+
+/// @dev Common contract exceptions
+
+/// @dev Thrown on attempting to set an important address to zero address
+error ZeroAddressException();
+
+/// @dev Thrown on attempting to call a non-implemented function
+error NotImplementedException();
+
+error RegisteredCreditManagerOnlyException();
+error RegisteredPoolOnlyException();
+
+error WethPoolsOnlyException();
+error ReceiveIsNotAllowedException();
+
+error IncompatibleCreditManagerException();
+
+/// @dev Thrown on attempting to set an EOA as an important contract in the system
+error AddressIsNotContractException(address);
+
+/// @dev Thrown on attempting to add a token that is already in a collateral list
+error TokenAlreadyAddedException();
+
+/// @dev Thrown on attempting to receive a token that is not a collateral token or was forbidden
+error TokenNotAllowedException();
+
+/// @dev Thrown on attempting to use a non-ERC20 contract or an EOA as a token
+error IncorrectTokenContractException();
+
+/// @dev Thrown on attempting to set a token price feed to an address that is not a
+///      correct price feed
+error IncorrectPriceFeedException();
+
+///
+/// ACCESS
+///
+
+/// @dev Thrown on attempting to call an access restricted function as a non-Configurator
+error CallerNotConfiguratorException();
+
+/// @dev Thrown on attempting to call an access restricted function as a non-CreditManager
+error CallerNotCreditManagerException();
+
+/// @dev Thrown if an access-restricted function is called by an address that is not
+///      the connected Credit Facade
+error CallerNotCreditFacadeException();
+
+/// @dev Thrown on attempting to call an access restricted function as a non-Configurator
+error CallerNotControllerException();
+
+/// @dev Thrown on attempting to pause a contract as a non-Pausable admin
+error CallerNotPausableAdminException();
+
+/// @dev Thrown on attempting to pause a contract as a non-Unpausable admin
+error CallerNotUnPausableAdminException();
+
+/// @dev Thrown when a gauge-only function is called by non-gauge
+error CallerNotGaugeException();
+
+/// @dev Thrown when a poolQuotaKeeper function is called by non-pqk
+error CallerNotPoolQuotaKeeperException();
+
+/// @dev Thrown when `vote` or `unvote` are called from non-voter address
+error CallerNotVoterException();
+
+/// interface ICreditConfiguratorExceptions {
+
+/// @dev Thrown if the underlying's LT is set directly
+/// @notice Underlying LT is derived from fee parameters and is set automatically
+///         on updating fees
+error SetLTForUnderlyingException();
+
+/// @dev Thrown if the newly set LT if zero or greater than the underlying's LT
+error IncorrectLiquidationThresholdException();
+
+/// @dev Thrown if feeInterest or (liquidationPremium + feeLiquidation) is out of [0%..100%] range (encoded as [0..10000])
+error IncorrectFeesException();
+
+/// @dev Thrown if borrowing limits are incorrect: minLimit > maxLimit or maxLimit > blockLimit
+error IncorrectLimitsException();
+
+/// @dev Thrown if the new expiration date is less than the current expiration date or block.timestamp
+error IncorrectExpirationDateException();
+
+/// @dev Thrown if address of CreditManager or CreditFacade are being set as a target for an adapter
+error CreditManagerOrFacadeUsedAsTargetContractsException();
+
+/// @dev Thrown if an adapter that is already linked to a contract is being connected to another
+error AdapterUsedTwiceException();
+
+/// @dev Thrown if a contract (adapter or Credit Facade) set in a Credit Configurator returns a wrong Credit Manager
+///      or retrieving the Credit Manager from it fails
+error IncompatibleContractException();
+
+/// @dev Thrown if attempting to forbid an adapter that is not allowed for the Credit Manager
+error ContractIsNotAnAllowedAdapterException();
+
+/// @dev Thrown if attempting to forbid or migrate a target contract that is not allowed for the Credit Manager
+error ContractIsNotAnAllowedTargetException();
+
+/// @dev Thrown when attempting to limit a token that is not quotable in PoolQuotaKeeper
+error TokenIsNotQuotedException();
+
+// interface ICreditFacadeExceptions is ICreditManagerV2Exceptions {
+/// @dev Thrown if the CreditFacade is not expirable, and an aciton is attempted that
+///      requires expirability
+error NotAllowedWhenNotExpirableException();
+
+/// @dev Thrown if whitelisted mode is enabled, and an action is attempted that is
+///      not allowed in whitelisted mode
+error NotAllowedInWhitelistedMode();
+
+/// @dev Thrown if a user attempts to transfer a CA to an address that didn't allow it
+error AccountTransferNotAllowedException();
+
+/// @dev Thrown if a liquidator tries to liquidate an account with a health factor above 1
+error CantLiquidateWithSuchHealthFactorException();
+
+/// @dev Thrown if a liquidator tries to liquidate an account by expiry while a Credit Facade is not expired
+error CantLiquidateNonExpiredException();
+
+/// @dev Thrown if call data passed to a multicall is too short
+error IncorrectCallDataException();
+
+/// @dev Thrown inside account closure multicall if the borrower attempts an action that is forbidden on closing
+///      an account
+error ForbiddenDuringClosureException();
+
+/// @dev Thrown if debt increase and decrease are subsequently attempted in one multicall
+error IncreaseAndDecreaseForbiddenInOneCallException();
+
+/// @dev Thrown if a selector that doesn't match any allowed function is passed to the Credit Facade
+///      during a multicall
+error UnknownMethodException();
+
+/// @dev Thrown if a user tries to open an account or increase debt with increaseDebtForbidden mode on
+error IncreaseDebtForbiddenException();
+
+/// @dev Thrown if the account owner tries to transfer an unhealthy account
+error CantTransferLiquidatableAccountException();
+
+/// @dev Thrown if too much new debt was taken within a single block
+error BorrowedBlockLimitException();
+
+/// @dev Thrown if the new debt principal for a CA falls outside of borrowing limits
+error BorrowAmountOutOfLimitsException();
+
+/// @dev Thrown if one of the balances on a Credit Account is less than expected
+///      at the end of a multicall, if revertIfReceivedLessThan was called
+error BalanceLessThanMinimumDesiredException(address);
+
+/// @dev Thrown if a user attempts to open an account on a Credit Facade that has expired
+error OpenAccountNotAllowedAfterExpirationException();
+
+/// @dev Thrown if expected balances are attempted to be set through revertIfReceivedLessThan twice
+error ExpectedBalancesAlreadySetException();
+
+/// @dev Thrown if a Credit Account has enabled forbidden tokens and the owner attempts to perform an action
+///      that is not allowed with any forbidden tokens enabled
+error ActionProhibitedWithForbiddenTokensException();
+
+/// @dev Thrown when attempting to perform an action on behalf of a borrower that is blacklisted in the underlying token
+error NotAllowedForBlacklistedAddressException();
+
+/// @dev Thrown if botMulticall is called by an address that is not a bot for a specified borrower
+error NotApprovedBotException();
+
+/// CM
+
+/// @dev Thrown if an access-restricted function is called by an address that is not
+///      the connected Credit Facade, or an allowed adapter
+error AdaptersOrCreditFacadeOnlyException();
+
+/// @dev Thrown on attempting to open a Credit Account for or transfer a Credit Account
+///      to the zero address or an address that already owns a Credit Account
+error UserAlreadyHasAccountException();
+
+/// @dev Thrown on attempting to execute an order to an address that is not an allowed
+///      target contract
+error TargetContractNotAllowedException();
+
+/// @dev Thrown on failing a full collateral check after an operation
+error NotEnoughCollateralException();
+
+/// @dev Thrown if an attempt to approve a collateral token to a target contract failed
+error AllowanceFailedException();
+
+/// @dev Thrown on attempting to perform an action for an address that owns no Credit Account
+error HasNoOpenedAccountException();
+
+/// @dev Thrown on configurator attempting to add more than 256 collateral tokens
+error TooManyTokensException();
+
+/// @dev Thrown if more than the maximal number of tokens were enabled on a Credit Account,
+///      and there are not enough unused token to disable
+error TooManyEnabledTokensException();
+
+/// @dev Thrown when a reentrancy into the contract is attempted
+// error ReentrancyLockException();
+
+/// @dev Thrown when attempting to perform a quota-related operation on a non-quota CM
+error CMDoesNotSupportQuotasException();
+
+/// @dev Thrown when attempting to ramp LT for underlying
+error CannotRampLTForUnderlyingException();
+
+/// @dev Thrown when a custom HF parameter lower than 10000 is passed into a full collateral check
+error CustomHealthFactorTooLowException();
+
+// interface IGaugeExceptions {
+
+// interface IGearStakingExceptions {
+/// @dev Thrown when attempting to vote in a non-approved contract
+error VotingContractNotAllowedException();
+
+// interface IInterestRateModelExceptions {
+error IncorrectParameterException();
+error BorrowingMoreU2ForbiddenException();
+
+// interface ILPPriceFeedExceptions {
+/// @dev Thrown on returning a value that violates the current bounds
+error ValueOutOfRangeException();
+
+// interface IPool4626Exceptions {
+error ExpectedLiquidityLimitException();
+
+error CreditManagerCantBorrowException();
+
+error IncorrectWithdrawalFeeException();
+error ZeroAssetsException();
+error IncompatiblePoolQuotaKeeper();
+
+error AdditionalYieldPoolException();
+
+// interface IPoolQuotaKeeperExceptions {
+
+// interface IBotListExceptions {
+/// @dev Thrown when attempting to pass a zero amount to a funding-related operation
+error AmountCantBeZeroException();
+
+/// @dev Thrown when attempting to fund a bot that is forbidden or not directly allowed by the user
+error InvalidBotException();
+
+// interface IBlacklistHelperExceptions {
+
+/// @dev Thrown when attempting to add a Credit Facade that has non-blacklistable underlying
+error CreditFacadeNonBlacklistable();
+
+/// @dev Thrown when attempting to claim funds without having anything claimable
+error NothingToClaimException();
+// }
+
+// interface IAdapterExceptions {
+/// @notice Thrown when adapter tries to use a token that's not a collateral token of the connected Credit Manager
+error TokenIsNotInAllowedList(address);
+
+error LiquiditySanityCheckException();

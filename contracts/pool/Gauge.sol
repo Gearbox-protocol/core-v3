@@ -11,8 +11,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
-import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
-import {ACLNonReentrantTrait} from "../core/ACLNonReentrantTrait.sol";
+import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 
 // interfaces
 import {IGauge, QuotaRateParams, UserVotes} from "../interfaces/IGauge.sol";
@@ -21,11 +20,10 @@ import {IGearStaking} from "../interfaces/IGearStaking.sol";
 
 import {RAY, SECONDS_PER_YEAR, MAX_WITHDRAW_FEE} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
-import {Errors} from "@gearbox-protocol/core-v2/contracts/libraries/Errors.sol";
 import {Pool4626} from "./Pool4626.sol";
 
 // EXCEPTIONS
-import {ZeroAddressException} from "../interfaces/IErrors.sol";
+import "../interfaces/IExceptions.sol";
 
 /// @title Gauge fore new 4626 pools
 contract Gauge is IGauge, ACLNonReentrantTrait {
@@ -75,7 +73,7 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
     /// @dev Reverts if the function is called by an address other than the voter
     modifier onlyVoter() {
         if (msg.sender != address(voter)) {
-            revert OnlyVoterException();
+            revert CallerNotVoterException();
         }
         _;
     }

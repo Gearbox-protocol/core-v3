@@ -10,8 +10,7 @@ import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks
 import {UniversalAdapter, RevocationPair} from "../../adapters/UniversalAdapter.sol";
 import {CreditFacade} from "../../credit/CreditFacade.sol";
 import {ICreditManagerV2} from "../../interfaces/ICreditManagerV2.sol";
-import {ZeroAddressException} from "../../interfaces/IErrors.sol";
-import {IAdapterExceptions} from "../../interfaces/adapters/IAdapter.sol";
+import "../../interfaces/IExceptions.sol";
 
 // CONSTANTS
 import {CONFIGURATOR, USER} from "../lib/constants.sol";
@@ -97,7 +96,7 @@ contract UniversalAdapterTest is BalanceHelper, CreditFacadeTestHelper {
     /// @notice [UA-2]: UniversalAdapter `revokeAllowances` reverts if called not from multicall
     function test_UA_02_revokeAllowances_reverts_if_called_not_from_multicall() public {
         evm.prank(USER);
-        evm.expectRevert(IAdapterExceptions.CreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotCreditFacadeException.selector);
         universalAdapter.revokeAdapterAllowances(new RevocationPair[](0));
     }
 

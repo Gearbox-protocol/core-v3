@@ -11,16 +11,8 @@ interface ILPPriceFeedEvents {
     event NewLimiterParams(uint256 lowerBound, uint256 upperBound);
 }
 
-interface ILPPriceFeedExceptions {
-    /// @dev Thrown on returning a value that violates the current bounds
-    error ValueOutOfRangeException();
-
-    /// @dev Thrown on failing sanity checks when setting new bounds
-    error IncorrectLimitsException();
-}
-
 /// @title Interface for LP PriceFeeds with limiter
-interface ILPPriceFeed is AggregatorV3Interface, IPriceFeedType, ILPPriceFeedEvents, ILPPriceFeedExceptions {
+interface ILPPriceFeed is AggregatorV3Interface, IPriceFeedType, ILPPriceFeedEvents {
     /// @dev Sets the lower and upper bounds for virtual price.
     /// @param _lowerBound The new lower bound
     /// @notice The upper bound is computed automatically

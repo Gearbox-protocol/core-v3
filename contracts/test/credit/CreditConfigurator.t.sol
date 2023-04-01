@@ -19,19 +19,8 @@ import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {AddressList} from "@gearbox-protocol/core-v2/contracts/libraries/AddressList.sol";
 
 // EXCEPTIONS
-import {ICreditConfiguratorExceptions} from "../../interfaces/ICreditConfigurator.sol";
-import {
-    ZeroAddressException,
-    AddressIsNotContractException,
-    CallerNotConfiguratorException,
-    IncorrectPriceFeedException,
-    IncorrectTokenContractException,
-    CallerNotPausableAdminException,
-    CallerNotUnPausableAdminException,
-    CallerNotControllerException,
-    TokenNotAllowedException
-} from "../../interfaces/IErrors.sol";
-import {ICreditManagerV2Exceptions} from "../../interfaces/ICreditManagerV2.sol";
+
+import "../../interfaces/IExceptions.sol";
 
 // TEST
 import "../lib/constants.sol";
@@ -50,12 +39,7 @@ import {CollateralTokensItem} from "../config/CreditConfig.sol";
 
 /// @title CreditConfiguratorTest
 /// @notice Designed for unit test purposes only
-contract CreditConfiguratorTest is
-    DSTest,
-    ICreditManagerV2Events,
-    ICreditConfiguratorEvents,
-    ICreditConfiguratorExceptions
-{
+contract CreditConfiguratorTest is DSTest, ICreditManagerV2Events, ICreditConfiguratorEvents {
     using AddressList for address[];
 
     CheatCodes evm = CheatCodes(HEVM_ADDRESS);
@@ -296,7 +280,7 @@ contract CreditConfiguratorTest is
             DEFAULT_LIQUIDATION_PREMIUM,
             DEFAULT_FEE_LIQUIDATION_EXPIRED,
             DEFAULT_LIQUIDATION_PREMIUM_EXPIRED
-        );
+            );
 
         evm.expectEmit(true, false, false, false);
         emit TokenAllowed(usdcToken);
@@ -856,7 +840,7 @@ contract CreditConfiguratorTest is
             newLiquidationPremium,
             newFeeLiquidationExpired,
             newLiquidationPremiumExpired
-        );
+            );
 
         evm.prank(CONFIGURATOR);
         creditConfigurator.setFees(
@@ -1253,7 +1237,7 @@ contract CreditConfiguratorTest is
         evm.expectEmit(true, false, false, true);
         emit TokenLiquidationThresholdRampScheduled(
             usdc, initialLT, 8900, uint40(block.timestamp + 5), uint40(block.timestamp + 1005)
-        );
+            );
 
         evm.prank(CONFIGURATOR);
         creditConfigurator.rampLiquidationThreshold(usdc, 8900, uint40(block.timestamp + 5), 1000);

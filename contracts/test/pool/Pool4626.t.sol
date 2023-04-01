@@ -12,7 +12,7 @@ import {LinearInterestRateModel} from "../../pool/LinearInterestRateModel.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {Pool4626} from "../../pool/Pool4626.sol";
-import {IPool4626Events, Pool4626Opts, IPool4626Exceptions} from "../../interfaces/IPool4626.sol";
+import {IPool4626Events, Pool4626Opts} from "../../interfaces/IPool4626.sol";
 import {IERC4626Events} from "../../interfaces/IERC4626.sol";
 
 import {IInterestRateModel} from "../../interfaces/IInterestRateModel.sol";
@@ -43,12 +43,7 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 import "forge-std/console.sol";
 
 // EXCEPTIONS
-import {
-    CallerNotConfiguratorException,
-    CallerNotControllerException,
-    ZeroAddressException,
-    CreditManagerNotRegsiterException
-} from "../../interfaces/IErrors.sol";
+import "../../interfaces/IExceptions.sol";
 
 uint256 constant fee = 6000;
 
@@ -1024,7 +1019,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
         _setUpTestCase(Tokens.DAI, 0, 0, addLiquidity, 2 * RAY, 0, false);
 
-        evm.expectRevert(IPool4626Exceptions.CreditManagerCantBorrowException.selector);
+        evm.expectRevert(CreditManagerCantBorrowException.selector);
         cmMock.lendCreditAccount(0, creditAccount);
 
         evm.startPrank(CONFIGURATOR);
@@ -1032,7 +1027,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         pool.setTotalBorrowedLimit(addLiquidity);
         evm.stopPrank();
 
-        evm.expectRevert(IPool4626Exceptions.CreditManagerCantBorrowException.selector);
+        evm.expectRevert(CreditManagerCantBorrowException.selector);
         cmMock.lendCreditAccount(addLiquidity + 1, creditAccount);
 
         evm.startPrank(CONFIGURATOR);
@@ -1040,7 +1035,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         pool.setTotalBorrowedLimit(type(uint128).max);
         evm.stopPrank();
 
-        evm.expectRevert(IPool4626Exceptions.CreditManagerCantBorrowException.selector);
+        evm.expectRevert(CreditManagerCantBorrowException.selector);
         cmMock.lendCreditAccount(addLiquidity + 1, creditAccount);
     }
 
@@ -1053,14 +1048,14 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         _setUpTestCase(Tokens.DAI, 0, 0, addLiquidity, 2 * RAY, 0, false);
 
         /// Case for unknown CM
-        evm.expectRevert(IPool4626Exceptions.CreditManagerOnlyException.selector);
+        evm.expectRevert(CallerNotCreditManagerException.selector);
         evm.prank(USER);
         pool.repayCreditAccount(1, 0, 0);
 
         /// Case for CM with zero debt
         assertEq(pool.creditManagerBorrowed(address(cmMock)), 0, "SETUP: Incorrect CM limit");
 
-        evm.expectRevert(IPool4626Exceptions.CreditManagerOnlyException.selector);
+        evm.expectRevert(CallerNotCreditManagerException.selector);
         cmMock.repayCreditAccount(1, 0, 0);
     }
 
@@ -1461,7 +1456,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
     // [P4-19]: setCreditManagerLimit reverts if not in register
     function test_P4_19_connectCreditManager_reverts_if_not_in_register() public {
-        evm.expectRevert(CreditManagerNotRegsiterException.selector);
+        evm.expectRevert(RegisteredCreditManagerOnlyException.selector);
 
         evm.prank(CONFIGURATOR);
         pool.setCreditManagerLimit(DUMB_ADDRESS, 1);
@@ -1471,7 +1466,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
     function test_P4_20_connectCreditManager_fails_on_incompatible_CM() public {
         cmMock.changePoolService(DUMB_ADDRESS);
 
-        evm.expectRevert(IPool4626Exceptions.IncompatibleCreditManagerException.selector);
+        evm.expectRevert(IncompatibleCreditManagerException.selector);
 
         evm.prank(CONFIGURATOR);
         pool.setCreditManagerLimit(address(cmMock), 1);
@@ -1622,7 +1617,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
     // [P4-26]: setWithdrawFee works correctly
     function test_P4_26_setWithdrawFee_works_correctly() public {
-        evm.expectRevert(IPool4626Exceptions.IncorrectWithdrawalFeeException.selector);
+        evm.expectRevert(IncorrectWithdrawalFeeException.selector);
 
         evm.prank(CONFIGURATOR);
         pool.setWithdrawFee(101);

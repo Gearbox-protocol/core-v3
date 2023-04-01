@@ -8,10 +8,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {UNIVERSAL_CONTRACT} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 import {AbstractAdapter} from "./AbstractAdapter.sol";
-import {AdapterType} from "../interfaces/adapters/IAdapter.sol";
+import {AdapterType} from "../interfaces/IAdapter.sol";
 import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
-import {IUniversalAdapter, RevocationPair} from "../interfaces/adapters/IUniversalAdapter.sol";
-import {ZeroAddressException} from "../interfaces/IErrors.sol";
+import {IUniversalAdapter, RevocationPair} from "../interfaces/IUniversalAdapter.sol";
+import "../interfaces/IExceptions.sol";
 
 /// @title Universal adapter
 /// @notice Implements the initial version of universal adapter, which handles allowance revocations

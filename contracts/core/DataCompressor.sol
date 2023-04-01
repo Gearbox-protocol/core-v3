@@ -8,7 +8,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 import {IDataCompressor} from "@gearbox-protocol/core-v2/contracts/interfaces/IDataCompressor.sol";
-import {ICreditManager} from "@gearbox-protocol/core-v2/contracts/interfaces/V1/ICreditManager.sol";
+import {ICreditManager as ICreditManagerV1} from "@gearbox-protocol/core-v2/contracts/interfaces/V1/ICreditManager.sol";
 import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
 import {ICreditFacade} from "../interfaces/ICreditFacade.sol";
 import {ICreditFilter} from "@gearbox-protocol/core-v2/contracts/interfaces/V1/ICreditFilter.sol";
@@ -21,7 +21,7 @@ import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.
 
 import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
-
+import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 import {
     CreditAccountData,
     CreditManagerData,
@@ -32,12 +32,12 @@ import {
 } from "@gearbox-protocol/core-v2/contracts/libraries/Types.sol";
 
 // EXCEPTIONS
-import {ZeroAddressException} from "../interfaces/IErrors.sol";
+import {ZeroAddressException} from "../interfaces/IExceptions.sol";
 
 /// @title Data compressor
 /// @notice Collects data from various contracts for use in the dApp
 /// Do not use for data from any onchain activities
-contract DataCompressor is IDataCompressor {
+contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
     /// @dev Address of the AddressProvider
     AddressProvider public immutable addressProvider;
 
@@ -50,21 +50,7 @@ contract DataCompressor is IDataCompressor {
     // Contract version
     uint256 public constant version = 3_00;
 
-    /// @dev Prevents function usage for target contracts that are not Gearbox pools
-    modifier targetIsRegisteredPool(address pool) {
-        if (!contractsRegister.isPool(pool)) revert NotPoolException(); // T:[WG-1]
-        _;
-    }
-
-    /// @dev Prevents function usage for target contracts that are not Gearbox Credit Managers
-    modifier targetIsRegisteredCreditManager(address creditManager) {
-        if (!contractsRegister.isCreditManager(creditManager)) {
-            revert NotCreditManagerException();
-        } // T:[WG-3]
-        _;
-    }
-
-    constructor(address _addressProvider) {
+    constructor(address _addressProvider) ContractsRegisterTrait(_addressProvider) {
         if (_addressProvider == address(0)) revert ZeroAddressException();
 
         addressProvider = AddressProvider(_addressProvider);
@@ -113,7 +99,7 @@ contract DataCompressor is IDataCompressor {
     function hasOpenedCreditAccount(address _creditManager, address borrower)
         public
         view
-        targetIsRegisteredCreditManager(_creditManager)
+        registeredCreditManagerOnly(_creditManager)
         returns (bool)
     {
         return _hasOpenedCreditAccount(_creditManager, borrower);
@@ -129,7 +115,7 @@ contract DataCompressor is IDataCompressor {
     {
         (
             uint8 ver,
-            ICreditManager creditManager,
+            ICreditManagerV1 creditManager,
             ICreditFilter creditFilter,
             ICreditManagerV2 creditManagerV2,
             ICreditFacade creditFacade,
@@ -150,15 +136,15 @@ contract DataCompressor is IDataCompressor {
             result.totalValue = creditFilter.calcTotalValue(creditAccount);
             result.healthFactor = creditFilter.calcCreditAccountHealthFactor(creditAccount);
 
-            try ICreditManager(creditManager).calcRepayAmount(borrower, false) returns (uint256 value) {
+            try ICreditManagerV1(creditManager).calcRepayAmount(borrower, false) returns (uint256 value) {
                 result.repayAmount = value;
             } catch {}
 
-            try ICreditManager(creditManager).calcRepayAmount(borrower, true) returns (uint256 value) {
+            try ICreditManagerV1(creditManager).calcRepayAmount(borrower, true) returns (uint256 value) {
                 result.liquidationAmount = value;
             } catch {}
 
-            try ICreditManager(creditManager)._calcClosePayments(creditAccount, result.totalValue, false) returns (
+            try ICreditManagerV1(creditManager)._calcClosePayments(creditAccount, result.totalValue, false) returns (
                 uint256, uint256, uint256 remainingFunds, uint256, uint256
             ) {
                 result.canBeClosed = remainingFunds > 0;
@@ -231,7 +217,7 @@ contract DataCompressor is IDataCompressor {
     function getCreditManagerData(address _creditManager) public view returns (CreditManagerData memory result) {
         (
             uint8 ver,
-            ICreditManager creditManager,
+            ICreditManagerV1 creditManager,
             ICreditFilter creditFilter,
             ICreditManagerV2 creditManagerV2,
             ICreditFacade creditFacade,
@@ -311,7 +297,7 @@ contract DataCompressor is IDataCompressor {
 
         if (ver == 1) {
             // VERSION 1 SPECIFIC FIELDS
-            result.maxLeverageFactor = ICreditManager(creditManager).maxLeverageFactor();
+            result.maxLeverageFactor = ICreditManagerV1(creditManager).maxLeverageFactor();
             result.maxEnabledTokensLength = 255;
             result.feeInterest = uint16(creditManager.feeInterest());
             result.feeLiquidation = uint16(creditManager.feeLiquidation());
@@ -338,7 +324,7 @@ contract DataCompressor is IDataCompressor {
 
     /// @dev Returns PoolData for a particular pool
     /// @param _pool Pool address
-    function getPoolData(address _pool) public view targetIsRegisteredPool(_pool) returns (PoolData memory result) {
+    function getPoolData(address _pool) public view registeredPoolOnly(_pool) returns (PoolData memory result) {
         IPoolService pool = IPoolService(_pool);
         result.version = uint8(pool.version());
 
@@ -390,7 +376,7 @@ contract DataCompressor is IDataCompressor {
     function getAdapter(address _creditManager, address _allowedContract)
         external
         view
-        targetIsRegisteredCreditManager(_creditManager)
+        registeredCreditManagerOnly(_creditManager)
         returns (address adapter)
     {
         (uint8 ver,, ICreditFilter creditFilter, ICreditManagerV2 creditManagerV2,,) =
@@ -410,10 +396,10 @@ contract DataCompressor is IDataCompressor {
     function getCreditContracts(address _creditManager)
         internal
         view
-        targetIsRegisteredCreditManager(_creditManager)
+        registeredCreditManagerOnly(_creditManager)
         returns (
             uint8 ver,
-            ICreditManager creditManager,
+            ICreditManagerV1 creditManager,
             ICreditFilter creditFilter,
             ICreditManagerV2 creditManagerV2,
             ICreditFacade creditFacade,
@@ -422,7 +408,7 @@ contract DataCompressor is IDataCompressor {
     {
         ver = uint8(IVersion(_creditManager).version());
         if (ver == 1) {
-            creditManager = ICreditManager(_creditManager);
+            creditManager = ICreditManagerV1(_creditManager);
             creditFilter = ICreditFilter(creditManager.creditFilter());
         } else {
             creditManagerV2 = ICreditManagerV2(_creditManager);

@@ -4,15 +4,10 @@
 pragma solidity ^0.8.10;
 
 import {GearStaking} from "../../support/GearStaking.sol";
-import {
-    IGearStakingExceptions,
-    IGearStakingEvents,
-    MultiVote,
-    VotingContractStatus
-} from "../../interfaces/IGearStaking.sol";
+import {IGearStakingEvents, MultiVote, VotingContractStatus} from "../../interfaces/IGearStaking.sol";
 import {IVotingContract} from "../../interfaces/IVotingContract.sol";
 
-import {CallerNotConfiguratorException} from "../../interfaces/IErrors.sol";
+import {CallerNotConfiguratorException} from "../../interfaces/IExceptions.sol";
 
 // TEST
 import "../lib/constants.sol";
@@ -26,9 +21,12 @@ import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
 import {Tokens} from "../config/Tokens.sol";
 
+// EXCEPTIONS
+import "../../interfaces/IExceptions.sol";
+
 uint256 constant EPOCH_LENGTH = 7 days;
 
-contract GearStakingTest is IGearStakingExceptions, IGearStakingEvents, DSTest {
+contract GearStakingTest is IGearStakingEvents, DSTest {
     CheatCodes evm = CheatCodes(HEVM_ADDRESS);
 
     address gearToken;

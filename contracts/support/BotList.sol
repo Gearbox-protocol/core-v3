@@ -6,11 +6,11 @@ pragma solidity ^0.8.10;
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
-import {ACLNonReentrantTrait} from "../core/ACLNonReentrantTrait.sol";
+import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {IBotList, BotFunding} from "../interfaces/IBotList.sol";
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 
-import {ZeroAddressException, AddressIsNotContractException} from "../interfaces/IErrors.sol";
+import {ZeroAddressException, AddressIsNotContractException} from "../interfaces/IExceptions.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 uint256 constant SECONDS_PER_WEEK = 3600 * 24 * 7;
