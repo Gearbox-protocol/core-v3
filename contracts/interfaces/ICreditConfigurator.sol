@@ -109,6 +109,12 @@ interface ICreditConfiguratorEvents {
 
     /// @dev Emits when the token is set as limited
     event TokenLimited(address);
+
+    /// @dev Emits when new max cumulative loss is set
+    event NewMaxCumulativeLoss(uint128);
+
+    /// @dev Emits when the current cumulative loss in Credit Facade is reset
+    event CumulativeLossReset();
 }
 
 /// @dev CreditConfigurator Exceptions
@@ -219,6 +225,17 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
     /// @dev Removex an address frp, the list of emergency liquidators
     /// @param liquidator The address to remove from the list
     function removeEmergencyLiquidator(address liquidator) external;
+
+    /// @dev Sets the max cumulative loss, which is a threshold of total loss that triggers a system pause
+    /// @param _maxCumulativeLoss The new value for maximal cumulative loss
+    function setMaxCumulativeLoss(uint128 _maxCumulativeLoss) external;
+
+    /// @dev Resets the current cumulative loss in Credit Facade
+    function resetCumulativeLoss() external;
+
+    /// @dev Sets the bot list contract
+    /// @param botList The address of the new bot list
+    function setBotList(address botList) external;
 
     //
     // GETTERS

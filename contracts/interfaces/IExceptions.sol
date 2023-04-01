@@ -257,3 +257,5 @@ error NothingToClaimException();
 // interface IAdapterExceptions {
 /// @notice Thrown when adapter tries to use a token that's not a collateral token of the connected Credit Manager
 error TokenIsNotInAllowedList(address);
+
+error LiquiditySanityCheckException();

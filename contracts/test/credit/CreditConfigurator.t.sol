@@ -338,6 +338,12 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV2Events, ICreditConfig
         evm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.setBotList(FRIEND);
 
+        evm.expectRevert(CallerNotConfiguratorException.selector);
+        creditConfigurator.setMaxCumulativeLoss(0);
+
+        evm.expectRevert(CallerNotConfiguratorException.selector);
+        creditConfigurator.resetCumulativeLoss();
+
         evm.stopPrank();
     }
 

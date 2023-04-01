@@ -148,8 +148,7 @@ contract AbstractAdapterTest is
             creditManager.tokenMasksMap(tokenTestSuite.addressOf(Tokens.DAI))
         );
 
-        address token = address(0xdead);
-        evm.expectRevert(abi.encodeWithSelector(TokenIsNotInAllowedList.selector, token));
+        evm.expectRevert(TokenNotAllowedException.selector);
         adapterMock.getMaskOrRevert(address(0xdead));
     }
 
@@ -403,13 +402,8 @@ contract AbstractAdapterTest is
                     );
                 }
 
-                if (sa == 0 && ti == 1) {
-                    evm.expectRevert(abi.encodeWithSelector(TokenIsNotInAllowedList.selector, TOKEN));
-                } else {
-                    evm.expectRevert(TokenNotAllowedException.selector);
-                }
-
                 evm.prank(USER);
+                evm.expectRevert(TokenNotAllowedException.selector);
                 creditFacade.multicall(multicallBuilder(MultiCall({target: address(adapterMock), callData: callData})));
             }
         }

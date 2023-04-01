@@ -6,7 +6,9 @@ pragma solidity ^0.8.10;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 //  DATA
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
@@ -17,7 +19,9 @@ import {QuotaUpdate} from "../interfaces/IPoolQuotaKeeper.sol";
 import {ICreditFacade, ICreditFacadeExtended, FullCheckParams} from "../interfaces/ICreditFacade.sol";
 import {ICreditManagerV2, ClosureAction} from "../interfaces/ICreditManagerV2.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
+
 import {IPool4626} from "../interfaces/IPool4626.sol";
+import {TokenLT} from "../interfaces/IPoolQuotaKeeper.sol";
 import {IDegenNFT} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
@@ -47,6 +51,13 @@ struct Limits {
     uint128 maxBorrowedAmount;
 }
 
+struct CumulativeLossParams {
+    /// @dev Current cumulative loss from all bad debt liquidations
+    uint128 currentCumulativeLoss;
+    /// @dev Max cumulative loss accrued before the system is paused
+    uint128 maxCumulativeLoss;
+}
+
 /// @title CreditFacade
 /// @notice User interface for interacting with Credit Manager.
 /// @dev CreditFacade provides an interface between the user and the Credit Manager. Direct interactions
@@ -57,6 +68,7 @@ struct Limits {
 contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using Address for address;
+    using SafeCast for uint256;
 
     /// @dev Credit Manager connected to this Credit Facade
     ICreditManagerV2 public immutable creditManager;
@@ -75,6 +87,9 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
 
     /// @dev Keeps borrowing limits together for storage access optimization
     Limits public override limits;
+
+    /// @dev Keeps parameters that are used to pause the system after too much bad debt over a short period
+    CumulativeLossParams public override lossParams;
 
     /// @dev Address of the underlying token
     address public immutable underlying;
@@ -285,10 +300,19 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
             _multicall(calls, msg.sender, creditAccount, true, false);
         } // F:[FA-2, 12, 13]
 
+        uint256 availableLiquidityBefore = _getAvailableLiquidity();
+        (, uint256 borrowAmountWithInterest,) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+
         // Requests the Credit manager to close the Credit Account
         creditManager.closeCreditAccount(
             msg.sender, ClosureAction.CLOSE_ACCOUNT, 0, msg.sender, to, skipTokenMask, convertWETH
         ); // F:[FA-2, 12]
+
+        uint256 availableLiquidityAfter = _getAvailableLiquidity();
+
+        if (availableLiquidityAfter < availableLiquidityBefore + borrowAmountWithInterest) {
+            revert LiquiditySanityCheckException();
+        }
 
         // TODO: add test
         if (convertWETH) {
@@ -357,7 +381,8 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
             _checkIfEmergencyLiquidator(false);
         }
 
-        uint256 remainingFunds = _closeLiquidatedAccount(totalValue, borrower, to, skipTokenMask, convertWETH, false);
+        uint256 remainingFunds =
+            _closeLiquidatedAccount(totalValue, creditAccount, borrower, to, skipTokenMask, convertWETH, false);
 
         emit LiquidateCreditAccount(borrower, msg.sender, to, remainingFunds); // F:[FA-15]
     }
@@ -407,7 +432,8 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
             _checkIfEmergencyLiquidator(false);
         }
 
-        uint256 remainingFunds = _closeLiquidatedAccount(totalValue, borrower, to, skipTokenMask, convertWETH, true);
+        uint256 remainingFunds =
+            _closeLiquidatedAccount(totalValue, creditAccount, borrower, to, skipTokenMask, convertWETH, true);
 
         // Emits event
         emit LiquidateExpiredCreditAccount(borrower, msg.sender, to, remainingFunds); // F:[FA-49]
@@ -416,6 +442,7 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
     /// @dev Closes a liquidated credit account, possibly expired
     function _closeLiquidatedAccount(
         uint256 totalValue,
+        address creditAccount,
         address borrower,
         address to,
         uint256 skipTokenMask,
@@ -430,8 +457,12 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
             _transferAccount(borrower, blacklistHelper);
         } // F:[FA-56]
 
+        uint256 availableLiquidityBefore = _getAvailableLiquidity();
+        (, uint256 borrowAmountWithInterest,) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+
         // Liquidates the CA and sends the remaining funds to the borrower or blacklist helper
-        remainingFunds = creditManager.closeCreditAccount(
+        uint256 reportedLoss;
+        (remainingFunds, reportedLoss) = creditManager.closeCreditAccount(
             helperBalance > 0 ? blacklistHelper : borrower,
             expired ? ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT : ClosureAction.LIQUIDATE_ACCOUNT,
             totalValue,
@@ -440,6 +471,25 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
             skipTokenMask,
             convertWETH
         ); // F:[FA-15,49]
+
+        uint256 availableLiquidityAfter = _getAvailableLiquidity();
+
+        unchecked {
+            uint256 availableLoss = availableLiquidityAfter < availableLiquidityBefore + borrowAmountWithInterest
+                ? availableLiquidityBefore + borrowAmountWithInterest - availableLiquidityAfter
+                : 0;
+
+            if (reportedLoss > 0 || availableLoss > 0) {
+                uint256 loss = reportedLoss > availableLoss ? reportedLoss : availableLoss;
+
+                params.isIncreaseDebtForbidden = true; // F: [FA-15A]
+
+                lossParams.currentCumulativeLoss += loss.toUint128();
+                if (lossParams.currentCumulativeLoss > lossParams.maxCumulativeLoss) {
+                    _pauseCreditManager(); // F: [FA-15B]
+                }
+            }
+        }
 
         /// Credit Facade increases the borrower's claimable balance in BlacklistHelper, so the
         /// borrower can recover funds to a different address
@@ -1083,6 +1133,16 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
         );
     }
 
+    /// @dev Returns the current available liquidity of the pool
+    function _getAvailableLiquidity() internal view returns (uint256) {
+        return IPool4626(creditManager.pool()).availableLiquidity();
+    }
+
+    /// @dev Pauses the Credit Manager
+    function _pauseCreditManager() internal {
+        creditManager.creditFacadePause();
+    }
+
     //
     // GETTERS
     //
@@ -1119,8 +1179,20 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
         view
         returns (uint256 totalUSD, uint256 twvUSD)
     {
-        uint256 tokenMask = 1;
         uint256 enabledTokensMask = creditManager.enabledTokensMap(creditAccount); // F:[FA-41]
+        uint256 limitedTokenMask = creditManager.limitedTokenMask();
+
+        if (creditManager.supportsQuotas()) {
+            TokenLT[] memory tokens = creditManager.getLimitedTokens(creditAccount);
+
+            if (tokens.length > 0) {
+                (twvUSD,) = creditManager.poolQuotaKeeper().computeQuotedCollateralUSD(
+                    address(creditManager), creditAccount, address(priceOracle), tokens
+                );
+            }
+        }
+
+        uint256 tokenMask = 1;
 
         while (tokenMask <= enabledTokensMask) {
             if (enabledTokensMask & tokenMask != 0) {
@@ -1133,7 +1205,10 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
                     unchecked {
                         totalUSD += value; // F:[FA-41]
                     }
-                    twvUSD += value * liquidationThreshold; // F:[FA-41]
+
+                    if (tokenMask & limitedTokenMask == 0) {
+                        twvUSD += value * liquidationThreshold; // F:[FA-41]
+                    }
                 }
             } // T:[FA-41]
 
@@ -1264,5 +1339,15 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
     ///      contract for easier transferability
     function setBotList(address _botList) external creditConfiguratorOnly {
         botList = _botList;
+    }
+
+    /// @dev Sets the max cumulative loss that can be accrued before pausing the Credit Manager
+    function setMaxCumulativeLoss(uint128 _maxCumulativeLoss) external creditConfiguratorOnly {
+        lossParams.maxCumulativeLoss = _maxCumulativeLoss;
+    }
+
+    /// @dev Resets the current cumulative loss value
+    function resetCumulativeLoss() external creditConfiguratorOnly {
+        lossParams.currentCumulativeLoss = 0;
     }
 }

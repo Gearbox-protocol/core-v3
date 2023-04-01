@@ -63,7 +63,7 @@ abstract contract AbstractAdapter is IAdapter, ACLNonReentrantTrait {
     function _getMaskOrRevert(address token) internal view returns (uint256 tokenMask) {
         tokenMask = creditManager.tokenMasksMap(token); // F: [AA-6]
         if (tokenMask == 0) {
-            revert TokenIsNotInAllowedList(token); // F: [AA-6]
+            revert TokenNotAllowedException(); // F: [AA-6]
         }
     }
 
