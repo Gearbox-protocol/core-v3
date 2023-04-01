@@ -49,11 +49,7 @@ interface IPool4626Events {
     event NewWithdrawFee(uint256 fee);
 }
 
-/// @title Pool Service Interface
-/// @notice Implements business logic:
-///   - Adding/removing pool liquidity
-///   - Managing diesel tokens & diesel rates
-///   - Taking/repaying Credit Manager debt
+/// @title Pool 4626
 /// More: https://dev.gearbox.fi/developers/pool/abstractpoolservice
 interface IPool4626 is IPool4626Events, IERC4626, IVersion {
     function depositReferral(uint256 assets, address receiver, uint16 referralCode) external returns (uint256 shares);

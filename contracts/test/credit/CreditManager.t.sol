@@ -566,11 +566,11 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
     /// @dev [CM-7]: openCreditAccount reverts if zero address or address exists
     function test_CM_07_openCreditAccount_reverts_if_zero_address_or_address_exists() public {
         // Zero address case
-        evm.expectRevert(ZeroAddressOrUserAlreadyHasAccountException.selector);
+        evm.expectRevert(ZeroAddressException.selector);
         creditManager.openCreditAccount(1, address(0));
         // Existing address case
         creditManager.openCreditAccount(1, USER);
-        evm.expectRevert(ZeroAddressOrUserAlreadyHasAccountException.selector);
+        evm.expectRevert(UserAlreadyHasAccountException.selector);
         creditManager.openCreditAccount(1, USER);
     }
 
@@ -1209,10 +1209,10 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
 
         creditManager.openCreditAccount(1, FRIEND);
         // address(0) case
-        evm.expectRevert(ZeroAddressOrUserAlreadyHasAccountException.selector);
+        evm.expectRevert(ZeroAddressException.selector);
         creditManager.transferAccountOwnership(USER, address(0));
         // Existing account case
-        evm.expectRevert(ZeroAddressOrUserAlreadyHasAccountException.selector);
+        evm.expectRevert(UserAlreadyHasAccountException.selector);
         creditManager.transferAccountOwnership(FRIEND, USER);
     }
 

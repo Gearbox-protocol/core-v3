@@ -8,7 +8,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 import {IDataCompressor} from "@gearbox-protocol/core-v2/contracts/interfaces/IDataCompressor.sol";
-import {ICreditManager} from "@gearbox-protocol/core-v2/contracts/interfaces/V1/ICreditManager.sol";
+import {ICreditManager as ICreditManagerV1} from "@gearbox-protocol/core-v2/contracts/interfaces/V1/ICreditManager.sol";
 import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
 import {ICreditFacade} from "../interfaces/ICreditFacade.sol";
 import {ICreditFilter} from "@gearbox-protocol/core-v2/contracts/interfaces/V1/ICreditFilter.sol";
@@ -115,7 +115,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
     {
         (
             uint8 ver,
-            ICreditManager creditManager,
+            ICreditManagerV1 creditManager,
             ICreditFilter creditFilter,
             ICreditManagerV2 creditManagerV2,
             ICreditFacade creditFacade,
@@ -136,15 +136,15 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
             result.totalValue = creditFilter.calcTotalValue(creditAccount);
             result.healthFactor = creditFilter.calcCreditAccountHealthFactor(creditAccount);
 
-            try ICreditManager(creditManager).calcRepayAmount(borrower, false) returns (uint256 value) {
+            try ICreditManagerV1(creditManager).calcRepayAmount(borrower, false) returns (uint256 value) {
                 result.repayAmount = value;
             } catch {}
 
-            try ICreditManager(creditManager).calcRepayAmount(borrower, true) returns (uint256 value) {
+            try ICreditManagerV1(creditManager).calcRepayAmount(borrower, true) returns (uint256 value) {
                 result.liquidationAmount = value;
             } catch {}
 
-            try ICreditManager(creditManager)._calcClosePayments(creditAccount, result.totalValue, false) returns (
+            try ICreditManagerV1(creditManager)._calcClosePayments(creditAccount, result.totalValue, false) returns (
                 uint256, uint256, uint256 remainingFunds, uint256, uint256
             ) {
                 result.canBeClosed = remainingFunds > 0;
@@ -217,7 +217,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
     function getCreditManagerData(address _creditManager) public view returns (CreditManagerData memory result) {
         (
             uint8 ver,
-            ICreditManager creditManager,
+            ICreditManagerV1 creditManager,
             ICreditFilter creditFilter,
             ICreditManagerV2 creditManagerV2,
             ICreditFacade creditFacade,
@@ -297,7 +297,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
 
         if (ver == 1) {
             // VERSION 1 SPECIFIC FIELDS
-            result.maxLeverageFactor = ICreditManager(creditManager).maxLeverageFactor();
+            result.maxLeverageFactor = ICreditManagerV1(creditManager).maxLeverageFactor();
             result.maxEnabledTokensLength = 255;
             result.feeInterest = uint16(creditManager.feeInterest());
             result.feeLiquidation = uint16(creditManager.feeLiquidation());
@@ -399,7 +399,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
         registeredCreditManagerOnly(_creditManager)
         returns (
             uint8 ver,
-            ICreditManager creditManager,
+            ICreditManagerV1 creditManager,
             ICreditFilter creditFilter,
             ICreditManagerV2 creditManagerV2,
             ICreditFacade creditFacade,
@@ -408,7 +408,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
     {
         ver = uint8(IVersion(_creditManager).version());
         if (ver == 1) {
-            creditManager = ICreditManager(_creditManager);
+            creditManager = ICreditManagerV1(_creditManager);
             creditFilter = ICreditFilter(creditManager.creditFilter());
         } else {
             creditManagerV2 = ICreditManagerV2(_creditManager);

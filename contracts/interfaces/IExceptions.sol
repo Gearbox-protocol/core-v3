@@ -61,6 +61,7 @@ error CallerNotUnPausableAdminException();
 /// @dev Thrown when a gauge-only function is called by non-gauge
 error CallerNotGaugeException();
 
+/// @dev Thrown when a poolQuotaKeeper function is called by non-pqk
 error CallerNotPoolQuotaKeeperException();
 
 /// @dev Thrown when `vote` or `unvote` are called from non-voter address
@@ -176,7 +177,7 @@ error AdaptersOrCreditFacadeOnlyException();
 
 /// @dev Thrown on attempting to open a Credit Account for or transfer a Credit Account
 ///      to the zero address or an address that already owns a Credit Account
-error ZeroAddressOrUserAlreadyHasAccountException();
+error UserAlreadyHasAccountException();
 
 /// @dev Thrown on attempting to execute an order to an address that is not an allowed
 ///      target contract

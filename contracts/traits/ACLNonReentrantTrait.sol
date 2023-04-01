@@ -14,9 +14,11 @@ import {
     CallerNotControllerException
 } from "../interfaces/IExceptions.sol";
 
+import {SanityCheckTrait} from "./SanityCheckTrait.sol";
+
 /// @title ACL Trait
 /// @notice Utility class for ACL consumers
-abstract contract ACLNonReentrantTrait is Pausable {
+abstract contract ACLNonReentrantTrait is Pausable, SanityCheckTrait {
     uint8 private constant _NOT_ENTERED = 1;
     uint8 private constant _ENTERED = 2;
 
@@ -63,10 +65,10 @@ abstract contract ACLNonReentrantTrait is Pausable {
 
     event NewController(address indexed newController);
 
-    modifier nonZeroAddress(address addr) {
-        if (addr == address(0)) revert ZeroAddressException(); // F:[P4-2]
-        _;
-    }
+    // modifier nonZeroAddress(address addr) {
+    //     if (addr == address(0)) revert ZeroAddressException(); // F:[P4-2]
+    //     _;
+    // }
 
     /// @dev constructor
     /// @param addressProvider Address of address repository

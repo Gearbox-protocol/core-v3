@@ -235,6 +235,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         whenNotPaused // F:[CM-5]
         nonReentrant
         creditFacadeOnly // F:[CM-2]
+        nonZeroAddress(onBehalfOf) // TODO: Add test
         returns (address)
     {
         // Takes a Credit Account from the factory and sets initial parameters
@@ -606,6 +607,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         whenNotPausedOrEmergency // F:[CM-5]
         nonReentrant
         creditFacadeOnly // F:[CM-2]
+        nonZeroAddress(to) // TODO: Add test
     {
         address creditAccount = getCreditAccountOrRevert(from); // F:[CM-6]
         delete creditAccounts[from]; // F:[CM-24]
@@ -1144,8 +1146,8 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
     /// @param borrower The new owner of the Credit Account
     /// @param creditAccount The Credit Account address
     function _safeCreditAccountSet(address borrower, address creditAccount) internal {
-        if (borrower == address(0) || creditAccounts[borrower] != address(0)) {
-            revert ZeroAddressOrUserAlreadyHasAccountException();
+        if (creditAccounts[borrower] != address(0)) {
+            revert UserAlreadyHasAccountException();
         } // F:[CM-7]
         creditAccounts[borrower] = creditAccount; // F:[CM-7]
     }

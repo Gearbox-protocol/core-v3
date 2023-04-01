@@ -12,14 +12,15 @@ import {
     RegisteredPoolOnlyException
 } from "../interfaces/IExceptions.sol";
 
+import {SanityCheckTrait} from "./SanityCheckTrait.sol";
+
 /// @title ContractsRegister Trait
 /// @notice Trait enables checks for registered pools & creditManagers
-abstract contract ContractsRegisterTrait {
+abstract contract ContractsRegisterTrait is SanityCheckTrait {
     // ACL contract to check rights
     ContractsRegister immutable _cr;
 
-    constructor(address addressProvider) {
-        if (addressProvider == address(0)) revert ZeroAddressException(); // F:[P4-2]
+    constructor(address addressProvider) nonZeroAddress(addressProvider) {
         _cr = ContractsRegister(AddressProvider(addressProvider).getContractsRegister());
     }
 
