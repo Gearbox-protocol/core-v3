@@ -12,14 +12,6 @@ struct BotFunding {
     uint40 allowanceLU;
 }
 
-interface IBotListExceptions {
-    /// @dev Thrown when attempting to pass a zero amount to a funding-related operation
-    error AmountCantBeZeroException();
-
-    /// @dev Thrown when attempting to fund a bot that is forbidden or not directly allowed by the user
-    error InvalidBotException();
-}
-
 interface IBotListEvents {
     /// @dev Emits when a borrower enables or disables a bot for their account
     event BotApprovalChanged(address indexed borrower, address indexed bot, bool status);
@@ -41,7 +33,7 @@ interface IBotListEvents {
 }
 
 /// @title IBotList
-interface IBotList is IBotListEvents, IBotListExceptions, IVersion {
+interface IBotList is IBotListEvents, IVersion {
     /// @dev Sets approval from msg.sender to bot
     function setBotStatus(address bot, bool status) external;
 

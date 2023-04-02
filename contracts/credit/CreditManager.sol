@@ -169,7 +169,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
     /// @dev Restricts calls to Credit Facade or allowed adapters
     modifier adaptersOrCreditFacadeOnly() {
         if (adapterToContract[msg.sender] == address(0) && msg.sender != creditFacade) {
-            revert AdaptersOrCreditFacadeOnlyException();
+            revert CallerNotAdaptersOrCreditFacadeException();
         } //
         _;
     }
@@ -640,7 +640,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
                     && msg.sender != universalAdapter
             ) || targetContract == address(0)
         ) {
-            revert AdaptersOrCreditFacadeOnlyException(); // F:[CM-3,25]
+            revert CallerNotAdaptersOrCreditFacadeException(); // F:[CM-3,25]
         }
 
         // Checks that the token is a collateral token
@@ -1483,9 +1483,9 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         } // F:[CM-52]
 
         // Checks that there aren't too many tokens
-        // Since token masks are 256 bit numbers with each bit corresponding to 1 token,
-        // only at most 256 are supported
-        if (collateralTokensCount >= 256) revert TooManyTokensException(); // F:[CM-52]
+        // Since token masks are 255 bit numbers with each bit corresponding to 1 token,
+        // only at most 255 are supported
+        if (collateralTokensCount >= 255) revert TooManyTokensException(); // F:[CM-52]
 
         // The tokenMask of a token is a bit mask with 1 at position corresponding to its index
         // (i.e. 2 ** index or 1 << index)

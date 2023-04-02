@@ -22,14 +22,14 @@ library CreditFacadeCalls {
         });
     }
 
-    function addCollateral(CreditFacadeMulticaller creditFacade, address borrower, address token, uint256 amount)
+    function addCollateral(CreditFacadeMulticaller creditFacade, address token, uint256 amount)
         internal
         pure
         returns (MultiCall memory)
     {
         return MultiCall({
             target: address(creditFacade),
-            callData: abi.encodeCall(ICreditFacade.addCollateral, (borrower, token, amount))
+            callData: abi.encodeCall(ICreditFacadeExtended.addCollateral, (token, amount))
         });
     }
 

@@ -10,10 +10,8 @@ import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {IBotList, BotFunding} from "../interfaces/IBotList.sol";
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 
-import {ZeroAddressException, AddressIsNotContractException} from "../interfaces/IExceptions.sol";
+import "../interfaces/IExceptions.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
-
-uint256 constant SECONDS_PER_WEEK = 3600 * 24 * 7;
 
 /// @title BotList
 /// @dev Used to store a mapping of borrowers => bots. A separate contract is used for transferability when
@@ -48,11 +46,7 @@ contract BotList is ACLNonReentrantTrait, IBotList {
     /// @dev Adds or removes allowance for a bot to execute multicalls on behalf of sender
     /// @param bot Bot address
     /// @param status Whether allowance is added or removed
-    function setBotStatus(address bot, bool status) external {
-        if (bot == address(0)) {
-            revert ZeroAddressException();
-        }
-
+    function setBotStatus(address bot, bool status) external nonZeroAddress(bot) {
         if (!bot.isContract() && status) {
             revert AddressIsNotContractException(bot);
         }
@@ -125,7 +119,7 @@ contract BotList is ACLNonReentrantTrait, IBotList {
 
         BotFunding memory bf = botFunding[payer][msg.sender];
 
-        if (block.timestamp >= bf.allowanceLU + SECONDS_PER_WEEK) {
+        if (block.timestamp >= bf.allowanceLU + uint40(7 days)) {
             bf.allowanceLU = uint40(block.timestamp);
             bf.remainingWeeklyAllowance = bf.maxWeeklyAllowance;
         }

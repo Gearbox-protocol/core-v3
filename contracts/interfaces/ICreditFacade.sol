@@ -34,10 +34,9 @@ interface ICreditFacadeExtended {
     function disableToken(address token) external;
 
     /// @dev Adds collateral to borrower's credit account
-    /// @param onBehalfOf Address of the borrower whose account is funded
     /// @param token Address of a collateral token
     /// @param amount Amount to add
-    function addCollateral(address onBehalfOf, address token, uint256 amount) external payable;
+    function addCollateral(address token, uint256 amount) external payable;
 
     /// @dev Increases debt for msg.sender's Credit Account
     /// - Borrows the requested amount from the pool
@@ -114,12 +113,6 @@ interface ICreditFacadeEvents {
 
     /// @dev Emits when the user changes approval for account transfers to itself from another address
     event TransferAccountAllowed(address indexed from, address indexed to, bool state);
-
-    /// @dev Emits when the account owner enables a token on their CA
-    event TokenEnabled(address indexed borrower, address indexed token);
-
-    /// @dev Emits when the account owner disables a token on their CA
-    event TokenDisabled(address indexed borrower, address indexed token);
 }
 
 interface ICreditFacade is ICreditFacadeEvents, IVersion {

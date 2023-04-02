@@ -4,7 +4,7 @@
 pragma solidity ^0.8.10;
 
 import {BotList} from "../../support/BotList.sol";
-import {IBotListEvents, IBotListExceptions, BotFunding} from "../../interfaces/IBotList.sol";
+import {IBotListEvents, BotFunding} from "../../interfaces/IBotList.sol";
 
 // TEST
 import "../lib/constants.sol";
@@ -18,16 +18,11 @@ import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
 import {Tokens} from "../config/Tokens.sol";
 
 // EXCEPTIONS
-
-import {
-    ZeroAddressException,
-    CallerNotConfiguratorException,
-    NotImplementedException
-} from "../../interfaces/IExceptions.sol";
+import "../../interfaces/IExceptions.sol";
 
 /// @title LPPriceFeedTest
 /// @notice Designed for unit test purposes only
-contract BotListTest is IBotListEvents, IBotListExceptions, DSTest {
+contract BotListTest is IBotListEvents, DSTest {
     CheatCodes evm = CheatCodes(HEVM_ADDRESS);
 
     AddressProviderACLMock public addressProvider;

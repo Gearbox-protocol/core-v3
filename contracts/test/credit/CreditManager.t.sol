@@ -399,25 +399,25 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
 
         evm.startPrank(USER);
 
-        evm.expectRevert(AdaptersOrCreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotAdaptersOrCreditFacadeException.selector);
         creditManager.approveCreditAccount(DUMB_ADDRESS, DUMB_ADDRESS, 100);
 
         evm.expectRevert(TargetContractNotAllowedException.selector);
         creditManager.executeOrder(DUMB_ADDRESS, bytes("0"));
 
-        evm.expectRevert(AdaptersOrCreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotAdaptersOrCreditFacadeException.selector);
         creditManager.checkAndEnableToken(DUMB_ADDRESS);
 
-        evm.expectRevert(AdaptersOrCreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotAdaptersOrCreditFacadeException.selector);
         creditManager.fullCollateralCheck(DUMB_ADDRESS, new uint256[](0), 10000);
 
-        evm.expectRevert(AdaptersOrCreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotAdaptersOrCreditFacadeException.selector);
         creditManager.checkEnabledTokensLength(DUMB_ADDRESS);
 
-        evm.expectRevert(AdaptersOrCreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotAdaptersOrCreditFacadeException.selector);
         creditManager.disableToken(DUMB_ADDRESS);
 
-        evm.expectRevert(AdaptersOrCreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotAdaptersOrCreditFacadeException.selector);
         creditManager.changeEnabledTokens(0, 0);
 
         evm.stopPrank();
@@ -1255,13 +1255,13 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         evm.prank(CONFIGURATOR);
         creditManager.changeContractAllowance(DUMB_ADDRESS, FRIEND);
 
-        evm.expectRevert(AdaptersOrCreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotAdaptersOrCreditFacadeException.selector);
 
         evm.prank(DUMB_ADDRESS);
         creditManager.approveCreditAccount(DUMB_ADDRESS, DUMB_ADDRESS, 100);
 
         // Address 0 case
-        evm.expectRevert(AdaptersOrCreditFacadeOnlyException.selector);
+        evm.expectRevert(CallerNotAdaptersOrCreditFacadeException.selector);
         evm.prank(DUMB_ADDRESS);
         creditManager.approveCreditAccount(address(0), DUMB_ADDRESS, 100);
     }
@@ -2141,7 +2141,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         evm.expectRevert(TokenAlreadyAddedException.selector);
         creditManager.addToken(underlying);
 
-        for (uint256 i = creditManager.collateralTokensCount(); i < 256; i++) {
+        for (uint256 i = creditManager.collateralTokensCount(); i < 255; i++) {
             creditManager.addToken(address(uint160(uint256(keccak256(abi.encodePacked(i))))));
         }
 

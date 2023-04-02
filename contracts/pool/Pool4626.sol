@@ -705,7 +705,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
         controllerOnly // F:[P4-18]
     {
         if (_withdrawFee > MAX_WITHDRAW_FEE) {
-            revert IncorrectWithdrawalFeeException(); // F:[P4-26]
+            revert IncorrectParameterException(); // F:[P4-26]
         }
         withdrawFee = _withdrawFee; // F:[P4-26]
         emit NewWithdrawFee(_withdrawFee); // F:[P4-26]

@@ -24,10 +24,7 @@ import {IBlacklistHelper} from "../../interfaces/IBlacklistHelper.sol";
 import {MultiCall, MultiCallOps} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 
-import {
-    CreditFacadeMulticaller,
-    CreditFacadeCalls
-} from "@gearbox-protocol/core-v2/contracts/multicall/CreditFacadeCalls.sol";
+import {CreditFacadeMulticaller, CreditFacadeCalls} from "../../multicall/CreditFacadeCalls.sol";
 
 // CONSTANTS
 
@@ -200,9 +197,7 @@ contract CreditFacadeTest is
             multicallBuilder(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeWithSelector(
-                        ICreditFacade.addCollateral.selector, USER, underlying, DAI_ACCOUNT_AMOUNT / 4
-                        )
+                    callData: abi.encodeCall(ICreditFacadeExtended.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
                 })
             )
         );
@@ -252,9 +247,7 @@ contract CreditFacadeTest is
             multicallBuilder(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeWithSelector(
-                        ICreditFacade.addCollateral.selector, USER, underlying, DAI_ACCOUNT_AMOUNT / 4
-                        )
+                    callData: abi.encodeCall(ICreditFacadeExtended.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
                 })
             ),
             0
@@ -347,7 +340,7 @@ contract CreditFacadeTest is
 
         (uint256 minBorrowedAmount,) = creditFacade.limits();
 
-        evm.expectRevert(NotAllowedInWhitelistedMode.selector);
+        evm.expectRevert(AccountTransferNotAllowedException.selector);
         evm.prank(USER);
         creditFacade.openCreditAccount(minBorrowedAmount, FRIEND, 100, 0);
 
@@ -355,7 +348,7 @@ contract CreditFacadeTest is
         evm.prank(FRIEND);
         creditFacade.openCreditAccount(minBorrowedAmount, FRIEND, 100, 0);
 
-        evm.expectRevert(NotAllowedInWhitelistedMode.selector);
+        evm.expectRevert(AccountTransferNotAllowedException.selector);
 
         evm.prank(USER);
         creditFacade.openCreditAccountMulticall(minBorrowedAmount, FRIEND, multicallBuilder(), 0);
@@ -393,9 +386,7 @@ contract CreditFacadeTest is
             multicallBuilder(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeWithSelector(
-                        ICreditFacade.addCollateral.selector, USER, underlying, DAI_ACCOUNT_AMOUNT
-                        )
+                    callData: abi.encodeCall(ICreditFacadeExtended.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT))
                 })
             ),
             0
@@ -503,9 +494,7 @@ contract CreditFacadeTest is
         MultiCall[] memory calls = multicallBuilder(
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeWithSelector(
-                    ICreditFacade.addCollateral.selector, FRIEND, underlying, DAI_ACCOUNT_AMOUNT
-                    )
+                callData: abi.encodeCall(ICreditFacadeExtended.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT))
             }),
             MultiCall({
                 target: address(creditFacade),
@@ -597,7 +586,7 @@ contract CreditFacadeTest is
         MultiCall[] memory calls = multicallBuilder(
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeWithSelector(ICreditFacade.addCollateral.selector, USER, collateral, amount)
+                callData: abi.encodeCall(ICreditFacadeExtended.addCollateral, (collateral, amount))
             })
         );
 
@@ -1130,25 +1119,6 @@ contract CreditFacadeTest is
         creditFacade.addCollateral(USER, DUMB_ADDRESS, 512);
     }
 
-    /// @dev [FA-21B]: addCollateral reverts in a multicall when account transfer is not allowed
-    function test_FA_21B_addCollateral_reverts_on_account_transfer_not_allowed_multicall() public {
-        _openTestCreditAccount();
-        _openExtraTestCreditAccount();
-
-        evm.expectRevert(AccountTransferNotAllowedException.selector);
-        evm.prank(FRIEND);
-        creditFacade.multicall(
-            multicallBuilder(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeWithSelector(
-                        ICreditFacade.addCollateral.selector, USER, DUMB_ADDRESS, USDC_EXCHANGE_AMOUNT
-                        )
-                })
-            )
-        );
-    }
-
     /// @dev [FA-21C]: addCollateral calls checkEnabledTokensLength
     function test_FA_21C_addCollateral_optimizes_enabled_tokens() public {
         (address creditAccount,) = _openTestCreditAccount();
@@ -1270,9 +1240,7 @@ contract CreditFacadeTest is
             multicallBuilder(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeWithSelector(
-                        ICreditFacade.addCollateral.selector, USER, usdcToken, USDC_EXCHANGE_AMOUNT
-                        )
+                    callData: abi.encodeCall(ICreditFacadeExtended.addCollateral, (usdcToken, USDC_EXCHANGE_AMOUNT))
                 }),
                 MultiCall({
                     target: address(creditFacade),
@@ -1333,9 +1301,7 @@ contract CreditFacadeTest is
             multicallBuilder(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeWithSelector(
-                        ICreditFacade.addCollateral.selector, USER, usdcToken, USDC_EXCHANGE_AMOUNT
-                        )
+                    callData: abi.encodeCall(ICreditFacadeExtended.addCollateral, (usdcToken, USDC_EXCHANGE_AMOUNT))
                 }),
                 MultiCall({
                     target: address(creditFacade),
@@ -1419,7 +1385,7 @@ contract CreditFacadeTest is
         cft.testFacadeWithDegenNFT();
         creditFacade = cft.creditFacade();
 
-        evm.expectRevert(NotAllowedInWhitelistedMode.selector);
+        evm.expectRevert(AccountTransferNotAllowedException.selector);
         evm.prank(USER);
         creditFacade.transferAccountOwnership(DUMB_ADDRESS);
     }
@@ -1755,8 +1721,8 @@ contract CreditFacadeTest is
         creditFacade.multicall(
             multicallBuilder(
                 CreditFacadeMulticaller(address(creditFacade)).revertIfReceivedLessThan(expectedBalances),
-                CreditFacadeMulticaller(address(creditFacade)).addCollateral(USER, underlying, expectedDAI),
-                CreditFacadeMulticaller(address(creditFacade)).addCollateral(USER, tokenLINK, expectedLINK)
+                CreditFacadeMulticaller(address(creditFacade)).addCollateral(underlying, expectedDAI),
+                CreditFacadeMulticaller(address(creditFacade)).addCollateral(tokenLINK, expectedLINK)
             )
         );
 
@@ -1772,23 +1738,18 @@ contract CreditFacadeTest is
                 multicallBuilder(
                     MultiCall({
                         target: address(creditFacade),
-                        callData: abi.encodeWithSelector(
-                            ICreditFacadeExtended.revertIfReceivedLessThan.selector, expectedBalances
+                        callData: abi.encodeCall(ICreditFacadeExtended.revertIfReceivedLessThan, (expectedBalances))
+                    }),
+                    MultiCall({
+                        target: address(creditFacade),
+                        callData: abi.encodeCall(
+                            ICreditFacadeExtended.addCollateral, (underlying, (i == 0) ? expectedDAI - 1 : expectedDAI)
                             )
                     }),
                     MultiCall({
                         target: address(creditFacade),
-                        callData: abi.encodeWithSelector(
-                            ICreditFacade.addCollateral.selector, USER, underlying, (i == 0) ? expectedDAI - 1 : expectedDAI
-                            )
-                    }),
-                    MultiCall({
-                        target: address(creditFacade),
-                        callData: abi.encodeWithSelector(
-                            ICreditFacade.addCollateral.selector,
-                            USER,
-                            tokenLINK,
-                            (i == 0) ? expectedLINK : expectedLINK - 1
+                        callData: abi.encodeCall(
+                            ICreditFacadeExtended.addCollateral, (tokenLINK, (i == 0) ? expectedLINK : expectedLINK - 1)
                             )
                     })
                 )
@@ -1959,9 +1920,6 @@ contract CreditFacadeTest is
             address(creditManager), abi.encodeWithSelector(ICreditManagerV2.checkAndEnableToken.selector, token)
         );
 
-        evm.expectEmit(true, false, false, true);
-        emit TokenEnabled(USER, token);
-
         evm.prank(USER);
         creditFacade.multicall(
             multicallBuilder(
@@ -1992,9 +1950,6 @@ contract CreditFacadeTest is
         );
 
         evm.expectCall(address(creditManager), abi.encodeWithSelector(ICreditManagerV2.disableToken.selector, token));
-
-        evm.expectEmit(true, false, false, true);
-        emit TokenDisabled(USER, token);
 
         evm.prank(USER);
         creditFacade.multicall(

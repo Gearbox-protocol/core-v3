@@ -359,7 +359,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         if (
             targetContract == address(creditManager) || targetContract == address(creditFacade())
                 || adapter == address(creditManager) || adapter == address(creditFacade())
-        ) revert CreditManagerOrFacadeUsedAsTargetContractsException(); // F:[CC-13]
+        ) revert TargetContractNotAllowedException(); // F:[CC-13]
 
         // Checks that adapter is not used for another target
         if (creditManager.adapterToContract(adapter) != address(0)) {
@@ -480,7 +480,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         if (
             _feeInterest >= PERCENTAGE_FACTOR || (_liquidationPremium + _feeLiquidation) >= PERCENTAGE_FACTOR
                 || (_liquidationPremiumExpired + _feeLiquidationExpired) >= PERCENTAGE_FACTOR
-        ) revert IncorrectFeesException(); // FT:[CC-23]
+        ) revert IncorrectParameterException(); // FT:[CC-23]
 
         _setParams(
             _feeInterest,
