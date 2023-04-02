@@ -594,13 +594,13 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV2Events, ICreditConfig
     function test_CC_13_allowContract_reverts_for_creditManager_and_creditFacade_contracts() public {
         evm.startPrank(CONFIGURATOR);
 
-        evm.expectRevert(CreditManagerOrFacadeUsedAsTargetContractsException.selector);
+        evm.expectRevert(TargetContractNotAllowedException.selector);
         creditConfigurator.allowContract(address(creditManager), DUMB_COMPARTIBLE_CONTRACT);
 
-        evm.expectRevert(CreditManagerOrFacadeUsedAsTargetContractsException.selector);
+        evm.expectRevert(TargetContractNotAllowedException.selector);
         creditConfigurator.allowContract(DUMB_COMPARTIBLE_CONTRACT, address(creditFacade));
 
-        evm.expectRevert(CreditManagerOrFacadeUsedAsTargetContractsException.selector);
+        evm.expectRevert(TargetContractNotAllowedException.selector);
         creditConfigurator.allowContract(address(creditFacade), DUMB_COMPARTIBLE_CONTRACT);
 
         evm.stopPrank();
@@ -760,17 +760,17 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV2Events, ICreditConfig
     function test_CC_23_setFees_reverts_for_incorrect_fees() public {
         (, uint16 feeLiquidation,, uint16 feeLiquidationExpired,) = creditManager.fees();
 
-        evm.expectRevert(IncorrectFeesException.selector);
+        evm.expectRevert(IncorrectParameterException.selector);
 
         evm.prank(CONFIGURATOR);
         creditConfigurator.setFees(PERCENTAGE_FACTOR, feeLiquidation, 0, 0, 0);
 
-        evm.expectRevert(IncorrectFeesException.selector);
+        evm.expectRevert(IncorrectParameterException.selector);
 
         evm.prank(CONFIGURATOR);
         creditConfigurator.setFees(PERCENTAGE_FACTOR - 1, feeLiquidation, PERCENTAGE_FACTOR - feeLiquidation, 0, 0);
 
-        evm.expectRevert(IncorrectFeesException.selector);
+        evm.expectRevert(IncorrectParameterException.selector);
 
         evm.prank(CONFIGURATOR);
         creditConfigurator.setFees(

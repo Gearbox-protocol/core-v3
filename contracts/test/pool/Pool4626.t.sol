@@ -1617,7 +1617,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
     // [P4-26]: setWithdrawFee works correctly
     function test_P4_26_setWithdrawFee_works_correctly() public {
-        evm.expectRevert(IncorrectWithdrawalFeeException.selector);
+        evm.expectRevert(IncorrectParameterException.selector);
 
         evm.prank(CONFIGURATOR);
         pool.setWithdrawFee(101);

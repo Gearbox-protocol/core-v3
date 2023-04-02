@@ -11,6 +11,9 @@ error ZeroAddressException();
 /// @dev Thrown on attempting to call a non-implemented function
 error NotImplementedException();
 
+/// @dev Thrown on incorrect input parameter
+error IncorrectParameterException();
+
 error RegisteredCreditManagerOnlyException();
 error RegisteredPoolOnlyException();
 
@@ -67,6 +70,10 @@ error CallerNotPoolQuotaKeeperException();
 /// @dev Thrown when `vote` or `unvote` are called from non-voter address
 error CallerNotVoterException();
 
+/// @dev Thrown if an access-restricted function is called by an address that is not
+///      the connected Credit Facade, or an allowed adapter
+error CallerNotAdaptersOrCreditFacadeException();
+
 /// interface ICreditConfiguratorExceptions {
 
 /// @dev Thrown if the underlying's LT is set directly
@@ -77,17 +84,11 @@ error SetLTForUnderlyingException();
 /// @dev Thrown if the newly set LT if zero or greater than the underlying's LT
 error IncorrectLiquidationThresholdException();
 
-/// @dev Thrown if feeInterest or (liquidationPremium + feeLiquidation) is out of [0%..100%] range (encoded as [0..10000])
-error IncorrectFeesException();
-
 /// @dev Thrown if borrowing limits are incorrect: minLimit > maxLimit or maxLimit > blockLimit
 error IncorrectLimitsException();
 
 /// @dev Thrown if the new expiration date is less than the current expiration date or block.timestamp
 error IncorrectExpirationDateException();
-
-/// @dev Thrown if address of CreditManager or CreditFacade are being set as a target for an adapter
-error CreditManagerOrFacadeUsedAsTargetContractsException();
 
 /// @dev Thrown if an adapter that is already linked to a contract is being connected to another
 error AdapterUsedTwiceException();
@@ -99,9 +100,6 @@ error IncompatibleContractException();
 /// @dev Thrown if attempting to forbid an adapter that is not allowed for the Credit Manager
 error ContractIsNotAnAllowedAdapterException();
 
-/// @dev Thrown if attempting to forbid or migrate a target contract that is not allowed for the Credit Manager
-error ContractIsNotAnAllowedTargetException();
-
 /// @dev Thrown when attempting to limit a token that is not quotable in PoolQuotaKeeper
 error TokenIsNotQuotedException();
 
@@ -110,11 +108,7 @@ error TokenIsNotQuotedException();
 ///      requires expirability
 error NotAllowedWhenNotExpirableException();
 
-/// @dev Thrown if whitelisted mode is enabled, and an action is attempted that is
-///      not allowed in whitelisted mode
-error NotAllowedInWhitelistedMode();
-
-/// @dev Thrown if a user attempts to transfer a CA to an address that didn't allow it
+/// @dev Thrown if a user attempts to transfer a CA to an address that didn't allow it or transfer in whitelisted mode
 error AccountTransferNotAllowedException();
 
 /// @dev Thrown if a liquidator tries to liquidate an account with a health factor above 1
@@ -171,10 +165,6 @@ error NotApprovedBotException();
 
 /// CM
 
-/// @dev Thrown if an access-restricted function is called by an address that is not
-///      the connected Credit Facade, or an allowed adapter
-error AdaptersOrCreditFacadeOnlyException();
-
 /// @dev Thrown on attempting to open a Credit Account for or transfer a Credit Account
 ///      to the zero address or an address that already owns a Credit Account
 error UserAlreadyHasAccountException();
@@ -199,26 +189,15 @@ error TooManyTokensException();
 ///      and there are not enough unused token to disable
 error TooManyEnabledTokensException();
 
-/// @dev Thrown when a reentrancy into the contract is attempted
-// error ReentrancyLockException();
-
-/// @dev Thrown when attempting to perform a quota-related operation on a non-quota CM
-error CMDoesNotSupportQuotasException();
-
 /// @dev Thrown when attempting to ramp LT for underlying
 error CannotRampLTForUnderlyingException();
 
 /// @dev Thrown when a custom HF parameter lower than 10000 is passed into a full collateral check
 error CustomHealthFactorTooLowException();
 
-// interface IGaugeExceptions {
-
-// interface IGearStakingExceptions {
 /// @dev Thrown when attempting to vote in a non-approved contract
 error VotingContractNotAllowedException();
 
-// interface IInterestRateModelExceptions {
-error IncorrectParameterException();
 error BorrowingMoreU2ForbiddenException();
 
 // interface ILPPriceFeedExceptions {
@@ -230,32 +209,18 @@ error ExpectedLiquidityLimitException();
 
 error CreditManagerCantBorrowException();
 
-error IncorrectWithdrawalFeeException();
-error ZeroAssetsException();
 error IncompatiblePoolQuotaKeeper();
 
-error AdditionalYieldPoolException();
-
-// interface IPoolQuotaKeeperExceptions {
-
-// interface IBotListExceptions {
 /// @dev Thrown when attempting to pass a zero amount to a funding-related operation
 error AmountCantBeZeroException();
 
 /// @dev Thrown when attempting to fund a bot that is forbidden or not directly allowed by the user
 error InvalidBotException();
 
-// interface IBlacklistHelperExceptions {
-
 /// @dev Thrown when attempting to add a Credit Facade that has non-blacklistable underlying
 error CreditFacadeNonBlacklistable();
 
 /// @dev Thrown when attempting to claim funds without having anything claimable
 error NothingToClaimException();
-// }
-
-// interface IAdapterExceptions {
-/// @notice Thrown when adapter tries to use a token that's not a collateral token of the connected Credit Manager
-error TokenIsNotInAllowedList(address);
 
 error LiquiditySanityCheckException();
