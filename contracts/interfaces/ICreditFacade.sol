@@ -68,7 +68,7 @@ interface ICreditFacadeExtended {
 
 interface ICreditFacadeEvents {
     /// @dev Emits when BlacklistHelper is set for CreditFacade upon creation
-    event BlacklistHelperSet(address indexed blacklistHelper);
+    event SetBlacklistHelper(address indexed blacklistHelper);
 
     /// @dev Emits when a new Credit Account is opened through the
     ///      Credit Facade
@@ -89,10 +89,6 @@ interface ICreditFacadeEvents {
         address indexed borrower, address indexed liquidator, address indexed to, uint256 remainingFunds
     );
 
-    /// @dev Emits when remaining funds in underlying currency are sent to blacklist helper
-    ///      upon blacklisted borrower liquidation
-    event UnderlyingSentToBlacklistHelper(address indexed borrower, uint256 amount);
-
     /// @dev Emits when the account owner increases CA's debt
     event IncreaseBorrowedAmount(address indexed borrower, uint256 amount);
 
@@ -103,16 +99,16 @@ interface ICreditFacadeEvents {
     event AddCollateral(address indexed onBehalfOf, address indexed token, uint256 value);
 
     /// @dev Emits when a multicall is started
-    event MultiCallStarted(address indexed borrower);
+    event StartMultiCall(address indexed borrower);
 
     /// @dev Emits when a multicall is finished
-    event MultiCallFinished();
+    event FinishMultiCall();
 
     /// @dev Emits when Credit Account ownership is transferred
     event TransferAccount(address indexed oldOwner, address indexed newOwner);
 
     /// @dev Emits when the user changes approval for account transfers to itself from another address
-    event TransferAccountAllowed(address indexed from, address indexed to, bool state);
+    event AllowAccountTransfer(address indexed from, address indexed to, bool state);
 }
 
 interface ICreditFacade is ICreditFacadeEvents, IVersion {

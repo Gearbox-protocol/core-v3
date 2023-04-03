@@ -1695,7 +1695,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         creditConfiguratorOnly // F:[CM-4]
     {
         creditConfigurator = _creditConfigurator; // F:[CM-58]
-        emit NewConfigurator(_creditConfigurator); // F:[CM-58]
+        emit SetConfigurator(_creditConfigurator); // F:[CM-58]
     }
 
     /// @dev Pauses the Credit Manager when triggered by the Credit Facade;

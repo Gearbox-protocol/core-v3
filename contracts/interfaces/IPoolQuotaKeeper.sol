@@ -33,25 +33,22 @@ struct AccountQuota {
 
 interface IPoolQuotaKeeperEvents {
     /// @dev Emits when CA's quota for token is changed
-    event AccountQuotaChanged(address creditAccount, address token, uint96 oldQuota, uint96 newQuota);
-
-    /// @dev Emits when pool's total quota for token is changed
-    event PoolQuotaChanged(address token, uint96 oldQuota, uint96 newQuota);
+    event ChangeAccountQuota(address creditAccount, address token, uint96 oldQuota, uint96 newQuota);
 
     /// @dev Emits when the quota rate is updated
-    event QuotaRateUpdated(address indexed token, uint16 rate);
-
-    /// @dev Emits when the gauge address is updated
-    event GaugeUpdated(address indexed newGauge);
+    event UpdateTokenQuotaRate(address indexed token, uint16 rate);
 
     /// @dev Emits when a new Credit Manager is allowed in PoolQuotaKeeper
-    event CreditManagerAdded(address indexed creditManager);
+    event AddCreditManager(address indexed creditManager);
 
     /// @dev Emits when a new token added to PoolQuotaKeeper
-    event NewQuotaTokenAdded(address indexed token);
+    event AddQuotaToken(address indexed token);
 
     /// @dev Emits when a new limit is set for a token
-    event TokenLimitSet(address indexed token, uint96 limit);
+    event SetTokenLimit(address indexed token, uint96 limit);
+
+    /// @dev Emits when the gauge address is updated
+    event SetGauge(address indexed newGauge);
 }
 
 /// @title Pool Quotas Interface

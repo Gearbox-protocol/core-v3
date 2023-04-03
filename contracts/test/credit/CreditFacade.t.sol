@@ -414,7 +414,7 @@ contract CreditFacadeTest is
         evm.expectEmit(true, true, false, true);
         emit OpenCreditAccount(
             FRIEND, expectedCreditAccountAddress, (DAI_ACCOUNT_AMOUNT * LEVERAGE) / LEVERAGE_DECIMALS, REFERRAL_CODE
-            );
+        );
 
         evm.expectCall(
             address(creditManager),
@@ -518,7 +518,7 @@ contract CreditFacadeTest is
         );
 
         evm.expectEmit(true, false, false, false);
-        emit MultiCallStarted(FRIEND);
+        emit StartMultiCall(FRIEND);
 
         evm.expectCall(
             address(creditManager),
@@ -543,7 +543,7 @@ contract CreditFacadeTest is
         emit IncreaseBorrowedAmount(FRIEND, WAD);
 
         evm.expectEmit(false, false, false, true);
-        emit MultiCallFinished();
+        emit FinishMultiCall();
 
         evm.expectCall(
             address(creditManager),
@@ -676,7 +676,7 @@ contract CreditFacadeTest is
         );
 
         evm.expectEmit(true, false, false, false);
-        emit MultiCallStarted(USER);
+        emit StartMultiCall(USER);
 
         evm.expectCall(
             address(creditManager),
@@ -693,7 +693,7 @@ contract CreditFacadeTest is
         evm.expectCall(address(targetMock), DUMB_CALLDATA);
 
         evm.expectEmit(false, false, false, true);
-        emit MultiCallFinished();
+        emit FinishMultiCall();
 
         evm.expectCall(
             address(creditManager),
@@ -774,7 +774,7 @@ contract CreditFacadeTest is
         );
 
         evm.expectEmit(true, false, false, false);
-        emit MultiCallStarted(USER);
+        emit StartMultiCall(USER);
 
         evm.expectCall(
             address(creditManager),
@@ -791,7 +791,7 @@ contract CreditFacadeTest is
         evm.expectCall(address(targetMock), DUMB_CALLDATA);
 
         evm.expectEmit(false, false, false, false);
-        emit MultiCallFinished();
+        emit FinishMultiCall();
 
         evm.expectCall(
             address(creditManager),
@@ -1203,7 +1203,7 @@ contract CreditFacadeTest is
         );
 
         evm.expectEmit(true, true, false, true);
-        emit MultiCallStarted(USER);
+        emit StartMultiCall(USER);
 
         evm.expectCall(
             address(creditManager),
@@ -1224,7 +1224,7 @@ contract CreditFacadeTest is
         emit IncreaseBorrowedAmount(USER, 256);
 
         evm.expectEmit(false, false, false, true);
-        emit MultiCallFinished();
+        emit FinishMultiCall();
 
         evm.expectCall(
             address(creditManager),
@@ -1264,7 +1264,7 @@ contract CreditFacadeTest is
         );
 
         evm.expectEmit(true, true, false, true);
-        emit MultiCallStarted(USER);
+        emit StartMultiCall(USER);
 
         evm.expectCall(
             address(creditManager),
@@ -1285,7 +1285,7 @@ contract CreditFacadeTest is
         emit DecreaseBorrowedAmount(USER, 256);
 
         evm.expectEmit(false, false, false, true);
-        emit MultiCallFinished();
+        emit FinishMultiCall();
 
         evm.expectCall(
             address(creditManager),
@@ -1344,7 +1344,7 @@ contract CreditFacadeTest is
         );
 
         evm.expectEmit(true, true, false, true);
-        emit MultiCallStarted(USER);
+        emit StartMultiCall(USER);
 
         evm.expectCall(
             address(creditManager),
@@ -1361,7 +1361,7 @@ contract CreditFacadeTest is
         evm.expectCall(address(targetMock), DUMB_CALLDATA);
 
         evm.expectEmit(false, false, false, true);
-        emit MultiCallFinished();
+        emit FinishMultiCall();
 
         evm.expectCall(
             address(creditManager),
@@ -1510,7 +1510,7 @@ contract CreditFacadeTest is
         assertTrue(creditFacade.transfersAllowed(USER, FRIEND) == false, "Transfer is unexpectedly allowed ");
 
         evm.expectEmit(true, true, false, true);
-        emit TransferAccountAllowed(USER, FRIEND, true);
+        emit AllowAccountTransfer(USER, FRIEND, true);
 
         evm.prank(FRIEND);
         creditFacade.approveAccountTransfer(USER, true);
@@ -1518,7 +1518,7 @@ contract CreditFacadeTest is
         assertTrue(creditFacade.transfersAllowed(USER, FRIEND) == true, "Transfer is unexpectedly not allowed ");
 
         evm.expectEmit(true, true, false, true);
-        emit TransferAccountAllowed(USER, FRIEND, false);
+        emit AllowAccountTransfer(USER, FRIEND, false);
 
         evm.prank(FRIEND);
         creditFacade.approveAccountTransfer(USER, false);
@@ -1856,7 +1856,7 @@ contract CreditFacadeTest is
         );
 
         evm.expectEmit(true, false, false, false);
-        emit MultiCallStarted(USER);
+        emit StartMultiCall(USER);
 
         evm.expectCall(
             address(creditManager),
@@ -1873,7 +1873,7 @@ contract CreditFacadeTest is
         evm.expectCall(address(targetMock), DUMB_CALLDATA);
 
         evm.expectEmit(false, false, false, false);
-        emit MultiCallFinished();
+        emit FinishMultiCall();
 
         evm.expectCall(
             address(creditManager),
@@ -2000,9 +2000,6 @@ contract CreditFacadeTest is
             blacklistHelper, abi.encodeWithSelector(IBlacklistHelper.addClaimable.selector, usdc, USER, expectedAmount)
         );
 
-        evm.expectEmit(true, false, false, true);
-        emit UnderlyingSentToBlacklistHelper(USER, expectedAmount);
-
         evm.prank(LIQUIDATOR);
         creditFacade.liquidateCreditAccount(USER, FRIEND, 0, true, multicallBuilder());
 
@@ -2059,7 +2056,7 @@ contract CreditFacadeTest is
         );
 
         evm.expectEmit(true, true, false, true);
-        emit MultiCallStarted(USER);
+        emit StartMultiCall(USER);
 
         evm.expectCall(
             address(creditManager),
@@ -2076,7 +2073,7 @@ contract CreditFacadeTest is
         evm.expectCall(address(targetMock), DUMB_CALLDATA);
 
         evm.expectEmit(false, false, false, true);
-        emit MultiCallFinished();
+        emit FinishMultiCall();
 
         evm.expectCall(
             address(creditManager),

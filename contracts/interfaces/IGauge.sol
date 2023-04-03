@@ -20,19 +20,19 @@ struct UserVotes {
 
 interface IGaugeEvents {
     /// @dev Emits when a user submits a vote
-    event VoteFor(address indexed user, address indexed token, uint96 votes, bool lpSide);
+    event Vote(address indexed user, address indexed token, uint96 votes, bool lpSide);
 
     /// @dev Emits when a user removes a vote
-    event UnvoteFrom(address indexed user, address indexed token, uint96 votes, bool lpSide);
+    event Unvote(address indexed user, address indexed token, uint96 votes, bool lpSide);
 
     /// @dev Emits when the Voter contract is changed
-    event VoterUpdated(address indexed newVoter);
+    event SetVoter(address indexed newVoter);
 
     /// @dev Emits when a new quota token is added in the PoolQuotaKeeper
-    event QuotaTokenAdded(address indexed token, uint16 minRate, uint16 maxRate);
+    event AddQuotaToken(address indexed token, uint16 minRate, uint16 maxRate);
 
     /// @dev Emits when quota interest rate parameters are changed
-    event QuotaParametersChanged(address indexed token, uint16 minRate, uint16 maxRate);
+    event SetQuotaTokenParams(address indexed token, uint16 minRate, uint16 maxRate);
 }
 
 /// @title IGauge

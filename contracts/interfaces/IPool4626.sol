@@ -17,7 +17,7 @@ struct Pool4626Opts {
 
 interface IPool4626Events {
     /// @dev Emits on new liquidity being added to the pool
-    event DepositReferral(address indexed sender, address indexed onBehalfOf, uint256 amount, uint16 referralCode);
+    event DepositWithReferral(address indexed sender, address indexed onBehalfOf, uint256 amount, uint16 referralCode);
 
     /// @dev Emits on a Credit Manager borrowing funds for a Credit Account
     event Borrow(address indexed creditManager, address indexed creditAccount, uint256 amount);
@@ -25,28 +25,29 @@ interface IPool4626Events {
     /// @dev Emits on repayment of a Credit Account's debt
     event Repay(address indexed creditManager, uint256 borrowedAmount, uint256 profit, uint256 loss);
 
-    /// @dev Emits on updating the interest rate model
-    event NewInterestRateModel(address indexed newInterestRateModel);
-
-    /// @dev Emits each time when new Pool Quota Manager updated
-    event NewPoolQuotaKeeper(address indexed newPoolQuotaKeeper);
-
-    /// @dev Emits on connecting a new Credit Manager
-    event NewCreditManagerConnected(address indexed creditManager);
-
-    event NewTotalBorrowedLimit(uint256 limit);
-
-    /// @dev Emits when a Credit Manager is forbidden to borrow
-    event BorrowLimitChanged(address indexed creditManager, uint256 newLimit);
-
-    /// @dev Emitted when loss is incurred that can't be covered by treasury funds
-    event UncoveredLoss(address indexed creditManager, uint256 loss);
+    /// @dev Emits when loss is incurred that can't be covered by treasury funds
+    event ReceiveUncoveredLoss(address indexed creditManager, uint256 loss);
 
     /// @dev Emits when the liquidity limit is changed
-    event NewExpectedLiquidityLimit(uint256 newLimit);
+    event SetExpectedLiquidityLimit(uint256 newLimit);
 
     /// @dev Emits when the withdrawal fee is changed
-    event NewWithdrawFee(uint256 fee);
+    event SetWithdrawFee(uint256 fee);
+
+    /// @dev Emits on updating the interest rate model
+    event SetInterestRateModel(address indexed newInterestRateModel);
+
+    /// @dev Emits each time when new Pool Quota Manager updated
+    event SetPoolQuotaKeeper(address indexed newPoolQuotaKeeper);
+
+    /// @dev Emits on connecting a new Credit Manager
+    event ConnectCreditManager(address indexed creditManager);
+
+    /// @dev Emits when a limit on total borrowing from all Credit Managers is set
+    event SetTotalBorrowedLimit(uint256 limit);
+
+    /// @dev Emits when a limit on borrowing by a particular Credit Manager is set
+    event SetCreditManagerBorrowLimit(address indexed creditManager, uint256 newLimit);
 }
 
 /// @title Pool 4626

@@ -439,7 +439,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         TokenQuotaParams storage qp = totalQuotaParams[token]; // F:[PQK-5]
         qp.cumulativeIndexLU_RAY = uint192(RAY); // F:[PQK-5]
 
-        emit NewQuotaTokenAdded(token); // F:[PQK-5]
+        emit AddQuotaToken(token); // F:[PQK-5]
     }
 
     /// @dev Batch updates the quota rates and changes the combined quota revenue
@@ -466,7 +466,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
 
             quotaRevenue += rate * tq.totalQuoted;
 
-            emit QuotaRateUpdated(token, rate); // F:[PQK-7]
+            emit UpdateTokenQuotaRate(token, rate); // F:[PQK-7]
 
             unchecked {
                 ++i;
@@ -490,7 +490,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         if (gauge != _gauge) {
             gauge = _gauge; // F:[PQK-8]
             lastQuotaRateUpdate = uint40(block.timestamp); // F:[PQK-8]
-            emit GaugeUpdated(_gauge); // F:[PQK-8]
+            emit SetGauge(_gauge); // F:[PQK-8]
         }
     }
 
@@ -509,7 +509,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         /// Checks if creditManager is already in list
         if (!creditManagerSet.contains(_creditManager)) {
             creditManagerSet.add(_creditManager); // F:[PQK-10]
-            emit CreditManagerAdded(_creditManager); // F:[PQK-10]
+            emit AddCreditManager(_creditManager); // F:[PQK-10]
         }
     }
 
@@ -528,7 +528,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
 
         if (tq.limit != limit) {
             tq.limit = limit; // F:[PQK-12]
-            emit TokenLimitSet(token, limit); // F:[PQK-12]
+            emit SetTokenLimit(token, limit); // F:[PQK-12]
         }
     }
 }

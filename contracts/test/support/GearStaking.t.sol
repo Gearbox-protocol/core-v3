@@ -82,7 +82,7 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
         tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
         evm.expectEmit(true, false, false, true);
-        emit GearDeposited(USER, WAD);
+        emit DepositGear(USER, WAD);
 
         evm.expectCall(address(votingContract), abi.encodeCall(IVotingContract.vote, (USER, uint96(WAD / 2), "")));
 
@@ -121,7 +121,7 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
         evm.expectCall(address(votingContract), abi.encodeCall(IVotingContract.unvote, (USER, uint96(WAD / 2), "")));
 
         evm.expectEmit(true, false, false, true);
-        emit GearWithdrawalScheduled(USER, WAD);
+        emit ScheduleGearWithdrawal(USER, WAD);
 
         evm.prank(USER);
         gearStaking.withdraw(WAD, FRIEND, votes);
@@ -304,7 +304,7 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
         evm.warp(block.timestamp + 2 * EPOCH_LENGTH);
 
         evm.expectEmit(true, false, false, true);
-        emit GearWithdrawalClaimed(USER, FRIEND, 3000);
+        emit ClaimGearWithdrawal(USER, FRIEND, 3000);
 
         evm.prank(USER);
         gearStaking.claimWithdrawals(FRIEND);
@@ -330,7 +330,7 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
         evm.warp(block.timestamp + EPOCH_LENGTH);
 
         evm.expectEmit(true, false, false, true);
-        emit GearWithdrawalClaimed(USER, FRIEND, 3000);
+        emit ClaimGearWithdrawal(USER, FRIEND, 3000);
 
         evm.prank(USER);
         gearStaking.withdraw(10000, FRIEND, votes);
@@ -358,7 +358,7 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
         gearStaking.setVotingContractStatus(DUMB_ADDRESS, VotingContractStatus.ALLOWED);
 
         evm.expectEmit(true, false, false, true);
-        emit VotingContractStatusUpdated(DUMB_ADDRESS, VotingContractStatus.UNVOTE_ONLY);
+        emit SetVotingContractStatus(DUMB_ADDRESS, VotingContractStatus.UNVOTE_ONLY);
 
         evm.prank(CONFIGURATOR);
         gearStaking.setVotingContractStatus(DUMB_ADDRESS, VotingContractStatus.UNVOTE_ONLY);

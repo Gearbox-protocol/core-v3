@@ -146,7 +146,7 @@ contract PoolQuotaKeeperTest is DSTest, BalanceHelper, IPoolQuotaKeeperEvents {
         assertEq(tokens.length, 0, "SETUP: tokens set unexpectedly has tokens");
 
         evm.expectEmit(true, true, false, false);
-        emit NewQuotaTokenAdded(DUMB_ADDRESS);
+        emit AddQuotaToken(DUMB_ADDRESS);
 
         evm.prank(pqk.gauge());
         pqk.addQuotaToken(DUMB_ADDRESS);
@@ -228,10 +228,10 @@ contract PoolQuotaKeeperTest is DSTest, BalanceHelper, IPoolQuotaKeeperEvents {
             evm.expectCall(address(gaugeMock), abi.encodeCall(IGauge.getRates, tokens));
 
             evm.expectEmit(true, true, false, true);
-            emit QuotaRateUpdated(DAI, DAI_QUOTA_RATE);
+            emit UpdateTokenQuotaRate(DAI, DAI_QUOTA_RATE);
 
             evm.expectEmit(true, true, false, true);
-            emit QuotaRateUpdated(USDC, USDC_QUOTA_RATE);
+            emit UpdateTokenQuotaRate(USDC, USDC_QUOTA_RATE);
 
             uint96 expectedQuotaRevenue =
                 uint96(DAI_QUOTA_RATE * uint96(daiQuota) + USDC_QUOTA_RATE * uint96(usdcQuota));
@@ -279,7 +279,7 @@ contract PoolQuotaKeeperTest is DSTest, BalanceHelper, IPoolQuotaKeeperEvents {
         evm.warp(block.timestamp + 2 days);
 
         evm.expectEmit(true, true, false, false);
-        emit GaugeUpdated(address(gaugeMock));
+        emit SetGauge(address(gaugeMock));
 
         pqk.setGauge(address(gaugeMock));
 
@@ -321,7 +321,7 @@ contract PoolQuotaKeeperTest is DSTest, BalanceHelper, IPoolQuotaKeeperEvents {
         assertEq(managers.length, 0, "SETUP: at least one creditmanager is unexpectedly connected");
 
         evm.expectEmit(true, true, false, false);
-        emit CreditManagerAdded(address(cmMock));
+        emit AddCreditManager(address(cmMock));
 
         evm.prank(CONFIGURATOR);
         pqk.addCreditManager(address(cmMock));
@@ -357,7 +357,7 @@ contract PoolQuotaKeeperTest is DSTest, BalanceHelper, IPoolQuotaKeeperEvents {
         evm.prank(CONFIGURATOR);
 
         evm.expectEmit(true, true, false, true);
-        emit TokenLimitSet(DUMB_ADDRESS, limit);
+        emit SetTokenLimit(DUMB_ADDRESS, limit);
 
         pqk.setTokenLimit(DUMB_ADDRESS, limit);
 

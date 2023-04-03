@@ -152,7 +152,7 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
         blacklistHelper = _blacklistHelper;
         isBlacklistableUnderlying = _blacklistHelper != address(0);
         if (_blacklistHelper != address(0)) {
-            emit BlacklistHelperSet(_blacklistHelper);
+            emit SetBlacklistHelper(_blacklistHelper);
         }
 
         expirable = _expirable;
@@ -532,7 +532,6 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
                 amount = helperBalance - helperBalanceBefore;
             }
             IBlacklistHelper(blacklistHelper).addClaimable(underlying, borrower, amount); // F:[FA-56]
-            emit UnderlyingSentToBlacklistHelper(borrower, amount); // F:[FA-56]
         }
     }
 
@@ -716,7 +715,7 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
         // Uniswap: [Token (?)] -> [ someting in the middle ] -> [AllowedToken]
         //          [ AllowedToken here] -> [ allowed connectors ] -> [Allowed Token]
         //
-        emit MultiCallStarted(borrower);
+        emit StartMultiCall(borrower);
         // F:[FA-26]
 
         // Declares the expectedBalances array, which can later be used for slippage control
@@ -784,7 +783,7 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
         }
 
         // Emits event for multicall end - used in analytics to track actions within multicalls
-        emit MultiCallFinished(); // F:[FA-27,27,29]
+        emit FinishMultiCall(); // F:[FA-27,27,29]
 
         // Returns ownership back to the borrower
         _transferAccount(address(this), borrower); // F:[FA-27,27,29]
@@ -1080,7 +1079,7 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
         transfersAllowed[from][msg.sender] = state; // F:[FA-38]
 
         // Emits event
-        emit TransferAccountAllowed(from, msg.sender, state); // F:[FA-38]
+        emit AllowAccountTransfer(from, msg.sender, state); // F:[FA-38]
     }
 
     //

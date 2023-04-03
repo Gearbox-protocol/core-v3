@@ -26,7 +26,7 @@ interface ICreditManagerV2Events {
     event ExecuteOrder(address indexed target);
 
     /// @dev Emits when a configurator is upgraded
-    event NewConfigurator(address indexed newConfigurator);
+    event SetConfigurator(address indexed newConfigurator);
 }
 
 /// @notice All Credit Manager functions are access-restricted and can only be called

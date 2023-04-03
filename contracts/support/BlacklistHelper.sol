@@ -80,7 +80,7 @@ contract BlacklistHelper is ACLNonReentrantTrait, IBlacklistHelper {
     ///         Expects the underlying to be transferred directly to this contract in the same transaction
     function addClaimable(address underlying, address holder, uint256 amount) external override creditFacadeOnly {
         claimable[underlying][holder] += amount;
-        emit ClaimableAdded(underlying, holder, amount);
+        emit IncreaseClaimableBalance(underlying, holder, amount);
     }
 
     /// @dev Transfer the sender's current claimable balance in underlying to a specified address
@@ -93,7 +93,7 @@ contract BlacklistHelper is ACLNonReentrantTrait, IBlacklistHelper {
         }
         claimable[underlying][msg.sender] = 0;
         IERC20(underlying).safeTransfer(to, amount);
-        emit Claimed(underlying, msg.sender, to, amount);
+        emit Claim(underlying, msg.sender, to, amount);
     }
 
     /// @dev Adds a new Credit Facade to `supported` list
@@ -103,13 +103,13 @@ contract BlacklistHelper is ACLNonReentrantTrait, IBlacklistHelper {
             revert CreditFacadeNonBlacklistable();
         }
         isSupportedCreditFacade[_creditFacade] = true;
-        emit CreditFacadeAdded(_creditFacade);
+        emit AddCreditFacade(_creditFacade);
     }
 
     /// @dev Removes a Credit Facade from the `supported` list
     /// @param _creditFacade Address of the Credit Facade
     function removeCreditFacade(address _creditFacade) external configuratorOnly {
         isSupportedCreditFacade[_creditFacade] = false;
-        emit CreditFacadeRemoved(_creditFacade);
+        emit RemoveCreditFacade(_creditFacade);
     }
 }

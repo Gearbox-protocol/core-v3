@@ -7,16 +7,16 @@ import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.
 
 interface IBlacklistHelperEvents {
     /// @dev Emitted when a borrower's claimable balance is increased
-    event ClaimableAdded(address indexed underlying, address indexed holder, uint256 amount);
+    event IncreaseClaimableBalance(address indexed underlying, address indexed holder, uint256 amount);
 
     /// @dev Emitted when a borrower claims their tokens
-    event Claimed(address indexed underlying, address indexed holder, address to, uint256 amount);
+    event Claim(address indexed underlying, address indexed holder, address to, uint256 amount);
 
     /// @dev Emitted when a Credit Facade is added to BlacklistHelper
-    event CreditFacadeAdded(address indexed creditFacade);
+    event AddCreditFacade(address indexed creditFacade);
 
     /// @dev Emitted when a Credit Facade is removed from BlacklistHelper
-    event CreditFacadeRemoved(address indexed creditFacade);
+    event RemoveCreditFacade(address indexed creditFacade);
 }
 
 interface IBlacklistHelper is IBlacklistHelperEvents, IVersion {
