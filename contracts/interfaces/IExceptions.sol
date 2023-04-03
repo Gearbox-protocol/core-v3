@@ -155,7 +155,7 @@ error ExpectedBalancesAlreadySetException();
 
 /// @dev Thrown if a Credit Account has enabled forbidden tokens and the owner attempts to perform an action
 ///      that is not allowed with any forbidden tokens enabled
-error ActionProhibitedWithForbiddenTokensException();
+error ForbiddenTokensException();
 
 /// @dev Thrown when attempting to perform an action on behalf of a borrower that is blacklisted in the underlying token
 error NotAllowedForBlacklistedAddressException();
@@ -224,3 +224,5 @@ error CreditFacadeNonBlacklistable();
 error NothingToClaimException();
 
 error LiquiditySanityCheckException();
+
+error ZeroCallsException();

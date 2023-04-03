@@ -599,17 +599,18 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV2Events, BalanceHelpe
         assertLe(diff, 2, "Total debt not equal");
     }
 
-    /// @dev [CMQ-11]: updateQuotas reverts on too many enabled tokens
-    function test_CMQ_11_updateQuotas_reverts_on_too_many_tokens_enabled() public {
-        (,,, address creditAccount) = _openCreditAccount();
+    // [DEPRECIATED]: We test that after full collateral
+    // /// @dev [CMQ-11]: updateQuotas reverts on too many enabled tokens
+    // function test_CMQ_11_updateQuotas_reverts_on_too_many_tokens_enabled() public {
+    //     (,,, address creditAccount) = _openCreditAccount();
 
-        uint256 maxTokens = creditManager.maxAllowedEnabledTokenLength();
+    //     uint256 maxTokens = creditManager.maxAllowedEnabledTokenLength();
 
-        QuotaUpdate[] memory quotaUpdates = _addManyLimitedTokens(maxTokens + 1, 100);
+    //     QuotaUpdate[] memory quotaUpdates = _addManyLimitedTokens(maxTokens + 1, 100);
 
-        evm.expectRevert(TooManyEnabledTokensException.selector);
-        creditManager.updateQuotas(creditAccount, quotaUpdates);
-    }
+    //     evm.expectRevert(TooManyEnabledTokensException.selector);
+    //     creditManager.updateQuotas(creditAccount, quotaUpdates);
+    // }
 
     /// @dev [CMQ-12]: Credit Manager zeroes limits on quoted tokens upon incurring a loss
     function test_CMQ_12_creditManager_triggers_limit_zeroing_on_loss() public {

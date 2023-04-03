@@ -211,7 +211,14 @@ contract CreditFacadeTest is
 
         evm.expectRevert(HasNoOpenedAccountException.selector);
         evm.prank(USER);
-        creditFacade.multicall(multicallBuilder());
+        creditFacade.multicall(
+            multicallBuilder(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeExtended.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
+                })
+            )
+        );
 
         evm.prank(CONFIGURATOR);
         creditConfigurator.allowContract(address(targetMock), address(adapterMock));
@@ -307,7 +314,14 @@ contract CreditFacadeTest is
         _prepareForWETHTest();
 
         evm.prank(USER);
-        creditFacade.multicall{value: WETH_TEST_AMOUNT}(multicallBuilder());
+        creditFacade.multicall{value: WETH_TEST_AMOUNT}(
+            multicallBuilder(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeExtended.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
+                })
+            )
+        );
         _checkForWETHTest();
     }
 
@@ -326,7 +340,12 @@ contract CreditFacadeTest is
         evm.expectRevert(AccountTransferNotAllowedException.selector);
         creditFacade.openCreditAccount(minBorrowedAmount, FRIEND, 100, 0);
 
-        MultiCall[] memory calls;
+        MultiCall[] memory calls = multicallBuilder(
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeExtended.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
+            })
+        );
         evm.expectRevert(AccountTransferNotAllowedException.selector);
         creditFacade.openCreditAccountMulticall(minBorrowedAmount, FRIEND, calls, 0);
 
@@ -351,12 +370,32 @@ contract CreditFacadeTest is
         evm.expectRevert(AccountTransferNotAllowedException.selector);
 
         evm.prank(USER);
-        creditFacade.openCreditAccountMulticall(minBorrowedAmount, FRIEND, multicallBuilder(), 0);
+        creditFacade.openCreditAccountMulticall(
+            minBorrowedAmount,
+            FRIEND,
+            multicallBuilder(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeExtended.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
+                })
+            ),
+            0
+        );
 
         evm.expectRevert(IDegenNFTExceptions.InsufficientBalanceException.selector);
 
         evm.prank(FRIEND);
-        creditFacade.openCreditAccountMulticall(minBorrowedAmount, FRIEND, multicallBuilder(), 0);
+        creditFacade.openCreditAccountMulticall(
+            minBorrowedAmount,
+            FRIEND,
+            multicallBuilder(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeExtended.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
+                })
+            ),
+            0
+        );
     }
 
     /// @dev [FA-4C]: openCreditAccount opens account and burns token
@@ -471,7 +510,12 @@ contract CreditFacadeTest is
         creditConfigurator.setIncreaseDebtForbidden(true);
 
         evm.expectRevert(IncreaseDebtForbiddenException.selector);
-        MultiCall[] memory calls;
+        MultiCall[] memory calls = multicallBuilder(
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeExtended.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
+            })
+        );
 
         evm.prank(USER);
         creditFacade.openCreditAccountMulticall(minBorrowedAmount, USER, calls, 0);
@@ -635,7 +679,12 @@ contract CreditFacadeTest is
         evm.prank(USER);
         creditFacade.openCreditAccount(blockLimit + 1, USER, 100, 0);
 
-        MultiCall[] memory calls;
+        MultiCall[] memory calls = multicallBuilder(
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeExtended.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
+            })
+        );
 
         evm.expectRevert(BorrowedBlockLimitException.selector);
 
@@ -1014,7 +1063,7 @@ contract CreditFacadeTest is
         evm.prank(CONFIGURATOR);
         creditConfigurator.forbidToken(link);
 
-        evm.expectRevert(ActionProhibitedWithForbiddenTokensException.selector);
+        evm.expectRevert(ForbiddenTokensException.selector);
 
         evm.prank(USER);
         creditFacade.multicall(
@@ -1803,7 +1852,17 @@ contract CreditFacadeTest is
         evm.expectRevert(OpenAccountNotAllowedAfterExpirationException.selector);
 
         evm.prank(USER);
-        creditFacade.openCreditAccountMulticall(DAI_ACCOUNT_AMOUNT, USER, multicallBuilder(), 0);
+        creditFacade.openCreditAccountMulticall(
+            DAI_ACCOUNT_AMOUNT,
+            USER,
+            multicallBuilder(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeExtended.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
+                })
+            ),
+            0
+        );
     }
 
     /// @dev [FA-47]: liquidateExpiredCreditAccount should not work before the CreditFacade is expired
@@ -2034,7 +2093,17 @@ contract CreditFacadeTest is
         evm.expectRevert(NotAllowedForBlacklistedAddressException.selector);
 
         evm.prank(USER);
-        creditFacade.openCreditAccountMulticall(USDC_ACCOUNT_AMOUNT, USER, multicallBuilder(), 0);
+        creditFacade.openCreditAccountMulticall(
+            USDC_ACCOUNT_AMOUNT,
+            USER,
+            multicallBuilder(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeExtended.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
+                })
+            ),
+            0
+        );
     }
 
     /// @dev [FA-58]: botMulticall works correctly

@@ -11,6 +11,7 @@ import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 //  DATA
+import {TokenIndex} from "../libraries/TokenIndex.sol";
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 import {Balance, BalanceOps} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 import {QuotaUpdate} from "../interfaces/IPoolQuotaKeeper.sol";
@@ -67,8 +68,11 @@ struct CumulativeLossParams {
 /// - Through adapters, which call the Credit Manager directly, but only allow interactions with specific target contracts
 contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableSet for EnumerableSet.UintSet;
     using Address for address;
     using SafeCast for uint256;
+    using TokenIndex for uint256;
+    using TokenIndex for address;
 
     /// @dev Credit Manager connected to this Credit Facade
     ICreditManagerV2 public immutable creditManager;
@@ -97,6 +101,9 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
     /// @dev Address of the underlying token
     address public immutable underlying;
 
+    /// @dev True of credit manager support quotas
+    bool public immutable supportsQuotas;
+
     /// @dev Contract containing the list of approval statuses for borrowers / bots
     address public botList;
 
@@ -118,6 +125,11 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
     /// @dev Stores in a compressed state the last block where borrowing happened and the total amount borrowed in that block
     uint256 internal totalBorrowedInBlock;
 
+    /// @dev Bit mask encoding a set of forbidden tokens
+    uint256 public forbiddenTokenMask;
+
+    EnumerableSet.UintSet internal forbiddenTokenSet;
+
     /// @dev Contract version
     uint256 public constant override version = 3_00;
 
@@ -127,6 +139,13 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
             revert CallerNotConfiguratorException();
         }
 
+        _;
+    }
+
+    modifier nonZeroCallsOnly(MultiCall[] calldata calls) {
+        if (calls.length == 0) {
+            revert ZeroCallsException();
+        }
         _;
     }
 
@@ -143,6 +162,8 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
         creditManager = ICreditManagerV2(_creditManager); // F:[FA-1A]
         pool = creditManager.pool();
         underlying = ICreditManagerV2(_creditManager).underlying(); // F:[FA-1A]
+        supportsQuotas = creditManager.supportsQuotas(); // TODO: add test
+
         wethAddress = ICreditManagerV2(_creditManager).wethAddress(); // F:[FA-1A]
         wethGateway = IWETHGateway(ICreditManagerV2(_creditManager).wethGateway());
 
@@ -239,7 +260,7 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
         address onBehalfOf,
         MultiCall[] calldata calls,
         uint16 referralCode
-    ) external payable override nonReentrant {
+    ) external payable override nonReentrant nonZeroCallsOnly(calls) {
         // Checks whether the new borrowed amount does not violate the block limit
         _checkAndUpdateBorrowedBlockLimit(borrowedAmount); // F:[FA-11]
 
@@ -258,17 +279,14 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
         // emits a new event
         emit OpenCreditAccount(onBehalfOf, creditAccount, borrowedAmount, referralCode); // F:[FA-8]
 
-        FullCheckParams memory fullCheckParams;
-        fullCheckParams.minHealthFactor = PERCENTAGE_FACTOR;
+        uint256[] memory forbiddenBalances;
 
         // F:[FA-10]: no free flashloans through opening a Credit Account
         // and immediately decreasing debt
-        if (calls.length != 0) {
-            fullCheckParams = _multicall(calls, onBehalfOf, creditAccount, false, true);
-        } // F:[FA-8]
+        FullCheckParams memory fullCheckParams = _multicall(calls, onBehalfOf, creditAccount, false, true); // F:[FA-8]
 
         // Checks that the new credit account has enough collateral to cover the debt
-        _fullCollateralCheck(creditAccount, fullCheckParams); // F:[FA-8, 9]
+        _fullCollateralCheck(creditAccount, fullCheckParams, 0, forbiddenBalances); // F:[FA-8, 9]
     }
 
     /// @dev Runs a batch of transactions within a multicall and closes the account
@@ -549,10 +567,6 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
         // Checks that the borrowed amount does not violate the per block limit
         _checkAndUpdateBorrowedBlockLimit(amount); // F:[FA-18A]
 
-        // Checks that there are no forbidden tokens, as borrowing
-        // is prohibited when forbidden tokens are enabled on the account
-        _checkForbiddenTokens(creditAccount);
-
         // Requests the Credit Manager to borrow additional funds from the pool
         uint256 newBorrowedAmount = creditManager.manageDebt(creditAccount, amount, true); // F:[FA-17]
 
@@ -561,30 +575,6 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
 
         // Emits event
         emit IncreaseBorrowedAmount(borrower, amount); // F:[FA-17]
-    }
-
-    /// @dev Checks that there are no intersections between the user's enabled tokens
-    /// and the set of forbidden tokens
-    /// @notice The main purpose of forbidding tokens is to prevent exposing
-    /// pool funds to dangerous or exploited collateral, without immediately
-    /// liquidating accounts that hold the forbidden token
-    /// There are two ways pool funds can be exposed:
-    ///     - The CA owner tries to swap borrowed funds to the forbidden asset:
-    ///       this will be blocked by checkAndEnableToken, which is invoked for tokenOut
-    ///       after every operation;
-    ///     - The CA owner with an already enabled forbidden token transfers it
-    ///       to the account - they can't use addCollateral / enableToken due to checkAndEnableToken,
-    ///       but can transfer the token directly when it is enabled and it will be counted in the collateral -
-    ///       an borrows against it. This check is used to prevent this.
-    /// If the owner has a forbidden token and want to take more debt, they must first
-    /// dispose of the token and disable it.
-    function _checkForbiddenTokens(address creditAccount) internal view {
-        uint256 enabledTokenMask = creditManager.enabledTokensMap(creditAccount);
-        uint256 forbiddenTokenMask = creditManager.forbiddenTokenMask();
-
-        if (enabledTokenMask & forbiddenTokenMask > 0) {
-            revert ActionProhibitedWithForbiddenTokensException();
-        }
     }
 
     /// @dev Decreases debt for a Credit Account
@@ -641,21 +631,21 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
     ///  - Executes the Multicall
     ///  - Performs a fullCollateralCheck to verify that hf > 1 after all actions
     /// @param calls The array of MultiCall structs encoding the operations to execute.
-    function multicall(MultiCall[] calldata calls) external payable override nonReentrant {
+    function multicall(MultiCall[] calldata calls) external payable override nonReentrant nonZeroCallsOnly(calls) {
         // Checks that msg.sender has an account
         address creditAccount = _getCreditAccountOrRevert(msg.sender);
 
         // Wraps ETH and sends it back to msg.sender
         _wrapETH(); // F:[FA-3F]
 
-        if (calls.length != 0) {
-            FullCheckParams memory fullCheckParams = _multicall(calls, msg.sender, creditAccount, false, false);
+        (uint256 enabledTokenMaskBefore, uint256[] memory forbiddenBalances) = _storeForbiddenBalances(creditAccount);
 
-            // Performs a fullCollateralCheck
-            // During a multicall, all intermediary health checks are skipped,
-            // as one fullCollateralCheck at the end is sufficient
-            _fullCollateralCheck(creditAccount, fullCheckParams);
-        }
+        FullCheckParams memory fullCheckParams = _multicall(calls, msg.sender, creditAccount, false, false);
+
+        // Performs a fullCollateralCheck
+        // During a multicall, all intermediary health checks are skipped,
+        // as one fullCollateralCheck at the end is sufficient
+        _fullCollateralCheck(creditAccount, fullCheckParams, enabledTokenMaskBefore, forbiddenBalances);
     }
 
     /// @dev Executes a batch of transactions within a Multicall from bot on behalf of a borrower
@@ -664,7 +654,13 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
     ///  - Performs a fullCollateralCheck to verify that hf > 1 after all actions
     /// @param borrower Borrower to perform the multicall for
     /// @param calls The array of MultiCall structs encoding the operations to execute.
-    function botMulticall(address borrower, MultiCall[] calldata calls) external payable override nonReentrant {
+    function botMulticall(address borrower, MultiCall[] calldata calls)
+        external
+        payable
+        override
+        nonReentrant
+        nonZeroCallsOnly(calls)
+    {
         // Checks that the bot is approved by the borrower and is not forbidden
         if (!IBotList(botList).approvedBot(borrower, msg.sender) || IBotList(botList).forbiddenBot(msg.sender)) {
             revert NotApprovedBotException(); // F: [FA-58]
@@ -673,14 +669,14 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
         // Checks that msg.sender has an account
         address creditAccount = _getCreditAccountOrRevert(borrower);
 
-        if (calls.length != 0) {
-            FullCheckParams memory fullCheckParams = _multicall(calls, borrower, creditAccount, false, false); // F: [FA-58]
+        (uint256 enabledTokenMaskBefore, uint256[] memory forbiddenBalances) = _storeForbiddenBalances(creditAccount);
 
-            // Performs a fullCollateralCheck
-            // During a multicall, all intermediary health checks are skipped,
-            // as one fullCollateralCheck at the end is sufficient
-            _fullCollateralCheck(creditAccount, fullCheckParams); // F: [FA-58]
-        }
+        FullCheckParams memory fullCheckParams = _multicall(calls, borrower, creditAccount, false, false); // F: [FA-58]
+
+        // Performs a fullCollateralCheck
+        // During a multicall, all intermediary health checks are skipped,
+        // as one fullCollateralCheck at the end is sufficient
+        _fullCollateralCheck(creditAccount, fullCheckParams, enabledTokenMaskBefore, forbiddenBalances); // F: [FA-58]
     }
 
     /// @dev IMPLEMENTATION: multicall
@@ -1099,12 +1095,85 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
         return creditManager.getCreditAccountOrRevert(borrower);
     }
 
+    // /// @dev Internal wrapper for `creditManager.fullCollateralCheck()`
+    // /// @notice The external call is wrapped to optimize contract size
+    // function _fullCollateralCheck(
+    //     address creditAccount,
+    //     FullCheckParams memory fullCheckParams,
+    //     uint256 enabledTokenMaskBefore
+    // ) internal {
+    //     uint256 enabledTokenMaskAfter = creditManager.fullCollateralCheck(
+    //         creditAccount, fullCheckParams.collateralHints, fullCheckParams.minHealthFactor
+    //     );
+
+    //     if (enabledTokenMaskBefore ^ enabledTokenMaskAfter & enabledTokenMaskAfter & forbiddenTokenMask != 0) {
+    //         revert TokenNotAllowedException();
+    //     }
+    // }
+
     /// @dev Internal wrapper for `creditManager.fullCollateralCheck()`
     /// @notice The external call is wrapped to optimize contract size
-    function _fullCollateralCheck(address creditAccount, FullCheckParams memory fullCheckParams) internal {
-        creditManager.fullCollateralCheck(
+    function _fullCollateralCheck(
+        address creditAccount,
+        FullCheckParams memory fullCheckParams,
+        uint256 enabledTokenMaskBefore,
+        uint256[] memory forbiddenBalances
+    ) internal {
+        uint256 enabledTokenMaskAfter = creditManager.fullCollateralCheck(
             creditAccount, fullCheckParams.collateralHints, fullCheckParams.minHealthFactor
         );
+
+        uint256 forbiddenTokensOnAccount = enabledTokenMaskAfter & forbiddenTokenMask;
+
+        if (forbiddenTokensOnAccount != 0) {
+            if (enabledTokenMaskBefore ^ enabledTokenMaskAfter & forbiddenTokensOnAccount != 0) {
+                revert TokenNotAllowedException();
+            }
+
+            _checkForbiddenBalances(creditAccount, forbiddenBalances, forbiddenTokensOnAccount);
+        }
+    }
+
+    function _storeForbiddenBalances(address creditAccount)
+        internal
+        view
+        returns (uint256 enabledTokenMaskBefore, uint256[] memory forbiddenBalances)
+    {
+        enabledTokenMaskBefore = creditManager.enabledTokensMap(creditAccount);
+        uint256 forbiddenTokensOnAccount = enabledTokenMaskBefore & forbiddenTokenMask;
+        if (forbiddenTokensOnAccount != 0) {
+            uint256 len = forbiddenTokenSet.length();
+            forbiddenBalances = new uint256[](len);
+
+            unchecked {
+                for (uint256 i; i < len; ++i) {
+                    (address token, uint8 index) = forbiddenTokenSet.at(i).unzip();
+                    if (forbiddenTokensOnAccount & (1 << index) != 0) {
+                        forbiddenBalances[i] = IERC20(token).balanceOf(creditAccount);
+                    }
+                }
+            }
+        }
+    }
+
+    function _checkForbiddenBalances(
+        address creditAccount,
+        uint256[] memory forbiddenBalances,
+        uint256 forbiddenTokensOnAccount
+    ) internal view {
+        uint256 len = forbiddenTokenSet.length();
+
+        unchecked {
+            for (uint256 i; i < len; ++i) {
+                (address token, uint8 index) = forbiddenTokenSet.at(i).unzip();
+                if (forbiddenTokensOnAccount & (1 << index) != 0) {
+                    uint256 balance = IERC20(token).balanceOf(creditAccount);
+                    if (balance > forbiddenBalances[i]) {
+                        revert ForbiddenTokensException();
+                    }
+                }
+            }
+        }
     }
 
     /// @dev Returns the current available liquidity of the pool
@@ -1156,8 +1225,8 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
         uint256 enabledTokensMask = creditManager.enabledTokensMap(creditAccount); // F:[FA-41]
         uint256 limitedTokenMask = creditManager.limitedTokenMask();
 
-        if (creditManager.supportsQuotas()) {
-            TokenLT[] memory tokens = creditManager.getLimitedTokens(creditAccount);
+        if (supportsQuotas) {
+            TokenLT[] memory tokens = creditManager.getQuotedTokens(creditAccount);
 
             if (tokens.length > 0) {
                 (twvUSD,) = creditManager.poolQuotaKeeper().computeQuotedCollateralUSD(
@@ -1323,5 +1392,35 @@ contract CreditFacade is ICreditFacade, ACLNonReentrantTrait {
     /// @dev Resets the current cumulative loss value
     function resetCumulativeLoss() external creditConfiguratorOnly {
         lossParams.currentCumulativeLoss = 0;
+    }
+
+    /// @dev Adds forbidden token
+    function forbiddenToken(address tokenToForbid) external creditConfiguratorOnly {
+        (uint256 tokenMaskMap, uint256 zip) = _getTokenMaskAndZip(tokenToForbid);
+        forbiddenTokenSet.add(zip);
+        forbiddenTokenMask |= tokenMaskMap;
+    }
+
+    function allowToken(address token) external creditConfiguratorOnly {
+        (uint256 tokenMaskMap, uint256 zip) = _getTokenMaskAndZip(token);
+        if (forbiddenTokenSet.contains(zip)) {
+            forbiddenTokenSet.remove(zip);
+            forbiddenTokenMask ^= tokenMaskMap;
+        }
+    }
+
+    function _getTokenMaskAndZip(address token) internal view returns (uint256 tokenMask, uint256 zip) {
+        tokenMask = creditManager.tokenMasksMap(token);
+        if (tokenMask == 0) revert TokenNotAllowedException();
+        uint8 tokenIndex = _maskToIndex(tokenMask);
+
+        zip = token.zipWith(tokenIndex);
+    }
+
+    function _maskToIndex(uint256 mask) internal pure returns (uint8) {
+        for (uint8 index; index < 256; index++) {
+            if (mask == (1 << index)) return index;
+        }
+        revert IncorrectParameterException();
     }
 }

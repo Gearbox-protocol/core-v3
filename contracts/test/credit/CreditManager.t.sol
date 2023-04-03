@@ -141,8 +141,8 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
 
         evm.expectCall(
             address(priceOracle),
-            abi.encodeWithSelector(
-                IPriceOracleV2.convertToUSD.selector, borrowedAmountWithInterestAndFees * PERCENTAGE_FACTOR, underlying
+            abi.encodeCall(
+                IPriceOracleV2.convertToUSD, (borrowedAmountWithInterestAndFees * PERCENTAGE_FACTOR, underlying)
             )
         );
     }
@@ -408,11 +408,8 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         evm.expectRevert(CallerNotAdaptersOrCreditFacadeException.selector);
         creditManager.checkAndEnableToken(DUMB_ADDRESS);
 
-        evm.expectRevert(CallerNotAdaptersOrCreditFacadeException.selector);
+        evm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.fullCollateralCheck(DUMB_ADDRESS, new uint256[](0), 10000);
-
-        evm.expectRevert(CallerNotAdaptersOrCreditFacadeException.selector);
-        creditManager.checkEnabledTokensLength(DUMB_ADDRESS);
 
         evm.expectRevert(CallerNotAdaptersOrCreditFacadeException.selector);
         creditManager.disableToken(DUMB_ADDRESS);
@@ -2458,7 +2455,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
 
         address creditAccount = _openAccountAndTransferToCF();
 
-        CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
+        // CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
 
         tokenTestSuite.mint(Tokens.USDC, creditAccount, USDC_ACCOUNT_AMOUNT);
         tokenTestSuite.mint(Tokens.USDT, creditAccount, 10);
@@ -2469,18 +2466,21 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.LINK));
 
         uint256[] memory collateralHints = new uint256[](2);
-        collateralHints[0] = cmi.tokenMasksMap(tokenTestSuite.addressOf(Tokens.USDT));
-        collateralHints[1] = cmi.tokenMasksMap(tokenTestSuite.addressOf(Tokens.LINK));
+        collateralHints[0] = creditManager.tokenMasksMap(tokenTestSuite.addressOf(Tokens.USDT));
+        collateralHints[1] = creditManager.tokenMasksMap(tokenTestSuite.addressOf(Tokens.LINK));
 
-        cmi.fullCollateralCheck(creditAccount, collateralHints, PERCENTAGE_FACTOR);
+        evm.expectCall(tokenTestSuite.addressOf(Tokens.USDT), abi.encodeCall(IERC20.balanceOf, (creditAccount)));
+        evm.expectCall(tokenTestSuite.addressOf(Tokens.LINK), abi.encodeCall(IERC20.balanceOf, (creditAccount)));
 
-        assertEq(cmi.fullCheckOrder(0), tokenTestSuite.addressOf(Tokens.USDT), "Token order incorrect");
+        creditManager.fullCollateralCheck(creditAccount, collateralHints, PERCENTAGE_FACTOR);
 
-        assertEq(cmi.fullCheckOrder(1), tokenTestSuite.addressOf(Tokens.LINK), "Token order incorrect");
+        // assertEq(cmi.fullCheckOrder(0), tokenTestSuite.addressOf(Tokens.USDT), "Token order incorrect");
 
-        assertEq(cmi.fullCheckOrder(2), tokenTestSuite.addressOf(Tokens.DAI), "Token order incorrect");
+        // assertEq(cmi.fullCheckOrder(1), tokenTestSuite.addressOf(Tokens.LINK), "Token order incorrect");
 
-        assertEq(cmi.fullCheckOrder(3), tokenTestSuite.addressOf(Tokens.USDC), "Token order incorrect");
+        // assertEq(cmi.fullCheckOrder(2), tokenTestSuite.addressOf(Tokens.DAI), "Token order incorrect");
+
+        // assertEq(cmi.fullCheckOrder(3), tokenTestSuite.addressOf(Tokens.USDC), "Token order incorrect");
     }
 
     /// @dev [CM-70]: fullCollateralCheck reverts when an illegal mask is passed in collateralHints

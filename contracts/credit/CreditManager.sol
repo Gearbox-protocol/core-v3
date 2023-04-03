@@ -324,7 +324,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
             TokenLT[] memory tokens;
 
             if (supportsQuotas) {
-                tokens = getLimitedTokens(creditAccount);
+                tokens = getQuotedTokens(creditAccount);
 
                 // TODO: Check that it never breaks
                 uint256 quotaInterest = cumulativeQuotaInterest[creditAccount] - 1;
@@ -421,11 +421,14 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
 
         uint256 newCumulativeIndex;
         if (increase) {
+            // Checks that there are no forbidden tokens, as borrowing
+            // is prohibited when forbidden tokens are enabled on the account
+            _checkForbiddenTokens(creditAccount);
+
             newBorrowedAmount = borrowedAmount + amount;
 
             // Computes the new cumulative index to keep the interest
             // unchanged with different principal
-
             newCumulativeIndex =
                 _calcNewCumulativeIndex(borrowedAmount, amount, cumulativeIndexNow_RAY, cumulativeIndexAtOpen_RAY, true);
 
@@ -504,6 +507,27 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         }
     }
 
+    /// @dev Checks that there are no intersections between the user's enabled tokens
+    /// and the set of forbidden tokens
+    /// @notice The main purpose of forbidding tokens is to prevent exposing
+    /// pool funds to dangerous or exploited collateral, without immediately
+    /// liquidating accounts that hold the forbidden token
+    /// There are two ways pool funds can be exposed:
+    ///     - The CA owner tries to swap borrowed funds to the forbidden asset:
+    ///       this will be blocked by checkAndEnableToken, which is invoked for tokenOut
+    ///       after every operation;
+    ///     - The CA owner with an already enabled forbidden token transfers it
+    ///       to the account - they can't use addCollateral / enableToken due to checkAndEnableToken,
+    ///       but can transfer the token directly when it is enabled and it will be counted in the collateral -
+    ///       an borrows against it. This check is used to prevent this.
+    /// If the owner has a forbidden token and want to take more debt, they must first
+    /// dispose of the token and disable it.
+    function _checkForbiddenTokens(address creditAccount) internal view {
+        if (enabledTokensMap[creditAccount] & forbiddenTokenMask > 0) {
+            revert ForbiddenTokensException();
+        }
+    }
+
     function _computeQuotasAmountDebtDecrease(address creditAccount, uint256 _amountRepaid, uint256 _amountProfit)
         internal
         returns (uint256 amountRepaid, uint256 amountProfit)
@@ -514,7 +538,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         uint16 feeInterest = slot1.feeInterest;
         uint256 quotaInterestAccrued = cumulativeQuotaInterest[creditAccount];
 
-        TokenLT[] memory tokens = getLimitedTokens(creditAccount);
+        TokenLT[] memory tokens = getQuotedTokens(creditAccount);
         if (tokens.length > 0) {
             quotaInterestAccrued += poolQuotaKeeper().accrueQuotaInterest(creditAccount, tokens); // F: [CMQ-4,5]
         }
@@ -751,88 +775,72 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
     /// @param minHealthFactor Minimal health factor of the account, in PERCENTAGE format
     function fullCollateralCheck(address creditAccount, uint256[] memory collateralHints, uint16 minHealthFactor)
         external
-        adaptersOrCreditFacadeOnly
+        creditFacadeOnly
         nonReentrant
+        returns (uint256 enabledTokenMask)
     {
         if (minHealthFactor < PERCENTAGE_FACTOR) {
             revert CustomHealthFactorTooLowException();
         }
 
-        _fullCollateralCheck(creditAccount, collateralHints, minHealthFactor);
-    }
-
-    /// @dev IMPLEMENTATION: fullCollateralCheck
-    function _fullCollateralCheck(address creditAccount, uint256[] memory collateralHints, uint16 minHealthFactor)
-        internal
-        virtual
-    {
         IPriceOracleV2 _priceOracle = slot1.priceOracle;
 
-        uint256 enabledTokenMask = enabledTokensMap[creditAccount];
+        enabledTokenMask = enabledTokensMap[creditAccount];
         uint256 checkedTokenMask = enabledTokenMask;
         uint256 borrowAmountPlusInterestRateUSD;
 
         uint256 twvUSD;
 
-        {
-            uint256 quotaInterest;
-            if (supportsQuotas) {
-                TokenLT[] memory tokens = getLimitedTokens(creditAccount);
+        uint256 quotaInterest;
+        if (supportsQuotas) {
+            TokenLT[] memory tokens = getQuotedTokens(creditAccount);
 
-                if (tokens.length > 0) {
-                    /// If credit account has any connected token - then check that
-                    (twvUSD, quotaInterest) = poolQuotaKeeper().computeQuotedCollateralUSD(
-                        address(this), creditAccount, address(_priceOracle), tokens
-                    ); // F: [CMQ-8]
+            if (tokens.length > 0) {
+                /// If credit account has any connected token - then check that
+                (twvUSD, quotaInterest) = poolQuotaKeeper().computeQuotedCollateralUSD(
+                    address(this), creditAccount, address(_priceOracle), tokens
+                ); // F: [CMQ-8]
 
-                    checkedTokenMask = checkedTokenMask & (~limitedTokenMask);
-                }
-
-                quotaInterest += cumulativeQuotaInterest[creditAccount]; // F: [CMQ-8]
+                checkedTokenMask = checkedTokenMask & (~limitedTokenMask);
             }
 
-            // The total weighted value of a Credit Account has to be compared
-            // with the entire debt sum, including interest and fees
-            (,, uint256 borrowedAmountWithInterestAndFees) =
-                _calcCreditAccountAccruedInterest(creditAccount, quotaInterest);
+            quotaInterest += cumulativeQuotaInterest[creditAccount]; // F: [CMQ-8]
+        }
 
-            borrowAmountPlusInterestRateUSD = _priceOracle.convertToUSD(
-                borrowedAmountWithInterestAndFees * minHealthFactor, // F: [CM-42]
-                underlying
+        // The total weighted value of a Credit Account has to be compared
+        // with the entire debt sum, including interest and fees
+        (,, uint256 borrowedAmountWithInterestAndFees) = _calcCreditAccountAccruedInterest(creditAccount, quotaInterest);
+
+        borrowAmountPlusInterestRateUSD = _priceOracle.convertToUSD(
+            borrowedAmountWithInterestAndFees * minHealthFactor, // F: [CM-42]
+            underlying
+        );
+
+        // If quoted tokens fully cover the debt, we can stop here
+        // after performing some additional cleanup
+        if (twvUSD < borrowAmountPlusInterestRateUSD) {
+            uint256 tokensToDisable = _checkNonLimitedTokens(
+                creditAccount, checkedTokenMask, twvUSD, borrowAmountPlusInterestRateUSD, collateralHints, _priceOracle
             );
 
-            // If quoted tokens fully cover the debt, we can stop here
-            // after performing some additional cleanup
-            if (twvUSD >= borrowAmountPlusInterestRateUSD) {
-                // F: [CMQ-9]
-                _afterFullCheck(creditAccount, enabledTokenMask, false);
-
-                return;
+            if (tokensToDisable != 0) {
+                enabledTokenMask = enabledTokenMask & (~tokensToDisable);
+                enabledTokensMap[creditAccount] = enabledTokenMask;
             }
         }
 
-        _checkNonLimitedTokens(
-            creditAccount,
-            enabledTokenMask,
-            checkedTokenMask,
-            twvUSD,
-            borrowAmountPlusInterestRateUSD,
-            collateralHints,
-            _priceOracle
-        );
+        _checkEnabledTokenLength(enabledTokenMask);
     }
 
     function _checkNonLimitedTokens(
         address creditAccount,
-        uint256 enabledTokenMask,
         uint256 checkedTokenMask,
         uint256 twvUSD,
         uint256 borrowAmountPlusInterestRateUSD,
         uint256[] memory collateralHints,
         IPriceOracleV2 _priceOracle
-    ) internal {
+    ) internal returns (uint256 tokensToDisable) {
         uint256 tokenMask;
-        bool atLeastOneTokenWasDisabled;
 
         uint256 len = collateralHints.length;
         uint256 i;
@@ -856,18 +864,13 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
                     // Once the TWV computed thus far exceeds the debt, the check is considered
                     // successful, and the function returns without evaluating any further collateral
                     if (twvUSD >= borrowAmountPlusInterestRateUSD) {
-                        // The _afterFullCheck hook does some cleanup, such as disabling
-                        // zero-balance tokens
-                        _afterFullCheck(creditAccount, enabledTokenMask, atLeastOneTokenWasDisabled);
-
-                        return; // F:[CM-40]
+                        return tokensToDisable;
                     }
                     // Zero-balance tokens are disabled; this is done by flipping the
                     // bit in enabledTokenMask, which is then written into storage at the
                     // very end, to avoid redundant storage writes
                 } else {
-                    enabledTokenMask &= ~tokenMask; // F:[CM-39]
-                    atLeastOneTokenWasDisabled = true; // F:[CM-39]
+                    tokensToDisable |= tokenMask; // F:[CM-39]
                 }
             }
 
@@ -879,40 +882,22 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         revert NotEnoughCollateralException();
     }
 
-    function _afterFullCheck(address creditAccount, uint256 enabledTokenMask, bool atLeastOneTokenWasDisabled)
-        internal
-    {
-        uint256 totalTokensEnabled = _calcEnabledTokens(enabledTokenMask);
-        if (totalTokensEnabled > maxAllowedEnabledTokenLength) {
-            revert TooManyEnabledTokensException();
-        } else {
-            // Saves enabledTokensMask if at least one token was disabled
-            if (atLeastOneTokenWasDisabled) {
-                enabledTokensMap[creditAccount] = enabledTokenMask; // F:[CM-39]
-            }
-        }
-    }
-
     /// @dev Returns the array of quoted tokens that are enabled on the account
-    function getLimitedTokens(address creditAccount) public view returns (TokenLT[] memory tokens) {
-        uint256 limitMask = enabledTokensMap[creditAccount] & limitedTokenMask;
+    function getQuotedTokens(address creditAccount) public view returns (TokenLT[] memory tokens) {
+        uint256 quotedMask = enabledTokensMap[creditAccount] & limitedTokenMask;
 
-        if (limitMask > 0) {
+        if (quotedMask > 0) {
             tokens = new TokenLT[](maxAllowedEnabledTokenLength + 1);
-
-            uint256 tokenMask = 2;
 
             uint256 j;
 
             unchecked {
-                while (tokenMask <= limitMask) {
-                    if (limitMask & tokenMask != 0) {
+                for (uint256 tokenMask = 2; tokenMask <= quotedMask; tokenMask <<= 1) {
+                    if (quotedMask & tokenMask != 0) {
                         (address token, uint16 lt) = collateralTokensByMask(tokenMask);
                         tokens[j] = TokenLT({token: token, lt: lt});
                         ++j;
                     }
-
-                    tokenMask = tokenMask << 1;
                 }
             }
         }
@@ -921,15 +906,13 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
     /// @dev Checks that the number of enabled tokens on a Credit Account
     ///      does not violate the maximal enabled token limit
     /// @param creditAccount Account to check enabled tokens for
-    function checkEnabledTokensLength(address creditAccount)
-        external
-        view
-        override
-        adaptersOrCreditFacadeOnly // F:[CM-3]
-    {
+    function checkEnabledTokensLength(address creditAccount) external view override {
         uint256 enabledTokenMask = enabledTokensMap[creditAccount];
-        uint256 totalTokensEnabled = _calcEnabledTokens(enabledTokenMask);
+        _checkEnabledTokenLength(enabledTokenMask);
+    }
 
+    function _checkEnabledTokenLength(uint256 enabledTokenMask) internal view {
+        uint256 totalTokensEnabled = _calcEnabledTokens(enabledTokenMask);
         if (totalTokensEnabled > maxAllowedEnabledTokenLength) {
             revert TooManyEnabledTokensException();
         }
@@ -948,7 +931,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         unchecked {
             while (enabledTokenMask > 0) {
                 totalTokensEnabled += enabledTokenMask & 1;
-                enabledTokenMask = enabledTokenMask >> 1;
+                enabledTokenMask >>= 1;
             }
         }
     }
@@ -1012,10 +995,10 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         tokensToEnable &= ~intersection; // F:[CM-33]
         tokensToDisable &= ~intersection; // F:[CM-33]
 
-        // check that operation doesn't try to enable one of forbidden tokens
-        if (forbiddenTokenMask & tokensToEnable != 0) {
-            revert TokenNotAllowedException(); // F:[CM-30,32]
-        }
+        // // check that operation doesn't try to enable one of forbidden tokens
+        // if (forbiddenTokenMask & tokensToEnable != 0) {
+        //     revert TokenNotAllowedException(); // F:[CM-30,32]
+        // }
 
         uint256 enabledTokens = enabledTokensMap[creditAccount];
 
@@ -1050,12 +1033,6 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
             poolQuotaKeeper().updateQuotas(creditAccount, quotaUpdates, enabledTokensMap[creditAccount]); // F: [CMQ-3]
 
         cumulativeQuotaInterest[creditAccount] += caInterestChange; // F: [CMQ-3]
-
-        uint256 totalTokensEnabled = _calcEnabledTokens(enabledTokensMask);
-        if (totalTokensEnabled > maxAllowedEnabledTokenLength) {
-            revert TooManyEnabledTokensException(); // F: [CMQ-11]
-        }
-
         enabledTokensMap[creditAccount] = enabledTokensMask; // F: [CMQ-3]
     }
 
@@ -1342,7 +1319,7 @@ contract CreditManager is ICreditManagerV2, ACLNonReentrantTrait {
         uint256 quotaInterest;
 
         if (supportsQuotas) {
-            TokenLT[] memory tokens = getLimitedTokens(creditAccount);
+            TokenLT[] memory tokens = getQuotedTokens(creditAccount);
 
             quotaInterest = cumulativeQuotaInterest[creditAccount] - 1;
 

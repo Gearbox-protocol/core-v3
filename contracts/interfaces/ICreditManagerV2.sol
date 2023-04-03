@@ -140,7 +140,8 @@ interface ICreditManagerV2 is ICreditManagerV2Events, IVersion {
     /// @param collateralHints Array of token masks in the desired order of evaluation
     /// @param minHealthFactor Minimal health factor of the account, in PERCENTAGE format
     function fullCollateralCheck(address creditAccount, uint256[] memory collateralHints, uint16 minHealthFactor)
-        external;
+        external
+        returns (uint256 enabledTokenMaskAfter);
 
     /// @dev Checks that the number of enabled tokens on a Credit Account
     ///      does not violate the maximal enabled token limit and tries
@@ -232,7 +233,7 @@ interface ICreditManagerV2 is ICreditManagerV2Events, IVersion {
         returns (address token, uint16 liquidationThreshold);
 
     /// @dev Returns the array of quoted tokens that are enabled on the account
-    function getLimitedTokens(address creditAccount) external view returns (TokenLT[] memory tokens);
+    function getQuotedTokens(address creditAccount) external view returns (TokenLT[] memory tokens);
 
     /// @dev Total number of known collateral tokens.
     function collateralTokensCount() external view returns (uint256);
