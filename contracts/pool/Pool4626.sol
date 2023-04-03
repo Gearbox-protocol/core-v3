@@ -633,7 +633,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
 
         CreditManagerDebt storage cmDebt = creditManagersDebt[_creditManager]; // F:[P4-21]
         cmDebt.limit = _convertToU128(_limit); // F:[P4-21]
-        emit SetCreditManagerBorrowLimit(_creditManager, _limit); // F:[P4-21]
+        emit SetCreditManagerBorrowedLimit(_creditManager, _limit); // F:[P4-21]
     }
 
     /// @dev Sets the new interest rate model for the pool

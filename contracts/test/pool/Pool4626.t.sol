@@ -1481,7 +1481,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         emit ConnectCreditManager(address(cmMock));
 
         evm.expectEmit(true, true, false, true);
-        emit SetCreditManagerBorrowLimit(address(cmMock), 230);
+        emit SetCreditManagerBorrowedLimit(address(cmMock), 230);
 
         evm.prank(CONFIGURATOR);
         pool.setCreditManagerLimit(address(cmMock), 230);
@@ -1493,7 +1493,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         assertEq(pool.creditManagerLimit(address(cmMock)), 230, "#1: Incorrect CM limit");
 
         evm.expectEmit(true, true, false, true);
-        emit SetCreditManagerBorrowLimit(address(cmMock), 150);
+        emit SetCreditManagerBorrowedLimit(address(cmMock), 150);
 
         evm.prank(CONFIGURATOR);
         pool.setCreditManagerLimit(address(cmMock), 150);

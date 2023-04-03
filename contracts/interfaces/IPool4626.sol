@@ -47,7 +47,7 @@ interface IPool4626Events {
     event SetTotalBorrowedLimit(uint256 limit);
 
     /// @dev Emits when a limit on borrowing by a particular Credit Manager is set
-    event SetCreditManagerBorrowLimit(address indexed creditManager, uint256 newLimit);
+    event SetCreditManagerBorrowedLimit(address indexed creditManager, uint256 newLimit);
 }
 
 /// @title Pool 4626
