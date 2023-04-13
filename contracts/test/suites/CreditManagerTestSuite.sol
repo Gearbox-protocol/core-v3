@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
-import {CreditManager} from "../../credit/CreditManager.sol";
+import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfigurator.sol";
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
@@ -21,11 +21,11 @@ import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 import "forge-std/console.sol";
 
 /// @title CreditManagerTestSuite
-/// @notice Deploys contract for unit testing of CreditManager.sol
+/// @notice Deploys contract for unit testing of CreditManagerV3.sol
 contract CreditManagerTestSuite is PoolDeployer {
     ITokenTestSuite public tokenTestSuite;
 
-    CreditManager public creditManager;
+    CreditManagerV3 public creditManager;
 
     IWETH wethToken;
 
@@ -54,7 +54,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         tokenTestSuite = creditConfig.tokenTestSuite();
 
         creditManager =
-            internalSuite ? new CreditManagerTestInternal(address(poolMock)) : new CreditManager(address(poolMock));
+            internalSuite ? new CreditManagerTestInternal(address(poolMock)) : new CreditManagerV3(address(poolMock));
 
         creditFacade = msg.sender;
 
@@ -165,7 +165,7 @@ contract CreditManagerTestSuite is PoolDeployer {
 
         gaugeMock.updateEpoch();
 
-        uint256 tokenMask = creditManager.tokenMasksMap(token);
+        uint256 tokenMask = creditManager.getTokenMaskOrRevert(token);
         uint256 limitedMask = creditManager.limitedTokenMask();
 
         creditManager.setLimitedMask(limitedMask | tokenMask);

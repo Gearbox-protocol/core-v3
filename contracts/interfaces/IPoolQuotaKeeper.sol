@@ -59,14 +59,14 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
     /// @dev Updates credit account's quotas for multiple tokens
     /// @param creditAccount Address of credit account
     /// @param quotaUpdates Requested quota updates, see `QuotaUpdate`
-    function updateQuotas(address creditAccount, QuotaUpdate[] memory quotaUpdates, uint256 enableTokenMask)
+    function updateQuotas(address creditAccount, QuotaUpdate[] memory quotaUpdates)
         external
-        returns (uint256 caQuotaInterestChange, uint256 enableTokenMaskUpdated);
+        returns (uint256 caQuotaInterestChange, uint256 tokensToEnable, uint256 tokensToDisable);
 
     /// @dev Updates all quotas to zero when closing a credit account, and computes the final quota interest change
     /// @param creditAccount Address of the Credit Account being closed
     /// @param tokensLT Array of all active quoted tokens on the account
-    function closeCreditAccount(address creditAccount, TokenLT[] memory tokensLT) external returns (uint256);
+    function removeQuotas(address creditAccount, TokenLT[] memory tokensLT) external;
 
     /// @dev Sets limits for a number of tokens to zero, preventing further quota increases
     /// @notice Triggered by the Credit Manager when there is loss during liquidation
@@ -121,7 +121,7 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
         address creditAccount,
         address _priceOracle,
         TokenLT[] memory tokens
-    ) external view returns (uint256 value, uint256 totalQuotaInterest);
+    ) external view returns (uint256 totalValue, uint256 twv, uint256 totalQuotaInterest);
 
     /// @dev Computes outstanding quota interest
     function outstandingQuotaInterest(address creditManager, address creditAccount, TokenLT[] memory tokens)

@@ -32,18 +32,6 @@ contract AdapterMock is AbstractAdapter {
         _approveToken(token, amount);
     }
 
-    function enableToken(address token) external creditFacadeOnly {
-        _enableToken(token);
-    }
-
-    function disableToken(address token) external creditFacadeOnly {
-        _disableToken(token);
-    }
-
-    function changeEnabledTokens(uint256 tokensToEnable, uint256 tokensToDisable) external creditFacadeOnly {
-        _changeEnabledTokens(tokensToEnable, tokensToDisable);
-    }
-
     function execute(bytes memory callData) external creditFacadeOnly returns (bytes memory result) {
         result = _execute(callData);
     }

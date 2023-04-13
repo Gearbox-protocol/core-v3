@@ -1331,7 +1331,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                     quotaChange: int96(int256(quotaInterestPerYear))
                 });
 
-                cmMock.updateQuotas(DUMB_ADDRESS, qu, 0);
+                cmMock.updateQuotas(DUMB_ADDRESS, qu);
 
                 psts.gaugeMock().updateEpoch();
 
@@ -1462,7 +1462,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         pool.setCreditManagerLimit(DUMB_ADDRESS, 1);
     }
 
-    // [P4-20]: setCreditManagerLimit reverts if another pool is setup in CreditManager
+    // [P4-20]: setCreditManagerLimit reverts if another pool is setup in CreditManagerV3
     function test_P4_20_connectCreditManager_fails_on_incompatible_CM() public {
         cmMock.changePoolService(DUMB_ADDRESS);
 

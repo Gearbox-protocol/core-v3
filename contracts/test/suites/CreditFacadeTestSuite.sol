@@ -3,9 +3,9 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
-import {CreditFacade} from "../../credit/CreditFacade.sol";
+import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
 import {CreditConfigurator} from "../../credit/CreditConfigurator.sol";
-import {CreditManager} from "../../credit/CreditManager.sol";
+import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 
 import {CreditManagerFactoryBase} from "../../factories/CreditManagerFactoryBase.sol";
 
@@ -21,12 +21,12 @@ import {ICreditConfig} from "../interfaces/ICreditConfig.sol";
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 
 /// @title CreditManagerTestSuite
-/// @notice Deploys contract for unit testing of CreditManager.sol
+/// @notice Deploys contract for unit testing of CreditManagerV3.sol
 contract CreditFacadeTestSuite is PoolDeployer {
     ITokenTestSuite public tokenTestSuite;
 
-    CreditManager public creditManager;
-    CreditFacade public creditFacade;
+    CreditManagerV3 public creditManager;
+    CreditFacadeV3 public creditFacade;
     CreditConfigurator public creditConfigurator;
     DegenNFT public degenNFT;
     BlacklistHelper public blacklistHelper;
@@ -69,8 +69,8 @@ contract CreditFacadeTestSuite is PoolDeployer {
         cr.addCreditManager(address(creditManager));
 
         evm.label(address(poolMock), "Pool");
-        evm.label(address(creditFacade), "CreditFacade");
-        evm.label(address(creditManager), "CreditManager");
+        evm.label(address(creditFacade), "CreditFacadeV3");
+        evm.label(address(creditManager), "CreditManagerV3");
         evm.label(address(creditConfigurator), "CreditConfigurator");
 
         tokenTestSuite.mint(underlying, USER, creditAccountAmount);
@@ -103,7 +103,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
 
         degenNFT.setMinter(CONFIGURATOR);
 
-        creditFacade = new CreditFacade(
+        creditFacade = new CreditFacadeV3(
             address(creditManager),
             address(degenNFT),
             address(0),
@@ -120,7 +120,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
     function testFacadeWithExpiration() external {
         evm.startPrank(CONFIGURATOR);
 
-        creditFacade = new CreditFacade(
+        creditFacade = new CreditFacadeV3(
             address(creditManager),
             address(0),
             address(0),
@@ -142,7 +142,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
 
         evm.startPrank(CONFIGURATOR);
 
-        creditFacade = new CreditFacade(
+        creditFacade = new CreditFacadeV3(
             address(creditManager),
             address(0),
             address(blacklistHelper),
@@ -177,8 +177,8 @@ contract CreditFacadeTestSuite is PoolDeployer {
         evm.stopPrank();
 
         evm.label(address(poolMock), "Pool");
-        evm.label(address(creditFacade), "CreditFacade");
-        evm.label(address(creditManager), "CreditManager");
+        evm.label(address(creditFacade), "CreditFacadeV3");
+        evm.label(address(creditManager), "CreditManagerV3");
         evm.label(address(creditConfigurator), "CreditConfigurator");
 
         evm.prank(USER);

@@ -4,8 +4,8 @@
 pragma solidity ^0.8.10;
 
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
-import {CreditManager} from "../credit/CreditManager.sol";
-import {CreditFacade} from "../credit/CreditFacade.sol";
+import {CreditManagerV3} from "../credit/CreditManagerV3.sol";
+import {CreditFacadeV3} from "../credit/CreditFacadeV3.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 /// @dev A struct containing parameters for a recognized collateral token in the system
@@ -28,7 +28,7 @@ struct CreditManagerOpts {
     address degenNFT;
     /// @dev Address of BlacklistHelper, address(0) if the underlying is not blacklistable
     address blacklistHelper;
-    /// @dev Whether the Credit Manager is connected to an expirable pool (and the CreditFacade is expirable)
+    /// @dev Whether the Credit Manager is connected to an expirable pool (and the CreditFacadeV3 is expirable)
     bool expirable;
 }
 
@@ -184,8 +184,8 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
     function upgradePriceOracle() external;
 
     /// @dev Upgrades the Credit Facade corresponding to the Credit Manager
-    /// @param _creditFacade address of the new CreditFacade
-    /// @param migrateParams Whether the previous CreditFacade's parameter need to be copied
+    /// @param _creditFacade address of the new CreditFacadeV3
+    /// @param migrateParams Whether the previous CreditFacadeV3's parameter need to be copied
     function upgradeCreditFacade(address _creditFacade, bool migrateParams) external;
 
     /// @dev Upgrades the Credit Configurator for a connected Credit Manager
@@ -201,8 +201,8 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
     /// @param newLimit The new max borrowed amount per block
     function setLimitPerBlock(uint128 newLimit) external;
 
-    /// @dev Sets expiration date in a CreditFacade connected
-    /// To a CreditManager with an expirable pool
+    /// @dev Sets expiration date in a CreditFacadeV3 connected
+    /// To a CreditManagerV3 with an expirable pool
     /// @param newExpirationDate The timestamp of the next expiration
     function setExpirationDate(uint40 newExpirationDate) external;
 
@@ -245,10 +245,10 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
     function addressProvider() external view returns (IAddressProvider);
 
     /// @dev Returns the Credit Facade currently connected to the Credit Manager
-    function creditFacade() external view returns (CreditFacade);
+    function creditFacade() external view returns (CreditFacadeV3);
 
     /// @dev Address of the Credit Manager
-    function creditManager() external view returns (CreditManager);
+    function creditManager() external view returns (CreditManagerV3);
 
     /// @dev Address of the Credit Manager's underlying asset
     function underlying() external view returns (address);

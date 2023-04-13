@@ -6,7 +6,7 @@ pragma solidity ^0.8.10;
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {CreditManager, ClosureAction} from "../../../credit/CreditManager.sol";
+import {CreditManagerV3, ClosureAction} from "../../../credit/CreditManagerV3.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IPoolQuotaKeeper, QuotaUpdate, TokenLT} from "../../../interfaces/IPoolQuotaKeeper.sol";
 import {CollateralTokenData} from "../../../interfaces/ICreditManagerV2.sol";
@@ -18,13 +18,13 @@ import "../../../interfaces/IExceptions.sol";
 /// @notice It encapsulates business logic for managing credit accounts
 ///
 /// More info: https://dev.gearbox.fi/developers/credit/credit_manager
-contract CreditManagerTestInternal is CreditManager {
+contract CreditManagerTestInternal is CreditManagerV3 {
     using SafeERC20 for IERC20;
     using Address for address payable;
 
     /// @dev Constructor
     /// @param _poolService Address of pool service
-    constructor(address _poolService) CreditManager(_poolService) {}
+    constructor(address _poolService) CreditManagerV3(_poolService) {}
 
     function setCumulativeDropAtFastCheck(address creditAccount, uint16 value) external {
         // cumulativeDropAtFastCheckRAY[creditAccount] = value;

@@ -155,8 +155,8 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
             result.borrowedAmountPlusInterest = creditFilter.calcCreditAccountAccruedInterest(creditAccount);
         } else {
             result.underlying = creditManagerV2.underlying();
-            (result.totalValue,) = creditFacade.calcTotalValue(creditAccount);
-            result.healthFactor = creditFacade.calcCreditAccountHealthFactor(creditAccount);
+            // (result.totalValue,) = creditFacade.calcTotalValue(creditAccount);
+            // result.healthFactor = creditFacade.calcCreditAccountHealthFactor(creditAccount);
 
             (result.borrowedAmount, result.borrowedAmountPlusInterest, result.borrowedAmountPlusInterestAndFees) =
                 creditManagerV2.calcCreditAccountAccruedInterest(creditAccount);
@@ -182,7 +182,8 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
                 } else {
                     (balance.token,) = creditManagerV2.collateralTokens(i);
                     balance.balance = IERC20(balance.token).balanceOf(creditAccount);
-                    balance.isAllowed = creditFacade.isTokenAllowed(balance.token);
+                    // TODO: change
+                    balance.isAllowed = true; //creditFacade.isTokenAllowed(balance.token);
                 }
                 balance.isEnabled = tokenMask & result.enabledTokenMask == 0 ? false : true;
 
@@ -308,7 +309,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
             result.creditConfigurator = creditManagerV2.creditConfigurator();
             result.degenNFT = creditFacade.degenNFT();
             (, result.isIncreaseDebtForbidden,) = creditFacade.params(); // V2 only: true if increasing debt is forbidden
-            result.forbiddenTokenMask = creditManagerV2.forbiddenTokenMask(); // V2 only: mask which forbids some particular tokens
+            result.forbiddenTokenMask = creditFacade.forbiddenTokenMask(); // V2 only: mask which forbids some particular tokens
             result.maxEnabledTokensLength = creditManagerV2.maxAllowedEnabledTokenLength(); // V2 only: a limit on enabled tokens imposed for security
             {
                 (

@@ -8,16 +8,20 @@ import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall
 import {ICreditManagerV2} from "./ICreditManagerV2.sol";
 import {QuotaUpdate} from "./IPoolQuotaKeeper.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+import {ClosureAction} from "../interfaces/ICreditManagerV2.sol";
 
 struct FullCheckParams {
     uint256[] collateralHints;
     uint16 minHealthFactor;
+    uint256 enabledTokensMaskAfter;
 }
 
 interface ICreditFacadeExtended {
-    /// @dev Stores expected balances (computed as current balance + passed delta)
-    ///      and compare with actual balances at the end of a multicall, reverts
-    ///      if at least one is less than expected
+    /// @dev Instructs CreditFacadeV3 to check token balances at the end
+    /// Used to control slippage after the entire sequence of operations, since tracking slippage
+    /// On each operation is not ideal. Stores expected balances (computed as current balance + passed delta)
+    /// and compare with actual balances at the end of a multicall, reverts
+    /// if at least one is less than expected
     /// @param expected Array of expected balance changes
     /// @notice This is an extenstion function that does not exist in the Credit Facade
     ///         itself and can only be used within a multicall
@@ -67,7 +71,7 @@ interface ICreditFacadeExtended {
 }
 
 interface ICreditFacadeEvents {
-    /// @dev Emits when BlacklistHelper is set for CreditFacade upon creation
+    /// @dev Emits when BlacklistHelper is set for CreditFacadeV3 upon creation
     event BlacklistHelperSet(address indexed blacklistHelper);
 
     /// @dev Emits when a new Credit Account is opened through the
@@ -81,12 +85,11 @@ interface ICreditFacadeEvents {
 
     /// @dev Emits when a Credit Account is liquidated due to low health factor
     event LiquidateCreditAccount(
-        address indexed borrower, address indexed liquidator, address indexed to, uint256 remainingFunds
-    );
-
-    /// @dev Emits when a Credit Account is liquidated due to expiry
-    event LiquidateExpiredCreditAccount(
-        address indexed borrower, address indexed liquidator, address indexed to, uint256 remainingFunds
+        address indexed borrower,
+        address indexed liquidator,
+        address indexed to,
+        ClosureAction closureAction,
+        uint256 remainingFunds
     );
 
     /// @dev Emits when remaining funds in underlying currency are sent to blacklist helper
@@ -120,18 +123,6 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     // CREDIT ACCOUNT MANAGEMENT
     //
 
-    /// @dev Opens credit account, borrows funds from the pool and pulls collateral
-    /// without any additional action.
-    /// @param amount The amount of collateral provided by the borrower
-    /// @param onBehalfOf The address to open an account for. Transfers to it have to be allowed if
-    /// msg.sender != obBehalfOf
-    /// @param leverageFactor Percentage of the user's own funds to borrow. 100 is equal to 100% - borrows the same amount
-    /// as the user's own collateral, equivalent to 2x leverage.
-    /// @param referralCode Referral code that is used for potential rewards. 0 if no referral code provided.
-    function openCreditAccount(uint256 amount, address onBehalfOf, uint16 leverageFactor, uint16 referralCode)
-        external
-        payable;
-
     /// @dev Opens a Credit Account and runs a batch of operations in a multicall
     /// @param borrowedAmount Debt size
     /// @param onBehalfOf The address to open an account for. Transfers to it have to be allowed if
@@ -139,7 +130,7 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     /// @param calls The array of MultiCall structs encoding the required operations. Generally must have
     /// at least a call to addCollateral, as otherwise the health check at the end will fail.
     /// @param referralCode Referral code which is used for potential rewards. 0 if no referral code provided
-    function openCreditAccountMulticall(
+    function openCreditAccount(
         uint256 borrowedAmount,
         address onBehalfOf,
         MultiCall[] calldata calls,
@@ -198,32 +189,11 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
         MultiCall[] calldata calls
     ) external payable;
 
-    /// @dev Runs a batch of transactions within a multicall and liquidates the account when
-    /// this Credit Facade is expired
-    /// The general flow of liquidation is nearly the same as normal liquidations, with two main differences:
-    ///     - An account can be liquidated on an expired Credit Facade even with hf > 1. However,
-    ///       no accounts can be liquidated through this function if the Credit Facade is not expired.
-    ///     - Liquidation premiums and fees for liquidating expired accounts are reduced.
-    /// It is still possible to normally liquidate an underwater Credit Account, even when the Credit Facade
-    /// is expired.
-    /// @param to Address to send funds to after liquidation
-    /// @param skipTokenMask Uint-encoded bit mask where 1's mark tokens that shouldn't be transferred
-    /// @param convertWETH If true, converts WETH into ETH before sending to "to"
-    /// @param calls The array of MultiCall structs encoding the operations to execute before liquidating the account.
-    /// @notice See more at https://dev.gearbox.fi/docs/documentation/credit/liquidation#liquidating-accounts-by-expiration
-    function liquidateExpiredCreditAccount(
-        address borrower,
-        address to,
-        uint256 skipTokenMask,
-        bool convertWETH,
-        MultiCall[] calldata calls
-    ) external payable;
-
-    /// @dev Adds collateral to borrower's credit account
-    /// @param onBehalfOf Address of the borrower whose account is funded
-    /// @param token Address of a collateral token
-    /// @param amount Amount to add
-    function addCollateral(address onBehalfOf, address token, uint256 amount) external payable;
+    // /// @dev Adds collateral to borrower's credit account
+    // /// @param onBehalfOf Address of the borrower whose account is funded
+    // /// @param token Address of a collateral token
+    // /// @param amount Amount to add
+    // function addCollateral(address onBehalfOf, address token, uint256 amount) external payable;
 
     /// @dev Executes a batch of transactions within a Multicall, to manage an existing account
     ///  - Wraps ETH and sends it back to msg.sender, if value > 0
@@ -268,7 +238,7 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     ///
     /// @param creditAccount Credit Account address
     /// @return total Total value in underlying
-    /// @return twv Total weighted (discounted by liquidation thresholds) value in underlying
+    // @return twv Total weighted (discounted by liquidation thresholds) value in underlying
     function calcTotalValue(address creditAccount) external view returns (uint256 total, uint256 twv);
 
     /**
@@ -284,14 +254,12 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
      * @param creditAccount Credit account address
      * @return hf = Health factor in bp (see PERCENTAGE FACTOR in Constants.sol)
      */
-    function calcCreditAccountHealthFactor(address creditAccount) external view returns (uint256 hf);
+    // function calcCreditAccountHealthFactor(address creditAccount) external view returns (uint256 hf);
 
-    /// @dev Returns true if token is a collateral token and is not forbidden,
-    /// otherwise returns false
-    /// @param token Token to check
-    function isTokenAllowed(address token) external view returns (bool);
+    /// @dev Bit mask encoding a set of forbidden tokens
+    function forbiddenTokenMask() external view returns (uint256);
 
-    /// @dev Returns the CreditManager connected to this Credit Facade
+    /// @dev Returns the CreditManagerV3 connected to this Credit Facade
     function creditManager() external view returns (ICreditManagerV2);
 
     /// @dev Returns true if 'from' is allowed to transfer Credit Accounts to 'to'

@@ -32,7 +32,7 @@ struct PoolCreditOpts {
 // }
 
 /// @title CreditManagerTestSuite
-/// @notice Deploys contract for unit testing of CreditManager.sol
+/// @notice Deploys contract for unit testing of CreditManagerV3.sol
 contract PoolDeployer is DSTest {
     CheatCodes evm = CheatCodes(HEVM_ADDRESS);
 

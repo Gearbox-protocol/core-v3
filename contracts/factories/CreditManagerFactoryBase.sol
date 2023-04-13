@@ -5,8 +5,8 @@ pragma solidity ^0.8.10;
 
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 import {Pool4626} from "../pool/Pool4626.sol";
-import {CreditManager} from "../credit/CreditManager.sol";
-import {CreditFacade} from "../credit/CreditFacade.sol";
+import {CreditManagerV3} from "../credit/CreditManagerV3.sol";
+import {CreditFacadeV3} from "../credit/CreditFacadeV3.sol";
 import {CreditConfigurator, CreditManagerOpts} from "../credit/CreditConfigurator.sol";
 
 import {ContractUpgrader} from "@gearbox-protocol/core-v2/contracts/support/ContractUpgrader.sol";
@@ -17,11 +17,11 @@ struct Adapter {
 }
 
 /// @title CreditManagerFactory
-/// @notice Deploys 3 core interdependent contracts: CreditManage, CreditFacade and CredigConfigurator
+/// @notice Deploys 3 core interdependent contracts: CreditManage, CreditFacadeV3 and CredigConfigurator
 ///         and setup them by following options
 contract CreditManagerFactoryBase is ContractUpgrader {
-    CreditManager public creditManager;
-    CreditFacade public creditFacade;
+    CreditManagerV3 public creditManager;
+    CreditFacadeV3 public creditFacade;
     CreditConfigurator public creditConfigurator;
     Pool4626 public immutable pool;
 
@@ -32,8 +32,8 @@ contract CreditManagerFactoryBase is ContractUpgrader {
     {
         pool = Pool4626(_pool);
 
-        creditManager = new CreditManager(_pool);
-        creditFacade = new CreditFacade(
+        creditManager = new CreditManagerV3(_pool);
+        creditFacade = new CreditFacadeV3(
             address(creditManager),
             opts.degenNFT,
             opts.blacklistHelper,

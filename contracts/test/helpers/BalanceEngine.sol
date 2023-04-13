@@ -9,7 +9,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import "../lib/test.sol";
 
 /// @title CreditManagerTestSuite
-/// @notice Deploys contract for unit testing of CreditManager.sol
+/// @notice Deploys contract for unit testing of CreditManagerV3.sol
 contract BalanceEngine is DSTest {
     function expectBalance(address token, address holder, uint256 expectedBalance) internal {
         expectBalance(token, holder, expectedBalance, "");
@@ -24,7 +24,7 @@ contract BalanceEngine is DSTest {
                     abi.encodePacked(reason, "\nInsufficient ", IERC20Metadata(token).symbol(), " balance on account: ")
                 ),
                 holder
-                );
+            );
         }
 
         assertGe(balance, minBalance);
@@ -39,7 +39,7 @@ contract BalanceEngine is DSTest {
                     abi.encodePacked(reason, "\nExceeding ", IERC20Metadata(token).symbol(), " balance on account: ")
                 ),
                 holder
-                );
+            );
         }
 
         assertLe(balance, maxBalance);
@@ -54,7 +54,7 @@ contract BalanceEngine is DSTest {
                     abi.encodePacked(reason, "\nIncorrect ", IERC20Metadata(token).symbol(), " balance on account: ")
                 ),
                 holder
-                );
+            );
         }
 
         assertEq(balance, expectedBalance);
@@ -92,7 +92,7 @@ contract BalanceEngine is DSTest {
                     abi.encodePacked(reason, "Incorrect ", IERC20Metadata(token).symbol(), " Allowance on account:  ")
                 ),
                 owner
-                );
+            );
             emit log_named_address(" spender: ", spender);
         }
         assertEq(allowance, expectedAllowance);

@@ -9,7 +9,7 @@ import "../lib/constants.sol";
 import {Tokens} from "../config/Tokens.sol";
 
 /// @title CreditManagerTestSuite
-/// @notice Deploys contract for unit testing of CreditManager.sol
+/// @notice Deploys contract for unit testing of CreditManagerV3.sol
 contract CreditFacadeTestHelper is CreditFacadeTestEngine {
     function expectTokenIsEnabled(Tokens t, bool expectedState) internal {
         expectTokenIsEnabled(t, expectedState, "");
@@ -24,7 +24,8 @@ contract CreditFacadeTestHelper is CreditFacadeTestEngine {
         tokenTestSuite().approve(t, USER, address(creditManager));
 
         evm.startPrank(USER);
-        creditFacade.addCollateral(USER, tokenTestSuite().addressOf(t), amount);
+        // TODO: rewrite using addCollateral in mc
+        // creditFacade.addCollateral(USER, tokenTestSuite().addressOf(t), amount);
         evm.stopPrank();
     }
 

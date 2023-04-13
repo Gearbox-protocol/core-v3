@@ -45,7 +45,7 @@ error IncorrectPriceFeedException();
 /// @dev Thrown on attempting to call an access restricted function as a non-Configurator
 error CallerNotConfiguratorException();
 
-/// @dev Thrown on attempting to call an access restricted function as a non-CreditManager
+/// @dev Thrown on attempting to call an access restricted function as a non-CreditManagerV3
 error CallerNotCreditManagerException();
 
 /// @dev Thrown if an access-restricted function is called by an address that is not
@@ -104,7 +104,7 @@ error ContractIsNotAnAllowedAdapterException();
 error TokenIsNotQuotedException();
 
 // interface ICreditFacadeExceptions is ICreditManagerV2Exceptions {
-/// @dev Thrown if the CreditFacade is not expirable, and an aciton is attempted that
+/// @dev Thrown if the CreditFacadeV3 is not expirable, and an aciton is attempted that
 ///      requires expirability
 error NotAllowedWhenNotExpirableException();
 
@@ -112,10 +112,7 @@ error NotAllowedWhenNotExpirableException();
 error AccountTransferNotAllowedException();
 
 /// @dev Thrown if a liquidator tries to liquidate an account with a health factor above 1
-error CantLiquidateWithSuchHealthFactorException();
-
-/// @dev Thrown if a liquidator tries to liquidate an account by expiry while a Credit Facade is not expired
-error CantLiquidateNonExpiredException();
+error CreditAccountNotLiquidatableException();
 
 /// @dev Thrown if call data passed to a multicall is too short
 error IncorrectCallDataException();

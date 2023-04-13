@@ -15,7 +15,7 @@ import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressP
 import "../../../interfaces/IExceptions.sol";
 
 /**
- * @title Mock of pool service for CreditManager constracts testing
+ * @title Mock of pool service for CreditManagerV3 constracts testing
  * @notice Used for testing purposes only.
  * @author Gearbox
  */

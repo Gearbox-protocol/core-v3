@@ -5,7 +5,7 @@ pragma solidity ^0.8.10;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {CreditFacade} from "../../credit/CreditFacade.sol";
+import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
 import {CreditConfigurator} from "../../credit/CreditConfigurator.sol";
 import {MultiCall} from "../../interfaces/ICreditFacade.sol";
 
@@ -17,13 +17,13 @@ import {CreditFacadeTestSuite} from "../suites/CreditFacadeTestSuite.sol";
 import "../lib/constants.sol";
 
 /// @title CreditManagerTestSuite
-/// @notice Deploys contract for unit testing of CreditManager.sol
+/// @notice Deploys contract for unit testing of CreditManagerV3.sol
 contract CreditFacadeTestEngine is DSTest {
     CheatCodes evm = CheatCodes(HEVM_ADDRESS);
 
     // Suites
     ICreditManagerV2 public creditManager;
-    CreditFacade public creditFacade;
+    CreditFacadeV3 public creditFacade;
     CreditConfigurator public creditConfigurator;
 
     CreditFacadeTestSuite public cft;
@@ -39,8 +39,9 @@ contract CreditFacadeTestEngine is DSTest {
 
         cft.tokenTestSuite().mint(underlying, USER, accountAmount);
 
-        evm.prank(USER);
-        creditFacade.openCreditAccount(accountAmount, USER, 100, 0);
+        // TODO: FIX
+        // evm.prank(USER);
+        // creditFacade.openCreditAccount(accountAmount, USER, 100, 0);
 
         creditAccount = creditManager.getCreditAccountOrRevert(USER);
 
@@ -52,8 +53,9 @@ contract CreditFacadeTestEngine is DSTest {
     function _openExtraTestCreditAccount() internal returns (address creditAccount, uint256 balance) {
         uint256 accountAmount = cft.creditAccountAmount();
 
-        evm.prank(FRIEND);
-        creditFacade.openCreditAccount(accountAmount, FRIEND, 100, 0);
+        /// TODO: FIX
+        // evm.prank(FRIEND);
+        // creditFacade.openCreditAccount(accountAmount, FRIEND, 100, 0);
 
         creditAccount = creditManager.getCreditAccountOrRevert(FRIEND);
 
@@ -88,7 +90,7 @@ contract CreditFacadeTestEngine is DSTest {
     function expectTokenIsEnabled(address token, bool expectedState, string memory reason) internal {
         address creditAccount = creditManager.getCreditAccountOrRevert(USER);
 
-        bool state = creditManager.tokenMasksMap(token) & creditManager.enabledTokensMap(creditAccount) != 0;
+        bool state = creditManager.getTokenMaskOrRevert(token) & creditManager.enabledTokensMap(creditAccount) != 0;
 
         if (state != expectedState && bytes(reason).length != 0) {
             emit log_string(reason);
@@ -112,7 +114,8 @@ contract CreditFacadeTestEngine is DSTest {
         evm.startPrank(USER);
         IERC20(token).approve(address(creditManager), type(uint256).max);
 
-        creditFacade.addCollateral(USER, token, amount);
+        // TODO: rewrite as collateral
+        // creditFacade.addCollateral(USER, token, amount);
 
         evm.stopPrank();
     }

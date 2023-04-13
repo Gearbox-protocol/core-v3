@@ -3,8 +3,8 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
-import {CreditManager} from "../../credit/CreditManager.sol";
-import {CreditFacade} from "../../credit/CreditFacade.sol";
+import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
+import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
 
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 
@@ -107,7 +107,7 @@ contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
         degenNFT.mint(USER, 1);
     }
 
-    // @dev [DNFT-4]: burn reverts on non-CreditFacade or configurator
+    // @dev [DNFT-4]: burn reverts on non-CreditFacadeV3 or configurator
     function test_DNFT_04_burn_reverts_on_non_CreditFacade() public {
         evm.expectRevert(abi.encodeWithSelector(CreditFacadeOrConfiguratorOnlyException.selector));
         evm.prank(FRIEND);
@@ -140,8 +140,8 @@ contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
         evm.prank(CONFIGURATOR);
         degenNFT.addCreditFacade(address(accountFactory));
 
-        ICreditManagerV2 fakeCM = new CreditManager(creditManager.pool());
-        CreditFacade fakeCF = new CreditFacade(
+        ICreditManagerV2 fakeCM = new CreditManagerV3(creditManager.pool());
+        CreditFacadeV3 fakeCF = new CreditFacadeV3(
             address(fakeCM),
             DUMB_ADDRESS,
             address(0),
@@ -152,7 +152,7 @@ contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
         evm.prank(CONFIGURATOR);
         degenNFT.addCreditFacade(address(fakeCF));
 
-        fakeCF = new CreditFacade(
+        fakeCF = new CreditFacadeV3(
             address(creditManager),
             DUMB_ADDRESS,
             address(0),
@@ -163,7 +163,7 @@ contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
         evm.prank(CONFIGURATOR);
         degenNFT.addCreditFacade(address(fakeCF));
 
-        fakeCF = new CreditFacade(
+        fakeCF = new CreditFacadeV3(
             address(creditManager),
             address(degenNFT),
             address(0),

@@ -8,7 +8,7 @@ import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall
 import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
 
 import {UniversalAdapter, RevocationPair} from "../../adapters/UniversalAdapter.sol";
-import {CreditFacade} from "../../credit/CreditFacade.sol";
+import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
 import {ICreditManagerV2} from "../../interfaces/ICreditManagerV2.sol";
 import "../../interfaces/IExceptions.sol";
 

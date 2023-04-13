@@ -20,7 +20,7 @@ struct CollateralTokensItem {
 }
 
 /// @title CreditManagerTestSuite
-/// @notice Deploys contract for unit testing of CreditManager.sol
+/// @notice Deploys contract for unit testing of CreditManagerV3.sol
 contract CreditConfig is DSTest, ICreditConfig {
     uint128 public minBorrowedAmount;
     uint128 public maxBorrowedAmount;

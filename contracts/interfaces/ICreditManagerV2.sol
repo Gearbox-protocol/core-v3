@@ -77,7 +77,9 @@ interface ICreditManagerV2 is ICreditManagerV2Events, IVersion {
         uint256 totalValue,
         address payer,
         address to,
+        uint256 enabledTokenMask,
         uint256 skipTokenMask,
+        uint256 borrowedAmountWithInterest,
         bool convertWETH
     ) external returns (uint256 remainingFunds, uint256 loss);
 
@@ -106,7 +108,9 @@ interface ICreditManagerV2 is ICreditManagerV2Events, IVersion {
     /// @param creditAccount Address of the Credit Account
     /// @param token Collateral token to add
     /// @param amount Amount to add
-    function addCollateral(address payer, address creditAccount, address token, uint256 amount) external;
+    function addCollateral(address payer, address creditAccount, address token, uint256 amount)
+        external
+        returns (uint256);
 
     /// @dev Transfers Credit Account ownership to another address
     /// @param from Address of previous owner
@@ -129,44 +133,47 @@ interface ICreditManagerV2 is ICreditManagerV2Events, IVersion {
     // COLLATERAL VALIDITY AND ACCOUNT HEALTH CHECKS
     //
 
-    /// @dev Enables a token on a Credit Account currently owned by the Credit Facade,
-    ///      including it into account health factor and total value calculations
-    /// @param token Address of the token to enable
-    function checkAndEnableToken(address token) external;
+    // /// @dev Enables a token on a Credit Account currently owned by the Credit Facade,
+    // ///      including it into account health factor and total value calculations
+    // /// @param token Address of the token to enable
+    // function checkAndEnableToken(address token) external;
 
     /// @dev Performs a full health check on an account with a custom order of evaluated tokens and
     ///      a custom minimal health factor
     /// @param creditAccount Address of the Credit Account to check
     /// @param collateralHints Array of token masks in the desired order of evaluation
     /// @param minHealthFactor Minimal health factor of the account, in PERCENTAGE format
-    function fullCollateralCheck(address creditAccount, uint256[] memory collateralHints, uint16 minHealthFactor)
-        external
-        returns (uint256 enabledTokenMaskAfter);
+    function fullCollateralCheck(
+        address creditAccount,
+        uint256 enabledTokenMaskBefore,
+        uint256[] memory collateralHints,
+        uint16 minHealthFactor
+    ) external;
 
-    /// @dev Checks that the number of enabled tokens on a Credit Account
-    ///      does not violate the maximal enabled token limit and tries
-    ///      to disable unused tokens if it does
-    /// @param creditAccount Account to check enabled tokens for
-    function checkEnabledTokensLength(address creditAccount) external;
+    // /// @dev Checks that the number of enabled tokens on a Credit Account
+    // ///      does not violate the maximal enabled token limit and tries
+    // ///      to disable unused tokens if it does
+    // /// @param creditAccount Account to check enabled tokens for
+    // function checkEnabledTokensLength(address creditAccount) external;
 
-    /// @dev Disables a token on a Credit Account currently owned by the Credit Facade
-    ///      excluding it from account health factor and total value calculations
-    /// @notice Usually called by adapters to disable spent tokens during a multicall,
-    ///         but can also be called separately from the Credit Facade to remove
-    ///         unwanted tokens
-    /// @param token Address of the token to disable
-    /// @return True if token mask was changed and false otherwise
-    function disableToken(address token) external returns (bool);
+    // /// @dev Disables a token on a Credit Account currently owned by the Credit Facade
+    // ///      excluding it from account health factor and total value calculations
+    // /// @notice Usually called by adapters to disable spent tokens during a multicall,
+    // ///         but can also be called separately from the Credit Facade to remove
+    // ///         unwanted tokens
+    // /// @param token Address of the token to disable
+    // /// @return True if token mask was changed and false otherwise
+    // function disableToken(address token) external returns (bool);
 
-    /// @dev Changes enabled tokens for a Credit Account currently owned by the Credit Facade
-    /// @notice Can be used by adapters that enable/disable multiple tokens at the same time to reduce gas costs
-    /// @param tokensToEnable Tokens mask where 1's represent tokens that should be enabled
-    /// @param tokensToDisable Tokens mask where 1's represent tokens that should be disabled
-    /// @return wasEnabled True if at least one token was enabled and false otherwise
-    /// @return wasDisabled True if at least one token was disabled and false otherwise
-    function changeEnabledTokens(uint256 tokensToEnable, uint256 tokensToDisable)
-        external
-        returns (bool wasEnabled, bool wasDisabled);
+    // /// @dev Changes enabled tokens for a Credit Account currently owned by the Credit Facade
+    // /// @notice Can be used by adapters that enable/disable multiple tokens at the same time to reduce gas costs
+    // /// @param tokensToEnable Tokens mask where 1's represent tokens that should be enabled
+    // /// @param tokensToDisable Tokens mask where 1's represent tokens that should be disabled
+    // /// @return wasEnabled True if at least one token was enabled and false otherwise
+    // /// @return wasDisabled True if at least one token was disabled and false otherwise
+    // function changeEnabledTokens(uint256 tokensToEnable, uint256 tokensToDisable)
+    //     external
+    //     returns (bool wasEnabled, bool wasDisabled);
 
     //
     // QUOTAS MANAGEMENT
@@ -175,7 +182,9 @@ interface ICreditManagerV2 is ICreditManagerV2Events, IVersion {
     /// @dev Updates credit account's quotas for multiple tokens
     /// @param creditAccount Address of credit account
     /// @param quotaUpdates Requested quota updates, see `QuotaUpdate`
-    function updateQuotas(address creditAccount, QuotaUpdate[] memory quotaUpdates) external;
+    function updateQuotas(address creditAccount, QuotaUpdate[] memory quotaUpdates)
+        external
+        returns (uint256 tokensToEnable, uint256 tokensToDisable);
 
     //
     // GETTERS
@@ -240,10 +249,7 @@ interface ICreditManagerV2 is ICreditManagerV2Events, IVersion {
 
     /// @dev Returns the mask for the provided token
     /// @param token Token to returns the mask for
-    function tokenMasksMap(address token) external view returns (uint256);
-
-    /// @dev Bit mask encoding a set of forbidden tokens
-    function forbiddenTokenMask() external view returns (uint256);
+    function getTokenMaskOrRevert(address token) external view returns (uint256);
 
     /// @dev Mask of tokens to apply quotas for
     function limitedTokenMask() external view returns (uint256);
@@ -330,14 +336,14 @@ interface ICreditManagerV2 is ICreditManagerV2Events, IVersion {
     /// @dev Contract's version
     function version() external view returns (uint256);
 
-    /// @dev Paused() state
-    function checkEmergencyPausable(address caller, bool state) external returns (bool);
-
-    //
-    // CREDIT FACADE EMERGENCY
-    //
-
-    /// @dev Pauses the Credit Manager when triggered by the Credit Facade
-    ///      Used as a circuit breaker on too much loss suffered by the pool
-    function creditFacadePause() external;
+    function calcTotalValue(address creditAccount)
+        external
+        view
+        returns (
+            uint256 enabledTokenMask,
+            uint256 total,
+            uint256 twv,
+            uint256 borrowedAmountWithInterest,
+            bool canBeLiquidated
+        );
 }

@@ -23,8 +23,8 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 
 // CONTRACTS
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
-import {CreditFacade} from "./CreditFacade.sol";
-import {CreditManager} from "./CreditManager.sol";
+import {CreditFacadeV3} from "./CreditFacadeV3.sol";
+import {CreditManagerV3} from "./CreditManagerV3.sol";
 
 // INTERFACES
 import {ICreditConfigurator, CollateralToken, CreditManagerOpts} from "../interfaces/ICreditConfigurator.sol";
@@ -41,7 +41,7 @@ import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
 /// @notice This contract is used to configure CreditManagers and is the only one with the priviledge
 /// to call access-restricted functions
 /// @dev All functions can only by called by he Configurator as per ACL.
-/// CreditManager blindly executes all requests from CreditConfigurator, so all sanity checks
+/// CreditManagerV3 blindly executes all requests from CreditConfigurator, so all sanity checks
 /// are performed here.
 contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -51,7 +51,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     IAddressProvider public override addressProvider;
 
     /// @dev Address of the Credit Manager
-    CreditManager public override creditManager;
+    CreditManagerV3 public override creditManager;
 
     /// @dev Address of the Credit Manager's underlying asset
     address public override underlying;
@@ -66,15 +66,15 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     /// This is where the initial configuration is performed.
     /// The correct deployment flow is as follows:
     ///
-    /// 1. Configures CreditManager fee parameters and sets underlying LT
+    /// 1. Configures CreditManagerV3 fee parameters and sets underlying LT
     /// 2. Adds collateral tokens and sets their LTs
     /// 3. Connects creditFacade and priceOracle to the Credit Manager
     /// 4. Sets itself as creditConfigurator in Credit Manager
     ///
-    /// @param _creditManager CreditManager contract instance
-    /// @param _creditFacade CreditFacade contract instance
-    /// @param opts Configuration parameters for CreditManager
-    constructor(CreditManager _creditManager, CreditFacade _creditFacade, CreditManagerOpts memory opts)
+    /// @param _creditManager CreditManagerV3 contract instance
+    /// @param _creditFacade CreditFacadeV3 contract instance
+    /// @param opts Configuration parameters for CreditManagerV3
+    constructor(CreditManagerV3 _creditManager, CreditFacadeV3 _creditFacade, CreditManagerOpts memory opts)
         ACLNonReentrantTrait(address(IPoolService(_creditManager.poolService()).addressProvider()))
     {
         /// Sets contract addressees
@@ -234,7 +234,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
             creditManager.rampLiquidationThreshold(token, liquidationThresholdFinal, timestampRampStart, rampDuration);
             emit TokenLiquidationThresholdRampScheduled(
                 token, currentLT, liquidationThresholdFinal, timestampRampStart, timestampRampStart + rampDuration
-                );
+            );
         }
     }
 
@@ -248,14 +248,14 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         uint256 tokenMask = _getAndCheckTokenMaskForSettingLT(token); // F:[CC-7]
 
         // Gets current forbidden mask
-        uint256 forbiddenTokenMask = creditManager.forbiddenTokenMask(); // F:[CC-8,9]
+        uint256 forbiddenTokenMask = creditFacade().forbiddenTokenMask(); // F:[CC-8,9]
 
         // If the token was forbidden before, flips the corresponding bit in the mask,
         // otherwise no actions done.
         // Skipping case: F:[CC-8]
         if (forbiddenTokenMask & tokenMask != 0) {
             forbiddenTokenMask ^= tokenMask; // F:[CC-9]
-            creditManager.setForbidMask(forbiddenTokenMask); // F:[CC-9]
+            // creditManager.setForbidMask(forbiddenTokenMask); // F:[CC-9]
             emit TokenAllowed(token); // F:[CC-9]
         }
     }
@@ -273,14 +273,14 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         uint256 tokenMask = _getAndCheckTokenMaskForSettingLT(token); // F:[CC-7]
 
         // Gets current forbidden mask
-        uint256 forbiddenTokenMask = creditManager.forbiddenTokenMask();
+        uint256 forbiddenTokenMask = creditFacade().forbiddenTokenMask();
 
         // If the token was not forbidden before, flips the corresponding bit in the mask,
         // otherwise no actions done.
         // Skipping case: F:[CC-10]
         if (forbiddenTokenMask & tokenMask == 0) {
             forbiddenTokenMask |= tokenMask; // F:[CC-11]
-            creditManager.setForbidMask(forbiddenTokenMask); // F:[CC-11]
+            // creditManager.setForbidMask(forbiddenTokenMask); // F:[CC-11]
             emit TokenForbidden(token); // F:[CC-11]
         }
     }
@@ -315,12 +315,12 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     /// is not the underlying
     function _getAndCheckTokenMaskForSettingLT(address token) internal view returns (uint256 tokenMask) {
         // Gets tokenMask for the token
-        tokenMask = creditManager.tokenMasksMap(token); // F:[CC-7]
+        tokenMask = creditManager.getTokenMaskOrRevert(token); // F:[CC-7]
 
         // tokenMask can't be 0, since this means that the token is not a collateral token
         // tokenMask can't be 1, since this mask is reserved for underlying
 
-        if (tokenMask == 0 || tokenMask == 1) {
+        if (tokenMask == 1) {
             revert TokenNotAllowedException();
         } // F:[CC-7]
     }
@@ -491,7 +491,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         ); // FT:[CC-24,25,26]
     }
 
-    /// @dev Does sanity checks on fee params and sets them in CreditManager
+    /// @dev Does sanity checks on fee params and sets them in CreditManagerV3
     function _setParams(
         uint16 _feeInterest,
         uint16 _feeLiquidation,
@@ -535,7 +535,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
                 PERCENTAGE_FACTOR - _liquidationDiscount,
                 _feeLiquidationExpired,
                 PERCENTAGE_FACTOR - _liquidationDiscountExpired
-                ); // FT:[CC-1A,26]
+            ); // FT:[CC-1A,26]
         }
     }
 
@@ -581,8 +581,8 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     }
 
     /// @dev Upgrades the Credit Facade corresponding to the Credit Manager
-    /// @param _creditFacade address of the new CreditFacade
-    /// @param migrateParams Whether the previous CreditFacade's parameter need to be copied
+    /// @param _creditFacade address of the new CreditFacadeV3
+    /// @param migrateParams Whether the previous CreditFacadeV3's parameter need to be copied
     function upgradeCreditFacade(address _creditFacade, bool migrateParams)
         external
         configuratorOnly // F:[CC-2]
@@ -655,7 +655,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         } // F:[CC-12A,29]
 
         // Checks that the contract has a creditManager() function, which returns a correct value
-        try CreditFacade(_contract).creditManager() returns (ICreditManagerV2 cm) {
+        try CreditFacadeV3(_contract).creditManager() returns (ICreditManagerV2 cm) {
             if (cm != creditManager) revert IncompatibleContractException(); // F:[CC-12B,29]
         } catch {
             revert IncompatibleContractException(); // F:[CC-12B,29]
@@ -730,8 +730,8 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         }
     }
 
-    /// @dev Sets expiration date in a CreditFacade connected
-    /// To a CreditManager with an expirable pool
+    /// @dev Sets expiration date in a CreditFacadeV3 connected
+    /// To a CreditManagerV3 with an expirable pool
     /// @param newExpirationDate The timestamp of the next expiration
     /// @notice See more at https://dev.gearbox.fi/docs/documentation/credit/liquidation#liquidating-accounts-by-expiration
     function setExpirationDate(uint40 newExpirationDate)
@@ -858,7 +858,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     }
 
     /// @dev Returns the Credit Facade currently connected to the Credit Manager
-    function creditFacade() public view override returns (CreditFacade) {
-        return CreditFacade(creditManager.creditFacade());
+    function creditFacade() public view override returns (CreditFacadeV3) {
+        return CreditFacadeV3(creditManager.creditFacade());
     }
 }

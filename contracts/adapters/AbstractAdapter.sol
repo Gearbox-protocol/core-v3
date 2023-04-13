@@ -61,10 +61,7 @@ abstract contract AbstractAdapter is IAdapter, ACLNonReentrantTrait {
     /// @return tokenMask Collateral token mask
     /// @dev Reverts if token is not registered as collateral token in the Credit Manager
     function _getMaskOrRevert(address token) internal view returns (uint256 tokenMask) {
-        tokenMask = creditManager.tokenMasksMap(token); // F: [AA-6]
-        if (tokenMask == 0) {
-            revert TokenNotAllowedException(); // F: [AA-6]
-        }
+        tokenMask = creditManager.getTokenMaskOrRevert(token); // F: [AA-6]
     }
 
     /// @dev Approves the target contract to spend given token from the Credit Account
@@ -75,28 +72,15 @@ abstract contract AbstractAdapter is IAdapter, ACLNonReentrantTrait {
         creditManager.approveCreditAccount(targetContract, token, amount); // F: [AA-7, AA-8]
     }
 
-    /// @dev Enables a token in the Credit Account
-    /// @param token Address of the token to enable
-    /// @dev Reverts if token is not registered as collateral token in the Credit Manager
-    function _enableToken(address token) internal {
-        creditManager.checkAndEnableToken(token); // F: [AA-7, AA-9]
-    }
-
-    /// @dev Disables a token in the Credit Account
-    /// @param token Address of the token to disable
-    function _disableToken(address token) internal {
-        creditManager.disableToken(token); // F: [AA-7, AA-10]
-    }
-
-    /// @dev Changes enabled tokens in the Credit Account
-    /// @param tokensToEnable Bitmask of tokens that should be enabled
-    /// @param tokensToDisable Bitmask of tokens that should be disabled
-    /// @dev This function might be useful for adapters that work with limited set of tokens, whose masks can be
-    ///      determined in the adapter constructor, thus saving gas by avoiding querying them during execution
-    ///      and combining multiple enable/disable operations into a single one
-    function _changeEnabledTokens(uint256 tokensToEnable, uint256 tokensToDisable) internal {
-        creditManager.changeEnabledTokens(tokensToEnable, tokensToDisable); // F: [AA-7, AA-11]
-    }
+    // /// @dev Changes enabled tokens in the Credit Account
+    // /// @param tokensToEnable Bitmask of tokens that should be enabled
+    // /// @param tokensToDisable Bitmask of tokens that should be disabled
+    // /// @dev This function might be useful for adapters that work with limited set of tokens, whose masks can be
+    // ///      determined in the adapter constructor, thus saving gas by avoiding querying them during execution
+    // ///      and combining multiple enable/disable operations into a single one
+    // function _changeEnabledTokens(uint256 tokensToEnable, uint256 tokensToDisable) internal {
+    //     creditManager.changeEnabledTokens(tokensToEnable, tokensToDisable); // F: [AA-7, AA-11]
+    // }
 
     /// @dev Executes an arbitrary call from the Credit Account to the target contract
     /// @param callData Data to call the target contract with
@@ -148,9 +132,9 @@ abstract contract AbstractAdapter is IAdapter, ACLNonReentrantTrait {
         returns (bytes memory result)
     {
         result = _execute(callData); // F: [AA-13, AA-14]
-        if (disableTokenIn) {
-            _disableToken(tokenIn); // F: [AA-13, AA-14]
-        }
-        _enableToken(tokenOut); // F: [AA-13, AA-14, AA-15]
+            // if (disableTokenIn) {
+            //     _disableToken(tokenIn); // F: [AA-13, AA-14]
+            // }
+            // _enableToken(tokenOut); // F: [AA-13, AA-14, AA-15]
     }
 }
