@@ -29,25 +29,24 @@ contract UniversalAdapter is AbstractAdapter, IUniversalAdapter {
     function revokeAdapterAllowances(RevocationPair[] calldata revocations)
         external
         creditFacadeOnly // F: [UA-2]
+        returns (uint256 tokenToEnable, uint256 tokensToDisable)
     {
         address creditAccount = _creditAccount();
 
         uint256 numRevocations = revocations.length;
-        for (uint256 i; i < numRevocations;) {
-            address spender = revocations[i].spender;
-            address token = revocations[i].token;
+        unchecked {
+            for (uint256 i; i < numRevocations; ++i) {
+                address spender = revocations[i].spender;
+                address token = revocations[i].token;
 
-            if (spender == address(0) || token == address(0)) {
-                revert ZeroAddressException(); // F: [UA-3]
-            }
+                if (spender == address(0) || token == address(0)) {
+                    revert ZeroAddressException(); // F: [UA-3]
+                }
 
-            uint256 allowance = IERC20(token).allowance(creditAccount, spender);
-            if (allowance > 1) {
-                creditManager.approveCreditAccount(spender, token, 1); // F: [UA-4]
-            }
-
-            unchecked {
-                ++i;
+                uint256 allowance = IERC20(token).allowance(creditAccount, spender);
+                if (allowance > 1) {
+                    creditManager.approveCreditAccount(spender, token, 1); // F: [UA-4]
+                }
             }
         }
     }

@@ -15,5 +15,7 @@ struct RevocationPair {
 interface IUniversalAdapter is IAdapter {
     /// @notice Revokes allowances for specified spender/token pairs
     /// @param revocations Spender/token pairs to revoke allowances for
-    function revokeAdapterAllowances(RevocationPair[] calldata revocations) external;
+    function revokeAdapterAllowances(RevocationPair[] calldata revocations)
+        external
+        returns (uint256 tokenToEnable, uint256 tokensToDisable);
 }

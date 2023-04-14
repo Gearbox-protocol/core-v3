@@ -13,6 +13,11 @@ enum ClosureAction {
     LIQUIDATE_EXPIRED_ACCOUNT
 }
 
+enum ManageDebtAction {
+    INCREASE_DEBT,
+    DECREASE_DEBT
+}
+
 struct CollateralTokenData {
     address token;
     uint16 ltInitial;
@@ -97,9 +102,9 @@ interface ICreditManagerV2 is ICreditManagerV2Events, IVersion {
     ///
     /// @param creditAccount Address of the Credit Account to change debt for
     /// @param amount Amount to increase / decrease the principal by
-    /// @param increase True to increase principal, false to decrease
+    /// @param  action Increase/decrease
     /// @return newBorrowedAmount The new debt principal
-    function manageDebt(address creditAccount, uint256 amount, bool increase)
+    function manageDebt(address creditAccount, uint256 amount, ManageDebtAction action)
         external
         returns (uint256 newBorrowedAmount);
 

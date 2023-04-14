@@ -255,7 +255,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         // Skipping case: F:[CC-8]
         if (forbiddenTokenMask & tokenMask != 0) {
             forbiddenTokenMask ^= tokenMask; // F:[CC-9]
-            // creditManager.setForbidMask(forbiddenTokenMask); // F:[CC-9]
+            creditFacade().allowToken(token); // TODO: CHECK
             emit TokenAllowed(token); // F:[CC-9]
         }
     }
@@ -280,7 +280,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         // Skipping case: F:[CC-10]
         if (forbiddenTokenMask & tokenMask == 0) {
             forbiddenTokenMask |= tokenMask; // F:[CC-11]
-            // creditManager.setForbidMask(forbiddenTokenMask); // F:[CC-11]
+            creditFacade().forbidToken(token); // TODO: CHECK
             emit TokenForbidden(token); // F:[CC-11]
         }
     }

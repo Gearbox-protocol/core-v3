@@ -16,7 +16,7 @@ struct FullCheckParams {
     uint256 enabledTokensMaskAfter;
 }
 
-interface ICreditFacadeExtended {
+interface ICreditFacadeMulticall {
     /// @dev Instructs CreditFacadeV3 to check token balances at the end
     /// Used to control slippage after the entire sequence of operations, since tracking slippage
     /// On each operation is not ideal. Stores expected balances (computed as current balance + passed delta)

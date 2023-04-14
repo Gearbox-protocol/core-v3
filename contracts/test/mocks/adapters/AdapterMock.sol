@@ -28,8 +28,26 @@ contract AdapterMock is AbstractAdapter {
         return _getMaskOrRevert(token);
     }
 
-    function approveToken(address token, uint256 amount) external creditFacadeOnly {
+    function approveToken(address token, uint256 amount)
+        external
+        creditFacadeOnly
+        returns (uint256 tokensToEnable, uint256 tokensToDisable)
+    {
         _approveToken(token, amount);
+    }
+
+    function dumbCall(uint256 _tokensToEnable, uint256 _tokensToDisable)
+        external
+        creditFacadeOnly
+        returns (uint256 tokensToEnable, uint256 tokensToDisable)
+    {
+        _execute(dumbCallData());
+        tokensToEnable = _tokensToEnable;
+        tokensToDisable = _tokensToDisable;
+    }
+
+    function dumbCallData() public pure returns (bytes memory) {
+        return abi.encodeWithSignature("hello(string)", "world");
     }
 
     function execute(bytes memory callData) external creditFacadeOnly returns (bytes memory result) {

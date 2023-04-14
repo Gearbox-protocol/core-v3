@@ -17,7 +17,9 @@ import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICr
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
 import {IPool4626} from "../interfaces/IPool4626.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
-import {ICreditManagerV2, ClosureAction, CollateralTokenData} from "../interfaces/ICreditManagerV2.sol";
+import {
+    ICreditManagerV2, ClosureAction, CollateralTokenData, ManageDebtAction
+} from "../interfaces/ICreditManagerV2.sol";
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IPoolQuotaKeeper, QuotaUpdate, TokenLT} from "../interfaces/IPoolQuotaKeeper.sol";
@@ -121,6 +123,16 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
     ///         the bit at the position equal to token's index to 1
     mapping(address => uint256) public override enabledTokensMap;
 
+    mapping(address => uint256) public borrowedAmounts;
+
+    mapping(address => uint256) public cumulativeIndicies;
+
+    /// @dev Previously accrued and unrepaid interest on quotas.
+    ///      This does not always represent the most actual quota interest,
+    ///      since it continuously accrues for all active quotas. The accrued interest
+    ///      needs to be periodically cached to ensure that computations are correct
+    mapping(address => uint256) public cumulativeQuotaInterest;
+
     /// @dev Maps allowed adapters to their respective target contracts.
     mapping(address => address) public override adapterToContract;
 
@@ -146,12 +158,6 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
 
     /// @dev Mask of tokens to apply quotas for
     uint256 public override limitedTokenMask;
-
-    /// @dev Previously accrued and unrepaid interest on quotas.
-    ///      This does not always represent the most actual quota interest,
-    ///      since it continuously accrues for all active quotas. The accrued interest
-    ///      needs to be periodically cached to ensure that computations are correct
-    mapping(address => uint256) public cumulativeQuotaInterest;
 
     /// @dev contract version
     uint256 public constant override version = 3_00;
@@ -228,8 +234,10 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
     {
         // Takes a Credit Account from the factory and sets initial parameters
         // The Credit Account will be connected to this Credit Manager until closing
-        address creditAccount =
-            _accountFactory.takeCreditAccount(borrowedAmount, IPoolService(pool).calcLinearCumulative_RAY()); // F:[CM-8]
+        address creditAccount = _accountFactory.takeCreditAccount(0, 0); // F:[CM-8]
+
+        borrowedAmounts[creditAccount] = borrowedAmount;
+        cumulativeIndicies[creditAccount] = IPoolService(pool).calcLinearCumulative_RAY();
 
         // Requests the pool to transfer tokens the Credit Account
         IPoolService(pool).lendCreditAccount(borrowedAmount, creditAccount); // F:[CM-8]
@@ -301,7 +309,7 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
         {
             // Makes all computations needed to close credit account
             uint256 amountToPool;
-            uint256 borrowedAmount;
+            uint256 borrowedAmount = borrowedAmounts[creditAccount];
 
             uint256 profit;
 
@@ -358,6 +366,7 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
         }
 
         enabledTokenMask &= ~skipTokensMask;
+
         _transferAssetsTo(creditAccount, to, convertWETH, enabledTokenMask); // F:[CM-14,17,19]
 
         // Returns Credit Account to the factory
@@ -378,9 +387,9 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
     ///
     /// @param creditAccount Address of the Credit Account to change debt for
     /// @param amount Amount to increase / decrease the principal by
-    /// @param increase True to increase principal, false to decrease
+    /// @param action Increase/decrease bed debt
     /// @return newBorrowedAmount The new debt principal
-    function manageDebt(address creditAccount, uint256 amount, bool increase)
+    function manageDebt(address creditAccount, uint256 amount, ManageDebtAction action)
         external
         nonReentrant
         creditFacadeOnly // F:[CM-2]
@@ -390,7 +399,7 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
             _getCreditAccountParameters(creditAccount);
 
         uint256 newCumulativeIndex;
-        if (increase) {
+        if (action == ManageDebtAction.INCREASE_DEBT) {
             // Checks that there are no forbidden tokens, as borrowing
             // is prohibited when forbidden tokens are enabled on the account
             /// TODO: add in collateral
@@ -474,7 +483,9 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
         //
         // Sets new parameters on the Credit Account if they were changed
         if (newBorrowedAmount != borrowedAmount || newCumulativeIndex != cumulativeIndexAtOpen_RAY) {
-            ICreditAccount(creditAccount).updateParameters(newBorrowedAmount, newCumulativeIndex); // F:[CM-20. 21]
+            borrowedAmounts[creditAccount] = newBorrowedAmount;
+            cumulativeIndicies[creditAccount] = newCumulativeIndex;
+            // ICreditAccount(creditAccount).updateParameters(newBorrowedAmount, newCumulativeIndex); // F:[CM-20. 21]
         }
     }
 
@@ -797,14 +808,16 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
             borrowAmountPlusInterestRateUSD = _priceOracle.convertToUSD(
                 borrowedAmountWithInterestAndFees * minHealthFactor, // F: [CM-42]
                 underlying
-            );
+            ) / PERCENTAGE_FACTOR;
         }
+
         // If quoted tokens fully cover the debt, we can stop here
         // after performing some additional cleanup
         if (twvUSD < borrowAmountPlusInterestRateUSD || !lazy) {
             uint256 limit = lazy ? (borrowAmountPlusInterestRateUSD - twvUSD) : type(uint256).max;
             uint256 _totalUSD;
             uint256 _twvUSD;
+
             (enabledTokenMask, _totalUSD, _twvUSD) =
                 _calcNotQuotedCollateral(_priceOracle, creditAccount, enabledTokenMask, limit, collateralHints);
             totalUSD += _totalUSD;
@@ -834,15 +847,20 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
     function _calcNotQuotedCollateral(
         IPriceOracleV2 _priceOracle,
         address creditAccount,
-        uint256 enabledTokensMask,
+        uint256 _enabledTokensMask,
         uint256 borrowAmountPlusInterestRateUSD,
         uint256[] memory collateralHints
-    ) internal view returns (uint256 twvUSD, uint256 totalValue, uint256) {
+    ) internal view returns (uint256 enabledTokensMask, uint256 totalValue, uint256 twvUSD) {
         uint256 tokenMask;
         uint256 len = collateralHints.length;
         bool nonZeroBalance;
 
+        enabledTokensMask = _enabledTokensMask;
         uint256 checkedTokenMask = supportsQuotas ? enabledTokensMask & (~limitedTokenMask) : enabledTokensMask;
+
+        if (borrowAmountPlusInterestRateUSD != type(uint256).max) {
+            borrowAmountPlusInterestRateUSD *= PERCENTAGE_FACTOR;
+        }
 
         unchecked {
             // TODO: add test that we check all values and it's always reachable
@@ -873,6 +891,8 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
                 checkedTokenMask &= (~tokenMask);
             }
         }
+
+        twvUSD /= PERCENTAGE_FACTOR;
     }
 
     function _getBalance(
@@ -1247,8 +1267,8 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
         view
         returns (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen_RAY, uint256 cumulativeIndexNow_RAY)
     {
-        borrowedAmount = ICreditAccount(creditAccount).borrowedAmount(); // F:[CM-49,50]
-        cumulativeIndexAtOpen_RAY = ICreditAccount(creditAccount).cumulativeIndexAtOpen(); // F:[CM-49,50]
+        borrowedAmount = borrowedAmounts[creditAccount]; // F:[CM-49,50]
+        cumulativeIndexAtOpen_RAY = cumulativeIndicies[creditAccount]; // ICreditAccount(creditAccount).cumulativeIndexAtOpen(); // F:[CM-49,50]
         cumulativeIndexNow_RAY = IPoolService(pool).calcLinearCumulative_RAY(); // F:[CM-49,50]
     }
 

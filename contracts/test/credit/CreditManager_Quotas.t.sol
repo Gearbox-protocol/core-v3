@@ -12,7 +12,8 @@ import {
     ICreditManagerV2,
     ICreditManagerV2Events,
     ClosureAction,
-    CollateralTokenData
+    CollateralTokenData,
+    ManageDebtAction
 } from "../../interfaces/ICreditManagerV2.sol";
 import {IPoolQuotaKeeper, QuotaUpdate, TokenLT, AccountQuota} from "../../interfaces/IPoolQuotaKeeper.sol";
 import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
@@ -272,7 +273,7 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV2Events, BalanceHelpe
 
         (,, uint256 totalDebtBefore) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
 
-        creditManager.manageDebt(creditAccount, amountRepaid, false);
+        creditManager.manageDebt(creditAccount, amountRepaid, ManageDebtAction.DECREASE_DEBT);
 
         assertEq(
             creditManager.cumulativeQuotaInterest(creditAccount),
@@ -312,7 +313,7 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV2Events, BalanceHelpe
 
         (,, uint256 totalDebtBefore) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
 
-        creditManager.manageDebt(creditAccount, amountRepaid, false);
+        creditManager.manageDebt(creditAccount, amountRepaid, ManageDebtAction.INCREASE_DEBT);
 
         assertEq(
             creditManager.cumulativeQuotaInterest(creditAccount),

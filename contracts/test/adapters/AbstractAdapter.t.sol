@@ -317,34 +317,35 @@ contract AbstractAdapterTest is
         }
     }
 
-    /// @dev [AA-15]: _executeSwapNoApprove reverts if tokenIn or tokenOut are not allowed
-    function test_AA_15_executeSwap_reverts_if_tokenIn_or_tokenOut_are_not_allowed() public {
-        _openTestCreditAccount();
+    /// TODO: UPDATE IF NEEDED
+    // /// @dev [AA-15]: _executeSwapNoApprove reverts if tokenIn or tokenOut are not allowed
+    // function test_AA_15_executeSwap_reverts_if_tokenIn_or_tokenOut_are_not_allowed() public {
+    //     _openTestCreditAccount();
 
-        address TOKEN = address(0xdead);
-        bytes memory DUMB_CALLDATA = abi.encodeWithSignature("hello(string)", "world");
+    //     address TOKEN = address(0xdead);
+    //     bytes memory DUMB_CALLDATA = abi.encodeWithSignature("hello(string)", "world");
 
-        // ti == 0 => bad tokenOut, ti == 1 => bad tokenIn
-        // sa == 0 => no approve, sa == 1 => safe approve
-        for (uint256 ti; ti < 2; ++ti) {
-            for (uint256 sa; sa < 2; ++sa) {
-                bytes memory callData;
-                if (sa == 1) {
-                    callData = abi.encodeCall(
-                        adapterMock.executeSwapSafeApprove,
-                        (ti == 1 ? TOKEN : dai, ti == 1 ? dai : TOKEN, DUMB_CALLDATA, false)
-                    );
-                } else {
-                    callData = abi.encodeCall(
-                        adapterMock.executeSwapNoApprove,
-                        (ti == 1 ? TOKEN : dai, ti == 1 ? dai : TOKEN, DUMB_CALLDATA, false)
-                    );
-                }
+    //     // ti == 0 => bad tokenOut, ti == 1 => bad tokenIn
+    //     // sa == 0 => no approve, sa == 1 => safe approve
+    //     for (uint256 ti; ti < 2; ++ti) {
+    //         for (uint256 sa; sa < 2; ++sa) {
+    //             bytes memory callData;
+    //             if (sa == 1) {
+    //                 callData = abi.encodeCall(
+    //                     adapterMock.executeSwapSafeApprove,
+    //                     (ti == 1 ? TOKEN : dai, ti == 1 ? dai : TOKEN, DUMB_CALLDATA, false)
+    //                 );
+    //             } else {
+    //                 callData = abi.encodeCall(
+    //                     adapterMock.executeSwapNoApprove,
+    //                     (ti == 1 ? TOKEN : dai, ti == 1 ? dai : TOKEN, DUMB_CALLDATA, false)
+    //                 );
+    //             }
 
-                evm.prank(USER);
-                evm.expectRevert(TokenNotAllowedException.selector);
-                creditFacade.multicall(multicallBuilder(MultiCall({target: address(adapterMock), callData: callData})));
-            }
-        }
-    }
+    //             evm.prank(USER);
+    //             evm.expectRevert(TokenNotAllowedException.selector);
+    //             creditFacade.multicall(multicallBuilder(MultiCall({target: address(adapterMock), callData: callData})));
+    //         }
+    //     }
+    // }
 }

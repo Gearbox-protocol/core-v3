@@ -12,7 +12,8 @@ import {
     ICreditManagerV2,
     ICreditManagerV2Events,
     ClosureAction,
-    CollateralTokenData
+    CollateralTokenData,
+    ManageDebtAction
 } from "../../interfaces/ICreditManagerV2.sol";
 
 import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
@@ -373,7 +374,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         // );
 
         evm.expectRevert(CallerNotCreditFacadeException.selector);
-        creditManager.manageDebt(DUMB_ADDRESS, 100, true);
+        creditManager.manageDebt(DUMB_ADDRESS, 100, ManageDebtAction.INCREASE_DEBT);
 
         evm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.addCollateral(DUMB_ADDRESS, DUMB_ADDRESS, DUMB_ADDRESS, 100);
@@ -486,7 +487,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         // );
 
         evm.expectRevert(bytes(PAUSABLE_ERROR));
-        creditManager.manageDebt(DUMB_ADDRESS, 100, true);
+        creditManager.manageDebt(DUMB_ADDRESS, 100, ManageDebtAction.INCREASE_DEBT);
 
         evm.expectRevert(bytes(PAUSABLE_ERROR));
         creditManager.addCollateral(DUMB_ADDRESS, DUMB_ADDRESS, DUMB_ADDRESS, 100);
@@ -1085,7 +1086,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         uint256 expectedNewCulumativeIndex =
             (2 * cumulativeIndexAtOpen * (borrowedAmount + amount)) / (2 * borrowedAmount + amount);
 
-        uint256 newBorrowedAmount = creditManager.manageDebt(creditAccount, amount, true);
+        uint256 newBorrowedAmount = creditManager.manageDebt(creditAccount, amount, ManageDebtAction.INCREASE_DEBT);
 
         assertEq(newBorrowedAmount, borrowedAmount + amount, "Incorrect returned newBorrowedAmount");
 
@@ -1123,7 +1124,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
             expectedBorrowAmount = borrowedAmount;
         }
 
-        uint256 newBorrowedAmount = creditManager.manageDebt(creditAccount, amount, false);
+        uint256 newBorrowedAmount = creditManager.manageDebt(creditAccount, amount, ManageDebtAction.DECREASE_DEBT);
 
         assertEq(newBorrowedAmount, expectedBorrowAmount, "Incorrect returned newBorrowedAmount");
 

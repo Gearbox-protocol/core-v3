@@ -9,11 +9,12 @@ import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
 import {CreditConfigurator} from "../../credit/CreditConfigurator.sol";
 import {MultiCall} from "../../interfaces/ICreditFacade.sol";
 
+import {ICreditFacadeMulticall} from "../../interfaces/ICreditFacade.sol";
 import {ICreditManagerV2, ICreditManagerV2Events} from "../../interfaces/ICreditManagerV2.sol";
 
 import {CreditFacadeTestSuite} from "../suites/CreditFacadeTestSuite.sol";
 // import { TokensTestSuite, Tokens } from "../suites/TokensTestSuite.sol";
-
+import {LEVERAGE_DECIMALS} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import "../lib/constants.sol";
 
 /// @title CreditManagerTestSuite
@@ -34,14 +35,33 @@ contract CreditFacadeTestEngine is DSTest {
     /// HELPERS
     ///
 
+    function _openCreditAccount(uint256 amount, address onBehalfOf, uint16 leverageFactor, uint16 referralCode)
+        internal
+    {
+        uint256 borrowedAmount = (amount * leverageFactor) / LEVERAGE_DECIMALS; // F:[FA-5]
+
+        creditFacade.openCreditAccount(
+            borrowedAmount,
+            onBehalfOf,
+            multicallBuilder(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, amount))
+                })
+            ),
+            referralCode
+        );
+    }
+
     function _openTestCreditAccount() internal returns (address creditAccount, uint256 balance) {
         uint256 accountAmount = cft.creditAccountAmount();
 
         cft.tokenTestSuite().mint(underlying, USER, accountAmount);
 
-        // TODO: FIX
-        // evm.prank(USER);
-        // creditFacade.openCreditAccount(accountAmount, USER, 100, 0);
+        evm.startPrank(USER);
+        _openCreditAccount(accountAmount, USER, 100, 0);
+
+        evm.stopPrank();
 
         creditAccount = creditManager.getCreditAccountOrRevert(USER);
 
@@ -56,6 +76,11 @@ contract CreditFacadeTestEngine is DSTest {
         /// TODO: FIX
         // evm.prank(FRIEND);
         // creditFacade.openCreditAccount(accountAmount, FRIEND, 100, 0);
+
+        evm.startPrank(USER);
+        _openCreditAccount(accountAmount, USER, 100, 0);
+
+        evm.stopPrank();
 
         creditAccount = creditManager.getCreditAccountOrRevert(FRIEND);
 
