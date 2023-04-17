@@ -246,7 +246,8 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
         _safeCreditAccountSet(onBehalfOf, creditAccount); // F:[CM-7]
 
         // Initializes the enabled token mask for Credit Account to 1 (only the underlying is enabled)
-        enabledTokensMap[creditAccount] = 1; // F:[CM-8]
+        // OUTDATED: enabledTokensMap is set in FullCollateralCheck
+        // enabledTokensMap[creditAccount] = 1; // F:[CM-8]
 
         if (supportsQuotas) cumulativeQuotaInterest[creditAccount] = 1; // F: [CMQ-1]
 
@@ -730,6 +731,8 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
 
         (enabledTokenMask,, twvUSD, borrowAmountPlusInterestRateUSD,) =
             _calcAllCollateral(_priceOracle, creditAccount, enabledTokenMask, minHealthFactor, collateralHints, true);
+
+        console.log("FC", twvUSD, borrowAmountPlusInterestRateUSD);
 
         if (twvUSD < borrowAmountPlusInterestRateUSD) {
             revert NotEnoughCollateralException();
