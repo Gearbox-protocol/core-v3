@@ -2124,7 +2124,7 @@ contract CreditFacadeTest is
     //
 
     /// @dev [FA-62]: addEmergencyLiquidator correctly sets value
-    function test_CM_62_addEmergencyLiquidator_works_correctly() public {
+    function test_FA_62_addEmergencyLiquidator_works_correctly() public {
         evm.prank(address(creditConfigurator));
         creditFacade.addEmergencyLiquidator(DUMB_ADDRESS);
 

@@ -151,6 +151,8 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard 
     /// @dev Mask of tokens to apply quotas for
     uint256 public override limitedTokenMask;
 
+    With withdrawManager;
+
     /// @dev contract version
     uint256 public constant override version = 3_00;
 
@@ -860,7 +862,7 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard 
                 // CASE enabledTokenMask & tokenMask == 0 F:[CM-38]
                 if (checkedTokenMask & tokenMask != 0) {
                     (totalValue, twvUSDx10K, nonZeroBalance) =
-                        _getBalance(_priceOracle, tokenMask, creditAccount, totalValue, twvUSDx10K);
+                        _calcOneNonQuotedTokenCollateral(_priceOracle, tokenMask, creditAccount, totalValue, twvUSDx10K);
 
                     // Collateral calculations are only done if there is a non-zero balance
                     if (nonZeroBalance) {
@@ -885,7 +887,7 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard 
         twvUSD = twvUSDx10K / PERCENTAGE_FACTOR;
     }
 
-    function _getBalance(
+    function _calcOneNonQuotedTokenCollateral(
         IPriceOracleV2 _priceOracle,
         uint256 tokenMask,
         address creditAccount,
@@ -1555,4 +1557,11 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard 
             }
         }
     }
+
+    function withdraw(address creditAccount, address token, uint256 amount)
+        external
+        returns (uint256 tokensToDisable)
+    {}
+
+    function _cancelWithdrawals() internal {}
 }

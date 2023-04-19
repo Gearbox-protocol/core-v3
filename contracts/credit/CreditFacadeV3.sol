@@ -5,11 +5,10 @@ pragma solidity ^0.8.10;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 
 //  DATA
-import {TokenIndex} from "../libraries/TokenIndex.sol";
+
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 import {Balance, BalanceOps} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 import {QuotaUpdate} from "../interfaces/IPoolQuotaKeeper.sol";
@@ -67,12 +66,7 @@ struct CumulativeLossParams {
 /// as well as Multicalls that allow to perform multiple actions within a single transaction, with a single health check
 /// - Through adapters, which call the Credit Manager directly, but only allow interactions with specific target contracts
 contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
-    using EnumerableSet for EnumerableSet.AddressSet;
-    using EnumerableSet for EnumerableSet.UintSet;
     using Address for address;
-
-    using TokenIndex for uint256;
-    using TokenIndex for address;
 
     /// @dev Credit Manager connected to this Credit Facade
     ICreditManagerV2 public immutable creditManager;
@@ -128,7 +122,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @dev Bit mask encoding a set of forbidden tokens
     uint256 public forbiddenTokenMask;
 
-    EnumerableSet.UintSet internal forbiddenTokenSet;
+    mapping(uint256 => address) internal cachedTokenMasks;
 
     /// @dev Maps addresses to their status as emergency liquidator.
     /// @notice Emergency liquidators are trusted addresses
@@ -300,7 +294,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
         // TODO: add test
         if (convertWETH) {
-            wethGateway.withdrawTo(to);
+            _wethWithdrawTo(to);
         }
 
         // Emits a CloseCreditAccount event
@@ -429,7 +423,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
         // TODO: add test
         if (convertWETH) {
-            wethGateway.withdrawTo(to);
+            _wethWithdrawTo(to);
         }
 
         emit LiquidateCreditAccount(borrower, msg.sender, to, closeAction, remainingFunds); // F:[FA-15]
@@ -444,7 +438,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         ) {
             // can't realistically overflow
             unchecked {
-                helperBalance = IERC20(underlying).balanceOf(blacklistHelper) + 1;
+                helperBalance = _balanceOf(underlying, blacklistHelper) + 1;
             }
         }
     }
@@ -453,7 +447,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     ///      and, if so, increases the borrower's claimable balance by the difference
     ///      Not relying on `remainingFunds` to support fee-on-transfer tokens
     function _increaseClaimableBalance(address borrower, uint256 helperBalanceBefore) internal {
-        uint256 helperBalance = IERC20(underlying).balanceOf(blacklistHelper);
+        uint256 helperBalance = _balanceOf(underlying, blacklistHelper);
         if (helperBalance > helperBalanceBefore) {
             uint256 amount;
             unchecked {
@@ -600,7 +594,9 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                         // Sets increaseDebtWasCalled to prevent debt reductions afterwards,
                         // as that could be used to get free flash loans
                         increaseDebtWasCalled = true; // F:[FA-28]
-                        _increaseDebt(creditAccount, callData, enabledTokensMask, borrower); // F:[FA-26]
+                        _manageDebt(
+                            creditAccount, callData, enabledTokensMask, borrower, ManageDebtAction.INCREASE_DEBT
+                        ); // F:[FA-26]
                     }
                     //
                     // DECREASE DEBT
@@ -612,7 +608,9 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                         }
                         // F:[FA-28]
 
-                        _decreaseDebt(creditAccount, callData, enabledTokensMask, borrower); // F:[FA-27]
+                        _manageDebt(
+                            creditAccount, callData, enabledTokensMask, borrower, ManageDebtAction.DECREASE_DEBT
+                        ); // F:[FA-27]
                     }
                     //
                     // ENABLE TOKEN
@@ -620,7 +618,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeMulticall.enableToken.selector) {
                         // Parses token
                         address token = abi.decode(callData, (address)); // F: [FA-53]
-                        enabledTokensMask |= _tokenMaskByAddressOrRevert(token);
+                        enabledTokensMask |= _getTokenMaskOrRevert(token);
                     }
                     //
                     // DISABLE TOKEN
@@ -628,7 +626,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeMulticall.disableToken.selector) {
                         // Parses token
                         address token = abi.decode(callData, (address)); // F: [FA-53]
-                        enabledTokensMask &= ~_tokenMaskByAddressOrRevert(token);
+                        enabledTokensMask &= ~_getTokenMaskOrRevert(token);
                     }
                     //
                     // UPDATE QUOTAS
@@ -638,6 +636,14 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                         (uint256 tokensToEnable, uint256 tokensToDisable) =
                             creditManager.updateQuotas(creditAccount, quotaUpdates);
                         enabledTokensMask = (enabledTokensMask | tokensToEnable) & (~tokensToDisable);
+                    }
+                    //
+                    // WITHDRAW
+                    //
+                    else if (method == ICreditFacadeMulticall.withdraw.selector) {
+                        (address token, uint256 amount) = abi.decode(callData, (address, uint256));
+                        uint256 tokensToDisable = creditManager.withdraw(creditAccount, token, amount);
+                        enabledTokensMask = enabledTokensMask & (~tokensToDisable);
                     }
                     //
                     // UNKNOWN METHOD
@@ -725,7 +731,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         uint256 len = expected.length; // F:[FA-45]
 
         for (uint256 i = 0; i < len;) {
-            expected[i].balance += IERC20(expected[i].token).balanceOf(creditAccount); // F:[FA-45]
+            expected[i].balance += _balanceOf(expected[i].token, creditAccount); // F:[FA-45]
             unchecked {
                 ++i;
             }
@@ -741,7 +747,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         uint256 len = expected.length; // F:[FA-45]
         unchecked {
             for (uint256 i = 0; i < len; ++i) {
-                if (IERC20(expected[i].token).balanceOf(creditAccount) < expected[i].balance) {
+                if (_balanceOf(expected[i].token, creditAccount) < expected[i].balance) {
                     revert BalanceLessThanMinimumDesiredException(expected[i].token);
                 } // F:[FA-45]
             }
@@ -752,9 +758,13 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @param creditAccount CA to increase debt for
     /// @param callData Bytes calldata for parsing
     /// @param borrower Owner of the account
-    function _increaseDebt(address creditAccount, bytes memory callData, uint256 enabledTokensMask, address borrower)
-        internal
-    {
+    function _manageDebt(
+        address creditAccount,
+        bytes memory callData,
+        uint256 enabledTokensMask,
+        address borrower,
+        ManageDebtAction action
+    ) internal {
         // It is forbidden to take new debt if increaseDebtForbidden mode is enabled
         if (params.isIncreaseDebtForbidden) {
             revert IncreaseDebtForbiddenException();
@@ -766,34 +776,15 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         _checkAndUpdateBorrowedBlockLimit(amount); // F:[FA-18A]
 
         // Requests the Credit Manager to borrow additional funds from the pool
-        uint256 newBorrowedAmount =
-            _manageDebt(creditAccount, amount, enabledTokensMask, ManageDebtAction.INCREASE_DEBT); // F:[FA-17]
+        uint256 newBorrowedAmount = creditManager.manageDebt(creditAccount, amount, enabledTokensMask, action); // F:[FA-17]
 
         // Checks that the new total borrowed amount is within bounds
         _revertIfOutOfBorrowedLimits(newBorrowedAmount); // F:[FA-18B]
 
         // Emits event
-        emit IncreaseBorrowedAmount(borrower, amount); // F:[FA-17]
-    }
+        if (action == ManageDebtAction.INCREASE_DEBT) emit IncreaseBorrowedAmount(borrower, amount); // F:[FA-17]
 
-    /// @dev Decreases debt for a Credit Account
-    /// @param creditAccount CA to increase debt for
-    /// @param callData Bytes calldata for parsing
-    /// @param borrower Owner of the account
-    function _decreaseDebt(address creditAccount, bytes memory callData, uint256 enabledTokensMask, address borrower)
-        internal
-    {
-        uint256 amount = abi.decode(callData, (uint256)); // F:[FA-26]
-
-        // Requests the creditManager to reduce the borrowed sum by amount
-        uint256 newBorrowedAmount =
-            _manageDebt(creditAccount, amount, enabledTokensMask, ManageDebtAction.DECREASE_DEBT); // F:[FA-19]
-
-        // Checks that the new borrowed amount is within limits
-        _revertIfOutOfBorrowedLimits(newBorrowedAmount); // F:[FA-20]
-
-        // Emits an event
-        emit DecreaseBorrowedAmount(borrower, amount); // F:[FA-19]
+        else emit DecreaseBorrowedAmount(borrower, amount); // F:[FA-19]
     }
 
     function _addCollateral(address creditAccount, bytes memory callData, address borrower)
@@ -948,12 +939,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     //
     // HELPERS
     //
-    function _manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)
-        internal
-        returns (uint256)
-    {
-        return creditManager.manageDebt(creditAccount, amount, enabledTokensMask, action);
-    }
 
     /// @dev Internal wrapper for `creditManager.transferAccountOwnership()`
     /// @notice The external call is wrapped to optimize contract size
@@ -967,9 +952,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         return creditManager.getCreditAccountOrRevert(borrower);
     }
 
-    function _tokenMaskByAddressOrRevert(address token) internal view returns (uint256 mask) {
+    function _getTokenMaskOrRevert(address token) internal view returns (uint256 mask) {
         mask = creditManager.getTokenMaskOrRevert(token);
-        if (mask == 0) revert TokenNotAllowedException();
     }
 
     /// @dev Internal wrapper for `creditManager.fullCollateralCheck()`
@@ -990,11 +974,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         uint256 forbiddenTokensOnAccount = fullCheckParams.enabledTokensMaskAfter & forbiddenTokenMask;
 
         if (forbiddenTokensOnAccount != 0) {
-            if (enabledTokenMaskBefore ^ fullCheckParams.enabledTokensMaskAfter & forbiddenTokensOnAccount != 0) {
-                revert TokenNotAllowedException();
-            }
-
-            _checkForbiddenBalances(creditAccount, forbiddenBalances, forbiddenTokensOnAccount);
+            _checkForbiddenBalances(creditAccount, enabledTokenMaskBefore, forbiddenBalances, forbiddenTokensOnAccount);
         }
     }
 
@@ -1005,16 +985,18 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     {
         enabledTokenMaskBefore = creditManager.enabledTokensMap(creditAccount);
         uint256 forbiddenTokensOnAccount = enabledTokenMaskBefore & forbiddenTokenMask;
-        if (forbiddenTokensOnAccount != 0) {
-            uint256 len = forbiddenTokenSet.length();
-            forbiddenBalances = new uint256[](len);
 
-            unchecked {
-                for (uint256 i; i < len; ++i) {
-                    (address token, uint8 index) = forbiddenTokenSet.at(i).unzip();
-                    if (forbiddenTokensOnAccount & (1 << index) != 0) {
-                        forbiddenBalances[i] = IERC20(token).balanceOf(creditAccount);
-                    }
+        if (forbiddenTokensOnAccount != 0) {
+            forbiddenBalances = new uint256[](_calcEnabledTokens(enabledTokenMaskBefore));
+            uint256 tokenMask;
+            uint256 j;
+            for (uint256 i; tokenMask < forbiddenTokensOnAccount; ++i) {
+                tokenMask = 1 << i; // F: [CM-68]
+
+                if (forbiddenTokensOnAccount & tokenMask != 0) {
+                    address token = cachedTokenMasks[tokenMask];
+                    forbiddenBalances[j] = _balanceOf(token, creditAccount);
+                    ++j;
                 }
             }
         }
@@ -1022,20 +1004,51 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
     function _checkForbiddenBalances(
         address creditAccount,
+        uint256 enabledTokenMaskBefore,
         uint256[] memory forbiddenBalances,
         uint256 forbiddenTokensOnAccount
     ) internal view {
-        uint256 len = forbiddenTokenSet.length();
-
         unchecked {
-            for (uint256 i; i < len; ++i) {
-                (address token, uint8 index) = forbiddenTokenSet.at(i).unzip();
-                if (forbiddenTokensOnAccount & (1 << index) != 0) {
-                    uint256 balance = IERC20(token).balanceOf(creditAccount);
-                    if (balance > forbiddenBalances[i]) {
-                        revert ForbiddenTokensException();
+            uint256 forbiddenTokensOnAccountBefore = enabledTokenMaskBefore & forbiddenTokenMask;
+
+            if (forbiddenTokensOnAccountBefore ^ forbiddenTokensOnAccount & forbiddenTokensOnAccount != 0) {
+                revert TokenNotAllowedException();
+            }
+
+            uint256 tokenMask;
+            uint256 j;
+            for (uint256 i; tokenMask < forbiddenTokensOnAccountBefore; ++i) {
+                tokenMask = 1 << i; // F: [CM-68]
+
+                if (forbiddenTokensOnAccountBefore & tokenMask != 0) {
+                    ++j;
+
+                    if (forbiddenTokensOnAccount & tokenMask != 0) {
+                        address token = cachedTokenMasks[tokenMask];
+                        uint256 balance = _balanceOf(token, creditAccount);
+                        if (balance > forbiddenBalances[i]) {
+                            revert ForbiddenTokensException();
+                        }
                     }
                 }
+            }
+        }
+    }
+
+    /// @dev Calculates the number of enabled tokens, based on the
+    ///      provided token mask
+    /// @param enabledTokenMask Bit mask encoding a set of enabled tokens
+    function _calcEnabledTokens(uint256 enabledTokenMask) internal pure returns (uint256 totalTokensEnabled) {
+        // Bit mask is a number encoding enabled tokens as 1's;
+        // Therefore, to count the number of enabled tokens, we simply
+        // need to keep shifting the mask by one bit and checking if the rightmost bit is 1,
+        // until the whole mask is 0;
+        // Since bit shifting is overflow-safe and the loop has at most 256 steps,
+        // the whole function can be marked as unsafe to optimize gas
+        unchecked {
+            while (enabledTokenMask > 0) {
+                totalTokensEnabled += enabledTokenMask & 1;
+                enabledTokenMask >>= 1;
             }
         }
     }
@@ -1136,6 +1149,10 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         return creditManager.enabledTokensMap(creditAccount);
     }
 
+    function _wethWithdrawTo(address to) internal {
+        wethGateway.withdrawTo(to);
+    }
+
     //
     // CONFIGURATION
     //
@@ -1208,31 +1225,19 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     }
 
     /// @dev Adds forbidden token
-    function forbidToken(address tokenToForbid) external creditConfiguratorOnly {
-        (uint256 tokenMaskMap, uint256 zip) = _getTokenMaskAndZip(tokenToForbid);
-        forbiddenTokenSet.add(zip);
-        forbiddenTokenMask |= tokenMaskMap;
+    function forbidToken(address token) external creditConfiguratorOnly {
+        uint256 tokenMask = _getTokenMaskOrRevert(token);
+        cachedTokenMasks[tokenMask] = token;
+        forbiddenTokenMask |= tokenMask;
     }
 
     function allowToken(address token) external creditConfiguratorOnly {
-        (uint256 tokenMaskMap, uint256 zip) = _getTokenMaskAndZip(token);
-        if (forbiddenTokenSet.contains(zip)) {
-            forbiddenTokenSet.remove(zip);
-            forbiddenTokenMask ^= tokenMaskMap;
-        }
-    }
+        uint256 tokenMask = _getTokenMaskOrRevert(token);
 
-    function _getTokenMaskAndZip(address token) internal view returns (uint256 tokenMask, uint256 zip) {
-        tokenMask = _tokenMaskByAddressOrRevert(token);
-        uint8 tokenIndex = _maskToIndex(tokenMask);
-        zip = token.zipWith(tokenIndex);
-    }
-
-    function _maskToIndex(uint256 mask) internal pure returns (uint8) {
-        for (uint8 index; index < 256; index++) {
-            if (mask == (1 << index)) return index;
+        if (forbiddenTokenMask & tokenMask != 0) {
+            cachedTokenMasks[tokenMask] = token;
+            forbiddenTokenMask ^= tokenMask;
         }
-        revert IncorrectParameterException();
     }
 
     /// @dev Adds an address to the list of emergency liquidators
@@ -1251,5 +1256,9 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         creditConfiguratorOnly // F: [CM-4]
     {
         canLiquidateWhilePaused[liquidator] = false;
+    }
+
+    function _balanceOf(address token, address holder) internal view returns (uint256) {
+        return IERC20(token).balanceOf(holder);
     }
 }

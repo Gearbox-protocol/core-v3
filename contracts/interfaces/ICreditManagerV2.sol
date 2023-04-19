@@ -343,4 +343,8 @@ interface ICreditManagerV2 is ICreditManagerV2Events, IVersion {
             uint256 borrowedAmountWithInterest,
             bool canBeLiquidated
         );
+
+    function withdraw(address creditAccount, address token, uint256 amount)
+        external
+        returns (uint256 tokensToDisable);
 }
