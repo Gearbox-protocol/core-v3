@@ -235,11 +235,11 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     /// @dev Address of the underlying asset
     function underlying() external view returns (address);
 
-    /// @dev Address of the blacklist helper or address(0), if the underlying is not blacklistable
-    function blacklistHelper() external view returns (address);
+    // /// @dev Address of the blacklist helper or address(0), if the underlying is not blacklistable
+    // function blacklistHelper() external view returns (address);
 
-    /// @dev Whether the underlying of connected Credit Manager is blacklistable
-    function isBlacklistableUnderlying() external view returns (bool);
+    // /// @dev Whether the underlying of connected Credit Manager is blacklistable
+    // function isBlacklistableUnderlying() external view returns (bool);
 
     /// @dev Maps addresses to their status as emergency liquidator.
     /// @notice Emergency liquidators are trusted addresses

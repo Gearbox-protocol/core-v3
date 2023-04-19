@@ -26,6 +26,11 @@ struct CollateralTokenData {
     uint24 rampDuration;
 }
 
+struct RevocationPair {
+    address spender;
+    address token;
+}
+
 interface ICreditManagerV2Events {
     /// @dev Emits when a call to an external contract is made through the Credit Manager
     event ExecuteOrder(address indexed target);
@@ -327,9 +332,6 @@ interface ICreditManagerV2 is ICreditManagerV2Events, IVersion {
     /// @dev Address of the connected Price Oracle
     function priceOracle() external view returns (IPriceOracleV2);
 
-    /// @dev Address of the universal adapter
-    function universalAdapter() external view returns (address);
-
     /// @dev Contract's version
     function version() external view returns (uint256);
 
@@ -347,4 +349,8 @@ interface ICreditManagerV2 is ICreditManagerV2Events, IVersion {
     function withdraw(address creditAccount, address token, uint256 amount)
         external
         returns (uint256 tokensToDisable);
+
+    /// @notice Revokes allowances for specified spender/token pairs
+    /// @param revocations Spender/token pairs to revoke allowances for
+    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external;
 }

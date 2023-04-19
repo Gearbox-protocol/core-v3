@@ -19,7 +19,7 @@ import {
 import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IWETHGateway} from "../../interfaces/IWETHGateway.sol";
 
-import {CreditManagerV3, UNIVERSAL_CONTRACT} from "../../credit/CreditManagerV3.sol";
+import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
 
@@ -2267,15 +2267,15 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
 
         assertEq(creditManager.contractToAdapter(DUMB_ADDRESS), address(0), "adapterToContract is not set correctly");
 
-        evm.prank(CONFIGURATOR);
-        creditManager.changeContractAllowance(ADAPTER, UNIVERSAL_CONTRACT);
+        // evm.prank(CONFIGURATOR);
+        // creditManager.changeContractAllowance(ADAPTER, UNIVERSAL_CONTRACT);
 
-        assertEq(creditManager.universalAdapter(), ADAPTER, "Universal adapter is not correctly set");
+        // assertEq(creditManager.universalAdapter(), ADAPTER, "Universal adapter is not correctly set");
 
-        evm.prank(CONFIGURATOR);
-        creditManager.changeContractAllowance(address(0), UNIVERSAL_CONTRACT);
+        // evm.prank(CONFIGURATOR);
+        // creditManager.changeContractAllowance(address(0), UNIVERSAL_CONTRACT);
 
-        assertEq(creditManager.universalAdapter(), address(0), "Universal adapter is not correctly set");
+        // assertEq(creditManager.universalAdapter(), address(0), "Universal adapter is not correctly set");
     }
 
     //
@@ -2334,23 +2334,23 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
     //     }
     // }
 
-    /// @dev [CM-60]: CreditManagerV3 allows approveCreditAccount and executeOrder for universal adapter
-    function test_CM_60_universal_adapter_can_call_adapter_restricted_functions() public {
-        TargetContractMock targetMock = new TargetContractMock();
+    // /// @dev [CM-60]: CreditManagerV3 allows approveCreditAccount and executeOrder for universal adapter
+    // function test_CM_60_universal_adapter_can_call_adapter_restricted_functions() public {
+    //     TargetContractMock targetMock = new TargetContractMock();
 
-        evm.prank(CONFIGURATOR);
-        creditManager.changeContractAllowance(ADAPTER, UNIVERSAL_CONTRACT_ADDRESS);
+    //     evm.prank(CONFIGURATOR);
+    //     creditManager.changeContractAllowance(ADAPTER, UNIVERSAL_CONTRACT_ADDRESS);
 
-        _openAccountAndTransferToCF();
+    //     _openAccountAndTransferToCF();
 
-        evm.prank(ADAPTER);
-        creditManager.approveCreditAccount(DUMB_ADDRESS, underlying, type(uint256).max);
+    //     evm.prank(ADAPTER);
+    //     creditManager.approveCreditAccount(DUMB_ADDRESS, underlying, type(uint256).max);
 
-        bytes memory callData = bytes("Hello");
+    //     bytes memory callData = bytes("Hello");
 
-        evm.prank(ADAPTER);
-        creditManager.executeOrder(address(targetMock), callData);
-    }
+    //     evm.prank(ADAPTER);
+    //     creditManager.executeOrder(address(targetMock), callData);
+    // }
 
     /// @dev [CM-61]: setMaxEnabledToken correctly sets value
     function test_CM_61_setMaxEnabledTokens_works_correctly() public {

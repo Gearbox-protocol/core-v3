@@ -144,7 +144,6 @@ contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
         CreditFacadeV3 fakeCF = new CreditFacadeV3(
             address(fakeCM),
             DUMB_ADDRESS,
-            address(0),
             false
         );
 
@@ -155,7 +154,6 @@ contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
         fakeCF = new CreditFacadeV3(
             address(creditManager),
             DUMB_ADDRESS,
-            address(0),
             false
         );
 
@@ -166,7 +164,6 @@ contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
         fakeCF = new CreditFacadeV3(
             address(creditManager),
             address(degenNFT),
-            address(0),
             false
         );
 

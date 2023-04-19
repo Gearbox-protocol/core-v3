@@ -9,16 +9,24 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
+// TRAITS
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
+import {BalanceHelperTrait} from "../traits/BalanceHelperTrait.sol";
+
 // INTERFACES
 import {IAccountFactory} from "@gearbox-protocol/core-v2/contracts/interfaces/IAccountFactory.sol";
 import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
 import {IPool4626} from "../interfaces/IPool4626.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
+import {IWithdrawManager} from "../interfaces/IWithdrawManager.sol";
 import {
-    ICreditManagerV2, ClosureAction, CollateralTokenData, ManageDebtAction
+    ICreditManagerV2,
+    ClosureAction,
+    CollateralTokenData,
+    ManageDebtAction,
+    RevocationPair
 } from "../interfaces/ICreditManagerV2.sol";
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
@@ -33,8 +41,7 @@ import {
     DEFAULT_FEE_LIQUIDATION,
     DEFAULT_LIQUIDATION_PREMIUM,
     LEVERAGE_DECIMALS,
-    ALLOWANCE_THRESHOLD,
-    UNIVERSAL_CONTRACT
+    ALLOWANCE_THRESHOLD
 } from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // EXCEPTIONS
@@ -69,7 +76,7 @@ struct Slot1 {
 /// @notice Encapsulates the business logic for managing Credit Accounts
 ///
 /// More info: https://dev.gearbox.fi/developers/credit/credit_manager
-contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard {
+contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard, BalanceHelperTrait {
     using SafeERC20 for IERC20;
     using Address for address payable;
     using SafeCast for uint256;
@@ -139,10 +146,6 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard 
     /// @dev Maps 3rd party contracts to their respective adapters
     mapping(address => address) public override contractToAdapter;
 
-    /// @dev Stores address of the Universal adapter
-    /// @notice See more at https://dev.gearbox.fi/docs/documentation/integrations/universal
-    address public universalAdapter;
-
     /// QUOTA-RELATED PARAMS
 
     /// @dev Whether the CM supports quota-related logic
@@ -151,7 +154,7 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard 
     /// @dev Mask of tokens to apply quotas for
     uint256 public override limitedTokenMask;
 
-    With withdrawManager;
+    IWithdrawManager public withdrawManager;
 
     /// @dev contract version
     uint256 public constant override version = 3_00;
@@ -311,7 +314,7 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard 
             (amountToPool, remainingFunds, profit, loss) =
                 calcClosePayments(totalValue, closureActionType, borrowedAmount, borrowedAmountWithInterest); // F:[CM-10,11,12]
 
-            uint256 underlyingBalance = IERC20(underlying).balanceOf(creditAccount);
+            uint256 underlyingBalance = _balanceOf(underlying, creditAccount);
 
             // If there is an underlying surplus, transfers it to the "to" address
             if (underlyingBalance > amountToPool + remainingFunds + 1) {
@@ -612,22 +615,24 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard 
         // This function can only be called by connected adapters (must be a correct adapter/contract pair),
         // Credit Facade or Universal Adapter
         if (
-            (
-                adapterToContract[msg.sender] != targetContract && msg.sender != creditFacade
-                    && msg.sender != universalAdapter
-            ) || targetContract == address(0)
+            (adapterToContract[msg.sender] != targetContract && msg.sender != creditFacade)
+                || targetContract == address(0)
         ) {
             revert CallerNotAdaptersOrCreditFacadeException(); // F:[CM-3,25]
         }
 
+        /// Token approval is multicall-only, so the Credit Account must
+        /// belong to the Credit Facade at this point
+        address creditAccount = getCreditAccountOrRevert(creditFacade); // F:[CM-6]
+
+        _approveSpender(token, targetContract, creditAccount, amount);
+    }
+
+    function _approveSpender(address token, address targetContract, address creditAccount, uint256 amount) internal {
         // Checks that the token is a collateral token
         // Forbidden tokens can be approved, since users need that to
         // sell them off
         getTokenMaskOrRevert(token);
-
-        /// Token approval is multicall-only, so the Credit Account must
-        /// belong to the Credit Facade at this point
-        address creditAccount = getCreditAccountOrRevert(creditFacade); // F:[CM-6]
 
         // Attempts to set allowance directly to the required amount
         // If unsuccessful, assumes that the token requires setting allowance to zero first
@@ -673,12 +678,10 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard 
         returns (bytes memory)
     {
         // Checks that msg.sender is the adapter associated with the passed
-        // target contract. The exception is the Universal Adapter, which
-        // can potentially call any target.
+        // target contract.
         if (adapterToContract[msg.sender] != targetContract || targetContract == address(0)) {
-            if (msg.sender != universalAdapter) {
-                revert TargetContractNotAllowedException();
-            } // F:[CM-28]
+            revert TargetContractNotAllowedException();
+            // F:[CM-28]
         }
 
         /// Order execution is multicall-only, so the Credit Account must
@@ -895,7 +898,7 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard 
         uint256 _twvUSDx10K
     ) internal view returns (uint256 totalValueUSD, uint256 twvUSDx10K, bool nonZeroBalance) {
         (address token, uint16 liquidationThreshold) = collateralTokensByMask(tokenMask);
-        uint256 balance = IERC20(token).balanceOf(creditAccount);
+        uint256 balance = _balanceOf(token, creditAccount);
 
         // Collateral calculations are only done if there is a non-zero balance
         if (balance > 1) {
@@ -978,7 +981,7 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard 
             // and 0 otherwise
             if (enabledTokensMask & tokenMask != 0) {
                 (address token,) = collateralTokensByMask(tokenMask); // F:[CM-44]
-                uint256 amount = IERC20(token).balanceOf(creditAccount); // F:[CM-44]
+                uint256 amount = _balanceOf(token, creditAccount); // F:[CM-44]
                 if (amount > 1) {
                     // 1 is subtracted from amount to leave a non-zero value
                     // in the balance mapping, optimizing future writes
@@ -1497,12 +1500,6 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard 
         if (targetContract != address(0)) {
             contractToAdapter[targetContract] = adapter; // F:[CM-56]
         }
-
-        // The universal adapter can potentially target multiple contracts,
-        // so it is set using a special vanity address
-        if (targetContract == UNIVERSAL_CONTRACT) {
-            universalAdapter = adapter; // F:[CM-56]
-        }
     }
 
     /// @dev Sets the Credit Facade
@@ -1560,8 +1557,34 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard 
 
     function withdraw(address creditAccount, address token, uint256 amount)
         external
+        override
+        creditFacadeOnly
         returns (uint256 tokensToDisable)
-    {}
+    {
+        // IWithdrawManager(blacklistHelper).addClaimable(underlying, borrower, amount); // F:[FA-56]
+    }
 
     function _cancelWithdrawals() internal {}
+
+    /// @notice Revokes allowances for specified spender/token pairs
+    /// @param revocations Spender/token pairs to revoke allowances for
+    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations)
+        external
+        override
+        creditFacadeOnly
+    {
+        uint256 numRevocations = revocations.length;
+        unchecked {
+            for (uint256 i; i < numRevocations; ++i) {
+                address spender = revocations[i].spender;
+                address token = revocations[i].token;
+
+                if (spender == address(0) || token == address(0)) {
+                    revert ZeroAddressException();
+                }
+
+                _approveSpender(token, spender, creditAccount, 1);
+            }
+        }
+    }
 }

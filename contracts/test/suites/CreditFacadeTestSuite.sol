@@ -12,7 +12,6 @@ import {CreditManagerFactoryBase} from "../../factories/CreditManagerFactoryBase
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {DegenNFT} from "@gearbox-protocol/core-v2/contracts/tokens/DegenNFT.sol";
-import {BlacklistHelper} from "../../support/BlacklistHelper.sol";
 
 import "../lib/constants.sol";
 
@@ -29,7 +28,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
     CreditFacadeV3 public creditFacade;
     CreditConfigurator public creditConfigurator;
     DegenNFT public degenNFT;
-    BlacklistHelper public blacklistHelper;
+    // BlacklistHelper public blacklistHelper;
 
     uint128 public minBorrowedAmount;
     uint128 public maxBorrowedAmount;
@@ -106,7 +105,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
         creditFacade = new CreditFacadeV3(
             address(creditManager),
             address(degenNFT),
-            address(0),
+
             false
         );
 
@@ -123,7 +122,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
         creditFacade = new CreditFacadeV3(
             address(creditManager),
             address(0),
-            address(0),
+
             true
         );
 
@@ -134,24 +133,18 @@ contract CreditFacadeTestSuite is PoolDeployer {
     }
 
     function testFacadeWithBlacklistHelper() external {
-        blacklistHelper = new BlacklistHelper(
-            address(addressProvider),
-            creditManager.underlying(),
-            DUMB_ADDRESS
-        );
-
         evm.startPrank(CONFIGURATOR);
 
         creditFacade = new CreditFacadeV3(
             address(creditManager),
             address(0),
-            address(blacklistHelper),
+
             false
         );
 
         creditConfigurator.upgradeCreditFacade(address(creditFacade), true);
 
-        blacklistHelper.addCreditFacade(address(creditFacade));
+        // blacklistHelper.addCreditFacade(address(creditFacade));
 
         evm.stopPrank();
     }

@@ -10,7 +10,7 @@ import {CreditConfigurator, CreditManagerOpts, CollateralToken} from "../../cred
 import {ICreditManagerV2, ICreditManagerV2Events} from "../../interfaces/ICreditManagerV2.sol";
 import {ICreditConfiguratorEvents} from "../../interfaces/ICreditConfigurator.sol";
 import {IAdapter} from "@gearbox-protocol/core-v2/contracts/interfaces/adapters/IAdapter.sol";
-import {UniversalAdapter} from "../../adapters/UniversalAdapter.sol";
+
 import {BotList} from "../../support/BotList.sol";
 
 //
@@ -256,7 +256,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV2Events, ICreditConfig
         creditFacade = new CreditFacadeV3(
             address(creditManager),
             creditOpts.degenNFT,
-            creditOpts.blacklistHelper,
+
             creditOpts.expirable
         );
 
@@ -649,17 +649,17 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV2Events, ICreditConfig
         assertTrue(allowedContracts.includes(TARGET_CONTRACT), "Target contract wasnt found");
     }
 
-    /// @dev [CC-15A]: allowContract allows universal adapter for universal contract
-    function test_CC_15A_allowContract_allows_universal_contract() public {
-        evm.prank(CONFIGURATOR);
+    // /// @dev [CC-15A]: allowContract allows universal adapter for universal contract
+    // function test_CC_15A_allowContract_allows_universal_contract() public {
+    //     evm.prank(CONFIGURATOR);
 
-        evm.expectEmit(true, true, false, false);
-        emit ContractAllowed(UNIVERSAL_CONTRACT, address(adapter1));
+    //     evm.expectEmit(true, true, false, false);
+    //     emit ContractAllowed(UNIVERSAL_CONTRACT, address(adapter1));
 
-        creditConfigurator.allowContract(UNIVERSAL_CONTRACT, address(adapter1));
+    //     creditConfigurator.allowContract(UNIVERSAL_CONTRACT, address(adapter1));
 
-        assertEq(creditManager.universalAdapter(), address(adapter1), "Universal adapter wasn't updated");
-    }
+    //     assertEq(creditManager.universalAdapter(), address(adapter1), "Universal adapter wasn't updated");
+    // }
 
     /// @dev [CC-15A]: allowContract removes existing adapter
     function test_CC_15A_allowContract_removes_old_adapter_if_it_exists() public {
@@ -926,7 +926,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV2Events, ICreditConfig
                         CreditFacadeV3 initialCf = new CreditFacadeV3(
                             address(creditManager),
                             address(0),
-                            address(0),
+
                             true
                         );
 
@@ -941,7 +941,6 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV2Events, ICreditConfig
 
                     CreditFacadeV3 cf = new CreditFacadeV3(
                         address(creditManager),
-                        address(0),
                         address(0),
                         isExpirable
                     );
@@ -999,7 +998,6 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV2Events, ICreditConfig
 
             CreditFacadeV3 cf = new CreditFacadeV3(
                 address(creditManager),
-                address(0),
                 address(0),
                 false
             );

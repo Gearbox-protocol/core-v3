@@ -5,7 +5,7 @@ pragma solidity ^0.8.10;
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
-interface IBlacklistHelperEvents {
+interface IWithdrawManagerEvents {
     /// @dev Emitted when a borrower's claimable balance is increased
     event ClaimableAdded(address indexed underlying, address indexed holder, uint256 amount);
 
@@ -19,10 +19,7 @@ interface IBlacklistHelperEvents {
     event CreditFacadeRemoved(address indexed creditFacade);
 }
 
-interface IBlacklistHelper is IBlacklistHelperEvents, IVersion {
-    /// @dev Returns whether the account is blacklisted for a particular underlying
-    function isBlacklisted(address underlying, address account) external view returns (bool);
-
+interface IWithdrawManager is IWithdrawManagerEvents, IVersion {
     /// @dev Transfers the sender's claimable balance of underlying to the specified address
     function claim(address underlying, address to) external;
 

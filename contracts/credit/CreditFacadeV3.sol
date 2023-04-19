@@ -3,10 +3,11 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 
+// TRAITS
+import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
+import {BalanceHelperTrait} from "../traits/BalanceHelperTrait.sol";
 //  DATA
 
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
@@ -23,8 +24,8 @@ import {TokenLT} from "../interfaces/IPoolQuotaKeeper.sol";
 import {IDegenNFT} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
-import {IBlacklistHelper} from "../interfaces/IBlacklistHelper.sol";
 import {IBotList} from "../interfaces/IBotList.sol";
+import {RevocationPair} from "../interfaces/ICreditManagerV2.sol";
 
 // CONSTANTS
 import {LEVERAGE_DECIMALS} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
@@ -65,7 +66,7 @@ struct CumulativeLossParams {
 /// - Through CreditFacadeV3, which provides all the required account management function: open / close / liquidate / manageDebt,
 /// as well as Multicalls that allow to perform multiple actions within a single transaction, with a single health check
 /// - Through adapters, which call the Credit Manager directly, but only allow interactions with specific target contracts
-contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
+contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTrait {
     using Address for address;
 
     /// @dev Credit Manager connected to this Credit Facade
@@ -73,9 +74,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
     /// @dev Whether the whitelisted mode is active
     bool public immutable whitelisted;
-
-    /// @dev Whether the Credit Manager's underlying has blacklisting
-    bool public immutable isBlacklistableUnderlying;
 
     /// @dev Whether the Credit Facade implements expirable logic
     bool public immutable expirable;
@@ -112,9 +110,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
     /// @dev Address of the DegenNFT that gatekeeps account openings in whitelisted mode
     address public immutable override degenNFT;
-
-    /// @dev Address of the BlacklistHelper if underlying is blacklistable, otherwise address(0)
-    address public immutable override blacklistHelper;
 
     /// @dev Stores in a compressed state the last block where borrowing happened and the total amount borrowed in that block
     uint256 internal totalBorrowedInBlock;
@@ -159,10 +154,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @dev Initializes creditFacade and connects it with CreditManagerV3
     /// @param _creditManager address of Credit Manager
     /// @param _degenNFT address of the DegenNFT or address(0) if whitelisted mode is not used
-    /// @param _blacklistHelper address of the funds recovery contract for blacklistable underlyings.
-    ///                         Must be address(0) is the underlying is not blacklistable
     /// @param _expirable Whether the CreditFacadeV3 can expire and implements expiration-related logic
-    constructor(address _creditManager, address _degenNFT, address _blacklistHelper, bool _expirable)
+    constructor(address _creditManager, address _degenNFT, bool _expirable)
         ACLNonReentrantTrait(address(IPool4626(ICreditManagerV2(_creditManager).pool()).addressProvider()))
         nonZeroAddress(_creditManager)
     {
@@ -176,12 +169,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
         degenNFT = _degenNFT; // F:[FA-1A]
         whitelisted = _degenNFT != address(0); // F:[FA-1A]
-
-        blacklistHelper = _blacklistHelper;
-        isBlacklistableUnderlying = _blacklistHelper != address(0);
-        if (_blacklistHelper != address(0)) {
-            emit BlacklistHelperSet(_blacklistHelper);
-        }
 
         expirable = _expirable;
     }
@@ -382,18 +369,10 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         bool convertWETH,
         ClosureAction closeAction
     ) internal returns (uint256 remainingFunds) {
-        uint256 helperBalance = _isBlacklisted(borrower);
-        // If the borrower is blacklisted, transfer the account to a special recovery contract,
-        // so that the attempt to transfer remaining funds to a blacklisted borrower does not
-        // break the liquidation. The borrower can retrieve the funds from the recovery contract afterwards.
-        if (helperBalance > 0) {
-            _transferAccount(borrower, blacklistHelper);
-        } // F:[FA-56]
-
         // Liquidates the CA and sends the remaining funds to the borrower or blacklist helper
         uint256 reportedLoss;
         (remainingFunds, reportedLoss) = creditManager.closeCreditAccount(
-            helperBalance > 0 ? blacklistHelper : borrower,
+            borrower,
             closeAction,
             totalValue,
             msg.sender,
@@ -415,47 +394,12 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             }
         }
 
-        /// Credit Facade increases the borrower's claimable balance in BlacklistHelper, so the
-        /// borrower can recover funds to a different address
-        if (helperBalance > 0 && remainingFunds > 1) {
-            _increaseClaimableBalance(borrower, helperBalance);
-        }
-
         // TODO: add test
         if (convertWETH) {
             _wethWithdrawTo(to);
         }
 
         emit LiquidateCreditAccount(borrower, msg.sender, to, closeAction, remainingFunds); // F:[FA-15]
-    }
-
-    /// @dev Checks whether borrower is blacklisted in the underlying token and, if so,
-    ///      returns non-zero value equal to blacklist helper's balance of underlying
-    //       Zero return value always indicates that borrower is not blacklisted
-    function _isBlacklisted(address borrower) internal view returns (uint256 helperBalance) {
-        if (
-            isBlacklistableUnderlying && IBlacklistHelper(blacklistHelper).isBlacklisted(underlying, borrower) // F:[FA-56]
-        ) {
-            // can't realistically overflow
-            unchecked {
-                helperBalance = _balanceOf(underlying, blacklistHelper) + 1;
-            }
-        }
-    }
-
-    /// @dev Checks if blacklist helper's balance of underlying increased after liquidation
-    ///      and, if so, increases the borrower's claimable balance by the difference
-    ///      Not relying on `remainingFunds` to support fee-on-transfer tokens
-    function _increaseClaimableBalance(address borrower, uint256 helperBalanceBefore) internal {
-        uint256 helperBalance = _balanceOf(underlying, blacklistHelper);
-        if (helperBalance > helperBalanceBefore) {
-            uint256 amount;
-            unchecked {
-                amount = helperBalance - helperBalanceBefore;
-            }
-            IBlacklistHelper(blacklistHelper).addClaimable(underlying, borrower, amount); // F:[FA-56]
-            emit UnderlyingSentToBlacklistHelper(borrower, amount); // F:[FA-56]
-        }
     }
 
     /// @dev Executes a batch of transactions within a Multicall, to manage an existing account
@@ -644,6 +588,13 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                         (address token, uint256 amount) = abi.decode(callData, (address, uint256));
                         uint256 tokensToDisable = creditManager.withdraw(creditAccount, token, amount);
                         enabledTokensMask = enabledTokensMask & (~tokensToDisable);
+                    }
+                    //
+                    // RevokeAdapterAllowances
+                    //
+                    else if (method == ICreditFacadeMulticall.revokeAdapterAllowances.selector) {
+                        RevocationPair[] memory revocations = abi.decode(callData, (RevocationPair[]));
+                        creditManager.revokeAdapterAllowances(creditAccount, revocations);
                     }
                     //
                     // UNKNOWN METHOD
@@ -847,10 +798,10 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             revert OpenAccountNotAllowedAfterExpirationException(); // F: [FA-46]
         }
 
-        // Checks that the borrower is not blacklisted, if the underlying is blacklistable
-        if (_isBlacklisted(onBehalfOf) != 0) {
-            revert NotAllowedForBlacklistedAddressException();
-        }
+        // // Checks that the borrower is not blacklisted, if the underlying is blacklistable
+        // if (_isBlacklisted(onBehalfOf) != 0) {
+        //     revert NotAllowedForBlacklistedAddressException();
+        // }
 
         // F:[FA-5] covers case when degenNFT == address(0)
         if (degenNFT != address(0)) {
@@ -1256,9 +1207,5 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         creditConfiguratorOnly // F: [CM-4]
     {
         canLiquidateWhilePaused[liquidator] = false;
-    }
-
-    function _balanceOf(address token, address holder) internal view returns (uint256) {
-        return IERC20(token).balanceOf(holder);
     }
 }

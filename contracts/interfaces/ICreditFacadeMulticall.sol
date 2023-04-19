@@ -5,6 +5,7 @@ pragma solidity ^0.8.10;
 
 import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 import {QuotaUpdate} from "./IPoolQuotaKeeper.sol";
+import {RevocationPair} from "./ICreditManagerV2.sol";
 
 interface ICreditFacadeMulticall {
     /// @dev Instructs CreditFacadeV3 to check token balances at the end
@@ -60,4 +61,6 @@ interface ICreditFacadeMulticall {
     function setFullCheckParams(uint256[] memory collateralHints, uint16 minHealthFactor) external;
 
     function withdraw(address token, uint256 amount) external;
+
+    function revokeAdapterAllowances(RevocationPair[] calldata revocations) external;
 }
