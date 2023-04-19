@@ -130,6 +130,14 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
     EnumerableSet.UintSet internal forbiddenTokenSet;
 
+    /// @dev Maps addresses to their status as emergency liquidator.
+    /// @notice Emergency liquidators are trusted addresses
+    /// that are able to liquidate positions while the contracts are paused,
+    /// e.g. when there is a risk of bad debt while an exploit is being patched.
+    /// In the interest of fairness, emergency liquidators do not receive a premium
+    /// And are compensated by the Gearbox DAO separately.
+    mapping(address => bool) public override canLiquidateWhilePaused;
+
     /// @dev Contract version
     uint256 public constant override version = 3_00;
 
@@ -150,7 +158,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     }
 
     modifier whenNotPausedOrEmergency() {
-        require(!paused() || creditManager.canLiquidateWhilePaused(msg.sender), "Pausable: paused");
+        require(!paused() || canLiquidateWhilePaused[msg.sender], "Pausable: paused");
         _;
     }
 
@@ -1225,5 +1233,23 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             if (mask == (1 << index)) return index;
         }
         revert IncorrectParameterException();
+    }
+
+    /// @dev Adds an address to the list of emergency liquidators
+    /// @param liquidator Address to add to the list
+    function addEmergencyLiquidator(address liquidator)
+        external
+        creditConfiguratorOnly // F:[CM-4]
+    {
+        canLiquidateWhilePaused[liquidator] = true;
+    }
+
+    /// @dev Removes an address from the list of emergency liquidators
+    /// @param liquidator Address to remove from the list
+    function removeEmergencyLiquidator(address liquidator)
+        external
+        creditConfiguratorOnly // F: [CM-4]
+    {
+        canLiquidateWhilePaused[liquidator] = false;
     }
 }

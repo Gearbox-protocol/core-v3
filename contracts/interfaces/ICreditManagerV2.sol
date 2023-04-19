@@ -300,14 +300,6 @@ interface ICreditManagerV2 is ICreditManagerV2Events, IVersion {
     /// @dev The maximal number of enabled tokens on a single Credit Account
     function maxAllowedEnabledTokenLength() external view returns (uint8);
 
-    /// @dev Maps addresses to their status as emergency liquidator.
-    /// @notice Emergency liquidators are trusted addresses
-    /// that are able to liquidate positions while the contracts are paused,
-    /// e.g. when there is a risk of bad debt while an exploit is being patched.
-    /// In the interest of fairness, emergency liquidators do not receive a premium
-    /// And are compensated by the Gearbox DAO separately.
-    function canLiquidateWhilePaused(address) external view returns (bool);
-
     /// @dev Returns the fee parameters of the Credit Manager
     /// @return feeInterest Percentage of interest taken by the protocol as profit
     /// @return feeLiquidation Percentage of account value taken by the protocol as profit

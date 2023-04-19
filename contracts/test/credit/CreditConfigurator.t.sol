@@ -1130,7 +1130,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV2Events, ICreditConfig
         creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS);
 
         assertTrue(
-            creditManager.canLiquidateWhilePaused(DUMB_ADDRESS), "Credit manager emergency liquidator status incorrect"
+            creditFacade.canLiquidateWhilePaused(DUMB_ADDRESS), "Credit manager emergency liquidator status incorrect"
         );
     }
 
@@ -1149,7 +1149,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV2Events, ICreditConfig
         creditConfigurator.removeEmergencyLiquidator(DUMB_ADDRESS);
 
         assertTrue(
-            !creditManager.canLiquidateWhilePaused(DUMB_ADDRESS), "Credit manager emergency liquidator status incorrect"
+            !creditFacade.canLiquidateWhilePaused(DUMB_ADDRESS), "Credit manager emergency liquidator status incorrect"
         );
     }
 

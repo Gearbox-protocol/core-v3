@@ -289,9 +289,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
             if (quoted > 1) {
                 TokenQuotaParams storage tq = totalQuotaParams[token];
 
-                console.log("BEFORE: ", accountQuota.cumulativeIndexLU);
                 caQuotaInterestChange += _updateAccountQuotaInterest(tq, accountQuota, quoted);
-                console.log("AFTER: ", accountQuota.cumulativeIndexLU);
             }
             unchecked {
                 ++i;
@@ -322,8 +320,6 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
                 TokenQuotaParams storage tq = totalQuotaParams[token];
                 uint192 cumulativeIndexNow = _cumulativeIndexNow(tq);
 
-                console.log("VIEW NOW ", cumulativeIndexNow);
-                console.log("VIEW UPD ", accountQuota.cumulativeIndexLU);
                 caQuotaInterestChange +=
                     _computeOutstandingQuotaInterest(quoted, cumulativeIndexNow, accountQuota.cumulativeIndexLU); // F:[CMQ-10]
             }
@@ -331,8 +327,6 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
                 ++i;
             }
         }
-
-        console.log("VIEW CAQ", caQuotaInterestChange);
     }
 
     /// @dev Internal function for outstanding quota interest computation

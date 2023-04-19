@@ -810,12 +810,12 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
 
     /// @dev IMPLEMENTATION: addEmergencyLiquidator
     function _addEmergencyLiquidator(address liquidator) internal {
-        bool statusCurrent = creditManager.canLiquidateWhilePaused(liquidator);
+        bool statusCurrent = creditFacade().canLiquidateWhilePaused(liquidator);
 
         // Checks that the address is not already in the list,
         // to avoid redundant events
         if (!statusCurrent) {
-            creditManager.addEmergencyLiquidator(liquidator); // F: [CC-38]
+            creditFacade().addEmergencyLiquidator(liquidator); // F: [CC-38]
             emit EmergencyLiquidatorAdded(liquidator); // F: [CC-38]
         }
     }
@@ -831,12 +831,12 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
 
     /// @dev IMPLEMENTATION: removeEmergencyLiquidator
     function _removeEmergencyLiquidator(address liquidator) internal {
-        bool statusCurrent = creditManager.canLiquidateWhilePaused(liquidator);
+        bool statusCurrent = creditFacade().canLiquidateWhilePaused(liquidator);
 
         // Checks that the address is in the list
         // to avoid redundant events
         if (statusCurrent) {
-            creditManager.removeEmergencyLiquidator(liquidator); // F: [CC-38]
+            creditFacade().removeEmergencyLiquidator(liquidator); // F: [CC-38]
             emit EmergencyLiquidatorRemoved(liquidator); // F: [CC-38]
         }
     }

@@ -438,12 +438,6 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setMaxEnabledTokens(255);
 
-        evm.expectRevert(CallerNotConfiguratorException.selector);
-        creditManager.addEmergencyLiquidator(DUMB_ADDRESS);
-
-        evm.expectRevert(CallerNotConfiguratorException.selector);
-        creditManager.removeEmergencyLiquidator(DUMB_ADDRESS);
-
         evm.stopPrank();
     }
 
@@ -2364,29 +2358,6 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         creditManager.setMaxEnabledTokens(255);
 
         assertEq(creditManager.maxAllowedEnabledTokenLength(), 255, "Incorrect max enabled tokens");
-    }
-
-    //
-    // EMERGENCY LIQUIDATIONS
-    //
-
-    /// @dev [CM-62]: addEmergencyLiquidator correctly sets value
-    function test_CM_62_addEmergencyLiquidator_works_correctly() public {
-        evm.prank(CONFIGURATOR);
-        creditManager.addEmergencyLiquidator(DUMB_ADDRESS);
-
-        assertTrue(creditManager.canLiquidateWhilePaused(DUMB_ADDRESS), "Value was not set");
-    }
-
-    /// @dev [CM-63]: removeEmergencyLiquidator correctly sets value
-    function test_CM_63_removeEmergencyLiquidator_works_correctly() public {
-        evm.prank(CONFIGURATOR);
-        creditManager.addEmergencyLiquidator(DUMB_ADDRESS);
-
-        evm.prank(CONFIGURATOR);
-        creditManager.removeEmergencyLiquidator(DUMB_ADDRESS);
-
-        assertTrue(!creditManager.canLiquidateWhilePaused(DUMB_ADDRESS), "Value was is still set");
     }
 
     // /// @dev [CM-64]: closeCreditAccount reverts when attempting to liquidate while paused,

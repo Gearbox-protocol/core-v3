@@ -9,8 +9,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
-import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
-
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 // INTERFACES
 import {IAccountFactory} from "@gearbox-protocol/core-v2/contracts/interfaces/IAccountFactory.sol";
 import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
@@ -69,7 +69,7 @@ struct Slot1 {
 /// @notice Encapsulates the business logic for managing Credit Accounts
 ///
 /// More info: https://dev.gearbox.fi/developers/credit/credit_manager
-contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
+contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using Address for address payable;
     using SafeCast for uint256;
@@ -139,14 +139,6 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
     /// @dev Maps 3rd party contracts to their respective adapters
     mapping(address => address) public override contractToAdapter;
 
-    /// @dev Maps addresses to their status as emergency liquidator.
-    /// @notice Emergency liquidators are trusted addresses
-    /// that are able to liquidate positions while the contracts are paused,
-    /// e.g. when there is a risk of bad debt while an exploit is being patched.
-    /// In the interest of fairness, emergency liquidators do not receive a premium
-    /// And are compensated by the Gearbox DAO separately.
-    mapping(address => bool) public override canLiquidateWhilePaused;
-
     /// @dev Stores address of the Universal adapter
     /// @notice See more at https://dev.gearbox.fi/docs/documentation/integrations/universal
     address public universalAdapter;
@@ -190,7 +182,7 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
 
     /// @dev Constructor
     /// @param _pool Address of the pool to borrow funds from
-    constructor(address _pool) ACLNonReentrantTrait(address(IPool4626(_pool).addressProvider())) {
+    constructor(address _pool) {
         IAddressProvider addressProvider = IPoolService(_pool).addressProvider();
 
         pool = _pool; // F:[CM-1]
@@ -517,15 +509,10 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
             } else {
                 uint256 amountToPool = (amountRepaid * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
 
-                console.log("QQ-2");
-
                 amountProfit += amountRepaid - amountToPool; // F: [CMQ-4]
                 amountRepaid = 0; // F: [CMQ-4]
 
                 uint256 newCumulativeQuotaInterest = quotaInterestAccrued - amountToPool;
-
-                console.log("quotaInterestAccrued: ", quotaInterestAccrued);
-                console.log("newCumulativeQuotaInterest", newCumulativeQuotaInterest);
 
                 cumulativeQuotaInterest[creditAccount] = newCumulativeQuotaInterest + 1; // F: [CMQ-4]
             }
@@ -732,8 +719,6 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
         (enabledTokenMask,, twvUSD, borrowAmountPlusInterestRateAndFeesUSD,) =
             _calcAllCollateral(_priceOracle, creditAccount, enabledTokenMask, minHealthFactor, collateralHints, true);
 
-        console.log("FC", twvUSD, borrowAmountPlusInterestRateAndFeesUSD);
-
         if (twvUSD < borrowAmountPlusInterestRateAndFeesUSD) {
             revert NotEnoughCollateralException();
         }
@@ -812,9 +797,6 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
                 borrowedAmountWithInterestAndFees * minHealthFactor, // F: [CM-42]
                 underlying
             ) / PERCENTAGE_FACTOR;
-
-            console.log("BB#1", borrowedAmountWithInterestAndFees);
-            console.log("BB#2", borrowAmountPlusInterestRateAndFeesUSD);
         }
 
         // If quoted tokens fully cover the debt, we can stop here
@@ -1228,13 +1210,10 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
             TokenLT[] memory tokens = getQuotedTokens(creditAccount);
 
             quotaInterest = cumulativeQuotaInterest[creditAccount] - 1;
-            console.log("QI", quotaInterest);
 
             if (tokens.length > 0) {
                 quotaInterest += poolQuotaKeeper().outstandingQuotaInterest(address(this), creditAccount, tokens); // F: [CMQ-10]
             }
-
-            console.log("QI", quotaInterest);
         }
 
         return _calcCreditAccountAccruedInterest(creditAccount, quotaInterest);
@@ -1254,8 +1233,6 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
         uint256 cumulativeIndexAtOpen_RAY;
         uint256 cumulativeIndexNow_RAY;
         (borrowedAmount, cumulativeIndexAtOpen_RAY, cumulativeIndexNow_RAY) = _getCreditAccountParameters(creditAccount); // F:[CM-49]
-
-        console.log(cumulativeIndexAtOpen_RAY);
 
         // Interest is never stored and is always computed dynamically
         // as the difference between the current cumulative index of the pool
@@ -1542,24 +1519,6 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
         creditConfiguratorOnly // F:[CM-4]
     {
         slot1.priceOracle = IPriceOracleV2(_priceOracle);
-    }
-
-    /// @dev Adds an address to the list of emergency liquidators
-    /// @param liquidator Address to add to the list
-    function addEmergencyLiquidator(address liquidator)
-        external
-        creditConfiguratorOnly // F:[CM-4]
-    {
-        canLiquidateWhilePaused[liquidator] = true;
-    }
-
-    /// @dev Removes an address from the list of emergency liquidators
-    /// @param liquidator Address to remove from the list
-    function removeEmergencyLiquidator(address liquidator)
-        external
-        creditConfiguratorOnly // F: [CM-4]
-    {
-        canLiquidateWhilePaused[liquidator] = false;
     }
 
     /// @dev Sets a new Credit Configurator

@@ -1658,6 +1658,14 @@ contract CreditFacadeTest is
         evm.expectRevert(CallerNotConfiguratorException.selector);
         evm.prank(USER);
         creditFacade.setBotList(FRIEND);
+
+        evm.expectRevert(CallerNotConfiguratorException.selector);
+        evm.prank(USER);
+        creditFacade.addEmergencyLiquidator(DUMB_ADDRESS);
+
+        evm.expectRevert(CallerNotConfiguratorException.selector);
+        evm.prank(USER);
+        creditFacade.removeEmergencyLiquidator(DUMB_ADDRESS);
     }
 
     /// CHECK SLIPPAGE PROTECTION
@@ -2109,5 +2117,28 @@ contract CreditFacadeTest is
                 })
             )
         );
+    }
+
+    //
+    // EMERGENCY LIQUIDATIONS
+    //
+
+    /// @dev [FA-62]: addEmergencyLiquidator correctly sets value
+    function test_CM_62_addEmergencyLiquidator_works_correctly() public {
+        evm.prank(address(creditConfigurator));
+        creditFacade.addEmergencyLiquidator(DUMB_ADDRESS);
+
+        assertTrue(creditFacade.canLiquidateWhilePaused(DUMB_ADDRESS), "Value was not set");
+    }
+
+    /// @dev [FA-63]: removeEmergencyLiquidator correctly sets value
+    function test_FA_63_removeEmergencyLiquidator_works_correctly() public {
+        evm.prank(address(creditConfigurator));
+        creditFacade.addEmergencyLiquidator(DUMB_ADDRESS);
+
+        evm.prank(address(creditConfigurator));
+        creditFacade.removeEmergencyLiquidator(DUMB_ADDRESS);
+
+        assertTrue(!creditFacade.canLiquidateWhilePaused(DUMB_ADDRESS), "Value was is still set");
     }
 }
