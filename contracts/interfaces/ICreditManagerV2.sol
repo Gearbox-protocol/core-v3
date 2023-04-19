@@ -104,7 +104,7 @@ interface ICreditManagerV2 is ICreditManagerV2Events, IVersion {
     /// @param amount Amount to increase / decrease the principal by
     /// @param  action Increase/decrease
     /// @return newBorrowedAmount The new debt principal
-    function manageDebt(address creditAccount, uint256 amount, ManageDebtAction action)
+    function manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)
         external
         returns (uint256 newBorrowedAmount);
 

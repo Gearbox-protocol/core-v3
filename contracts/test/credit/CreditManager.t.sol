@@ -362,7 +362,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         // );
 
         evm.expectRevert(CallerNotCreditFacadeException.selector);
-        creditManager.manageDebt(DUMB_ADDRESS, 100, ManageDebtAction.INCREASE_DEBT);
+        creditManager.manageDebt(DUMB_ADDRESS, 100, 0, ManageDebtAction.INCREASE_DEBT);
 
         evm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.addCollateral(DUMB_ADDRESS, DUMB_ADDRESS, DUMB_ADDRESS, 100);
@@ -1098,7 +1098,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         uint256 expectedNewCulumativeIndex =
             (2 * cumulativeIndexAtOpen * (borrowedAmount + amount)) / (2 * borrowedAmount + amount);
 
-        uint256 newBorrowedAmount = creditManager.manageDebt(creditAccount, amount, ManageDebtAction.INCREASE_DEBT);
+        uint256 newBorrowedAmount = creditManager.manageDebt(creditAccount, amount, 1, ManageDebtAction.INCREASE_DEBT);
 
         assertEq(newBorrowedAmount, borrowedAmount + amount, "Incorrect returned newBorrowedAmount");
 
@@ -1136,7 +1136,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
             expectedBorrowAmount = borrowedAmount;
         }
 
-        uint256 newBorrowedAmount = creditManager.manageDebt(creditAccount, amount, ManageDebtAction.DECREASE_DEBT);
+        uint256 newBorrowedAmount = creditManager.manageDebt(creditAccount, amount, 1, ManageDebtAction.DECREASE_DEBT);
 
         assertEq(newBorrowedAmount, expectedBorrowAmount, "Incorrect returned newBorrowedAmount");
 

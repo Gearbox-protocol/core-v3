@@ -390,7 +390,7 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
     /// @param amount Amount to increase / decrease the principal by
     /// @param action Increase/decrease bed debt
     /// @return newBorrowedAmount The new debt principal
-    function manageDebt(address creditAccount, uint256 amount, ManageDebtAction action)
+    function manageDebt(address creditAccount, uint256 amount, uint256 enableTokenMask, ManageDebtAction action)
         external
         nonReentrant
         creditFacadeOnly // F:[CM-2]
@@ -422,7 +422,7 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
 
             if (supportsQuotas) {
                 (amountRepaid, amountProfit) =
-                    _computeQuotasAmountDebtDecrease(creditAccount, amountRepaid, amountProfit);
+                    _computeQuotasAmountDebtDecrease(creditAccount, amountRepaid, amountProfit, enableTokenMask);
             }
 
             if (amountRepaid > 0) {
@@ -490,28 +490,24 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
         }
     }
 
-    // function _checkForbiddenTokens(address creditAccount) internal view {
-    //     if (enabledTokensMap[creditAccount] & forbiddenTokenMask > 0) {
-    //         revert ForbiddenTokensException();
-    //     }
-    // }
-
-    function _computeQuotasAmountDebtDecrease(address creditAccount, uint256 _amountRepaid, uint256 _amountProfit)
-        internal
-        returns (uint256 amountRepaid, uint256 amountProfit)
-    {
+    function _computeQuotasAmountDebtDecrease(
+        address creditAccount,
+        uint256 _amountRepaid,
+        uint256 _amountProfit,
+        uint256 enabledTokenMask
+    ) internal returns (uint256 amountRepaid, uint256 amountProfit) {
         amountRepaid = _amountRepaid;
         amountProfit = _amountProfit;
 
         uint16 feeInterest = slot1.feeInterest;
         uint256 quotaInterestAccrued = cumulativeQuotaInterest[creditAccount] - 1;
 
-        TokenLT[] memory tokens = getQuotedTokens(creditAccount);
+        TokenLT[] memory tokens = _getQuotedTokens(enabledTokenMask);
         if (tokens.length > 0) {
             quotaInterestAccrued += poolQuotaKeeper().accrueQuotaInterest(creditAccount, tokens); // F: [CMQ-4,5]
         }
 
-        if (quotaInterestAccrued > 2) {
+        if (quotaInterestAccrued > 1) {
             uint256 quotaProfit = (quotaInterestAccrued * feeInterest) / PERCENTAGE_FACTOR;
 
             if (amountRepaid >= quotaInterestAccrued + quotaProfit) {
@@ -521,13 +517,17 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
             } else {
                 uint256 amountToPool = (amountRepaid * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
 
+                console.log("QQ-2");
+
                 amountProfit += amountRepaid - amountToPool; // F: [CMQ-4]
                 amountRepaid = 0; // F: [CMQ-4]
 
                 uint256 newCumulativeQuotaInterest = quotaInterestAccrued - amountToPool;
 
-                cumulativeQuotaInterest[creditAccount] =
-                    newCumulativeQuotaInterest == 0 ? 1 : newCumulativeQuotaInterest; // F: [CMQ-4]
+                console.log("quotaInterestAccrued: ", quotaInterestAccrued);
+                console.log("newCumulativeQuotaInterest", newCumulativeQuotaInterest);
+
+                cumulativeQuotaInterest[creditAccount] = newCumulativeQuotaInterest + 1; // F: [CMQ-4]
             }
         }
     }
@@ -727,14 +727,14 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
         IPriceOracleV2 _priceOracle = slot1.priceOracle;
 
         uint256 twvUSD;
-        uint256 borrowAmountPlusInterestRateUSD;
+        uint256 borrowAmountPlusInterestRateAndFeesUSD;
 
-        (enabledTokenMask,, twvUSD, borrowAmountPlusInterestRateUSD,) =
+        (enabledTokenMask,, twvUSD, borrowAmountPlusInterestRateAndFeesUSD,) =
             _calcAllCollateral(_priceOracle, creditAccount, enabledTokenMask, minHealthFactor, collateralHints, true);
 
-        console.log("FC", twvUSD, borrowAmountPlusInterestRateUSD);
+        console.log("FC", twvUSD, borrowAmountPlusInterestRateAndFeesUSD);
 
-        if (twvUSD < borrowAmountPlusInterestRateUSD) {
+        if (twvUSD < borrowAmountPlusInterestRateAndFeesUSD) {
             revert NotEnoughCollateralException();
         }
 
@@ -765,13 +765,13 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
         enabledTokenMask = enabledTokensMap[creditAccount];
         uint256 totalUSD;
         uint256 twvUSD;
-        uint256 borrowAmountPlusInterestRateUSD;
-        (, totalUSD, twvUSD, borrowAmountPlusInterestRateUSD, borrowedAmountWithInterest) =
+        uint256 borrowAmountPlusInterestRateAndFeesUSD;
+        (, totalUSD, twvUSD, borrowAmountPlusInterestRateAndFeesUSD, borrowedAmountWithInterest) =
             _calcAllCollateral(_priceOracle, creditAccount, enabledTokenMask, PERCENTAGE_FACTOR, collateralHints, false);
         total = _priceOracle.convertFromUSD(totalUSD, underlying); // F:[FA-41]
-        twv = _priceOracle.convertFromUSD(twvUSD, underlying) / PERCENTAGE_FACTOR; // F:[FA-41]
+        twv = _priceOracle.convertFromUSD(twvUSD, underlying); // F:[FA-41]
 
-        canBeLiquidated = twvUSD < borrowAmountPlusInterestRateUSD;
+        canBeLiquidated = twvUSD < borrowAmountPlusInterestRateAndFeesUSD;
     }
 
     /// @dev Calculates total value for provided Credit Account in USD
@@ -793,7 +793,7 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
             uint256 _enabledTokenMask,
             uint256 totalUSD,
             uint256 twvUSD,
-            uint256 borrowAmountPlusInterestRateUSD,
+            uint256 borrowAmountPlusInterestRateAndFeesUSD,
             uint256 borrowedAmountWithInterestAndFees
         )
     {
@@ -808,16 +808,19 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
             // with the entire debt sum, including interest and fees
             (,, borrowedAmountWithInterestAndFees) = _calcCreditAccountAccruedInterest(creditAccount, quotaInterest);
 
-            borrowAmountPlusInterestRateUSD = _priceOracle.convertToUSD(
+            borrowAmountPlusInterestRateAndFeesUSD = _priceOracle.convertToUSD(
                 borrowedAmountWithInterestAndFees * minHealthFactor, // F: [CM-42]
                 underlying
             ) / PERCENTAGE_FACTOR;
+
+            console.log("BB#1", borrowedAmountWithInterestAndFees);
+            console.log("BB#2", borrowAmountPlusInterestRateAndFeesUSD);
         }
 
         // If quoted tokens fully cover the debt, we can stop here
         // after performing some additional cleanup
-        if (twvUSD < borrowAmountPlusInterestRateUSD || !lazy) {
-            uint256 limit = lazy ? (borrowAmountPlusInterestRateUSD - twvUSD) : type(uint256).max;
+        if (twvUSD < borrowAmountPlusInterestRateAndFeesUSD || !lazy) {
+            uint256 limit = lazy ? (borrowAmountPlusInterestRateAndFeesUSD - twvUSD) : type(uint256).max;
             uint256 _totalUSD;
             uint256 _twvUSD;
 
@@ -851,7 +854,7 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
         IPriceOracleV2 _priceOracle,
         address creditAccount,
         uint256 _enabledTokensMask,
-        uint256 borrowAmountPlusInterestRateUSD,
+        uint256 borrowAmountPlusInterestRateAndFeesUSD,
         uint256[] memory collateralHints
     ) internal view returns (uint256 enabledTokensMask, uint256 totalValue, uint256 twvUSD) {
         uint256 tokenMask;
@@ -861,9 +864,11 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
         enabledTokensMask = _enabledTokensMask;
         uint256 checkedTokenMask = supportsQuotas ? enabledTokensMask & (~limitedTokenMask) : enabledTokensMask;
 
-        if (borrowAmountPlusInterestRateUSD != type(uint256).max) {
-            borrowAmountPlusInterestRateUSD *= PERCENTAGE_FACTOR;
+        if (borrowAmountPlusInterestRateAndFeesUSD != type(uint256).max) {
+            borrowAmountPlusInterestRateAndFeesUSD *= PERCENTAGE_FACTOR;
         }
+
+        uint256 twvUSDx10K;
 
         unchecked {
             // TODO: add test that we check all values and it's always reachable
@@ -872,15 +877,15 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
 
                 // CASE enabledTokenMask & tokenMask == 0 F:[CM-38]
                 if (checkedTokenMask & tokenMask != 0) {
-                    (totalValue, twvUSD, nonZeroBalance) =
-                        _getBalance(_priceOracle, tokenMask, creditAccount, totalValue, twvUSD);
+                    (totalValue, twvUSDx10K, nonZeroBalance) =
+                        _getBalance(_priceOracle, tokenMask, creditAccount, totalValue, twvUSDx10K);
 
                     // Collateral calculations are only done if there is a non-zero balance
                     if (nonZeroBalance) {
                         // Full collateral check evaluates a Credit Account's health factor lazily;
                         // Once the TWV computed thus far exceeds the debt, the check is considered
                         // successful, and the function returns without evaluating any further collateral
-                        if (twvUSD >= borrowAmountPlusInterestRateUSD) {
+                        if (twvUSDx10K >= borrowAmountPlusInterestRateAndFeesUSD) {
                             break;
                         }
                         // Zero-balance tokens are disabled; this is done by flipping the
@@ -895,7 +900,7 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
             }
         }
 
-        twvUSD /= PERCENTAGE_FACTOR;
+        twvUSD = twvUSDx10K / PERCENTAGE_FACTOR;
     }
 
     function _getBalance(
@@ -903,8 +908,8 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
         uint256 tokenMask,
         address creditAccount,
         uint256 _totalValueUSD,
-        uint256 _twvUSD
-    ) internal view returns (uint256 totalValueUSD, uint256 twvUSD, bool nonZeroBalance) {
+        uint256 _twvUSDx10K
+    ) internal view returns (uint256 totalValueUSD, uint256 twvUSDx10K, bool nonZeroBalance) {
         (address token, uint16 liquidationThreshold) = collateralTokensByMask(tokenMask);
         uint256 balance = IERC20(token).balanceOf(creditAccount);
 
@@ -912,7 +917,7 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
         if (balance > 1) {
             uint256 balanceUSD = _priceOracle.convertToUSD(balance, token);
             totalValueUSD = _totalValueUSD + balanceUSD;
-            twvUSD = _twvUSD + balanceUSD * liquidationThreshold;
+            twvUSDx10K = _twvUSDx10K + balanceUSD * liquidationThreshold;
 
             nonZeroBalance = true;
         }
@@ -1223,10 +1228,13 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
             TokenLT[] memory tokens = getQuotedTokens(creditAccount);
 
             quotaInterest = cumulativeQuotaInterest[creditAccount] - 1;
+            console.log("QI", quotaInterest);
 
             if (tokens.length > 0) {
                 quotaInterest += poolQuotaKeeper().outstandingQuotaInterest(address(this), creditAccount, tokens); // F: [CMQ-10]
             }
+
+            console.log("QI", quotaInterest);
         }
 
         return _calcCreditAccountAccruedInterest(creditAccount, quotaInterest);
@@ -1246,6 +1254,8 @@ contract CreditManagerV3 is ICreditManagerV2, ACLNonReentrantTrait {
         uint256 cumulativeIndexAtOpen_RAY;
         uint256 cumulativeIndexNow_RAY;
         (borrowedAmount, cumulativeIndexAtOpen_RAY, cumulativeIndexNow_RAY) = _getCreditAccountParameters(creditAccount); // F:[CM-49]
+
+        console.log(cumulativeIndexAtOpen_RAY);
 
         // Interest is never stored and is always computed dynamically
         // as the difference between the current cumulative index of the pool

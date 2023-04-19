@@ -501,7 +501,7 @@ contract CreditFacadeTest is
         evm.expectCall(
             address(creditManager),
             abi.encodeCall(
-                ICreditManagerV2.manageDebt, (expectedCreditAccountAddress, WAD, ManageDebtAction.INCREASE_DEBT)
+                ICreditManagerV2.manageDebt, (expectedCreditAccountAddress, WAD, 1, ManageDebtAction.INCREASE_DEBT)
             )
         );
 
@@ -879,7 +879,7 @@ contract CreditFacadeTest is
 
         evm.expectCall(
             address(creditManager),
-            abi.encodeCall(ICreditManagerV2.manageDebt, (creditAccount, 512, ManageDebtAction.INCREASE_DEBT))
+            abi.encodeCall(ICreditManagerV2.manageDebt, (creditAccount, 512, 1, ManageDebtAction.INCREASE_DEBT))
         );
 
         evm.expectCall(
@@ -1003,7 +1003,7 @@ contract CreditFacadeTest is
 
         evm.expectCall(
             address(creditManager),
-            abi.encodeCall(ICreditManagerV2.manageDebt, (creditAccount, 512, ManageDebtAction.DECREASE_DEBT))
+            abi.encodeCall(ICreditManagerV2.manageDebt, (creditAccount, 512, 1, ManageDebtAction.DECREASE_DEBT))
         );
 
         evm.expectCall(
@@ -1167,6 +1167,8 @@ contract CreditFacadeTest is
         tokenTestSuite.mint(Tokens.USDC, USER, USDC_EXCHANGE_AMOUNT);
         tokenTestSuite.approve(Tokens.USDC, USER, address(creditManager));
 
+        uint256 usdcMask = creditManager.getTokenMaskOrRevert(usdcToken);
+
         evm.expectCall(
             address(creditManager),
             abi.encodeCall(ICreditManagerV2.transferAccountOwnership, (USER, address(creditFacade)))
@@ -1185,7 +1187,9 @@ contract CreditFacadeTest is
 
         evm.expectCall(
             address(creditManager),
-            abi.encodeCall(ICreditManagerV2.manageDebt, (creditAccount, 256, ManageDebtAction.INCREASE_DEBT))
+            abi.encodeCall(
+                ICreditManagerV2.manageDebt, (creditAccount, 256, usdcMask | 1, ManageDebtAction.INCREASE_DEBT)
+            )
         );
 
         evm.expectEmit(true, false, false, true);
@@ -1229,6 +1233,8 @@ contract CreditFacadeTest is
         tokenTestSuite.mint(Tokens.USDC, USER, USDC_EXCHANGE_AMOUNT);
         tokenTestSuite.approve(Tokens.USDC, USER, address(creditManager));
 
+        uint256 usdcMask = creditManager.getTokenMaskOrRevert(usdcToken);
+
         evm.expectCall(
             address(creditManager),
             abi.encodeCall(ICreditManagerV2.transferAccountOwnership, (USER, address(creditFacade)))
@@ -1247,7 +1253,9 @@ contract CreditFacadeTest is
 
         evm.expectCall(
             address(creditManager),
-            abi.encodeCall(ICreditManagerV2.manageDebt, (creditAccount, 256, ManageDebtAction.DECREASE_DEBT))
+            abi.encodeCall(
+                ICreditManagerV2.manageDebt, (creditAccount, 256, usdcMask | 1, ManageDebtAction.DECREASE_DEBT)
+            )
         );
 
         evm.expectEmit(true, false, false, true);

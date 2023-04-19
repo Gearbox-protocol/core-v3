@@ -84,9 +84,9 @@ contract CreditManagerTestInternal is CreditManagerV3 {
         return collateralTokensData[tokenMask];
     }
 
-    // function getMaxIndex(uint256 mask) external pure returns (uint256 index) {
-    //     index = _getMaxIndex(mask);
-    // }
+    function setEnabledTokenMask(address creditAccount, uint256 enabledTokenMask) external {
+        enabledTokensMap[creditAccount] = enabledTokenMask;
+    }
 
     function getSlotBytes(uint256 slotNum) external view returns (bytes32 slotVal) {
         assembly {

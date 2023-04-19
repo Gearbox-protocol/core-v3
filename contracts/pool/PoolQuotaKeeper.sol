@@ -178,7 +178,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
             accountQuota.quota -= change; // F:[CMQ-03]
 
             if (accountQuota.quota <= 1) {
-                tokensToDisable |= ~getTokenMask(creditManager, token); // F:[CMQ-03]
+                tokensToDisable |= getTokenMask(creditManager, token); // F:[CMQ-03]
             }
 
             quotaRevenueChange = -int128(int16(tq.rate)) * int96(change);
@@ -288,7 +288,10 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
             uint96 quoted = accountQuota.quota;
             if (quoted > 1) {
                 TokenQuotaParams storage tq = totalQuotaParams[token];
+
+                console.log("BEFORE: ", accountQuota.cumulativeIndexLU);
                 caQuotaInterestChange += _updateAccountQuotaInterest(tq, accountQuota, quoted);
+                console.log("AFTER: ", accountQuota.cumulativeIndexLU);
             }
             unchecked {
                 ++i;
@@ -312,19 +315,24 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
 
         while (i < len && tokensLT[i].token != address(0)) {
             address token = tokensLT[i].token;
-            AccountQuota storage q = accountQuotas[creditManager][creditAccount][token];
+            AccountQuota storage accountQuota = accountQuotas[creditManager][creditAccount][token];
 
-            uint96 quoted = q.quota;
+            uint96 quoted = accountQuota.quota;
             if (quoted > 1) {
                 TokenQuotaParams storage tq = totalQuotaParams[token];
                 uint192 cumulativeIndexNow = _cumulativeIndexNow(tq);
+
+                console.log("VIEW NOW ", cumulativeIndexNow);
+                console.log("VIEW UPD ", accountQuota.cumulativeIndexLU);
                 caQuotaInterestChange +=
-                    _computeOutstandingQuotaInterest(quoted, cumulativeIndexNow, q.cumulativeIndexLU); // F:[CMQ-10]
+                    _computeOutstandingQuotaInterest(quoted, cumulativeIndexNow, accountQuota.cumulativeIndexLU); // F:[CMQ-10]
             }
             unchecked {
                 ++i;
             }
         }
+
+        console.log("VIEW CAQ", caQuotaInterestChange);
     }
 
     /// @dev Internal function for outstanding quota interest computation
@@ -343,9 +351,8 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         address _priceOracle,
         TokenLT[] memory tokens
     ) external view override returns (uint256 totalValue, uint256 twv, uint256 totalQuotaInterest) {
-        uint256 i;
         uint256 len = tokens.length;
-        while (i < len && tokens[i].token != address(0)) {
+        for (uint256 i; i < len && tokens[i].token != address(0);) {
             (uint256 currentUSD, uint256 outstandingInterest) =
                 _getCollateralValue(creditManager, creditAccount, tokens[i].token, _priceOracle); // F:[CMQ-8]
 
@@ -357,6 +364,8 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
                 ++i;
             }
         }
+
+        twv /= PERCENTAGE_FACTOR;
     }
 
     /// @dev Gets the effective value (i.e., value in underlying included into TWV) for a quoted token on an account

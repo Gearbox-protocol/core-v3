@@ -592,7 +592,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                         // Sets increaseDebtWasCalled to prevent debt reductions afterwards,
                         // as that could be used to get free flash loans
                         increaseDebtWasCalled = true; // F:[FA-28]
-                        _increaseDebt(creditAccount, callData, borrower); // F:[FA-26]
+                        _increaseDebt(creditAccount, callData, enabledTokensMask, borrower); // F:[FA-26]
                     }
                     //
                     // DECREASE DEBT
@@ -604,7 +604,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                         }
                         // F:[FA-28]
 
-                        _decreaseDebt(creditAccount, callData, borrower); // F:[FA-27]
+                        _decreaseDebt(creditAccount, callData, enabledTokensMask, borrower); // F:[FA-27]
                     }
                     //
                     // ENABLE TOKEN
@@ -744,7 +744,9 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @param creditAccount CA to increase debt for
     /// @param callData Bytes calldata for parsing
     /// @param borrower Owner of the account
-    function _increaseDebt(address creditAccount, bytes memory callData, address borrower) internal {
+    function _increaseDebt(address creditAccount, bytes memory callData, uint256 enabledTokensMask, address borrower)
+        internal
+    {
         // It is forbidden to take new debt if increaseDebtForbidden mode is enabled
         if (params.isIncreaseDebtForbidden) {
             revert IncreaseDebtForbiddenException();
@@ -756,7 +758,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         _checkAndUpdateBorrowedBlockLimit(amount); // F:[FA-18A]
 
         // Requests the Credit Manager to borrow additional funds from the pool
-        uint256 newBorrowedAmount = _manageDebt(creditAccount, amount, ManageDebtAction.INCREASE_DEBT); // F:[FA-17]
+        uint256 newBorrowedAmount =
+            _manageDebt(creditAccount, amount, enabledTokensMask, ManageDebtAction.INCREASE_DEBT); // F:[FA-17]
 
         // Checks that the new total borrowed amount is within bounds
         _revertIfOutOfBorrowedLimits(newBorrowedAmount); // F:[FA-18B]
@@ -769,11 +772,14 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @param creditAccount CA to increase debt for
     /// @param callData Bytes calldata for parsing
     /// @param borrower Owner of the account
-    function _decreaseDebt(address creditAccount, bytes memory callData, address borrower) internal {
+    function _decreaseDebt(address creditAccount, bytes memory callData, uint256 enabledTokensMask, address borrower)
+        internal
+    {
         uint256 amount = abi.decode(callData, (uint256)); // F:[FA-26]
 
         // Requests the creditManager to reduce the borrowed sum by amount
-        uint256 newBorrowedAmount = _manageDebt(creditAccount, amount, ManageDebtAction.DECREASE_DEBT); // F:[FA-19]
+        uint256 newBorrowedAmount =
+            _manageDebt(creditAccount, amount, enabledTokensMask, ManageDebtAction.DECREASE_DEBT); // F:[FA-19]
 
         // Checks that the new borrowed amount is within limits
         _revertIfOutOfBorrowedLimits(newBorrowedAmount); // F:[FA-20]
@@ -934,8 +940,11 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     //
     // HELPERS
     //
-    function _manageDebt(address creditAccount, uint256 amount, ManageDebtAction action) internal returns (uint256) {
-        return creditManager.manageDebt(creditAccount, amount, action);
+    function _manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)
+        internal
+        returns (uint256)
+    {
+        return creditManager.manageDebt(creditAccount, amount, enabledTokensMask, action);
     }
 
     /// @dev Internal wrapper for `creditManager.transferAccountOwnership()`
