@@ -11,7 +11,7 @@ import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {DataCompressor} from "@gearbox-protocol/core-v2/contracts/core/DataCompressor.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 
-import {WETHGateway} from "../core/WETHGateway.sol";
+import {WETHGateway} from "../support/WETHGateway.sol";
 import {PriceOracle, PriceFeedConfig} from "@gearbox-protocol/core-v2/contracts/oracles/PriceOracle.sol";
 import {GearToken} from "@gearbox-protocol/core-v2/contracts/tokens/GearToken.sol";
 
