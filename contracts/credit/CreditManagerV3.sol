@@ -20,13 +20,15 @@ import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICr
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
 import {IPool4626} from "../interfaces/IPool4626.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
-import {IWithdrawManager} from "../interfaces/IWithdrawManager.sol";
+import {IWithdrawManager, ClaimAvailability, CancellationType} from "../interfaces/IWithdrawManager.sol";
 import {
     ICreditManagerV2,
     ClosureAction,
     CollateralTokenData,
     ManageDebtAction,
-    RevocationPair
+    CreditAccountInfo,
+    RevocationPair,
+    WITHDRAWAL_FLAG
 } from "../interfaces/ICreditManagerV2.sol";
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
@@ -128,7 +130,7 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
     /// Only enabled tokens are counted as collateral for the Credit Account
     /// @notice An enabled token mask encodes an enabled token by setting
     ///         the bit at the position equal to token's index to 1
-    mapping(address => uint256) public override enabledTokensMap;
+    mapping(address => CreditAccountInfo) internal creditAccountInfo;
 
     mapping(address => uint256) public borrowedAmounts;
 
@@ -174,6 +176,12 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
     /// @dev Restricts calls to Credit Facade only
     modifier creditFacadeOnly() {
         if (msg.sender != creditFacade) revert CallerNotCreditFacadeException();
+        _;
+    }
+
+    /// @dev Restricts calls to Credit Facade only
+    modifier withdrawManagerOnly() {
+        if (msg.sender != address(withdrawManager)) revert CallerNotCreditFacadeException();
         _;
     }
 
@@ -728,8 +736,7 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
             revert NotEnoughCollateralException();
         }
 
-        _checkEnabledTokenLength(enabledTokenMask);
-        enabledTokensMap[creditAccount] = enabledTokenMask;
+        _saveEnabledTokenMask(creditAccount, enabledTokenMask);
     }
 
     /// @dev Calculates total value for provided Credit Account in underlying
@@ -745,21 +752,22 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
         returns (
             uint256 enabledTokenMask,
             uint256 total,
-            uint256 twv,
+            uint256 hf,
             uint256 borrowedAmountWithInterest,
             bool canBeLiquidated
         )
     {
         IPriceOracleV2 _priceOracle = slot1.priceOracle;
         uint256[] memory collateralHints;
-        enabledTokenMask = enabledTokensMap[creditAccount];
+        enabledTokenMask = enabledTokensMap(creditAccount);
         uint256 totalUSD;
         uint256 twvUSD;
         uint256 borrowAmountPlusInterestRateAndFeesUSD;
         (, totalUSD, twvUSD, borrowAmountPlusInterestRateAndFeesUSD, borrowedAmountWithInterest) =
             _calcAllCollateral(_priceOracle, creditAccount, enabledTokenMask, PERCENTAGE_FACTOR, collateralHints, false);
-        total = _priceOracle.convertFromUSD(totalUSD, underlying); // F:[FA-41]
-        twv = _priceOracle.convertFromUSD(twvUSD, underlying); // F:[FA-41]
+
+        total = _convertFromUSD(_priceOracle, totalUSD, underlying); // F:[FA-41]
+        hf = twvUSD * PERCENTAGE_FACTOR / borrowAmountPlusInterestRateAndFeesUSD;
 
         canBeLiquidated = twvUSD < borrowAmountPlusInterestRateAndFeesUSD;
     }
@@ -798,7 +806,8 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
             // with the entire debt sum, including interest and fees
             (,, borrowedAmountWithInterestAndFees) = _calcCreditAccountAccruedInterest(creditAccount, quotaInterest);
 
-            borrowAmountPlusInterestRateAndFeesUSD = _priceOracle.convertToUSD(
+            borrowAmountPlusInterestRateAndFeesUSD = _convertToUSD(
+                _priceOracle,
                 borrowedAmountWithInterestAndFees * minHealthFactor, // F: [CM-42]
                 underlying
             ) / PERCENTAGE_FACTOR;
@@ -902,7 +911,7 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
 
         // Collateral calculations are only done if there is a non-zero balance
         if (balance > 1) {
-            uint256 balanceUSD = _priceOracle.convertToUSD(balance, token);
+            uint256 balanceUSD = _convertToUSD(_priceOracle, balance, token);
             totalValueUSD = _totalValueUSD + balanceUSD;
             twvUSDx10K = _twvUSDx10K + balanceUSD * liquidationThreshold;
 
@@ -910,9 +919,17 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
         }
     }
 
+    function _calcDelayedWithdrawalCollateral(address creditAccount)
+        internal
+        view
+        returns (uint256 amount, uint256 enabledTokenMask)
+    {
+        // (address token1, uint256 amount1, address token2, uint256 amount2) =
+    }
+
     /// @dev Returns the array of quoted tokens that are enabled on the account
     function getQuotedTokens(address creditAccount) public view returns (TokenLT[] memory tokens) {
-        return _getQuotedTokens(enabledTokensMap[creditAccount]);
+        return _getQuotedTokens(enabledTokensMap(creditAccount));
     }
 
     function _getQuotedTokens(uint256 enabledTokensMask) internal view returns (TokenLT[] memory tokens) {
@@ -1014,7 +1031,12 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
             ICreditAccount(creditAccount).safeTransfer(token, wethGateway, amount); // F:[CM-45]
             IWETHGateway(wethGateway).depositFor(to, amount); // F:[CM-45]
         } else {
-            ICreditAccount(creditAccount).safeTransfer(token, to, amount); // F:[CM-45]
+            try ICreditAccount(creditAccount).safeTransfer(token, to, amount) { // F:[CM-45]
+            } catch {
+                if (to != address(withdrawManager)) {
+                    _withdraw(creditAccount, to, token, amount, ClaimAvailability.IMMEDIATE);
+                }
+            }
         }
     }
 
@@ -1354,9 +1376,9 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
         } // F:[CM-52]
 
         // Checks that there aren't too many tokens
-        // Since token masks are 255 bit numbers with each bit corresponding to 1 token,
-        // only at most 255 are supported
-        if (collateralTokensCount >= 255) revert TooManyTokensException(); // F:[CM-52]
+        // Since token masks are 248 bit numbers with each bit corresponding to 1 token,
+        // only at most 248 are supported
+        if (collateralTokensCount >= 248) revert TooManyTokensException(); // F:[CM-52]
 
         // The tokenMask of a token is a bit mask with 1 at position corresponding to its index
         // (i.e. 2 ** index or 1 << index)
@@ -1527,7 +1549,7 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
         creditConfiguratorOnly // F:[CM-4]
     {
         creditConfigurator = _creditConfigurator; // F:[CM-58]
-        emit NewConfigurator(_creditConfigurator); // F:[CM-58]
+        emit SetConfigurator(_creditConfigurator); // F:[CM-58]
     }
 
     function _checkEnabledTokenLength(uint256 enabledTokenMask) internal view {
@@ -1555,16 +1577,40 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
         }
     }
 
-    function withdraw(address creditAccount, address token, uint256 amount)
+    function withdraw(address creditAccount, address borrower, address token, uint256 amount)
         external
         override
         creditFacadeOnly
         returns (uint256 tokensToDisable)
     {
-        // IWithdrawManager(blacklistHelper).addClaimable(underlying, borrower, amount); // F:[FA-56]
+        uint256 tokenMask = getTokenMaskOrRevert(token);
+
+        _withdraw(creditAccount, borrower, token, amount, ClaimAvailability.DELAYED);
+        _enableWithdrawalFlag(creditAccount);
+
+        // We need to disable empty tokens in case they could be forbidden, to finally eliminate them
+        if (_balanceOf(token, creditAccount) <= 1) {
+            tokensToDisable = tokenMask;
+        }
     }
 
-    function _cancelWithdrawals() internal {}
+    function _withdraw(address creditAccount, address to, address token, uint256 amount, ClaimAvailability availability)
+        internal
+    {
+        _safeTokenTransfer(creditAccount, token, address(withdrawManager), amount, false);
+        withdrawManager.addWithdrawal(creditAccount, token, to, amount, availability); // F:[FA-56]
+    }
+
+    function cancelWithdrawals(address creditAccount, CancellationType ctype)
+        external
+        override
+        creditFacadeOnly
+        returns (uint256 tokensToEnable)
+    {
+        if (creditAccountInfo[creditAccount].flags & WITHDRAWAL_FLAG != 0) {
+            withdrawManager.cancelWithdrawals(creditAccount, ctype);
+        }
+    }
 
     /// @notice Revokes allowances for specified spender/token pairs
     /// @param revocations Spender/token pairs to revoke allowances for
@@ -1586,5 +1632,41 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
                 _approveSpender(token, spender, creditAccount, 1);
             }
         }
+    }
+
+    function enabledTokensMap(address creditAccount) public view override returns (uint256) {
+        return uint256(creditAccountInfo[creditAccount].enabledTokensMask);
+    }
+
+    function _saveEnabledTokenMask(address creditAccount, uint256 enabledTokenMask) internal {
+        if (enabledTokenMask > type(uint248).max) {
+            revert IncorrectParameterException();
+        }
+        _checkEnabledTokenLength(enabledTokenMask);
+        creditAccountInfo[creditAccount].enabledTokensMask = uint248(enabledTokenMask);
+    }
+
+    function _enableWithdrawalFlag(address creditAccount) internal {
+        creditAccountInfo[creditAccount].flags |= WITHDRAWAL_FLAG;
+    }
+
+    function disableWithdrawalFlag(address creditAccount) external override withdrawManagerOnly {
+        creditAccountInfo[creditAccount].flags &= ~WITHDRAWAL_FLAG;
+    }
+
+    function _convertFromUSD(IPriceOracleV2 _priceOracle, uint256 amountInUSD, address token)
+        internal
+        view
+        returns (uint256 amountInToken)
+    {
+        amountInToken = _priceOracle.convertFromUSD(amountInUSD, token);
+    }
+
+    function _convertToUSD(IPriceOracleV2 _priceOracle, uint256 amountInToken, address token)
+        internal
+        view
+        returns (uint256 amountInUSD)
+    {
+        amountInUSD = _priceOracle.convertToUSD(amountInToken, token);
     }
 }

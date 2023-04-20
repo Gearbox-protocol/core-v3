@@ -30,16 +30,16 @@ struct MultiVote {
 
 interface IGearStakingEvents {
     /// @dev Emits when the user deposits GEAR into staked GEAR
-    event GearDeposited(address indexed user, uint256 amount);
+    event DepositGear(address indexed user, uint256 amount);
 
     /// @dev Emits when the user starts a withdrawal from staked GEAR
-    event GearWithdrawalScheduled(address indexed user, uint256 amount);
+    event ScheduleGearWithdrawal(address indexed user, uint256 amount);
 
     /// @dev Emits when the user claims a mature withdrawal from staked GEAR
-    event GearWithdrawalClaimed(address indexed user, address to, uint256 amount);
+    event ClaimGearWithdrawal(address indexed user, address to, uint256 amount);
 
     /// @dev Emits when the configurator adds or removes a voting contract
-    event VotingContractStatusUpdated(address indexed votingContract, VotingContractStatus status);
+    event SetVotingContractStatus(address indexed votingContract, VotingContractStatus status);
 }
 
 interface IGearStaking is IGearStakingEvents, IVersion {

@@ -26,6 +26,7 @@ import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWE
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
 import {IBotList} from "../interfaces/IBotList.sol";
 import {RevocationPair} from "../interfaces/ICreditManagerV2.sol";
+import {CancellationType} from "../interfaces/IWithdrawManager.sol";
 
 // CONSTANTS
 import {LEVERAGE_DECIMALS} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
@@ -256,6 +257,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
 
         uint256 enabledTokensMask = _enabledTokenMask(creditAccount);
 
+        _cancelWithdrawals(creditAccount, CancellationType.PUSH_WITHDRAWALS);
+
         // [FA-13]: Calls to CreditFacadeV3 are forbidden during closure
         if (calls.length != 0) {
             // TODO: CHANGE
@@ -338,6 +341,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
         // Wraps ETH and sends it back to msg.sender
         _wrapETH(); // F:[FA-3D]
 
+        enabledTokensMask |= _cancelWithdrawals(creditAccount, CancellationType.RETURN_FUNDS);
+
         if (calls.length != 0) {
             // TODO: CHANGE
             FullCheckParams memory fullCheckParams =
@@ -345,7 +350,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
             enabledTokensMask = fullCheckParams.enabledTokensMaskAfter;
         } // F:[FA-15]
 
-        // uint256 remainingFunds =
         _liquidateCreditAccount(
             totalValue,
             borrower,
@@ -482,7 +486,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
         _transferAccount(borrower, address(this)); // F:[FA-26]
 
         // Emits event for multicall start - used in analytics to track actions within multicalls
-        emit MultiCallStarted(borrower); // F:[FA-26]
+        emit StartMultiCall(borrower); // F:[FA-26]
 
         // Declares the expectedBalances array, which can later be used for slippage control
         Balance[] memory expectedBalances;
@@ -585,8 +589,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
                     // WITHDRAW
                     //
                     else if (method == ICreditFacadeMulticall.withdraw.selector) {
-                        (address token, uint256 amount) = abi.decode(callData, (address, uint256));
-                        uint256 tokensToDisable = creditManager.withdraw(creditAccount, token, amount);
+                        // (address token, uint256 amount) = abi.decode(callData, (address, uint256));
+                        uint256 tokensToDisable = _withdraw(callData, creditAccount);
                         enabledTokensMask = enabledTokensMask & (~tokensToDisable);
                     }
                     //
@@ -650,12 +654,17 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
         }
 
         // Emits event for multicall end - used in analytics to track actions within multicalls
-        emit MultiCallFinished(); // F:[FA-27,27,29]
+        emit FinishMultiCall(); // F:[FA-27,27,29]
 
         fullCheckParams.enabledTokensMaskAfter = enabledTokensMask;
 
         // Returns ownership back to the borrower
         _transferAccount(address(this), borrower); // F:[FA-27,27,29]
+    }
+
+    function _withdraw(bytes memory callData, address creditAccount) internal returns (uint256 tokensToDisable) {
+        (address to, address token, uint256 amount) = abi.decode(callData, (address, address, uint256));
+        tokensToDisable = creditManager.withdraw(creditAccount, to, token, amount);
     }
 
     /// @dev Adds expected deltas to current balances on a Credit account and returns the result
@@ -884,7 +893,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
         transfersAllowed[from][msg.sender] = state; // F:[FA-38]
 
         // Emits event
-        emit TransferAccountAllowed(from, msg.sender, state); // F:[FA-38]
+        emit AllowAccountTransfer(from, msg.sender, state); // F:[FA-38]
     }
 
     //
@@ -1098,6 +1107,13 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
 
     function _enabledTokenMask(address creditAccount) internal view returns (uint256) {
         return creditManager.enabledTokensMap(creditAccount);
+    }
+
+    function _cancelWithdrawals(address creditAccount, CancellationType ctype)
+        internal
+        returns (uint256 tokensToEnable)
+    {
+        tokensToEnable = creditManager.cancelWithdrawals(creditAccount, ctype);
     }
 
     function _wethWithdrawTo(address to) internal {

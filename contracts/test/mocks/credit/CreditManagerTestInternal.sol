@@ -85,7 +85,7 @@ contract CreditManagerTestInternal is CreditManagerV3 {
     }
 
     function setEnabledTokenMask(address creditAccount, uint256 enabledTokenMask) external {
-        enabledTokensMap[creditAccount] = enabledTokenMask;
+        creditAccountInfo[creditAccount].enabledTokensMask = uint248(enabledTokenMask);
     }
 
     function getSlotBytes(uint256 slotNum) external view returns (bytes32 slotVal) {

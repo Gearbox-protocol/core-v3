@@ -2313,7 +2313,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         evm.prank(CONFIGURATOR);
 
         evm.expectEmit(true, false, false, false);
-        emit NewConfigurator(DUMB_ADDRESS);
+        emit SetConfigurator(DUMB_ADDRESS);
 
         creditManager.setConfigurator(DUMB_ADDRESS);
 

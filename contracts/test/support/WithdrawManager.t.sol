@@ -108,18 +108,18 @@ contract WithdrawManagerTest is IWithdrawManagerEvents, DSTest {
     //     withdrawManager.addCreditFacade(address(this));
     // }
 
-    // /// @dev [BH-4]: addClaimable works correctly and reverts on non-Credit Facade
-    // function test_BH_04_addClaimable_works_correctly() public {
+    // /// @dev [BH-4]: addWithdrawal works correctly and reverts on non-Credit Facade
+    // function test_BH_04_addWithdrawal_works_correctly() public {
     //     evm.prank(CONFIGURATOR);
     //     withdrawManager.addCreditFacade(address(this));
 
-    //     withdrawManager.addClaimable(usdc, USER, 10000);
+    //     withdrawManager.addWithdrawal(usdc, USER, 10000);
 
     //     assertEq(withdrawManager.claimable(usdc, USER), 10000);
 
     //     evm.expectRevert(CallerNotCreditFacadeException.selector);
     //     evm.prank(DUMB_ADDRESS);
-    //     withdrawManager.addClaimable(usdc, USER, 10000);
+    //     withdrawManager.addWithdrawal(usdc, USER, 10000);
     // }
 
     // /// @dev [BH-5]: claim works correctly
@@ -127,7 +127,7 @@ contract WithdrawManagerTest is IWithdrawManagerEvents, DSTest {
     //     evm.prank(CONFIGURATOR);
     //     withdrawManager.addCreditFacade(address(this));
 
-    //     withdrawManager.addClaimable(usdc, USER, 10000);
+    //     withdrawManager.addWithdrawal(usdc, USER, 10000);
 
     //     tokenTestSuite.mint(Tokens.USDC, address(withdrawManager), 10000);
 

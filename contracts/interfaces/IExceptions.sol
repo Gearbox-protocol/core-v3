@@ -223,3 +223,5 @@ error NothingToClaimException();
 error LiquiditySanityCheckException();
 
 error ZeroCallsException();
+
+error NoFreeQithdrawalSlotsException();

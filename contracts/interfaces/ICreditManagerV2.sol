@@ -6,6 +6,7 @@ pragma solidity ^0.8.10;
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IPoolQuotaKeeper, QuotaUpdate, TokenLT} from "./IPoolQuotaKeeper.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+import {CancellationType} from "./IWithdrawManager.sol";
 
 enum ClosureAction {
     CLOSE_ACCOUNT,
@@ -16,6 +17,13 @@ enum ClosureAction {
 enum ManageDebtAction {
     INCREASE_DEBT,
     DECREASE_DEBT
+}
+
+uint8 constant WITHDRAWAL_FLAG = 1;
+
+struct CreditAccountInfo {
+    uint8 flags;
+    uint248 enabledTokensMask;
 }
 
 struct CollateralTokenData {
@@ -36,7 +44,7 @@ interface ICreditManagerV2Events {
     event ExecuteOrder(address indexed target);
 
     /// @dev Emits when a configurator is upgraded
-    event NewConfigurator(address indexed newConfigurator);
+    event SetConfigurator(address indexed SetConfigurator);
 }
 
 /// @notice All Credit Manager functions are access-restricted and can only be called
@@ -346,11 +354,17 @@ interface ICreditManagerV2 is ICreditManagerV2Events, IVersion {
             bool canBeLiquidated
         );
 
-    function withdraw(address creditAccount, address token, uint256 amount)
+    function withdraw(address creditAccount, address borrower, address token, uint256 amount)
         external
         returns (uint256 tokensToDisable);
+
+    function cancelWithdrawals(address creditAccount, CancellationType ctype)
+        external
+        returns (uint256 tokensToEnable);
 
     /// @notice Revokes allowances for specified spender/token pairs
     /// @param revocations Spender/token pairs to revoke allowances for
     function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external;
+
+    function disableWithdrawalFlag(address creditAccount) external;
 }

@@ -183,7 +183,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
                     (balance.token,) = creditManagerV2.collateralTokens(i);
                     balance.balance = IERC20(balance.token).balanceOf(creditAccount);
                     // TODO: change
-                    balance.isAllowed = true; //creditFacade.isTokenAllowed(balance.token);
+                    balance.isAllowed = true; //creditFacade.isAllowToken(balance.token);
                 }
                 balance.isEnabled = tokenMask & result.enabledTokenMask == 0 ? false : true;
 

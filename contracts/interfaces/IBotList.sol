@@ -14,22 +14,22 @@ struct BotFunding {
 
 interface IBotListEvents {
     /// @dev Emits when a borrower enables or disables a bot for their account
-    event BotApprovalChanged(address indexed borrower, address indexed bot, bool status);
+    event ApproveBot(address indexed borrower, address indexed bot, bool status);
 
     /// @dev Emits when a bot is forbidden system-wide
     event BotForbiddenStatusChanged(address indexed bot, bool status);
 
     /// @dev Emits when the amount of remaining funds for a bot is changed by the user
-    event BotFundingChanged(address indexed payer, address indexed bot, uint72 newRemainingFunds);
+    event ChangeBotFunding(address indexed payer, address indexed bot, uint72 newRemainingFunds);
 
     /// @dev Emits when the allowed weekly amount of bot's spending is changed by the user
-    event BotWeeklyAllowanceChanged(address indexed payer, address indexed bot, uint72 newWeeklyAllowance);
+    event ChangeBotWeeklyAllowance(address indexed payer, address indexed bot, uint72 newWeeklyAllowance);
 
     /// @dev Emits when the bot pull payment for performed services
-    event BotPaymentPulled(address indexed payer, address indexed bot, uint72 paymentAmount, uint72 daoFeeAmount);
+    event PullBotPayment(address indexed payer, address indexed bot, uint72 paymentAmount, uint72 daoFeeAmount);
 
     /// @dev Emits when the DAO sets a new fee on bot payments
-    event NewBotDAOFee(uint16 newFee);
+    event SetBotDAOFee(uint16 newFee);
 }
 
 /// @title IBotList

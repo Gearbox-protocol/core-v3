@@ -58,7 +58,7 @@ contract BotListTest is IBotListEvents, DSTest {
         botList.setDAOFee(1);
 
         evm.expectEmit(false, false, false, true);
-        emit NewBotDAOFee(15);
+        emit SetBotDAOFee(15);
 
         evm.prank(CONFIGURATOR);
         botList.setDAOFee(15);

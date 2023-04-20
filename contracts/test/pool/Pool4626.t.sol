@@ -230,13 +230,13 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         });
 
         evm.expectEmit(true, false, false, false);
-        emit NewInterestRateModel(address(psts.linearIRModel()));
+        emit SetInterestRateModel(address(psts.linearIRModel()));
 
         evm.expectEmit(true, false, false, true);
-        emit NewExpectedLiquidityLimit(limit);
+        emit SetExpectedLiquidityLimit(limit);
 
         evm.expectEmit(false, false, false, true);
-        emit NewTotalBorrowedLimit(limit);
+        emit SetTotalBorrowedLimit(limit);
 
         new Pool4626(opts);
     }
@@ -361,7 +361,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
                 if (withReferralCode) {
                     evm.expectEmit(true, true, false, true);
-                    emit DepositReferral(USER, FRIEND, testCase.amountToDeposit, referral);
+                    emit DepositWithReferral(USER, FRIEND, testCase.amountToDeposit, referral);
                 }
 
                 evm.prank(USER);
@@ -1237,7 +1237,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
             if (testCase.uncoveredLoss > 0) {
                 evm.expectEmit(true, false, false, true);
-                emit UncoveredLoss(address(cmMock), testCase.uncoveredLoss);
+                emit ReceiveUncoveredLoss(address(cmMock), testCase.uncoveredLoss);
             }
 
             evm.expectEmit(true, true, false, true);
@@ -1478,7 +1478,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         assertEq(cms.length, 0, "Credit manager is already connected!");
 
         evm.expectEmit(true, true, false, false);
-        emit NewCreditManagerConnected(address(cmMock));
+        emit AddCreditManager(address(cmMock));
 
         evm.expectEmit(true, true, false, true);
         emit BorrowLimitChanged(address(cmMock), 230);
@@ -1527,7 +1527,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         );
 
         evm.expectEmit(true, false, false, false);
-        emit NewInterestRateModel(address(newIR));
+        emit SetInterestRateModel(address(newIR));
 
         evm.prank(CONFIGURATOR);
         pool.updateInterestRateModel(address(newIR));
@@ -1561,7 +1561,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         address POOL_QUOTA_KEEPER = address(pqk);
 
         evm.expectEmit(true, true, false, false);
-        emit NewPoolQuotaKeeper(POOL_QUOTA_KEEPER);
+        emit SetPoolQuotaKeeper(POOL_QUOTA_KEEPER);
 
         evm.prank(CONFIGURATOR);
         pool.connectPoolQuotaManager(POOL_QUOTA_KEEPER);
@@ -1582,7 +1582,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         address POOL_QUOTA_KEEPER2 = address(pqk2);
 
         evm.expectEmit(true, true, false, false);
-        emit NewPoolQuotaKeeper(POOL_QUOTA_KEEPER2);
+        emit SetPoolQuotaKeeper(POOL_QUOTA_KEEPER2);
 
         evm.prank(CONFIGURATOR);
         pool.connectPoolQuotaManager(POOL_QUOTA_KEEPER2);
@@ -1596,7 +1596,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
     // [P4-24]: setExpectedLiquidityLimit() sets limit & emits event
     function test_P4_24_setExpectedLiquidityLimit_correct_and_emits_event() public {
         evm.expectEmit(false, false, false, true);
-        emit NewExpectedLiquidityLimit(10005);
+        emit SetExpectedLiquidityLimit(10005);
 
         evm.prank(CONFIGURATOR);
         pool.setExpectedLiquidityLimit(10005);
@@ -1607,7 +1607,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
     // [P4-25]: setTotalBorrowedLimit sets limit & emits event
     function test_P4_25_setTotalBorrowedLimit_correct_and_emits_event() public {
         evm.expectEmit(false, false, false, true);
-        emit NewTotalBorrowedLimit(10005);
+        emit SetTotalBorrowedLimit(10005);
 
         evm.prank(CONFIGURATOR);
         pool.setTotalBorrowedLimit(10005);
@@ -1623,7 +1623,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         pool.setWithdrawFee(101);
 
         evm.expectEmit(false, false, false, true);
-        emit NewWithdrawFee(50);
+        emit SetWithdrawFee(50);
 
         evm.prank(CONFIGURATOR);
         pool.setWithdrawFee(50);

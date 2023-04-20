@@ -146,7 +146,7 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
             uv.votesCaSide += votes;
         }
 
-        emit VoteFor(user, token, votes, lpSide);
+        emit Vote(user, token, votes, lpSide);
     }
 
     /// @dev Removes the user's existing vote from the provided token and side
@@ -174,7 +174,7 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
             uv.votesCaSide -= votes;
         }
 
-        emit UnvoteFrom(user, token, votes, lpSide);
+        emit Unvote(user, token, votes, lpSide);
     }
 
     //
@@ -185,7 +185,7 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
     function setVoter(address newVoter) external configuratorOnly {
         voter = IGearStaking(newVoter);
 
-        emit VoterUpdated(newVoter);
+        emit SetVoter(newVoter);
     }
 
     /// @dev Adds a new quoted token to the Gauge and PoolQuotaKeeper, and sets the initial rate params
@@ -199,7 +199,7 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
         IPoolQuotaKeeper keeper = IPoolQuotaKeeper(pool.poolQuotaKeeper());
         keeper.addQuotaToken(token);
 
-        emit QuotaTokenAdded(token, _minRiskRate, _maxRate);
+        emit AddQuotaToken(token, _minRiskRate, _maxRate);
     }
 
     /// @dev Changes the rate params for a quoted token
@@ -214,6 +214,6 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
         qrp.maxRate = _maxRate;
         quotaRateParams[token] = qrp;
 
-        emit QuotaParametersChanged(token, _minRiskRate, _maxRate);
+        emit SetQuotaTokenParams(token, _minRiskRate, _maxRate);
     }
 }
