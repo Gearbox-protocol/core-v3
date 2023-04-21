@@ -8,17 +8,18 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
 
-import {IWithdrawManager, ClaimAvailability, CancellationType} from "../interfaces/IWithdrawManager.sol";
+import {IWithdrawManager, CancellationType} from "../interfaces/IWithdrawManager.sol";
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
+/// We keep token index to keep 2 slots structure
 struct WithdrawRequest {
-    address token;
-    uint256 amount;
+    uint8 tokenIndex;
     address to;
     uint40 availableAt;
+    uint256 amount;
 }
 
 struct WithdrawPush {
@@ -35,7 +36,7 @@ contract WithdrawManager is IWithdrawManager, ACLNonReentrantTrait {
 
     mapping(address => bool) public isSupportedCreditManager;
 
-    /// @dev mapping from token => holder => amount available to claim
+    /// @dev mapping from token => to => amount available to claim
     mapping(address => mapping(address => uint256)) public claimable;
 
     /// @dev mapping from creditManager => creditAccount => WithdrawRequest[2] to keep 2 requests for withdraw
@@ -54,66 +55,58 @@ contract WithdrawManager is IWithdrawManager, ACLNonReentrantTrait {
         _;
     }
 
+    /// TODO: add CM   to list
+
     /// @param _addressProvider Address of the address provider
 
     constructor(address _addressProvider) ACLNonReentrantTrait(_addressProvider) {}
 
-    /// @dev Increases the underlying balance available to claim by the account
-    /// @param underlying Underlying to increase balance for
-    /// @param holder Account to increase balance for
+    /// @dev Increases the token balance available to claim by the account
+    /// @param token Underlying to increase balance for
+    /// @param to Account to increase balance for
     /// @param amount Incremented amount
     /// @notice Can only be called by Credit Facades when liquidating a blacklisted borrower
-    ///         Expects the underlying to be transferred directly to this contract in the same transaction
-    function addWithdrawal(
-        address creditAccount,
-        address holder,
-        address underlying,
-        uint256 amount, // add check amount >0
-        ClaimAvailability availability
-    ) external override creditManagerOnly {
-        if (availability == ClaimAvailability.IMMEDIATE) {
-            _addImmediateClaimable(holder, underlying, amount);
-        } else {
-            _addDelayedClaimable(msg.sender, creditAccount, holder, underlying, amount);
-        }
-    }
-
-    function _addImmediateClaimable(address holder, address underlying, uint256 amount) internal {
-        claimable[underlying][holder] += amount;
-        emit IncreaseClaimableBalance(underlying, holder, amount);
-    }
-
-    function _addDelayedClaimable(
-        address creditManager,
-        address creditAccount,
+    ///         Expects the token to be transferred directly to this contract in the same transaction
+    function addImmediateWithdrawal(
         address to,
         address token,
-        uint256 amount
-    ) internal {
-        (bool hasFreeSlot, uint256 slot) = _push(creditManager, creditAccount, false, false);
+        uint256 amount // add check amount >0
+    ) external override creditManagerOnly {
+        claimable[token][to] += amount;
+        emit IncreaseClaimableBalance(token, to, amount);
+    }
+
+    function addDelayedWithdrawal(address creditAccount, address to, address token, uint256 tokenMask, uint256 amount)
+        external
+        override
+        creditManagerOnly
+    {
+        (bool hasFreeSlot, uint256 slot) = _push(msg.sender, creditAccount, false, false);
         if (!hasFreeSlot) {
             revert NoFreeQithdrawalSlotsException();
         }
 
         uint40 availableAt = uint40(block.timestamp) + delay;
 
-        delayed[creditManager][creditAccount][slot] =
-            WithdrawRequest({token: token, amount: amount, to: to, availableAt: availableAt});
+        uint8 tokenIndex = _calcIndexFromMask(tokenMask);
 
-        // emit IncreaseClaimableBalance(underlying, holder, amount);
+        delayed[msg.sender][creditAccount][slot] =
+            WithdrawRequest({tokenIndex: tokenIndex, amount: amount, to: to, availableAt: availableAt});
+
+        // emit IncreaseClaimableBalance(token, to, amount);
     }
 
-    /// @dev Transfer the sender's current claimable balance in underlying to a specified address
-    /// @param underlying Underlying to transfer
+    /// @dev Transfer the sender's current claimable balance in token to a specified address
+    /// @param token Underlying to transfer
     /// @param to Recipient address
-    function claim(address underlying, address to) external override {
-        uint256 amount = claimable[underlying][msg.sender];
+    function claim(address token, address to) external override {
+        uint256 amount = claimable[token][msg.sender];
         if (amount < 2) {
             revert NothingToClaimException();
         }
-        claimable[underlying][msg.sender] = 0;
-        IERC20(underlying).safeTransfer(to, amount);
-        emit Claim(underlying, msg.sender, to, amount);
+        claimable[token][msg.sender] = 0;
+        IERC20(token).safeTransfer(to, amount);
+        emit Claim(token, msg.sender, to, amount);
     }
 
     function push(address creditManager, address creditAccount) external {
@@ -125,8 +118,8 @@ contract WithdrawManager is IWithdrawManager, ACLNonReentrantTrait {
         returns (bool hasFreeSlot, uint256 slot)
     {
         WithdrawRequest[2] storage reqs = delayed[creditManager][creditAccount];
-        bool isFreeSlot1 = _pushRequest(reqs[0], pushBeforeDeadline);
-        bool isFreeSlot2 = _pushRequest(reqs[1], pushBeforeDeadline);
+        bool isFreeSlot1 = _pushRequest(creditManager, reqs[0], pushBeforeDeadline);
+        bool isFreeSlot2 = _pushRequest(creditManager, reqs[1], pushBeforeDeadline);
 
         hasFreeSlot = isFreeSlot1 || isFreeSlot2;
         slot = isFreeSlot1 ? 0 : 1;
@@ -136,22 +129,24 @@ contract WithdrawManager is IWithdrawManager, ACLNonReentrantTrait {
         }
     }
 
-    function _pushRequest(WithdrawRequest storage req, bool pushBeforeDeadline) internal returns (bool free) {
+    function _pushRequest(address creditManager, WithdrawRequest storage req, bool pushBeforeDeadline)
+        internal
+        returns (bool free)
+    {
         if (req.availableAt <= 1) {
             return true;
         }
         if (pushBeforeDeadline || req.availableAt > block.timestamp) {
-            IERC20(req.token).safeTransfer(req.to, req.amount);
-            req.availableAt = 1;
-            req.amount = 1;
+            _executeWithdrawal(creditManager, req, req.to);
             return true;
         }
 
         return false;
     }
 
-    function _executeWithdrawal(WithdrawRequest storage req, address to) internal {
-        IERC20(req.token).safeTransfer(to, req.amount);
+    function _executeWithdrawal(address creditManager, WithdrawRequest storage req, address to) internal {
+        (address token,) = ICreditManagerV2(creditManager).collateralTokensByMask(1 << req.tokenIndex);
+        IERC20(token).safeTransfer(to, req.amount);
         req.availableAt = 1;
         req.amount = 1;
     }
@@ -161,8 +156,8 @@ contract WithdrawManager is IWithdrawManager, ACLNonReentrantTrait {
         returns (uint256 tokensToEnable)
     {
         if (req.availableAt > 1) {
-            _executeWithdrawal(req, creditAccount);
-            tokensToEnable = ICreditManagerV2(creditManager).getTokenMaskOrRevert(req.token);
+            _executeWithdrawal(creditManager, req, creditAccount);
+            tokensToEnable = 1 << req.tokenIndex;
         }
         // EVENT HERE
     }
@@ -183,4 +178,12 @@ contract WithdrawManager is IWithdrawManager, ACLNonReentrantTrait {
     }
 
     function pushAndClaim(address[] calldata tokens, WithdrawPush[] calldata pushes, address to) external {}
+
+    function _calcIndexFromMask(uint256 tokenMask) internal pure returns (uint8 index) {
+        unchecked {
+            while (tokenMask < (1 << index)) {
+                ++index;
+            }
+        }
+    }
 }

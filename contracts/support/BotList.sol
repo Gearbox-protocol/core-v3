@@ -22,7 +22,7 @@ contract BotList is ACLNonReentrantTrait, IBotList {
     using Address for address payable;
 
     /// @dev Mapping from (borrower, bot) to bot approval status
-    mapping(address => mapping(address => bool)) public approvedBot;
+    mapping(address => mapping(address => uint192)) public botPermissions;
 
     /// @dev Whether the bot is forbidden system-wide
     mapping(address => bool) public forbiddenBot;
@@ -45,19 +45,19 @@ contract BotList is ACLNonReentrantTrait, IBotList {
 
     /// @dev Adds or removes allowance for a bot to execute multicalls on behalf of sender
     /// @param bot Bot address
-    /// @param status Whether allowance is added or removed
-    function setBotStatus(address bot, bool status) external nonZeroAddress(bot) {
-        if (!bot.isContract() && status) {
+    /// @param permissions Whether allowance is added or removed
+    function setBotPermissions(address bot, uint192 permissions) external nonZeroAddress(bot) {
+        if (!bot.isContract()) {
             revert AddressIsNotContractException(bot);
         }
 
-        if (forbiddenBot[bot] && status) {
+        if (forbiddenBot[bot] && permissions != 0) {
             revert InvalidBotException();
         }
 
-        approvedBot[msg.sender][bot] = status;
+        botPermissions[msg.sender][bot] = permissions;
 
-        emit ApproveBot(msg.sender, bot, status);
+        emit ApproveBot(msg.sender, bot, permissions);
     }
 
     /// @dev Adds funds to user's balance for a particular bot. The entire sent value in ETH is added
@@ -67,7 +67,7 @@ contract BotList is ACLNonReentrantTrait, IBotList {
             revert AmountCantBeZeroException();
         }
 
-        if (forbiddenBot[bot] || !approvedBot[msg.sender][bot]) {
+        if (forbiddenBot[bot] || botPermissions[msg.sender][bot] == 0) {
             revert InvalidBotException();
         }
 

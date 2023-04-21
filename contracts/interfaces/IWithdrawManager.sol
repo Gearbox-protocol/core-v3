@@ -5,11 +5,6 @@ pragma solidity ^0.8.10;
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
-enum ClaimAvailability {
-    IMMEDIATE,
-    DELAYED
-}
-
 enum CancellationType {
     RETURN_FUNDS,
     PUSH_WITHDRAWALS
@@ -33,16 +28,14 @@ interface IWithdrawManager is IWithdrawManagerEvents, IVersion {
     /// @dev Transfers the sender's claimable balance of token to the specified address
     function claim(address token, address to) external;
 
-    /// @dev Increases the claimable balance for an account
-    /// @notice Assumes that the sender transfers the tokens in the same transaction, so doesn't
-    ///         perform an explicit transferFrom()
-    function addWithdrawal(
-        address creditAccount,
-        address holder,
+    function addImmediateWithdrawal(
+        address to,
         address token,
-        uint256 amount,
-        ClaimAvailability availability
+        uint256 amount // add check amount >0
     ) external;
+
+    function addDelayedWithdrawal(address creditAccount, address to, address token, uint256 tokenMask, uint256 amount)
+        external;
 
     /// @dev Returns the amount claimable by an account
     /// @param token token the get the amount for

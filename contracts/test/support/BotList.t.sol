@@ -78,7 +78,7 @@ contract BotListTest is IBotListEvents, DSTest {
         botList.increaseBotFunding{value: 1 ether}(FRIEND);
 
         evm.prank(USER);
-        botList.setBotStatus(address(addressProvider), true);
+        botList.setBotPermissions(address(addressProvider), type(uint192).max);
 
         evm.prank(CONFIGURATOR);
         botList.setBotForbiddenStatus(address(addressProvider), true);
@@ -110,7 +110,7 @@ contract BotListTest is IBotListEvents, DSTest {
         evm.deal(USER, 10 ether);
 
         evm.prank(USER);
-        botList.setBotStatus(address(addressProvider), true);
+        botList.setBotPermissions(address(addressProvider), type(uint192).max);
 
         evm.prank(USER);
         botList.increaseBotFunding{value: 2 ether}(address(addressProvider));
@@ -130,7 +130,7 @@ contract BotListTest is IBotListEvents, DSTest {
         evm.deal(USER, 10 ether);
 
         evm.prank(USER);
-        botList.setBotStatus(address(addressProvider), true);
+        botList.setBotPermissions(address(addressProvider), type(uint192).max);
 
         evm.prank(USER);
         botList.setWeeklyBotAllowance(address(addressProvider), 1 ether);
@@ -162,7 +162,7 @@ contract BotListTest is IBotListEvents, DSTest {
         evm.deal(USER, 10 ether);
 
         evm.prank(USER);
-        botList.setBotStatus(address(addressProvider), true);
+        botList.setBotPermissions(address(addressProvider), type(uint192).max);
 
         evm.prank(USER);
         botList.setWeeklyBotAllowance(address(addressProvider), 1 ether);

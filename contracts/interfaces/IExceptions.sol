@@ -225,3 +225,5 @@ error LiquiditySanityCheckException();
 error ZeroCallsException();
 
 error NoFreeQithdrawalSlotsException();
+
+error NoPermissionException(uint256 permission);
