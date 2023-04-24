@@ -4,14 +4,14 @@
 pragma solidity ^0.8.10;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
-import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
-import {CreditConfigurator, CreditManagerOpts, CollateralToken} from "../../credit/CreditConfigurator.sol";
-import {ICreditManagerV2, ICreditManagerV2Events} from "../../interfaces/ICreditManagerV2.sol";
-import {ICreditConfiguratorEvents} from "../../interfaces/ICreditConfigurator.sol";
+import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
+import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
+import {CreditConfigurator, CreditManagerOpts, CollateralToken} from "../../../credit/CreditConfigurator.sol";
+import {ICreditManagerV2, ICreditManagerV2Events} from "../../../interfaces/ICreditManagerV2.sol";
+import {ICreditConfiguratorEvents} from "../../../interfaces/ICreditConfigurator.sol";
 import {IAdapter} from "@gearbox-protocol/core-v2/contracts/interfaces/adapters/IAdapter.sol";
 
-import {BotList} from "../../support/BotList.sol";
+import {BotList} from "../../../support/BotList.sol";
 
 //
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
@@ -20,22 +20,22 @@ import {AddressList} from "@gearbox-protocol/core-v2/contracts/libraries/Address
 
 // EXCEPTIONS
 
-import "../../interfaces/IExceptions.sol";
+import "../../../interfaces/IExceptions.sol";
 
 // TEST
-import "../lib/constants.sol";
+import "../../lib/constants.sol";
 
 // MOCKS
-import {AdapterMock} from "../mocks/adapters/AdapterMock.sol";
+import {AdapterMock} from "../../mocks/adapters/AdapterMock.sol";
 import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
 
 // SUITES
-import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
-import {Tokens} from "../config/Tokens.sol";
-import {CreditFacadeTestSuite} from "../suites/CreditFacadeTestSuite.sol";
-import {CreditConfig} from "../config/CreditConfig.sol";
+import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
+import {Tokens} from "../../config/Tokens.sol";
+import {CreditFacadeTestSuite} from "../../suites/CreditFacadeTestSuite.sol";
+import {CreditConfig} from "../../config/CreditConfig.sol";
 
-import {CollateralTokensItem} from "../config/CreditConfig.sol";
+import {CollateralTokensItem} from "../../config/CreditConfig.sol";
 
 /// @title CreditConfiguratorTest
 /// @notice Designed for unit test purposes only

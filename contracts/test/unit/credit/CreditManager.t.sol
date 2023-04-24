@@ -14,12 +14,12 @@ import {
     ClosureAction,
     CollateralTokenData,
     ManageDebtAction
-} from "../../interfaces/ICreditManagerV2.sol";
+} from "../../../interfaces/ICreditManagerV2.sol";
 
 import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {IWETHGateway} from "../../interfaces/IWETHGateway.sol";
+import {IWETHGateway} from "../../../interfaces/IWETHGateway.sol";
 
-import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
+import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
 
@@ -30,16 +30,16 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 
 // TESTS
 
-import "../lib/constants.sol";
+import "../../lib/constants.sol";
 
-import {BalanceHelper} from "../helpers/BalanceHelper.sol";
+import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 
 // EXCEPTIONS
-import {TokenAlreadyAddedException} from "../../interfaces/IExceptions.sol";
+import {TokenAlreadyAddedException} from "../../../interfaces/IExceptions.sol";
 
 // MOCKS
 import {PriceFeedMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/oracles/PriceFeedMock.sol";
-import {PoolServiceMock} from "../mocks/pool/PoolServiceMock.sol";
+import {PoolServiceMock} from "../../mocks/pool/PoolServiceMock.sol";
 import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
 import {
     ERC20ApproveRestrictedRevert,
@@ -47,16 +47,16 @@ import {
 } from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20ApproveRestricted.sol";
 
 // SUITES
-import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
-import {Tokens} from "../config/Tokens.sol";
-import {CreditManagerTestSuite} from "../suites/CreditManagerTestSuite.sol";
-import {GenesisFactory} from "../../factories/GenesisFactory.sol";
-import {CreditManagerTestInternal} from "../mocks/credit/CreditManagerTestInternal.sol";
+import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
+import {Tokens} from "../../config/Tokens.sol";
+import {CreditManagerTestSuite} from "../../suites/CreditManagerTestSuite.sol";
+import {GenesisFactory} from "../../../factories/GenesisFactory.sol";
+import {CreditManagerTestInternal} from "../../mocks/credit/CreditManagerTestInternal.sol";
 
-import {CreditConfig} from "../config/CreditConfig.sol";
+import {CreditConfig} from "../../config/CreditConfig.sol";
 
 // EXCEPTIONS
-import "../../interfaces/IExceptions.sol";
+import "../../../interfaces/IExceptions.sol";
 import "forge-std/console.sol";
 
 /// @title AddressRepository

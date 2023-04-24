@@ -55,9 +55,6 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
     /// @dev Mapping from (user, token) to per-account quota parameters
     mapping(address => mapping(address => mapping(address => AccountQuota))) internal accountQuotas;
 
-    /// @dev Mapping for cached token masks
-    mapping(address => mapping(address => uint256)) internal tokenMaskCached;
-
     /// @dev Address of the gauge that determines quota rates
     address public gauge;
 
@@ -199,13 +196,8 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         accountQuota.cumulativeIndexLU = cumulativeIndexNow;
     }
 
-    function getTokenMask(address creditManager, address token) internal returns (uint256 mask) {
-        mask = tokenMaskCached[creditManager][token];
-        if (mask == 0) {
-            mask = ICreditManagerV2(creditManager).getTokenMaskOrRevert(token);
-
-            tokenMaskCached[creditManager][token] = mask;
-        }
+    function getTokenMask(address creditManager, address token) internal view returns (uint256 mask) {
+        mask = ICreditManagerV2(creditManager).getTokenMaskOrRevert(token);
     }
 
     /// @dev Updates all accountQuotas to zero when closing a credit account, and computes the final quota interest change

@@ -6,30 +6,30 @@ pragma solidity ^0.8.10;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 
-import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
-import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
+import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
+import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 
 import {CreditAccount} from "@gearbox-protocol/core-v2/contracts/credit/CreditAccount.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 
-import {BotList} from "../../support/BotList.sol";
+import {BotList} from "../../../support/BotList.sol";
 
-import "../../interfaces/ICreditFacade.sol";
+import "../../../interfaces/ICreditFacade.sol";
 import {
     ICreditManagerV2,
     ICreditManagerV2Events,
     ClosureAction,
     ManageDebtAction
-} from "../../interfaces/ICreditManagerV2.sol";
-import {ICreditFacadeEvents} from "../../interfaces/ICreditFacade.sol";
+} from "../../../interfaces/ICreditManagerV2.sol";
+import {ICreditFacadeEvents} from "../../../interfaces/ICreditFacade.sol";
 import {IDegenNFT, IDegenNFTExceptions} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
-import {IWithdrawManager} from "../../interfaces/IWithdrawManager.sol";
+import {IWithdrawManager} from "../../../interfaces/IWithdrawManager.sol";
 
 // DATA
 import {MultiCall, MultiCallOps} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 
-import {CreditFacadeMulticaller, CreditFacadeCalls} from "../../multicall/CreditFacadeCalls.sol";
+import {CreditFacadeMulticaller, CreditFacadeCalls} from "../../../multicall/CreditFacadeCalls.sol";
 
 // CONSTANTS
 
@@ -38,23 +38,23 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 
 // TESTS
 
-import "../lib/constants.sol";
-import {BalanceHelper} from "../helpers/BalanceHelper.sol";
-import {CreditFacadeTestHelper} from "../helpers/CreditFacadeTestHelper.sol";
+import "../../lib/constants.sol";
+import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
+import {CreditFacadeTestHelper} from "../../helpers/CreditFacadeTestHelper.sol";
 
 // EXCEPTIONS
-import "../../interfaces/IExceptions.sol";
+import "../../../interfaces/IExceptions.sol";
 
 // MOCKS
-import {AdapterMock} from "../mocks/adapters/AdapterMock.sol";
+import {AdapterMock} from "../../mocks/adapters/AdapterMock.sol";
 import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
-import {ERC20BlacklistableMock} from "../mocks/token/ERC20Blacklistable.sol";
+import {ERC20BlacklistableMock} from "../../mocks/token/ERC20Blacklistable.sol";
 
 // SUITES
-import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
-import {Tokens} from "../config/Tokens.sol";
-import {CreditFacadeTestSuite} from "../suites/CreditFacadeTestSuite.sol";
-import {CreditConfig} from "../config/CreditConfig.sol";
+import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
+import {Tokens} from "../../config/Tokens.sol";
+import {CreditFacadeTestSuite} from "../../suites/CreditFacadeTestSuite.sol";
+import {CreditConfig} from "../../config/CreditConfig.sol";
 
 import "forge-std/console.sol";
 

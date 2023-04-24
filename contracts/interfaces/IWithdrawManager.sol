@@ -22,6 +22,12 @@ interface IWithdrawManagerEvents {
 
     /// @dev Emitted when a Credit Facade is removed from BlacklistHelper
     event CreditFacadeRemoved(address indexed creditFacade);
+
+    event ScheduleDelayedWithdrawal(address indexed to, address indexed token, uint256 amount, uint256 availableAt);
+
+    event CancelDelayedWithdrawal(address indexed to, address indexed token, uint256 amount);
+
+    event PayDelayedWithdrawal(address indexed to, address indexed token, uint256 amount);
 }
 
 interface IWithdrawManager is IWithdrawManagerEvents, IVersion {

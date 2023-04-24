@@ -6,34 +6,34 @@ pragma solidity ^0.8.17;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
-import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
+import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
 import {ICreditFacade, MultiCall} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditFacade.sol";
-import {ICreditManagerV2, ICreditManagerV2Events} from "../../interfaces/ICreditManagerV2.sol";
-import {ICreditFacadeEvents} from "../../interfaces/ICreditFacade.sol";
-import {IPool4626} from "../../interfaces/IPool4626.sol";
+import {ICreditManagerV2, ICreditManagerV2Events} from "../../../interfaces/ICreditManagerV2.sol";
+import {ICreditFacadeEvents} from "../../../interfaces/ICreditFacade.sol";
+import {IPool4626} from "../../../interfaces/IPool4626.sol";
 
-import "../lib/constants.sol";
-import {BalanceHelper} from "../helpers/BalanceHelper.sol";
-import {CreditFacadeTestHelper} from "../helpers/CreditFacadeTestHelper.sol";
+import "../../lib/constants.sol";
+import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
+import {CreditFacadeTestHelper} from "../../helpers/CreditFacadeTestHelper.sol";
 
 // EXCEPTIONS
-import "../../interfaces/IExceptions.sol";
+import "../../../interfaces/IExceptions.sol";
 
 // MOCKS
-import {AdapterMock} from "../mocks/adapters/AdapterMock.sol";
+import {AdapterMock} from "../../mocks/adapters/AdapterMock.sol";
 import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
 
 // SUITES
-import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
-import {Tokens} from "../config/Tokens.sol";
-import {CreditFacadeTestSuite} from "../suites/CreditFacadeTestSuite.sol";
-import {CreditConfig} from "../config/CreditConfig.sol";
+import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
+import {Tokens} from "../../config/Tokens.sol";
+import {CreditFacadeTestSuite} from "../../suites/CreditFacadeTestSuite.sol";
+import {CreditConfig} from "../../config/CreditConfig.sol";
 
 // EXCEPTIONS
-import "../../interfaces/IExceptions.sol";
+import "../../../interfaces/IExceptions.sol";
 
 uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
 uint16 constant REFERRAL_CODE = 23;

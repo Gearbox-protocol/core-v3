@@ -3,18 +3,18 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
-import {IInterestRateModel} from "../../interfaces/IInterestRateModel.sol";
-import {LinearInterestRateModel} from "../../pool/LinearInterestRateModel.sol";
+import {IInterestRateModel} from "../../../interfaces/IInterestRateModel.sol";
+import {LinearInterestRateModel} from "../../../pool/LinearInterestRateModel.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 // TEST
-import "../lib/constants.sol";
-import "../lib/StringUtils.sol";
+import "../../lib/constants.sol";
+import "../../lib/StringUtils.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // EXCEPTIONS
-import "../../interfaces/IExceptions.sol";
+import "../../../interfaces/IExceptions.sol";
 
 import "forge-std/console.sol";
 

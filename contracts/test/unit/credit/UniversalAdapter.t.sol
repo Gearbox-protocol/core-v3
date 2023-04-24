@@ -7,26 +7,26 @@ pragma solidity ^0.8.17;
 // import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 // import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
 
-// import {UniversalAdapter, RevocationPair} from "../../adapters/UniversalAdapter.sol";
-// import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
-// import {ICreditManagerV2} from "../../interfaces/ICreditManagerV2.sol";
-// import "../../interfaces/IExceptions.sol";
+// import {UniversalAdapter, RevocationPair} from "../../../adapters/UniversalAdapter.sol";
+// import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
+// import {ICreditManagerV2} from "../../../interfaces/ICreditManagerV2.sol";
+// import "../../../interfaces/IExceptions.sol";
 
 // // CONSTANTS
-// import {CONFIGURATOR, USER} from "../lib/constants.sol";
+// import {CONFIGURATOR, USER} from "../../lib/constants.sol";
 
 // // HELPERS
-// import {BalanceHelper} from "../helpers/BalanceHelper.sol";
-// import {CreditFacadeTestHelper} from "../helpers/CreditFacadeTestHelper.sol";
+// import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
+// import {CreditFacadeTestHelper} from "../../helpers/CreditFacadeTestHelper.sol";
 
 // // MOCKS
-// import {AdapterMock} from "../mocks/adapters/AdapterMock.sol";
+// import {AdapterMock} from "../../mocks/adapters/AdapterMock.sol";
 
 // // SUITES
-// import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
-// import {Tokens} from "../config/Tokens.sol";
-// import {CreditFacadeTestSuite} from "../suites/CreditFacadeTestSuite.sol";
-// import {CreditConfig} from "../config/CreditConfig.sol";
+// import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
+// import {Tokens} from "../../config/Tokens.sol";
+// import {CreditFacadeTestSuite} from "../../suites/CreditFacadeTestSuite.sol";
+// import {CreditConfig} from "../../config/CreditConfig.sol";
 
 // /// @title Universal adapter test
 // /// @notice Designed for unit test purposes only

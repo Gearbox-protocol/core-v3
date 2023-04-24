@@ -3,28 +3,28 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
-import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
-import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
+import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
+import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 
-import {ICreditManagerV2, ICreditManagerV2Events} from "../../interfaces/ICreditManagerV2.sol";
+import {ICreditManagerV2, ICreditManagerV2Events} from "../../../interfaces/ICreditManagerV2.sol";
 
 import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
 import {IDegenNFT, IDegenNFTExceptions} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
 import {DegenNFT} from "@gearbox-protocol/core-v2/contracts/tokens/DegenNFT.sol";
 
-import "../lib/constants.sol";
-import {CreditFacadeTestHelper} from "../helpers/CreditFacadeTestHelper.sol";
+import "../../lib/constants.sol";
+import {CreditFacadeTestHelper} from "../../helpers/CreditFacadeTestHelper.sol";
 
 // EXCEPTIONS
-import {NotImplementedException, CallerNotConfiguratorException} from "../../interfaces/IExceptions.sol";
+import {NotImplementedException, CallerNotConfiguratorException} from "../../../interfaces/IExceptions.sol";
 
 // SUITES
-import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
-import {CreditFacadeTestSuite} from "../suites/CreditFacadeTestSuite.sol";
-import {CreditConfig} from "../config/CreditConfig.sol";
-import {Tokens} from "../config/Tokens.sol";
+import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
+import {CreditFacadeTestSuite} from "../../suites/CreditFacadeTestSuite.sol";
+import {CreditConfig} from "../../config/CreditConfig.sol";
+import {Tokens} from "../../config/Tokens.sol";
 
 uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
 uint16 constant REFERRAL_CODE = 23;

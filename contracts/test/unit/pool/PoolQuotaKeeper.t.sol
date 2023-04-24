@@ -11,34 +11,34 @@ import {
     IPoolQuotaKeeperEvents,
     TokenLT,
     TokenQuotaParams
-} from "../../interfaces/IPoolQuotaKeeper.sol";
-import {IGauge} from "../../interfaces/IGauge.sol";
-import {IPool4626} from "../../interfaces/IPool4626.sol";
+} from "../../../interfaces/IPoolQuotaKeeper.sol";
+import {IGauge} from "../../../interfaces/IGauge.sol";
+import {IPool4626} from "../../../interfaces/IPool4626.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {PoolServiceMock} from "../mocks/pool/PoolServiceMock.sol";
+import {PoolServiceMock} from "../../mocks/pool/PoolServiceMock.sol";
 
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
-import {CreditManagerMockForPoolTest} from "../mocks/pool/CreditManagerMockForPoolTest.sol";
-import {addLiquidity, referral, PoolQuotaKeeperTestSuite} from "../suites/PoolQuotaKeeperTestSuite.sol";
+import {CreditManagerMockForPoolTest} from "../../mocks/pool/CreditManagerMockForPoolTest.sol";
+import {addLiquidity, referral, PoolQuotaKeeperTestSuite} from "../../suites/PoolQuotaKeeperTestSuite.sol";
 
 import "@gearbox-protocol/core-v2/contracts/libraries/Errors.sol";
 
-import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
-import {Tokens} from "../config/Tokens.sol";
-import {BalanceHelper} from "../helpers/BalanceHelper.sol";
+import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
+import {Tokens} from "../../config/Tokens.sol";
+import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 
-import {PoolQuotaKeeper} from "../../pool/PoolQuotaKeeper.sol";
-import {GaugeMock} from "../mocks/pool/GaugeMock.sol";
+import {PoolQuotaKeeper} from "../../../pool/PoolQuotaKeeper.sol";
+import {GaugeMock} from "../../mocks/pool/GaugeMock.sol";
 
 // TEST
-import "../lib/constants.sol";
-import "../lib/StringUtils.sol";
+import "../../lib/constants.sol";
+import "../../lib/StringUtils.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // EXCEPTIONS
-import "../../interfaces/IExceptions.sol";
+import "../../../interfaces/IExceptions.sol";
 
 import "forge-std/console.sol";
 

@@ -9,6 +9,9 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
 
 import {IWithdrawManager, CancellationType} from "../interfaces/IWithdrawManager.sol";
+
+// LIBS & TRAITS
+import {BitMask} from "../libraries/BitMask.sol";
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 
 // EXCEPTIONS
@@ -32,7 +35,7 @@ struct WithdrawPush {
 ///      while simultaneously allowing them to recover their funds under a different address
 contract WithdrawManager is IWithdrawManager, ACLNonReentrantTrait {
     using SafeERC20 for IERC20;
-    /// @dev mapping from address to supported Credit Facade status
+    using BitMask for uint256;
 
     mapping(address => bool) public isSupportedCreditManager;
 
@@ -88,12 +91,12 @@ contract WithdrawManager is IWithdrawManager, ACLNonReentrantTrait {
 
         uint40 availableAt = uint40(block.timestamp) + delay;
 
-        uint8 tokenIndex = _calcIndexFromMask(tokenMask);
+        uint8 tokenIndex = tokenMask.calcIndex();
 
         delayed[msg.sender][creditAccount][slot] =
             WithdrawRequest({tokenIndex: tokenIndex, amount: amount, to: to, availableAt: availableAt});
 
-        // emit IncreaseClaimableBalance(token, to, amount);
+        emit ScheduleDelayedWithdrawal(to, token, amount, availableAt);
     }
 
     /// @dev Transfer the sender's current claimable balance in token to a specified address
@@ -137,15 +140,19 @@ contract WithdrawManager is IWithdrawManager, ACLNonReentrantTrait {
             return true;
         }
         if (pushBeforeDeadline || req.availableAt > block.timestamp) {
-            _executeWithdrawal(creditManager, req, req.to);
+            address token = _executeWithdrawal(creditManager, req, req.to);
+            emit PayDelayedWithdrawal(req.to, token, req.amount);
             return true;
         }
 
         return false;
     }
 
-    function _executeWithdrawal(address creditManager, WithdrawRequest storage req, address to) internal {
-        (address token,) = ICreditManagerV2(creditManager).collateralTokensByMask(1 << req.tokenIndex);
+    function _executeWithdrawal(address creditManager, WithdrawRequest storage req, address to)
+        internal
+        returns (address token)
+    {
+        (token,) = ICreditManagerV2(creditManager).collateralTokensByMask(1 << req.tokenIndex);
         IERC20(token).safeTransfer(to, req.amount);
         req.availableAt = 1;
         req.amount = 1;
@@ -156,10 +163,10 @@ contract WithdrawManager is IWithdrawManager, ACLNonReentrantTrait {
         returns (uint256 tokensToEnable)
     {
         if (req.availableAt > 1) {
-            _executeWithdrawal(creditManager, req, creditAccount);
+            address token = _executeWithdrawal(creditManager, req, creditAccount);
             tokensToEnable = 1 << req.tokenIndex;
+            emit CancelDelayedWithdrawal(req.to, token, req.amount);
         }
-        // EVENT HERE
     }
 
     function cancelWithdrawals(address creditAccount, CancellationType ctype)
@@ -177,12 +184,11 @@ contract WithdrawManager is IWithdrawManager, ACLNonReentrantTrait {
         }
     }
 
-    function pushAndClaim(address[] calldata tokens, WithdrawPush[] calldata pushes, address to) external {}
-
-    function _calcIndexFromMask(uint256 tokenMask) internal pure returns (uint8 index) {
+    function pushAndClaim(WithdrawPush[] calldata pushes) external {
+        uint256 len = pushes.length;
         unchecked {
-            while (tokenMask < (1 << index)) {
-                ++index;
+            for (uint256 i; i < len; ++i) {
+                _push(pushes[i].creditManager, pushes[i].creditAccount, false, true);
             }
         }
     }

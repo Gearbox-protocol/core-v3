@@ -3,26 +3,26 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
-import {GearStaking} from "../../support/GearStaking.sol";
-import {IGearStakingEvents, MultiVote, VotingContractStatus} from "../../interfaces/IGearStaking.sol";
-import {IVotingContract} from "../../interfaces/IVotingContract.sol";
+import {GearStaking} from "../../../support/GearStaking.sol";
+import {IGearStakingEvents, MultiVote, VotingContractStatus} from "../../../interfaces/IGearStaking.sol";
+import {IVotingContract} from "../../../interfaces/IVotingContract.sol";
 
-import {CallerNotConfiguratorException} from "../../interfaces/IExceptions.sol";
+import {CallerNotConfiguratorException} from "../../../interfaces/IExceptions.sol";
 
 // TEST
-import "../lib/constants.sol";
+import "../../lib/constants.sol";
 
 // MOCKS
-import {AddressProviderACLMock} from "../mocks/core/AddressProviderACLMock.sol";
+import {AddressProviderACLMock} from "../../mocks/core/AddressProviderACLMock.sol";
 import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
 import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
 
 // SUITES
-import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
-import {Tokens} from "../config/Tokens.sol";
+import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
+import {Tokens} from "../../config/Tokens.sol";
 
 // EXCEPTIONS
-import "../../interfaces/IExceptions.sol";
+import "../../../interfaces/IExceptions.sol";
 
 uint256 constant EPOCH_LENGTH = 7 days;
 

@@ -6,44 +6,44 @@ pragma solidity ^0.8.10;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import {IPoolQuotaKeeper, QuotaUpdate} from "../../interfaces/IPoolQuotaKeeper.sol";
-import {LinearInterestRateModel} from "../../pool/LinearInterestRateModel.sol";
+import {IPoolQuotaKeeper, QuotaUpdate} from "../../../interfaces/IPoolQuotaKeeper.sol";
+import {LinearInterestRateModel} from "../../../pool/LinearInterestRateModel.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {Pool4626} from "../../pool/Pool4626.sol";
-import {IPool4626Events, Pool4626Opts} from "../../interfaces/IPool4626.sol";
-import {IERC4626Events} from "../../interfaces/IERC4626.sol";
+import {Pool4626} from "../../../pool/Pool4626.sol";
+import {IPool4626Events, Pool4626Opts} from "../../../interfaces/IPool4626.sol";
+import {IERC4626Events} from "../../../interfaces/IERC4626.sol";
 
-import {IInterestRateModel} from "../../interfaces/IInterestRateModel.sol";
+import {IInterestRateModel} from "../../../interfaces/IInterestRateModel.sol";
 
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
-import {CreditManagerMockForPoolTest} from "../mocks/pool/CreditManagerMockForPoolTest.sol";
+import {CreditManagerMockForPoolTest} from "../../mocks/pool/CreditManagerMockForPoolTest.sol";
 import {
     liquidityProviderInitBalance,
     addLiquidity,
     removeLiquidity,
     referral,
     PoolServiceTestSuite
-} from "../suites/PoolServiceTestSuite.sol";
+} from "../../suites/PoolServiceTestSuite.sol";
 
 import "@gearbox-protocol/core-v2/contracts/libraries/Errors.sol";
 
-import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
-import {Tokens} from "../config/Tokens.sol";
-import {BalanceHelper} from "../helpers/BalanceHelper.sol";
-import {ERC20FeeMock} from "../mocks/token/ERC20FeeMock.sol";
-import {PoolQuotaKeeper} from "../../pool/PoolQuotaKeeper.sol";
+import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
+import {Tokens} from "../../config/Tokens.sol";
+import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
+import {ERC20FeeMock} from "../../mocks/token/ERC20FeeMock.sol";
+import {PoolQuotaKeeper} from "../../../pool/PoolQuotaKeeper.sol";
 
 // TEST
-import "../lib/constants.sol";
-import "../lib/StringUtils.sol";
+import "../../lib/constants.sol";
+import "../../lib/StringUtils.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 import "forge-std/console.sol";
 
 // EXCEPTIONS
-import "../../interfaces/IExceptions.sol";
+import "../../../interfaces/IExceptions.sol";
 
 uint256 constant fee = 6000;
 

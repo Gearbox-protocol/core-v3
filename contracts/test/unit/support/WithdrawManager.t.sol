@@ -3,23 +3,23 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
-import {WithdrawManager} from "../../support/WithdrawManager.sol";
-import {IWithdrawManagerEvents} from "../../interfaces/IWithdrawManager.sol";
+import {WithdrawManager} from "../../../support/WithdrawManager.sol";
+import {IWithdrawManagerEvents} from "../../../interfaces/IWithdrawManager.sol";
 
 // TEST
-import "../lib/constants.sol";
+import "../../lib/constants.sol";
 
 // MOCKS
-import {AddressProviderACLMock} from "../mocks/core/AddressProviderACLMock.sol";
-import {ERC20BlacklistableMock} from "../mocks/token/ERC20Blacklistable.sol";
+import {AddressProviderACLMock} from "../../mocks/core/AddressProviderACLMock.sol";
+import {ERC20BlacklistableMock} from "../../mocks/token/ERC20Blacklistable.sol";
 
 // SUITES
-import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
-import {Tokens} from "../config/Tokens.sol";
+import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
+import {Tokens} from "../../config/Tokens.sol";
 
 // EXCEPTIONS
 
-import "../../interfaces/IExceptions.sol";
+import "../../../interfaces/IExceptions.sol";
 
 /// @title LPPriceFeedTest
 /// @notice Designed for unit test purposes only

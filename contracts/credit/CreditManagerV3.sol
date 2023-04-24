@@ -9,7 +9,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
-// TRAITS
+// LIBS & TRAITS
+import {BitMask} from "../libraries/BitMask.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 import {BalanceHelperTrait} from "../traits/BalanceHelperTrait.sol";
@@ -81,7 +82,8 @@ struct Slot1 {
 contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard, BalanceHelperTrait {
     using SafeERC20 for IERC20;
     using Address for address payable;
-    using SafeCast for uint256;
+    // using SafeCast for uint256;
+    using BitMask for uint256;
 
     /// @dev The maximal number of enabled tokens on a single Credit Account
     uint8 public override maxAllowedEnabledTokenLength = 12;
@@ -1112,6 +1114,9 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
                     )
             ) / PERCENTAGE_FACTOR; // F:[CM-43]
 
+            /// Adding fee here
+            // amountToPool = _amountWithFee(amountToPool);
+
             // If there are any funds left after all respective payments (this
             // includes the liquidation premium, since totalFunds is already
             // discounted from totalValue), they are recorded to remainingFunds
@@ -1550,27 +1555,9 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
     }
 
     function _checkEnabledTokenLength(uint256 enabledTokenMask) internal view {
-        uint256 totalTokensEnabled = _calcEnabledTokens(enabledTokenMask);
+        uint256 totalTokensEnabled = enabledTokenMask.calcEnabledTokens();
         if (totalTokensEnabled > maxAllowedEnabledTokenLength) {
             revert TooManyEnabledTokensException();
-        }
-    }
-
-    /// @dev Calculates the number of enabled tokens, based on the
-    ///      provided token mask
-    /// @param enabledTokenMask Bit mask encoding a set of enabled tokens
-    function _calcEnabledTokens(uint256 enabledTokenMask) internal pure returns (uint256 totalTokensEnabled) {
-        // Bit mask is a number encoding enabled tokens as 1's;
-        // Therefore, to count the number of enabled tokens, we simply
-        // need to keep shifting the mask by one bit and checking if the rightmost bit is 1,
-        // until the whole mask is 0;
-        // Since bit shifting is overflow-safe and the loop has at most 256 steps,
-        // the whole function can be marked as unsafe to optimize gas
-        unchecked {
-            while (enabledTokenMask > 0) {
-                totalTokensEnabled += enabledTokenMask & 1;
-                enabledTokenMask >>= 1;
-            }
         }
     }
 
@@ -1674,5 +1661,12 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
         returns (uint256 amountInUSD)
     {
         amountInUSD = _priceOracle.convertToUSD(amountInToken, token);
+    }
+
+    //
+    // FEE TOKEN SUPPORT
+
+    function _amountWithFee(uint256 amount) internal view virtual returns (uint256) {
+        return amount;
     }
 }
