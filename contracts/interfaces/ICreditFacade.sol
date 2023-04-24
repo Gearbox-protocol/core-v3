@@ -28,6 +28,7 @@ uint256 constant ALL_PERMISSIONS = ALL_CREDIT_FACADE_CALLS_PERMISSION | EXTERNAL
 
 // All flags start from 193rd bit, because bot permissions is uint192
 uint256 constant INCREASE_DEBT_WAS_CALLED = 2 ** 193;
+uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 2 ** 194;
 
 struct FullCheckParams {
     uint256[] collateralHints;

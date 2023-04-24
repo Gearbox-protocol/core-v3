@@ -367,4 +367,6 @@ interface ICreditManagerV2 is ICreditManagerV2Events, IVersion {
     function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external;
 
     function disableWithdrawalFlag(address creditAccount) external;
+
+    function setCaForExternalCall(address creditAccount) external;
 }

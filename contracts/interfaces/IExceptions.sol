@@ -72,7 +72,7 @@ error CallerNotVoterException();
 
 /// @dev Thrown if an access-restricted function is called by an address that is not
 ///      the connected Credit Facade, or an allowed adapter
-error CallerNotAdaptersOrCreditFacadeException();
+error CallerNotAdapterException();
 
 /// interface ICreditConfiguratorExceptions {
 
@@ -227,3 +227,5 @@ error ZeroCallsException();
 error NoFreeQithdrawalSlotsException();
 
 error NoPermissionException(uint256 permission);
+
+error ExternalCallCreditAccountNotSetException();

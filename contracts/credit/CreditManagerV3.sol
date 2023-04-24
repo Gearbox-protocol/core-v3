@@ -89,6 +89,11 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
     /// @dev Address of the connected Credit Facade
     address public override creditFacade;
 
+    /// @dev Points to creditAccount during multicall, otherwise keeps address(1) for gas savings
+    /// CreditFacade is trusted source, so primarly it sends creditAccount as parameter
+    /// externalCallCA is used for adapters interation when adapter calls approve / execute methods
+    address public externalCallCA;
+
     /// @dev Stores fees & parameters commonly used together for gas savings
     Slot1 internal slot1;
 
@@ -166,9 +171,9 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
     //
 
     /// @dev Restricts calls to Credit Facade or allowed adapters
-    modifier adaptersOrCreditFacadeOnly() {
-        if (adapterToContract[msg.sender] == address(0) && msg.sender != creditFacade) {
-            revert CallerNotAdaptersOrCreditFacadeException();
+    modifier adaptersOnly() {
+        if (adapterToContract[msg.sender] == address(0)) {
+            revert CallerNotAdapterException();
         } //
         _;
     }
@@ -217,6 +222,8 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
         slot1.priceOracle = IPriceOracleV2(addressProvider.getPriceOracle()); // F:[CM-1]
         _accountFactory = IAccountFactory(addressProvider.getAccountFactory()); // F:[CM-1]
         creditConfigurator = msg.sender; // F:[CM-1]
+
+        externalCallCA = address(1);
     }
 
     //
@@ -235,11 +242,11 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
         nonReentrant
         creditFacadeOnly // F:[CM-2]
         nonZeroAddress(onBehalfOf) // TODO: Add test
-        returns (address)
+        returns (address creditAccount)
     {
         // Takes a Credit Account from the factory and sets initial parameters
         // The Credit Account will be connected to this Credit Manager until closing
-        address creditAccount = _accountFactory.takeCreditAccount(0, 0); // F:[CM-8]
+        creditAccount = _accountFactory.takeCreditAccount(0, 0); // F:[CM-8]
 
         borrowedAmounts[creditAccount] = borrowedAmount;
         cumulativeIndicies[creditAccount] = IPoolService(pool).calcLinearCumulative_RAY();
@@ -255,9 +262,6 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
         // enabledTokensMap[creditAccount] = 1; // F:[CM-8]
 
         if (supportsQuotas) cumulativeQuotaInterest[creditAccount] = 1; // F: [CMQ-1]
-
-        // Returns the address of the opened Credit Account
-        return creditAccount; // F:[CM-8]
     }
 
     ///  @dev Closes a Credit Account - covers both normal closure and liquidation
@@ -617,7 +621,7 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
     function approveCreditAccount(address targetContract, address token, uint256 amount)
         external
         override
-        adaptersOrCreditFacadeOnly
+        adaptersOnly
         nonReentrant
     {
         // This function can only be called by connected adapters (must be a correct adapter/contract pair),
@@ -626,14 +630,10 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
             (adapterToContract[msg.sender] != targetContract && msg.sender != creditFacade)
                 || targetContract == address(0)
         ) {
-            revert CallerNotAdaptersOrCreditFacadeException(); // F:[CM-3,25]
+            revert CallerNotAdapterException(); // F:[CM-3,25]
         }
 
-        /// Token approval is multicall-only, so the Credit Account must
-        /// belong to the Credit Facade at this point
-        address creditAccount = getCreditAccountOrRevert(creditFacade); // F:[CM-6]
-
-        _approveSpender(token, targetContract, creditAccount, amount);
+        _approveSpender(token, targetContract, externalCallCreditAccountOrRevert(), amount);
     }
 
     function _approveSpender(address token, address targetContract, address creditAccount, uint256 amount) internal {
@@ -681,7 +681,7 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
     function executeOrder(address targetContract, bytes memory data)
         external
         override
-        adaptersOrCreditFacadeOnly
+        adaptersOnly
         nonReentrant
         returns (bytes memory)
     {
@@ -692,17 +692,13 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
             // F:[CM-28]
         }
 
-        /// Order execution is multicall-only, so the Credit Account must
-        /// belong to the Credit Facade at this point
-        address creditAccount = getCreditAccountOrRevert(creditFacade); // F:[CM-6]
-
         // Emits an event
         emit ExecuteOrder(targetContract); // F:[CM-29]
 
         // Returned data is provided as-is to the caller;
         // It is expected that is is parsed and returned as a correct type
         // by the adapter itself.
-        return ICreditAccount(creditAccount).execute(targetContract, data); // F:[CM-29]
+        return ICreditAccount(externalCallCreditAccountOrRevert()).execute(targetContract, data); // F:[CM-29]
     }
 
     //
@@ -1298,7 +1294,6 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
         if (token == underlying) return slot1.ltUnderlying; // F:[CM-47]
 
         uint256 tokenMask = getTokenMaskOrRevert(token);
-
         (, lt) = collateralTokensByMask(tokenMask); // F:[CM-47]
     }
 
@@ -1633,6 +1628,16 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
                 _approveSpender(token, spender, creditAccount, 1);
             }
         }
+    }
+
+    ///
+    function setCaForExternalCall(address creditAccount) external override creditFacadeOnly {
+        externalCallCA = creditAccount;
+    }
+
+    function externalCallCreditAccountOrRevert() public view returns (address creditAccount) {
+        creditAccount = externalCallCA;
+        if (creditAccount == address(1)) revert ExternalCallCreditAccountNotSetException();
     }
 
     function enabledTokensMap(address creditAccount) public view override returns (uint256) {

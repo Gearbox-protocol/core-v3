@@ -386,10 +386,10 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
 
         evm.startPrank(USER);
 
-        evm.expectRevert(CallerNotAdaptersOrCreditFacadeException.selector);
+        evm.expectRevert(CallerNotAdapterException.selector);
         creditManager.approveCreditAccount(DUMB_ADDRESS, DUMB_ADDRESS, 100);
 
-        evm.expectRevert(CallerNotAdaptersOrCreditFacadeException.selector);
+        evm.expectRevert(CallerNotAdapterException.selector);
         creditManager.executeOrder(DUMB_ADDRESS, bytes("0"));
 
         evm.expectRevert(CallerNotCreditFacadeException.selector);
@@ -508,21 +508,23 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         creditManager.transferAccountOwnership(USER, DUMB_ADDRESS);
     }
 
-    /// @dev [CM-6A]: multicall-only functions revert when the Credit Facade has no account
+    /// @dev [CM-6A]: external call functions revert when the Credit Facade has no account
     /// Functions list:
     /// - executeOrder
     /// - approveCreditAccount
-    function test_CM_06B_multicall_only_functions_revert_when_CF_has_no_account() public {
+    function test_CM_06B_extenrnal_ca_only_functions_revert_when_ec_is_not_set() public {
         address token = tokenTestSuite.addressOf(Tokens.DAI);
-
-        evm.expectRevert(HasNoOpenedAccountException.selector);
-        creditManager.approveCreditAccount(DUMB_ADDRESS, token, 100);
 
         evm.prank(CONFIGURATOR);
         creditManager.changeContractAllowance(ADAPTER, DUMB_ADDRESS);
 
         evm.prank(ADAPTER);
-        evm.expectRevert(HasNoOpenedAccountException.selector);
+        evm.expectRevert(ExternalCallCreditAccountNotSetException.selector);
+        creditManager.approveCreditAccount(DUMB_ADDRESS, token, 100);
+
+        // / TODO: decide about test
+        evm.prank(ADAPTER);
+        evm.expectRevert(ExternalCallCreditAccountNotSetException.selector);
         creditManager.executeOrder(DUMB_ADDRESS, bytes("dd"));
     }
 
@@ -1251,48 +1253,67 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         evm.prank(CONFIGURATOR);
         creditManager.changeContractAllowance(DUMB_ADDRESS, FRIEND);
 
-        evm.expectRevert(CallerNotAdaptersOrCreditFacadeException.selector);
+        evm.expectRevert(CallerNotAdapterException.selector);
 
         evm.prank(DUMB_ADDRESS);
         creditManager.approveCreditAccount(DUMB_ADDRESS, DUMB_ADDRESS, 100);
 
         // Address 0 case
-        evm.expectRevert(CallerNotAdaptersOrCreditFacadeException.selector);
+        evm.expectRevert(CallerNotAdapterException.selector);
         evm.prank(DUMB_ADDRESS);
         creditManager.approveCreditAccount(address(0), DUMB_ADDRESS, 100);
     }
 
     /// @dev [CM-25A]: approveCreditAccount reverts if the token is not added
     function test_CM_25A_approveCreditAccount_reverts_if_the_token_is_not_added() public {
-        _openAccountAndTransferToCF();
+        (,,, address creditAccount) = _openCreditAccount();
+        creditManager.setCaForExternalCall(creditAccount);
+
+        evm.prank(CONFIGURATOR);
+        creditManager.changeContractAllowance(ADAPTER, DUMB_ADDRESS);
 
         evm.expectRevert(TokenNotAllowedException.selector);
 
+        evm.prank(ADAPTER);
         creditManager.approveCreditAccount(DUMB_ADDRESS, DUMB_ADDRESS, 100);
     }
 
     /// @dev [CM-26]: approveCreditAccount approves with desired allowance
     function test_CM_26_approveCreditAccount_approves_with_desired_allowance() public {
-        address creditAccount = _openAccountAndTransferToCF();
+        (,,, address creditAccount) = _openCreditAccount();
+        creditManager.setCaForExternalCall(creditAccount);
+
+        evm.prank(CONFIGURATOR);
+        creditManager.changeContractAllowance(ADAPTER, DUMB_ADDRESS);
 
         // Case, when current allowance > ALLOWANCE_THRESHOLD
         tokenTestSuite.approve(Tokens.DAI, creditAccount, DUMB_ADDRESS, 200);
-        creditManager.approveCreditAccount(DUMB_ADDRESS, tokenTestSuite.addressOf(Tokens.DAI), DAI_EXCHANGE_AMOUNT);
+
+        address dai = tokenTestSuite.addressOf(Tokens.DAI);
+
+        evm.prank(ADAPTER);
+        creditManager.approveCreditAccount(DUMB_ADDRESS, dai, DAI_EXCHANGE_AMOUNT);
 
         expectAllowance(Tokens.DAI, creditAccount, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
     }
 
     /// @dev [CM-27A]: approveCreditAccount works for ERC20 that revert if allowance > 0 before approve
     function test_CM_27A_approveCreditAccount_works_for_ERC20_with_approve_restrictions() public {
-        address creditAccount = _openAccountAndTransferToCF();
+        (,,, address creditAccount) = _openCreditAccount();
+        creditManager.setCaForExternalCall(creditAccount);
+
+        evm.prank(CONFIGURATOR);
+        creditManager.changeContractAllowance(ADAPTER, DUMB_ADDRESS);
 
         address approveRevertToken = address(new ERC20ApproveRestrictedRevert());
 
         evm.prank(CONFIGURATOR);
         creditManager.addToken(approveRevertToken);
 
+        evm.prank(ADAPTER);
         creditManager.approveCreditAccount(DUMB_ADDRESS, approveRevertToken, DAI_EXCHANGE_AMOUNT);
 
+        evm.prank(ADAPTER);
         creditManager.approveCreditAccount(DUMB_ADDRESS, approveRevertToken, 2 * DAI_EXCHANGE_AMOUNT);
 
         expectAllowance(approveRevertToken, creditAccount, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
@@ -1300,15 +1321,21 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
 
     // /// @dev [CM-27B]: approveCreditAccount works for ERC20 that returns false if allowance > 0 before approve
     function test_CM_27B_approveCreditAccount_works_for_ERC20_with_approve_restrictions() public {
-        address creditAccount = _openAccountAndTransferToCF();
+        (,,, address creditAccount) = _openCreditAccount();
+        creditManager.setCaForExternalCall(creditAccount);
 
         address approveFalseToken = address(new ERC20ApproveRestrictedFalse());
 
         evm.prank(CONFIGURATOR);
         creditManager.addToken(approveFalseToken);
 
+        evm.prank(CONFIGURATOR);
+        creditManager.changeContractAllowance(ADAPTER, DUMB_ADDRESS);
+
+        evm.prank(ADAPTER);
         creditManager.approveCreditAccount(DUMB_ADDRESS, approveFalseToken, DAI_EXCHANGE_AMOUNT);
 
+        evm.prank(ADAPTER);
         creditManager.approveCreditAccount(DUMB_ADDRESS, approveFalseToken, 2 * DAI_EXCHANGE_AMOUNT);
 
         expectAllowance(approveFalseToken, creditAccount, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
@@ -1334,7 +1361,8 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
 
     /// @dev [CM-29]: executeOrder calls credit account method and emit event
     function test_CM_29_executeOrder_calls_credit_account_method_and_emit_event() public {
-        address creditAccount = _openAccountAndTransferToCF();
+        (,,, address creditAccount) = _openCreditAccount();
+        creditManager.setCaForExternalCall(creditAccount);
 
         TargetContractMock targetMock = new TargetContractMock();
 

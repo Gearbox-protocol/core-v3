@@ -484,9 +484,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
         uint256 enabledTokensMask,
         uint256 flags
     ) internal returns (FullCheckParams memory fullCheckParams) {
-        // Takes ownership of the Credit Account
-        _transferAccount(borrower, address(this)); // F:[FA-26]
-
         // Emits event for multicall start - used in analytics to track actions within multicalls
         emit StartMultiCall(borrower); // F:[FA-26]
 
@@ -618,10 +615,16 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
                     // As CreditFacadeV3 has powerful permissions in CreditManagers,
                     // functionCall to it is strictly forbidden, even if
                     // the Configurator adds it as an adapter
+
                     if (
                         creditManager.adapterToContract(mcall.target) == address(0)
                             || mcall.target == address(creditManager)
                     ) revert TargetContractNotAllowedException(); // F:[FA-24]
+
+                    if (flags & EXTERNAL_CONTRACT_WAS_CALLED == 0) {
+                        flags |= EXTERNAL_CONTRACT_WAS_CALLED;
+                        _setCaForExterallCall(creditAccount);
+                    }
 
                     // Makes a call
                     bytes memory result = mcall.target.functionCall(mcall.callData); // F:[FA-29]
@@ -656,13 +659,25 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
             revert ForbiddenTokensException();
         }
 
+        if (flags & EXTERNAL_CONTRACT_WAS_CALLED != 0) {
+            _returnCaForExterallCall();
+        }
+
         // Emits event for multicall end - used in analytics to track actions within multicalls
+        // Emits event for multicall start - used in analytics to track actions within multicalls
         emit FinishMultiCall(); // F:[FA-27,27,29]
 
         fullCheckParams.enabledTokensMaskAfter = enabledTokensMask;
+    }
 
-        // Returns ownership back to the borrower
-        _transferAccount(address(this), borrower); // F:[FA-27,27,29]
+    function _setCaForExterallCall(address creditAccount) internal {
+        // Takes ownership of the Credit Account
+        creditManager.setCaForExternalCall(creditAccount); // F:[FA-26]
+    }
+
+    function _returnCaForExterallCall() internal {
+        // Takes ownership of the Credit Account
+        creditManager.setCaForExternalCall(address(1)); // F:[FA-26]
     }
 
     function _revertIfNoPermission(uint256 flags, uint256 permission) internal pure {
