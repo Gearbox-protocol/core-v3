@@ -597,8 +597,9 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
                     //
                     else if (method == ICreditFacadeMulticall.revokeAdapterAllowances.selector) {
                         _revertIfNoPermission(flags, REVOKE_ALLOWANCES_PERMISSION);
-                        RevocationPair[] memory revocations = abi.decode(callData, (RevocationPair[]));
-                        creditManager.revokeAdapterAllowances(creditAccount, revocations);
+                        (RevocationPair[] memory revocations, bool keepOne) =
+                            abi.decode(callData, (RevocationPair[], bool));
+                        creditManager.revokeAdapterAllowances(creditAccount, revocations, keepOne);
                     }
                     //
                     // UNKNOWN METHOD

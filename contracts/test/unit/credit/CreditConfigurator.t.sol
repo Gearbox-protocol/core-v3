@@ -252,7 +252,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV2Events, ICreditConfig
             expirable: false
         });
 
-        creditManager = new CreditManagerV3(address(cct.poolMock()));
+        creditManager = new CreditManagerV3(address(cct.poolMock()), address(withdrawManager));
         creditFacade = new CreditFacadeV3(
             address(creditManager),
             creditOpts.degenNFT,

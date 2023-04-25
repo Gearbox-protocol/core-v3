@@ -6,6 +6,7 @@ pragma solidity ^0.8.10;
 import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
 import {CreditConfigurator} from "../../credit/CreditConfigurator.sol";
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
+import {WithdrawManager} from "../../support/WithdrawManager.sol";
 
 import {CreditManagerFactoryBase} from "../../factories/CreditManagerFactoryBase.sol";
 
@@ -28,7 +29,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
     CreditFacadeV3 public creditFacade;
     CreditConfigurator public creditConfigurator;
     DegenNFT public degenNFT;
-    // BlacklistHelper public blacklistHelper;
+    WithdrawManager public withdrawManager;
 
     uint128 public minBorrowedAmount;
     uint128 public maxBorrowedAmount;
@@ -60,6 +61,8 @@ contract CreditFacadeTestSuite is PoolDeployer {
             creditConfig.getCreditOpts(),
             0
         );
+
+        withdrawManager = cmf.withdrawManager();
 
         creditManager = cmf.creditManager();
         creditFacade = cmf.creditFacade();

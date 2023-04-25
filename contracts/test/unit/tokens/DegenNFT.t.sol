@@ -140,7 +140,7 @@ contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
         evm.prank(CONFIGURATOR);
         degenNFT.addCreditFacade(address(accountFactory));
 
-        ICreditManagerV2 fakeCM = new CreditManagerV3(creditManager.pool());
+        ICreditManagerV2 fakeCM = new CreditManagerV3(creditManager.pool(), address(0));
         CreditFacadeV3 fakeCF = new CreditFacadeV3(
             address(fakeCM),
             DUMB_ADDRESS,

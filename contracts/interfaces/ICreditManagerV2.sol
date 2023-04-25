@@ -364,7 +364,8 @@ interface ICreditManagerV2 is ICreditManagerV2Events, IVersion {
 
     /// @notice Revokes allowances for specified spender/token pairs
     /// @param revocations Spender/token pairs to revoke allowances for
-    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external;
+    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations, bool keepOne)
+        external;
 
     function disableWithdrawalFlag(address creditAccount) external;
 

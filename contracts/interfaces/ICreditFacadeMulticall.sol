@@ -7,6 +7,26 @@ import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.so
 import {QuotaUpdate} from "./IPoolQuotaKeeper.sol";
 import {RevocationPair} from "./ICreditManagerV2.sol";
 
+uint256 constant ADD_COLLATERAL_PERMISSION = 1;
+uint256 constant INCREASE_DEBT_PERMISSION = 2 ** 1;
+uint256 constant DECREASE_DEBT_PERMISSION = 2 ** 2;
+uint256 constant ENABLE_TOKEN_PERMISSION = 2 ** 3;
+uint256 constant DISABLE_TOKEN_PERMISSION = 2 ** 4;
+uint256 constant WITHDRAW_PERMISSION = 2 ** 5;
+uint256 constant UPDATE_QUOTAS_PERMISSION = 2 ** 6;
+uint256 constant REVOKE_ALLOWANCES_PERMISSION = 2 ** 7;
+uint256 constant EXTERNAL_CALLS_PERMISSION = 2 ** 16;
+
+uint256 constant ALL_CREDIT_FACADE_CALLS_PERMISSION = ADD_COLLATERAL_PERMISSION | INCREASE_DEBT_PERMISSION
+    | DECREASE_DEBT_PERMISSION | ENABLE_TOKEN_PERMISSION | DISABLE_TOKEN_PERMISSION | WITHDRAW_PERMISSION
+    | UPDATE_QUOTAS_PERMISSION | REVOKE_ALLOWANCES_PERMISSION;
+
+uint256 constant ALL_PERMISSIONS = ALL_CREDIT_FACADE_CALLS_PERMISSION | EXTERNAL_CALLS_PERMISSION;
+
+// All flags start from 193rd bit, because bot permissions is uint192
+uint256 constant INCREASE_DEBT_WAS_CALLED = 2 ** 193;
+uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 2 ** 194;
+
 interface ICreditFacadeMulticall {
     /// @dev Instructs CreditFacadeV3 to check token balances at the end
     /// Used to control slippage after the entire sequence of operations, since tracking slippage
@@ -62,5 +82,5 @@ interface ICreditFacadeMulticall {
 
     function withdraw(address to, address token, uint256 amount) external;
 
-    function revokeAdapterAllowances(RevocationPair[] calldata revocations) external;
+    function revokeAdapterAllowances(RevocationPair[] calldata revocations, bool keepOne) external;
 }

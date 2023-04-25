@@ -202,7 +202,7 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
 
     /// @dev Constructor
     /// @param _pool Address of the pool to borrow funds from
-    constructor(address _pool) {
+    constructor(address _pool, address _withdrawManager) {
         IAddressProvider addressProvider = IPoolService(_pool).addressProvider();
 
         pool = _pool; // F:[CM-1]
@@ -224,6 +224,8 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
         slot1.priceOracle = IPriceOracleV2(addressProvider.getPriceOracle()); // F:[CM-1]
         _accountFactory = IAccountFactory(addressProvider.getAccountFactory()); // F:[CM-1]
         creditConfigurator = msg.sender; // F:[CM-1]
+
+        withdrawManager = IWithdrawManager(_withdrawManager);
 
         externalCallCA = address(1);
     }
@@ -1597,7 +1599,7 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
 
     /// @notice Revokes allowances for specified spender/token pairs
     /// @param revocations Spender/token pairs to revoke allowances for
-    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations)
+    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations, bool keepOne)
         external
         override
         creditFacadeOnly
@@ -1612,7 +1614,7 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
                     revert ZeroAddressException();
                 }
 
-                _approveSpender(token, spender, creditAccount, 1);
+                _approveSpender(token, spender, creditAccount, keepOne ? 1 : 0);
             }
         }
     }

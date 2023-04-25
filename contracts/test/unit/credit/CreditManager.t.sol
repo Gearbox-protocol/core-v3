@@ -18,6 +18,7 @@ import {
 
 import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IWETHGateway} from "../../../interfaces/IWETHGateway.sol";
+import {IWithdrawManager} from "../../../interfaces/IWithdrawManager.sol";
 
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 
@@ -74,6 +75,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
     PoolServiceMock poolMock;
     IPriceOracleV2 priceOracle;
     IWETHGateway wethGateway;
+    IWithdrawManager withdrawManager;
     ACL acl;
     address underlying;
 
@@ -100,6 +102,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         af = cms.af();
 
         poolMock = cms.poolMock();
+        withdrawManager = cms.withdrawManager();
 
         creditManager = cms.creditManager();
 
@@ -311,7 +314,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
     ///
     /// @dev [CM-1]: credit manager reverts if were called non-creditFacade
     function test_CM_01_constructor_sets_correct_values() public {
-        creditManager = new CreditManagerV3(address(poolMock));
+        creditManager = new CreditManagerV3(address(poolMock), address(withdrawManager));
 
         assertEq(address(creditManager.poolService()), address(poolMock), "Incorrect poolSerivice");
 
@@ -1578,7 +1581,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
     ) public {
         evm.startPrank(CONFIGURATOR);
 
-        CreditManagerV3 cm = new CreditManagerV3(address(poolMock));
+        CreditManagerV3 cm = new CreditManagerV3(address(poolMock), address(withdrawManager));
         cms.cr().addCreditManager(address(cm));
 
         cm.upgradeCreditFacade(address(this));
@@ -1626,7 +1629,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         evm.startPrank(CONFIGURATOR);
 
         // We use clean CreditManagerV3 to have only one underlying token for testing
-        creditManager = new CreditManagerV3(address(poolMock));
+        creditManager = new CreditManagerV3(address(poolMock), address(withdrawManager));
         cms.cr().addCreditManager(address(creditManager));
 
         creditManager.upgradeCreditFacade(address(this));
@@ -2064,7 +2067,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         evm.startPrank(CONFIGURATOR);
 
         // reset connected tokens
-        CreditManagerV3 cm = new CreditManagerV3(address(poolMock));
+        CreditManagerV3 cm = new CreditManagerV3(address(poolMock), address(0));
 
         cm.setLiquidationThreshold(underlying, 9200);
 
