@@ -6,6 +6,7 @@ pragma solidity ^0.8.10;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
+import {WithdrawManager} from "../../../support/WithdrawManager.sol";
 import {CreditConfigurator, CreditManagerOpts, CollateralToken} from "../../../credit/CreditConfigurator.sol";
 import {ICreditManagerV2, ICreditManagerV2Events} from "../../../interfaces/ICreditManagerV2.sol";
 import {ICreditConfiguratorEvents} from "../../../interfaces/ICreditConfigurator.sol";
@@ -50,6 +51,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV2Events, ICreditConfig
     CreditManagerV3 public creditManager;
     CreditFacadeV3 public creditFacade;
     CreditConfigurator public creditConfigurator;
+    WithdrawManager public withdrawManager;
     address underlying;
 
     AdapterMock adapter1;
@@ -73,6 +75,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV2Events, ICreditConfig
         creditManager = cct.creditManager();
         creditFacade = cct.creditFacade();
         creditConfigurator = cct.creditConfigurator();
+        withdrawManager = cct.withdrawManager();
 
         TARGET_CONTRACT = address(new TargetContractMock());
 
@@ -248,7 +251,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV2Events, ICreditConfig
             maxBorrowedAmount: uint128(150000 * WAD),
             collateralTokens: cTokens,
             degenNFT: address(0),
-            blacklistHelper: address(0),
+            withdrawManager: address(0),
             expirable: false
         });
 
@@ -1186,7 +1189,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV2Events, ICreditConfig
             maxBorrowedAmount: uint128(150000 * WAD),
             collateralTokens: cTokens,
             degenNFT: address(0),
-            blacklistHelper: address(0),
+            withdrawManager: address(0),
             expirable: false
         });
 

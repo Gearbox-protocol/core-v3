@@ -1163,7 +1163,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
             );
         } else {
             CreditManagerTestInternal cmi = new CreditManagerTestInternal(
-                creditManager.poolService()
+                creditManager.poolService(), address(withdrawManager)
             );
 
             {
@@ -2439,7 +2439,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         if (!isIncrease && (delta > interest)) delta %= uint128(interest);
 
         CreditManagerTestInternal cmi = new CreditManagerTestInternal(
-            creditManager.poolService()
+            creditManager.poolService(), address(withdrawManager)
         );
 
         if (isIncrease) {

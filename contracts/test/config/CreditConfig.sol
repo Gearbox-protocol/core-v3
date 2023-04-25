@@ -56,7 +56,7 @@ contract CreditConfig is DSTest, ICreditConfig {
             maxBorrowedAmount: maxBorrowedAmount,
             collateralTokens: getCollateralTokens(),
             degenNFT: address(0),
-            blacklistHelper: address(0),
+            withdrawManager: address(0),
             expirable: false
         });
     }

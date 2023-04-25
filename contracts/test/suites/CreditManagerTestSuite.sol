@@ -27,7 +27,6 @@ contract CreditManagerTestSuite is PoolDeployer {
     ITokenTestSuite public tokenTestSuite;
 
     CreditManagerV3 public creditManager;
-    WithdrawManager public withdrawManager;
 
     IWETH wethToken;
 
@@ -55,10 +54,8 @@ contract CreditManagerTestSuite is PoolDeployer {
 
         tokenTestSuite = creditConfig.tokenTestSuite();
 
-        withdrawManager = new WithdrawManager(address(poolMock.addressProvider()));
-
         creditManager = internalSuite
-            ? new CreditManagerTestInternal(address(poolMock))
+            ? new CreditManagerTestInternal(address(poolMock), address(withdrawManager))
             : new CreditManagerV3(address(poolMock), address(withdrawManager));
 
         creditFacade = msg.sender;

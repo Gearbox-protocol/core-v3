@@ -17,7 +17,7 @@ import {DegenNFT} from "@gearbox-protocol/core-v2/contracts/tokens/DegenNFT.sol"
 import "../lib/constants.sol";
 
 import {PoolDeployer} from "./PoolDeployer.sol";
-import {ICreditConfig} from "../interfaces/ICreditConfig.sol";
+import {ICreditConfig, CreditManagerOpts} from "../interfaces/ICreditConfig.sol";
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 
 /// @title CreditManagerTestSuite
@@ -29,7 +29,6 @@ contract CreditFacadeTestSuite is PoolDeployer {
     CreditFacadeV3 public creditFacade;
     CreditConfigurator public creditConfigurator;
     DegenNFT public degenNFT;
-    WithdrawManager public withdrawManager;
 
     uint128 public minBorrowedAmount;
     uint128 public maxBorrowedAmount;
@@ -56,13 +55,15 @@ contract CreditFacadeTestSuite is PoolDeployer {
 
         creditAccountAmount = creditConfig.getAccountAmount();
 
+        CreditManagerOpts memory cmOpts = creditConfig.getCreditOpts();
+
+        cmOpts.withdrawManager = address(withdrawManager);
+
         CreditManagerFactoryBase cmf = new CreditManagerFactoryBase(
             address(poolMock),
-            creditConfig.getCreditOpts(),
+            cmOpts,
             0
         );
-
-        withdrawManager = cmf.withdrawManager();
 
         creditManager = cmf.creditManager();
         creditFacade = cmf.creditFacade();

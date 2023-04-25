@@ -7,6 +7,7 @@ import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/Contra
 import {Pool4626} from "../pool/Pool4626.sol";
 import {CreditManagerV3} from "../credit/CreditManagerV3.sol";
 import {CreditFacadeV3} from "../credit/CreditFacadeV3.sol";
+
 import {CreditConfigurator, CreditManagerOpts} from "../credit/CreditConfigurator.sol";
 
 import {ContractUpgrader} from "@gearbox-protocol/core-v2/contracts/support/ContractUpgrader.sol";
@@ -32,7 +33,7 @@ contract CreditManagerFactoryBase is ContractUpgrader {
     {
         pool = Pool4626(_pool);
 
-        creditManager = new CreditManagerV3(_pool);
+        creditManager = new CreditManagerV3(_pool, opts.withdrawManager);
         creditFacade = new CreditFacadeV3(
             address(creditManager),
             opts.degenNFT,
