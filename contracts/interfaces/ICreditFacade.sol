@@ -154,7 +154,7 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     ///  - Performs a fullCollateralCheck to verify that hf > 1 after all actions
     /// @param borrower Borrower the perform the multicall for
     /// @param calls The array of MultiCall structs encoding the operations to execute.
-    function botMulticall(address borrower, MultiCall[] calldata calls) external payable;
+    function botMulticall(address borrower, MultiCall[] calldata calls) external;
 
     /// @dev Returns true if the borrower has an open Credit Account
     /// @param borrower Borrower address

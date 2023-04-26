@@ -25,6 +25,9 @@ struct CreditAccountInfo {
     uint8 flags;
     uint248 enabledTokensMask;
 }
+/// TODO: check in Remix
+/// uint256 borrowAmount;
+/// uint256 cumulativeIndexAtOpen;
 
 struct CollateralTokenData {
     address token;
