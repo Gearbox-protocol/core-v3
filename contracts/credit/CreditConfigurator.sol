@@ -35,7 +35,7 @@ import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
-import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
+import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 
 /// @title CreditConfigurator
 /// @notice This contract is used to configure CreditManagers and is the only one with the priviledge
@@ -655,7 +655,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         } // F:[CC-12A,29]
 
         // Checks that the contract has a creditManager() function, which returns a correct value
-        try CreditFacadeV3(_contract).creditManager() returns (ICreditManagerV2 cm) {
+        try CreditFacadeV3(_contract).creditManager() returns (ICreditManagerV3 cm) {
             if (cm != creditManager) revert IncompatibleContractException(); // F:[CC-12B,29]
         } catch {
             revert IncompatibleContractException(); // F:[CC-12B,29]

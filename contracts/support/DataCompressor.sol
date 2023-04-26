@@ -9,7 +9,7 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 
 import {IDataCompressor} from "@gearbox-protocol/core-v2/contracts/interfaces/IDataCompressor.sol";
 import {ICreditManager as ICreditManagerV1} from "@gearbox-protocol/core-v2/contracts/interfaces/V1/ICreditManager.sol";
-import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
+import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {ICreditFacade} from "../interfaces/ICreditFacade.sol";
 import {ICreditFilter} from "@gearbox-protocol/core-v2/contracts/interfaces/V1/ICreditFilter.sol";
 import {ICreditConfigurator} from "../interfaces/ICreditConfigurator.sol";
@@ -117,7 +117,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
             uint8 ver,
             ICreditManagerV1 creditManager,
             ICreditFilter creditFilter,
-            ICreditManagerV2 creditManagerV2,
+            ICreditManagerV3 creditManagerV2,
             ICreditFacade creditFacade,
         ) = getCreditContracts(_creditManager);
 
@@ -220,7 +220,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
             uint8 ver,
             ICreditManagerV1 creditManager,
             ICreditFilter creditFilter,
-            ICreditManagerV2 creditManagerV2,
+            ICreditManagerV3 creditManagerV2,
             ICreditFacade creditFacade,
             ICreditConfigurator creditConfigurator
         ) = getCreditContracts(_creditManager);
@@ -380,7 +380,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
         registeredCreditManagerOnly(_creditManager)
         returns (address adapter)
     {
-        (uint8 ver,, ICreditFilter creditFilter, ICreditManagerV2 creditManagerV2,,) =
+        (uint8 ver,, ICreditFilter creditFilter, ICreditManagerV3 creditManagerV2,,) =
             getCreditContracts(_creditManager);
 
         adapter = (ver == 1)
@@ -390,7 +390,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
 
     /// @dev Internal implementation for hasOpenedCreditAccount
     function _hasOpenedCreditAccount(address creditManager, address borrower) internal view returns (bool) {
-        return ICreditManagerV2(creditManager).creditAccounts(borrower) != address(0);
+        return ICreditManagerV3(creditManager).creditAccounts(borrower) != address(0);
     }
 
     /// @dev Retrieves all relevant credit contracts for a particular Credit Manager
@@ -402,7 +402,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
             uint8 ver,
             ICreditManagerV1 creditManager,
             ICreditFilter creditFilter,
-            ICreditManagerV2 creditManagerV2,
+            ICreditManagerV3 creditManagerV2,
             ICreditFacade creditFacade,
             ICreditConfigurator creditConfigurator
         )
@@ -412,7 +412,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
             creditManager = ICreditManagerV1(_creditManager);
             creditFilter = ICreditFilter(creditManager.creditFilter());
         } else {
-            creditManagerV2 = ICreditManagerV2(_creditManager);
+            creditManagerV2 = ICreditManagerV3(_creditManager);
             creditFacade = ICreditFacade(creditManagerV2.creditFacade());
             creditConfigurator = ICreditConfigurator(creditManagerV2.creditConfigurator());
         }

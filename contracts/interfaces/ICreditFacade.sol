@@ -4,10 +4,10 @@
 pragma solidity ^0.8.10;
 
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
-import {ICreditManagerV2} from "./ICreditManagerV2.sol";
+import {ICreditManagerV3} from "./ICreditManagerV3.sol";
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
-import {ClosureAction} from "../interfaces/ICreditManagerV2.sol";
+import {ClosureAction} from "../interfaces/ICreditManagerV3.sol";
 import "./ICreditFacadeMulticall.sol";
 
 struct FullCheckParams {
@@ -206,7 +206,7 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     function forbiddenTokenMask() external view returns (uint256);
 
     /// @dev Returns the CreditManagerV3 connected to this Credit Facade
-    function creditManager() external view returns (ICreditManagerV2);
+    function creditManager() external view returns (ICreditManagerV3);
 
     /// @dev Returns true if 'from' is allowed to transfer Credit Accounts to 'to'
     /// @param from Sender address to check allowance for

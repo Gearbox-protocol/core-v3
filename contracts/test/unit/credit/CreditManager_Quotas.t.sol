@@ -9,12 +9,12 @@ import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
 import {
-    ICreditManagerV2,
-    ICreditManagerV2Events,
+    ICreditManagerV3,
+    ICreditManagerV3Events,
     ClosureAction,
     CollateralTokenData,
     ManageDebtAction
-} from "../../../interfaces/ICreditManagerV2.sol";
+} from "../../../interfaces/ICreditManagerV3.sol";
 import {IPoolQuotaKeeper, QuotaUpdate, TokenLT, AccountQuota} from "../../../interfaces/IPoolQuotaKeeper.sol";
 import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 
@@ -52,7 +52,7 @@ import "../../../interfaces/IExceptions.sol";
 
 import "forge-std/console.sol";
 
-contract CreditManagerQuotasTest is DSTest, ICreditManagerV2Events, BalanceHelper {
+contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     CheatCodes evm = CheatCodes(HEVM_ADDRESS);
 
     CreditManagerTestSuite cms;

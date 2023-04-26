@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
-import {ICreditManagerV2} from "./ICreditManagerV2.sol";
+import {ICreditManagerV3} from "./ICreditManagerV3.sol";
 
 enum AdapterType {
     ABSTRACT,
@@ -33,7 +33,7 @@ enum AdapterType {
 /// @title Adapter interface
 interface IAdapter {
     /// @notice Credit Manager the adapter is connected to
-    function creditManager() external view returns (ICreditManagerV2);
+    function creditManager() external view returns (ICreditManagerV3);
 
     /// @notice Address of the contract the adapter is interacting with
     function targetContract() external view returns (address);

@@ -9,7 +9,7 @@ pragma solidity ^0.8.17;
 
 // import {UniversalAdapter, RevocationPair} from "../../../adapters/UniversalAdapter.sol";
 // import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
-// import {ICreditManagerV2} from "../../../interfaces/ICreditManagerV2.sol";
+// import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 // import "../../../interfaces/IExceptions.sol";
 
 // // CONSTANTS
@@ -160,11 +160,11 @@ pragma solidity ^0.8.17;
 
 //         evm.expectCall(
 //             address(creditManager),
-//             abi.encodeCall(ICreditManagerV2.approveCreditAccount, (address(targetMock1), usdc, 1))
+//             abi.encodeCall(ICreditManagerV3.approveCreditAccount, (address(targetMock1), usdc, 1))
 //         );
 //         evm.expectCall(
 //             address(creditManager),
-//             abi.encodeCall(ICreditManagerV2.approveCreditAccount, (address(targetMock2), dai, 1))
+//             abi.encodeCall(ICreditManagerV3.approveCreditAccount, (address(targetMock2), dai, 1))
 //         );
 
 //         evm.prank(USER);

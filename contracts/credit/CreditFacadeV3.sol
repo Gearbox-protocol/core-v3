@@ -5,10 +5,10 @@ pragma solidity ^0.8.10;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
-// TRAITS
+// LIBS & TRAITS
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {BalanceHelperTrait} from "../traits/BalanceHelperTrait.sol";
-import {UNDERLYING_TOKEN_MASK} from "../librarires/BitMask.sol";
+import {UNDERLYING_TOKEN_MASK, BitMask} from "../libraries/BitMask.sol";
 
 //  DATA
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
@@ -17,7 +17,7 @@ import {QuotaUpdate} from "../interfaces/IPoolQuotaKeeper.sol";
 
 /// INTERFACES
 import "../interfaces/ICreditFacade.sol";
-import {ICreditManagerV2, ClosureAction, ManageDebtAction} from "../interfaces/ICreditManagerV2.sol";
+import {ICreditManagerV3, ClosureAction, ManageDebtAction} from "../interfaces/ICreditManagerV3.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 
 import {IPool4626} from "../interfaces/IPool4626.sol";
@@ -26,7 +26,7 @@ import {IDegenNFT} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNF
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
 import {IBotList} from "../interfaces/IBotList.sol";
-import {RevocationPair} from "../interfaces/ICreditManagerV2.sol";
+import {RevocationPair} from "../interfaces/ICreditManagerV3.sol";
 import {CancellationType} from "../interfaces/IWithdrawManager.sol";
 
 // CONSTANTS
@@ -75,9 +75,10 @@ struct CumulativeLossParams {
 /// - Through adapters, which call the Credit Manager directly, but only allow interactions with specific target contracts
 contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTrait {
     using Address for address;
+    using BitMask for uint256;
 
     /// @dev Credit Manager connected to this Credit Facade
-    ICreditManagerV2 public immutable creditManager;
+    ICreditManagerV3 public immutable creditManager;
 
     /// @dev Whether the whitelisted mode is active
     bool public immutable whitelisted;
@@ -160,15 +161,15 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
     /// @param _degenNFT address of the DegenNFT or address(0) if whitelisted mode is not used
     /// @param _expirable Whether the CreditFacadeV3 can expire and implements expiration-related logic
     constructor(address _creditManager, address _degenNFT, bool _expirable)
-        ACLNonReentrantTrait(address(IPool4626(ICreditManagerV2(_creditManager).pool()).addressProvider()))
+        ACLNonReentrantTrait(address(IPool4626(ICreditManagerV3(_creditManager).pool()).addressProvider()))
         nonZeroAddress(_creditManager)
     {
-        creditManager = ICreditManagerV2(_creditManager); // F:[FA-1A]
+        creditManager = ICreditManagerV3(_creditManager); // F:[FA-1A]
         pool = creditManager.pool();
-        underlying = ICreditManagerV2(_creditManager).underlying(); // F:[FA-1A]
+        underlying = ICreditManagerV3(_creditManager).underlying(); // F:[FA-1A]
 
-        wethAddress = ICreditManagerV2(_creditManager).wethAddress(); // F:[FA-1A]
-        wethGateway = IWETHGateway(ICreditManagerV2(_creditManager).wethGateway());
+        wethAddress = ICreditManagerV3(_creditManager).wethAddress(); // F:[FA-1A]
+        wethGateway = IWETHGateway(ICreditManagerV3(_creditManager).wethGateway());
 
         degenNFT = _degenNFT; // F:[FA-1A]
         whitelisted = _degenNFT != address(0); // F:[FA-1A]
@@ -596,9 +597,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
                     //
                     else if (method == ICreditFacadeMulticall.revokeAdapterAllowances.selector) {
                         _revertIfNoPermission(flags, REVOKE_ALLOWANCES_PERMISSION);
-                        (RevocationPair[] memory revocations, bool keepOne) =
-                            abi.decode(callData, (RevocationPair[], bool));
-                        creditManager.revokeAdapterAllowances(creditAccount, revocations, keepOne);
+                        (RevocationPair[] memory revocations) = abi.decode(callData, (RevocationPair[]));
+                        creditManager.revokeAdapterAllowances(creditAccount, revocations);
                     }
                     //
                     // UNKNOWN METHOD
@@ -972,14 +972,14 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
         uint256 forbiddenTokensOnAccount = enabledTokenMaskBefore & forbiddenTokenMask;
 
         if (forbiddenTokensOnAccount != 0) {
-            forbiddenBalances = new uint256[](_calcEnabledTokens(enabledTokenMaskBefore));
+            forbiddenBalances = new uint256[](enabledTokenMaskBefore.calcEnabledTokens());
             uint256 tokenMask;
             uint256 j;
             for (uint256 i; tokenMask < forbiddenTokensOnAccount; ++i) {
                 tokenMask = 1 << i; // F: [CM-68]
 
                 if (forbiddenTokensOnAccount & tokenMask != 0) {
-                    address token = cachedTokenMasks[tokenMask];
+                    address token = _getTokenByMask(tokenMask);
                     forbiddenBalances[j] = _balanceOf(token, creditAccount);
                     ++j;
                 }
@@ -1009,31 +1009,13 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
                     ++j;
 
                     if (forbiddenTokensOnAccount & tokenMask != 0) {
-                        address token = cachedTokenMasks[tokenMask];
+                        address token = _getTokenByMask(tokenMask);
                         uint256 balance = _balanceOf(token, creditAccount);
                         if (balance > forbiddenBalances[i]) {
                             revert ForbiddenTokensException();
                         }
                     }
                 }
-            }
-        }
-    }
-
-    /// @dev Calculates the number of enabled tokens, based on the
-    ///      provided token mask
-    /// @param enabledTokenMask Bit mask encoding a set of enabled tokens
-    function _calcEnabledTokens(uint256 enabledTokenMask) internal pure returns (uint256 totalTokensEnabled) {
-        // Bit mask is a number encoding enabled tokens as 1's;
-        // Therefore, to count the number of enabled tokens, we simply
-        // need to keep shifting the mask by one bit and checking if the rightmost bit is 1,
-        // until the whole mask is 0;
-        // Since bit shifting is overflow-safe and the loop has at most 256 steps,
-        // the whole function can be marked as unsafe to optimize gas
-        unchecked {
-            while (enabledTokenMask > 0) {
-                totalTokensEnabled += enabledTokenMask & 1;
-                enabledTokenMask >>= 1;
             }
         }
     }
@@ -1132,6 +1114,10 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
         return creditManager.calcTotalValue(creditAccount);
     }
 
+    function _getTokenByMask(uint256 mask) internal view returns (address) {
+        return creditManager.getTokenByMask(mask);
+    }
+
     function _enabledTokenMask(address creditAccount) internal view returns (uint256) {
         return creditManager.enabledTokensMap(creditAccount);
     }
@@ -1221,7 +1207,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
     /// @dev Adds forbidden token
     function forbidToken(address token) external creditConfiguratorOnly {
         uint256 tokenMask = _getTokenMaskOrRevert(token);
-        cachedTokenMasks[tokenMask] = token;
+        // cachedTokenMasks[tokenMask] = token;
         forbiddenTokenMask |= tokenMask;
     }
 
@@ -1229,7 +1215,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
         uint256 tokenMask = _getTokenMaskOrRevert(token);
 
         if (forbiddenTokenMask & tokenMask != 0) {
-            cachedTokenMasks[tokenMask] = token;
+            // cachedTokenMasks[tokenMask] = token;
             forbiddenTokenMask ^= tokenMask;
         }
     }

@@ -16,10 +16,6 @@ contract AdapterMock is AbstractAdapter {
     /// @param _targetContract Target contract address
     constructor(address _creditManager, address _targetContract) AbstractAdapter(_creditManager, _targetContract) {}
 
-    function creditFacade() external view returns (address) {
-        return _creditFacade();
-    }
-
     function creditAccount() external view returns (address) {
         return _creditAccount();
     }

@@ -6,7 +6,7 @@ pragma solidity ^0.8.10;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
+import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 
 import {IWithdrawManager, CancellationType} from "../interfaces/IWithdrawManager.sol";
 
@@ -128,7 +128,7 @@ contract WithdrawManager is IWithdrawManager, ACLNonReentrantTrait {
         slot = isFreeSlot1 ? 0 : 1;
 
         if (clearFlag && isFreeSlot1 && isFreeSlot2) {
-            ICreditManagerV2(creditManager).disableWithdrawalFlag(creditAccount);
+            ICreditManagerV3(creditManager).disableWithdrawalFlag(creditAccount);
         }
     }
 
@@ -152,7 +152,7 @@ contract WithdrawManager is IWithdrawManager, ACLNonReentrantTrait {
         internal
         returns (address token)
     {
-        (token,) = ICreditManagerV2(creditManager).collateralTokensByMask(1 << req.tokenIndex);
+        (token,) = ICreditManagerV3(creditManager).collateralTokensByMask(1 << req.tokenIndex);
         IERC20(token).safeTransfer(to, req.amount);
         req.availableAt = 1;
         req.amount = 1;

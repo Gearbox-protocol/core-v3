@@ -23,7 +23,7 @@ import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
 import {IInterestRateModel} from "../interfaces/IInterestRateModel.sol";
 import {IPool4626, Pool4626Opts} from "../interfaces/IPool4626.sol";
-import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
+import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
 
 import {RAY, SECONDS_PER_YEAR, MAX_WITHDRAW_FEE} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
@@ -623,7 +623,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
         /// Checks if creditManager is already in list
         if (!creditManagerSet.contains(_creditManager)) {
             /// Reverts if c redit manager has different underlying asset
-            if (address(this) != ICreditManagerV2(_creditManager).pool()) {
+            if (address(this) != ICreditManagerV3(_creditManager).pool()) {
                 revert IncompatibleCreditManagerException(); // F:[P4-20]
             }
 

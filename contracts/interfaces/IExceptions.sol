@@ -103,7 +103,7 @@ error ContractIsNotAnAllowedAdapterException();
 /// @dev Thrown when attempting to limit a token that is not quotable in PoolQuotaKeeper
 error TokenIsNotQuotedException();
 
-// interface ICreditFacadeExceptions is ICreditManagerV2Exceptions {
+// interface ICreditFacadeExceptions is ICreditManagerV3Exceptions {
 /// @dev Thrown if the CreditFacadeV3 is not expirable, and an aciton is attempted that
 ///      requires expirability
 error NotAllowedWhenNotExpirableException();

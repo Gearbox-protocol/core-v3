@@ -8,7 +8,7 @@ import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 
-import {ICreditManagerV2, ICreditManagerV2Events} from "../../../interfaces/ICreditManagerV2.sol";
+import {ICreditManagerV3, ICreditManagerV3Events} from "../../../interfaces/ICreditManagerV3.sol";
 
 import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
 import {IDegenNFT, IDegenNFTExceptions} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
@@ -140,7 +140,7 @@ contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
         evm.prank(CONFIGURATOR);
         degenNFT.addCreditFacade(address(accountFactory));
 
-        ICreditManagerV2 fakeCM = new CreditManagerV3(creditManager.pool(), address(0));
+        ICreditManagerV3 fakeCM = new CreditManagerV3(creditManager.pool(), address(0));
         CreditFacadeV3 fakeCF = new CreditFacadeV3(
             address(fakeCM),
             DUMB_ADDRESS,

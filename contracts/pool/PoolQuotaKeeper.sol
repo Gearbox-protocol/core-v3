@@ -20,7 +20,7 @@ import {
     IPoolQuotaKeeper, QuotaUpdate, TokenLT, TokenQuotaParams, AccountQuota
 } from "../interfaces/IPoolQuotaKeeper.sol";
 import {IGauge} from "../interfaces/IGauge.sol";
-import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
+import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 
 import {RAY, SECONDS_PER_YEAR, MAX_WITHDRAW_FEE} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
@@ -197,7 +197,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
     }
 
     function getTokenMask(address creditManager, address token) internal view returns (uint256 mask) {
-        mask = ICreditManagerV2(creditManager).getTokenMaskOrRevert(token);
+        mask = ICreditManagerV3(creditManager).getTokenMaskOrRevert(token);
     }
 
     /// @dev Updates all accountQuotas to zero when closing a credit account, and computes the final quota interest change
@@ -495,7 +495,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         nonZeroAddress(_creditManager)
         registeredCreditManagerOnly(_creditManager) // F:[PQK-9]
     {
-        if (ICreditManagerV2(_creditManager).pool() != address(pool)) {
+        if (ICreditManagerV3(_creditManager).pool() != address(pool)) {
             revert IncompatibleCreditManagerException(); // F:[PQK-9]
         }
 

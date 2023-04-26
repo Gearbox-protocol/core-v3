@@ -5,7 +5,7 @@ pragma solidity ^0.8.10;
 
 import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 import {QuotaUpdate} from "./IPoolQuotaKeeper.sol";
-import {RevocationPair} from "./ICreditManagerV2.sol";
+import {RevocationPair} from "./ICreditManagerV3.sol";
 
 uint256 constant ADD_COLLATERAL_PERMISSION = 1;
 uint256 constant INCREASE_DEBT_PERMISSION = 2 ** 1;

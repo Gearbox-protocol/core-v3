@@ -42,18 +42,18 @@ struct RevocationPair {
     address token;
 }
 
-interface ICreditManagerV2Events {
+interface ICreditManagerV3Events {
     /// @dev Emits when a call to an external contract is made through the Credit Manager
-    event ExecuteOrder(address indexed target);
+    event ExecuteOrder(address indexed targetContract);
 
     /// @dev Emits when a configurator is upgraded
-    event SetConfigurator(address indexed SetConfigurator);
+    event SetConfigurator(address indexed newConfigurator);
 }
 
 /// @notice All Credit Manager functions are access-restricted and can only be called
 ///         by the Credit Facade or allowed adapters. Users are not allowed to
 ///         interact with the Credit Manager directly
-interface ICreditManagerV2 is ICreditManagerV2Events, IVersion {
+interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     //
     // CREDIT ACCOUNT MANAGEMENT
     //
@@ -139,16 +139,14 @@ interface ICreditManagerV2 is ICreditManagerV2Events, IVersion {
     function transferAccountOwnership(address from, address to) external;
 
     /// @dev Requests the Credit Account to approve a collateral token to another contract.\
-    /// @param targetContract Spender to change allowance for
     /// @param token Collateral token to approve
     /// @param amount New allowance amount
-    function approveCreditAccount(address targetContract, address token, uint256 amount) external;
+    function approveCreditAccount(address token, uint256 amount) external;
 
     /// @dev Requests a Credit Account to make a low-level call with provided data
     /// This is the intended pathway for state-changing interactions with 3rd-party protocols
-    /// @param targetContract Contract to be called
-    /// @param data Data to pass with the call
-    function executeOrder(address targetContract, bytes memory data) external returns (bytes memory);
+    /// @param callData Data to pass with the call
+    function executeOrder(bytes memory callData) external returns (bytes memory);
 
     //
     // COLLATERAL VALIDITY AND ACCOUNT HEALTH CHECKS
@@ -367,10 +365,13 @@ interface ICreditManagerV2 is ICreditManagerV2Events, IVersion {
 
     /// @notice Revokes allowances for specified spender/token pairs
     /// @param revocations Spender/token pairs to revoke allowances for
-    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations, bool keepOne)
-        external;
+    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external;
 
     function disableWithdrawalFlag(address creditAccount) external;
 
     function setCaForExternalCall(address creditAccount) external;
+
+    function externalCallCreditAccountOrRevert() external view returns (address creditAccount);
+
+    function getTokenByMask(uint256 tokenMask) external view returns (address token);
 }

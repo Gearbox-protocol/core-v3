@@ -9,12 +9,12 @@ import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
 import {
-    ICreditManagerV2,
-    ICreditManagerV2Events,
+    ICreditManagerV3,
+    ICreditManagerV3Events,
     ClosureAction,
     CollateralTokenData,
     ManageDebtAction
-} from "../../../interfaces/ICreditManagerV2.sol";
+} from "../../../interfaces/ICreditManagerV3.sol";
 
 import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IWETHGateway} from "../../../interfaces/IWETHGateway.sol";
@@ -62,7 +62,7 @@ import "forge-std/console.sol";
 
 /// @title AddressRepository
 /// @notice Stores addresses of deployed contracts
-contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
+contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     CheatCodes evm = CheatCodes(HEVM_ADDRESS);
 
     CreditManagerTestSuite cms;
@@ -390,10 +390,10 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         evm.startPrank(USER);
 
         evm.expectRevert(CallerNotAdapterException.selector);
-        creditManager.approveCreditAccount(DUMB_ADDRESS, DUMB_ADDRESS, 100);
+        creditManager.approveCreditAccount(DUMB_ADDRESS, 100);
 
         evm.expectRevert(CallerNotAdapterException.selector);
-        creditManager.executeOrder(DUMB_ADDRESS, bytes("0"));
+        creditManager.executeOrder(bytes("0"));
 
         evm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.fullCollateralCheck(DUMB_ADDRESS, 0, new uint256[](0), 10000);
@@ -523,12 +523,12 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
 
         evm.prank(ADAPTER);
         evm.expectRevert(ExternalCallCreditAccountNotSetException.selector);
-        creditManager.approveCreditAccount(DUMB_ADDRESS, token, 100);
+        creditManager.approveCreditAccount(token, 100);
 
         // / TODO: decide about test
         evm.prank(ADAPTER);
         evm.expectRevert(ExternalCallCreditAccountNotSetException.selector);
-        creditManager.executeOrder(DUMB_ADDRESS, bytes("dd"));
+        creditManager.executeOrder(bytes("dd"));
     }
 
     ///
@@ -1259,12 +1259,12 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         evm.expectRevert(CallerNotAdapterException.selector);
 
         evm.prank(DUMB_ADDRESS);
-        creditManager.approveCreditAccount(DUMB_ADDRESS, DUMB_ADDRESS, 100);
+        creditManager.approveCreditAccount(DUMB_ADDRESS, 100);
 
         // Address 0 case
         evm.expectRevert(CallerNotAdapterException.selector);
         evm.prank(DUMB_ADDRESS);
-        creditManager.approveCreditAccount(address(0), DUMB_ADDRESS, 100);
+        creditManager.approveCreditAccount(DUMB_ADDRESS, 100);
     }
 
     /// @dev [CM-25A]: approveCreditAccount reverts if the token is not added
@@ -1278,7 +1278,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         evm.expectRevert(TokenNotAllowedException.selector);
 
         evm.prank(ADAPTER);
-        creditManager.approveCreditAccount(DUMB_ADDRESS, DUMB_ADDRESS, 100);
+        creditManager.approveCreditAccount(DUMB_ADDRESS, 100);
     }
 
     /// @dev [CM-26]: approveCreditAccount approves with desired allowance
@@ -1295,7 +1295,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         address dai = tokenTestSuite.addressOf(Tokens.DAI);
 
         evm.prank(ADAPTER);
-        creditManager.approveCreditAccount(DUMB_ADDRESS, dai, DAI_EXCHANGE_AMOUNT);
+        creditManager.approveCreditAccount(dai, DAI_EXCHANGE_AMOUNT);
 
         expectAllowance(Tokens.DAI, creditAccount, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
     }
@@ -1314,10 +1314,10 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         creditManager.addToken(approveRevertToken);
 
         evm.prank(ADAPTER);
-        creditManager.approveCreditAccount(DUMB_ADDRESS, approveRevertToken, DAI_EXCHANGE_AMOUNT);
+        creditManager.approveCreditAccount(approveRevertToken, DAI_EXCHANGE_AMOUNT);
 
         evm.prank(ADAPTER);
-        creditManager.approveCreditAccount(DUMB_ADDRESS, approveRevertToken, 2 * DAI_EXCHANGE_AMOUNT);
+        creditManager.approveCreditAccount(approveRevertToken, 2 * DAI_EXCHANGE_AMOUNT);
 
         expectAllowance(approveRevertToken, creditAccount, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
     }
@@ -1336,10 +1336,10 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         creditManager.changeContractAllowance(ADAPTER, DUMB_ADDRESS);
 
         evm.prank(ADAPTER);
-        creditManager.approveCreditAccount(DUMB_ADDRESS, approveFalseToken, DAI_EXCHANGE_AMOUNT);
+        creditManager.approveCreditAccount(approveFalseToken, DAI_EXCHANGE_AMOUNT);
 
         evm.prank(ADAPTER);
-        creditManager.approveCreditAccount(DUMB_ADDRESS, approveFalseToken, 2 * DAI_EXCHANGE_AMOUNT);
+        creditManager.approveCreditAccount(approveFalseToken, 2 * DAI_EXCHANGE_AMOUNT);
 
         expectAllowance(approveFalseToken, creditAccount, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
     }
@@ -1359,7 +1359,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         evm.expectRevert(TargetContractNotAllowedException.selector);
 
         evm.prank(ADAPTER);
-        creditManager.executeOrder(DUMB_ADDRESS, bytes("Hello, world!"));
+        creditManager.executeOrder(bytes("Hello, world!"));
     }
 
     /// @dev [CM-29]: executeOrder calls credit account method and emit event
@@ -1383,7 +1383,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV2Events, BalanceHelper {
         evm.expectCall(address(targetMock), callData);
 
         evm.prank(ADAPTER);
-        creditManager.executeOrder(address(targetMock), callData);
+        creditManager.executeOrder(callData);
 
         assertEq0(targetMock.callData(), callData, "Incorrect calldata");
     }

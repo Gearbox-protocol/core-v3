@@ -23,14 +23,14 @@ import {IPool4626} from "../interfaces/IPool4626.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
 import {IWithdrawManager, CancellationType} from "../interfaces/IWithdrawManager.sol";
 import {
-    ICreditManagerV2,
+    ICreditManagerV3,
     ClosureAction,
     CollateralTokenData,
     ManageDebtAction,
     CreditAccountInfo,
     RevocationPair,
     WITHDRAWAL_FLAG
-} from "../interfaces/ICreditManagerV2.sol";
+} from "../interfaces/ICreditManagerV3.sol";
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IPoolQuotaKeeper, QuotaUpdate, TokenLT} from "../interfaces/IPoolQuotaKeeper.sol";
@@ -79,7 +79,7 @@ struct Slot1 {
 /// @notice Encapsulates the business logic for managing Credit Accounts
 ///
 /// More info: https://dev.gearbox.fi/developers/credit/credit_manager
-contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard, BalanceHelperTrait {
+contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard, BalanceHelperTrait {
     using SafeERC20 for IERC20;
     using Address for address payable;
     using BitMask for uint256;
@@ -170,14 +170,6 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
     //
     // MODIFIERS
     //
-
-    /// @dev Restricts calls to Credit Facade or allowed adapters
-    modifier adaptersOnly() {
-        if (adapterToContract[msg.sender] == address(0)) {
-            revert CallerNotAdapterException();
-        } //
-        _;
-    }
 
     /// @dev Restricts calls to Credit Facade only
     modifier creditFacadeOnly() {
@@ -617,24 +609,10 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
     }
 
     /// @dev Requests the Credit Account to approve a collateral token to another contract.
-
-    /// @param targetContract Spender to change allowance for
     /// @param token Collateral token to approve
     /// @param amount New allowance amount
-    function approveCreditAccount(address targetContract, address token, uint256 amount)
-        external
-        override
-        adaptersOnly
-        nonReentrant
-    {
-        // This function can only be called by connected adapters (must be a correct adapter/contract pair),
-        // Credit Facade or Universal Adapter
-        if (
-            (adapterToContract[msg.sender] != targetContract && msg.sender != creditFacade)
-                || targetContract == address(0)
-        ) {
-            revert CallerNotAdapterException(); // F:[CM-3,25]
-        }
+    function approveCreditAccount(address token, uint256 amount) external override nonReentrant {
+        address targetContract = _getTargetContractOrRevert();
 
         _approveSpender(token, targetContract, externalCallCreditAccountOrRevert(), amount);
     }
@@ -679,22 +657,9 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
 
     /// @dev Requests a Credit Account to make a low-level call with provided data
     /// This is the intended pathway for state-changing interactions with 3rd-party protocols
-    /// @param targetContract Contract to be called
     /// @param data Data to pass with the call
-    function executeOrder(address targetContract, bytes memory data)
-        external
-        override
-        adaptersOnly
-        nonReentrant
-        returns (bytes memory)
-    {
-        // Checks that msg.sender is the adapter associated with the passed
-        // target contract.
-        if (adapterToContract[msg.sender] != targetContract || targetContract == address(0)) {
-            revert TargetContractNotAllowedException();
-            // F:[CM-28]
-        }
-
+    function executeOrder(bytes memory data) external override nonReentrant returns (bytes memory) {
+        address targetContract = _getTargetContractOrRevert();
         // Emits an event
         emit ExecuteOrder(targetContract); // F:[CM-29]
 
@@ -702,6 +667,17 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
         // It is expected that is is parsed and returned as a correct type
         // by the adapter itself.
         return ICreditAccount(externalCallCreditAccountOrRevert()).execute(targetContract, data); // F:[CM-29]
+    }
+
+    function _getTargetContractOrRevert() internal view returns (address targetContract) {
+        targetContract = adapterToContract[msg.sender];
+
+        // Checks that msg.sender is the adapter associated with the passed
+        // target contract.
+        if (targetContract == address(0)) {
+            revert TargetContractNotAllowedException();
+            // F:[CM-28]
+        }
     }
 
     //
@@ -944,9 +920,7 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
         tokensToEnable = _tokensToEnbable;
 
         if (balance > 1) {
-            CollateralTokenData memory tokenData = collateralTokensData[tokenMask]; // F:[CM-47]
-
-            address token = tokenData.token;
+            address token = getTokenByMask(tokenMask);
             amount += _convertToUSD(_priceOracle, balance, token);
             tokensToEnable |= tokenMask;
         }
@@ -1227,6 +1201,18 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
                 );
             } else {
                 liquidationThreshold = tokenData.ltFinal;
+            }
+        }
+    }
+
+    function getTokenByMask(uint256 tokenMask) public view override returns (address token) {
+        if (tokenMask == 1) {
+            token = underlying; // F:[CM-47]
+        } else {
+            CollateralTokenData memory tokenData = collateralTokensData[tokenMask]; // F:[CM-47]
+            token = tokenData.token;
+            if (token == address(0)) {
+                revert TokenNotAllowedException();
             }
         }
     }
@@ -1624,7 +1610,7 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
 
     /// @notice Revokes allowances for specified spender/token pairs
     /// @param revocations Spender/token pairs to revoke allowances for
-    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations, bool keepOne)
+    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations)
         external
         override
         creditFacadeOnly
@@ -1638,8 +1624,8 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
                 if (spender == address(0) || token == address(0)) {
                     revert ZeroAddressException();
                 }
-
-                _approveSpender(token, spender, creditAccount, keepOne ? 1 : 0);
+                uint256 allowance = IERC20(token).allowance(creditAccount, spender);
+                if (allowance > 1) _approveSpender(token, spender, creditAccount, 0);
             }
         }
     }
@@ -1649,7 +1635,7 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
         externalCallCA = creditAccount;
     }
 
-    function externalCallCreditAccountOrRevert() public view returns (address creditAccount) {
+    function externalCallCreditAccountOrRevert() public view override returns (address creditAccount) {
         creditAccount = externalCallCA;
         if (creditAccount == address(1)) revert ExternalCallCreditAccountNotSetException();
     }

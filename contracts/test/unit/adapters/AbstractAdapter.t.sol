@@ -11,7 +11,7 @@ import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
 import {ICreditFacade, MultiCall} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditFacade.sol";
-import {ICreditManagerV2, ICreditManagerV2Events} from "../../../interfaces/ICreditManagerV2.sol";
+import {ICreditManagerV3, ICreditManagerV3Events} from "../../../interfaces/ICreditManagerV3.sol";
 import {ICreditFacadeEvents} from "../../../interfaces/ICreditFacade.sol";
 import {IPool4626} from "../../../interfaces/IPool4626.sol";
 
@@ -44,7 +44,7 @@ contract AbstractAdapterTest is
     DSTest,
     BalanceHelper,
     CreditFacadeTestHelper,
-    ICreditManagerV2Events,
+    ICreditManagerV3Events,
     ICreditFacadeEvents
 {
     AccountFactory accountFactory;
@@ -115,12 +115,6 @@ contract AbstractAdapterTest is
 
         evm.expectRevert(ZeroAddressException.selector);
         new AdapterMock(address(creditManager), address(0));
-    }
-
-    /// @dev [AA-3]: AbstractAdapter uses correct credit facade
-    function test_AA_03_adapter_uses_correct_credit_facade() public {
-        address facade = adapterMock.creditFacade();
-        assertEq(facade, address(creditFacade));
     }
 
     /// @dev [AA-4]: AbstractAdapter uses correct credit account
@@ -214,10 +208,7 @@ contract AbstractAdapterTest is
     function test_AA_08_approveToken_correctly_passes_to_credit_manager() public {
         _openTestCreditAccount();
 
-        evm.expectCall(
-            address(creditManager),
-            abi.encodeCall(ICreditManagerV2.approveCreditAccount, (address(targetMock), usdc, 10))
-        );
+        evm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.approveCreditAccount, (usdc, 10)));
 
         evm.prank(USER);
         creditFacade.multicall(
@@ -233,9 +224,7 @@ contract AbstractAdapterTest is
 
         bytes memory DUMB_CALLDATA = abi.encodeWithSignature("hello(string)", "world");
 
-        evm.expectCall(
-            address(creditManager), abi.encodeCall(ICreditManagerV2.executeOrder, (address(targetMock), DUMB_CALLDATA))
-        );
+        evm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.executeOrder, (DUMB_CALLDATA)));
 
         evm.prank(USER);
         creditFacade.multicall(
@@ -252,16 +241,13 @@ contract AbstractAdapterTest is
         bytes memory DUMB_CALLDATA = abi.encodeWithSignature("hello(string)", "world");
 
         for (uint256 dt = 0; dt < 2; ++dt) {
-            evm.expectCall(
-                address(creditManager),
-                abi.encodeCall(ICreditManagerV2.executeOrder, (address(targetMock), DUMB_CALLDATA))
-            );
+            evm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.executeOrder, (DUMB_CALLDATA)));
 
             // if (dt == 1) {
-            //     evm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV2.disableToken, (usdc)));
+            //     evm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.disableToken, (usdc)));
             // }
 
-            // evm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV2.checkAndEnableToken, (dai)));
+            // evm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.checkAndEnableToken, (dai)));
 
             evm.prank(USER);
             creditFacade.multicall(
@@ -283,25 +269,18 @@ contract AbstractAdapterTest is
 
         for (uint256 dt = 0; dt < 2; ++dt) {
             evm.expectCall(
-                address(creditManager),
-                abi.encodeCall(ICreditManagerV2.approveCreditAccount, (address(targetMock), usdc, type(uint256).max))
+                address(creditManager), abi.encodeCall(ICreditManagerV3.approveCreditAccount, (usdc, type(uint256).max))
             );
 
-            evm.expectCall(
-                address(creditManager),
-                abi.encodeCall(ICreditManagerV2.executeOrder, (address(targetMock), DUMB_CALLDATA))
-            );
+            evm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.executeOrder, (DUMB_CALLDATA)));
 
-            evm.expectCall(
-                address(creditManager),
-                abi.encodeCall(ICreditManagerV2.approveCreditAccount, (address(targetMock), usdc, 1))
-            );
+            evm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.approveCreditAccount, (usdc, 1)));
 
             // if (dt == 1) {
-            //     evm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV2.disableToken, (usdc)));
+            //     evm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.disableToken, (usdc)));
             // }
 
-            // evm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV2.checkAndEnableToken, (dai)));
+            // evm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.checkAndEnableToken, (dai)));
 
             evm.prank(USER);
             creditFacade.multicall(

@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-uint256 UNDERLYING_TOKEN_MASK = 1;
+uint256 constant UNDERLYING_TOKEN_MASK = 1;
 
 /// @title Quota Library
 library BitMask {

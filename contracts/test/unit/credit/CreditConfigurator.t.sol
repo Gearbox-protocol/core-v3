@@ -8,7 +8,7 @@ import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 import {WithdrawManager} from "../../../support/WithdrawManager.sol";
 import {CreditConfigurator, CreditManagerOpts, CollateralToken} from "../../../credit/CreditConfigurator.sol";
-import {ICreditManagerV2, ICreditManagerV2Events} from "../../../interfaces/ICreditManagerV2.sol";
+import {ICreditManagerV3, ICreditManagerV3Events} from "../../../interfaces/ICreditManagerV3.sol";
 import {ICreditConfiguratorEvents} from "../../../interfaces/ICreditConfigurator.sol";
 import {IAdapter} from "@gearbox-protocol/core-v2/contracts/interfaces/adapters/IAdapter.sol";
 
@@ -40,7 +40,7 @@ import {CollateralTokensItem} from "../../config/CreditConfig.sol";
 
 /// @title CreditConfiguratorTest
 /// @notice Designed for unit test purposes only
-contract CreditConfiguratorTest is DSTest, ICreditManagerV2Events, ICreditConfiguratorEvents {
+contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfiguratorEvents {
     using AddressList for address[];
 
     CheatCodes evm = CheatCodes(HEVM_ADDRESS);

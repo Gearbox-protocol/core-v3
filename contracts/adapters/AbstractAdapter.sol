@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {IAdapter} from "../interfaces/IAdapter.sol";
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
-import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
+import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {IPool4626} from "../interfaces/IPool4626.sol";
 import "../interfaces/IExceptions.sol";
 
@@ -14,7 +14,7 @@ import "../interfaces/IExceptions.sol";
 /// @dev Inheriting adapters MUST use provided internal functions to perform all operations with credit accounts
 abstract contract AbstractAdapter is IAdapter, ACLNonReentrantTrait {
     /// @notice Credit Manager the adapter is connected to
-    ICreditManagerV2 public immutable override creditManager;
+    ICreditManagerV3 public immutable override creditManager;
 
     /// @notice Address provider
     IAddressProvider public immutable override addressProvider;
@@ -26,10 +26,10 @@ abstract contract AbstractAdapter is IAdapter, ACLNonReentrantTrait {
     /// @param _creditManager Credit Manager to connect this adapter to
     /// @param _targetContract Address of the contract this adapter should interact with
     constructor(address _creditManager, address _targetContract)
-        ACLNonReentrantTrait(address(IPool4626(ICreditManagerV2(_creditManager).pool()).addressProvider()))
+        ACLNonReentrantTrait(address(IPool4626(ICreditManagerV3(_creditManager).pool()).addressProvider()))
         nonZeroAddress(_targetContract) // F: [AA-2]
     {
-        creditManager = ICreditManagerV2(_creditManager); // F: [AA-1]
+        creditManager = ICreditManagerV3(_creditManager); // F: [AA-1]
         addressProvider = IAddressProvider(IPool4626(creditManager.pool()).addressProvider()); // F: [AA-1]
         targetContract = _targetContract; // F: [AA-1]
     }
@@ -39,21 +39,16 @@ abstract contract AbstractAdapter is IAdapter, ACLNonReentrantTrait {
     ///      Since at this point Credit Account is owned by the Credit Facade, all functions
     ///      of inheriting adapters that perform actions on account MUST have this modifier
     modifier creditFacadeOnly() {
-        if (msg.sender != _creditFacade()) {
+        if (msg.sender != creditManager.creditFacade()) {
             revert CallerNotCreditFacadeException(); // F: [AA-5]
         }
         _;
     }
 
-    /// @dev Returns the Credit Facade connected to the Credit Manager
-    function _creditFacade() internal view returns (address) {
-        return creditManager.creditFacade(); // F: [AA-3]
-    }
-
     /// @dev Returns the Credit Account currently owned by the Credit Facade
     /// @dev Inheriting adapters MUST use this function to find the account address
     function _creditAccount() internal view returns (address) {
-        return creditManager.getCreditAccountOrRevert(_creditFacade()); // F: [AA-4]
+        return creditManager.externalCallCreditAccountOrRevert(); // F: [AA-4]
     }
 
     /// @dev Returns collateral token mask of given token in the Credit Manager
@@ -69,24 +64,14 @@ abstract contract AbstractAdapter is IAdapter, ACLNonReentrantTrait {
     /// @param amount Amount to be approved
     /// @dev Reverts if token is not registered as collateral token in the Credit Manager
     function _approveToken(address token, uint256 amount) internal {
-        creditManager.approveCreditAccount(targetContract, token, amount); // F: [AA-7, AA-8]
+        creditManager.approveCreditAccount(token, amount); // F: [AA-7, AA-8]
     }
-
-    // /// @dev Changes enabled tokens in the Credit Account
-    // /// @param tokensToEnable Bitmask of tokens that should be enabled
-    // /// @param tokensToDisable Bitmask of tokens that should be disabled
-    // /// @dev This function might be useful for adapters that work with limited set of tokens, whose masks can be
-    // ///      determined in the adapter constructor, thus saving gas by avoiding querying them during execution
-    // ///      and combining multiple enable/disable operations into a single one
-    // function _changeEnabledTokens(uint256 tokensToEnable, uint256 tokensToDisable) internal {
-    //     creditManager.changeEnabledTokens(tokensToEnable, tokensToDisable); // F: [AA-7, AA-11]
-    // }
 
     /// @dev Executes an arbitrary call from the Credit Account to the target contract
     /// @param callData Data to call the target contract with
     /// @return result Call output
     function _execute(bytes memory callData) internal returns (bytes memory result) {
-        return creditManager.executeOrder(targetContract, callData); // F: [AA-7, AA-12]
+        return creditManager.executeOrder(callData); // F: [AA-7, AA-12]
     }
 
     /// @dev Executes a swap operation on the target contract from the Credit Account

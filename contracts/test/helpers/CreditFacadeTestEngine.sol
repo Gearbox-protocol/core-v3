@@ -10,7 +10,7 @@ import {CreditConfigurator} from "../../credit/CreditConfigurator.sol";
 import {MultiCall} from "../../interfaces/ICreditFacade.sol";
 
 import {ICreditFacadeMulticall} from "../../interfaces/ICreditFacade.sol";
-import {ICreditManagerV2, ICreditManagerV2Events} from "../../interfaces/ICreditManagerV2.sol";
+import {ICreditManagerV3, ICreditManagerV3Events} from "../../interfaces/ICreditManagerV3.sol";
 
 import {CreditFacadeTestSuite} from "../suites/CreditFacadeTestSuite.sol";
 // import { TokensTestSuite, Tokens } from "../suites/TokensTestSuite.sol";
@@ -23,7 +23,7 @@ contract CreditFacadeTestEngine is DSTest {
     CheatCodes evm = CheatCodes(HEVM_ADDRESS);
 
     // Suites
-    ICreditManagerV2 public creditManager;
+    ICreditManagerV3 public creditManager;
     CreditFacadeV3 public creditFacade;
     CreditConfigurator public creditConfigurator;
 

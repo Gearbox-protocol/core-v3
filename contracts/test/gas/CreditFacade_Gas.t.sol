@@ -15,7 +15,7 @@ import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFa
 import {BotList} from "../../support/BotList.sol";
 
 import {ICreditFacade, ICreditFacadeMulticall, ICreditFacadeEvents} from "../../interfaces/ICreditFacade.sol";
-import {ICreditManagerV2, ICreditManagerV2Events, ClosureAction} from "../../interfaces/ICreditManagerV2.sol";
+import {ICreditManagerV3, ICreditManagerV3Events, ClosureAction} from "../../interfaces/ICreditManagerV3.sol";
 
 import {IDegenNFT, IDegenNFTExceptions} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
 import {IWithdrawManager} from "../../interfaces/IWithdrawManager.sol";
@@ -64,7 +64,7 @@ contract CreditFacadeTest is
     DSTest,
     BalanceHelper,
     CreditFacadeTestHelper,
-    ICreditManagerV2Events,
+    ICreditManagerV3Events,
     ICreditFacadeEvents
 {
     using CreditFacadeCalls for CreditFacadeMulticaller;
