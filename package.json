@@ -38,6 +38,6 @@
     "*.{json,md}": "prettier --write"
   },
   "dependencies": {
-    "@gearbox-protocol/core-v2": "^1.7.2"
+    "@gearbox-protocol/core-v2": "^1.16.2"
   }
 }
