@@ -429,13 +429,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
     ///  - Performs a fullCollateralCheck to verify that hf > 1 after all actions
     /// @param borrower Borrower to perform the multicall for
     /// @param calls The array of MultiCall structs encoding the operations to execute.
-    function botMulticall(address borrower, MultiCall[] calldata calls)
-        external
-        payable
-        override
-        whenNotPaused
-        nonReentrant
-    {
+    function botMulticall(address borrower, MultiCall[] calldata calls) external override whenNotPaused nonReentrant {
         uint256 botPermissions = IBotList(botList).botPermissions(borrower, msg.sender);
         // Checks that the bot is approved by the borrower and is not forbidden
         if (botPermissions == 0 || IBotList(botList).forbiddenBot(msg.sender)) {
@@ -575,6 +569,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
                         _revertIfNoPermission(flags, DISABLE_TOKEN_PERMISSION);
                         // Parses token
                         address token = abi.decode(callData, (address)); // F: [FA-53]
+                        /// IGNORE QUOTED TOKEN MASK
                         enabledTokensMask &= ~_getTokenMaskOrRevert(token);
                     }
                     //
@@ -593,6 +588,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
                     else if (method == ICreditFacadeMulticall.withdraw.selector) {
                         _revertIfNoPermission(flags, WITHDRAW_PERMISSION);
                         uint256 tokensToDisable = _withdraw(callData, creditAccount);
+                        /// IGNORE QUOTED TOKEN MASK
                         enabledTokensMask = enabledTokensMask & (~tokensToDisable);
                     }
                     //
@@ -633,6 +629,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
                     // Makes a call
                     bytes memory result = mcall.target.functionCall(mcall.callData); // F:[FA-29]
                     (uint256 tokensToEnable, uint256 tokensToDisable) = abi.decode(result, (uint256, uint256));
+                    /// IGNORE QUOTED TOKEN MASK
                     enabledTokensMask = (enabledTokensMask | tokensToEnable) & (~tokensToDisable);
                 }
             }
@@ -1086,6 +1083,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
     }
 
     /// @dev Wraps ETH into WETH and sends it back to msg.sender
+    /// TODO: Check L2 networks for supporting native currencies
     function _wrapETH() internal {
         if (msg.value > 0) {
             IWETH(wethAddress).deposit{value: msg.value}(); // F:[FA-3]
