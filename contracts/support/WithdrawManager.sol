@@ -192,4 +192,11 @@ contract WithdrawManager is IWithdrawManager, ACLNonReentrantTrait {
             }
         }
     }
+
+    function getWithdrawals(address creditManager, address creditAccount)
+        external
+        view
+        override
+        returns (uint256 tokenMask1, uint256 amount1, uint256 tokenMask2, uint256 amount2)
+    {}
 }

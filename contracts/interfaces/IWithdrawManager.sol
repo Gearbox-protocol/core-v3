@@ -51,4 +51,9 @@ interface IWithdrawManager is IWithdrawManagerEvents, IVersion {
     function cancelWithdrawals(address creditAccount, CancellationType ctype)
         external
         returns (uint256 tokensToEnable);
+
+    function getWithdrawals(address creditManager, address creditAccount)
+        external
+        view
+        returns (uint256 tokenMask1, uint256 amount1, uint256 tokenMask2, uint256 amount2);
 }

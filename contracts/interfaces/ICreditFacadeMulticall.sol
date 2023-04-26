@@ -51,7 +51,7 @@ interface ICreditFacadeMulticall {
     /// @dev Adds collateral to borrower's credit account
     /// @param token Address of a collateral token
     /// @param amount Amount to add
-    function addCollateral(address token, uint256 amount) external payable;
+    function addCollateral(address token, uint256 amount) external;
 
     /// @dev Increases debt for msg.sender's Credit Account
     /// - Borrows the requested amount from the pool

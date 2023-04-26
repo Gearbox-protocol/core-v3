@@ -82,7 +82,6 @@ struct Slot1 {
 contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard, BalanceHelperTrait {
     using SafeERC20 for IERC20;
     using Address for address payable;
-    // using SafeCast for uint256;
     using BitMask for uint256;
 
     /// @dev The maximal number of enabled tokens on a single Credit Account
@@ -766,6 +765,8 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
         (, totalUSD, twvUSD, borrowAmountPlusInterestRateAndFeesUSD, borrowedAmountWithInterest) =
             _calcAllCollateral(_priceOracle, creditAccount, enabledTokenMask, PERCENTAGE_FACTOR, collateralHints, false);
 
+        // add withdrawal balances to TotalValue
+
         total = _convertFromUSD(_priceOracle, totalUSD, underlying); // F:[FA-41]
         hf = twvUSD * PERCENTAGE_FACTOR / borrowAmountPlusInterestRateAndFeesUSD;
 
@@ -792,7 +793,7 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
             uint256 totalUSD,
             uint256 twvUSD,
             uint256 borrowAmountPlusInterestRateAndFeesUSD,
-            uint256 borrowedAmountWithInterestAndFees
+            uint256 borrowedAmountWithInterestAndFees // TODO: without FEES
         )
     {
         uint256 quotaInterest;
@@ -919,12 +920,36 @@ contract CreditManagerV3 is ICreditManagerV2, SanityCheckTrait, ReentrancyGuard,
         }
     }
 
-    function _calcDelayedWithdrawalCollateral(address creditAccount)
+    function _calcDelayedWithdrawalValue(IPriceOracleV2 _priceOracle, address creditAccount)
         internal
         view
         returns (uint256 amount, uint256 enabledTokenMask)
     {
-        // (address token1, uint256 amount1, address token2, uint256 amount2) =
+        (uint256 tokenMask1, uint256 balance1, uint256 tokenMask2, uint256 balance2) =
+            withdrawManager.getWithdrawals(address(this), creditAccount);
+
+        (amount, enabledTokenMask) = _calcWithdrawalValueUSD(0, 0, _priceOracle, tokenMask1, balance1);
+        (amount, enabledTokenMask) =
+            _calcWithdrawalValueUSD(amount, enabledTokenMask, _priceOracle, tokenMask2, balance2);
+    }
+
+    function _calcWithdrawalValueUSD(
+        uint256 _amount,
+        uint256 _tokensToEnbable,
+        IPriceOracleV2 _priceOracle,
+        uint256 tokenMask,
+        uint256 balance
+    ) internal view returns (uint256 amount, uint256 tokensToEnable) {
+        amount = _amount;
+        tokensToEnable = _tokensToEnbable;
+
+        if (balance > 1) {
+            CollateralTokenData memory tokenData = collateralTokensData[tokenMask]; // F:[CM-47]
+
+            address token = tokenData.token;
+            amount += _convertToUSD(_priceOracle, balance, token);
+            tokensToEnable |= tokenMask;
+        }
     }
 
     /// @dev Returns the array of quoted tokens that are enabled on the account

@@ -8,8 +8,9 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 // TRAITS
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {BalanceHelperTrait} from "../traits/BalanceHelperTrait.sol";
-//  DATA
+import {UNDERLYING_TOKEN_MASK} from "../librarires/BitMask.sol";
 
+//  DATA
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 import {Balance, BalanceOps} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 import {QuotaUpdate} from "../interfaces/IPoolQuotaKeeper.sol";
@@ -37,8 +38,8 @@ import "../interfaces/IExceptions.sol";
 
 import "forge-std/console.sol";
 
-uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS //INCREASE_DEBT_PERMISSION |
-    & ~(DECREASE_DEBT_PERMISSION | WITHDRAW_PERMISSION) | INCREASE_DEBT_WAS_CALLED;
+uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS
+    & ~(INCREASE_DEBT_PERMISSION | DECREASE_DEBT_PERMISSION | WITHDRAW_PERMISSION) | INCREASE_DEBT_WAS_CALLED;
 
 uint256 constant CLOSE_CREDIT_ACCOUNT_FLAGS = EXTERNAL_CALLS_PERMISSION;
 
@@ -120,7 +121,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
     /// @dev Bit mask encoding a set of forbidden tokens
     uint256 public forbiddenTokenMask;
 
-    mapping(uint256 => address) internal cachedTokenMasks;
+    // mapping(uint256 => address) internal cachedTokenMasks;
 
     /// @dev Maps addresses to their status as emergency liquidator.
     /// @notice Emergency liquidators are trusted addresses
@@ -222,10 +223,10 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
         // F:[FA-10]: no free flashloans through opening a Credit Account
         // and immediately decreasing debt
         FullCheckParams memory fullCheckParams =
-            _multicall(calls, onBehalfOf, creditAccount, 1, OPEN_CREDIT_ACCOUNT_FLAGS); // F:[FA-8]
+            _multicall(calls, onBehalfOf, creditAccount, UNDERLYING_TOKEN_MASK, OPEN_CREDIT_ACCOUNT_FLAGS); // F:[FA-8]
 
         // Checks that the new credit account has enough collateral to cover the debt
-        _fullCollateralCheck(creditAccount, 1, fullCheckParams, forbiddenBalances); // F:[FA-8, 9]
+        _fullCollateralCheck(creditAccount, UNDERLYING_TOKEN_MASK, fullCheckParams, forbiddenBalances); // F:[FA-8, 9]
     }
 
     /// @dev Runs a batch of transactions within a multicall and closes the account
@@ -269,7 +270,9 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
             enabledTokensMask = fullCheckParams.enabledTokensMaskAfter;
         } // F:[FA-2, 12, 13]
 
-        (,, uint256 borrowedAmountWithInterestAndFees) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        /// HOW TO CHECK QUOTAED BALANCES
+
+        (, uint256 borrowedAmountWithInterest,) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
 
         // Requests the Credit manager to close the Credit Account
         creditManager.closeCreditAccount(
@@ -280,7 +283,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
             to,
             enabledTokensMask,
             skipTokenMask,
-            borrowedAmountWithInterestAndFees,
+            borrowedAmountWithInterest,
             convertWETH
         ); // F:[FA-2, 12]
 
@@ -1106,6 +1109,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
     {
         (enabledTokenMask, totalValue,, borrowedAmountWithInterest, isLiquidatable) = _calcTotalValue(creditAccount);
 
+        /// CHANGE PRIORITY IN EXPIRED / LIQUIDATE
         if (_isExpired()) {
             return (
                 true, ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT, totalValue, borrowedAmountWithInterest, enabledTokenMask
