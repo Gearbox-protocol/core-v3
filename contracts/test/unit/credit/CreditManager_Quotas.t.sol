@@ -134,22 +134,22 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
         assertTrue(creditManager.supportsQuotas(), "Credit Manager does not support quotas");
     }
 
-    /// @dev [CMQ-2]: setLimitedMask works correctly
-    function test_CMQ_02_setLimitedMask_works_correctly() public {
+    /// @dev [CMQ-2]: setQuotedMask works correctly
+    function test_CMQ_02_setQuotedMask_works_correctly() public {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
 
         uint256 usdcMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.USDC));
         uint256 linkMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.LINK));
 
-        uint256 limitedTokenMask = creditManager.limitedTokenMask();
+        uint256 quotedTokenMask = creditManager.quotedTokenMask();
 
         evm.expectRevert(CallerNotConfiguratorException.selector);
-        creditManager.setLimitedMask(limitedTokenMask | usdcMask);
+        creditManager.setQuotedMask(quotedTokenMask | usdcMask);
 
         evm.prank(CONFIGURATOR);
-        creditManager.setLimitedMask(limitedTokenMask | usdcMask);
+        creditManager.setQuotedMask(quotedTokenMask | usdcMask);
 
-        assertEq(creditManager.limitedTokenMask(), usdcMask | linkMask, "New limited mask is incorrect");
+        assertEq(creditManager.quotedTokenMask(), usdcMask | linkMask, "New limited mask is incorrect");
     }
 
     /// @dev [CMQ-3]: updateQuotas works correctly

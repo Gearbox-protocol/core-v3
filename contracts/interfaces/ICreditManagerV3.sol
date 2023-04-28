@@ -271,7 +271,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     function getTokenMaskOrRevert(address token) external view returns (uint256);
 
     /// @dev Mask of tokens to apply quotas for
-    function limitedTokenMask() external view returns (uint256);
+    function quotedTokenMask() external view returns (uint256);
 
     /// @dev Maps allowed adapters to their respective target contracts.
     function adapterToContract(address adapter) external view returns (address);
