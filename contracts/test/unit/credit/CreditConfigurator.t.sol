@@ -271,7 +271,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
 
         address creditConfiguratorAddr = _getAddress(configuratorByteCode, 0);
 
-        creditManager.setConfigurator(creditConfiguratorAddr);
+        creditManager.setCreditConfigurator(creditConfiguratorAddr);
 
         evm.expectEmit(true, false, false, true);
         emit SetTokenLiquidationThreshold(underlying, DEFAULT_UNDERLYING_LT);
@@ -330,10 +330,10 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
 
         // Upgrades
         evm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.upgradePriceOracle();
+        creditConfigurator.setPriceOracle();
 
         evm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.upgradeCreditFacade(DUMB_ADDRESS, false);
+        creditConfigurator.setCreditFacade(DUMB_ADDRESS, false);
 
         evm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.upgradeCreditConfigurator(DUMB_ADDRESS);
@@ -871,51 +871,51 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
     // CONTRACT UPGRADES
     //
 
-    /// @dev [CC-28]: upgradePriceOracle upgrades priceOracleCorrectly and doesnt change facade
-    function test_CC_28_upgradePriceOracle_upgrades_priceOracleCorrectly_and_doesnt_change_facade() public {
+    /// @dev [CC-28]: setPriceOracle upgrades priceOracleCorrectly and doesnt change facade
+    function test_CC_28_setPriceOracle_upgrades_priceOracleCorrectly_and_doesnt_change_facade() public {
         evm.startPrank(CONFIGURATOR);
         cct.addressProvider().setPriceOracle(DUMB_ADDRESS);
 
         evm.expectEmit(true, false, false, false);
         emit SetPriceOracle(DUMB_ADDRESS);
 
-        creditConfigurator.upgradePriceOracle();
+        creditConfigurator.setPriceOracle();
 
         assertEq(address(creditManager.priceOracle()), DUMB_ADDRESS);
         evm.stopPrank();
     }
 
-    /// @dev [CC-29]: upgradePriceOracle upgrades priceOracleCorrectly and doesnt change facade
-    function test_CC_29_upgradeCreditFacade_upgradeCreditConfigurator_reverts_for_incompatible_contracts() public {
+    /// @dev [CC-29]: setPriceOracle upgrades priceOracleCorrectly and doesnt change facade
+    function test_CC_29_setCreditFacade_upgradeCreditConfigurator_reverts_for_incompatible_contracts() public {
         evm.startPrank(CONFIGURATOR);
 
         evm.expectRevert(ZeroAddressException.selector);
-        creditConfigurator.upgradeCreditFacade(address(0), false);
+        creditConfigurator.setCreditFacade(address(0), false);
 
         evm.expectRevert(ZeroAddressException.selector);
         creditConfigurator.upgradeCreditConfigurator(address(0));
 
         evm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, DUMB_ADDRESS));
-        creditConfigurator.upgradeCreditFacade(DUMB_ADDRESS, false);
+        creditConfigurator.setCreditFacade(DUMB_ADDRESS, false);
 
         evm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, DUMB_ADDRESS));
         creditConfigurator.upgradeCreditConfigurator(DUMB_ADDRESS);
 
         evm.expectRevert(IncompatibleContractException.selector);
-        creditConfigurator.upgradeCreditFacade(underlying, false);
+        creditConfigurator.setCreditFacade(underlying, false);
 
         evm.expectRevert(IncompatibleContractException.selector);
         creditConfigurator.upgradeCreditConfigurator(underlying);
 
         evm.expectRevert(IncompatibleContractException.selector);
-        creditConfigurator.upgradeCreditFacade(address(adapterDifferentCM), false);
+        creditConfigurator.setCreditFacade(address(adapterDifferentCM), false);
 
         evm.expectRevert(IncompatibleContractException.selector);
         creditConfigurator.upgradeCreditConfigurator(address(adapterDifferentCM));
     }
 
-    /// @dev [CC-30]: upgradeCreditFacade upgrades creditFacade and doesnt change priceOracle
-    function test_CC_30_upgradeCreditFacade_upgrades_creditFacade_and_doesnt_change_priceOracle() public {
+    /// @dev [CC-30]: setCreditFacade upgrades creditFacade and doesnt change priceOracle
+    function test_CC_30_setCreditFacade_upgrades_creditFacade_and_doesnt_change_priceOracle() public {
         for (uint256 id = 0; id < 2; id++) {
             bool isIDF = id != 0;
             for (uint256 ex = 0; ex < 2; ex++) {
@@ -934,7 +934,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
                         );
 
                         evm.prank(CONFIGURATOR);
-                        creditConfigurator.upgradeCreditFacade(address(initialCf), migrateSettings);
+                        creditConfigurator.setCreditFacade(address(initialCf), migrateSettings);
 
                         evm.prank(CONFIGURATOR);
                         creditConfigurator.setExpirationDate(uint40(block.timestamp + 1));
@@ -958,7 +958,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
                     emit SetCreditFacade(address(cf));
 
                     evm.prank(CONFIGURATOR);
-                    creditConfigurator.upgradeCreditFacade(address(cf), migrateSettings);
+                    creditConfigurator.setCreditFacade(address(cf), migrateSettings);
 
                     assertEq(address(creditManager.priceOracle()), cct.addressProvider().getPriceOracle());
 
@@ -987,7 +987,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
         }
     }
 
-    /// @dev [CC-30A]: uupgradeCreditFacade transfers bot list
+    /// @dev [CC-30A]: usetCreditFacade transfers bot list
     function test_CC_30A_botList_is_transferred_on_CreditFacade_upgrade() public {
         for (uint256 ms = 0; ms < 2; ms++) {
             bool migrateSettings = ms != 0;
@@ -1006,7 +1006,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
             );
 
             evm.prank(CONFIGURATOR);
-            creditConfigurator.upgradeCreditFacade(address(cf), migrateSettings);
+            creditConfigurator.setCreditFacade(address(cf), migrateSettings);
 
             address botList2 = cf.botList();
 

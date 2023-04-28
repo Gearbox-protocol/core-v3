@@ -30,7 +30,7 @@ contract CreditManagerFactory {
 
         creditConfigurator = CreditConfigurator(Create2.computeAddress(salt, keccak256(configuratorByteCode)));
 
-        creditManager.setConfigurator(address(creditConfigurator));
+        creditManager.setCreditConfigurator(address(creditConfigurator));
 
         Create2.deploy(0, salt, configuratorByteCode);
 

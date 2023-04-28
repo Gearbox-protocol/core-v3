@@ -347,7 +347,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     /// - setForbidMask
     /// - changeContractAllowance
     /// - upgradeContracts
-    /// - setConfigurator
+    /// - setCreditConfigurator
     /// - addEmergencyLiquidator
     /// - removeEmergenceLiquidator
     function test_CM_04_credit_account_configurator_functions_revert_if_not_called_by_creditConfigurator() public {
@@ -368,13 +368,13 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         creditManager.changeContractAllowance(DUMB_ADDRESS, DUMB_ADDRESS);
 
         evm.expectRevert(CallerNotConfiguratorException.selector);
-        creditManager.upgradeCreditFacade(DUMB_ADDRESS);
+        creditManager.setCreditFacade(DUMB_ADDRESS);
 
         evm.expectRevert(CallerNotConfiguratorException.selector);
-        creditManager.upgradePriceOracle(DUMB_ADDRESS);
+        creditManager.setPriceOracle(DUMB_ADDRESS);
 
         evm.expectRevert(CallerNotConfiguratorException.selector);
-        creditManager.setConfigurator(DUMB_ADDRESS);
+        creditManager.setCreditConfigurator(DUMB_ADDRESS);
 
         evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setMaxEnabledTokens(255);
@@ -1358,8 +1358,8 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         CreditManagerV3 cm = new CreditManagerV3(address(poolMock), address(withdrawManager));
         cms.cr().addCreditManager(address(cm));
 
-        cm.upgradeCreditFacade(address(this));
-        cm.upgradePriceOracle(address(priceOracle));
+        cm.setCreditFacade(address(this));
+        cm.setPriceOracle(address(priceOracle));
 
         evm.stopPrank();
 
@@ -1406,8 +1406,8 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         creditManager = new CreditManagerV3(address(poolMock), address(withdrawManager));
         cms.cr().addCreditManager(address(creditManager));
 
-        creditManager.upgradeCreditFacade(address(this));
-        creditManager.upgradePriceOracle(address(priceOracle));
+        creditManager.setCreditFacade(address(this));
+        creditManager.setPriceOracle(address(priceOracle));
 
         creditManager.setLiquidationThreshold(poolMock.underlyingToken(), 9300);
         evm.stopPrank();
@@ -2088,22 +2088,22 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     // UPGRADE CONTRACTS
     //
 
-    /// @dev [CM-57A]: upgradeCreditFacade updates Credit Facade correctly
-    function test_CM_57A_upgradeCreditFacade_updates_contract_correctly() public {
+    /// @dev [CM-57A]: setCreditFacade updates Credit Facade correctly
+    function test_CM_57A_setCreditFacade_updates_contract_correctly() public {
         assertTrue(creditManager.creditFacade() != DUMB_ADDRESS, "creditFacade( is already the same");
 
         evm.prank(CONFIGURATOR);
-        creditManager.upgradeCreditFacade(DUMB_ADDRESS);
+        creditManager.setCreditFacade(DUMB_ADDRESS);
 
         assertEq(creditManager.creditFacade(), DUMB_ADDRESS, "creditFacade is not set correctly");
     }
 
-    /// @dev [CM-57B]: upgradePriceOracle updates contract correctly
-    function test_CM_57_upgradePriceOracle_updates_contract_correctly() public {
+    /// @dev [CM-57B]: setPriceOracle updates contract correctly
+    function test_CM_57_setPriceOracle_updates_contract_correctly() public {
         assertTrue(address(creditManager.priceOracle()) != DUMB_ADDRESS2, "priceOracle is already the same");
 
         evm.prank(CONFIGURATOR);
-        creditManager.upgradePriceOracle(DUMB_ADDRESS2);
+        creditManager.setPriceOracle(DUMB_ADDRESS2);
 
         assertEq(address(creditManager.priceOracle()), DUMB_ADDRESS2, "priceOracle is not set correctly");
     }
@@ -2112,16 +2112,16 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     // SET CONFIGURATOR
     //
 
-    /// @dev [CM-58]: setConfigurator sets creditConfigurator correctly and emits event
-    function test_CM_58_setConfigurator_sets_creditConfigurator_correctly_and_emits_event() public {
+    /// @dev [CM-58]: setCreditConfigurator sets creditConfigurator correctly and emits event
+    function test_CM_58_setCreditConfigurator_sets_creditConfigurator_correctly_and_emits_event() public {
         assertTrue(creditManager.creditConfigurator() != DUMB_ADDRESS, "creditConfigurator is already the same");
 
         evm.prank(CONFIGURATOR);
 
         evm.expectEmit(true, false, false, false);
-        emit SetConfigurator(DUMB_ADDRESS);
+        emit SetCreditConfigurator(DUMB_ADDRESS);
 
-        creditManager.setConfigurator(DUMB_ADDRESS);
+        creditManager.setCreditConfigurator(DUMB_ADDRESS);
 
         assertEq(creditManager.creditConfigurator(), DUMB_ADDRESS, "creditConfigurator is not set correctly");
     }

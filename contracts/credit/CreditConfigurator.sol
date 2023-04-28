@@ -126,7 +126,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
             }
 
             // Connects creditFacade and priceOracle
-            creditManager.upgradeCreditFacade(address(_creditFacade)); // F:[CC-1]
+            creditManager.setCreditFacade(address(_creditFacade)); // F:[CC-1]
 
             emit SetCreditFacade(address(_creditFacade)); // F: [CC-1A]
             emit SetPriceOracle(address(creditManager.priceOracle())); // F: [CC-1A]
@@ -566,7 +566,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
 
     /// @dev Upgrades the price oracle in the Credit Manager, taking the address
     /// from the address provider
-    function upgradePriceOracle()
+    function setPriceOracle()
         external
         configuratorOnly // F:[CC-2]
     {
@@ -575,7 +575,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
 
         // Checks that the price oracle is actually new to avoid emitting redundant events
         if (priceOracle != currentPriceOracle) {
-            creditManager.upgradePriceOracle(priceOracle); // F: [CC-28]
+            creditManager.setPriceOracle(priceOracle); // F: [CC-28]
             emit SetPriceOracle(priceOracle); // F:[CC-28]
         }
     }
@@ -583,7 +583,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     /// @dev Upgrades the Credit Facade corresponding to the Credit Manager
     /// @param _creditFacade address of the new CreditFacadeV3
     /// @param migrateParams Whether the previous CreditFacadeV3's parameter need to be copied
-    function upgradeCreditFacade(address _creditFacade, bool migrateParams)
+    function setCreditFacade(address _creditFacade, bool migrateParams)
         external
         configuratorOnly // F:[CC-2]
     {
@@ -607,7 +607,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         address botList = creditFacade().botList();
 
         // Sets Credit Facade to the new address
-        creditManager.upgradeCreditFacade(_creditFacade); // F:[CC-30]
+        creditManager.setCreditFacade(_creditFacade); // F:[CC-30]
 
         if (migrateParams) {
             // Copies all limits and restrictions on borrowing
@@ -638,7 +638,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
 
         _revertIfContractIncompatible(_creditConfigurator); // F:[CC-29]
 
-        creditManager.setConfigurator(_creditConfigurator); // F:[CC-31]
+        creditManager.setCreditConfigurator(_creditConfigurator); // F:[CC-31]
         emit CreditConfiguratorUpgraded(_creditConfigurator); // F:[CC-31]
     }
 

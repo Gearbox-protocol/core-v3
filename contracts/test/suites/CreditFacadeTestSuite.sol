@@ -113,7 +113,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
             false
         );
 
-        creditConfigurator.upgradeCreditFacade(address(creditFacade), true);
+        creditConfigurator.setCreditFacade(address(creditFacade), true);
 
         degenNFT.addCreditFacade(address(creditFacade));
 
@@ -130,7 +130,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
             true
         );
 
-        creditConfigurator.upgradeCreditFacade(address(creditFacade), true);
+        creditConfigurator.setCreditFacade(address(creditFacade), true);
         creditConfigurator.setExpirationDate(uint40(block.timestamp + 1));
 
         evm.stopPrank();
@@ -146,7 +146,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
             false
         );
 
-        creditConfigurator.upgradeCreditFacade(address(creditFacade), true);
+        creditConfigurator.setCreditFacade(address(creditFacade), true);
 
         // blacklistHelper.addCreditFacade(address(creditFacade));
 

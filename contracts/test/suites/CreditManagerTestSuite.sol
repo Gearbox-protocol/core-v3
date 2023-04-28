@@ -60,11 +60,11 @@ contract CreditManagerTestSuite is PoolDeployer {
 
         creditFacade = msg.sender;
 
-        creditManager.setConfigurator(CONFIGURATOR);
+        creditManager.setCreditConfigurator(CONFIGURATOR);
 
         evm.startPrank(CONFIGURATOR);
 
-        creditManager.upgradeCreditFacade(creditFacade);
+        creditManager.setCreditFacade(creditFacade);
 
         creditManager.setParams(
             DEFAULT_FEE_INTEREST,
