@@ -9,7 +9,7 @@ import {PriceFeedConfig} from "@gearbox-protocol/core-v2/contracts/oracles/Price
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
-import {GenesisFactory} from "../../factories/GenesisFactory.sol";
+import {GenesisFactory} from "./GenesisFactory.sol";
 import {PoolFactory, PoolOpts} from "@gearbox-protocol/core-v2/contracts/factories/PoolFactory.sol";
 import {WithdrawManager} from "../../support/WithdrawManager.sol";
 

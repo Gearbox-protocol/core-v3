@@ -8,7 +8,7 @@ import {CreditConfigurator} from "../../credit/CreditConfigurator.sol";
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {WithdrawManager} from "../../support/WithdrawManager.sol";
 
-import {CreditManagerFactoryBase} from "../../factories/CreditManagerFactoryBase.sol";
+import {CreditManagerFactory} from "../../factories/CreditManagerFactory.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -59,7 +59,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
 
         cmOpts.withdrawManager = address(withdrawManager);
 
-        CreditManagerFactoryBase cmf = new CreditManagerFactoryBase(
+        CreditManagerFactory cmf = new CreditManagerFactory(
             address(poolMock),
             cmOpts,
             0
@@ -156,7 +156,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
     function testFacadeWithQuotas() external {
         poolMock.setSupportsQuotas(true);
 
-        CreditManagerFactoryBase cmf = new CreditManagerFactoryBase(
+        CreditManagerFactory cmf = new CreditManagerFactory(
             address(poolMock),
             creditConfig.getCreditOpts(),
             0

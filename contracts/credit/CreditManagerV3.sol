@@ -675,7 +675,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         // Checks that msg.sender is the adapter associated with the passed
         // target contract.
         if (targetContract == address(0)) {
-            revert TargetContractNotAllowedException();
+            revert CallerNotAdapterException();
             // F:[CM-28]
         }
     }
@@ -1625,6 +1625,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
                     revert ZeroAddressException();
                 }
                 uint256 allowance = IERC20(token).allowance(creditAccount, spender);
+                /// It checks that token is in collateral token list in _approveSpender function
                 if (allowance > 1) _approveSpender(token, spender, creditAccount, 0);
             }
         }

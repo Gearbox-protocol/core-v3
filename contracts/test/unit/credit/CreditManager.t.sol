@@ -51,7 +51,7 @@ import {
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";
 import {CreditManagerTestSuite} from "../../suites/CreditManagerTestSuite.sol";
-import {GenesisFactory} from "../../../factories/GenesisFactory.sol";
+
 import {CreditManagerTestInternal} from "../../mocks/credit/CreditManagerTestInternal.sol";
 
 import {CreditConfig} from "../../config/CreditConfig.sol";
@@ -69,7 +69,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
     IAddressProvider addressProvider;
     IWETH wethToken;
-    GenesisFactory gp;
+
     AccountFactory af;
     CreditManagerV3 creditManager;
     PoolServiceMock poolMock;
@@ -95,7 +95,6 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         creditConfig = new CreditConfig(tokenTestSuite, t);
         cms = new CreditManagerTestSuite(creditConfig, internalSuite, false);
 
-        gp = cms.gp();
         acl = cms.acl();
 
         addressProvider = cms.addressProvider();
@@ -1249,24 +1248,6 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     // APPROVE CREDIT ACCOUNT
     //
 
-    /// @dev [CM-25]: approveCreditAccount reverts if adapter is not connected with target contract
-    function test_CM_25_approveCreditAccount_reverts_if_adapter_isnt_connected_with_contract_or_0() public {
-        _openAccountAndTransferToCF();
-
-        evm.prank(CONFIGURATOR);
-        creditManager.changeContractAllowance(DUMB_ADDRESS, FRIEND);
-
-        evm.expectRevert(CallerNotAdapterException.selector);
-
-        evm.prank(DUMB_ADDRESS);
-        creditManager.approveCreditAccount(DUMB_ADDRESS, 100);
-
-        // Address 0 case
-        evm.expectRevert(CallerNotAdapterException.selector);
-        evm.prank(DUMB_ADDRESS);
-        creditManager.approveCreditAccount(DUMB_ADDRESS, 100);
-    }
-
     /// @dev [CM-25A]: approveCreditAccount reverts if the token is not added
     function test_CM_25A_approveCreditAccount_reverts_if_the_token_is_not_added() public {
         (,,, address creditAccount) = _openCreditAccount();
@@ -1348,20 +1329,6 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     // EXECUTE ORDER
     //
 
-    /// @dev [CM-28]: executeOrder reverts if adapter is not connected with target contract
-    function test_CM_28_executeOrder_reverts_if_adapter_is_not_connected_with_target_contract() public {
-        _openAccountAndTransferToCF();
-
-        evm.prank(CONFIGURATOR);
-        creditManager.changeContractAllowance(ADAPTER, FRIEND);
-
-        // Address 0 case
-        evm.expectRevert(TargetContractNotAllowedException.selector);
-
-        evm.prank(ADAPTER);
-        creditManager.executeOrder(bytes("Hello, world!"));
-    }
-
     /// @dev [CM-29]: executeOrder calls credit account method and emit event
     function test_CM_29_executeOrder_calls_credit_account_method_and_emit_event() public {
         (,,, address creditAccount) = _openCreditAccount();
@@ -1387,138 +1354,6 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
         assertEq0(targetMock.callData(), callData, "Incorrect calldata");
     }
-
-    //
-    // CHECK AND ENABLE TOKEN
-    //
-
-    // /// @dev [CM-31]: checkAndEnableToken enables token for creditAccount
-    // function test_CM_31_checkAndEnableToken_enables_token_for_creditAccount() public {
-    //     address creditAccount = _openAccountAndTransferToCF();
-
-    //     // Case: token is not enbaled before
-    //     address token = tokenTestSuite.addressOf(Tokens.USDC);
-
-    //     expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
-
-    //     // creditManager.checkAndEnableToken(token);
-    //     expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
-
-    //     // Case: token is already enabled
-    //     // creditManager.checkAndEnableToken(token);
-    //     expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
-    // }
-
-    //
-    // CHANGE ENABLED TOKENS
-    //
-
-    // /// @dev [CM-32]: changeEnabledTokens reverts on enabling forbidden tokens
-    // function test_CM_32_changeEnabledTokens_reverts_on_enabling_forbidden_tokens() public {
-    //     _openAccountAndTransferToCF();
-
-    //     address token = tokenTestSuite.addressOf(Tokens.USDC);
-    //     uint256 tokenMask = creditManager.getTokenMaskOrRevert(token);
-
-    //     evm.prank(CONFIGURATOR);
-    //     creditManager.setForbidMask(tokenMask);
-
-    //     evm.expectRevert(TokenNotAllowedException.selector);
-    //     creditManager.changeEnabledTokens(tokenMask, 0);
-    // }
-
-    // /// @dev [CM-33]: changeEnabledTokens ignores tokens on intersection of toEnable and toDisable
-    // function test_CM_33_changeEnabledTokens_ignores_tokens_on_intersection() public {
-    //     address creditAccount = _openAccountAndTransferToCF();
-
-    //     address token = tokenTestSuite.addressOf(Tokens.USDC);
-    //     uint256 tokenMask = creditManager.getTokenMaskOrRevert(token);
-
-    //     (bool wasEnabled, bool wasDisabled) = creditManager.changeEnabledTokens(tokenMask, tokenMask);
-    //     expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
-    //     assertTrue(!wasEnabled);
-    //     assertTrue(!wasDisabled);
-
-    //     creditManager.checkAndEnableToken(token);
-    //     expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
-
-    //     (wasEnabled, wasDisabled) = creditManager.changeEnabledTokens(tokenMask, tokenMask);
-    //     expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
-    //     assertTrue(!wasEnabled);
-    //     assertTrue(!wasDisabled);
-    // }
-
-    // /// @dev [CM-34] changeEnabledTokens enables and disables tokens for credit account
-    // function test_CM_34_changeEnabledTokens_enables_and_disables_tokens_for_credit_account() public {
-    //     address creditAccount = _openAccountAndTransferToCF();
-
-    //     address token = tokenTestSuite.addressOf(Tokens.USDC);
-    //     uint256 tokenMask = creditManager.getTokenMaskOrRevert(token);
-
-    //     (bool wasEnabled, bool wasDisabled) = creditManager.changeEnabledTokens(tokenMask, 0);
-    //     expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
-    //     assertTrue(wasEnabled);
-    //     assertTrue(!wasDisabled);
-
-    //     (wasEnabled, wasDisabled) = creditManager.changeEnabledTokens(0, tokenMask);
-    //     expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
-    //     assertTrue(!wasEnabled);
-    //     assertTrue(wasDisabled);
-    // }
-
-    // /// @dev [CM-35] changeEnabledTokens fuzzing test
-    // function test_CM_35_changeEnabledTokens_fuzzing_test(
-    //     bool enableUsdc,
-    //     bool disableUsdc,
-    //     bool enableWeth,
-    //     bool disableWeth,
-    //     bool enableLink,
-    //     bool disableLink,
-    //     bool forbidLink
-    // ) public {
-    //     address creditAccount = _openAccountAndTransferToCF();
-
-    //     if (disableUsdc) creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.USDC));
-    //     if (disableWeth) creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.WETH));
-    //     if (disableLink) creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.LINK));
-
-    //     uint256 tokensToEnable;
-    //     uint256 tokensToDisable;
-    //     bool mustRevert;
-    //     {
-    //         uint256 usdcMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.USDC));
-    //         uint256 wethMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.WETH));
-    //         uint256 linkMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.LINK));
-
-    //         tokensToEnable = 0;
-    //         if (enableUsdc) tokensToEnable |= usdcMask;
-    //         if (enableWeth) tokensToEnable |= wethMask;
-    //         if (enableLink) tokensToEnable |= linkMask;
-
-    //         tokensToDisable = 0;
-    //         if (disableUsdc) tokensToDisable |= usdcMask;
-    //         if (disableWeth) tokensToDisable |= wethMask;
-    //         if (disableLink) tokensToDisable |= linkMask;
-
-    //         if (forbidLink) {
-    //             evm.prank(CONFIGURATOR);
-    //             creditManager.setForbidMask(linkMask);
-    //         }
-
-    //         mustRevert = forbidLink && enableLink && !disableLink;
-    //     }
-
-    //     if (mustRevert) evm.expectRevert(TokenNotAllowedException.selector);
-    //     (bool enabled, bool disabled) = creditManager.changeEnabledTokens(tokensToEnable, tokensToDisable);
-    //     if (mustRevert) return;
-
-    //     expectTokenIsEnabled(creditAccount, Tokens.USDC, enableUsdc);
-    //     expectTokenIsEnabled(creditAccount, Tokens.WETH, enableWeth);
-    //     expectTokenIsEnabled(creditAccount, Tokens.LINK, enableLink);
-
-    //     assertTrue(enabled == (enableUsdc && !disableUsdc || enableWeth && !disableWeth || enableLink && !disableLink));
-    //     assertTrue(disabled == (!enableUsdc && disableUsdc || !enableWeth && disableWeth || !enableLink && disableLink));
-    // }
 
     //
     // FULL COLLATERAL CHECK

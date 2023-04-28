@@ -82,5 +82,5 @@ interface ICreditFacadeMulticall {
 
     function withdraw(address to, address token, uint256 amount) external;
 
-    function revokeAdapterAllowances(RevocationPair[] calldata revocations, bool keepOne) external;
+    function revokeAdapterAllowances(RevocationPair[] calldata revocations) external;
 }

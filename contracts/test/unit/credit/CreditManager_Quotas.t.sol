@@ -42,7 +42,6 @@ import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";
 import {CreditManagerTestSuite} from "../../suites/CreditManagerTestSuite.sol";
-import {GenesisFactory} from "../../../factories/GenesisFactory.sol";
 import {CreditManagerTestInternal} from "../../mocks/credit/CreditManagerTestInternal.sol";
 
 import {CreditConfig} from "../../config/CreditConfig.sol";
@@ -59,7 +58,7 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
 
     IAddressProvider addressProvider;
     IWETH wethToken;
-    GenesisFactory gp;
+
     AccountFactory af;
     CreditManagerV3 creditManager;
     PoolServiceMock poolMock;
@@ -84,7 +83,6 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
         creditConfig = new CreditConfig(tokenTestSuite, t);
         cms = new CreditManagerTestSuite(creditConfig, internalSuite, true);
 
-        gp = cms.gp();
         acl = cms.acl();
 
         addressProvider = cms.addressProvider();

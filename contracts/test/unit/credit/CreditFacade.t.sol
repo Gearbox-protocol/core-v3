@@ -455,6 +455,10 @@ contract CreditFacadeTest is
         evm.prank(FRIEND);
         creditFacade.approveAccountTransfer(USER, true);
 
+        RevocationPair[] memory revocations = new RevocationPair[](1);
+
+        revocations[0] = RevocationPair({spender: address(this), token: underlying});
+
         // tokenTestSuite.mint(Tokens.DAI, USER, WAD);
         // tokenTestSuite.approve(Tokens.DAI, USER, address(creditManager));
 
@@ -467,7 +471,7 @@ contract CreditFacadeTest is
             }),
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeMulticall.increaseDebt, WAD)
+                callData: abi.encodeCall(ICreditFacadeMulticall.revokeAdapterAllowances, (revocations))
             })
         );
 
@@ -495,13 +499,8 @@ contract CreditFacadeTest is
 
         evm.expectCall(
             address(creditManager),
-            abi.encodeCall(
-                ICreditManagerV3.manageDebt, (expectedCreditAccountAddress, WAD, 1, ManageDebtAction.INCREASE_DEBT)
-            )
+            abi.encodeCall(ICreditManagerV3.revokeAdapterAllowances, (expectedCreditAccountAddress, revocations))
         );
-
-        evm.expectEmit(true, false, false, true);
-        emit IncreaseBorrowedAmount(FRIEND, WAD);
 
         evm.expectEmit(false, false, false, true);
         emit FinishMultiCall();
