@@ -527,7 +527,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
                     //
                     else if (method == ICreditFacadeMulticall.addCollateral.selector) {
                         _revertIfNoPermission(flags, ADD_COLLATERAL_PERMISSION);
-                        enabledTokensMask |= _addCollateral(creditAccount, callData, borrower); // F:[FA-26, 27]
+                        enabledTokensMask |=
+                            _addCollateral(creditAccount, callData, borrower) & limitedTokenMaskInverted; // F:[FA-26, 27]
                     }
                     //
                     // INCREASE DEBT
