@@ -10,7 +10,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 // LIBS & TRAITS
-import {BitMask} from "../libraries/BitMask.sol";
+import {UNDERLYING_TOKEN_MASK, BitMask} from "../libraries/BitMask.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 import {BalanceHelperTrait} from "../traits/BalanceHelperTrait.sol";
@@ -395,11 +395,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     /// @param amount Amount to increase / decrease the principal by
     /// @param action Increase/decrease bed debt
     /// @return newBorrowedAmount The new debt principal
-    function manageDebt(address creditAccount, uint256 amount, uint256 enableTokenMask, ManageDebtAction action)
+    function manageDebt(address creditAccount, uint256 amount, uint256 _enabledTokensMask, ManageDebtAction action)
         external
         nonReentrant
         creditFacadeOnly // F:[CM-2]
-        returns (uint256 newBorrowedAmount, bool underlyingBalanceIsZero)
+        returns (uint256 newBorrowedAmount, uint256 enabledTokensMask)
     {
         (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen_RAY, uint256 cumulativeIndexNow_RAY) =
             _getCreditAccountParameters(creditAccount);
@@ -420,6 +420,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
             // Requests the pool to lend additional funds to the Credit Account
             IPoolService(pool).lendCreditAccount(amount, creditAccount); // F:[CM-20]
+            enabledTokensMask = _enabledTokensMask | UNDERLYING_TOKEN_MASK;
         } else {
             // Decrease
             uint256 amountRepaid = amount;
@@ -427,7 +428,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
             if (supportsQuotas) {
                 (amountRepaid, amountProfit) =
-                    _computeQuotasAmountDebtDecrease(creditAccount, amountRepaid, amountProfit, enableTokenMask);
+                    _computeQuotasAmountDebtDecrease(creditAccount, amountRepaid, amountProfit, _enabledTokensMask);
             }
 
             if (amountRepaid > 0) {
@@ -480,7 +481,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
             // Pays the amount back to the pool
             ICreditAccount(creditAccount).safeTransfer(underlying, pool, amount); // F:[CM-21]
-            underlyingBalanceIsZero = _balanceOf(creditAccount, underlying) <= 1;
+
+            enabledTokensMask = _balanceOf(underlying, creditAccount) <= 1
+                ? _enabledTokensMask & (~UNDERLYING_TOKEN_MASK)
+                : _enabledTokensMask;
 
             // TODO: delete after tests or write Invaraiant test
             require(borrowedAmount - newBorrowedAmount == amountRepaid, "Ooops, something was wring");

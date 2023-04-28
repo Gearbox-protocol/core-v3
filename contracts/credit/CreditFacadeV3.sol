@@ -748,10 +748,10 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
     function _manageDebt(
         address creditAccount,
         bytes memory callData,
-        uint256 enabledTokensMask,
+        uint256 _enabledTokensMask,
         address borrower,
         ManageDebtAction action
-    ) internal returns (uint256) {
+    ) internal returns (uint256 enabledTokensMask) {
         // It is forbidden to take new debt if increaseDebtForbidden mode is enabled
         if (params.isIncreaseDebtForbidden) {
             revert IncreaseDebtForbiddenException();
@@ -762,9 +762,10 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
         // Checks that the borrowed amount does not violate the per block limit
         _checkAndUpdateBorrowedBlockLimit(amount); // F:[FA-18A]
 
+        uint256 newBorrowedAmount;
         // Requests the Credit Manager to borrow additional funds from the pool
-        (uint256 newBorrowedAmount, bool underlyingBalanceIsZero) =
-            creditManager.manageDebt(creditAccount, amount, enabledTokensMask, action); // F:[FA-17]
+        (newBorrowedAmount, enabledTokensMask) =
+            creditManager.manageDebt(creditAccount, amount, _enabledTokensMask, action); // F:[FA-17]
 
         // Checks that the new total borrowed amount is within bounds
         _revertIfOutOfBorrowedLimits(newBorrowedAmount); // F:[FA-18B]
@@ -772,11 +773,9 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
         // Emits event
         if (action == ManageDebtAction.INCREASE_DEBT) {
             emit IncreaseBorrowedAmount(borrower, amount); // F:[FA-17]
-            return enabledTokensMask | UNDERLYING_TOKEN_MASK;
+        } else {
+            emit DecreaseBorrowedAmount(borrower, amount); // F:[FA-19]
         }
-
-        emit DecreaseBorrowedAmount(borrower, amount); // F:[FA-19]
-        return underlyingBalanceIsZero ? enabledTokensMask & (~UNDERLYING_TOKEN_MASK) : enabledTokensMask;
     }
 
     function _addCollateral(address creditAccount, bytes memory callData, address borrower)
