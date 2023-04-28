@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Holdings, 2022
+// (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
 import {AbstractAdapter} from "../../../adapters/AbstractAdapter.sol";
@@ -24,12 +24,26 @@ contract AdapterMock is AbstractAdapter {
         return _getMaskOrRevert(token);
     }
 
-    function approveToken(address token, uint256 amount)
-        external
-        creditFacadeOnly
-        returns (uint256 tokensToEnable, uint256 tokensToDisable)
-    {
+    function approveToken(address token, uint256 amount) external {
         _approveToken(token, amount);
+    }
+
+    function execute(bytes memory callData) external returns (bytes memory result) {
+        result = _execute(callData);
+    }
+
+    function executeSwapNoApprove(address tokenIn, address tokenOut, bytes memory callData, bool disableTokenIn)
+        external
+        returns (uint256 tokensToEnable, uint256 tokensToDisable, bytes memory result)
+    {
+        return _executeSwapNoApprove(tokenIn, tokenOut, callData, disableTokenIn);
+    }
+
+    function executeSwapSafeApprove(address tokenIn, address tokenOut, bytes memory callData, bool disableTokenIn)
+        external
+        returns (uint256 tokensToEnable, uint256 tokensToDisable, bytes memory result)
+    {
+        return _executeSwapSafeApprove(tokenIn, tokenOut, callData, disableTokenIn);
     }
 
     function dumbCall(uint256 _tokensToEnable, uint256 _tokensToDisable)
@@ -44,26 +58,6 @@ contract AdapterMock is AbstractAdapter {
 
     function dumbCallData() public pure returns (bytes memory) {
         return abi.encodeWithSignature("hello(string)", "world");
-    }
-
-    function execute(bytes memory callData) external creditFacadeOnly returns (bytes memory result) {
-        result = _execute(callData);
-    }
-
-    function executeSwapNoApprove(address tokenIn, address tokenOut, bytes memory callData, bool disableTokenIn)
-        external
-        creditFacadeOnly
-        returns (bytes memory result)
-    {
-        return _executeSwapNoApprove(tokenIn, tokenOut, callData, disableTokenIn);
-    }
-
-    function executeSwapSafeApprove(address tokenIn, address tokenOut, bytes memory callData, bool disableTokenIn)
-        external
-        creditFacadeOnly
-        returns (bytes memory result)
-    {
-        return _executeSwapSafeApprove(tokenIn, tokenOut, callData, disableTokenIn);
     }
 
     fallback() external creditFacadeOnly {
