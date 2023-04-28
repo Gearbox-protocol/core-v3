@@ -742,6 +742,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
             _calcAllCollateral(_priceOracle, creditAccount, enabledTokenMask, PERCENTAGE_FACTOR, collateralHints, false);
 
         // add withdrawal balances to TotalValue
+        if (hasWithdrawalValue(creditAccount)) {
+            (uint256 withdrawValueUSD, uint256 tokensToEnable) =
+                _calcDelayedWithdrawalValue(_priceOracle, creditAccount);
+
+            totalUSD += withdrawValueUSD;
+            enabledTokenMask |= tokensToEnable;
+        }
 
         total = _convertFromUSD(_priceOracle, totalUSD, underlying); // F:[FA-41]
         hf = twvUSD * PERCENTAGE_FACTOR / borrowAmountPlusInterestRateAndFeesUSD;
@@ -899,29 +906,29 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     function _calcDelayedWithdrawalValue(IPriceOracleV2 _priceOracle, address creditAccount)
         internal
         view
-        returns (uint256 amount, uint256 enabledTokenMask)
+        returns (uint256 withdrawValueUSD, uint256 tokensToEnable)
     {
         (uint256 tokenMask1, uint256 balance1, uint256 tokenMask2, uint256 balance2) =
             withdrawManager.getWithdrawals(address(this), creditAccount);
 
-        (amount, enabledTokenMask) = _calcWithdrawalValueUSD(0, 0, _priceOracle, tokenMask1, balance1);
-        (amount, enabledTokenMask) =
-            _calcWithdrawalValueUSD(amount, enabledTokenMask, _priceOracle, tokenMask2, balance2);
+        (withdrawValueUSD, tokensToEnable) = _calcWithdrawalValueUSD(0, 0, _priceOracle, tokenMask1, balance1);
+        (withdrawValueUSD, tokensToEnable) =
+            _calcWithdrawalValueUSD(withdrawValueUSD, tokensToEnable, _priceOracle, tokenMask2, balance2);
     }
 
     function _calcWithdrawalValueUSD(
-        uint256 _amount,
+        uint256 _withdrawValueUSD,
         uint256 _tokensToEnbable,
         IPriceOracleV2 _priceOracle,
         uint256 tokenMask,
         uint256 balance
-    ) internal view returns (uint256 amount, uint256 tokensToEnable) {
-        amount = _amount;
+    ) internal view returns (uint256 withdrawValueUSD, uint256 tokensToEnable) {
+        withdrawValueUSD = _withdrawValueUSD;
         tokensToEnable = _tokensToEnbable;
 
         if (balance > 1) {
             address token = getTokenByMask(tokenMask);
-            amount += _convertToUSD(_priceOracle, balance, token);
+            withdrawValueUSD += _convertToUSD(_priceOracle, balance, token);
             tokensToEnable |= tokenMask;
         }
     }
@@ -1603,7 +1610,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         creditFacadeOnly
         returns (uint256 tokensToEnable)
     {
-        if (creditAccountInfo[creditAccount].flags & WITHDRAWAL_FLAG != 0) {
+        if (hasWithdrawalValue(creditAccount)) {
             return withdrawManager.cancelWithdrawals(creditAccount, ctype);
         }
     }
@@ -1651,6 +1658,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         }
         _checkEnabledTokenLength(enabledTokenMask);
         creditAccountInfo[creditAccount].enabledTokensMask = uint248(enabledTokenMask);
+    }
+
+    function hasWithdrawalValue(address creditAccount) internal view returns (bool) {
+        return creditAccountInfo[creditAccount].flags & WITHDRAWAL_FLAG != 0;
     }
 
     function _enableWithdrawalFlag(address creditAccount) internal {

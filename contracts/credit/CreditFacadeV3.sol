@@ -482,6 +482,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
         uint256 enabledTokensMask,
         uint256 flags
     ) internal returns (FullCheckParams memory fullCheckParams) {
+        uint256 limitedTokenMask;
         // Emits event for multicall start - used in analytics to track actions within multicalls
         emit StartMultiCall(borrower); // F:[FA-26]
 

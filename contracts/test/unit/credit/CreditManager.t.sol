@@ -29,10 +29,11 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
+// LIBS & TRAITS
+import {BitMask} from "../../../libraries/BitMask.sol";
 // TESTS
 
 import "../../lib/constants.sol";
-
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 
 // EXCEPTIONS
@@ -63,6 +64,8 @@ import "forge-std/console.sol";
 /// @title AddressRepository
 /// @notice Stores addresses of deployed contracts
 contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
+    using BitMask for uint256;
+
     CheatCodes evm = CheatCodes(HEVM_ADDRESS);
 
     CreditManagerTestSuite cms;
@@ -230,70 +233,6 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     function enableTokensMoreThanLimit(address creditAccount) internal {
         uint256 maxAllowedEnabledTokenLength = creditManager.maxAllowedEnabledTokenLength();
         _addAndEnableTokens(creditAccount, maxAllowedEnabledTokenLength, 2);
-    }
-
-    // function prepareForEnabledTokenOptimization(
-    //     address creditAccount,
-    //     bool[] memory tokenTypes,
-    //     uint256 enabledTokensNum,
-    //     uint256 zeroTokensNum,
-    //     uint256 breakPoint
-    // ) internal returns (uint256) {
-    //     if (enabledTokensNum == 0) {
-    //         return 1;
-    //     }
-
-    //     bool setBreakpoint;
-
-    //     if (enabledTokensNum != zeroTokensNum) {
-    //         // When there are more enabled tokens than zero tokens, we have a breakpoint other than underlying
-
-    //         uint256 daiBalance = tokenTestSuite.balanceOf(Tokens.DAI, creditAccount);
-    //         tokenTestSuite.burn(Tokens.DAI, creditAccount, daiBalance);
-    //         setBreakpoint = true;
-    //     } else {
-    //         // When there is the same number of enabled and zero tokens, only the underlying will be checked in fullCheck,
-    //         // hence all tokens + underlying will remain enabled before optimizer is run
-
-    //         enabledTokensNum += 1;
-    //     }
-
-    //     for (uint256 i = 0; i < tokenTypes.length; i++) {
-    //         if ((i == breakPoint) && setBreakpoint) {
-    //             _addAndEnableTokens(creditAccount, 1, RAY);
-    //         } else if (tokenTypes[i]) {
-    //             _addAndEnableTokens(creditAccount, 1, 2);
-    //         } else {
-    //             _addAndEnableTokens(creditAccount, 1, 1);
-    //             if ((i > breakPoint) && setBreakpoint) {
-    //                 enabledTokensNum--;
-    //             }
-    //         }
-    //     }
-
-    //     return enabledTokensNum;
-    // }
-
-    function calcEnabledTokens(address creditAccount) internal view returns (uint256) {
-        uint256 enabledMask = creditManager.enabledTokensMap(creditAccount);
-
-        uint256 tokensEnabled;
-
-        uint256 tokenMask;
-        unchecked {
-            for (uint256 i; i < 256; ++i) {
-                tokenMask = 1 << i;
-                if (enabledMask & tokenMask != 0) {
-                    ++tokensEnabled;
-                }
-
-                if (tokenMask >= enabledMask) {
-                    break;
-                }
-            }
-        }
-
-        return tokensEnabled;
     }
 
     function _openAccountAndTransferToCF() internal returns (address creditAccount) {
@@ -1514,11 +1453,12 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
                 hints[i] = 2 ** (totalTokens - i - 1);
             }
         }
-        // _baseFullCollateralCheck(creditAccount);
 
         creditManager.fullCollateralCheck(creditAccount, 2 ** (totalTokens) - 1, hints, 10000);
 
-        assertEq(calcEnabledTokens(creditAccount), 1, "Incorrect number of tokens enabled");
+        assertEq(
+            creditManager.enabledTokensMap(creditAccount).calcEnabledTokens(), 1, "Incorrect number of tokens enabled"
+        );
     }
 
     /// @dev [CM-42]: fullCollateralCheck fuzzing test
