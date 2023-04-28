@@ -482,7 +482,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
         uint256 enabledTokensMask,
         uint256 flags
     ) internal returns (FullCheckParams memory fullCheckParams) {
-        uint256 limitedTokenMask;
+        uint256 limitedTokenMaskInverted = ~creditManager.limitedTokenMask();
         // Emits event for multicall start - used in analytics to track actions within multicalls
         emit StartMultiCall(borrower); // F:[FA-26]
 
@@ -562,7 +562,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
                         _revertIfNoPermission(flags, ENABLE_TOKEN_PERMISSION);
                         // Parses token
                         address token = abi.decode(callData, (address)); // F: [FA-53]
-                        enabledTokensMask |= _getTokenMaskOrRevert(token);
+                        enabledTokensMask |= _getTokenMaskOrRevert(token) & limitedTokenMaskInverted;
                     }
                     //
                     // DISABLE TOKEN
@@ -572,7 +572,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
                         // Parses token
                         address token = abi.decode(callData, (address)); // F: [FA-53]
                         /// IGNORE QUOTED TOKEN MASK
-                        enabledTokensMask &= ~_getTokenMaskOrRevert(token);
+                        enabledTokensMask &= ~(_getTokenMaskOrRevert(token) & limitedTokenMaskInverted);
                     }
                     //
                     // UPDATE QUOTAS
@@ -591,7 +591,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
                         _revertIfNoPermission(flags, WITHDRAW_PERMISSION);
                         uint256 tokensToDisable = _withdraw(callData, creditAccount);
                         /// IGNORE QUOTED TOKEN MASK
-                        enabledTokensMask = enabledTokensMask & (~tokensToDisable);
+                        enabledTokensMask = enabledTokensMask & (~(tokensToDisable & limitedTokenMaskInverted));
                     }
                     //
                     // RevokeAdapterAllowances
@@ -631,7 +631,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
                     bytes memory result = mcall.target.functionCall(mcall.callData); // F:[FA-29]
                     (uint256 tokensToEnable, uint256 tokensToDisable) = abi.decode(result, (uint256, uint256));
                     /// IGNORE QUOTED TOKEN MASK
-                    enabledTokensMask = (enabledTokensMask | tokensToEnable) & (~tokensToDisable);
+                    enabledTokensMask = (enabledTokensMask & limitedTokenMaskInverted | tokensToEnable)
+                        & (~(tokensToDisable & limitedTokenMaskInverted));
                 }
             }
         }
