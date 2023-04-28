@@ -1035,7 +1035,8 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         uint256 expectedNewCulumativeIndex =
             (2 * cumulativeIndexAtOpen * (borrowedAmount + amount)) / (2 * borrowedAmount + amount);
 
-        uint256 newBorrowedAmount = creditManager.manageDebt(creditAccount, amount, 1, ManageDebtAction.INCREASE_DEBT);
+        (uint256 newBorrowedAmount,) =
+            creditManager.manageDebt(creditAccount, amount, 1, ManageDebtAction.INCREASE_DEBT);
 
         assertEq(newBorrowedAmount, borrowedAmount + amount, "Incorrect returned newBorrowedAmount");
 
@@ -1073,7 +1074,8 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
             expectedBorrowAmount = borrowedAmount;
         }
 
-        uint256 newBorrowedAmount = creditManager.manageDebt(creditAccount, amount, 1, ManageDebtAction.DECREASE_DEBT);
+        (uint256 newBorrowedAmount,) =
+            creditManager.manageDebt(creditAccount, amount, 1, ManageDebtAction.DECREASE_DEBT);
 
         assertEq(newBorrowedAmount, expectedBorrowAmount, "Incorrect returned newBorrowedAmount");
 

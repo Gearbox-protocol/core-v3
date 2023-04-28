@@ -72,8 +72,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
     /// @dev Points to creditAccount during multicall, otherwise keeps address(1) for gas savings
     /// CreditFacade is trusted source, so primarly it sends creditAccount as parameter
-    /// externalCallCA is used for adapters interation when adapter calls approve / execute methods
-    address public externalCallCA;
+    /// _externalCallCreditAccount is used for adapters interation when adapter calls approve / execute methods
+    address internal _externalCallCreditAccount;
 
     /// @dev Interest fee charged by the protocol: fee = interest accrued * feeInterest
     uint16 public feeInterest;
@@ -124,7 +124,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     mapping(uint256 => CollateralTokenData) internal collateralTokensData;
 
     /// @dev Total number of known collateral tokens.
-    uint256 public collateralTokensCount;
+    uint8 public collateralTokensCount;
 
     /// @dev Internal map of token addresses to their indidivual masks.
     /// @notice A mask is a uint256 that has only 1 non-zero bit in the position correspondingto
@@ -219,7 +219,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
         withdrawManager = IWithdrawManager(_withdrawManager);
 
-        externalCallCA = address(1);
+        _externalCallCreditAccount = address(1);
     }
 
     //
@@ -399,7 +399,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         external
         nonReentrant
         creditFacadeOnly // F:[CM-2]
-        returns (uint256 newBorrowedAmount)
+        returns (uint256 newBorrowedAmount, bool underlyingBalanceIsZero)
     {
         (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen_RAY, uint256 cumulativeIndexNow_RAY) =
             _getCreditAccountParameters(creditAccount);
@@ -480,6 +480,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
             // Pays the amount back to the pool
             ICreditAccount(creditAccount).safeTransfer(underlying, pool, amount); // F:[CM-21]
+            underlyingBalanceIsZero = _balanceOf(creditAccount, underlying) <= 1;
 
             // TODO: delete after tests or write Invaraiant test
             require(borrowedAmount - newBorrowedAmount == amountRepaid, "Ooops, something was wring");
@@ -489,9 +490,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         //
         // Sets new parameters on the Credit Account if they were changed
         if (newBorrowedAmount != borrowedAmount || newCumulativeIndex != cumulativeIndexAtOpen_RAY) {
-            borrowedAmounts[creditAccount] = newBorrowedAmount;
-            cumulativeIndicies[creditAccount] = newCumulativeIndex;
-            // ICreditAccount(creditAccount).updateParameters(newBorrowedAmount, newCumulativeIndex); // F:[CM-20. 21]
+            borrowedAmounts[creditAccount] = newBorrowedAmount; // F:[CM-20. 21]
+            cumulativeIndicies[creditAccount] = newCumulativeIndex; // F:[CM-20. 21]
         }
     }
 
@@ -1632,11 +1632,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
     ///
     function setCaForExternalCall(address creditAccount) external override creditFacadeOnly {
-        externalCallCA = creditAccount;
+        _externalCallCreditAccount = creditAccount;
     }
 
     function externalCallCreditAccountOrRevert() public view override returns (address creditAccount) {
-        creditAccount = externalCallCA;
+        creditAccount = _externalCallCreditAccount;
         if (creditAccount == address(1)) revert ExternalCallCreditAccountNotSetException();
     }
 

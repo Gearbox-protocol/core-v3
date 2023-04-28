@@ -122,7 +122,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @return newBorrowedAmount The new debt principal
     function manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)
         external
-        returns (uint256 newBorrowedAmount);
+        returns (uint256 newBorrowedAmount, bool underlyingBalanceIsZero);
 
     /// @dev Adds collateral to borrower's credit account
     /// @param payer Address of the account which will be charged to provide additional collateral
@@ -264,7 +264,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     function getQuotedTokens(address creditAccount) external view returns (TokenLT[] memory tokens);
 
     /// @dev Total number of known collateral tokens.
-    function collateralTokensCount() external view returns (uint256);
+    function collateralTokensCount() external view returns (uint8);
 
     /// @dev Returns the mask for the provided token
     /// @param token Token to returns the mask for

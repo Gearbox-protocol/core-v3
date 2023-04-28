@@ -539,7 +539,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
 
                         flags &= ~DECREASE_DEBT_PERMISSION; // F:[FA-28]
                         flags |= INCREASE_DEBT_WAS_CALLED;
-                        _manageDebt(
+                        enabledTokensMask = _manageDebt(
                             creditAccount, callData, enabledTokensMask, borrower, ManageDebtAction.INCREASE_DEBT
                         ); // F:[FA-26]
                     }
@@ -551,7 +551,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
                         _revertIfNoPermission(flags, DECREASE_DEBT_PERMISSION);
                         // F:[FA-28]
 
-                        _manageDebt(
+                        enabledTokensMask = _manageDebt(
                             creditAccount, callData, enabledTokensMask, borrower, ManageDebtAction.DECREASE_DEBT
                         ); // F:[FA-27]
                     }
@@ -631,7 +631,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
                     bytes memory result = mcall.target.functionCall(mcall.callData); // F:[FA-29]
                     (uint256 tokensToEnable, uint256 tokensToDisable) = abi.decode(result, (uint256, uint256));
                     /// IGNORE QUOTED TOKEN MASK
-                    enabledTokensMask = (enabledTokensMask & quotedTokenMaskInverted | tokensToEnable)
+                    enabledTokensMask = (enabledTokensMask | (tokensToEnable & quotedTokenMaskInverted))
                         & (~(tokensToDisable & quotedTokenMaskInverted));
                 }
             }
@@ -751,7 +751,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
         uint256 enabledTokensMask,
         address borrower,
         ManageDebtAction action
-    ) internal {
+    ) internal returns (uint256) {
         // It is forbidden to take new debt if increaseDebtForbidden mode is enabled
         if (params.isIncreaseDebtForbidden) {
             revert IncreaseDebtForbiddenException();
@@ -763,15 +763,20 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
         _checkAndUpdateBorrowedBlockLimit(amount); // F:[FA-18A]
 
         // Requests the Credit Manager to borrow additional funds from the pool
-        uint256 newBorrowedAmount = creditManager.manageDebt(creditAccount, amount, enabledTokensMask, action); // F:[FA-17]
+        (uint256 newBorrowedAmount, bool underlyingBalanceIsZero) =
+            creditManager.manageDebt(creditAccount, amount, enabledTokensMask, action); // F:[FA-17]
 
         // Checks that the new total borrowed amount is within bounds
         _revertIfOutOfBorrowedLimits(newBorrowedAmount); // F:[FA-18B]
 
         // Emits event
-        if (action == ManageDebtAction.INCREASE_DEBT) emit IncreaseBorrowedAmount(borrower, amount); // F:[FA-17]
+        if (action == ManageDebtAction.INCREASE_DEBT) {
+            emit IncreaseBorrowedAmount(borrower, amount); // F:[FA-17]
+            return enabledTokensMask | UNDERLYING_TOKEN_MASK;
+        }
 
-        else emit DecreaseBorrowedAmount(borrower, amount); // F:[FA-19]
+        emit DecreaseBorrowedAmount(borrower, amount); // F:[FA-19]
+        return underlyingBalanceIsZero ? enabledTokensMask & (~UNDERLYING_TOKEN_MASK) : enabledTokensMask;
     }
 
     function _addCollateral(address creditAccount, bytes memory callData, address borrower)
