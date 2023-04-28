@@ -759,8 +759,10 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, BalanceHelperTra
 
         uint256 amount = abi.decode(callData, (uint256)); // F:[FA-26]
 
-        // Checks that the borrowed amount does not violate the per block limit
-        _checkAndUpdateBorrowedBlockLimit(amount); // F:[FA-18A]
+        if (action == ManageDebtAction.INCREASE_DEBT) {
+            // Checks that the borrowed amount does not violate the per block limit
+            _checkAndUpdateBorrowedBlockLimit(amount); // F:[FA-18A]
+        }
 
         uint256 newBorrowedAmount;
         // Requests the Credit Manager to borrow additional funds from the pool
