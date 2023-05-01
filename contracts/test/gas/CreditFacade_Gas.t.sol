@@ -60,7 +60,7 @@ uint16 constant REFERRAL_CODE = 23;
 
 /// @title CreditFacadeTest
 /// @notice Designed for unit test purposes only
-contract CreditFacadeTest is
+contract CreditFacadeGasTest is
     DSTest,
     BalanceHelper,
     CreditFacadeTestHelper,
@@ -199,7 +199,7 @@ contract CreditFacadeTest is
 
         emit log_string(
             string(abi.encodePacked("Gas spent - opening an account with adding collateral and executing one swap: "))
-            );
+        );
         emit log_uint(gasSpent);
     }
 
@@ -241,7 +241,7 @@ contract CreditFacadeTest is
 
         emit log_string(
             string(abi.encodePacked("Gas spent - opening an account with adding collateral and executing two swaps: "))
-            );
+        );
         emit log_uint(gasSpent);
     }
 
@@ -287,7 +287,7 @@ contract CreditFacadeTest is
             string(
                 abi.encodePacked("Gas spent - opening an account with adding quoted collateral and updating 1 quota: ")
             )
-            );
+        );
         emit log_uint(gasSpent);
     }
 
@@ -339,7 +339,7 @@ contract CreditFacadeTest is
 
         emit log_string(
             string(abi.encodePacked("Gas spent - opening an account with swapping into quoted collateral: "))
-            );
+        );
         emit log_uint(gasSpent);
     }
 
@@ -671,7 +671,7 @@ contract CreditFacadeTest is
                     "Gas spent - multicall with a single swap into quoted collateral and updating quotas: "
                 )
             )
-            );
+        );
         emit log_uint(gasSpent);
     }
 
@@ -966,7 +966,7 @@ contract CreditFacadeTest is
 
         emit log_string(
             string(abi.encodePacked("Gas spent - liquidateCreditAccount with underlying and quoted token: "))
-            );
+        );
         emit log_uint(gasSpent);
     }
 }
