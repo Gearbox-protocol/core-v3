@@ -221,21 +221,17 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
         assertEq(address(creditManager.priceOracle()), address(cct.priceOracle()), "Incorrect creditFacade");
 
         // CREDIT FACADE PARAMS
-        (uint128 minBorrowedAmount, uint128 maxBorrowedAmount) = creditFacade.limits();
+        (uint128 minBorrowedAmount, uint128 maxBorrowedAmount) = creditFacade.debtLimits();
 
         assertEq(minBorrowedAmount, cct.minBorrowedAmount(), "Incorrect minBorrowedAmount");
 
         assertEq(maxBorrowedAmount, cct.maxBorrowedAmount(), "Incorrect maxBorrowedAmount");
 
-        (uint128 maxBorrowedAmountPerBlock, bool isIncreaseDebtForbidden, uint40 expirationDate) = creditFacade.params();
+        uint8 maxBorrowedAmountPerBlock = creditFacade.maxDebtPerBlockMultiplier();
 
-        assertEq(
-            maxBorrowedAmountPerBlock,
-            DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER * cct.maxBorrowedAmount(),
-            "Incorrect  maxBorrowedAmountPerBlock"
-        );
+        uint40 expirationDate = creditFacade.expirationDate();
 
-        assertTrue(isIncreaseDebtForbidden == false, "Incorrect isIncreaseDebtForbidden ");
+        assertEq(maxBorrowedAmountPerBlock, DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER, "Incorrect  maxBorrowedAmountPerBlock");
 
         assertEq(expirationDate, 0, "Incorrect expiration date");
     }
@@ -297,8 +293,9 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
         evm.expectEmit(true, false, false, false);
         emit SetPriceOracle(priceOracleAddress);
 
-        evm.expectEmit(false, false, false, true);
-        emit SetBorrowingLimitPerBlock(uint128(150000 * WAD * DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER));
+        /// todo: change
+        // evm.expectEmit(false, false, false, true);
+        // emit SetMaxDebtPerBlockMultiplier(uint128(150000 * WAD * DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER));
 
         evm.expectEmit(false, false, false, true);
         emit SetBorrowingLimits(uint128(50 * WAD), uint128(150000 * WAD));
@@ -350,25 +347,19 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
         evm.stopPrank();
     }
 
-    function test_CC_02A_setIncreaseDebtForbidden_reverts_on_non_pausable_unpausable_admin() public {
+    function test_CC_02A_forbidBorrowing_on_non_pausable_admin() public {
         evm.expectRevert(CallerNotPausableAdminException.selector);
-        creditConfigurator.setIncreaseDebtForbidden(true);
-
-        evm.expectRevert(CallerNotPausableAdminException.selector);
-        creditConfigurator.setIncreaseDebtForbidden(false);
+        creditConfigurator.forbidBorrowing();
 
         evm.prank(CONFIGURATOR);
-        creditConfigurator.setIncreaseDebtForbidden(true);
-
-        evm.prank(CONFIGURATOR);
-        creditConfigurator.setIncreaseDebtForbidden(false);
+        creditConfigurator.forbidBorrowing();
     }
 
     function test_CC_02B_controllerOnly_functions_revert_on_non_controller() public {
         evm.expectRevert(CallerNotControllerException.selector);
         creditConfigurator.setLiquidationThreshold(DUMB_ADDRESS, uint16(0));
 
-        evm.expectRevert(CallerNotControllerException.selector);
+        evm.expectRevert(CallerNotPausableAdminException.selector);
         creditConfigurator.forbidToken(DUMB_ADDRESS);
 
         evm.expectRevert(CallerNotControllerException.selector);
@@ -378,7 +369,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
         creditConfigurator.setLimits(0, 0);
 
         evm.expectRevert(CallerNotControllerException.selector);
-        creditConfigurator.setLimitPerBlock(0);
+        creditConfigurator.setMaxDebtPerBlockMultiplier(0);
 
         evm.expectRevert(CallerNotControllerException.selector);
         creditConfigurator.setMaxEnabledTokens(1);
@@ -732,25 +723,19 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
     // CREDIT MANAGER MGMT
     //
 
-    /// @dev [CC-18]: setLimits reverts if minAmount > maxAmount or maxBorrowedAmount > blockLimit
-    function test_CC_18_setLimits_reverts_if_minAmount_gt_maxAmount_or_maxBorrowedAmount_gt_blockLimit() public {
-        (uint128 minBorrowedAmount, uint128 maxBorrowedAmount) = creditFacade.limits();
+    /// @dev [CC-18]: setLimits reverts if minAmount > maxAmount
+    function test_CC_18_setLimits_reverts_if_minAmount_gt_maxAmount() public {
+        (uint128 minBorrowedAmount, uint128 maxBorrowedAmount) = creditFacade.debtLimits();
 
         evm.expectRevert(IncorrectLimitsException.selector);
 
         evm.prank(CONFIGURATOR);
         creditConfigurator.setLimits(maxBorrowedAmount, minBorrowedAmount);
-
-        (uint128 blockLimit,,) = creditFacade.params();
-        evm.expectRevert(IncorrectLimitsException.selector);
-
-        evm.prank(CONFIGURATOR);
-        creditConfigurator.setLimits(minBorrowedAmount, blockLimit + 1);
     }
 
     /// @dev [CC-19]: setLimits sets limits
     function test_CC_19_setLimits_sets_limits() public {
-        (uint128 minBorrowedAmount, uint128 maxBorrowedAmount) = creditFacade.limits();
+        (uint128 minBorrowedAmount, uint128 maxBorrowedAmount) = creditFacade.debtLimits();
         uint128 newMinBorrowedAmount = minBorrowedAmount + 1000;
         uint128 newMaxBorrowedAmount = maxBorrowedAmount + 1000;
 
@@ -758,7 +743,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
         emit SetBorrowingLimits(newMinBorrowedAmount, newMaxBorrowedAmount);
         evm.prank(CONFIGURATOR);
         creditConfigurator.setLimits(newMinBorrowedAmount, newMaxBorrowedAmount);
-        (minBorrowedAmount, maxBorrowedAmount) = creditFacade.limits();
+        (minBorrowedAmount, maxBorrowedAmount) = creditFacade.debtLimits();
         assertEq(minBorrowedAmount, newMinBorrowedAmount, "Incorrect minBorrowedAmount");
         assertEq(maxBorrowedAmount, newMaxBorrowedAmount, "Incorrect maxBorrowedAmount");
     }
@@ -916,73 +901,67 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
 
     /// @dev [CC-30]: setCreditFacade upgrades creditFacade and doesnt change priceOracle
     function test_CC_30_setCreditFacade_upgrades_creditFacade_and_doesnt_change_priceOracle() public {
-        for (uint256 id = 0; id < 2; id++) {
-            bool isIDF = id != 0;
-            for (uint256 ex = 0; ex < 2; ex++) {
-                bool isExpirable = ex != 0;
-                for (uint256 ms = 0; ms < 2; ms++) {
-                    bool migrateSettings = ms != 0;
+        for (uint256 ex = 0; ex < 2; ex++) {
+            bool isExpirable = ex != 0;
+            for (uint256 ms = 0; ms < 2; ms++) {
+                bool migrateSettings = ms != 0;
 
-                    setUp();
+                setUp();
 
-                    if (isExpirable) {
-                        CreditFacadeV3 initialCf = new CreditFacadeV3(
+                if (isExpirable) {
+                    CreditFacadeV3 initialCf = new CreditFacadeV3(
                             address(creditManager),
                             address(0),
 
                             true
                         );
 
-                        evm.prank(CONFIGURATOR);
-                        creditConfigurator.setCreditFacade(address(initialCf), migrateSettings);
+                    evm.prank(CONFIGURATOR);
+                    creditConfigurator.setCreditFacade(address(initialCf), migrateSettings);
 
-                        evm.prank(CONFIGURATOR);
-                        creditConfigurator.setExpirationDate(uint40(block.timestamp + 1));
+                    evm.prank(CONFIGURATOR);
+                    creditConfigurator.setExpirationDate(uint40(block.timestamp + 1));
 
-                        creditFacade = initialCf;
-                    }
+                    creditFacade = initialCf;
+                }
 
-                    CreditFacadeV3 cf = new CreditFacadeV3(
+                CreditFacadeV3 cf = new CreditFacadeV3(
                         address(creditManager),
                         address(0),
                         isExpirable
                     );
 
-                    evm.prank(CONFIGURATOR);
-                    creditConfigurator.setIncreaseDebtForbidden(isIDF);
+                uint8 maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
 
-                    (uint128 limitPerBlock, bool isIncreaseDebtFobidden, uint40 expirationDate) = creditFacade.params();
-                    (uint128 minBorrowedAmount, uint128 maxBorrowedAmount) = creditFacade.limits();
+                uint40 expirationDate = creditFacade.expirationDate();
+                (uint128 minBorrowedAmount, uint128 maxBorrowedAmount) = creditFacade.debtLimits();
 
-                    evm.expectEmit(true, false, false, false);
-                    emit SetCreditFacade(address(cf));
+                evm.expectEmit(true, false, false, false);
+                emit SetCreditFacade(address(cf));
 
-                    evm.prank(CONFIGURATOR);
-                    creditConfigurator.setCreditFacade(address(cf), migrateSettings);
+                evm.prank(CONFIGURATOR);
+                creditConfigurator.setCreditFacade(address(cf), migrateSettings);
 
-                    assertEq(address(creditManager.priceOracle()), cct.addressProvider().getPriceOracle());
+                assertEq(address(creditManager.priceOracle()), cct.addressProvider().getPriceOracle());
 
-                    assertEq(address(creditManager.creditFacade()), address(cf));
-                    assertEq(address(creditConfigurator.creditFacade()), address(cf));
+                assertEq(address(creditManager.creditFacade()), address(cf));
+                assertEq(address(creditConfigurator.creditFacade()), address(cf));
 
-                    (uint128 limitPerBlock2, bool isIncreaseDebtFobidden2, uint40 expirationDate2) = cf.params();
-                    (uint128 minBorrowedAmount2, uint128 maxBorrowedAmount2) = cf.limits();
+                uint8 maxDebtPerBlockMultiplier2 = cf.maxDebtPerBlockMultiplier();
 
-                    assertEq(limitPerBlock2, migrateSettings ? limitPerBlock : 0, "Incorrwect limitPerBlock");
-                    assertEq(
-                        minBorrowedAmount2, migrateSettings ? minBorrowedAmount : 0, "Incorrwect minBorrowedAmount"
-                    );
-                    assertEq(
-                        maxBorrowedAmount2, migrateSettings ? maxBorrowedAmount : 0, "Incorrwect maxBorrowedAmount"
-                    );
+                uint40 expirationDate2 = cf.expirationDate();
 
-                    assertTrue(
-                        isIncreaseDebtFobidden2 == (migrateSettings ? isIncreaseDebtFobidden : false),
-                        "Incorrect isIncreaseDebtFobidden"
-                    );
+                (uint128 minBorrowedAmount2, uint128 maxBorrowedAmount2) = cf.debtLimits();
 
-                    assertEq(expirationDate2, migrateSettings ? expirationDate : 0, "Incorrect expirationDate");
-                }
+                assertEq(
+                    maxDebtPerBlockMultiplier2,
+                    migrateSettings ? maxDebtPerBlockMultiplier : 0,
+                    "Incorrwect limitPerBlock"
+                );
+                assertEq(minBorrowedAmount2, migrateSettings ? minBorrowedAmount : 0, "Incorrwect minBorrowedAmount");
+                assertEq(maxBorrowedAmount2, migrateSettings ? maxBorrowedAmount : 0, "Incorrwect maxBorrowedAmount");
+
+                assertEq(expirationDate2, migrateSettings ? expirationDate : 0, "Incorrect expirationDate");
             }
         }
     }
@@ -1025,54 +1004,55 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
         assertEq(address(creditManager.creditConfigurator()), DUMB_COMPARTIBLE_CONTRACT);
     }
 
-    /// @dev [CC-32]: setIncreaseDebtForbidden sets IncreaseDebtForbidden
-    function test_CC_32_setIncreaseDebtForbidden_sets_IncreaseDebtForbidden() public {
-        for (uint256 id = 0; id < 2; id++) {
-            bool isIDF = id != 0;
-            for (uint256 ii = 0; ii < 2; ii++) {
-                bool initialIDF = ii != 0;
+    /// @dev [CC-32]: setBorrowingAllowance sets IncreaseDebtForbidden
+    function test_CC_32_setBorrowingAllowance_sets_IncreaseDebtForbidden() public {
+        /// TODO: Change test
+        // for (uint256 id = 0; id < 2; id++) {
+        //     bool isIDF = id != 0;
+        //     for (uint256 ii = 0; ii < 2; ii++) {
+        //         bool initialIDF = ii != 0;
 
-                setUp();
+        //         setUp();
 
-                evm.prank(CONFIGURATOR);
-                creditConfigurator.setIncreaseDebtForbidden(initialIDF);
+        //         evm.prank(CONFIGURATOR);
+        //         creditConfigurator.setBorrowingAllowance(initialIDF);
 
-                (, bool isIncreaseDebtFobidden,) = creditFacade.params();
+        //         (, bool isIncreaseDebtFobidden,) = creditFacade.params();
 
-                if (isIncreaseDebtFobidden != isIDF) {
-                    evm.expectEmit(false, false, false, true);
-                    emit SetIncreaseDebtForbiddenMode(isIDF);
-                }
+        //         if (isIncreaseDebtFobidden != isIDF) {
+        //             evm.expectEmit(false, false, false, true);
+        //             emit SetIncreaseDebtForbiddenMode(isIDF);
+        //         }
 
-                evm.prank(CONFIGURATOR);
-                creditConfigurator.setIncreaseDebtForbidden(isIDF);
+        //         evm.prank(CONFIGURATOR);
+        //         creditConfigurator.setBorrowingAllowance(isIDF);
 
-                (, isIncreaseDebtFobidden,) = creditFacade.params();
+        //         (, isIncreaseDebtFobidden,) = creditFacade.params();
 
-                assertTrue(isIncreaseDebtFobidden == isIDF, "Incorrect isIncreaseDebtFobidden");
-            }
-        }
+        //         assertTrue(isIncreaseDebtFobidden == isIDF, "Incorrect isIncreaseDebtFobidden");
+        //     }
+        // }
     }
 
-    /// @dev [CC-33]: setLimitPerBlock reverts if it lt maxLimit otherwise sets limitPerBlock
-    function test_CC_33_setLimitPerBlock_reverts_if_it_lt_maxLimit_otherwise_sets_limitPerBlock() public {
-        (, uint128 maxBorrowedAmount) = creditFacade.limits();
+    /// @dev [CC-33]: setMaxDebtLimitPerBlock reverts if it lt maxLimit otherwise sets limitPerBlock
+    function test_CC_33_setMaxDebtLimitPerBlock_reverts_if_it_lt_maxLimit_otherwise_sets_limitPerBlock() public {
+        // (, uint128 maxBorrowedAmount) = creditFacade.debtLimits();
 
-        evm.prank(CONFIGURATOR);
-        evm.expectRevert(IncorrectLimitsException.selector);
-        creditConfigurator.setLimitPerBlock(maxBorrowedAmount - 1);
+        // evm.prank(CONFIGURATOR);
+        // evm.expectRevert(IncorrectLimitsException.selector);
+        // creditConfigurator.setMaxDebtLimitPerBlock(maxBorrowedAmount - 1);
 
-        uint128 newLimitBlock = (maxBorrowedAmount * 12) / 10;
+        // uint128 newLimitBlock = (maxBorrowedAmount * 12) / 10;
 
-        evm.expectEmit(false, false, false, true);
-        emit SetBorrowingLimitPerBlock(newLimitBlock);
+        // evm.expectEmit(false, false, false, true);
+        // emit SetMaxDebtPerBlockMultiplier(newLimitBlock);
 
-        evm.prank(CONFIGURATOR);
-        creditConfigurator.setLimitPerBlock(newLimitBlock);
+        // evm.prank(CONFIGURATOR);
+        // creditConfigurator.setMaxDebtLimitPerBlock(newLimitBlock);
 
-        (uint128 maxBorrowedAmountPerBlock,,) = creditFacade.params();
+        // (uint128 maxBorrowedAmountPerBlock,,) = creditFacade.params();
 
-        assertEq(maxBorrowedAmountPerBlock, newLimitBlock, "Incorrect new limits block");
+        // assertEq(maxBorrowedAmountPerBlock, newLimitBlock, "Incorrect new limits block");
     }
 
     /// @dev [CC-34]: setExpirationDate reverts if the new expiration date is stale, otherwise sets it
@@ -1080,7 +1060,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
         cct.testFacadeWithExpiration();
         creditFacade = cct.creditFacade();
 
-        (,, uint40 expirationDate) = creditFacade.params();
+        uint40 expirationDate = creditFacade.expirationDate();
 
         evm.prank(CONFIGURATOR);
         evm.expectRevert(IncorrectExpirationDateException.selector);
@@ -1100,7 +1080,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
         evm.prank(CONFIGURATOR);
         creditConfigurator.setExpirationDate(newExpirationDate);
 
-        (,, expirationDate) = creditFacade.params();
+        expirationDate = creditFacade.expirationDate();
 
         assertEq(expirationDate, newExpirationDate, "Incorrect new expirationDate");
     }

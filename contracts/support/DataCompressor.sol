@@ -121,9 +121,10 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
             ICreditFacade creditFacade,
         ) = getCreditContracts(_creditManager);
 
-        address creditAccount = (ver == 1)
-            ? creditManager.getCreditAccountOrRevert(borrower)
-            : creditManagerV2.getCreditAccountOrRevert(borrower);
+        address creditAccount = creditManager.getCreditAccountOrRevert(borrower); //
+        //  (ver == 1)
+        //     ? creditManager.getCreditAccountOrRevert(borrower)
+        //     : creditManagerV2.getCreditAccountOrRevert(borrower);
 
         result.version = ver;
 
@@ -243,7 +244,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
             result.minAmount = creditManager.minAmount();
             result.maxAmount = creditManager.maxAmount();
         } else {
-            (result.minAmount, result.maxAmount) = creditFacade.limits();
+            (result.minAmount, result.maxAmount) = creditFacade.debtLimits();
         }
         {
             uint256 collateralTokenCount =
@@ -308,7 +309,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
             result.creditFacade = address(creditFacade);
             result.creditConfigurator = creditManagerV2.creditConfigurator();
             result.degenNFT = creditFacade.degenNFT();
-            (, result.isIncreaseDebtForbidden,) = creditFacade.params(); // V2 only: true if increasing debt is forbidden
+            result.isIncreaseDebtForbidden = creditFacade.maxDebtPerBlockMultiplier() == 0; // V2 only: true if increasing debt is forbidden
             result.forbiddenTokenMask = creditFacade.forbiddenTokenMask(); // V2 only: mask which forbids some particular tokens
             result.maxEnabledTokensLength = creditManagerV2.maxAllowedEnabledTokenLength(); // V2 only: a limit on enabled tokens imposed for security
             {
@@ -390,7 +391,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
 
     /// @dev Internal implementation for hasOpenedCreditAccount
     function _hasOpenedCreditAccount(address creditManager, address borrower) internal view returns (bool) {
-        return ICreditManagerV3(creditManager).creditAccounts(borrower) != address(0);
+        // return ICreditManagerV3(creditManager).creditAccounts(borrower) != address(0);
     }
 
     /// @dev Retrieves all relevant credit contracts for a particular Credit Manager

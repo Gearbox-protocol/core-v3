@@ -89,7 +89,9 @@ contract BalanceEngine is DSTest {
         if (allowance != expectedAllowance) {
             emit log_named_address(
                 string(
-                    abi.encodePacked(reason, "Incorrect ", IERC20Metadata(token).symbol(), " Allowance on account:  ")
+                    abi.encodePacked(
+                        reason, "Incorrect ", IERC20Metadata(token).symbol(), " AllowanceAction on account:  "
+                    )
                 ),
                 owner
             );

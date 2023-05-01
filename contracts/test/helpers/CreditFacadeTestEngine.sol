@@ -37,10 +37,11 @@ contract CreditFacadeTestEngine is DSTest {
 
     function _openCreditAccount(uint256 amount, address onBehalfOf, uint16 leverageFactor, uint16 referralCode)
         internal
+        returns (address)
     {
         uint256 borrowedAmount = (amount * leverageFactor) / LEVERAGE_DECIMALS; // F:[FA-5]
 
-        creditFacade.openCreditAccount(
+        return creditFacade.openCreditAccount(
             borrowedAmount,
             onBehalfOf,
             multicallBuilder(
@@ -59,11 +60,9 @@ contract CreditFacadeTestEngine is DSTest {
         cft.tokenTestSuite().mint(underlying, USER, accountAmount);
 
         evm.startPrank(USER);
-        _openCreditAccount(accountAmount, USER, 100, 0);
+        creditAccount = _openCreditAccount(accountAmount, USER, 100, 0);
 
         evm.stopPrank();
-
-        creditAccount = creditManager.getCreditAccountOrRevert(USER);
 
         balance = IERC20(underlying).balanceOf(creditAccount);
 
@@ -78,22 +77,18 @@ contract CreditFacadeTestEngine is DSTest {
         // creditFacade.openCreditAccount(accountAmount, FRIEND, 100, 0);
 
         evm.startPrank(USER);
-        _openCreditAccount(accountAmount, USER, 100, 0);
+        creditAccount = _openCreditAccount(accountAmount, USER, 100, 0);
 
         evm.stopPrank();
-
-        creditAccount = creditManager.getCreditAccountOrRevert(FRIEND);
 
         balance = IERC20(underlying).balanceOf(creditAccount);
     }
 
-    function _closeTestCreditAccount() internal {
+    function _closeTestCreditAccount(address creditAccount) internal {
         MultiCall[] memory closeCalls;
 
         // switch to new block to be able to close account
         evm.roll(block.number + 1);
-
-        address creditAccount = creditManager.getCreditAccountOrRevert(USER);
 
         (,, uint256 underlyingToClose) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
         uint256 underlyingBalance = cft.tokenTestSuite().balanceOf(underlying, creditAccount);
@@ -105,16 +100,16 @@ contract CreditFacadeTestEngine is DSTest {
         }
 
         evm.prank(USER);
-        creditFacade.closeCreditAccount(FRIEND, 0, false, closeCalls);
+        creditFacade.closeCreditAccount(creditAccount, FRIEND, 0, false, closeCalls);
     }
 
-    function expectTokenIsEnabled(address token, bool expectedState) internal {
-        expectTokenIsEnabled(token, expectedState, "");
+    function expectTokenIsEnabled(address creditAccount, address token, bool expectedState) internal {
+        expectTokenIsEnabled(creditAccount, token, expectedState, "");
     }
 
-    function expectTokenIsEnabled(address token, bool expectedState, string memory reason) internal {
-        address creditAccount = creditManager.getCreditAccountOrRevert(USER);
-
+    function expectTokenIsEnabled(address creditAccount, address token, bool expectedState, string memory reason)
+        internal
+    {
         bool state = creditManager.getTokenMaskOrRevert(token) & creditManager.enabledTokensMap(creditAccount) != 0;
 
         if (state != expectedState && bytes(reason).length != 0) {
@@ -153,9 +148,9 @@ contract CreditFacadeTestEngine is DSTest {
         evm.roll(block.number + 1);
     }
 
-    function executeOneLineMulticall(address targetContract, bytes memory callData) internal {
+    function executeOneLineMulticall(address creditAccount, address targetContract, bytes memory callData) internal {
         evm.prank(USER);
-        creditFacade.multicall(multicallBuilder(MultiCall({target: targetContract, callData: callData})));
+        creditFacade.multicall(creditAccount, multicallBuilder(MultiCall({target: targetContract, callData: callData})));
     }
 
     function multicallBuilder() internal pure returns (MultiCall[] memory calls) {}
@@ -186,8 +181,7 @@ contract CreditFacadeTestEngine is DSTest {
         calls[2] = call3;
     }
 
-    function expectSafeAllowance(address target) internal {
-        address creditAccount = creditManager.getCreditAccountOrRevert(USER);
+    function expectSafeAllowance(address creditAccount, address target) internal {
         uint256 len = creditManager.collateralTokensCount();
         for (uint256 i = 0; i < len; i++) {
             (address token,) = creditManager.collateralTokens(i);

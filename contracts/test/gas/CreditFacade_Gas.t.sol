@@ -251,7 +251,7 @@ contract CreditFacadeTest is
     //     cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
     //     cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
     //     cft.gaugeMock().updateEpoch();
-    //     creditConfigurator.makeTokenLimited(tokenTestSuite.addressOf(Tokens.LINK));
+    //     creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
     //     evm.stopPrank();
 
     //     tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
@@ -297,7 +297,7 @@ contract CreditFacadeTest is
     //     cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
     //     cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
     //     cft.gaugeMock().updateEpoch();
-    //     creditConfigurator.makeTokenLimited(tokenTestSuite.addressOf(Tokens.LINK));
+    //     creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
     //     evm.stopPrank();
 
     //     tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
@@ -413,7 +413,7 @@ contract CreditFacadeTest is
     //     cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
     //     cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
     //     cft.gaugeMock().updateEpoch();
-    //     creditConfigurator.makeTokenLimited(tokenTestSuite.addressOf(Tokens.LINK));
+    //     creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
     //     evm.stopPrank();
 
     //     tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
@@ -614,7 +614,7 @@ contract CreditFacadeTest is
     //     cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
     //     cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
     //     cft.gaugeMock().updateEpoch();
-    //     creditConfigurator.makeTokenLimited(tokenTestSuite.addressOf(Tokens.LINK));
+    //     creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
     //     evm.stopPrank();
 
     //     tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
@@ -752,7 +752,7 @@ contract CreditFacadeTest is
     //     cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
     //     cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
     //     cft.gaugeMock().updateEpoch();
-    //     creditConfigurator.makeTokenLimited(tokenTestSuite.addressOf(Tokens.LINK));
+    //     creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
     //     evm.stopPrank();
 
     //     tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
@@ -918,7 +918,7 @@ contract CreditFacadeTest is
     //     cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
     //     cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
     //     cft.gaugeMock().updateEpoch();
-    //     creditConfigurator.makeTokenLimited(tokenTestSuite.addressOf(Tokens.LINK));
+    //     creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
     //     evm.stopPrank();
 
     //     tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);

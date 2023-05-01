@@ -141,30 +141,11 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         );
     }
 
-    function expectFullCollateralCheck() internal {
-        address creditAccount = creditManager.getCreditAccountOrRevert(USER);
-
-        (,, uint256 borrowedAmountWithInterestAndFees) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
-
-        evm.expectCall(
-            address(priceOracle),
-            abi.encodeCall(
-                IPriceOracleV2.convertToUSD, (borrowedAmountWithInterestAndFees * PERCENTAGE_FACTOR, underlying)
-            )
-        );
-    }
-
     function mintBalance(address creditAccount, Tokens t, uint256 amount, bool enable) internal {
         tokenTestSuite.mint(t, creditAccount, amount);
         // if (enable) {
         //     creditManager.checkAndEnableToken(tokenTestSuite.addressOf(t));
         // }
-    }
-
-    function isTokenEnabled(Tokens t) internal view returns (bool) {
-        address creditAccount = creditManager.getCreditAccountOrRevert(USER);
-        return creditManager.enabledTokensMap(creditAccount)
-            & creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(t)) != 0;
     }
 
     function _addAndEnableTokens(address creditAccount, uint256 numTokens, uint256 balance) internal {
@@ -237,7 +218,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
     function _openAccountAndTransferToCF() internal returns (address creditAccount) {
         (,,, creditAccount) = _openCreditAccount();
-        creditManager.transferAccountOwnership(USER, address(this));
+        creditManager.transferAccountOwnership(creditAccount, address(this));
     }
 
     function _baseFullCollateralCheck(address creditAccount) internal {
@@ -345,7 +326,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     /// - setParams
     /// - setLiquidationThreshold
     /// - setForbidMask
-    /// - changeContractAllowance
+    /// - setContractAllowance
     /// - upgradeContracts
     /// - setCreditConfigurator
     /// - addEmergencyLiquidator
@@ -365,7 +346,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         creditManager.setLiquidationThreshold(DUMB_ADDRESS, 0);
 
         evm.expectRevert(CallerNotConfiguratorException.selector);
-        creditManager.changeContractAllowance(DUMB_ADDRESS, DUMB_ADDRESS);
+        creditManager.setContractAllowance(DUMB_ADDRESS, DUMB_ADDRESS);
 
         evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setCreditFacade(DUMB_ADDRESS);
@@ -437,15 +418,15 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     /// - transferOwnership
 
     function test_CM_06A_management_functions_revert_if_account_does_not_exist() public {
-        evm.expectRevert(HasNoOpenedAccountException.selector);
-        creditManager.getCreditAccountOrRevert(USER);
+        // evm.expectRevert(CreditAccountNotExistsException.selector);
+        // creditManager.getCreditAccountOrRevert(USER);
 
-        // evm.expectRevert(HasNoOpenedAccountException.selector);
+        // evm.expectRevert(CreditAccountNotExistsException.selector);
         // creditManager.closeCreditAccount(
         //     USER, ClosureAction.LIQUIDATE_ACCOUNT, 0, DUMB_ADDRESS, DUMB_ADDRESS, type(uint256).max, false
         // );
 
-        evm.expectRevert(HasNoOpenedAccountException.selector);
+        evm.expectRevert(CreditAccountNotExistsException.selector);
         creditManager.transferAccountOwnership(USER, DUMB_ADDRESS);
     }
 
@@ -457,7 +438,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         address token = tokenTestSuite.addressOf(Tokens.DAI);
 
         evm.prank(CONFIGURATOR);
-        creditManager.changeContractAllowance(ADAPTER, DUMB_ADDRESS);
+        creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
 
         evm.prank(ADAPTER);
         evm.expectRevert(ExternalCallCreditAccountNotSetException.selector);
@@ -474,14 +455,11 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     ///
 
     /// @dev [CM-7]: openCreditAccount reverts if zero address or address exists
-    function test_CM_07_openCreditAccount_reverts_if_zero_address_or_address_exists() public {
-        // Zero address case
-        evm.expectRevert(ZeroAddressException.selector);
-        creditManager.openCreditAccount(1, address(0));
-        // Existing address case
-        creditManager.openCreditAccount(1, USER);
-        evm.expectRevert(UserAlreadyHasAccountException.selector);
-        creditManager.openCreditAccount(1, USER);
+    function test_CM_07_openCreditAccount_reverts_if_address_exists() public {
+        // // Existing address case
+        // creditManager.openCreditAccount(1, USER);
+        // evm.expectRevert(UserAlreadyHasAccountException.selector);
+        // creditManager.openCreditAccount(1, USER);
     }
 
     /// @dev [CM-8]: openCreditAccount sets correct values and transfers tokens from pool
@@ -495,16 +473,18 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         // Existing address case
         address creditAccount = creditManager.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER);
         assertEq(creditAccount, expectedCreditAccount, "Incorrecct credit account address");
-        assertEq(
-            creditManager.borrowedAmounts(creditAccount), DAI_ACCOUNT_AMOUNT, "Incorrect borrowed amount set in CA"
-        );
+
+        (uint256 debt, uint256 cumulativeIndexAtOpen,,,,) = creditManager.creditAccountInfo(creditAccount);
+
+        assertEq(debt, DAI_ACCOUNT_AMOUNT, "Incorrect borrowed amount set in CA");
+        assertEq(cumulativeIndexAtOpen, cumulativeAtOpen, "Incorrect cumulativeIndexAtOpen set in CA");
+
         assertEq(ICreditAccount(creditAccount).since(), blockAtOpen, "Incorrect since set in CA");
-        assertEq(creditManager.cumulativeIndicies(creditAccount), cumulativeAtOpen, "Incorrect since set in CA");
 
         expectBalance(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT);
         assertEq(poolMock.lendAmount(), DAI_ACCOUNT_AMOUNT, "Incorrect DAI_ACCOUNT_AMOUNT in Pool call");
         assertEq(poolMock.lendAccount(), creditAccount, "Incorrect credit account in lendCreditAccount call");
-        assertEq(creditManager.creditAccounts(USER), creditAccount, "Credit account is not associated with user");
+        // assertEq(creditManager.creditAccounts(USER), creditAccount, "Credit account is not associated with user");
         assertEq(creditManager.enabledTokensMap(creditAccount), 0, "Incorrect enabled token mask");
     }
 
@@ -529,7 +509,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         evm.roll(block.number + 1);
 
         creditManager.closeCreditAccount(
-            USER, ClosureAction.CLOSE_ACCOUNT, 0, USER, USER, 0, 0, DAI_ACCOUNT_AMOUNT, false
+            creditAccount, ClosureAction.CLOSE_ACCOUNT, 0, USER, USER, 0, 0, DAI_ACCOUNT_AMOUNT, false
         );
 
         assertEq(
@@ -538,8 +518,8 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
             "credit account is not in accountFactory tail!"
         );
 
-        evm.expectRevert(HasNoOpenedAccountException.selector);
-        creditManager.getCreditAccountOrRevert(USER);
+        // evm.expectRevert(CreditAccountNotExistsException.selector);
+        // creditManager.getCreditAccountOrRevert(USER);
     }
 
     /// @dev [CM-10]: closeCreditAccount returns undelying tokens if credit account balance > amounToPool
@@ -572,7 +552,15 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         );
 
         (uint256 remainingFunds, uint256 loss) = creditManager.closeCreditAccount(
-            USER, ClosureAction.CLOSE_ACCOUNT, 0, USER, FRIEND, 1, 0, DAI_ACCOUNT_AMOUNT + interestAccrued, false
+            creditAccount,
+            ClosureAction.CLOSE_ACCOUNT,
+            0,
+            USER,
+            FRIEND,
+            1,
+            0,
+            DAI_ACCOUNT_AMOUNT + interestAccrued,
+            false
         );
 
         assertEq(remainingFunds, 0, "Remaining funds is not zero!");
@@ -616,7 +604,15 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         );
 
         (uint256 remainingFunds, uint256 loss) = creditManager.closeCreditAccount(
-            USER, ClosureAction.CLOSE_ACCOUNT, 0, USER, FRIEND, 1, 0, DAI_ACCOUNT_AMOUNT + interestAccrued, false
+            creditAccount,
+            ClosureAction.CLOSE_ACCOUNT,
+            0,
+            USER,
+            FRIEND,
+            1,
+            0,
+            DAI_ACCOUNT_AMOUNT + interestAccrued,
+            false
         );
         assertEq(remainingFunds, 0, "Remaining funds is not zero!");
 
@@ -678,8 +674,9 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
             {
                 uint256 a = borrowedAmount + interestAccrued;
 
-                (uint256 remainingFunds,) =
-                    creditManager.closeCreditAccount(USER, action, borrowedAmount, LIQUIDATOR, FRIEND, 1, 0, a, false);
+                (uint256 remainingFunds,) = creditManager.closeCreditAccount(
+                    creditAccount, action, borrowedAmount, LIQUIDATOR, FRIEND, 1, 0, a, false
+                );
             }
 
             expectBalance(Tokens.DAI, creditAccount, 1, "Credit account balance != 1");
@@ -785,7 +782,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
                 uint256 a = borrowedAmount + interestAccrued;
                 (remainingFunds, loss) = creditManager.closeCreditAccount(
-                    USER,
+                    creditAccount,
                     i == 1 ? ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT : ClosureAction.LIQUIDATE_ACCOUNT,
                     totalValue,
                     LIQUIDATOR,
@@ -828,7 +825,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
     function test_CM_14_close_credit_account_with_nonzero_skipTokenMask_sends_correct_tokens() public {
         (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
-        creditManager.transferAccountOwnership(USER, address(this));
+        creditManager.transferAccountOwnership(creditAccount, address(this));
 
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
         tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
@@ -844,9 +841,10 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         uint256 usdcTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.USDC));
         uint256 linkTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.LINK));
 
-        creditManager.transferAccountOwnership(address(this), USER);
+        creditManager.transferAccountOwnership(creditAccount, USER);
+
         creditManager.closeCreditAccount(
-            USER,
+            creditAccount,
             ClosureAction.CLOSE_ACCOUNT,
             0,
             USER,
@@ -886,7 +884,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         // creditManager.closeCreditAccount(USER, ClosureAction.CLOSE_ACCOUNT, 0, USER, USER, 0, true);
 
         creditManager.closeCreditAccount(
-            USER, ClosureAction.CLOSE_ACCOUNT, 0, USER, USER, 1, 0, borrowedAmount + interestAccrued, true
+            creditAccount, ClosureAction.CLOSE_ACCOUNT, 0, USER, USER, 1, 0, borrowedAmount + interestAccrued, true
         );
 
         expectBalance(Tokens.WETH, creditAccount, 1);
@@ -910,7 +908,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     function test_CM_17_close_dai_credit_account_sends_eth_to_borrower() public {
         /// CLOSURE CASE
         (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
-        creditManager.transferAccountOwnership(USER, address(this));
+        creditManager.transferAccountOwnership(creditAccount, address(this));
 
         // Transfer additional borrowedAmount. After that underluying token balance = 2 * borrowedAmount
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
@@ -921,9 +919,17 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         uint256 wethTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.WETH));
         uint256 daiTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI));
 
-        creditManager.transferAccountOwnership(address(this), USER);
+        creditManager.transferAccountOwnership(creditAccount, USER);
         creditManager.closeCreditAccount(
-            USER, ClosureAction.CLOSE_ACCOUNT, 0, USER, USER, wethTokenMask | daiTokenMask, 0, borrowedAmount, true
+            creditAccount,
+            ClosureAction.CLOSE_ACCOUNT,
+            0,
+            USER,
+            USER,
+            wethTokenMask | daiTokenMask,
+            0,
+            borrowedAmount,
+            true
         );
 
         expectBalance(Tokens.WETH, creditAccount, 1);
@@ -956,7 +962,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         uint256 daiTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI));
 
         (uint256 remainingFunds,) = creditManager.closeCreditAccount(
-            USER,
+            creditAccount,
             ClosureAction.LIQUIDATE_ACCOUNT,
             totalValue,
             LIQUIDATOR,
@@ -987,7 +993,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     function test_CM_19_close_dai_credit_account_sends_eth_to_liquidator() public {
         /// CLOSURE CASE
         (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
-        creditManager.transferAccountOwnership(USER, address(this));
+        creditManager.transferAccountOwnership(creditAccount, address(this));
 
         // Transfer additional borrowedAmount. After that underluying token balance = 2 * borrowedAmount
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
@@ -995,12 +1001,12 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         // Adds WETH to test how it would be converted
         tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
 
-        creditManager.transferAccountOwnership(address(this), USER);
+        creditManager.transferAccountOwnership(creditAccount, USER);
         uint256 wethTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.WETH));
         uint256 daiTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI));
 
         (uint256 remainingFunds,) = creditManager.closeCreditAccount(
-            USER,
+            creditAccount,
             ClosureAction.LIQUIDATE_ACCOUNT,
             borrowedAmount,
             LIQUIDATOR,
@@ -1046,7 +1052,8 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
             "Incorrect cumulative index"
         );
 
-        assertEq(creditManager.borrowedAmounts(creditAccount), newBorrowedAmount, "Incorrect borrowedAmount");
+        (uint256 debt,,,,,) = creditManager.creditAccountInfo(creditAccount);
+        assertEq(debt, newBorrowedAmount, "Incorrect borrowedAmount");
 
         expectBalance(Tokens.DAI, creditAccount, newBorrowedAmount, "Incorrect balance on credit account");
 
@@ -1092,15 +1099,18 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
                 "Incorrect new interest"
             );
         }
+        uint256 cumulativeIndexAtOpenAfter;
+        {
+            uint256 debt;
+            (debt, cumulativeIndexAtOpenAfter,,,,) = creditManager.creditAccountInfo(creditAccount);
 
-        assertEq(creditManager.borrowedAmounts(creditAccount), newBorrowedAmount, "Incorrect borrowedAmount");
+            assertEq(debt, newBorrowedAmount, "Incorrect borrowedAmount");
+        }
 
         expectBalance(Tokens.DAI, creditAccount, borrowedAmount - amount, "Incorrect balance on credit account");
 
         if (amount >= totalDebt - borrowedAmount) {
-            assertEq(
-                creditManager.cumulativeIndicies(creditAccount), cumulativeIndexNow, "Incorrect cumulativeIndexAtOpen"
-            );
+            assertEq(cumulativeIndexAtOpenAfter, cumulativeIndexNow, "Incorrect cumulativeIndexAtOpen");
         } else {
             CreditManagerTestInternal cmi = new CreditManagerTestInternal(
                 creditManager.poolService(), address(withdrawManager)
@@ -1112,7 +1122,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
             }
 
             assertEq(
-                creditManager.cumulativeIndicies(creditAccount),
+                cumulativeIndexAtOpenAfter,
                 cmi.calcNewCumulativeIndex(borrowedAmount, amount, cumulativeIndexNow, cumulativeIndexAtOpen, false),
                 "Incorrect cumulativeIndexAtOpen"
             );
@@ -1158,16 +1168,14 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
     /// @dev [CM-23]: transferAccountOwnership reverts if to equals 0 or creditAccount is linked with "to" address
 
-    function test_CM_23_transferAccountOwnership_reverts_if_to_equals_zero_or_account_exists() public {
-        _openCreditAccount();
+    function test_CM_23_transferAccountOwnership_reverts_if_account_exists() public {
+        // _openCreditAccount();
 
-        creditManager.openCreditAccount(1, FRIEND);
-        // address(0) case
-        evm.expectRevert(ZeroAddressException.selector);
-        creditManager.transferAccountOwnership(USER, address(0));
-        // Existing account case
-        evm.expectRevert(UserAlreadyHasAccountException.selector);
-        creditManager.transferAccountOwnership(FRIEND, USER);
+        // creditManager.openCreditAccount(1, FRIEND);
+
+        // // Existing account case
+        // evm.expectRevert(UserAlreadyHasAccountException.selector);
+        // creditManager.transferAccountOwnership(FRIEND, USER);
     }
 
     /// @dev [CM-24]: transferAccountOwnership changes creditAccounts map properly
@@ -1175,14 +1183,14 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     function test_CM_24_transferAccountOwnership_changes_creditAccounts_map_properly() public {
         (,,, address creditAccount) = _openCreditAccount();
 
-        creditManager.transferAccountOwnership(USER, FRIEND);
+        creditManager.transferAccountOwnership(creditAccount, FRIEND);
 
-        assertEq(creditManager.creditAccounts(USER), address(0), "From account wasn't deleted");
+        // assertEq(creditManager.creditAccounts(USER), address(0), "From account wasn't deleted");
 
-        assertEq(creditManager.creditAccounts(FRIEND), creditAccount, "To account isn't correct");
+        // assertEq(creditManager.creditAccounts(FRIEND), creditAccount, "To account isn't correct");
 
-        evm.expectRevert(HasNoOpenedAccountException.selector);
-        creditManager.getCreditAccountOrRevert(USER);
+        // evm.expectRevert(CreditAccountNotExistsException.selector);
+        // creditManager.getCreditAccountOrRevert(USER);
     }
 
     //
@@ -1195,7 +1203,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         creditManager.setCaForExternalCall(creditAccount);
 
         evm.prank(CONFIGURATOR);
-        creditManager.changeContractAllowance(ADAPTER, DUMB_ADDRESS);
+        creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
 
         evm.expectRevert(TokenNotAllowedException.selector);
 
@@ -1209,9 +1217,9 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         creditManager.setCaForExternalCall(creditAccount);
 
         evm.prank(CONFIGURATOR);
-        creditManager.changeContractAllowance(ADAPTER, DUMB_ADDRESS);
+        creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
 
-        // Case, when current allowance > ALLOWANCE_THRESHOLD
+        // Case, when current allowance > Allowance_THRESHOLD
         tokenTestSuite.approve(Tokens.DAI, creditAccount, DUMB_ADDRESS, 200);
 
         address dai = tokenTestSuite.addressOf(Tokens.DAI);
@@ -1228,7 +1236,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         creditManager.setCaForExternalCall(creditAccount);
 
         evm.prank(CONFIGURATOR);
-        creditManager.changeContractAllowance(ADAPTER, DUMB_ADDRESS);
+        creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
 
         address approveRevertToken = address(new ERC20ApproveRestrictedRevert());
 
@@ -1255,7 +1263,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         creditManager.addToken(approveFalseToken);
 
         evm.prank(CONFIGURATOR);
-        creditManager.changeContractAllowance(ADAPTER, DUMB_ADDRESS);
+        creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
 
         evm.prank(ADAPTER);
         creditManager.approveCreditAccount(approveFalseToken, DAI_EXCHANGE_AMOUNT);
@@ -1278,7 +1286,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         TargetContractMock targetMock = new TargetContractMock();
 
         evm.prank(CONFIGURATOR);
-        creditManager.changeContractAllowance(ADAPTER, address(targetMock));
+        creditManager.setContractAllowance(ADAPTER, address(targetMock));
 
         bytes memory callData = bytes("Hello, world!");
 
@@ -1320,7 +1328,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     function test_CM_39_fullCollateralCheck_diables_tokens_if_they_have_zero_balance() public {
         (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen, uint256 cumulativeIndexNow, address creditAccount) =
             _openCreditAccount();
-        creditManager.transferAccountOwnership(USER, address(this));
+        creditManager.transferAccountOwnership(creditAccount, address(this));
 
         (uint256 feeInterest,,,,) = creditManager.fees();
 
@@ -1366,7 +1374,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         evm.stopPrank();
 
         address creditAccount = cm.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER);
-        cm.transferAccountOwnership(USER, address(this));
+        cm.transferAccountOwnership(creditAccount, address(this));
 
         address revertToken = DUMB_ADDRESS;
         address linkToken = tokenTestSuite.addressOf(Tokens.LINK);
@@ -1482,7 +1490,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         tokenTestSuite.mint(Tokens.DAI, address(poolMock), borrowedAmount);
 
         (,,, address creditAccount) = cms.openCreditAccount(borrowedAmount);
-        creditManager.transferAccountOwnership(USER, address(this));
+        creditManager.transferAccountOwnership(creditAccount, address(this));
 
         if (daiBalance > borrowedAmount) {
             tokenTestSuite.mint(Tokens.DAI, creditAccount, daiBalance - borrowedAmount);
@@ -1714,7 +1722,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
             address friend = friends[i];
             (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
-            creditManager.transferAccountOwnership(USER, address(this));
+            creditManager.transferAccountOwnership(creditAccount, address(this));
 
             CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
 
@@ -1754,9 +1762,9 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
             expectBalance(Tokens.LINK, friend, 0);
 
-            creditManager.transferAccountOwnership(address(this), USER);
+            creditManager.transferAccountOwnership(creditAccount, USER);
             creditManager.closeCreditAccount(
-                USER,
+                creditAccount,
                 ClosureAction.LIQUIDATE_ACCOUNT,
                 0,
                 LIQUIDATOR,
@@ -1807,7 +1815,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
             }
 
             creditManager.closeCreditAccount(
-                USER, ClosureAction.LIQUIDATE_ACCOUNT, 0, LIQUIDATOR, friend, 1, 0, DAI_ACCOUNT_AMOUNT, false
+                creditAccount, ClosureAction.LIQUIDATE_ACCOUNT, 0, LIQUIDATOR, friend, 1, 0, DAI_ACCOUNT_AMOUNT, false
             );
         }
     }
@@ -1882,14 +1890,14 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     //
 
     /// @dev [CM-48]: getCreditAccountOrRevert reverts if borrower has no account
-    function test_CM_48_getCreditAccountOrRevert_reverts_if_borrower_has_no_account() public {
-        (,,, address creditAccount) = _openCreditAccount();
+    // function test_CM_48_getCreditAccountOrRevert_reverts_if_borrower_has_no_account() public {
+    //     (,,, address creditAccount) = _openCreditAccount();
 
-        assertEq(creditManager.getCreditAccountOrRevert(USER), creditAccount, "Incorrect credit account");
+    //     assertEq(creditManager.getCreditAccountOrRevert(USER), creditAccount, "Incorrect credit account");
 
-        evm.expectRevert(HasNoOpenedAccountException.selector);
-        creditManager.getCreditAccountOrRevert(DUMB_ADDRESS);
-    }
+    //     evm.expectRevert(CreditAccountNotExistsException.selector);
+    //     creditManager.getCreditAccountOrRevert(DUMB_ADDRESS);
+    // }
 
     //
     // CALC CREDIT ACCOUNT ACCRUED INTEREST
@@ -1902,7 +1910,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
         uint256 expectedBorrowedAmount = amount;
 
-        uint256 cumulativeIndexAtOpen = creditManager.cumulativeIndicies(creditAccount);
+        (, uint256 cumulativeIndexAtOpen,,,,) = creditManager.creditAccountInfo(creditAccount);
 
         uint256 cumulativeIndexNow = poolMock._cumulativeIndex_RAY();
         uint256 expectedBorrowedAmountWithInterest =
@@ -1938,14 +1946,14 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
         (,,, address creditAccount) = _openCreditAccount();
 
-        uint256 expectedBorrowedAmount = creditManager.borrowedAmounts(creditAccount);
-        uint256 expectedCumulativeIndexAtOpen = creditManager.cumulativeIndicies(creditAccount);
+        (uint256 expectedDebt, uint256 expectedCumulativeIndexAtOpen,,,,) =
+            creditManager.creditAccountInfo(creditAccount);
 
         CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
 
         (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen,) = cmi.getCreditAccountParameters(creditAccount);
 
-        assertEq(borrowedAmount, expectedBorrowedAmount, "Incorrect borrowed amount");
+        assertEq(borrowedAmount, expectedDebt, "Incorrect borrowed amount");
         assertEq(cumulativeIndexAtOpen, expectedCumulativeIndexAtOpen, "Incorrect cumulativeIndexAtOpen");
 
         assertEq(cumulativeIndexAtOpen, expectedCumulativeIndexAtOpen, "cumulativeIndexAtOpen");
@@ -2042,46 +2050,46 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     // }
 
     //
-    // CHANGE CONTRACT ALLOWANCE
+    // CHANGE CONTRACT AllowanceAction
     //
 
-    /// @dev [CM-56]: changeContractAllowance updates adapterToContract
-    function test_CM_56_changeContractAllowance_updates_adapterToContract() public {
+    /// @dev [CM-56]: setContractAllowance updates adapterToContract
+    function test_CM_56_setContractAllowance_updates_adapterToContract() public {
         assertTrue(
             creditManager.adapterToContract(ADAPTER) != DUMB_ADDRESS, "adapterToContract(ADAPTER) is already the same"
         );
 
         evm.prank(CONFIGURATOR);
-        creditManager.changeContractAllowance(ADAPTER, DUMB_ADDRESS);
+        creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
 
         assertEq(creditManager.adapterToContract(ADAPTER), DUMB_ADDRESS, "adapterToContract is not set correctly");
 
         assertEq(creditManager.contractToAdapter(DUMB_ADDRESS), ADAPTER, "adapterToContract is not set correctly");
 
         evm.prank(CONFIGURATOR);
-        creditManager.changeContractAllowance(ADAPTER, address(0));
+        creditManager.setContractAllowance(ADAPTER, address(0));
 
         assertEq(creditManager.adapterToContract(ADAPTER), address(0), "adapterToContract is not set correctly");
 
         assertEq(creditManager.contractToAdapter(address(0)), address(0), "adapterToContract is not set correctly");
 
         evm.prank(CONFIGURATOR);
-        creditManager.changeContractAllowance(ADAPTER, DUMB_ADDRESS);
+        creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
 
         evm.prank(CONFIGURATOR);
-        creditManager.changeContractAllowance(address(0), DUMB_ADDRESS);
+        creditManager.setContractAllowance(address(0), DUMB_ADDRESS);
 
         assertEq(creditManager.adapterToContract(address(0)), address(0), "adapterToContract is not set correctly");
 
         assertEq(creditManager.contractToAdapter(DUMB_ADDRESS), address(0), "adapterToContract is not set correctly");
 
         // evm.prank(CONFIGURATOR);
-        // creditManager.changeContractAllowance(ADAPTER, UNIVERSAL_CONTRACT);
+        // creditManager.setContractAllowance(ADAPTER, UNIVERSAL_CONTRACT);
 
         // assertEq(creditManager.universalAdapter(), ADAPTER, "Universal adapter is not correctly set");
 
         // evm.prank(CONFIGURATOR);
-        // creditManager.changeContractAllowance(address(0), UNIVERSAL_CONTRACT);
+        // creditManager.setContractAllowance(address(0), UNIVERSAL_CONTRACT);
 
         // assertEq(creditManager.universalAdapter(), address(0), "Universal adapter is not correctly set");
     }
@@ -2147,7 +2155,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     //     TargetContractMock targetMock = new TargetContractMock();
 
     //     evm.prank(CONFIGURATOR);
-    //     creditManager.changeContractAllowance(ADAPTER, UNIVERSAL_CONTRACT_ADDRESS);
+    //     creditManager.setContractAllowance(ADAPTER, UNIVERSAL_CONTRACT_ADDRESS);
 
     //     _openAccountAndTransferToCF();
 

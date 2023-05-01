@@ -8,6 +8,11 @@ import {CreditManagerV3} from "../credit/CreditManagerV3.sol";
 import {CreditFacadeV3} from "../credit/CreditFacadeV3.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
+enum AllowanceAction {
+    FORBID,
+    ALLOW
+}
+
 /// @dev A struct containing parameters for a recognized collateral token in the system
 struct CollateralToken {
     /// @dev Address of the collateral token
@@ -81,10 +86,13 @@ interface ICreditConfiguratorEvents {
     event CreditConfiguratorUpgraded(address indexed newCreditConfigurator);
 
     /// @dev Emits when the status of the debt increase restriction is changed
-    event SetIncreaseDebtForbiddenMode(bool);
+    event AllowBorrowing(); // F:[CC-32]
+
+    /// @dev Emits when the status of the debt increase restriction is changed
+    event ForbidBorrowing();
 
     /// @dev Emits when the borrowing limit per block is changed
-    event SetBorrowingLimitPerBlock(uint128);
+    event SetMaxDebtPerBlockMultiplier(uint8);
 
     /// @dev Emits when an address is added to the upgradeable contract list
     event AddedToUpgradeable(address);
@@ -108,7 +116,7 @@ interface ICreditConfiguratorEvents {
     event SetBotList(address);
 
     /// @dev Emits when the token is set as limited
-    event LimitToken(address);
+    event QuoteToken(address);
 
     /// @dev Emits when new max cumulative loss is set
     event SetMaxCumulativeLoss(uint128);
@@ -192,14 +200,8 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
     /// @param _creditConfigurator New Credit Configurator's address
     function upgradeCreditConfigurator(address _creditConfigurator) external;
 
-    /// @dev Enables or disables borrowing
-    /// In Credit Facade (and, consequently, the Credit Manager)
-    /// @param _mode Prohibits borrowing if true, and allows borrowing otherwise
-    function setIncreaseDebtForbidden(bool _mode) external;
-
-    /// @dev Sets the maximal borrowed amount per block
-    /// @param newLimit The new max borrowed amount per block
-    function setLimitPerBlock(uint128 newLimit) external;
+    /// @dev Sets the maximal borrowed amount per block as multiplier to maxDebt
+    function setMaxDebtPerBlockMultiplier(uint8 newMaxDebtLimitPerBlockMultiplier) external;
 
     /// @dev Sets expiration date in a CreditFacadeV3 connected
     /// To a CreditManagerV3 with an expirable pool

@@ -98,7 +98,7 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
     }
 
     function _addQuotedToken(address token, uint16 rate, uint96 limit) internal {
-        cms.makeTokenLimited(token, rate, limit);
+        cms.makeTokenQuoted(token, rate, limit);
     }
 
     function _addManyLimitedTokens(uint256 numTokens, uint96 quota)
@@ -159,11 +159,9 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
 
         (,,, address creditAccount) = cms.openCreditAccount();
 
-        assertEq(
-            creditManager.cumulativeQuotaInterest(creditAccount),
-            1,
-            "SETUP: Cumulative quota interest was not updated correctly"
-        );
+        (,, uint256 cumulativeQuotaInterest,,,) = creditManager.creditAccountInfo(creditAccount);
+
+        assertEq(cumulativeQuotaInterest, 1, "SETUP: Cumulative quota interest was not updated correctly");
 
         QuotaUpdate[] memory quotaUpdates = new QuotaUpdate[](2);
         quotaUpdates[0] = QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.LINK), quotaChange: 100_000});
@@ -184,8 +182,6 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
 
         assertEq(tokensToEnable, linkMask | usdtMask, "Incorrect tokensToEnble");
         assertEq(tokensToDisable, 0, "Incorrect tokensToDisable");
-        // expectTokenIsEnabled(creditAccount, Tokens.LINK, true);
-        // expectTokenIsEnabled(creditAccount, Tokens.USDT, true);
 
         evm.warp(block.timestamp + 365 days);
 
@@ -194,14 +190,13 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
 
         (tokensToEnable, tokensToDisable) = creditManager.updateQuotas(creditAccount, quotaUpdates);
 
-        // expectTokenIsEnabled(creditAccount, Tokens.LINK, false);
-        // expectTokenIsEnabled(creditAccount, Tokens.USDT, true);
-
         assertEq(tokensToEnable, 0, "Incorrect tokensToEnable");
         assertEq(tokensToDisable, linkMask, "Incorrect tokensToDisable");
 
+        (,, cumulativeQuotaInterest,,,) = creditManager.creditAccountInfo(creditAccount);
+
         assertEq(
-            creditManager.cumulativeQuotaInterest(creditAccount),
+            cumulativeQuotaInterest,
             (100000 * 1000 + 200000 * 500) / PERCENTAGE_FACTOR + 1,
             "Cumulative quota interest was not updated correctly"
         );
@@ -253,14 +248,6 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
             creditAccount, amountRepaid, tokensToEnable | UNDERLYING_TOKEN_MASK, ManageDebtAction.DECREASE_DEBT
         );
 
-        console.log("CU: ", creditManager.cumulativeQuotaInterest(creditAccount));
-
-        // assertEq(
-        //     creditManager.cumulativeQuotaInterest(creditAccount),
-        //     20 * WAD - expectedQuotaInterestRepaid,
-        //     "Cumulative quota interest was not updated correctly"
-        // );
-
         (, uint256 totalDebtAfter, uint256 totalDebtAfterFee) =
             creditManager.calcCreditAccountAccruedInterest(creditAccount);
 
@@ -303,11 +290,9 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
             creditAccount, amountRepaid, tokensToEnable | UNDERLYING_TOKEN_MASK, ManageDebtAction.DECREASE_DEBT
         );
 
-        assertEq(
-            creditManager.cumulativeQuotaInterest(creditAccount),
-            1,
-            "Cumulative quota interest was not updated correctly"
-        );
+        (,, uint256 cumulativeQuotaInterest,,,) = creditManager.creditAccountInfo(creditAccount);
+
+        assertEq(cumulativeQuotaInterest, 1, "Cumulative quota interest was not updated correctly");
 
         (,, uint256 totalDebtAfter) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
 
@@ -367,7 +352,7 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
         (, uint256 borrowedAmountWithInterest,) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
 
         creditManager.closeCreditAccount(
-            USER,
+            creditAccount,
             ClosureAction.CLOSE_ACCOUNT,
             0,
             USER,
@@ -456,7 +441,7 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
         tokenTestSuite.mint(Tokens.DAI, address(poolMock), borrowedAmount);
 
         (,,, address creditAccount) = cms.openCreditAccount(borrowedAmount);
-        creditManager.transferAccountOwnership(USER, address(this));
+        creditManager.transferAccountOwnership(creditAccount, address(this));
 
         if (daiBalance > borrowedAmount) {
             tokenTestSuite.mint(Tokens.DAI, creditAccount, daiBalance - borrowedAmount);
@@ -551,7 +536,7 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
         tokenTestSuite.mint(Tokens.DAI, address(poolMock), 1_250_000 * WAD);
 
         (,,, address creditAccount) = cms.openCreditAccount(1_250_000 * WAD);
-        creditManager.transferAccountOwnership(USER, address(this));
+        creditManager.transferAccountOwnership(creditAccount, address(this));
 
         uint256 tokenToEnable;
 
@@ -679,7 +664,7 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
         evm.expectCall(address(poolQuotaKeeper), abi.encodeCall(IPoolQuotaKeeper.setLimitsToZero, (quotedTokens)));
 
         creditManager.closeCreditAccount(
-            USER,
+            creditAccount,
             ClosureAction.LIQUIDATE_ACCOUNT,
             DAI_ACCOUNT_AMOUNT,
             USER,

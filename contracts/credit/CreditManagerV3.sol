@@ -6,17 +6,15 @@ pragma solidity ^0.8.17;
 // LIBRARIES
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 // LIBS & TRAITS
 import {UNDERLYING_TOKEN_MASK, BitMask} from "../libraries/BitMask.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
-import {BalanceHelperTrait} from "../traits/BalanceHelperTrait.sol";
+import {IERC20HelperTrait} from "../traits/IERC20HelperTrait.sol";
 
 // INTERFACES
-import {IAccountFactory} from "@gearbox-protocol/core-v2/contracts/interfaces/IAccountFactory.sol";
+import {IAccountFactory} from "../interfaces/IAccountFactory.sol";
 import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
 import {IPool4626} from "../interfaces/IPool4626.sol";
@@ -42,9 +40,7 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 import {
     DEFAULT_FEE_INTEREST,
     DEFAULT_FEE_LIQUIDATION,
-    DEFAULT_LIQUIDATION_PREMIUM,
-    LEVERAGE_DECIMALS,
-    ALLOWANCE_THRESHOLD
+    DEFAULT_LIQUIDATION_PREMIUM
 } from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // EXCEPTIONS
@@ -52,55 +48,19 @@ import "../interfaces/IExceptions.sol";
 
 import "forge-std/console.sol";
 
-uint256 constant ADDR_BIT_SIZE = 160;
 uint256 constant INDEX_PRECISION = 10 ** 9;
 
 /// @title Credit Manager
 /// @notice Encapsulates the business logic for managing Credit Accounts
 ///
 /// More info: https://dev.gearbox.fi/developers/credit/credit_manager
-contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard, BalanceHelperTrait {
-    using SafeERC20 for IERC20;
+contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard, IERC20HelperTrait {
     using Address for address payable;
     using BitMask for uint256;
 
-    /// @dev The maximal number of enabled tokens on a single Credit Account
-    uint8 public override maxAllowedEnabledTokenLength = 12;
-
-    /// @dev Address of the connected Credit Facade
-    address public override creditFacade;
-
-    /// @dev Points to creditAccount during multicall, otherwise keeps address(1) for gas savings
-    /// CreditFacade is trusted source, so primarly it sends creditAccount as parameter
-    /// _externalCallCreditAccount is used for adapters interation when adapter calls approve / execute methods
-    address internal _externalCallCreditAccount;
-
-    /// @dev Interest fee charged by the protocol: fee = interest accrued * feeInterest
-    uint16 public feeInterest;
-
-    /// @dev Liquidation fee charged by the protocol: fee = totalValue * feeLiquidation
-    uint16 public feeLiquidation;
-
-    /// @dev Multiplier used to compute the total value of funds during liquidation.
-    /// At liquidation, the borrower's funds are discounted, and the pool is paid out of discounted value
-    /// The liquidator takes the difference between the discounted and actual values as premium.
-    uint16 public liquidationDiscount;
-
-    /// @dev Liquidation fee charged by the protocol during liquidation by expiry. Typically lower than feeLiquidation.
-    uint16 public feeLiquidationExpired;
-
-    /// @dev Multiplier used to compute the total value of funds during liquidation by expiry. Typically higher than
-    /// liquidationDiscount (meaning lower premium).
-    uint16 public liquidationDiscountExpired;
-
-    /// @dev Price oracle used to evaluate assets on Credit Accounts.
-    IPriceOracleV2 public override priceOracle;
-
-    /// @dev Liquidation threshold for the underlying token.
-    uint16 public ltUnderlying;
-
-    /// @dev A map from borrower addresses to Credit Account addresses
-    mapping(address => address) public override creditAccounts;
+    // IMMUTABLE PARAMS
+    /// @dev contract version
+    uint256 public constant override version = 3_00;
 
     /// @dev Factory contract for Credit Accounts
     IAccountFactory public immutable _accountFactory;
@@ -117,14 +77,56 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     /// @dev Address of WETH Gateway
     address public immutable wethGateway;
 
+    /// @dev Whether the CM supports quota-related logic
+    bool public immutable override supportsQuotas;
+
+    /// @dev The maximal number of enabled tokens on a single Credit Account
+    uint8 public override maxAllowedEnabledTokenLength = 12;
+
+    /// @dev Address of the connected Credit Facade
+    address public override creditFacade;
+
+    /// @dev Points to creditAccount during multicall, otherwise keeps address(1) for gas savings
+    /// CreditFacade is trusted source, so primarly it sends creditAccount as parameter
+    /// _externalCallCreditAccount is used for adapters interation when adapter calls approve / execute methods
+    address internal _externalCallCreditAccount;
+
+    /// @dev Interest fee charged by the protocol: fee = interest accrued * feeInterest
+    uint16 internal feeInterest;
+
+    /// @dev Liquidation fee charged by the protocol: fee = totalValue * feeLiquidation
+    uint16 internal feeLiquidation;
+
+    /// @dev Multiplier used to compute the total value of funds during liquidation.
+    /// At liquidation, the borrower's funds are discounted, and the pool is paid out of discounted value
+    /// The liquidator takes the difference between the discounted and actual values as premium.
+    uint16 internal liquidationDiscount;
+
+    /// @dev Liquidation fee charged by the protocol during liquidation by expiry. Typically lower than feeLiquidation.
+    uint16 internal feeLiquidationExpired;
+
+    /// @dev Multiplier used to compute the total value of funds during liquidation by expiry. Typically higher than
+    /// liquidationDiscount (meaning lower premium).
+    uint16 internal liquidationDiscountExpired;
+
+    /// @dev Price oracle used to evaluate assets on Credit Accounts.
+    IPriceOracleV2 public override priceOracle;
+
+    /// @dev Liquidation threshold for the underlying token.
+    uint16 internal ltUnderlying;
+
+    /// @dev Mask of tokens to apply quotas for
+    uint256 public override quotedTokenMask;
+
+    IWithdrawManager public withdrawManager;
+
     /// @dev Address of the connected Credit Configurator
     address public creditConfigurator;
 
+    /// COLLATERAL TOKENS DATA
+
     /// @dev Map of token's bit mask to its address and LT parameters in a single-slot struct
     mapping(uint256 => CollateralTokenData) internal collateralTokensData;
-
-    /// @dev Total number of known collateral tokens.
-    uint8 public collateralTokensCount;
 
     /// @dev Internal map of token addresses to their indidivual masks.
     /// @notice A mask is a uint256 that has only 1 non-zero bit in the position correspondingto
@@ -133,21 +135,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     ///         a single AND and comparison to zero
     mapping(address => uint256) internal tokenMasksMapInternal;
 
-    /// @dev Maps Credit Accounts to bit masks encoding their enabled token sets
-    /// Only enabled tokens are counted as collateral for the Credit Account
-    /// @notice An enabled token mask encodes an enabled token by setting
-    ///         the bit at the position equal to token's index to 1
-    mapping(address => CreditAccountInfo) internal creditAccountInfo;
+    /// @dev Total number of known collateral tokens.
+    uint8 public collateralTokensCount;
 
-    mapping(address => uint256) public borrowedAmounts;
-
-    mapping(address => uint256) public cumulativeIndicies;
-
-    /// @dev Previously accrued and unrepaid interest on quotas.
-    ///      This does not always represent the most actual quota interest,
-    ///      since it continuously accrues for all active quotas. The accrued interest
-    ///      needs to be periodically cached to ensure that computations are correct
-    mapping(address => uint256) public cumulativeQuotaInterest;
+    /// CONTRACTS & ADAPTERS
 
     /// @dev Maps allowed adapters to their respective target contracts.
     mapping(address => address) public override adapterToContract;
@@ -155,18 +146,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     /// @dev Maps 3rd party contracts to their respective adapters
     mapping(address => address) public override contractToAdapter;
 
-    /// QUOTA-RELATED PARAMS
+    /// CREDIT ACCOUNT DATA
 
-    /// @dev Whether the CM supports quota-related logic
-    bool public immutable override supportsQuotas;
-
-    /// @dev Mask of tokens to apply quotas for
-    uint256 public override quotedTokenMask;
-
-    IWithdrawManager public withdrawManager;
-
-    /// @dev contract version
-    uint256 public constant override version = 3_00;
+    /// @dev Contains infomation related to CA
+    mapping(address => CreditAccountInfo) public creditAccountInfo;
 
     //
     // MODIFIERS
@@ -230,34 +213,31 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     /// - Takes Credit Account from the factory;
     /// - Requests the pool to lend underlying to the Credit Account
     ///
-    /// @param borrowedAmount Amount to be borrowed by the Credit Account
+    /// @param debt Amount to be borrowed by the Credit Account
     /// @param onBehalfOf The owner of the newly opened Credit Account
-    function openCreditAccount(uint256 borrowedAmount, address onBehalfOf)
+    function openCreditAccount(uint256 debt, address onBehalfOf)
         external
         override
         nonReentrant
         creditFacadeOnly // F:[CM-2]
-        nonZeroAddress(onBehalfOf) // TODO: Add test
         returns (address creditAccount)
     {
         // Takes a Credit Account from the factory and sets initial parameters
         // The Credit Account will be connected to this Credit Manager until closing
         creditAccount = _accountFactory.takeCreditAccount(0, 0); // F:[CM-8]
 
-        borrowedAmounts[creditAccount] = borrowedAmount;
-        cumulativeIndicies[creditAccount] = IPoolService(pool).calcLinearCumulative_RAY();
+        creditAccountInfo[creditAccount].debt = debt;
+        creditAccountInfo[creditAccount].cumulativeIndexAtOpen = IPoolService(pool).calcLinearCumulative_RAY();
+        creditAccountInfo[creditAccount].borrower = onBehalfOf;
 
-        // Requests the pool to transfer tokens the Credit Account
-        IPoolService(pool).lendCreditAccount(borrowedAmount, creditAccount); // F:[CM-8]
-
-        // Checks that the onBehalfOf does not already have an account, and records it as owner
-        _safeCreditAccountSet(onBehalfOf, creditAccount); // F:[CM-7]
+        if (supportsQuotas) creditAccountInfo[creditAccount].cumulativeQuotaInterest = 1; // F: [CMQ-1]
 
         // Initializes the enabled token mask for Credit Account to 1 (only the underlying is enabled)
         // OUTDATED: enabledTokensMap is set in FullCollateralCheck
         // enabledTokensMap[creditAccount] = 1; // F:[CM-8]
 
-        if (supportsQuotas) cumulativeQuotaInterest[creditAccount] = 1; // F: [CMQ-1]
+        // Requests the pool to transfer tokens the Credit Account
+        IPoolService(pool).lendCreditAccount(debt, creditAccount); // F:[CM-8]
     }
 
     ///  @dev Closes a Credit Account - covers both normal closure and liquidation
@@ -279,7 +259,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     /// - If convertWETH is true, the function converts WETH into ETH before sending
     /// - Returns the Credit Account back to factory
     ///
-    /// @param borrower Borrower address
+    /// @param creditAccount Credit account address
     /// @param closureActionType Whether the account is closed, liquidated or liquidated due to expiry
     /// @param totalValue Portfolio value for liqution, 0 for ordinary closure
     /// @param payer Address which would be charged if credit account has not enough funds to cover amountToPool
@@ -287,14 +267,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     /// @param skipTokensMask Tokenmask contains 1 for tokens which needed to be send directly
     /// @param convertWETH If true converts WETH to ETH
     function closeCreditAccount(
-        address borrower,
+        address creditAccount,
         ClosureAction closureActionType,
         uint256 totalValue,
         address payer,
         address to,
         uint256 enabledTokenMask,
         uint256 skipTokensMask,
-        uint256 borrowedAmountWithInterest,
+        uint256 debtWithInterest,
         bool convertWETH
     )
         external
@@ -304,53 +284,24 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         returns (uint256 remainingFunds, uint256 loss)
     {
         // Checks that the Credit Account exists for the borrower
-        address creditAccount = getCreditAccountOrRevert(borrower); // F:[CM-6, 9, 10]
+        address borrower = getBorrowerOrRevert(creditAccount); // F:[CM-6, 9, 10]
 
         // Sets borrower's Credit Account to zero address in the map
-        // This needs to be done before other actions, to prevent inconsistent state
-        // in the middle of closing transaction - e.g., _transferAssetsTo can be used to report a lower
-        // value of a CA to third parties before the end of the function execution, since it
-        // gives up control flow when some assets are already removed from the account
-        delete creditAccounts[borrower]; // F:[CM-9]
+        creditAccountInfo[creditAccount].borrower = address(0); // F:[CM-9]
+
+        // Makes all computations needed to close credit account
         {
-            // Makes all computations needed to close credit account
             uint256 amountToPool;
-            uint256 borrowedAmount = borrowedAmounts[creditAccount];
+            uint256 debt = creditAccountInfo[creditAccount].debt;
 
             uint256 profit;
 
             (amountToPool, remainingFunds, profit, loss) =
-                calcClosePayments(totalValue, closureActionType, borrowedAmount, borrowedAmountWithInterest); // F:[CM-10,11,12]
+                calcClosePayments(totalValue, closureActionType, debt, debtWithInterest); // F:[CM-10,11,12]
 
-            uint256 underlyingBalance = _balanceOf(underlying, creditAccount);
-
-            // If there is an underlying surplus, transfers it to the "to" address
-            if (underlyingBalance > amountToPool + remainingFunds + 1) {
-                unchecked {
-                    _safeTokenTransfer(
-                        creditAccount,
-                        underlying,
-                        to,
-                        underlyingBalance - amountToPool - remainingFunds - 1,
-                        convertWETH
-                    ); // F:[CM-10,12,16]
-                }
-                // If there is an underlying shortfall, attempts to transfer it from the payer
-            } else {
-                unchecked {
-                    IERC20(underlying).safeTransferFrom(
-                        payer, creditAccount, amountToPool + remainingFunds - underlyingBalance + 1
-                    ); // F:[CM-11,13]
-                }
-            }
-
-            // Transfers the due funds to the pool
-            _safeTokenTransfer(creditAccount, underlying, pool, amountToPool, false); // F:[CM-10,11,12,13]
-
-            // Signals to the pool that debt has been repaid. The pool relies
-            // on the Credit Manager to repay the debt correctly, and does not
-            // check internally whether the underlying was actually transferred
-            IPoolService(pool).repayCreditAccount(borrowedAmount, profit, loss); // F:[CM-10,11,12,13]
+            _transferClosurePayments(
+                creditAccount, payer, to, borrower, convertWETH, amountToPool, remainingFunds, debt, profit, loss
+            );
         }
 
         if (supportsQuotas) {
@@ -366,11 +317,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
             }
         }
 
-        // transfer remaining funds to the borrower [liquidations only]
-        if (remainingFunds > 1) {
-            _safeTokenTransfer(creditAccount, underlying, borrower, remainingFunds, false); // F:[CM-13,18]
-        }
-
         enabledTokenMask &= ~skipTokensMask;
 
         _transferAssetsTo(creditAccount, to, convertWETH, enabledTokenMask); // F:[CM-14,17,19]
@@ -379,12 +325,54 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         _accountFactory.returnCreditAccount(creditAccount); // F:[CM-9]
     }
 
+    function _transferClosurePayments(
+        address creditAccount,
+        address payer,
+        address to,
+        address borrower,
+        bool convertWETH,
+        uint256 amountToPool,
+        uint256 remainingFunds,
+        uint256 debt,
+        uint256 profit,
+        uint256 loss
+    ) internal {
+        uint256 underlyingBalance = _balanceOf(underlying, creditAccount);
+
+        // If there is an underlying surplus, transfers it to the "to" address
+        if (underlyingBalance > amountToPool + remainingFunds + 1) {
+            unchecked {
+                _safeTokenTransfer(
+                    creditAccount, underlying, to, underlyingBalance - amountToPool - remainingFunds - 1, convertWETH
+                ); // F:[CM-10,12,16]
+            }
+            // If there is an underlying shortfall, attempts to transfer it from the payer
+        } else {
+            unchecked {
+                _transferFrom(underlying, payer, creditAccount, amountToPool + remainingFunds - underlyingBalance + 1); // F:[CM-11,13]
+            }
+        }
+
+        // Transfers the due funds to the pool
+        _safeTokenTransfer(creditAccount, underlying, pool, amountToPool, false); // F:[CM-10,11,12,13]
+
+        // Signals to the pool that debt has been repaid. The pool relies
+        // on the Credit Manager to repay the debt correctly, and does not
+        // check internally whether the underlying was actually transferred
+        IPoolService(pool).repayCreditAccount(debt, profit, loss); // F:[CM-10,11,12,13]
+
+        // transfer remaining funds to the borrower [liquidations only]
+        if (remainingFunds > 1) {
+            _safeTokenTransfer(creditAccount, underlying, borrower, remainingFunds, false); // F:[CM-13,18]
+        }
+    }
+
     /// @dev Manages debt size for borrower:
     ///
     /// - Increase debt:
     ///   + Increases debt by transferring funds from the pool to the credit account
     ///   + Updates the cumulative index to keep interest the same. Since interest
-    ///     is always computed dynamically as borrowedAmount * (cumulativeIndexNew / cumulativeIndexOpen - 1),
+    ///     is always computed dynamically as debt * (cumulativeIndexNew / cumulativeIndexOpen - 1),
     ///     cumulativeIndexOpen needs to be updated, as the borrow amount has changed
     ///
     /// - Decrease debt:
@@ -394,29 +382,24 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     /// @param creditAccount Address of the Credit Account to change debt for
     /// @param amount Amount to increase / decrease the principal by
     /// @param action Increase/decrease bed debt
-    /// @return newBorrowedAmount The new debt principal
+    /// @return newDebt The new debt principal
     function manageDebt(address creditAccount, uint256 amount, uint256 _enabledTokensMask, ManageDebtAction action)
         external
         nonReentrant
         creditFacadeOnly // F:[CM-2]
-        returns (uint256 newBorrowedAmount, uint256 enabledTokensMask)
+        returns (uint256 newDebt, uint256 enabledTokensMask)
     {
-        (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen_RAY, uint256 cumulativeIndexNow_RAY) =
+        (uint256 debt, uint256 cumulativeIndexAtOpen_RAY, uint256 cumulativeIndexNow_RAY) =
             _getCreditAccountParameters(creditAccount);
 
         uint256 newCumulativeIndex;
         if (action == ManageDebtAction.INCREASE_DEBT) {
-            // Checks that there are no forbidden tokens, as borrowing
-            // is prohibited when forbidden tokens are enabled on the account
-            /// TODO: add in collateral
-            // _checkForbiddenTokens(creditAccount);
-
-            newBorrowedAmount = borrowedAmount + amount;
+            newDebt = debt + amount;
 
             // Computes the new cumulative index to keep the interest
             // unchanged with different principal
             newCumulativeIndex =
-                _calcNewCumulativeIndex(borrowedAmount, amount, cumulativeIndexNow_RAY, cumulativeIndexAtOpen_RAY, true);
+                _calcNewCumulativeIndex(debt, amount, cumulativeIndexNow_RAY, cumulativeIndexAtOpen_RAY, true);
 
             // Requests the pool to lend additional funds to the Credit Account
             IPoolService(pool).lendCreditAccount(amount, creditAccount); // F:[CM-20]
@@ -433,8 +416,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
             if (amountRepaid > 0) {
                 // Computes the interest accrued thus far
-                uint256 interestAccrued =
-                    (borrowedAmount * cumulativeIndexNow_RAY) / cumulativeIndexAtOpen_RAY - borrowedAmount; // F:[CM-21]
+                uint256 interestAccrued = (debt * cumulativeIndexNow_RAY) / cumulativeIndexAtOpen_RAY - debt; // F:[CM-21]
 
                 // Computes profit, taken as a percentage of the interest rate
                 uint256 profit = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR; // F:[CM-21]
@@ -444,7 +426,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
                     // paid first, and the remainder is used to pay the principal
 
                     amountRepaid -= interestAccrued + profit;
-                    newBorrowedAmount = borrowedAmount - amountRepaid; //  + interestAccrued + profit - amount;
+                    newDebt = debt - amountRepaid; //  + interestAccrued + profit - amount;
 
                     amountProfit += profit;
 
@@ -465,37 +447,37 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
                     // Since interest and fees are paid out first, the principal
                     // remains unchanged
-                    newBorrowedAmount = borrowedAmount;
+                    newDebt = debt;
 
                     // Since the interest was only repaid partially, we need to recompute the
-                    // cumulativeIndexAtOpen, so that "borrowAmount * (indexNow / indexAtOpenNew - 1)"
+                    // cumulativeIndexAtOpen, so that "debt * (indexNow / indexAtOpenNew - 1)"
                     // is equal to interestAccrued - amountToInterest
                     newCumulativeIndex = _calcNewCumulativeIndex(
-                        borrowedAmount, amountToPool, cumulativeIndexNow_RAY, cumulativeIndexAtOpen_RAY, false
+                        debt, amountToPool, cumulativeIndexNow_RAY, cumulativeIndexAtOpen_RAY, false
                     );
                 }
             } else {
-                newBorrowedAmount = borrowedAmount;
+                newDebt = debt;
                 newCumulativeIndex = cumulativeIndexAtOpen_RAY;
             }
 
             // Pays the amount back to the pool
-            ICreditAccount(creditAccount).safeTransfer(underlying, pool, amount); // F:[CM-21]
+            _creditAccountSafeTransfer(creditAccount, underlying, pool, amount); // F:[CM-21]
 
             enabledTokensMask = _balanceOf(underlying, creditAccount) <= 1
                 ? _enabledTokensMask & (~UNDERLYING_TOKEN_MASK)
                 : _enabledTokensMask;
 
             // TODO: delete after tests or write Invaraiant test
-            require(borrowedAmount - newBorrowedAmount == amountRepaid, "Ooops, something was wring");
+            require(debt - newDebt == amountRepaid, "Ooops, something was wring");
 
             IPoolService(pool).repayCreditAccount(amountRepaid, amountProfit, 0); // F:[CM-21]
         }
         //
         // Sets new parameters on the Credit Account if they were changed
-        if (newBorrowedAmount != borrowedAmount || newCumulativeIndex != cumulativeIndexAtOpen_RAY) {
-            borrowedAmounts[creditAccount] = newBorrowedAmount; // F:[CM-20. 21]
-            cumulativeIndicies[creditAccount] = newCumulativeIndex; // F:[CM-20. 21]
+        if (newDebt != debt || newCumulativeIndex != cumulativeIndexAtOpen_RAY) {
+            creditAccountInfo[creditAccount].debt = newDebt; // F:[CM-20. 21]
+            creditAccountInfo[creditAccount].cumulativeIndexAtOpen = newCumulativeIndex; // F:[CM-20. 21]
         }
     }
 
@@ -509,7 +491,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         amountProfit = _amountProfit;
 
         uint16 _feeInterest = feeInterest;
-        uint256 quotaInterestAccrued = cumulativeQuotaInterest[creditAccount] - 1;
+        uint256 quotaInterestAccrued = creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1;
 
         TokenLT[] memory tokens = _getQuotedTokens(enabledTokenMask);
         if (tokens.length > 0) {
@@ -522,7 +504,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
             if (amountRepaid >= quotaInterestAccrued + quotaProfit) {
                 amountRepaid -= quotaInterestAccrued + quotaProfit; // F: [CMQ-5]
                 amountProfit += quotaProfit; // F: [CMQ-5]
-                cumulativeQuotaInterest[creditAccount] = 1; // F: [CMQ-5]
+                creditAccountInfo[creditAccount].cumulativeQuotaInterest = 1; // F: [CMQ-5]
             } else {
                 uint256 amountToPool = (amountRepaid * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + _feeInterest);
 
@@ -531,13 +513,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
                 uint256 newCumulativeQuotaInterest = quotaInterestAccrued - amountToPool;
 
-                cumulativeQuotaInterest[creditAccount] = newCumulativeQuotaInterest + 1; // F: [CMQ-4]
+                creditAccountInfo[creditAccount].cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // F: [CMQ-4]
             }
         }
     }
 
     /// @dev Calculates the new cumulative index when debt is updated
-    /// @param borrowedAmount Current debt principal
+    /// @param debt Current debt principal
     /// @param delta Absolute value of total debt amount change
     /// @param cumulativeIndexNow Current cumulative index of the pool
     /// @param cumulativeIndexOpen Last updated cumulative index recorded for the corresponding debt position
@@ -550,7 +532,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     ///         The debt decrease case where delta > interest + fees is trivial and should be handled outside
     ///         this function.
     function _calcNewCumulativeIndex(
-        uint256 borrowedAmount,
+        uint256 debt,
         uint256 delta,
         uint256 cumulativeIndexNow,
         uint256 cumulativeIndexOpen,
@@ -559,26 +541,23 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         if (isIncrease) {
             // In case of debt increase, the principal increases by exactly delta, but interest has to be kept unchanged
             // newCumulativeIndex is proven to be the solution to
-            // borrowedAmount * (cumulativeIndexNow / cumulativeIndexOpen - 1) ==
-            // == (borrowedAmount + delta) * (cumulativeIndexNow / newCumulativeIndex - 1)
+            // debt * (cumulativeIndexNow / cumulativeIndexOpen - 1) ==
+            // == (debt + delta) * (cumulativeIndexNow / newCumulativeIndex - 1)
 
-            uint256 newBorrowedAmount = borrowedAmount + delta;
+            uint256 newDebt = debt + delta;
 
             newCumulativeIndex = (
-                (cumulativeIndexNow * newBorrowedAmount * INDEX_PRECISION)
-                    / (
-                        (INDEX_PRECISION * cumulativeIndexNow * borrowedAmount) / cumulativeIndexOpen
-                            + INDEX_PRECISION * delta
-                    )
+                (cumulativeIndexNow * newDebt * INDEX_PRECISION)
+                    / ((INDEX_PRECISION * cumulativeIndexNow * debt) / cumulativeIndexOpen + INDEX_PRECISION * delta)
             );
         } else {
             // In case of debt decrease, the principal is the same, but the interest is reduced exactly by delta
             // newCumulativeIndex is proven to be the solution to
-            // borrowedAmount * (cumulativeIndexNow / cumulativeIndexOpen - 1) - delta ==
-            // == borrowedAmount * (cumulativeIndexNow / newCumulativeIndex - 1)
+            // debt * (cumulativeIndexNow / cumulativeIndexOpen - 1) - delta ==
+            // == debt * (cumulativeIndexNow / newCumulativeIndex - 1)
 
             newCumulativeIndex = (INDEX_PRECISION * cumulativeIndexNow * cumulativeIndexOpen)
-                / (INDEX_PRECISION * cumulativeIndexNow - (INDEX_PRECISION * delta * cumulativeIndexOpen) / borrowedAmount);
+                / (INDEX_PRECISION * cumulativeIndexNow - (INDEX_PRECISION * delta * cumulativeIndexOpen) / debt);
         }
     }
 
@@ -594,23 +573,22 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         returns (uint256 tokenMask)
     {
         tokenMask = getTokenMaskOrRevert(token);
-        IERC20(token).safeTransferFrom(payer, creditAccount, amount); // F:[CM-22]
+        _transferFrom(token, payer, creditAccount, amount); // F:[CM-22]
     }
 
     /// @dev Transfers Credit Account ownership to another address
-    /// @param from Address of previous owner
+    /// @param creditAccount Address of creditAccount to be transferred
     /// @param to Address of new owner
-    function transferAccountOwnership(address from, address to)
+    function transferAccountOwnership(address creditAccount, address to)
         external
         override
         nonReentrant
         creditFacadeOnly // F:[CM-2]
-        nonZeroAddress(to) // TODO: Add test
     {
-        address creditAccount = getCreditAccountOrRevert(from); // F:[CM-6]
-        delete creditAccounts[from]; // F:[CM-24]
-
-        _safeCreditAccountSet(to, creditAccount); // F:[CM-23, 24]
+        if (creditAccountInfo[creditAccount].borrower == address(0)) {
+            revert CreditAccountNotExistsException();
+        } // F:[CM-7]
+        creditAccountInfo[creditAccount].borrower = to; // F:[CM-7]
     }
 
     /// @dev Requests the Credit Account to approve a collateral token to another contract.
@@ -707,12 +685,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         IPriceOracleV2 _priceOracle = priceOracle;
 
         uint256 twvUSD;
-        uint256 borrowAmountPlusInterestRateAndFeesUSD;
+        uint256 debtPlusInterestRateAndFeesUSD;
 
-        (enabledTokenMask,, twvUSD, borrowAmountPlusInterestRateAndFeesUSD,) =
+        (enabledTokenMask,, twvUSD, debtPlusInterestRateAndFeesUSD,) =
             _calcAllCollateral(_priceOracle, creditAccount, enabledTokenMask, minHealthFactor, collateralHints, true);
 
-        if (twvUSD < borrowAmountPlusInterestRateAndFeesUSD) {
+        if (twvUSD < debtPlusInterestRateAndFeesUSD) {
             revert NotEnoughCollateralException();
         }
 
@@ -729,21 +707,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         external
         view
         override
-        returns (
-            uint256 enabledTokenMask,
-            uint256 total,
-            uint256 hf,
-            uint256 borrowedAmountWithInterest,
-            bool canBeLiquidated
-        )
+        returns (uint256 enabledTokenMask, uint256 total, uint256 hf, uint256 debtWithInterest, bool canBeLiquidated)
     {
         IPriceOracleV2 _priceOracle = priceOracle;
         uint256[] memory collateralHints;
         enabledTokenMask = enabledTokensMap(creditAccount);
         uint256 totalUSD;
         uint256 twvUSD;
-        uint256 borrowAmountPlusInterestRateAndFeesUSD;
-        (, totalUSD, twvUSD, borrowAmountPlusInterestRateAndFeesUSD, borrowedAmountWithInterest) =
+        uint256 debtPlusInterestRateAndFeesUSD;
+        (, totalUSD, twvUSD, debtPlusInterestRateAndFeesUSD, debtWithInterest) =
             _calcAllCollateral(_priceOracle, creditAccount, enabledTokenMask, PERCENTAGE_FACTOR, collateralHints, false);
 
         // add withdrawal balances to TotalValue
@@ -756,9 +728,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         }
 
         total = _convertFromUSD(_priceOracle, totalUSD, underlying); // F:[FA-41]
-        hf = twvUSD * PERCENTAGE_FACTOR / borrowAmountPlusInterestRateAndFeesUSD;
+        hf = twvUSD * PERCENTAGE_FACTOR / debtPlusInterestRateAndFeesUSD;
 
-        canBeLiquidated = twvUSD < borrowAmountPlusInterestRateAndFeesUSD;
+        canBeLiquidated = twvUSD < debtPlusInterestRateAndFeesUSD;
     }
 
     /// @dev Calculates total value for provided Credit Account in USD
@@ -780,8 +752,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
             uint256 _enabledTokenMask,
             uint256 totalUSD,
             uint256 twvUSD,
-            uint256 borrowAmountPlusInterestRateAndFeesUSD,
-            uint256 borrowedAmountWithInterestAndFees // TODO: without FEES
+            uint256 debtPlusInterestRateAndFeesUSD,
+            uint256 debtWithInterestAndFees // TODO: without FEES
         )
     {
         uint256 quotaInterest;
@@ -793,19 +765,19 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         {
             // The total weighted value of a Credit Account has to be compared
             // with the entire debt sum, including interest and fees
-            (,, borrowedAmountWithInterestAndFees) = _calcCreditAccountAccruedInterest(creditAccount, quotaInterest);
+            (,, debtWithInterestAndFees) = _calcCreditAccountAccruedInterest(creditAccount, quotaInterest);
 
-            borrowAmountPlusInterestRateAndFeesUSD = _convertToUSD(
+            debtPlusInterestRateAndFeesUSD = _convertToUSD(
                 _priceOracle,
-                borrowedAmountWithInterestAndFees * minHealthFactor, // F: [CM-42]
+                debtWithInterestAndFees * minHealthFactor, // F: [CM-42]
                 underlying
             ) / PERCENTAGE_FACTOR;
         }
 
         // If quoted tokens fully cover the debt, we can stop here
         // after performing some additional cleanup
-        if (twvUSD < borrowAmountPlusInterestRateAndFeesUSD || !lazy) {
-            uint256 limit = lazy ? (borrowAmountPlusInterestRateAndFeesUSD - twvUSD) : type(uint256).max;
+        if (twvUSD < debtPlusInterestRateAndFeesUSD || !lazy) {
+            uint256 limit = lazy ? (debtPlusInterestRateAndFeesUSD - twvUSD) : type(uint256).max;
             uint256 _totalUSD;
             uint256 _twvUSD;
 
@@ -832,14 +804,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
             ); // F: [CMQ-8]
         }
 
-        quotaInterest += cumulativeQuotaInterest[creditAccount] - 1; // F: [CMQ-8]
+        quotaInterest += creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1; // F: [CMQ-8]
     }
 
     function _calcNotQuotedCollateral(
         IPriceOracleV2 _priceOracle,
         address creditAccount,
         uint256 _enabledTokensMask,
-        uint256 borrowAmountPlusInterestRateAndFeesUSD,
+        uint256 debtPlusInterestRateAndFeesUSD,
         uint256[] memory collateralHints
     ) internal view returns (uint256 enabledTokensMask, uint256 totalValue, uint256 twvUSD) {
         uint256 tokenMask;
@@ -849,8 +821,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         enabledTokensMask = _enabledTokensMask;
         uint256 checkedTokenMask = supportsQuotas ? enabledTokensMask & (~quotedTokenMask) : enabledTokensMask;
 
-        if (borrowAmountPlusInterestRateAndFeesUSD != type(uint256).max) {
-            borrowAmountPlusInterestRateAndFeesUSD *= PERCENTAGE_FACTOR;
+        if (debtPlusInterestRateAndFeesUSD != type(uint256).max) {
+            debtPlusInterestRateAndFeesUSD *= PERCENTAGE_FACTOR;
         }
 
         uint256 twvUSDx10K;
@@ -870,7 +842,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
                         // Full collateral check evaluates a Credit Account's health factor lazily;
                         // Once the TWV computed thus far exceeds the debt, the check is considered
                         // successful, and the function returns without evaluating any further collateral
-                        if (twvUSDx10K >= borrowAmountPlusInterestRateAndFeesUSD) {
+                        if (twvUSDx10K >= debtPlusInterestRateAndFeesUSD) {
                             break;
                         }
                         // Zero-balance tokens are disabled; this is done by flipping the
@@ -980,7 +952,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         (caInterestChange, tokensToEnable, tokensToDisable) =
             poolQuotaKeeper().updateQuotas(creditAccount, quotaUpdates); // F: [CMQ-3]
 
-        cumulativeQuotaInterest[creditAccount] += caInterestChange; // F: [CMQ-3]
+        creditAccountInfo[creditAccount].cumulativeQuotaInterest += caInterestChange; // F: [CMQ-3]
     }
 
     //
@@ -1008,7 +980,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
             // enabledTokensMask & tokenMask == tokenMask when the token is enabled,
             // and 0 otherwise
             if (enabledTokensMask & tokenMask != 0) {
-                (address token,) = collateralTokensByMask(tokenMask); // F:[CM-44]
+                address token = getTokenByMask(tokenMask); // F:[CM-44]
                 uint256 amount = _balanceOf(token, creditAccount); // F:[CM-44]
                 if (amount > 1) {
                     // 1 is subtracted from amount to leave a non-zero value
@@ -1039,13 +1011,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         internal
     {
         if (convertToETH && token == wethAddress) {
-            ICreditAccount(creditAccount).safeTransfer(token, wethGateway, amount); // F:[CM-45]
+            _creditAccountSafeTransfer(creditAccount, token, wethGateway, amount); // F:[CM-45]
             IWETHGateway(wethGateway).depositFor(to, amount); // F:[CM-45]
         } else {
             try ICreditAccount(creditAccount).safeTransfer(token, to, amount) { // F:[CM-45]
             } catch {
                 uint256 balanceBefore = _balanceOf(token, address(withdrawManager));
-                ICreditAccount(creditAccount).safeTransfer(token, address(withdrawManager), amount);
+                _creditAccountSafeTransfer(creditAccount, token, address(withdrawManager), amount);
                 withdrawManager.addImmediateWithdrawal(
                     to, token, _balanceOf(token, address(withdrawManager)) - balanceBefore
                 );
@@ -1053,15 +1025,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         }
     }
 
-    /// @dev Sets the Credit Account owner while checking that they do not
-    ///      have an account already
-    /// @param borrower The new owner of the Credit Account
-    /// @param creditAccount The Credit Account address
-    function _safeCreditAccountSet(address borrower, address creditAccount) internal {
-        if (creditAccounts[borrower] != address(0)) {
-            revert UserAlreadyHasAccountException();
-        } // F:[CM-7]
-        creditAccounts[borrower] = creditAccount; // F:[CM-7]
+    function _creditAccountSafeTransfer(address creditAccount, address token, address to, uint256 amount) internal {
+        ICreditAccount(creditAccount).safeTransfer(token, to, amount);
     }
 
     //
@@ -1075,8 +1040,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     ///        * LIQUIDATE_ACCOUNT: The account is unhealthy and is being liquidated to avoid bad debt
     ///        * LIQUIDATE_EXPIRED_ACCOUNT: The account has expired and is being liquidated (lowered liquidation premium)
     ///        * LIQUIDATE_PAUSED: The account is liquidated while the system is paused due to emergency (no liquidation premium)
-    /// @param borrowedAmount Credit Account's debt principal
-    /// @param borrowedAmountWithInterest Credit Account's debt principal + interest
+    /// @param debt Credit Account's debt principal
+    /// @param debtWithInterest Credit Account's debt principal + interest
     /// @return amountToPool Amount of underlying to be sent to the pool
     /// @return remainingFunds Amount of underlying to be sent to the borrower (only applicable to liquidations)
     /// @return profit Protocol's profit from fees (if any)
@@ -1084,14 +1049,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     function calcClosePayments(
         uint256 totalValue,
         ClosureAction closureActionType,
-        uint256 borrowedAmount,
-        uint256 borrowedAmountWithInterest
+        uint256 debt,
+        uint256 debtWithInterest
     ) public view override returns (uint256 amountToPool, uint256 remainingFunds, uint256 profit, uint256 loss) {
         // The amount to be paid to pool is computed with fees included
         // The pool will compute the amount of Diesel tokens to treasury
         // based on profit
-        amountToPool = borrowedAmountWithInterest
-            + ((borrowedAmountWithInterest - borrowedAmount) * feeInterest) / PERCENTAGE_FACTOR; // F:[CM-43]
+        amountToPool = debtWithInterest + ((debtWithInterest - debt) * feeInterest) / PERCENTAGE_FACTOR; // F:[CM-43]
 
         if (
             closureActionType == ClosureAction.LIQUIDATE_ACCOUNT
@@ -1146,10 +1110,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
                     amountToPool = totalFunds; // F:[CM-43]
                 }
 
-                if (totalFunds >= borrowedAmountWithInterest) {
-                    profit = amountToPool - borrowedAmountWithInterest; // F:[CM-43]
+                if (totalFunds >= debtWithInterest) {
+                    profit = amountToPool - debtWithInterest; // F:[CM-43]
                 } else {
-                    loss = borrowedAmountWithInterest - amountToPool; // F:[CM-43]
+                    loss = debtWithInterest - amountToPool; // F:[CM-43]
                 }
             }
         } else {
@@ -1159,11 +1123,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
             // the principal + interest + fees. closeCreditAccount, thus, will
             // attempt to charge them the entire amount.
 
-            // Since in this case amountToPool + borrowedAmountWithInterest + fee,
+            // Since in this case amountToPool + debtWithInterest + fee,
             // this block can be marked as unchecked
 
             unchecked {
-                profit = amountToPool - borrowedAmountWithInterest; // F:[CM-43]
+                profit = amountToPool - debtWithInterest; // F:[CM-43]
             }
         }
     }
@@ -1239,28 +1203,28 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
     /// @dev Returns the address of a borrower's Credit Account, or reverts if there is none.
     /// @param borrower Borrower's address
-    function getCreditAccountOrRevert(address borrower) public view override returns (address result) {
-        result = creditAccounts[borrower]; // F:[CM-48]
-        if (result == address(0)) revert HasNoOpenedAccountException(); // F:[CM-48]
+    function getBorrowerOrRevert(address creditAccount) public view override returns (address borrower) {
+        borrower = creditAccountInfo[creditAccount].borrower; // F:[CM-48]
+        if (borrower == address(0)) revert CreditAccountNotExistsException(); // F:[CM-48]
     }
 
     /// @dev Calculates the debt accrued by a Credit Account
     /// @param creditAccount Address of the Credit Account
-    /// @return borrowedAmount The debt principal
-    /// @return borrowedAmountWithInterest The debt principal + accrued interest
-    /// @return borrowedAmountWithInterestAndFees The debt principal + accrued interest and protocol fees
+    /// @return debt The debt principal
+    /// @return debtWithInterest The debt principal + accrued interest
+    /// @return debtWithInterestAndFees The debt principal + accrued interest and protocol fees
     function calcCreditAccountAccruedInterest(address creditAccount)
         external
         view
         override
-        returns (uint256 borrowedAmount, uint256 borrowedAmountWithInterest, uint256 borrowedAmountWithInterestAndFees)
+        returns (uint256 debt, uint256 debtWithInterest, uint256 debtWithInterestAndFees)
     {
         uint256 quotaInterest;
 
         if (supportsQuotas) {
             TokenLT[] memory tokens = getQuotedTokens(creditAccount);
 
-            quotaInterest = cumulativeQuotaInterest[creditAccount] - 1;
+            quotaInterest = creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1;
 
             if (tokens.length > 0) {
                 quotaInterest += poolQuotaKeeper().outstandingQuotaInterest(address(this), creditAccount, tokens); // F: [CMQ-10]
@@ -1273,32 +1237,30 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     /// @dev IMPLEMENTATION: calcCreditAccountAccruedInterest
     /// @param creditAccount Address of the Credit Account
     /// @param quotaInterest Total quota premiums accrued, computed elsewhere
-    /// @return borrowedAmount The debt principal
-    /// @return borrowedAmountWithInterest The debt principal + accrued interest
-    /// @return borrowedAmountWithInterestAndFees The debt principal + accrued interest and protocol fees
+    /// @return debt The debt principal
+    /// @return debtWithInterest The debt principal + accrued interest
+    /// @return debtWithInterestAndFees The debt principal + accrued interest and protocol fees
     function _calcCreditAccountAccruedInterest(address creditAccount, uint256 quotaInterest)
         internal
         view
-        returns (uint256 borrowedAmount, uint256 borrowedAmountWithInterest, uint256 borrowedAmountWithInterestAndFees)
+        returns (uint256 debt, uint256 debtWithInterest, uint256 debtWithInterestAndFees)
     {
         uint256 cumulativeIndexAtOpen_RAY;
         uint256 cumulativeIndexNow_RAY;
-        (borrowedAmount, cumulativeIndexAtOpen_RAY, cumulativeIndexNow_RAY) = _getCreditAccountParameters(creditAccount); // F:[CM-49]
+        (debt, cumulativeIndexAtOpen_RAY, cumulativeIndexNow_RAY) = _getCreditAccountParameters(creditAccount); // F:[CM-49]
 
         // Interest is never stored and is always computed dynamically
         // as the difference between the current cumulative index of the pool
         // and the cumulative index recorded in the Credit Account
-        borrowedAmountWithInterest =
-            (borrowedAmount * cumulativeIndexNow_RAY) / cumulativeIndexAtOpen_RAY + quotaInterest; // F:[CM-49]
+        debtWithInterest = (debt * cumulativeIndexNow_RAY) / cumulativeIndexAtOpen_RAY + quotaInterest; // F:[CM-49]
 
         // Fees are computed as a percentage of interest
-        borrowedAmountWithInterestAndFees = borrowedAmountWithInterest
-            + ((borrowedAmountWithInterest - borrowedAmount) * feeInterest) / PERCENTAGE_FACTOR; // F: [CM-49]
+        debtWithInterestAndFees = debtWithInterest + ((debtWithInterest - debt) * feeInterest) / PERCENTAGE_FACTOR; // F: [CM-49]
     }
 
     /// @dev Returns the parameters of the Credit Account required to calculate debt
     /// @param creditAccount Address of the Credit Account
-    /// @return borrowedAmount Debt principal amount
+    /// @return debt Debt principal amount
     /// @return cumulativeIndexAtOpen_RAY The cumulative index value used to calculate
     ///         interest in conjunction  with current pool index. Not necessarily the index
     ///         value at the time of account opening, since it can be updated by manageDebt.
@@ -1306,10 +1268,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     function _getCreditAccountParameters(address creditAccount)
         internal
         view
-        returns (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen_RAY, uint256 cumulativeIndexNow_RAY)
+        returns (uint256 debt, uint256 cumulativeIndexAtOpen_RAY, uint256 cumulativeIndexNow_RAY)
     {
-        borrowedAmount = borrowedAmounts[creditAccount]; // F:[CM-49,50]
-        cumulativeIndexAtOpen_RAY = cumulativeIndicies[creditAccount]; // ICreditAccount(creditAccount).cumulativeIndexAtOpen(); // F:[CM-49,50]
+        debt = creditAccountInfo[creditAccount].debt; // F:[CM-49,50]
+        cumulativeIndexAtOpen_RAY = creditAccountInfo[creditAccount].cumulativeIndexAtOpen; // F:[CM-49,50]
         cumulativeIndexNow_RAY = IPoolService(pool).calcLinearCumulative_RAY(); // F:[CM-49,50]
     }
 
@@ -1533,7 +1495,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     /// @notice The function can be called with (adapter, address(0)) and (address(0), targetContract)
     ///         to disallow a particular target or adapter, since this would set values in respective
     ///         mappings to address(0).
-    function changeContractAllowance(address adapter, address targetContract) external creditConfiguratorOnly {
+    function setContractAllowance(address adapter, address targetContract) external creditConfiguratorOnly {
         if (adapter != address(0)) {
             adapterToContract[adapter] = targetContract; // F:[CM-56]
         }
@@ -1587,7 +1549,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
         uint256 balanceBefore = _balanceOf(token, address(withdrawManager));
 
-        ICreditAccount(creditAccount).safeTransfer(token, address(withdrawManager), amount);
+        _creditAccountSafeTransfer(creditAccount, token, address(withdrawManager), amount);
         withdrawManager.addDelayedWithdrawal(
             creditAccount, to, token, tokenMask, _balanceOf(token, address(withdrawManager)) - balanceBefore
         );

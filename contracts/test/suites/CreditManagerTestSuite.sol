@@ -158,7 +158,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         poolMock.setCumulative_RAY(cumulativeIndexAtClose);
     }
 
-    function makeTokenLimited(address token, uint16 rate, uint96 limit) external {
+    function makeTokenQuoted(address token, uint16 rate, uint96 limit) external {
         require(supportsQuotas, "Test suite does not support quotas");
 
         evm.startPrank(CONFIGURATOR);

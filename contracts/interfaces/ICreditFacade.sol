@@ -17,48 +17,45 @@ struct FullCheckParams {
 }
 
 interface ICreditFacadeEvents {
-    /// @dev Emits when BlacklistHelper is set for CreditFacadeV3 upon creation
-    event BlacklistHelperSet(address indexed blacklistHelper);
-
-    /// @dev Emits when a new Credit Account is opened through the
-    ///      Credit Facade
+    /// @dev Emits when a new Credit Account is opened through the Credit Facade
     event OpenCreditAccount(
-        address indexed onBehalfOf, address indexed creditAccount, uint256 borrowAmount, uint16 referralCode
+        address indexed creditAccount,
+        address indexed onBehalfOf,
+        address indexed caller,
+        uint256 debt,
+        uint16 referralCode
     );
 
     /// @dev Emits when the account owner closes their CA normally
-    event CloseCreditAccount(address indexed borrower, address indexed to);
+    event CloseCreditAccount(address indexed creditAccount, address indexed borrower, address indexed to);
 
     /// @dev Emits when a Credit Account is liquidated due to low health factor
     event LiquidateCreditAccount(
+        address indexed creditAccount,
         address indexed borrower,
         address indexed liquidator,
-        address indexed to,
+        address to,
         ClosureAction closureAction,
         uint256 remainingFunds
     );
 
-    /// @dev Emits when remaining funds in underlying currency are sent to blacklist helper
-    ///      upon blacklisted borrower liquidation
-    event UnderlyingSentToBlacklistHelper(address indexed borrower, uint256 amount);
-
     /// @dev Emits when the account owner increases CA's debt
-    event IncreaseBorrowedAmount(address indexed borrower, uint256 amount);
+    event IncreaseDebt(address indexed creditAccount, uint256 amount);
 
     /// @dev Emits when the account owner reduces CA's debt
-    event DecreaseBorrowedAmount(address indexed borrower, uint256 amount);
+    event DecreaseDebt(address indexed creditAccount, uint256 amount);
 
     /// @dev Emits when the account owner add new collateral to a CA
-    event AddCollateral(address indexed onBehalfOf, address indexed token, uint256 value);
+    event AddCollateral(address indexed creditAccount, address indexed token, uint256 value);
 
     /// @dev Emits when a multicall is started
-    event StartMultiCall(address indexed borrower);
+    event StartMultiCall(address indexed creditAccount);
 
     /// @dev Emits when a multicall is finished
     event FinishMultiCall();
 
     /// @dev Emits when Credit Account ownership is transferred
-    event TransferAccount(address indexed oldOwner, address indexed newOwner);
+    event TransferAccount(address indexed creditAccount, address indexed oldOwner, address indexed newOwner);
 
     /// @dev Emits when the user changes approval for account transfers to itself from another address
     event AllowAccountTransfer(address indexed from, address indexed to, bool state);
@@ -70,18 +67,16 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     //
 
     /// @dev Opens a Credit Account and runs a batch of operations in a multicall
-    /// @param borrowedAmount Debt size
+    /// @param debt Debt size
     /// @param onBehalfOf The address to open an account for. Transfers to it have to be allowed if
     /// msg.sender != obBehalfOf
     /// @param calls The array of MultiCall structs encoding the required operations. Generally must have
     /// at least a call to addCollateral, as otherwise the health check at the end will fail.
     /// @param referralCode Referral code which is used for potential rewards. 0 if no referral code provided
-    function openCreditAccount(
-        uint256 borrowedAmount,
-        address onBehalfOf,
-        MultiCall[] calldata calls,
-        uint16 referralCode
-    ) external payable;
+    function openCreditAccount(uint256 debt, address onBehalfOf, MultiCall[] calldata calls, uint16 referralCode)
+        external
+        payable
+        returns (address creditAccount);
 
     /// @dev Runs a batch of transactions within a multicall and closes the account
     /// - Wraps ETH to WETH and sends it msg.sender if value > 0
@@ -99,9 +94,13 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     /// @param skipTokenMask Uint-encoded bit mask where 1's mark tokens that shouldn't be transferred
     /// @param convertWETH If true, converts WETH into ETH before sending to "to"
     /// @param calls The array of MultiCall structs encoding the operations to execute before closing the account.
-    function closeCreditAccount(address to, uint256 skipTokenMask, bool convertWETH, MultiCall[] calldata calls)
-        external
-        payable;
+    function closeCreditAccount(
+        address creditAccount,
+        address to,
+        uint256 skipTokenMask,
+        bool convertWETH,
+        MultiCall[] calldata calls
+    ) external payable;
 
     /// @dev Runs a batch of transactions within a multicall and liquidates the account
     /// - Computes the total value and checks that hf < 1. An account can't be liquidated when hf >= 1.
@@ -128,7 +127,7 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     /// @param convertWETH If true, converts WETH into ETH before sending to "to"
     /// @param calls The array of MultiCall structs encoding the operations to execute before liquidating the account.
     function liquidateCreditAccount(
-        address borrower,
+        address creditAccount,
         address to,
         uint256 skipTokenMask,
         bool convertWETH,
@@ -146,7 +145,7 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     ///  - Executes the Multicall
     ///  - Performs a fullCollateralCheck to verify that hf > 1 after all actions
     /// @param calls The array of MultiCall structs encoding the operations to execute.
-    function multicall(MultiCall[] calldata calls) external payable;
+    function multicall(address creditAccount, MultiCall[] calldata calls) external payable;
 
     /// @dev Executes a batch of transactions within a Multicall from bot on behalf of a borrower
     ///  - Wraps ETH and sends it back to msg.sender, if value > 0
@@ -155,10 +154,6 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     /// @param borrower Borrower the perform the multicall for
     /// @param calls The array of MultiCall structs encoding the operations to execute.
     function botMulticall(address borrower, MultiCall[] calldata calls) external;
-
-    /// @dev Returns true if the borrower has an open Credit Account
-    /// @param borrower Borrower address
-    function hasOpenedCreditAccount(address borrower) external view returns (bool);
 
     /// @dev Approves account transfer from another user to msg.sender
     /// @param from Address for which account transfers are allowed/forbidden
@@ -174,33 +169,11 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     /// by calling approveAccountTransfer.
     /// This is done to prevent malicious actors from transferring compromised accounts to other users.
     /// @param to Address to transfer the account to
-    function transferAccountOwnership(address to) external;
+    function transferAccountOwnership(address creditAccount, address to) external;
 
     //
     // GETTERS
     //
-
-    /// @dev Calculates total value for provided Credit Account in underlying
-    ///
-    /// @param creditAccount Credit Account address
-    /// @return total Total value in underlying
-    // @return twv Total weighted (discounted by liquidation thresholds) value in underlying
-    function calcTotalValue(address creditAccount) external view returns (uint256 total, uint256 twv);
-
-    /**
-     * @dev Calculates health factor for the credit account
-     *
-     *          sum(asset[i] * liquidation threshold[i])
-     *   Hf = --------------------------------------------
-     *         borrowed amount + interest accrued + fees
-     *
-     *
-     * More info: https://dev.gearbox.fi/developers/credit/economy#health-factor
-     *
-     * @param creditAccount Credit account address
-     * @return hf = Health factor in bp (see PERCENTAGE FACTOR in Constants.sol)
-     */
-    // function calcCreditAccountHealthFactor(address creditAccount) external view returns (uint256 hf);
 
     /// @dev Bit mask encoding a set of forbidden tokens
     function forbiddenTokenMask() external view returns (uint256);
@@ -213,17 +186,10 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     /// @param to Receiver address to check allowance for
     function transfersAllowed(address from, address to) external view returns (bool);
 
-    /// @return maxBorrowedAmountPerBlock Maximal amount of new debt that can be taken per block
-    /// @return isIncreaseDebtForbidden True if increasing debt is forbidden
-    /// @return expirationDate Timestamp of the next expiration (for expirable Credit Facades only)
-    function params()
-        external
-        view
-        returns (uint128 maxBorrowedAmountPerBlock, bool isIncreaseDebtForbidden, uint40 expirationDate);
+    /// @return minDebt Minimal borrowed amount per credit account
+    function debtLimits() external view returns (uint128 minDebt, uint128 maxDebt);
 
-    /// @return minBorrowedAmount Minimal borrowed amount per credit account
-    /// @return maxBorrowedAmount Maximal borrowed amount per credit account
-    function limits() external view returns (uint128 minBorrowedAmount, uint128 maxBorrowedAmount);
+    function maxDebtPerBlockMultiplier() external view returns (uint8);
 
     /// @return currentCumulativeLoss The total amount of loss accumulated since last reset
     /// @return maxCumulativeLoss The maximal amount of loss accumulated before the Credit Manager is paused
@@ -234,12 +200,6 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
 
     /// @dev Address of the underlying asset
     function underlying() external view returns (address);
-
-    // /// @dev Address of the blacklist helper or address(0), if the underlying is not blacklistable
-    // function blacklistHelper() external view returns (address);
-
-    // /// @dev Whether the underlying of connected Credit Manager is blacklistable
-    // function isBlacklistableUnderlying() external view returns (bool);
 
     /// @dev Maps addresses to their status as emergency liquidator.
     /// @notice Emergency liquidators are trusted addresses

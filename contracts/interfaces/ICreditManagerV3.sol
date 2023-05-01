@@ -22,12 +22,13 @@ enum ManageDebtAction {
 uint8 constant WITHDRAWAL_FLAG = 1;
 
 struct CreditAccountInfo {
+    uint256 debt;
+    uint256 cumulativeIndexAtOpen;
+    uint256 cumulativeQuotaInterest;
     uint8 flags;
     uint248 enabledTokensMask;
+    address borrower;
 }
-/// TODO: check in Remix
-/// uint256 borrowAmount;
-/// uint256 cumulativeIndexAtOpen;
 
 struct CollateralTokenData {
     address token;
@@ -59,12 +60,9 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     //
 
     ///  @dev Opens credit account and borrows funds from the pool.
-    /// - Takes Credit Account from the factory;
-    /// - Requests the pool to lend underlying to the Credit Account
-    ///
-    /// @param borrowedAmount Amount to be borrowed by the Credit Account
+    /// @param debt Amount to be borrowed by the Credit Account
     /// @param onBehalfOf The owner of the newly opened Credit Account
-    function openCreditAccount(uint256 borrowedAmount, address onBehalfOf) external returns (address);
+    function openCreditAccount(uint256 debt, address onBehalfOf) external returns (address);
 
     ///  @dev Closes a Credit Account - covers both normal closure and liquidation
     /// - Checks whether the contract is paused, and, if so, if the payer is an emergency liquidator.
@@ -100,7 +98,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
         address to,
         uint256 enabledTokenMask,
         uint256 skipTokenMask,
-        uint256 borrowedAmountWithInterest,
+        uint256 debtWithInterest,
         bool convertWETH
     ) external returns (uint256 remainingFunds, uint256 loss);
 
@@ -109,7 +107,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// - Increase debt:
     ///   + Increases debt by transferring funds from the pool to the credit account
     ///   + Updates the cumulative index to keep interest the same. Since interest
-    ///     is always computed dynamically as borrowedAmount * (cumulativeIndexNew / cumulativeIndexOpen - 1),
+    ///     is always computed dynamically as debt * (cumulativeIndexNew / cumulativeIndexOpen - 1),
     ///     cumulativeIndexOpen needs to be updated, as the borrow amount has changed
     ///
     /// - Decrease debt:
@@ -119,10 +117,10 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @param creditAccount Address of the Credit Account to change debt for
     /// @param amount Amount to increase / decrease the principal by
     /// @param action Increase/decrease
-    /// @return newBorrowedAmount The new debt principal
+    /// @return newdebt The new debt principal
     function manageDebt(address creditAccount, uint256 amount, uint256 _enabledTokensMask, ManageDebtAction action)
         external
-        returns (uint256 newBorrowedAmount, uint256 enableTokenMask);
+        returns (uint256 newdebt, uint256 enableTokenMask);
 
     /// @dev Adds collateral to borrower's credit account
     /// @param payer Address of the account which will be charged to provide additional collateral
@@ -152,11 +150,6 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     // COLLATERAL VALIDITY AND ACCOUNT HEALTH CHECKS
     //
 
-    // /// @dev Enables a token on a Credit Account currently owned by the Credit Facade,
-    // ///      including it into account health factor and total value calculations
-    // /// @param token Address of the token to enable
-    // function checkAndEnableToken(address token) external;
-
     /// @dev Performs a full health check on an account with a custom order of evaluated tokens and
     ///      a custom minimal health factor
     /// @param creditAccount Address of the Credit Account to check
@@ -168,31 +161,6 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
         uint256[] memory collateralHints,
         uint16 minHealthFactor
     ) external;
-
-    // /// @dev Checks that the number of enabled tokens on a Credit Account
-    // ///      does not violate the maximal enabled token limit and tries
-    // ///      to disable unused tokens if it does
-    // /// @param creditAccount Account to check enabled tokens for
-    // function checkEnabledTokensLength(address creditAccount) external;
-
-    // /// @dev Disables a token on a Credit Account currently owned by the Credit Facade
-    // ///      excluding it from account health factor and total value calculations
-    // /// @notice Usually called by adapters to disable spent tokens during a multicall,
-    // ///         but can also be called separately from the Credit Facade to remove
-    // ///         unwanted tokens
-    // /// @param token Address of the token to disable
-    // /// @return True if token mask was changed and false otherwise
-    // function disableToken(address token) external returns (bool);
-
-    // /// @dev Changes enabled tokens for a Credit Account currently owned by the Credit Facade
-    // /// @notice Can be used by adapters that enable/disable multiple tokens at the same time to reduce gas costs
-    // /// @param tokensToEnable Tokens mask where 1's represent tokens that should be enabled
-    // /// @param tokensToDisable Tokens mask where 1's represent tokens that should be disabled
-    // /// @return wasEnabled True if at least one token was enabled and false otherwise
-    // /// @return wasDisabled True if at least one token was disabled and false otherwise
-    // function changeEnabledTokens(uint256 tokensToEnable, uint256 tokensToDisable)
-    //     external
-    //     returns (bool wasEnabled, bool wasDisabled);
 
     //
     // QUOTAS MANAGEMENT
@@ -210,8 +178,9 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     //
 
     /// @dev Returns the address of a borrower's Credit Account, or reverts if there is none.
-    /// @param borrower Borrower's address
-    function getCreditAccountOrRevert(address borrower) external view returns (address);
+    /// @param creditAccount credit account address
+    /// @return borrower Borrower's address
+    function getBorrowerOrRevert(address creditAccount) external view returns (address borrower);
 
     /// @dev Computes amounts that must be sent to various addresses before closing an account
     /// @param totalValue Credit Accounts total value in underlying
@@ -220,8 +189,8 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     ///        * LIQUIDATE_ACCOUNT: The account is unhealthy and is being liquidated to avoid bad debt
     ///        * LIQUIDATE_EXPIRED_ACCOUNT: The account has expired and is being liquidated (lowered liquidation premium)
     ///        * LIQUIDATE_PAUSED: The account is liquidated while the system is paused due to emergency (no liquidation premium)
-    /// @param borrowedAmount Credit Account's debt principal
-    /// @param borrowedAmountWithInterest Credit Account's debt principal + interest
+    /// @param debt Credit Account's debt principal
+    /// @param debtWithInterest Credit Account's debt principal + interest
     /// @return amountToPool Amount of underlying to be sent to the pool
     /// @return remainingFunds Amount of underlying to be sent to the borrower (only applicable to liquidations)
     /// @return profit Protocol's profit from fees (if any)
@@ -229,19 +198,19 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     function calcClosePayments(
         uint256 totalValue,
         ClosureAction closureActionType,
-        uint256 borrowedAmount,
-        uint256 borrowedAmountWithInterest
+        uint256 debt,
+        uint256 debtWithInterest
     ) external view returns (uint256 amountToPool, uint256 remainingFunds, uint256 profit, uint256 loss);
 
     /// @dev Calculates the debt accrued by a Credit Account
     /// @param creditAccount Address of the Credit Account
-    /// @return borrowedAmount The debt principal
-    /// @return borrowedAmountWithInterest The debt principal + accrued interest
-    /// @return borrowedAmountWithInterestAndFees The debt principal + accrued interest and protocol fees
+    /// @return debt The debt principal
+    /// @return debtWithInterest The debt principal + accrued interest
+    /// @return debtWithInterestAndFees The debt principal + accrued interest and protocol fees
     function calcCreditAccountAccruedInterest(address creditAccount)
         external
         view
-        returns (uint256 borrowedAmount, uint256 borrowedAmountWithInterest, uint256 borrowedAmountWithInterestAndFees);
+        returns (uint256 debt, uint256 debtWithInterest, uint256 debtWithInterestAndFees);
 
     /// @dev Maps Credit Accounts to bit masks encoding their enabled token sets
     /// Only enabled tokens are counted as collateral for the Credit Account
@@ -295,9 +264,6 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @dev Whether the Credit Manager supports quotas
     function supportsQuotas() external view returns (bool);
 
-    /// @dev A map from borrower addresses to Credit Account addresses
-    function creditAccounts(address borrower) external view returns (address);
-
     /// @dev Address of the connected Credit Configurator
     function creditConfigurator() external view returns (address);
 
@@ -341,19 +307,10 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @dev Address of the connected Price Oracle
     function priceOracle() external view returns (IPriceOracleV2);
 
-    /// @dev Contract's version
-    function version() external view returns (uint256);
-
     function calcTotalValue(address creditAccount)
         external
         view
-        returns (
-            uint256 enabledTokenMask,
-            uint256 total,
-            uint256 twv,
-            uint256 borrowedAmountWithInterest,
-            bool canBeLiquidated
-        );
+        returns (uint256 enabledTokenMask, uint256 total, uint256 twv, uint256 debtWithInterest, bool canBeLiquidated);
 
     function withdraw(address creditAccount, address borrower, address token, uint256 amount)
         external

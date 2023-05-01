@@ -42,6 +42,9 @@ error IncorrectPriceFeedException();
 /// ACCESS
 ///
 
+/// @dev Thrown on attempting to perform an action for an address that owns no Credit Account
+error CallerNotCreditAccountOwnerException();
+
 /// @dev Thrown on attempting to call an access restricted function as a non-Configurator
 error CallerNotConfiguratorException();
 
@@ -129,7 +132,7 @@ error IncreaseAndDecreaseForbiddenInOneCallException();
 error UnknownMethodException();
 
 /// @dev Thrown if a user tries to open an account or increase debt with increaseDebtForbidden mode on
-error IncreaseDebtForbiddenException();
+error BorrowingForbiddenException();
 
 /// @dev Thrown if the account owner tries to transfer an unhealthy account
 error CantTransferLiquidatableAccountException();
@@ -145,7 +148,7 @@ error BorrowAmountOutOfLimitsException();
 error BalanceLessThanMinimumDesiredException(address);
 
 /// @dev Thrown if a user attempts to open an account on a Credit Facade that has expired
-error OpenAccountNotAllowedAfterExpirationException();
+error NotAllowedAfterExpirationException();
 
 /// @dev Thrown if expected balances are attempted to be set through revertIfReceivedLessThan twice
 error ExpectedBalancesAlreadySetException();
@@ -177,7 +180,7 @@ error NotEnoughCollateralException();
 error AllowanceFailedException();
 
 /// @dev Thrown on attempting to perform an action for an address that owns no Credit Account
-error HasNoOpenedAccountException();
+error CreditAccountNotExistsException();
 
 /// @dev Thrown on configurator attempting to add more than 256 collateral tokens
 error TooManyTokensException();
