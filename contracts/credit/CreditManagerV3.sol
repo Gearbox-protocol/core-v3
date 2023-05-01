@@ -5,6 +5,7 @@ pragma solidity ^0.8.17;
 
 // LIBRARIES
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // LIBS & TRAITS
@@ -55,6 +56,7 @@ uint256 constant INDEX_PRECISION = 10 ** 9;
 ///
 /// More info: https://dev.gearbox.fi/developers/credit/credit_manager
 contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard, IERC20HelperTrait {
+    using EnumerableSet for EnumerableSet.AddressSet;
     using Address for address payable;
     using BitMask for uint256;
 
@@ -151,6 +153,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     /// @dev Contains infomation related to CA
     mapping(address => CreditAccountInfo) public creditAccountInfo;
 
+    /// @dev Array of the allowed contracts
+    EnumerableSet.AddressSet private creditAccountsSet;
+
     //
     // MODIFIERS
     //
@@ -238,6 +243,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
         // Requests the pool to transfer tokens the Credit Account
         IPoolService(pool).lendCreditAccount(debt, creditAccount); // F:[CM-8]
+        creditAccountsSet.add(creditAccount);
     }
 
     ///  @dev Closes a Credit Account - covers both normal closure and liquidation
@@ -323,6 +329,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
         // Returns Credit Account to the factory
         _accountFactory.returnCreditAccount(creditAccount); // F:[CM-9]
+        creditAccountsSet.remove(creditAccount);
     }
 
     function _transferClosurePayments(
@@ -1651,5 +1658,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
     function _amountWithFee(uint256 amount) internal view virtual returns (uint256) {
         return amount;
+    }
+
+    // CREDIT ACCOUNTS
+    function creditAccounts() external view returns (address[] memory) {
+        return creditAccountsSet.values();
     }
 }
