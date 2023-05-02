@@ -1016,9 +1016,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
                 uint256 balanceBefore = _balanceOf(token, address(withdrawalManager));
                 _creditAccountSafeTransfer(creditAccount, token, address(withdrawalManager), amount);
                 amount = _balanceOf(token, address(withdrawalManager)) - balanceBefore;
-                if (amount > 1) {
-                    withdrawalManager.addImmediateWithdrawal(to, token, amount);
-                }
+                withdrawalManager.addImmediateWithdrawal(to, token, amount);
             }
         }
     }

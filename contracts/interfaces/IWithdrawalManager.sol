@@ -76,7 +76,6 @@ interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
     /// @param account Account to add immediate withdrawal for
     /// @param token Token to withdraw
     /// @param amount Amount to withdraw
-    /// @custom:expects `amount` is greater than 1
     /// @custom:expects Credit manager transferred `amount` of `token` to this contract prior to calling this function
     function addImmediateWithdrawal(address account, address token, uint256 amount) external;
 

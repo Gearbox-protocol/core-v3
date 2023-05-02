@@ -22,10 +22,11 @@ import {ACLTrait} from "../traits/ACLTrait.sol";
 ///         There are two kinds of withdrawals: immediate and scheduled.
 ///         - Immediate withdrawals can be claimed, well, immediately, and exist to support liquidation of accounts
 ///           whose owners are blacklisted in credit manager's underlying.
+///           Also, when scheduled withdrawals are claimed, they turn into immediate withdrawals.
 ///         - Scheduled withdrawals can be claimed after a certain delay, and exist to support partial withdrawals
 ///           from credit accounts. One credit account can have up to two immature withdrawals at the same time.
 ///           Additional rules for scheduled withdrawals:
-///           + if account is closed, both mature and immature withdrawals are claimed (turned into immediate withdrawals)
+///           + if account is closed, both mature and immature withdrawals are claimed
 ///           + if account is liquidated, immature withdrawals are cancelled and mature ones are claimed
 ///           + if account is liquidated in emergency mode, both mature and immature withdrawals are cancelled
 ///           + in emergency mode, claiming is disabled
@@ -91,8 +92,10 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait {
 
     /// @dev Increases account's immediately withdrawable balance of token
     function _addImmediateWithdrawal(address account, address token, uint256 amount) internal {
-        immediateWithdrawals[account][token] += amount;
-        emit AddImmediateWithdrawal(account, token, amount);
+        if (amount > 1) {
+            immediateWithdrawals[account][token] += amount;
+            emit AddImmediateWithdrawal(account, token, amount);
+        }
     }
 
     /// --------------------- ///
