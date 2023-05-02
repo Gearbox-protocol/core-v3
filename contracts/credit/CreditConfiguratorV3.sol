@@ -31,7 +31,7 @@ import {
     CollateralToken,
     CreditManagerOpts,
     AllowanceAction
-} from "../interfaces/ICreditConfigurator.sol";
+} from "../interfaces/ICreditConfiguratorV3.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";

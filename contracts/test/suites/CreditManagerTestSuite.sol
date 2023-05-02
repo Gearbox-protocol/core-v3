@@ -4,7 +4,7 @@
 pragma solidity ^0.8.10;
 
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
-import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfigurator.sol";
+import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {WithdrawManager} from "../../support/WithdrawManager.sol";
@@ -65,7 +65,6 @@ contract CreditManagerTestSuite is PoolDeployer {
         creditManager.setCreditConfigurator(CONFIGURATOR);
 
         evm.startPrank(CONFIGURATOR);
-
         creditManager.setCreditFacade(creditFacade);
 
         creditManager.setParams(
@@ -86,34 +85,23 @@ contract CreditManagerTestSuite is PoolDeployer {
             }
         }
 
-        evm.stopPrank();
+        cr.addCreditManager(address(creditManager));
 
         assertEq(creditManager.creditConfigurator(), CONFIGURATOR, "Configurator wasn't set");
 
-        cr.addCreditManager(address(creditManager));
-
         if (supportsQuotas) {
             poolQuotaKeeper.addCreditManager(address(creditManager));
-            // poolQuotaKeeper.setGauge(CONFIGURATOR);
         }
 
         if (accountFactoryVer == 2) {
             AccountFactoryV2(address(af)).addCreditManager(address(creditManager));
         }
 
+        evm.stopPrank();
+
         // Approve USER & LIQUIDATOR to credit manager
         tokenTestSuite.approve(underlying, USER, address(creditManager));
         tokenTestSuite.approve(underlying, LIQUIDATOR, address(creditManager));
-
-        addressProvider.transferOwnership(CONFIGURATOR);
-        acl.transferOwnership(CONFIGURATOR);
-
-        evm.startPrank(CONFIGURATOR);
-
-        acl.claimOwnership();
-        addressProvider.claimOwnership();
-
-        evm.stopPrank();
     }
 
     ///

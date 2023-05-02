@@ -87,7 +87,11 @@ contract CreditFacadeGasTest is
             _underlying
         );
 
-        cft = new CreditFacadeTestSuite(creditConfig,  supportQuotas,  withDegenNFT,  withExpiration, 1);
+        cft = new CreditFacadeTestSuite({ _creditConfig: creditConfig,
+         supportQuotas: supportQuotas,
+         withDegenNFT: withDegenNFT,
+         withExpiration:  withExpiration,
+         accountFactoryVer: 1});
 
         // cft.testFacadeWithQuotas();
 

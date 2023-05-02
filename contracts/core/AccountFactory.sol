@@ -55,9 +55,6 @@ contract AccountFactoryV2 is IAccountFactory, ACLTrait, ContractsRegisterTrait {
         }
 
         masterCreditAccounts[creditManager] = address(new CreditAccount(creditManager));
-
-        console.log("CM", creditManager);
-        console.log(masterCreditAccounts[creditManager]);
     }
 
     function _getMasterCreditAccountOrRevert() internal view returns (address masterCA) {

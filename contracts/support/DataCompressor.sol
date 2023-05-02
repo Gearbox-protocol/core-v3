@@ -12,7 +12,7 @@ import {ICreditManager as ICreditManagerV1} from "@gearbox-protocol/core-v2/cont
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {ICreditFacade} from "../interfaces/ICreditFacade.sol";
 import {ICreditFilter} from "@gearbox-protocol/core-v2/contracts/interfaces/V1/ICreditFilter.sol";
-import {ICreditConfigurator} from "../interfaces/ICreditConfigurator.sol";
+import {ICreditConfigurator} from "../interfaces/ICreditConfiguratorV3.sol";
 import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
 import {IPool4626} from "../interfaces/IPool4626.sol";

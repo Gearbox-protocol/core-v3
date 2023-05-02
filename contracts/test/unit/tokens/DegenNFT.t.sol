@@ -47,8 +47,11 @@ contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
             Tokens.DAI
         );
 
-        cft = new CreditFacadeTestSuite(creditConfig, true, false, false, 1);
-        cft.testFacadeWithDegenNFT();
+        cft = cft = new CreditFacadeTestSuite({ _creditConfig: creditConfig,
+         supportQuotas: false,
+         withDegenNFT: true,
+         withExpiration:  false,
+         accountFactoryVer:  1});
 
         creditManager = cft.creditManager();
         creditFacade = cft.creditFacade();

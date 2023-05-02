@@ -6,7 +6,7 @@ pragma solidity ^0.8.10;
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
 import {Tokens} from "./Tokens.sol";
 
-import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfigurator.sol";
+import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 
 import {PriceFeedConfig} from "@gearbox-protocol/core-v2/contracts/oracles/PriceOracle.sol";
 import {ICreditConfig} from "../interfaces/ICreditConfig.sol";

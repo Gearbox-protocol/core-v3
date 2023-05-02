@@ -13,7 +13,7 @@ import {GenesisFactory} from "./GenesisFactory.sol";
 import {PoolFactory, PoolOpts} from "@gearbox-protocol/core-v2/contracts/factories/PoolFactory.sol";
 import {WithdrawManager} from "../../support/WithdrawManager.sol";
 
-import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfigurator.sol";
+import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 import {PoolServiceMock} from "../mocks/pool/PoolServiceMock.sol";
 import {GaugeMock} from "../mocks/pool/GaugeMock.sol";
 import {PoolQuotaKeeper} from "../../pool/PoolQuotaKeeper.sol";
@@ -106,5 +106,15 @@ contract PoolDeployer is DSTest {
         poolQuotaKeeper.setGauge(address(gaugeMock));
 
         poolMock.setPoolQuotaKeeper(address(poolQuotaKeeper));
+
+        addressProvider.transferOwnership(CONFIGURATOR);
+        acl.transferOwnership(CONFIGURATOR);
+
+        evm.startPrank(CONFIGURATOR);
+
+        acl.claimOwnership();
+        addressProvider.claimOwnership();
+
+        evm.stopPrank();
     }
 }

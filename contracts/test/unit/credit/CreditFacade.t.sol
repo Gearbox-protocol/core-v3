@@ -21,7 +21,7 @@ import {
     ClosureAction,
     ManageDebtAction
 } from "../../../interfaces/ICreditManagerV3.sol";
-import {AllowanceAction} from "../../../interfaces/ICreditConfigurator.sol";
+import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {ICreditFacadeEvents} from "../../../interfaces/ICreditFacade.sol";
 import {IDegenNFT, IDegenNFTExceptions} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
 import {IWithdrawManager} from "../../../interfaces/IWithdrawManager.sol";
@@ -86,9 +86,13 @@ contract CreditFacadeTest is
         _setUp(_underlying, false, false, false, 1);
     }
 
-    function _setUp(Tokens _underlying, bool withDegenNFT, bool expirable, bool supportQuotas, uint8 accountFactoryVer)
-        internal
-    {
+    function _setUp(
+        Tokens _underlying,
+        bool withDegenNFT,
+        bool withExpiration,
+        bool supportQuotas,
+        uint8 accountFactoryVer
+    ) internal {
         tokenTestSuite = new TokensTestSuite();
         tokenTestSuite.topUpWETH{value: 100 * WAD}();
 
@@ -97,7 +101,11 @@ contract CreditFacadeTest is
             _underlying
         );
 
-        cft = new CreditFacadeTestSuite(creditConfig,  withDegenNFT,  expirable, supportQuotas,  accountFactoryVer);
+        cft = new CreditFacadeTestSuite({ _creditConfig: creditConfig,
+         supportQuotas: supportQuotas,
+         withDegenNFT: withDegenNFT,
+         withExpiration:  withExpiration,
+         accountFactoryVer:  accountFactoryVer});
 
         underlying = tokenTestSuite.addressOf(_underlying);
         creditManager = cft.creditManager();
@@ -187,7 +195,13 @@ contract CreditFacadeTest is
 
         assertTrue(creditFacade.whitelisted() == false, "Incorrect whitelisted");
 
-        cft.testFacadeWithDegenNFT();
+        _setUp({
+            _underlying: Tokens.DAI,
+            withDegenNFT: true,
+            withExpiration: false,
+            supportQuotas: false,
+            accountFactoryVer: 1
+        });
         creditFacade = cft.creditFacade();
 
         assertEq(creditFacade.degenNFT(), address(cft.degenNFT()), "Incorrect degenNFT");
@@ -343,8 +357,13 @@ contract CreditFacadeTest is
 
     /// @dev [FA-4B]: openCreditAccount reverts if user has no NFT for degen mode
     function test_FA_04B_openCreditAccount_reverts_for_non_whitelisted_account() public {
-        cft.testFacadeWithDegenNFT();
-        creditFacade = cft.creditFacade();
+        _setUp({
+            _underlying: Tokens.DAI,
+            withDegenNFT: true,
+            withExpiration: false,
+            supportQuotas: false,
+            accountFactoryVer: 1
+        });
 
         (uint256 minBorrowedAmount,) = creditFacade.debtLimits();
 
@@ -366,8 +385,13 @@ contract CreditFacadeTest is
 
     /// @dev [FA-4C]: openCreditAccount opens account and burns token
     function test_FA_04C_openCreditAccount_burns_token_in_whitelisted_mode() public {
-        cft.testFacadeWithDegenNFT();
-        creditFacade = cft.creditFacade();
+        _setUp({
+            _underlying: Tokens.DAI,
+            withDegenNFT: true,
+            withExpiration: false,
+            supportQuotas: false,
+            accountFactoryVer: 1
+        });
 
         IDegenNFT degenNFT = IDegenNFT(creditFacade.degenNFT());
 
@@ -1761,8 +1785,13 @@ contract CreditFacadeTest is
 
     /// @dev [FA-46]: openCreditAccount and openCreditAccount no longer work if the CreditFacadeV3 is expired
     function test_FA_46_openCreditAccount_reverts_on_expired_CreditFacade() public {
-        cft.testFacadeWithExpiration();
-        creditFacade = cft.creditFacade();
+        _setUp({
+            _underlying: Tokens.DAI,
+            withDegenNFT: false,
+            withExpiration: true,
+            supportQuotas: false,
+            accountFactoryVer: 1
+        });
 
         evm.warp(block.timestamp + 1);
 
@@ -1784,8 +1813,13 @@ contract CreditFacadeTest is
 
     /// @dev [FA-47]: liquidateExpiredCreditAccount should not work before the CreditFacadeV3 is expired
     function test_FA_47_liquidateExpiredCreditAccount_reverts_before_expiration() public {
-        cft.testFacadeWithExpiration();
-        creditFacade = cft.creditFacade();
+        _setUp({
+            _underlying: Tokens.DAI,
+            withDegenNFT: false,
+            withExpiration: true,
+            supportQuotas: false,
+            accountFactoryVer: 1
+        });
 
         _openTestCreditAccount();
 
@@ -1807,9 +1841,13 @@ contract CreditFacadeTest is
 
     /// @dev [FA-49]: liquidateExpiredCreditAccount works correctly and emits events
     function test_FA_49_liquidateExpiredCreditAccount_works_correctly_after_expiration() public {
-        cft.testFacadeWithExpiration();
-        creditFacade = cft.creditFacade();
-
+        _setUp({
+            _underlying: Tokens.DAI,
+            withDegenNFT: false,
+            withExpiration: true,
+            supportQuotas: false,
+            accountFactoryVer: 1
+        });
         (address creditAccount, uint256 balance) = _openTestCreditAccount();
 
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();

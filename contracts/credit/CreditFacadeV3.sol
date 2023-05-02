@@ -18,7 +18,7 @@ import {QuotaUpdate} from "../interfaces/IPoolQuotaKeeper.sol";
 /// INTERFACES
 import "../interfaces/ICreditFacade.sol";
 import {ICreditManagerV3, ClosureAction, ManageDebtAction, RevocationPair} from "../interfaces/ICreditManagerV3.sol";
-import {AllowanceAction} from "../interfaces/ICreditConfigurator.sol";
+import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
 
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 
@@ -348,7 +348,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         uint256 skipTokenMask,
         bool convertWETH,
         MultiCall[] calldata calls
-    ) external payable override whenNotPausedOrEmergency nonReentrant nonZeroAddress(to) {
+    ) external payable override whenNotPausedOrEmergency nonZeroAddress(to) nonReentrant {
         // Checks that the CA exists to revert early for late liquidations and save gas
         address borrower = _getBorrowerOrRevert(creditAccount); // F:[FA-2]
 
