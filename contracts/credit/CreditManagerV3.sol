@@ -266,7 +266,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     /// - Returns the Credit Account back to factory
     ///
     /// @param creditAccount Credit account address
-    /// @param closureActionType Whether the account is closed, liquidated or liquidated due to expiry
+    /// @param closureAction Whether the account is closed, liquidated or liquidated due to expiry
     /// @param totalValue Portfolio value for liqution, 0 for ordinary closure
     /// @param payer Address which would be charged if credit account has not enough funds to cover amountToPool
     /// @param to Address to which the leftover funds will be sent
@@ -274,7 +274,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     /// @param convertWETH If true converts WETH to ETH
     function closeCreditAccount(
         address creditAccount,
-        ClosureAction closureActionType,
+        ClosureAction closureAction,
         uint256 totalValue,
         address payer,
         address to,
@@ -303,7 +303,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
             uint256 profit;
 
             (amountToPool, remainingFunds, profit, loss) =
-                calcClosePayments(totalValue, closureActionType, debt, debtWithInterest); // F:[CM-10,11,12]
+                calcClosePayments(totalValue, closureAction, debt, debtWithInterest); // F:[CM-10,11,12]
 
             _transferClosurePayments(
                 creditAccount, payer, to, borrower, convertWETH, amountToPool, remainingFunds, debt, profit, loss
@@ -1042,7 +1042,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
     /// @dev Computes amounts that must be sent to various addresses before closing an account
     /// @param totalValue Credit Accounts total value in underlying
-    /// @param closureActionType Type of account closure
+    /// @param closureAction Type of account closure
     ///        * CLOSE_ACCOUNT: The account is healthy and is closed normally
     ///        * LIQUIDATE_ACCOUNT: The account is unhealthy and is being liquidated to avoid bad debt
     ///        * LIQUIDATE_EXPIRED_ACCOUNT: The account has expired and is being liquidated (lowered liquidation premium)
@@ -1053,20 +1053,19 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     /// @return remainingFunds Amount of underlying to be sent to the borrower (only applicable to liquidations)
     /// @return profit Protocol's profit from fees (if any)
     /// @return loss Protocol's loss from bad debt (if any)
-    function calcClosePayments(
-        uint256 totalValue,
-        ClosureAction closureActionType,
-        uint256 debt,
-        uint256 debtWithInterest
-    ) public view override returns (uint256 amountToPool, uint256 remainingFunds, uint256 profit, uint256 loss) {
+    function calcClosePayments(uint256 totalValue, ClosureAction closureAction, uint256 debt, uint256 debtWithInterest)
+        public
+        view
+        override
+        returns (uint256 amountToPool, uint256 remainingFunds, uint256 profit, uint256 loss)
+    {
         // The amount to be paid to pool is computed with fees included
         // The pool will compute the amount of Diesel tokens to treasury
         // based on profit
         amountToPool = debtWithInterest + ((debtWithInterest - debt) * feeInterest) / PERCENTAGE_FACTOR; // F:[CM-43]
 
         if (
-            closureActionType == ClosureAction.LIQUIDATE_ACCOUNT
-                || closureActionType == ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT
+            closureAction == ClosureAction.LIQUIDATE_ACCOUNT || closureAction == ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT
         ) {
             // LIQUIDATION CASE
 
@@ -1082,16 +1081,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
             uint256 totalFunds = (
                 totalValue
-                    * (
-                        closureActionType == ClosureAction.LIQUIDATE_ACCOUNT
-                            ? liquidationDiscount
-                            : liquidationDiscountExpired
-                    )
+                    * (closureAction == ClosureAction.LIQUIDATE_ACCOUNT ? liquidationDiscount : liquidationDiscountExpired)
             ) / PERCENTAGE_FACTOR; // F:[CM-43]
 
             amountToPool += (
-                totalValue
-                    * (closureActionType == ClosureAction.LIQUIDATE_ACCOUNT ? feeLiquidation : feeLiquidationExpired)
+                totalValue * (closureAction == ClosureAction.LIQUIDATE_ACCOUNT ? feeLiquidation : feeLiquidationExpired)
             ) / PERCENTAGE_FACTOR; // F:[CM-43]
 
             /// Adding fee here

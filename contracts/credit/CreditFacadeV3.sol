@@ -241,14 +241,18 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         _wrapETH(); // F:[FA-3B]
 
         // Requests the Credit Manager to open a Credit Account
-        creditAccount = creditManager.openCreditAccount(debt, onBehalfOf); // F:[FA-8]
+        creditAccount = creditManager.openCreditAccount({debt: debt, onBehalfOf: onBehalfOf}); // F:[FA-8]
 
         // emits a new event
         emit OpenCreditAccount(creditAccount, onBehalfOf, msg.sender, debt, referralCode); // F:[FA-8]
         // F:[FA-10]: no free flashloans through opening a Credit Account
         // and immediately decreasing debt
-        FullCheckParams memory fullCheckParams =
-            _multicall(creditAccount, calls, UNDERLYING_TOKEN_MASK, OPEN_CREDIT_ACCOUNT_FLAGS); // F:[FA-8]
+        FullCheckParams memory fullCheckParams = _multicall({
+            creditAccount: creditAccount,
+            calls: calls,
+            enabledTokensMask: UNDERLYING_TOKEN_MASK,
+            flags: OPEN_CREDIT_ACCOUNT_FLAGS
+        }); // F:[FA-8]
 
         // Checks that the new credit account has enough collateral to cover the debt
         _fullCollateralCheck(creditAccount, UNDERLYING_TOKEN_MASK, fullCheckParams, forbiddenBalances); // F:[FA-8, 9]
@@ -297,17 +301,17 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         (, uint256 debtWithInterest,) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
 
         // Requests the Credit manager to close the Credit Account
-        creditManager.closeCreditAccount(
-            creditAccount,
-            ClosureAction.CLOSE_ACCOUNT,
-            0,
-            msg.sender,
-            to,
-            enabledTokensMask,
-            skipTokenMask,
-            debtWithInterest,
-            convertWETH
-        ); // F:[FA-2, 12]
+        creditManager.closeCreditAccount({
+            creditAccount: creditAccount,
+            closureAction: ClosureAction.CLOSE_ACCOUNT,
+            totalValue: 0,
+            payer: msg.sender,
+            to: to,
+            enabledTokenMask: enabledTokensMask,
+            skipTokenMask: skipTokenMask,
+            debtWithInterest: debtWithInterest,
+            convertWETH: convertWETH
+        }); // F:[FA-2, 12]
 
         // TODO: add test
         if (convertWETH) {
@@ -396,17 +400,17 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         uint256 debtWithInterest
     ) internal returns (uint256 remainingFunds) {
         uint256 reportedLoss;
-        (remainingFunds, reportedLoss) = creditManager.closeCreditAccount(
-            creditAccount,
-            closeAction,
-            totalValue,
-            msg.sender,
-            to,
-            enabledTokensMask,
-            skipTokenMask,
-            debtWithInterest,
-            convertWETH
-        ); // F:[FA-15,49]
+        (remainingFunds, reportedLoss) = creditManager.closeCreditAccount({
+            creditAccount: creditAccount,
+            closureAction: closeAction,
+            totalValue: totalValue,
+            payer: msg.sender,
+            to: to,
+            enabledTokenMask: enabledTokensMask,
+            skipTokenMask: skipTokenMask,
+            debtWithInterest: debtWithInterest,
+            convertWETH: convertWETH
+        }); // F:[FA-15,49]
 
         if (reportedLoss > 0) {
             maxDebtPerBlockMultiplier = 0; // F: [FA-15A]
@@ -1025,12 +1029,11 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
     {
         (enabledTokenMask, totalValue,, debtWithInterest, isLiquidatable) = _calcTotalValue(creditAccount);
 
-        /// CHANGE PRIORITY IN EXPIRED / LIQUIDATE
-        if (_isExpired()) {
-            return (true, ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT, totalValue, debtWithInterest, enabledTokenMask);
+        if (isLiquidatable || !_isExpired()) {
+            return (isLiquidatable, ClosureAction.LIQUIDATE_ACCOUNT, totalValue, debtWithInterest, enabledTokenMask);
         }
 
-        return (isLiquidatable, ClosureAction.LIQUIDATE_ACCOUNT, totalValue, debtWithInterest, enabledTokenMask);
+        return (true, ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT, totalValue, debtWithInterest, enabledTokenMask);
     }
 
     function _calcTotalValue(address creditAccount)

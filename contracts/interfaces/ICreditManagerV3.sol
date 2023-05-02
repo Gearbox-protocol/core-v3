@@ -83,16 +83,16 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// - If convertWETH is true, the function converts WETH into ETH before sending
     /// - Returns the Credit Account back to factory
     ///
-    /// @param borrower Borrower address
-    /// @param closureActionType Whether the account is closed, liquidated or liquidated due to expiry
+    /// @param creditAccount Credit account address
+    /// @param closureAction Whether the account is closed, liquidated or liquidated due to expiry
     /// @param totalValue Portfolio value for liqution, 0 for ordinary closure
     /// @param payer Address which would be charged if credit account has not enough funds to cover amountToPool
     /// @param to Address to which the leftover funds will be sent
     /// @param skipTokenMask Tokenmask contains 1 for tokens which needed to be skipped for sending
     /// @param convertWETH If true converts WETH to ETH
     function closeCreditAccount(
-        address borrower,
-        ClosureAction closureActionType,
+        address creditAccount,
+        ClosureAction closureAction,
         uint256 totalValue,
         address payer,
         address to,
