@@ -724,8 +724,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
     }
 
     function _withdraw(address creditAccount, bytes memory callData) internal returns (uint256 tokensToDisable) {
-        (address to, address token, uint256 amount) = abi.decode(callData, (address, address, uint256));
-        tokensToDisable = creditManager.withdraw(creditAccount, to, token, amount);
+        (address token, uint256 amount) = abi.decode(callData, (address, uint256));
+        tokensToDisable = creditManager.withdraw(creditAccount, token, amount);
     }
 
     /// @dev Adds expected deltas to current balances on a Credit account and returns the result

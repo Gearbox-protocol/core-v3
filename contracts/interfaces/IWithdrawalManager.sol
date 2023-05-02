@@ -7,13 +7,13 @@ import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.
 
 /// @notice Scheduled withdrawal data
 /// @param tokenIndex Collateral index of withdrawn token in account's credit manager
-/// @param to Withdrawal recipient
+/// @param borrower Account owner that should claim tokens
 /// @param maturity Timestamp after which withdrawal can be claimed
 /// @param amount Amount to withdraw
 /// @dev Keeping token index instead of mask allows to pack struct into 2 slots
 struct ScheduledWithdrawal {
     uint8 tokenIndex;
-    address to;
+    address borrower;
     uint40 maturity;
     uint256 amount;
 }
@@ -34,12 +34,12 @@ interface IWithdrawalManagerEvents {
 
     /// @notice Emitted when new scheduled withdrawal is added
     /// @param creditAccount Account to withdraw from
+    /// @param borrower Account owner that should claim tokens
     /// @param token Token to withdraw
-    /// @param to Withdrawal recipient
     /// @param amount Amount to withdraw
     /// @param maturity Timestamp after which withdrawal can be claimed
     event AddScheduledWithdrawal(
-        address indexed creditAccount, address indexed token, address to, uint256 amount, uint40 maturity
+        address indexed creditAccount, address indexed borrower, address indexed token, uint256 amount, uint40 maturity
     );
 
     /// @notice Emitted when scheduled withdrawal is cancelled
@@ -51,9 +51,8 @@ interface IWithdrawalManagerEvents {
     /// @notice Emitted when scheduled withdrawal is claimed
     /// @param creditAccount Account withdrawal was made from
     /// @param token Token claimed
-    /// @param to Token recipient
     /// @param amount Amount claimed
-    event ClaimScheduledWithdrawal(address indexed creditAccount, address indexed token, address to, uint256 amount);
+    event ClaimScheduledWithdrawal(address indexed creditAccount, address indexed token, uint256 amount);
 
     /// @notice Emitted when new scheduled withdrawal delay is set by configurator
     /// @param delay New delay for scheduled withdrawals
@@ -77,7 +76,6 @@ interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
     /// @param account Account to add immediate withdrawal for
     /// @param token Token to withdraw
     /// @param amount Amount to withdraw
-    /// @custom:expects `amount` is greater than 1
     /// @custom:expects Credit manager transferred `amount` of `token` to this contract prior to calling this function
     function addImmediateWithdrawal(address account, address token, uint256 amount) external;
 
@@ -119,15 +117,20 @@ interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
     /// @notice Schedules withdrawal of given token from the credit account,
     ///         might claim a mature withdrawal first if it's needed to free the slot
     /// @param creditAccount Account to withdraw from
+    /// @param borrower Account owner that should claim tokens
     /// @param token Token to withdraw
-    /// @param to Withdrawal recipient
     /// @param amount Amount to withdraw
     /// @param tokenIndex Collateral index of withdrawn token in account's credit manager
     /// @custom:expects `amount` is greater than 1
     /// @custom:expects Credit manager transferred `amount` of `token` to this contract prior to calling this function
     /// @custom:expects Credit manager is not in emergency mode
-    function addScheduledWithdrawal(address creditAccount, address token, address to, uint256 amount, uint8 tokenIndex)
-        external;
+    function addScheduledWithdrawal(
+        address creditAccount,
+        address borrower,
+        address token,
+        uint256 amount,
+        uint8 tokenIndex
+    ) external;
 
     /// @notice Cancels scheduled withdrawals from the credit account
     ///         - Under normal operation, cancels immature withdrawals and claims mature ones
@@ -140,7 +143,7 @@ interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
         external
         returns (uint256 tokensToEnable);
 
-    /// @notice Claims scheduled withdrawals from the credit account
+    /// @notice Claims scheduled withdrawals from the credit account by turning them into immediate withdrawals
     ///         - Under normal operation, claims all mature withdrawals
     ///         - In emergency mode, claiming is disabled so it reverts
     /// @param creditManager Manager the account is connected to

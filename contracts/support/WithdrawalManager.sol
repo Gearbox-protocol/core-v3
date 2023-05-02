@@ -22,6 +22,7 @@ import {ACLTrait} from "../traits/ACLTrait.sol";
 ///         There are two kinds of withdrawals: immediate and scheduled.
 ///         - Immediate withdrawals can be claimed, well, immediately, and exist to support liquidation of accounts
 ///           whose owners are blacklisted in credit manager's underlying.
+///           Also, when scheduled withdrawals are claimed, they turn into immediate withdrawals.
 ///         - Scheduled withdrawals can be claimed after a certain delay, and exist to support partial withdrawals
 ///           from credit accounts. One credit account can have up to two immature withdrawals at the same time.
 ///           Additional rules for scheduled withdrawals:
@@ -74,8 +75,7 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait {
         override
         creditManagerOnly
     {
-        immediateWithdrawals[account][token] += amount;
-        emit AddImmediateWithdrawal(account, token, amount);
+        _addImmediateWithdrawal(account, token, amount);
     }
 
     /// @inheritdoc IWithdrawalManager
@@ -88,6 +88,14 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait {
         immediateWithdrawals[msg.sender][token] = 1;
         IERC20(token).safeTransfer(to, amount);
         emit ClaimImmediateWithdrawal(msg.sender, token, to, amount);
+    }
+
+    /// @dev Increases account's immediately withdrawable balance of token
+    function _addImmediateWithdrawal(address account, address token, uint256 amount) internal {
+        if (amount > 1) {
+            immediateWithdrawals[account][token] += amount;
+            emit AddImmediateWithdrawal(account, token, amount);
+        }
     }
 
     /// --------------------- ///
@@ -140,11 +148,13 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait {
     }
 
     /// @inheritdoc IWithdrawalManager
-    function addScheduledWithdrawal(address creditAccount, address token, address to, uint256 amount, uint8 tokenIndex)
-        external
-        override
-        creditManagerOnly
-    {
+    function addScheduledWithdrawal(
+        address creditAccount,
+        address borrower,
+        address token,
+        uint256 amount,
+        uint8 tokenIndex
+    ) external override creditManagerOnly {
         ScheduledWithdrawal[2] memory withdrawals = _scheduled[msg.sender][creditAccount];
         (bool found, bool claim, uint8 slot) = withdrawals.findFreeSlot();
         if (!found) revert NoFreeWithdrawalSlotsException();
@@ -152,8 +162,8 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait {
 
         uint40 maturity = uint40(block.timestamp) + delay;
         _scheduled[msg.sender][creditAccount][slot] =
-            ScheduledWithdrawal({tokenIndex: tokenIndex, to: to, maturity: maturity, amount: amount});
-        emit AddScheduledWithdrawal(creditAccount, token, to, amount, maturity);
+            ScheduledWithdrawal({tokenIndex: tokenIndex, borrower: borrower, maturity: maturity, amount: amount});
+        emit AddScheduledWithdrawal(creditAccount, borrower, token, amount, maturity);
     }
 
     /// @inheritdoc IWithdrawalManager
@@ -207,16 +217,13 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait {
         (uint256 tokenMask, uint256 amount) = withdrawal.tokenMaskAndAmount();
         (address token,) = ICreditManagerV3(creditManager).collateralTokensByMask(tokenMask);
 
-        address to = isClaim ? withdrawal.to : creditAccount;
-        // FIXME: this might fail if `to` is blacklisted in `token`
-        // this might cause issues during non-emergency liquidations
-        IERC20(token).safeTransfer(to, amount);
-
         if (isClaim) {
-            emit ClaimScheduledWithdrawal(creditAccount, token, to, amount);
+            emit ClaimScheduledWithdrawal(creditAccount, token, amount);
+            _addImmediateWithdrawal(withdrawal.borrower, token, amount);
         } else {
-            tokensToEnable = tokenMask;
             emit CancelScheduledWithdrawal(creditAccount, token, amount);
+            IERC20(token).safeTransfer(creditAccount, amount);
+            tokensToEnable = tokenMask;
         }
 
         withdrawal.clear();
