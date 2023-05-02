@@ -1537,20 +1537,21 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         }
     }
 
-    function withdraw(address creditAccount, address to, address token, uint256 amount)
+    function withdraw(address creditAccount, address token, uint256 amount)
         external
         override
         creditFacadeOnly
         returns (uint256 tokensToDisable)
     {
         uint256 tokenMask = getTokenMaskOrRevert(token);
+        address borrower = creditAccountInfo[creditAccount].borrower;
 
         uint256 balanceBefore = _balanceOf(token, address(withdrawalManager));
         _creditAccountSafeTransfer(creditAccount, token, address(withdrawalManager), amount);
         amount = _balanceOf(token, address(withdrawalManager)) - balanceBefore;
 
         if (amount > 1) {
-            withdrawalManager.addScheduledWithdrawal(creditAccount, token, to, amount, tokenMask.calcIndex());
+            withdrawalManager.addScheduledWithdrawal(creditAccount, borrower, token, amount, tokenMask.calcIndex());
             _enableWithdrawalFlag(creditAccount);
         }
 

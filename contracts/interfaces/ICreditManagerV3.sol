@@ -315,7 +315,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @dev Withdrawal manager
     function withdrawalManager() external view returns (IWithdrawalManager);
 
-    function withdraw(address creditAccount, address to, address token, uint256 amount)
+    function withdraw(address creditAccount, address token, uint256 amount)
         external
         returns (uint256 tokensToDisable);
 
