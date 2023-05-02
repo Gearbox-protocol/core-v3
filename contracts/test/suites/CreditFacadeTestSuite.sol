@@ -6,7 +6,7 @@ pragma solidity ^0.8.10;
 import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
 import {CreditConfigurator} from "../../credit/CreditConfigurator.sol";
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
-import {WithdrawManager} from "../../support/WithdrawManager.sol";
+import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
 
 import {AccountFactoryV2} from "../../core/AccountFactory.sol";
 import {CreditManagerFactory} from "../../factories/CreditManagerFactory.sol";
@@ -80,7 +80,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
             degenNFT.setMinter(CONFIGURATOR);
         }
 
-        cmOpts.withdrawManager = address(withdrawManager);
+        cmOpts.withdrawalManager = address(withdrawalManager);
 
         CreditManagerFactory cmf = new CreditManagerFactory(
             address(poolMock),

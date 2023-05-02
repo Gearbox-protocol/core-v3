@@ -32,7 +32,7 @@ struct CreditManagerOpts {
     /// @dev Address of DegenNFT, address(0) if whitelisted mode is not used
     address degenNFT;
     /// @dev Address of BlacklistHelper, address(0) if the underlying is not blacklistable
-    address withdrawManager;
+    address withdrawalManager;
     /// @dev Whether the Credit Manager is connected to an expirable pool (and the CreditFacadeV3 is expirable)
     bool expirable;
 }

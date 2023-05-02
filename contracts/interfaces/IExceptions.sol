@@ -77,6 +77,9 @@ error CallerNotVoterException();
 ///      the connected Credit Facade, or an allowed adapter
 error CallerNotAdapterException();
 
+/// @dev Thrown if an access-restricted function is called by an address that is not withdrawal manager
+error CallerNotWithdrawalManagerException();
+
 /// interface ICreditConfiguratorExceptions {
 
 /// @dev Thrown if the underlying's LT is set directly
@@ -227,7 +230,8 @@ error LiquiditySanityCheckException();
 
 error ZeroCallsException();
 
-error NoFreeQithdrawalSlotsException();
+/// @dev Thrown when attempting to schedule withdrawal from a credit account that has no free withdrawal slots
+error NoFreeWithdrawalSlotsException();
 
 error NoPermissionException(uint256 permission);
 

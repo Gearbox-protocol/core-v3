@@ -18,7 +18,7 @@ import {ICreditFacade, ICreditFacadeMulticall, ICreditFacadeEvents} from "../../
 import {ICreditManagerV3, ICreditManagerV3Events, ClosureAction} from "../../interfaces/ICreditManagerV3.sol";
 
 import {IDegenNFT, IDegenNFTExceptions} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
-import {IWithdrawManager} from "../../interfaces/IWithdrawManager.sol";
+import {IWithdrawalManager} from "../../interfaces/IWithdrawalManager.sol";
 import {QuotaUpdate} from "../../interfaces/IPoolQuotaKeeper.sol";
 
 // DATA

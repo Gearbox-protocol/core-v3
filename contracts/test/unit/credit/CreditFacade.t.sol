@@ -24,7 +24,7 @@ import {
 import {AllowanceAction} from "../../../interfaces/ICreditConfigurator.sol";
 import {ICreditFacadeEvents} from "../../../interfaces/ICreditFacade.sol";
 import {IDegenNFT, IDegenNFTExceptions} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
-import {IWithdrawManager} from "../../../interfaces/IWithdrawManager.sol";
+import {IWithdrawalManager} from "../../../interfaces/IWithdrawalManager.sol";
 
 // DATA
 import {MultiCall, MultiCallOps} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
@@ -1964,13 +1964,13 @@ contract CreditFacadeTest is
 
     //     ERC20BlacklistableMock(usdc).setBlacklisted(USER, true);
 
-    //     evm.expectCall(blacklistHelper, abi.encodeCall(IWithdrawManager.isBlacklisted, (usdc, USER)));
+    //     evm.expectCall(blacklistHelper, abi.encodeCall(IWithdrawalManager.isBlacklisted, (usdc, USER)));
 
     //     evm.expectCall(
     //         address(creditManager), abi.encodeCall(ICreditManagerV3.transferAccountOwnership, (USER, blacklistHelper))
     //     );
 
-    //     evm.expectCall(blacklistHelper, abi.encodeCall(IWithdrawManager.addWithdrawal, (usdc, USER, expectedAmount)));
+    //     evm.expectCall(blacklistHelper, abi.encodeCall(IWithdrawalManager.addWithdrawal, (usdc, USER, expectedAmount)));
 
     //     evm.expectEmit(true, false, false, true);
     //     emit UnderlyingSentToBlacklistHelper(USER, expectedAmount);
@@ -1978,10 +1978,10 @@ contract CreditFacadeTest is
     //     evm.prank(LIQUIDATOR);
     //     creditFacade.liquidateCreditAccount(USER, FRIEND, 0, true, multicallBuilder());
 
-    //     assertEq(IWithdrawManager(blacklistHelper).claimable(usdc, USER), expectedAmount, "Incorrect claimable amount");
+    //     assertEq(IWithdrawalManager(blacklistHelper).claimable(usdc, USER), expectedAmount, "Incorrect claimable amount");
 
     //     evm.prank(USER);
-    //     IWithdrawManager(blacklistHelper).claim(usdc, FRIEND2);
+    //     IWithdrawalManager(blacklistHelper).claim(usdc, FRIEND2);
 
     //     assertEq(tokenTestSuite.balanceOf(Tokens.USDC, FRIEND2), expectedAmount, "Transferred amount incorrect");
     // }

@@ -29,8 +29,6 @@ import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWE
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
 import {IBotList} from "../interfaces/IBotList.sol";
 
-import {CancellationType} from "../interfaces/IWithdrawManager.sol";
-
 // CONSTANTS
 import {LEVERAGE_DECIMALS} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
@@ -263,6 +261,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
     ///      from the Credit Account and proceeds. If not, tries to transfer the shortfall from msg.sender.
     ///    + Transfers all enabled assets with non-zero balances to the "to" address, unless they are marked
     ///      to be skipped in skipTokenMask
+    ///    + If there are withdrawals scheduled for Credit Account, claims them all
     ///    + If convertWETH is true, converts WETH into ETH before sending to the recipient
     /// - Emits a CloseCreditAccount event
     ///
@@ -282,7 +281,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
 
         uint256 enabledTokensMask = _enabledTokenMask(creditAccount);
 
-        _cancelWithdrawals(creditAccount, CancellationType.PUSH_WITHDRAWALS);
+        _cancelWithdrawals({creditAccount: creditAccount, forceClaim: true});
 
         // [FA-13]: Calls to CreditFacadeV3 are forbidden during closure
         if (calls.length != 0) {
@@ -335,6 +334,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
     ///    + Transfers all enabled assets with non-zero balances to the "to" address, unless they are marked
     ///      to be skipped in skipTokenMask. If the liquidator is confident that all assets were converted
     ///      during the multicall, they can set the mask to uint256.max - 1, to only transfer the underlying
+    ///    + If there are withdrawals scheduled for Credit Account, cancels immature withdrawals and claims mature ones.
+    ///      In emergency mode, cancels both mature and immature withdrawals.
     ///    + If convertWETH is true, converts WETH into ETH before sending
     /// - Emits LiquidateCreditAccount event
     ///
@@ -368,7 +369,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         // Wraps ETH and sends it back to msg.sender
         _wrapETH(); // F:[FA-3D]
 
-        enabledTokensMask |= _cancelWithdrawals(creditAccount, CancellationType.RETURN_FUNDS);
+        enabledTokensMask |= _cancelWithdrawals({creditAccount: creditAccount, forceClaim: false});
 
         if (calls.length != 0) {
             // TODO: CHANGE
@@ -1049,11 +1050,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         return creditManager.enabledTokensMap(creditAccount);
     }
 
-    function _cancelWithdrawals(address creditAccount, CancellationType ctype)
-        internal
-        returns (uint256 tokensToEnable)
-    {
-        tokensToEnable = creditManager.cancelWithdrawals(creditAccount, ctype);
+    function _cancelWithdrawals(address creditAccount, bool forceClaim) internal returns (uint256 tokensToEnable) {
+        tokensToEnable = creditManager.cancelWithdrawals(creditAccount, forceClaim);
     }
 
     function _wethWithdrawTo(address to) internal {
