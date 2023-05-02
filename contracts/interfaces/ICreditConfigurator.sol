@@ -4,9 +4,14 @@
 pragma solidity ^0.8.10;
 
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
-import {CreditManager} from "../credit/CreditManager.sol";
-import {CreditFacade} from "../credit/CreditFacade.sol";
+import {CreditManagerV3} from "../credit/CreditManagerV3.sol";
+import {CreditFacadeV3} from "../credit/CreditFacadeV3.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+
+enum AllowanceAction {
+    FORBID,
+    ALLOW
+}
 
 /// @dev A struct containing parameters for a recognized collateral token in the system
 struct CollateralToken {
@@ -27,16 +32,16 @@ struct CreditManagerOpts {
     /// @dev Address of DegenNFT, address(0) if whitelisted mode is not used
     address degenNFT;
     /// @dev Address of BlacklistHelper, address(0) if the underlying is not blacklistable
-    address blacklistHelper;
-    /// @dev Whether the Credit Manager is connected to an expirable pool (and the CreditFacade is expirable)
+    address withdrawManager;
+    /// @dev Whether the Credit Manager is connected to an expirable pool (and the CreditFacadeV3 is expirable)
     bool expirable;
 }
 
 interface ICreditConfiguratorEvents {
     /// @dev Emits when a collateral token's liquidation threshold is changed
-    event TokenLiquidationThresholdUpdated(address indexed token, uint16 liquidityThreshold);
+    event SetTokenLiquidationThreshold(address indexed token, uint16 liquidityThreshold);
 
-    event TokenLiquidationThresholdRampScheduled(
+    event ScheduleTokenLiquidationThresholdRamp(
         address indexed token,
         uint16 liquidationThresholdInitial,
         uint16 liquidationThresholdFinal,
@@ -45,22 +50,22 @@ interface ICreditConfiguratorEvents {
     );
 
     /// @dev Emits when a new or a previously forbidden token is allowed
-    event TokenAllowed(address indexed token);
+    event AllowToken(address indexed token);
 
     /// @dev Emits when a collateral token is forbidden
-    event TokenForbidden(address indexed token);
+    event ForbidToken(address indexed token);
 
     /// @dev Emits when a contract <> adapter pair is linked for a Credit Manager
-    event ContractAllowed(address indexed protocol, address indexed adapter);
+    event AllowContract(address indexed protocol, address indexed adapter);
 
     /// @dev Emits when a 3rd-party contract is forbidden
-    event ContractForbidden(address indexed protocol);
+    event ForbidContract(address indexed protocol);
 
     /// @dev Emits when a particular adapter for a target contract is forbidden
-    event AdapterForbidden(address indexed adapter);
+    event ForbidAdapter(address indexed adapter);
 
     /// @dev Emits when debt principal limits are changed
-    event LimitsUpdated(uint256 minBorrowedAmount, uint256 maxBorrowedAmount);
+    event SetBorrowingLimits(uint256 minBorrowedAmount, uint256 maxBorrowedAmount);
 
     /// @dev Emits when Credit Manager's fee parameters are updated
     event FeesUpdated(
@@ -72,19 +77,22 @@ interface ICreditConfiguratorEvents {
     );
 
     /// @dev Emits when a new Price Oracle is connected to the Credit Manager
-    event PriceOracleUpgraded(address indexed newPriceOracle);
+    event SetPriceOracle(address indexed newPriceOracle);
 
     /// @dev Emits when a new Credit Facade is connected to the Credit Manager
-    event CreditFacadeUpgraded(address indexed newCreditFacade);
+    event SetCreditFacade(address indexed newCreditFacade);
 
     /// @dev Emits when a new Credit Configurator is connected to the Credit Manager
     event CreditConfiguratorUpgraded(address indexed newCreditConfigurator);
 
     /// @dev Emits when the status of the debt increase restriction is changed
-    event IncreaseDebtForbiddenModeChanged(bool);
+    event AllowBorrowing(); // F:[CC-32]
+
+    /// @dev Emits when the status of the debt increase restriction is changed
+    event ForbidBorrowing();
 
     /// @dev Emits when the borrowing limit per block is changed
-    event LimitPerBlockUpdated(uint128);
+    event SetMaxDebtPerBlockMultiplier(uint8);
 
     /// @dev Emits when an address is added to the upgradeable contract list
     event AddedToUpgradeable(address);
@@ -93,28 +101,28 @@ interface ICreditConfiguratorEvents {
     event RemovedFromUpgradeable(address);
 
     /// @dev Emits when the expiration date is updated in an expirable Credit Facade
-    event ExpirationDateUpdated(uint40);
+    event SetExpirationDate(uint40);
 
     /// @dev Emits when the enabled token limit is updated
-    event MaxEnabledTokensUpdated(uint8);
+    event SetMaxEnabledTokens(uint8);
 
     /// @dev Emits when an address is added to the list of emergency liquidators
-    event EmergencyLiquidatorAdded(address);
+    event AddEmergencyLiquidator(address);
 
     /// @dev Emits when an address is removed from the list of emergency liquidators
-    event EmergencyLiquidatorRemoved(address);
+    event RemoveEmergencyLiquidator(address);
 
     /// @dev Emits when the bot list is updated in Credit Facade
-    event BotListUpdated(address);
+    event SetBotList(address);
 
     /// @dev Emits when the token is set as limited
-    event TokenLimited(address);
+    event QuoteToken(address);
 
     /// @dev Emits when new max cumulative loss is set
-    event NewMaxCumulativeLoss(uint128);
+    event SetMaxCumulativeLoss(uint128);
 
     /// @dev Emits when the current cumulative loss in Credit Facade is reset
-    event CumulativeLossReset();
+    event ResetCumulativeLoss();
 }
 
 /// @dev CreditConfigurator Exceptions
@@ -181,28 +189,22 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
 
     /// @dev Upgrades the price oracle in the Credit Manager, taking the address
     /// from the address provider
-    function upgradePriceOracle() external;
+    function setPriceOracle() external;
 
     /// @dev Upgrades the Credit Facade corresponding to the Credit Manager
-    /// @param _creditFacade address of the new CreditFacade
-    /// @param migrateParams Whether the previous CreditFacade's parameter need to be copied
-    function upgradeCreditFacade(address _creditFacade, bool migrateParams) external;
+    /// @param _creditFacade address of the new CreditFacadeV3
+    /// @param migrateParams Whether the previous CreditFacadeV3's parameter need to be copied
+    function setCreditFacade(address _creditFacade, bool migrateParams) external;
 
     /// @dev Upgrades the Credit Configurator for a connected Credit Manager
     /// @param _creditConfigurator New Credit Configurator's address
     function upgradeCreditConfigurator(address _creditConfigurator) external;
 
-    /// @dev Enables or disables borrowing
-    /// In Credit Facade (and, consequently, the Credit Manager)
-    /// @param _mode Prohibits borrowing if true, and allows borrowing otherwise
-    function setIncreaseDebtForbidden(bool _mode) external;
+    /// @dev Sets the maximal borrowed amount per block as multiplier to maxDebt
+    function setMaxDebtPerBlockMultiplier(uint8 newMaxDebtLimitPerBlockMultiplier) external;
 
-    /// @dev Sets the maximal borrowed amount per block
-    /// @param newLimit The new max borrowed amount per block
-    function setLimitPerBlock(uint128 newLimit) external;
-
-    /// @dev Sets expiration date in a CreditFacade connected
-    /// To a CreditManager with an expirable pool
+    /// @dev Sets expiration date in a CreditFacadeV3 connected
+    /// To a CreditManagerV3 with an expirable pool
     /// @param newExpirationDate The timestamp of the next expiration
     function setExpirationDate(uint40 newExpirationDate) external;
 
@@ -245,10 +247,10 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
     function addressProvider() external view returns (IAddressProvider);
 
     /// @dev Returns the Credit Facade currently connected to the Credit Manager
-    function creditFacade() external view returns (CreditFacade);
+    function creditFacade() external view returns (CreditFacadeV3);
 
     /// @dev Address of the Credit Manager
-    function creditManager() external view returns (CreditManager);
+    function creditManager() external view returns (CreditManagerV3);
 
     /// @dev Address of the Credit Manager's underlying asset
     function underlying() external view returns (address);

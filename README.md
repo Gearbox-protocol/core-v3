@@ -62,7 +62,7 @@ This directory contains the contracts responsible for managing Credit Accounts, 
 
 Contains factory contracts used for deployment and initial configuration of important system contracts.
 
-1. `CreditManagerFactoryBase.sol` deploys a Credit Manager / Credit Facade / Credit Configurator suite. A special `_postInstall()` function can be overridden to additionally configure adapters.
+1. `CreditManagerFactory.sol` deploys a Credit Manager / Credit Facade / Credit Configurator suite. A special `_postInstall()` function can be overridden to additionally configure adapters.
 2. `GenesisFactory.sol` deploys and sets up core contracts, such as `ACL`, `AddressProvider`, `PriceOracle`, etc.
 3. `PoolFactory.sol` deploys and configures the borrowing pool.
 

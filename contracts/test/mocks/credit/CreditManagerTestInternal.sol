@@ -6,10 +6,10 @@ pragma solidity ^0.8.10;
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {CreditManager, ClosureAction} from "../../../credit/CreditManager.sol";
+import {CreditManagerV3, ClosureAction} from "../../../credit/CreditManagerV3.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IPoolQuotaKeeper, QuotaUpdate, TokenLT} from "../../../interfaces/IPoolQuotaKeeper.sol";
-import {CollateralTokenData} from "../../../interfaces/ICreditManagerV2.sol";
+import {CollateralTokenData} from "../../../interfaces/ICreditManagerV3.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
@@ -18,15 +18,13 @@ import "../../../interfaces/IExceptions.sol";
 /// @notice It encapsulates business logic for managing credit accounts
 ///
 /// More info: https://dev.gearbox.fi/developers/credit/credit_manager
-contract CreditManagerTestInternal is CreditManager {
+contract CreditManagerTestInternal is CreditManagerV3 {
     using SafeERC20 for IERC20;
     using Address for address payable;
 
-    address[] public fullCheckOrder;
-
     /// @dev Constructor
     /// @param _poolService Address of pool service
-    constructor(address _poolService) CreditManager(_poolService) {}
+    constructor(address _poolService, address _withdrawManager) CreditManagerV3(_poolService, _withdrawManager) {}
 
     function setCumulativeDropAtFastCheck(address creditAccount, uint16 value) external {
         // cumulativeDropAtFastCheckRAY[creditAccount] = value;
@@ -86,133 +84,13 @@ contract CreditManagerTestInternal is CreditManager {
         return collateralTokensData[tokenMask];
     }
 
-    // function getMaxIndex(uint256 mask) external pure returns (uint256 index) {
-    //     index = _getMaxIndex(mask);
-    // }
+    function setEnabledTokenMask(address creditAccount, uint256 enabledTokenMask) external {
+        creditAccountInfo[creditAccount].enabledTokensMask = uint248(enabledTokenMask);
+    }
 
     function getSlotBytes(uint256 slotNum) external view returns (bytes32 slotVal) {
         assembly {
             slotVal := sload(slotNum)
         }
-    }
-
-    /// @dev IMPLEMENTATION: fullCollateralCheck
-    function _fullCollateralCheck(address creditAccount, uint256[] memory collateralHints, uint16 minHealthFactor)
-        internal
-        override
-    {
-        IPriceOracleV2 _priceOracle = slot1.priceOracle;
-
-        uint256 enabledTokenMask = enabledTokensMap[creditAccount];
-        uint256 checkedTokenMask = enabledTokenMask;
-        uint256 borrowAmountPlusInterestRateUSD;
-
-        uint256 twvUSD;
-
-        {
-            uint256 quotaInterest;
-            if (supportsQuotas) {
-                TokenLT[] memory tokens = getLimitedTokens(creditAccount);
-
-                if (tokens.length > 0) {
-                    /// If credit account has any connected token - then check that
-                    (twvUSD, quotaInterest) = poolQuotaKeeper().computeQuotedCollateralUSD(
-                        address(this), creditAccount, address(_priceOracle), tokens
-                    );
-
-                    checkedTokenMask = checkedTokenMask & (~limitedTokenMask);
-                }
-
-                quotaInterest += cumulativeQuotaInterest[creditAccount];
-            }
-
-            // The total weighted value of a Credit Account has to be compared
-            // with the entire debt sum, including interest and fees
-            (,, uint256 borrowedAmountWithInterestAndFees) =
-                _calcCreditAccountAccruedInterest(creditAccount, quotaInterest);
-
-            borrowAmountPlusInterestRateUSD =
-                _priceOracle.convertToUSD(borrowedAmountWithInterestAndFees * minHealthFactor, underlying);
-
-            // If quoted tokens fully cover the debt, we can stop here
-            // after performing some additional cleanup
-            if (twvUSD >= borrowAmountPlusInterestRateUSD) {
-                _afterFullCheck(creditAccount, enabledTokenMask, false);
-
-                return;
-            }
-        }
-
-        _checkNonLimitedTokensAndSaveOrder(
-            creditAccount,
-            enabledTokenMask,
-            checkedTokenMask,
-            twvUSD,
-            borrowAmountPlusInterestRateUSD,
-            collateralHints,
-            _priceOracle
-        );
-    }
-
-    function _checkNonLimitedTokensAndSaveOrder(
-        address creditAccount,
-        uint256 enabledTokenMask,
-        uint256 checkedTokenMask,
-        uint256 twvUSD,
-        uint256 borrowAmountPlusInterestRateUSD,
-        uint256[] memory collateralHints,
-        IPriceOracleV2 _priceOracle
-    ) internal {
-        fullCheckOrder = new address[](0);
-
-        uint256 tokenMask;
-        bool atLeastOneTokenWasDisabled;
-
-        uint256 len = collateralHints.length;
-        uint256 i;
-
-        // TODO: add test that we check all values and it's always reachable
-        while (checkedTokenMask != 0) {
-            unchecked {
-                tokenMask = (i < len) ? collateralHints[i] : 1 << (i - len);
-            }
-
-            // CASE enabledTokenMask & tokenMask == 0 F:[CM-38]
-            if (checkedTokenMask & tokenMask != 0) {
-                (address token, uint16 liquidationThreshold) = collateralTokensByMask(tokenMask);
-
-                fullCheckOrder.push(token);
-
-                uint256 balance = IERC20(token).balanceOf(creditAccount);
-
-                // Collateral calculations are only done if there is a non-zero balance
-                if (balance > 1) {
-                    twvUSD += _priceOracle.convertToUSD(balance, token) * liquidationThreshold;
-
-                    // Full collateral check evaluates a Credit Account's health factor lazily;
-                    // Once the TWV computed thus far exceeds the debt, the check is considered
-                    // successful, and the function returns without evaluating any further collateral
-                    if (twvUSD >= borrowAmountPlusInterestRateUSD) {
-                        // The _afterFullCheck hook does some cleanup, such as disabling
-                        // zero-balance tokens
-                        _afterFullCheck(creditAccount, enabledTokenMask, atLeastOneTokenWasDisabled);
-
-                        return; // F:[CM-40]
-                    }
-                    // Zero-balance tokens are disabled; this is done by flipping the
-                    // bit in enabledTokenMask, which is then written into storage at the
-                    // very end, to avoid redundant storage writes
-                } else {
-                    enabledTokenMask &= ~tokenMask; // F:[CM-39]
-                    atLeastOneTokenWasDisabled = true; // F:[CM-39]
-                }
-            }
-
-            checkedTokenMask = checkedTokenMask & (~tokenMask);
-            unchecked {
-                ++i;
-            }
-        }
-        revert NotEnoughCollateralException();
     }
 }

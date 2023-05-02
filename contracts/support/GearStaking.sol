@@ -131,7 +131,7 @@ contract GearStaking is ACLNonReentrantTrait, IGearStaking {
             voteLockData[msg.sender] = vld;
         }
 
-        emit GearDeposited(msg.sender, amount);
+        emit DepositGear(msg.sender, amount);
 
         if (votes.length > 0) {
             _multivote(msg.sender, votes);
@@ -170,7 +170,7 @@ contract GearStaking is ACLNonReentrantTrait, IGearStaking {
         voteLockData[msg.sender].available -= amount96;
         withdrawalData[msg.sender].withdrawalsPerEpoch[3] += amount96;
 
-        emit GearWithdrawalScheduled(msg.sender, amount);
+        emit ScheduleGearWithdrawal(msg.sender, amount);
     }
 
     /// @dev Claims all of the caller's withdrawals that are mature
@@ -218,7 +218,7 @@ contract GearStaking is ACLNonReentrantTrait, IGearStaking {
 
                 if (totalClaimable > 0) {
                     gear.transfer(to, totalClaimable);
-                    emit GearWithdrawalClaimed(user, to, totalClaimable);
+                    emit ClaimGearWithdrawal(user, to, totalClaimable);
                 }
 
                 voteLockData[user].totalStaked -= totalClaimable.toUint96();
@@ -275,6 +275,6 @@ contract GearStaking is ACLNonReentrantTrait, IGearStaking {
     function setVotingContractStatus(address votingContract, VotingContractStatus status) external configuratorOnly {
         allowedVotingContract[votingContract] = status;
 
-        emit VotingContractStatusUpdated(votingContract, status);
+        emit SetVotingContractStatus(votingContract, status);
     }
 }

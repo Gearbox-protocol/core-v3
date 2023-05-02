@@ -23,7 +23,7 @@ import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
 import {IInterestRateModel} from "../interfaces/IInterestRateModel.sol";
 import {IPool4626, Pool4626Opts} from "../interfaces/IPool4626.sol";
-import {ICreditManagerV2} from "../interfaces/ICreditManagerV2.sol";
+import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
 
 import {RAY, SECONDS_PER_YEAR, MAX_WITHDRAW_FEE} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
@@ -161,7 +161,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
         cumulativeIndexLU_RAY = uint128(RAY); // F:[P4-01]
 
         interestRateModel = IInterestRateModel(opts.interestRateModel);
-        emit NewInterestRateModel(opts.interestRateModel); // F:[P4-03]
+        emit SetInterestRateModel(opts.interestRateModel); // F:[P4-03]
 
         _setExpectedLiquidityLimit(opts.expectedLiquidityLimit); // F:[P4-01, 03]
         _setTotalBorrowedLimit(opts.expectedLiquidityLimit); // F:[P4-03]
@@ -200,7 +200,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
         )
     {
         shares = deposit(assets, receiver); // F:[P4-5]
-        emit DepositReferral(msg.sender, receiver, assets, referralCode); // F:[P4-5]
+        emit DepositWithReferral(msg.sender, receiver, assets, referralCode); // F:[P4-5]
     }
 
     /// @dev See {IERC4626-mint}.
@@ -505,7 +505,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
 
             if (sharesInTreasury < sharesToBurn) {
                 sharesToBurn = sharesInTreasury; // F:[P4-14]
-                emit UncoveredLoss(msg.sender, loss - convertToAssets(sharesInTreasury)); // F:[P4-14]
+                emit ReceiveUncoveredLoss(msg.sender, loss - convertToAssets(sharesInTreasury)); // F:[P4-14]
             }
 
             // If treasury has enough funds, it just burns needed amount
@@ -623,12 +623,12 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
         /// Checks if creditManager is already in list
         if (!creditManagerSet.contains(_creditManager)) {
             /// Reverts if c redit manager has different underlying asset
-            if (address(this) != ICreditManagerV2(_creditManager).pool()) {
+            if (address(this) != ICreditManagerV3(_creditManager).pool()) {
                 revert IncompatibleCreditManagerException(); // F:[P4-20]
             }
 
             creditManagerSet.add(_creditManager); // F:[P4-21]
-            emit NewCreditManagerConnected(_creditManager); // F:[P4-21]
+            emit AddCreditManager(_creditManager); // F:[P4-21]
         }
 
         CreditManagerDebt storage cmDebt = creditManagersDebt[_creditManager]; // F:[P4-21]
@@ -647,7 +647,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
 
         _updateBaseParameters(0, 0, false); // F:[P4-22]
 
-        emit NewInterestRateModel(_interestRateModel); // F:[P4-22]
+        emit SetInterestRateModel(_interestRateModel); // F:[P4-22]
     }
 
     /// @dev Sets the new pool quota keeper
@@ -669,7 +669,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
 
         poolQuotaKeeper = _poolQuotaKeeper; // F:[P4-23]
 
-        emit NewPoolQuotaKeeper(_poolQuotaKeeper); // F:[P4-03,23]
+        emit SetPoolQuotaKeeper(_poolQuotaKeeper); // F:[P4-03,23]
     }
 
     /// @dev Sets a new expected liquidity limit
@@ -683,7 +683,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
 
     function _setExpectedLiquidityLimit(uint256 limit) internal {
         _expectedLiquidityLimit = _convertToU128(limit); // F:[P4-24]
-        emit NewExpectedLiquidityLimit(limit); // F:[P4-03,24]
+        emit SetExpectedLiquidityLimit(limit); // F:[P4-03,24]
     }
 
     function setTotalBorrowedLimit(uint256 limit)
@@ -695,7 +695,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
 
     function _setTotalBorrowedLimit(uint256 limit) internal {
         _totalBorrowedLimit = _convertToU128(limit); // F:[P4-25]
-        emit NewTotalBorrowedLimit(limit); // F:[P4-03,25]
+        emit SetTotalBorrowedLimit(limit); // F:[P4-03,25]
     }
 
     /// @dev Sets a new withdrawal fee
@@ -708,7 +708,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
             revert IncorrectParameterException(); // F:[P4-26]
         }
         withdrawFee = _withdrawFee; // F:[P4-26]
-        emit NewWithdrawFee(_withdrawFee); // F:[P4-26]
+        emit SetWithdrawFee(_withdrawFee); // F:[P4-26]
     }
 
     //

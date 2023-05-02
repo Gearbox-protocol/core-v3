@@ -3,10 +3,12 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
-import {CreditManager} from "../../credit/CreditManager.sol";
+import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfigurator.sol";
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
+import {WithdrawManager} from "../../support/WithdrawManager.sol";
+import {AccountFactoryV2} from "../../core/AccountFactory.sol";
 
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
@@ -21,11 +23,11 @@ import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 import "forge-std/console.sol";
 
 /// @title CreditManagerTestSuite
-/// @notice Deploys contract for unit testing of CreditManager.sol
+/// @notice Deploys contract for unit testing of CreditManagerV3.sol
 contract CreditManagerTestSuite is PoolDeployer {
     ITokenTestSuite public tokenTestSuite;
 
-    CreditManager public creditManager;
+    CreditManagerV3 public creditManager;
 
     IWETH wethToken;
 
@@ -34,13 +36,14 @@ contract CreditManagerTestSuite is PoolDeployer {
 
     bool supportsQuotas;
 
-    constructor(ICreditConfig creditConfig, bool internalSuite, bool _supportsQuotas)
+    constructor(ICreditConfig creditConfig, bool internalSuite, bool _supportsQuotas, uint8 accountFactoryVer)
         PoolDeployer(
             creditConfig.tokenTestSuite(),
             creditConfig.underlying(),
             creditConfig.wethToken(),
             10 * creditConfig.getAccountAmount(),
-            creditConfig.getPriceFeeds()
+            creditConfig.getPriceFeeds(),
+            accountFactoryVer
         )
     {
         supportsQuotas = _supportsQuotas;
@@ -53,16 +56,17 @@ contract CreditManagerTestSuite is PoolDeployer {
 
         tokenTestSuite = creditConfig.tokenTestSuite();
 
-        creditManager =
-            internalSuite ? new CreditManagerTestInternal(address(poolMock)) : new CreditManager(address(poolMock));
+        creditManager = internalSuite
+            ? new CreditManagerTestInternal(address(poolMock), address(withdrawManager))
+            : new CreditManagerV3(address(poolMock), address(withdrawManager));
 
         creditFacade = msg.sender;
 
-        creditManager.setConfigurator(CONFIGURATOR);
+        creditManager.setCreditConfigurator(CONFIGURATOR);
 
         evm.startPrank(CONFIGURATOR);
 
-        creditManager.upgradeCreditFacade(creditFacade);
+        creditManager.setCreditFacade(creditFacade);
 
         creditManager.setParams(
             DEFAULT_FEE_INTEREST,
@@ -91,6 +95,10 @@ contract CreditManagerTestSuite is PoolDeployer {
         if (supportsQuotas) {
             poolQuotaKeeper.addCreditManager(address(creditManager));
             // poolQuotaKeeper.setGauge(CONFIGURATOR);
+        }
+
+        if (accountFactoryVer == 2) {
+            AccountFactoryV2(address(af)).addCreditManager(address(creditManager));
         }
 
         // Approve USER & LIQUIDATOR to credit manager
@@ -156,7 +164,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         poolMock.setCumulative_RAY(cumulativeIndexAtClose);
     }
 
-    function makeTokenLimited(address token, uint16 rate, uint96 limit) external {
+    function makeTokenQuoted(address token, uint16 rate, uint96 limit) external {
         require(supportsQuotas, "Test suite does not support quotas");
 
         evm.startPrank(CONFIGURATOR);
@@ -165,10 +173,10 @@ contract CreditManagerTestSuite is PoolDeployer {
 
         gaugeMock.updateEpoch();
 
-        uint256 tokenMask = creditManager.tokenMasksMap(token);
-        uint256 limitedMask = creditManager.limitedTokenMask();
+        uint256 tokenMask = creditManager.getTokenMaskOrRevert(token);
+        uint256 limitedMask = creditManager.quotedTokenMask();
 
-        creditManager.setLimitedMask(limitedMask | tokenMask);
+        creditManager.setQuotedMask(limitedMask | tokenMask);
 
         evm.stopPrank();
     }

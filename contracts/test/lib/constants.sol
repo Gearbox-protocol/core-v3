@@ -33,6 +33,8 @@ address constant UNIVERSAL_CONTRACT_ADDRESS = 0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcC
 string constant PAUSABLE_ERROR = "Pausable: paused";
 string constant OWNABLE_ERROR = "Ownable: caller is not the owner";
 
+uint256 constant UNDERLYING_TOKEN_MASK = 1;
+
 uint128 constant DAI_MIN_BORROWED_AMOUNT = uint128(1000 * WAD);
 uint128 constant DAI_MAX_BORROWED_AMOUNT = uint128(10000 * WAD);
 

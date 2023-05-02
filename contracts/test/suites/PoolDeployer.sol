@@ -9,8 +9,9 @@ import {PriceFeedConfig} from "@gearbox-protocol/core-v2/contracts/oracles/Price
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
-import {GenesisFactory} from "../../factories/GenesisFactory.sol";
+import {GenesisFactory} from "./GenesisFactory.sol";
 import {PoolFactory, PoolOpts} from "@gearbox-protocol/core-v2/contracts/factories/PoolFactory.sol";
+import {WithdrawManager} from "../../support/WithdrawManager.sol";
 
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfigurator.sol";
 import {PoolServiceMock} from "../mocks/pool/PoolServiceMock.sol";
@@ -32,7 +33,7 @@ struct PoolCreditOpts {
 // }
 
 /// @title CreditManagerTestSuite
-/// @notice Deploys contract for unit testing of CreditManager.sol
+/// @notice Deploys contract for unit testing of CreditManagerV3.sol
 contract PoolDeployer is DSTest {
     CheatCodes evm = CheatCodes(HEVM_ADDRESS);
 
@@ -43,6 +44,7 @@ contract PoolDeployer is DSTest {
     PoolQuotaKeeper public poolQuotaKeeper;
     GaugeMock public gaugeMock;
     ContractsRegister public cr;
+    WithdrawManager public withdrawManager;
     ACL public acl;
 
     IPriceOracleV2Ext public priceOracle;
@@ -54,11 +56,12 @@ contract PoolDeployer is DSTest {
         address _underlying,
         address wethToken,
         uint256 initialBalance,
-        PriceFeedConfig[] memory priceFeeds
+        PriceFeedConfig[] memory priceFeeds,
+        uint8 accountFactoryVersion
     ) {
         new Roles();
 
-        gp = new GenesisFactory(wethToken, DUMB_ADDRESS);
+        gp = new GenesisFactory(wethToken, DUMB_ADDRESS, accountFactoryVersion);
 
         gp.acl().claimOwnership();
         gp.addressProvider().claimOwnership();
@@ -80,6 +83,8 @@ contract PoolDeployer is DSTest {
         acl = ACL(addressProvider.getACL());
 
         cr = ContractsRegister(addressProvider.getContractsRegister());
+
+        withdrawManager = new WithdrawManager(address(addressProvider));
 
         underlying = _underlying;
 

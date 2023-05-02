@@ -14,7 +14,7 @@ contract CreditManagerMockForPoolTest {
 
     address public creditAccount = DUMB_ADDRESS;
 
-    mapping(address => uint256) public tokenMasksMap;
+    mapping(address => uint256) public getTokenMaskOrRevert;
 
     constructor(address _poolService) {
         changePoolService(_poolService);
@@ -47,16 +47,14 @@ contract CreditManagerMockForPoolTest {
         result = creditAccount;
     }
 
-    function updateQuotas(address _creditAccount, QuotaUpdate[] memory quotaUpdates, uint256 enableTokenMask)
+    function updateQuotas(address _creditAccount, QuotaUpdate[] memory quotaUpdates)
         external
-        returns (uint256 caQuotaInterestChange, uint256 enableTokenMaskUpdated)
+        returns (uint256 caQuotaInterestChange, uint256 tokensToEnable, uint256 tokensToDisable)
     {
-        return IPoolQuotaKeeper(IPool4626(pool).poolQuotaKeeper()).updateQuotas(
-            _creditAccount, quotaUpdates, enableTokenMask
-        );
+        return IPoolQuotaKeeper(IPool4626(pool).poolQuotaKeeper()).updateQuotas(_creditAccount, quotaUpdates);
     }
 
     function addToken(address token, uint256 mask) external {
-        tokenMasksMap[token] = mask;
+        getTokenMaskOrRevert[token] = mask;
     }
 }

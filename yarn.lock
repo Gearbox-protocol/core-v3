@@ -467,10 +467,10 @@
     "@ethersproject/properties" "^5.7.0"
     "@ethersproject/strings" "^5.7.0"
 
-"@gearbox-protocol/core-v2@^1.7.2":
-  version "1.7.2"
-  resolved "https://registry.yarnpkg.com/@gearbox-protocol/core-v2/-/core-v2-1.7.2.tgz#a116672ab9d04a8f29bc15f3104bed15f6f853b8"
-  integrity sha512-mxFxHXqROg1tutki3MbBiff5rbZsO/ephzqdeOcVbpEYPTouHD+tYablOFf2dPX2mVQhLbR2Ccj6Yh1IRWUzMw==
+"@gearbox-protocol/core-v2@^1.16.2":
+  version "1.16.2"
+  resolved "https://registry.yarnpkg.com/@gearbox-protocol/core-v2/-/core-v2-1.16.2.tgz#89ebc011cdd7abb860c780093ee464721047342e"
+  integrity sha512-VcTXLAuL9P+NQzdTh55Kpw9VD8I0CKP/Zh1E6YcVqL1wbXRoGkOT6+jx3quMw+yOSsjkc8sAvggpzBeVXQI9oQ==
 
 "@gearbox-protocol/prettier-config@^1.5.0":
   version "1.5.0"

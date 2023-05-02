@@ -22,7 +22,7 @@ contract BotList is ACLNonReentrantTrait, IBotList {
     using Address for address payable;
 
     /// @dev Mapping from (borrower, bot) to bot approval status
-    mapping(address => mapping(address => bool)) public approvedBot;
+    mapping(address => mapping(address => uint192)) public botPermissions;
 
     /// @dev Whether the bot is forbidden system-wide
     mapping(address => bool) public forbiddenBot;
@@ -45,19 +45,19 @@ contract BotList is ACLNonReentrantTrait, IBotList {
 
     /// @dev Adds or removes allowance for a bot to execute multicalls on behalf of sender
     /// @param bot Bot address
-    /// @param status Whether allowance is added or removed
-    function setBotStatus(address bot, bool status) external nonZeroAddress(bot) {
-        if (!bot.isContract() && status) {
+    /// @param permissions Whether allowance is added or removed
+    function setBotPermissions(address bot, uint192 permissions) external nonZeroAddress(bot) {
+        if (!bot.isContract()) {
             revert AddressIsNotContractException(bot);
         }
 
-        if (forbiddenBot[bot] && status) {
+        if (forbiddenBot[bot] && permissions != 0) {
             revert InvalidBotException();
         }
 
-        approvedBot[msg.sender][bot] = status;
+        botPermissions[msg.sender][bot] = permissions;
 
-        emit BotApprovalChanged(msg.sender, bot, status);
+        emit ApproveBot(msg.sender, bot, permissions);
     }
 
     /// @dev Adds funds to user's balance for a particular bot. The entire sent value in ETH is added
@@ -67,7 +67,7 @@ contract BotList is ACLNonReentrantTrait, IBotList {
             revert AmountCantBeZeroException();
         }
 
-        if (forbiddenBot[bot] || !approvedBot[msg.sender][bot]) {
+        if (forbiddenBot[bot] || botPermissions[msg.sender][bot] == 0) {
             revert InvalidBotException();
         }
 
@@ -75,7 +75,7 @@ contract BotList is ACLNonReentrantTrait, IBotList {
 
         botFunding[msg.sender][bot].remainingFunds = newRemainingFunds;
 
-        emit BotFundingChanged(msg.sender, bot, newRemainingFunds);
+        emit ChangeBotFunding(msg.sender, bot, newRemainingFunds);
     }
 
     /// @dev Removes funds from the user's balance for a particular bot. The funds are sent to the user.
@@ -91,7 +91,7 @@ contract BotList is ACLNonReentrantTrait, IBotList {
         botFunding[msg.sender][bot].remainingFunds = newRemainingFunds;
         payable(msg.sender).sendValue(decreaseAmount);
 
-        emit BotFundingChanged(msg.sender, bot, newRemainingFunds);
+        emit ChangeBotFunding(msg.sender, bot, newRemainingFunds);
     }
 
     /// @dev Sets the amount that can be pull by the bot per week
@@ -106,7 +106,7 @@ contract BotList is ACLNonReentrantTrait, IBotList {
 
         botFunding[msg.sender][bot] = bf;
 
-        emit BotWeeklyAllowanceChanged(msg.sender, bot, allowanceAmount);
+        emit ChangeBotWeeklyAllowance(msg.sender, bot, allowanceAmount);
     }
 
     /// @dev Takes payment from the user to the bot for performed services
@@ -134,7 +134,7 @@ contract BotList is ACLNonReentrantTrait, IBotList {
         payable(msg.sender).sendValue(paymentAmount);
         if (feeAmount > 0) payable(treasury).sendValue(feeAmount);
 
-        emit BotPaymentPulled(payer, msg.sender, paymentAmount, feeAmount);
+        emit PullBotPayment(payer, msg.sender, paymentAmount, feeAmount);
     }
 
     //
@@ -152,6 +152,6 @@ contract BotList is ACLNonReentrantTrait, IBotList {
     function setDAOFee(uint16 newFee) external configuratorOnly {
         daoFee = newFee;
 
-        emit NewBotDAOFee(newFee);
+        emit SetBotDAOFee(newFee);
     }
 }

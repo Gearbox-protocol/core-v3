@@ -4,7 +4,7 @@
 pragma solidity ^0.8.10;
 
 import {Pool4626} from "./Pool4626.sol";
-import {USDT_Transfer} from "../libraries/USDT_Transfer.sol";
+import {USDT_Transfer} from "../traits/USDT_Transfer.sol";
 import {IPool4626, Pool4626Opts} from "../interfaces/IPool4626.sol";
 
 /// @title Core pool contract compatible with ERC4626

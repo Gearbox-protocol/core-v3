@@ -9,7 +9,7 @@ import {Tokens} from "../config/Tokens.sol";
 import {BalanceEngine} from "./BalanceEngine.sol";
 
 /// @title CreditManagerTestSuite
-/// @notice Deploys contract for unit testing of CreditManager.sol
+/// @notice Deploys contract for unit testing of CreditManagerV3.sol
 contract BalanceHelper is BalanceEngine {
     // Suites
     TokensTestSuite internal tokenTestSuite;

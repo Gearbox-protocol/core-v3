@@ -42,10 +42,13 @@ error IncorrectPriceFeedException();
 /// ACCESS
 ///
 
+/// @dev Thrown on attempting to perform an action for an address that owns no Credit Account
+error CallerNotCreditAccountOwnerException();
+
 /// @dev Thrown on attempting to call an access restricted function as a non-Configurator
 error CallerNotConfiguratorException();
 
-/// @dev Thrown on attempting to call an access restricted function as a non-CreditManager
+/// @dev Thrown on attempting to call an access restricted function as a non-CreditManagerV3
 error CallerNotCreditManagerException();
 
 /// @dev Thrown if an access-restricted function is called by an address that is not
@@ -72,7 +75,7 @@ error CallerNotVoterException();
 
 /// @dev Thrown if an access-restricted function is called by an address that is not
 ///      the connected Credit Facade, or an allowed adapter
-error CallerNotAdaptersOrCreditFacadeException();
+error CallerNotAdapterException();
 
 /// interface ICreditConfiguratorExceptions {
 
@@ -103,8 +106,8 @@ error ContractIsNotAnAllowedAdapterException();
 /// @dev Thrown when attempting to limit a token that is not quotable in PoolQuotaKeeper
 error TokenIsNotQuotedException();
 
-// interface ICreditFacadeExceptions is ICreditManagerV2Exceptions {
-/// @dev Thrown if the CreditFacade is not expirable, and an aciton is attempted that
+// interface ICreditFacadeExceptions is ICreditManagerV3Exceptions {
+/// @dev Thrown if the CreditFacadeV3 is not expirable, and an aciton is attempted that
 ///      requires expirability
 error NotAllowedWhenNotExpirableException();
 
@@ -112,10 +115,7 @@ error NotAllowedWhenNotExpirableException();
 error AccountTransferNotAllowedException();
 
 /// @dev Thrown if a liquidator tries to liquidate an account with a health factor above 1
-error CantLiquidateWithSuchHealthFactorException();
-
-/// @dev Thrown if a liquidator tries to liquidate an account by expiry while a Credit Facade is not expired
-error CantLiquidateNonExpiredException();
+error CreditAccountNotLiquidatableException();
 
 /// @dev Thrown if call data passed to a multicall is too short
 error IncorrectCallDataException();
@@ -132,7 +132,7 @@ error IncreaseAndDecreaseForbiddenInOneCallException();
 error UnknownMethodException();
 
 /// @dev Thrown if a user tries to open an account or increase debt with increaseDebtForbidden mode on
-error IncreaseDebtForbiddenException();
+error BorrowingForbiddenException();
 
 /// @dev Thrown if the account owner tries to transfer an unhealthy account
 error CantTransferLiquidatableAccountException();
@@ -148,14 +148,14 @@ error BorrowAmountOutOfLimitsException();
 error BalanceLessThanMinimumDesiredException(address);
 
 /// @dev Thrown if a user attempts to open an account on a Credit Facade that has expired
-error OpenAccountNotAllowedAfterExpirationException();
+error NotAllowedAfterExpirationException();
 
 /// @dev Thrown if expected balances are attempted to be set through revertIfReceivedLessThan twice
 error ExpectedBalancesAlreadySetException();
 
 /// @dev Thrown if a Credit Account has enabled forbidden tokens and the owner attempts to perform an action
 ///      that is not allowed with any forbidden tokens enabled
-error ActionProhibitedWithForbiddenTokensException();
+error ForbiddenTokensException();
 
 /// @dev Thrown when attempting to perform an action on behalf of a borrower that is blacklisted in the underlying token
 error NotAllowedForBlacklistedAddressException();
@@ -180,7 +180,7 @@ error NotEnoughCollateralException();
 error AllowanceFailedException();
 
 /// @dev Thrown on attempting to perform an action for an address that owns no Credit Account
-error HasNoOpenedAccountException();
+error CreditAccountNotExistsException();
 
 /// @dev Thrown on configurator attempting to add more than 256 collateral tokens
 error TooManyTokensException();
@@ -224,3 +224,11 @@ error CreditFacadeNonBlacklistable();
 error NothingToClaimException();
 
 error LiquiditySanityCheckException();
+
+error ZeroCallsException();
+
+error NoFreeQithdrawalSlotsException();
+
+error NoPermissionException(uint256 permission);
+
+error ExternalCallCreditAccountNotSetException();
