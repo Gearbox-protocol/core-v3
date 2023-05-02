@@ -43,7 +43,7 @@ contract AbstractAdapterTest is DSTest, BalanceHelper, CreditFacadeTestHelper {
             Tokens.DAI
         );
 
-        cft = new CreditFacadeTestSuite(creditConfig);
+        cft = new CreditFacadeTestSuite(creditConfig, false, false, false, 1);
 
         underlying = tokenTestSuite.addressOf(Tokens.DAI);
         creditManager = cft.creditManager();

@@ -83,6 +83,12 @@ contract CreditFacadeTest is
     }
 
     function _setUp(Tokens _underlying) internal {
+        _setUp(_underlying, false, false, false, 1);
+    }
+
+    function _setUp(Tokens _underlying, bool withDegenNFT, bool expirable, bool supportQuotas, uint8 accountFactoryVer)
+        internal
+    {
         tokenTestSuite = new TokensTestSuite();
         tokenTestSuite.topUpWETH{value: 100 * WAD}();
 
@@ -91,7 +97,7 @@ contract CreditFacadeTest is
             _underlying
         );
 
-        cft = new CreditFacadeTestSuite(creditConfig);
+        cft = new CreditFacadeTestSuite(creditConfig,  withDegenNFT,  expirable, supportQuotas,  accountFactoryVer);
 
         underlying = tokenTestSuite.addressOf(_underlying);
         creditManager = cft.creditManager();

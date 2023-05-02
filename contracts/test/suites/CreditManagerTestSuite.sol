@@ -8,6 +8,7 @@ import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfigurato
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {WithdrawManager} from "../../support/WithdrawManager.sol";
+import {AccountFactoryV2} from "../../core/AccountFactory.sol";
 
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
@@ -35,13 +36,14 @@ contract CreditManagerTestSuite is PoolDeployer {
 
     bool supportsQuotas;
 
-    constructor(ICreditConfig creditConfig, bool internalSuite, bool _supportsQuotas)
+    constructor(ICreditConfig creditConfig, bool internalSuite, bool _supportsQuotas, uint8 accountFactoryVer)
         PoolDeployer(
             creditConfig.tokenTestSuite(),
             creditConfig.underlying(),
             creditConfig.wethToken(),
             10 * creditConfig.getAccountAmount(),
-            creditConfig.getPriceFeeds()
+            creditConfig.getPriceFeeds(),
+            accountFactoryVer
         )
     {
         supportsQuotas = _supportsQuotas;
@@ -93,6 +95,10 @@ contract CreditManagerTestSuite is PoolDeployer {
         if (supportsQuotas) {
             poolQuotaKeeper.addCreditManager(address(creditManager));
             // poolQuotaKeeper.setGauge(CONFIGURATOR);
+        }
+
+        if (accountFactoryVer == 2) {
+            AccountFactoryV2(address(af)).addCreditManager(address(creditManager));
         }
 
         // Approve USER & LIQUIDATOR to credit manager

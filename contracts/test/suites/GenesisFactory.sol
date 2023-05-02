@@ -10,6 +10,7 @@ import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/Contra
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {DataCompressor} from "@gearbox-protocol/core-v2/contracts/core/DataCompressor.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
+import {AccountFactoryV2} from "../../core/AccountFactory.sol";
 
 import {WETHGateway} from "../../support/WETHGateway.sol";
 import {PriceOracle, PriceFeedConfig} from "@gearbox-protocol/core-v2/contracts/oracles/PriceOracle.sol";
@@ -20,7 +21,7 @@ contract GenesisFactory is Ownable {
     ACL public acl;
     PriceOracle public priceOracle;
 
-    constructor(address wethToken, address treasury) {
+    constructor(address wethToken, address treasury, uint8 accountFactoryVer) {
         addressProvider = new AddressProvider(); // T:[GD-1]
         addressProvider.setWethToken(wethToken); // T:[GD-1]
         addressProvider.setTreasuryContract(treasury); // T:[GD-1]
@@ -42,10 +43,21 @@ contract GenesisFactory is Ownable {
         priceOracle = new PriceOracle(address(addressProvider), config); // T:[GD-1]
         addressProvider.setPriceOracle(address(priceOracle)); // T:[GD-1]
 
-        AccountFactory accountFactory = new AccountFactory(
-            address(addressProvider)
-        ); // T:[GD-1]
-        addressProvider.setAccountFactory(address(accountFactory)); // T:[GD-1]
+        address accountFactory;
+
+        if (accountFactoryVer == 1) {
+            AccountFactory af = new AccountFactory(
+                                    address(addressProvider)
+                                    );
+            af.addCreditAccount();
+            af.addCreditAccount();
+
+            accountFactory = address(af);
+        } else {
+            accountFactory = address(new  AccountFactoryV2( address(addressProvider))); // T:[GD-1]
+        }
+
+        addressProvider.setAccountFactory(accountFactory); // T:[GD-1]
 
         WETHGateway wethGateway = new WETHGateway(address(addressProvider)); // T:[GD-1]
         addressProvider.setWETHGateway(address(wethGateway)); // T:[GD-1]

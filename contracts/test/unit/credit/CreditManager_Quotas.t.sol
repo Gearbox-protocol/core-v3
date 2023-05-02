@@ -81,7 +81,7 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
 
     function _connectCreditManagerSuite(Tokens t, bool internalSuite) internal {
         creditConfig = new CreditConfig(tokenTestSuite, t);
-        cms = new CreditManagerTestSuite(creditConfig, internalSuite, true);
+        cms = new CreditManagerTestSuite(creditConfig, internalSuite, true, 1);
 
         acl = cms.acl();
 

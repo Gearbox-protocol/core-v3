@@ -8,6 +8,7 @@ import {CreditConfigurator} from "../../credit/CreditConfigurator.sol";
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {WithdrawManager} from "../../support/WithdrawManager.sol";
 
+import {AccountFactoryV2} from "../../core/AccountFactory.sol";
 import {CreditManagerFactory} from "../../factories/CreditManagerFactory.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -19,6 +20,8 @@ import "../lib/constants.sol";
 import {PoolDeployer} from "./PoolDeployer.sol";
 import {ICreditConfig, CreditManagerOpts} from "../interfaces/ICreditConfig.sol";
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
+
+import "forge-std/console.sol";
 
 /// @title CreditManagerTestSuite
 /// @notice Deploys contract for unit testing of CreditManagerV3.sol
@@ -37,15 +40,23 @@ contract CreditFacadeTestSuite is PoolDeployer {
 
     ICreditConfig creditConfig;
 
-    constructor(ICreditConfig _creditConfig)
+    constructor(
+        ICreditConfig _creditConfig,
+        bool supportQuotas,
+        bool withDegenNFT,
+        bool withExpiration,
+        uint8 accountFactoryVer
+    )
         PoolDeployer(
             _creditConfig.tokenTestSuite(),
             _creditConfig.underlying(),
             _creditConfig.wethToken(),
             10 * _creditConfig.getAccountAmount(),
-            _creditConfig.getPriceFeeds()
+            _creditConfig.getPriceFeeds(),
+            accountFactoryVer
         )
     {
+        poolMock.setSupportsQuotas(supportQuotas);
         creditConfig = _creditConfig;
 
         minBorrowedAmount = creditConfig.minBorrowedAmount();
@@ -56,6 +67,18 @@ contract CreditFacadeTestSuite is PoolDeployer {
         creditAccountAmount = creditConfig.getAccountAmount();
 
         CreditManagerOpts memory cmOpts = creditConfig.getCreditOpts();
+
+        if (withDegenNFT) {
+            degenNFT = new DegenNFT(
+            address(addressProvider),
+            "DegenNFT",
+            "Gear-Degen"
+        );
+
+            evm.prank(CONFIGURATOR);
+
+            degenNFT.setMinter(CONFIGURATOR);
+        }
 
         cmOpts.withdrawManager = address(withdrawManager);
 
@@ -70,6 +93,15 @@ contract CreditFacadeTestSuite is PoolDeployer {
         creditConfigurator = cmf.creditConfigurator();
 
         cr.addCreditManager(address(creditManager));
+
+        console.log("AF", accountFactoryVer);
+        if (withDegenNFT) {
+            degenNFT.addCreditFacade(address(creditFacade));
+        }
+
+        if (accountFactoryVer == 2) {
+            AccountFactoryV2(address(af)).addCreditManager(address(creditManager));
+        }
 
         evm.label(address(poolMock), "Pool");
         evm.label(address(creditFacade), "CreditFacadeV3");
@@ -132,23 +164,6 @@ contract CreditFacadeTestSuite is PoolDeployer {
 
         creditConfigurator.setCreditFacade(address(creditFacade), true);
         creditConfigurator.setExpirationDate(uint40(block.timestamp + 1));
-
-        evm.stopPrank();
-    }
-
-    function testFacadeWithBlacklistHelper() external {
-        evm.startPrank(CONFIGURATOR);
-
-        creditFacade = new CreditFacadeV3(
-            address(creditManager),
-            address(0),
-
-            false
-        );
-
-        creditConfigurator.setCreditFacade(address(creditFacade), true);
-
-        // blacklistHelper.addCreditFacade(address(creditFacade));
 
         evm.stopPrank();
     }

@@ -96,7 +96,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
     function _connectCreditManagerSuite(Tokens t, bool internalSuite) internal {
         creditConfig = new CreditConfig(tokenTestSuite, t);
-        cms = new CreditManagerTestSuite(creditConfig, internalSuite, false);
+        cms = new CreditManagerTestSuite(creditConfig, internalSuite, false, 1);
 
         acl = cms.acl();
 

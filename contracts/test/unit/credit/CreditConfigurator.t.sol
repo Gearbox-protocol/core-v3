@@ -61,6 +61,10 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
     address TARGET_CONTRACT;
 
     function setUp() public {
+        _setUp(false, false, false);
+    }
+
+    function _setUp(bool withDegenNFT, bool expirable, bool supportQuotas) public {
         tokenTestSuite = new TokensTestSuite();
         tokenTestSuite.topUpWETH{value: 100 * WAD}();
 
@@ -69,7 +73,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
             Tokens.DAI
         );
 
-        cct = new CreditFacadeTestSuite(creditConfig);
+        cct = new CreditFacadeTestSuite(creditConfig,  withDegenNFT,  expirable,  supportQuotas, 1);
 
         underlying = cct.underlying();
         creditManager = cct.creditManager();
@@ -82,7 +86,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
         adapter1 = new AdapterMock(address(creditManager), TARGET_CONTRACT);
 
         adapterDifferentCM = new AdapterMock(
-            address(new CreditFacadeTestSuite(creditConfig).creditManager()), TARGET_CONTRACT
+            address(new CreditFacadeTestSuite(creditConfig, withDegenNFT,  expirable,  supportQuotas,1).creditManager()), TARGET_CONTRACT
         );
 
         DUMB_COMPARTIBLE_CONTRACT = address(adapter1);

@@ -56,11 +56,12 @@ contract PoolDeployer is DSTest {
         address _underlying,
         address wethToken,
         uint256 initialBalance,
-        PriceFeedConfig[] memory priceFeeds
+        PriceFeedConfig[] memory priceFeeds,
+        uint8 accountFactoryVersion
     ) {
         new Roles();
 
-        gp = new GenesisFactory(wethToken, DUMB_ADDRESS);
+        gp = new GenesisFactory(wethToken, DUMB_ADDRESS, accountFactoryVersion);
 
         gp.acl().claimOwnership();
         gp.addressProvider().claimOwnership();

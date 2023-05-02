@@ -75,10 +75,10 @@ contract CreditFacadeGasTest is
     AdapterMock adapterMock;
 
     function setUp() public {
-        _setUp(Tokens.DAI);
+        _setUp(Tokens.DAI, true, false, false);
     }
 
-    function _setUp(Tokens _underlying) internal {
+    function _setUp(Tokens _underlying, bool supportQuotas, bool withDegenNFT, bool withExpiration) internal {
         tokenTestSuite = new TokensTestSuite();
         tokenTestSuite.topUpWETH{value: 100 * WAD}();
 
@@ -87,9 +87,9 @@ contract CreditFacadeGasTest is
             _underlying
         );
 
-        cft = new CreditFacadeTestSuite(creditConfig);
+        cft = new CreditFacadeTestSuite(creditConfig,  supportQuotas,  withDegenNFT,  withExpiration, 1);
 
-        cft.testFacadeWithQuotas();
+        // cft.testFacadeWithQuotas();
 
         underlying = tokenTestSuite.addressOf(_underlying);
         creditManager = cft.creditManager();
@@ -442,514 +442,512 @@ contract CreditFacadeGasTest is
         emit log_uint(gasSpent);
     }
 
-    // /// @dev [G-FA-10]: multicall with enableToken
-    // function test_G_FA_10_enableToken_gas_estimate_1() public {
-    //     tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
+    /// @dev [G-FA-10]: multicall with enableToken
+    function test_G_FA_10_enableToken_gas_estimate_1() public {
+        tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
-    //     MultiCall[] memory calls = new MultiCall[](1);
+        MultiCall[] memory calls = new MultiCall[](1);
 
-    //     calls[0] = MultiCall({
-    //         target: address(creditFacade),
-    //         callData: abi.encodeCall(
-    //             ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-    //             )
-    //     });
+        calls[0] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(
+                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                )
+        });
 
-    //     evm.prank(USER);
-    //     creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        evm.prank(USER);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
 
-    //     calls[0] = MultiCall({
-    //         target: address(creditFacade),
-    //         callData: abi.encodeCall(ICreditFacadeMulticall.enableToken, (tokenTestSuite.addressOf(Tokens.LINK)))
-    //     });
+        calls[0] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(ICreditFacadeMulticall.enableToken, (tokenTestSuite.addressOf(Tokens.LINK)))
+        });
 
-    //     uint256 gasBefore = gasleft();
+        uint256 gasBefore = gasleft();
 
-    //     evm.prank(USER);
-    //     creditFacade.multicall(calls);
+        evm.prank(USER);
+        creditFacade.multicall(creditAccount, calls);
 
-    //     uint256 gasSpent = gasBefore - gasleft();
+        uint256 gasSpent = gasBefore - gasleft();
 
-    //     emit log_string(string(abi.encodePacked("Gas spent - multicall with enableToken: ")));
-    //     emit log_uint(gasSpent);
-    // }
+        emit log_string(string(abi.encodePacked("Gas spent - multicall with enableToken: ")));
+        emit log_uint(gasSpent);
+    }
 
-    // /// @dev [G-FA-11]: multicall with disableToken
-    // function test_G_FA_11_disableToken_gas_estimate_1() public {
-    //     tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
+    /// @dev [G-FA-11]: multicall with disableToken
+    function test_G_FA_11_disableToken_gas_estimate_1() public {
+        tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
-    //     MultiCall[] memory calls = new MultiCall[](2);
-
-    //     calls[0] = MultiCall({
-    //         target: address(creditFacade),
-    //         callData: abi.encodeCall(
-    //             ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-    //             )
-    //     });
+        MultiCall[] memory calls = new MultiCall[](2);
+
+        calls[0] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(
+                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                )
+        });
 
-    //     calls[1] = MultiCall({
-    //         target: address(creditFacade),
-    //         callData: abi.encodeCall(ICreditFacadeMulticall.enableToken, (tokenTestSuite.addressOf(Tokens.LINK)))
-    //     });
+        calls[1] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(ICreditFacadeMulticall.enableToken, (tokenTestSuite.addressOf(Tokens.LINK)))
+        });
 
-    //     evm.prank(USER);
-    //     creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        evm.prank(USER);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
 
-    //     calls[0] = MultiCall({
-    //         target: address(creditFacade),
-    //         callData: abi.encodeCall(ICreditFacadeMulticall.disableToken, (tokenTestSuite.addressOf(Tokens.LINK)))
-    //     });
-
-    //     uint256 gasBefore = gasleft();
+        calls[0] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(ICreditFacadeMulticall.disableToken, (tokenTestSuite.addressOf(Tokens.LINK)))
+        });
+
+        uint256 gasBefore = gasleft();
 
-    //     evm.prank(USER);
-    //     creditFacade.multicall(calls);
+        evm.prank(USER);
+        creditFacade.multicall(creditAccount, calls);
 
-    //     uint256 gasSpent = gasBefore - gasleft();
+        uint256 gasSpent = gasBefore - gasleft();
 
-    //     emit log_string(string(abi.encodePacked("Gas spent - multicall with disableToken: ")));
-    //     emit log_uint(gasSpent);
-    // }
+        emit log_string(string(abi.encodePacked("Gas spent - multicall with disableToken: ")));
+        emit log_uint(gasSpent);
+    }
 
-    // /// @dev [G-FA-12]: multicall with a single swap
-    // function test_G_FA_12_multicall_gas_estimate_1() public {
-    //     tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
+    /// @dev [G-FA-12]: multicall with a single swap
+    function test_G_FA_12_multicall_gas_estimate_1() public {
+        tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
-    //     MultiCall[] memory calls = new MultiCall[](1);
+        MultiCall[] memory calls = new MultiCall[](1);
 
-    //     calls[0] = MultiCall({
-    //         target: address(creditFacade),
-    //         callData: abi.encodeCall(
-    //             ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-    //             )
-    //     });
+        calls[0] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(
+                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                )
+        });
 
-    //     evm.prank(USER);
-    //     creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        evm.prank(USER);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
 
-    //     calls[0] = MultiCall({
-    //         target: address(adapterMock),
-    //         callData: abi.encodeCall(
-    //             AdapterMock.executeSwapSafeApprove,
-    //             (tokenTestSuite.addressOf(Tokens.DAI), tokenTestSuite.addressOf(Tokens.LINK), "", false)
-    //             )
-    //     });
+        calls[0] = MultiCall({
+            target: address(adapterMock),
+            callData: abi.encodeCall(
+                AdapterMock.executeSwapSafeApprove,
+                (tokenTestSuite.addressOf(Tokens.DAI), tokenTestSuite.addressOf(Tokens.LINK), "", false)
+                )
+        });
 
-    //     uint256 gasBefore = gasleft();
+        uint256 gasBefore = gasleft();
 
-    //     evm.prank(USER);
-    //     creditFacade.multicall(calls);
+        evm.prank(USER);
+        creditFacade.multicall(creditAccount, calls);
 
-    //     uint256 gasSpent = gasBefore - gasleft();
+        uint256 gasSpent = gasBefore - gasleft();
 
-    //     emit log_string(string(abi.encodePacked("Gas spent - multicall with a single swap: ")));
-    //     emit log_uint(gasSpent);
-    // }
-
-    // /// @dev [G-FA-12A]: multicall with a single swap
-    // function test_G_FA_12A_multicall_gas_estimate_1A() public {
-    //     tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
+        emit log_string(string(abi.encodePacked("Gas spent - multicall with a single swap: ")));
+        emit log_uint(gasSpent);
+    }
+
+    /// @dev [G-FA-12A]: multicall with a single swap
+    function test_G_FA_12A_multicall_gas_estimate_1A() public {
+        tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
+
+        MultiCall[] memory calls = new MultiCall[](1);
+
+        calls[0] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(
+                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                )
+        });
+
+        evm.prank(USER);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+
+        calls = new MultiCall[](2);
+
+        calls[0] = MultiCall({
+            target: address(adapterMock),
+            callData: abi.encodeCall(
+                AdapterMock.executeSwapSafeApprove,
+                (tokenTestSuite.addressOf(Tokens.DAI), tokenTestSuite.addressOf(Tokens.LINK), "", false)
+                )
+        });
+
+        calls[1] = MultiCall({
+            target: address(adapterMock),
+            callData: abi.encodeCall(
+                AdapterMock.executeSwapSafeApprove,
+                (tokenTestSuite.addressOf(Tokens.LINK), tokenTestSuite.addressOf(Tokens.USDC), "", true)
+                )
+        });
+
+        uint256 gasBefore = gasleft();
 
-    //     MultiCall[] memory calls = new MultiCall[](1);
-
-    //     calls[0] = MultiCall({
-    //         target: address(creditFacade),
-    //         callData: abi.encodeCall(
-    //             ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-    //             )
-    //     });
-
-    //     evm.prank(USER);
-    //     creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
-
-    //     calls = new MultiCall[](2);
-
-    //     calls[0] = MultiCall({
-    //         target: address(adapterMock),
-    //         callData: abi.encodeCall(
-    //             AdapterMock.executeSwapSafeApprove,
-    //             (tokenTestSuite.addressOf(Tokens.DAI), tokenTestSuite.addressOf(Tokens.LINK), "", false)
-    //             )
-    //     });
-
-    //     calls[1] = MultiCall({
-    //         target: address(adapterMock),
-    //         callData: abi.encodeCall(
-    //             AdapterMock.executeSwapSafeApprove,
-    //             (tokenTestSuite.addressOf(Tokens.LINK), tokenTestSuite.addressOf(Tokens.USDC), "", true)
-    //             )
-    //     });
-
-    //     uint256 gasBefore = gasleft();
+        evm.prank(USER);
+        creditFacade.multicall(creditAccount, calls);
 
-    //     evm.prank(USER);
-    //     creditFacade.multicall(calls);
+        uint256 gasSpent = gasBefore - gasleft();
 
-    //     uint256 gasSpent = gasBefore - gasleft();
+        emit log_string(string(abi.encodePacked("Gas spent - multicall with two swaps: ")));
+        emit log_uint(gasSpent);
+    }
 
-    //     emit log_string(string(abi.encodePacked("Gas spent - multicall with two swaps: ")));
-    //     emit log_uint(gasSpent);
-    // }
+    /// @dev [G-FA-13]: multicall with a single swap into quoted token
+    function test_G_FA_13_multicall_gas_estimate_2() public {
+        evm.startPrank(CONFIGURATOR);
+        cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
+        cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
+        cft.gaugeMock().updateEpoch();
+        creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
+        evm.stopPrank();
+
+        tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
+
+        MultiCall[] memory calls = new MultiCall[](1);
+
+        calls[0] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(
+                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                )
+        });
+
+        evm.prank(USER);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+
+        tokenTestSuite.burn(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT * 2);
+        tokenTestSuite.mint(Tokens.LINK, creditAccount, LINK_ACCOUNT_AMOUNT * 3);
 
-    // /// @dev [G-FA-13]: multicall with a single swap into quoted token
-    // function test_G_FA_13_multicall_gas_estimate_2() public {
-    //     evm.startPrank(CONFIGURATOR);
-    //     cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
-    //     cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-    //     cft.gaugeMock().updateEpoch();
-    //     creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
-    //     evm.stopPrank();
+        calls = new MultiCall[](2);
 
-    //     tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
+        calls[0] = MultiCall({
+            target: address(adapterMock),
+            callData: abi.encodeCall(
+                AdapterMock.executeSwapSafeApprove,
+                (tokenTestSuite.addressOf(Tokens.DAI), tokenTestSuite.addressOf(Tokens.LINK), "", true)
+                )
+        });
 
-    //     MultiCall[] memory calls = new MultiCall[](1);
-
-    //     calls[0] = MultiCall({
-    //         target: address(creditFacade),
-    //         callData: abi.encodeCall(
-    //             ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-    //             )
-    //     });
-
-    //     evm.prank(USER);
-    //     creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
-
-    //     address creditAccount = creditManager.getCreditAccountOrRevert(USER);
-
-    //     tokenTestSuite.burn(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT * 2);
-    //     tokenTestSuite.mint(Tokens.LINK, creditAccount, LINK_ACCOUNT_AMOUNT * 3);
+        QuotaUpdate[] memory quotaUpdates = new QuotaUpdate[](1);
 
-    //     calls = new MultiCall[](2);
+        quotaUpdates[0] = QuotaUpdate({
+            token: tokenTestSuite.addressOf(Tokens.LINK),
+            quotaChange: int96(int256(LINK_ACCOUNT_AMOUNT * 3))
+        });
 
-    //     calls[0] = MultiCall({
-    //         target: address(adapterMock),
-    //         callData: abi.encodeCall(
-    //             AdapterMock.executeSwapSafeApprove,
-    //             (tokenTestSuite.addressOf(Tokens.DAI), tokenTestSuite.addressOf(Tokens.LINK), "", true)
-    //             )
-    //     });
+        calls[1] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(ICreditFacadeMulticall.updateQuotas, (quotaUpdates))
+        });
 
-    //     QuotaUpdate[] memory quotaUpdates = new QuotaUpdate[](1);
+        uint256 gasBefore = gasleft();
 
-    //     quotaUpdates[0] = QuotaUpdate({
-    //         token: tokenTestSuite.addressOf(Tokens.LINK),
-    //         quotaChange: int96(int256(LINK_ACCOUNT_AMOUNT * 3))
-    //     });
+        evm.prank(USER);
+        creditFacade.multicall(creditAccount, calls);
 
-    //     calls[1] = MultiCall({
-    //         target: address(creditFacade),
-    //         callData: abi.encodeCall(ICreditFacadeMulticall.updateQuotas, (quotaUpdates))
-    //     });
+        uint256 gasSpent = gasBefore - gasleft();
 
-    //     uint256 gasBefore = gasleft();
+        emit log_string(
+            string(
+                abi.encodePacked(
+                    "Gas spent - multicall with a single swap into quoted collateral and updating quotas: "
+                )
+            )
+        );
+        emit log_uint(gasSpent);
+    }
 
-    //     evm.prank(USER);
-    //     creditFacade.multicall(calls);
+    /// @dev [G-FA-14]: closeCreditAccount with underlying only
+    function test_G_FA_14_closeCreditAccount_gas_estimate_1() public {
+        tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
-    //     uint256 gasSpent = gasBefore - gasleft();
+        MultiCall[] memory calls = new MultiCall[](1);
 
-    //     emit log_string(
-    //         string(
-    //             abi.encodePacked(
-    //                 "Gas spent - multicall with a single swap into quoted collateral and updating quotas: "
-    //             )
-    //         )
-    //     );
-    //     emit log_uint(gasSpent);
-    // }
+        calls[0] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(
+                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                )
+        });
 
-    // /// @dev [G-FA-14]: closeCreditAccount with underlying only
-    // function test_G_FA_14_closeCreditAccount_gas_estimate_1() public {
-    //     tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
+        evm.prank(USER);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
 
-    //     MultiCall[] memory calls = new MultiCall[](1);
+        evm.roll(block.number + 1);
 
-    //     calls[0] = MultiCall({
-    //         target: address(creditFacade),
-    //         callData: abi.encodeCall(
-    //             ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-    //             )
-    //     });
+        calls = new MultiCall[](0);
 
-    //     evm.prank(USER);
-    //     creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        uint256 gasBefore = gasleft();
 
-    //     evm.roll(block.number + 1);
+        evm.prank(USER);
+        creditFacade.closeCreditAccount(creditAccount, USER, 0, false, calls);
 
-    //     calls = new MultiCall[](0);
+        uint256 gasSpent = gasBefore - gasleft();
 
-    //     uint256 gasBefore = gasleft();
+        emit log_string(string(abi.encodePacked("Gas spent - closeCreditAccount with underlying only: ")));
+        emit log_uint(gasSpent);
+    }
 
-    //     evm.prank(USER);
-    //     creditFacade.closeCreditAccount(USER, 0, false, calls);
+    /// @dev [G-FA-15]: closeCreditAccount with two tokens
+    function test_G_FA_15_closeCreditAccount_gas_estimate_2() public {
+        tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
+        tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
+        tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
 
-    //     uint256 gasSpent = gasBefore - gasleft();
+        MultiCall[] memory calls = new MultiCall[](2);
 
-    //     emit log_string(string(abi.encodePacked("Gas spent - closeCreditAccount with underlying only: ")));
-    //     emit log_uint(gasSpent);
-    // }
+        calls[0] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(
+                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                )
+        });
 
-    // /// @dev [G-FA-15]: closeCreditAccount with two tokens
-    // function test_G_FA_15_closeCreditAccount_gas_estimate_2() public {
-    //     tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
-    //     tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
-    //     tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
+        calls[1] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(
+                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
+                )
+        });
 
-    //     MultiCall[] memory calls = new MultiCall[](2);
+        evm.prank(USER);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
 
-    //     calls[0] = MultiCall({
-    //         target: address(creditFacade),
-    //         callData: abi.encodeCall(
-    //             ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-    //             )
-    //     });
+        evm.roll(block.number + 1);
 
-    //     calls[1] = MultiCall({
-    //         target: address(creditFacade),
-    //         callData: abi.encodeCall(
-    //             ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
-    //             )
-    //     });
+        calls = new MultiCall[](0);
 
-    //     evm.prank(USER);
-    //     creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        uint256 gasBefore = gasleft();
 
-    //     evm.roll(block.number + 1);
+        evm.prank(USER);
+        creditFacade.closeCreditAccount(creditAccount, USER, 0, false, calls);
 
-    //     calls = new MultiCall[](0);
+        uint256 gasSpent = gasBefore - gasleft();
 
-    //     uint256 gasBefore = gasleft();
+        emit log_string(string(abi.encodePacked("Gas spent - closeCreditAccount with 2 tokens: ")));
+        emit log_uint(gasSpent);
+    }
 
-    //     evm.prank(USER);
-    //     creditFacade.closeCreditAccount(USER, 0, false, calls);
+    /// @dev [G-FA-16]: closeCreditAccount with 2 tokens and active quota interest
+    function test_G_FA_16_closeCreditAccount_gas_estimate_3() public {
+        evm.startPrank(CONFIGURATOR);
+        cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
+        cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
+        cft.gaugeMock().updateEpoch();
+        creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
+        evm.stopPrank();
 
-    //     uint256 gasSpent = gasBefore - gasleft();
+        tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
+        tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
 
-    //     emit log_string(string(abi.encodePacked("Gas spent - closeCreditAccount with 2 tokens: ")));
-    //     emit log_uint(gasSpent);
-    // }
+        MultiCall[] memory calls = new MultiCall[](2);
 
-    // /// @dev [G-FA-16]: closeCreditAccount with 2 tokens and active quota interest
-    // function test_G_FA_16_closeCreditAccount_gas_estimate_3() public {
-    //     evm.startPrank(CONFIGURATOR);
-    //     cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
-    //     cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-    //     cft.gaugeMock().updateEpoch();
-    //     creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
-    //     evm.stopPrank();
+        calls[0] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(
+                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
+                )
+        });
 
-    //     tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
-    //     tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
+        QuotaUpdate[] memory quotaUpdates = new QuotaUpdate[](1);
 
-    //     MultiCall[] memory calls = new MultiCall[](2);
+        quotaUpdates[0] =
+            QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.LINK), quotaChange: int96(int256(LINK_ACCOUNT_AMOUNT))});
 
-    //     calls[0] = MultiCall({
-    //         target: address(creditFacade),
-    //         callData: abi.encodeCall(
-    //             ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
-    //             )
-    //     });
+        calls[1] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(ICreditFacadeMulticall.updateQuotas, (quotaUpdates))
+        });
 
-    //     QuotaUpdate[] memory quotaUpdates = new QuotaUpdate[](1);
+        evm.prank(USER);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
 
-    //     quotaUpdates[0] =
-    //         QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.LINK), quotaChange: int96(int256(LINK_ACCOUNT_AMOUNT))});
+        evm.roll(block.number + 1);
 
-    //     calls[1] = MultiCall({
-    //         target: address(creditFacade),
-    //         callData: abi.encodeCall(ICreditFacadeMulticall.updateQuotas, (quotaUpdates))
-    //     });
+        evm.warp(block.timestamp + 30 days);
 
-    //     evm.prank(USER);
-    //     creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        calls = new MultiCall[](0);
 
-    //     evm.roll(block.number + 1);
+        uint256 gasBefore = gasleft();
 
-    //     evm.warp(block.timestamp + 30 days);
+        evm.prank(USER);
+        creditFacade.closeCreditAccount(creditAccount, USER, 0, false, calls);
 
-    //     calls = new MultiCall[](0);
+        uint256 gasSpent = gasBefore - gasleft();
 
-    //     uint256 gasBefore = gasleft();
+        emit log_string(string(abi.encodePacked("Gas spent - closeCreditAccount with underlying and quoted token: ")));
+        emit log_uint(gasSpent);
+    }
 
-    //     evm.prank(USER);
-    //     creditFacade.closeCreditAccount(USER, 0, false, calls);
+    /// @dev [G-FA-17]: closeCreditAccount with one swap
+    function test_G_FA_17_closeCreditAccount_gas_estimate_4() public {
+        tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
-    //     uint256 gasSpent = gasBefore - gasleft();
+        MultiCall[] memory calls = new MultiCall[](1);
 
-    //     emit log_string(string(abi.encodePacked("Gas spent - closeCreditAccount with underlying and quoted token: ")));
-    //     emit log_uint(gasSpent);
-    // }
+        calls[0] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(
+                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                )
+        });
 
-    // /// @dev [G-FA-17]: closeCreditAccount with one swap
-    // function test_G_FA_17_closeCreditAccount_gas_estimate_4() public {
-    //     tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
+        evm.prank(USER);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
 
-    //     MultiCall[] memory calls = new MultiCall[](1);
+        evm.roll(block.number + 1);
 
-    //     calls[0] = MultiCall({
-    //         target: address(creditFacade),
-    //         callData: abi.encodeCall(
-    //             ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-    //             )
-    //     });
+        calls[0] = MultiCall({
+            target: address(adapterMock),
+            callData: abi.encodeCall(
+                AdapterMock.executeSwapSafeApprove,
+                (tokenTestSuite.addressOf(Tokens.LINK), tokenTestSuite.addressOf(Tokens.DAI), "", true)
+                )
+        });
 
-    //     evm.prank(USER);
-    //     creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        uint256 gasBefore = gasleft();
 
-    //     evm.roll(block.number + 1);
+        evm.prank(USER);
+        creditFacade.closeCreditAccount(creditAccount, USER, 0, false, calls);
 
-    //     calls[0] = MultiCall({
-    //         target: address(adapterMock),
-    //         callData: abi.encodeCall(
-    //             AdapterMock.executeSwapSafeApprove,
-    //             (tokenTestSuite.addressOf(Tokens.LINK), tokenTestSuite.addressOf(Tokens.DAI), "", true)
-    //             )
-    //     });
+        uint256 gasSpent = gasBefore - gasleft();
 
-    //     uint256 gasBefore = gasleft();
+        emit log_string(string(abi.encodePacked("Gas spent - closeCreditAccount with one swap: ")));
+        emit log_uint(gasSpent);
+    }
 
-    //     evm.prank(USER);
-    //     creditFacade.closeCreditAccount(USER, 0, false, calls);
+    /// @dev [G-FA-18]: liquidateCreditAccount with underlying only
+    function test_G_FA_18_liquidateCreditAccount_gas_estimate_1() public {
+        tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
-    //     uint256 gasSpent = gasBefore - gasleft();
+        MultiCall[] memory calls = new MultiCall[](1);
 
-    //     emit log_string(string(abi.encodePacked("Gas spent - closeCreditAccount with one swap: ")));
-    //     emit log_uint(gasSpent);
-    // }
+        calls[0] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(
+                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                )
+        });
 
-    // /// @dev [G-FA-18]: liquidateCreditAccount with underlying only
-    // function test_G_FA_18_liquidateCreditAccount_gas_estimate_1() public {
-    //     tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
+        evm.prank(USER);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
 
-    //     MultiCall[] memory calls = new MultiCall[](1);
+        evm.roll(block.number + 1);
 
-    //     calls[0] = MultiCall({
-    //         target: address(creditFacade),
-    //         callData: abi.encodeCall(
-    //             ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-    //             )
-    //     });
+        _zeroAllLTs();
 
-    //     evm.prank(USER);
-    //     creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        calls = new MultiCall[](0);
 
-    //     evm.roll(block.number + 1);
+        uint256 gasBefore = gasleft();
 
-    //     _zeroAllLTs();
+        evm.prank(FRIEND);
+        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 0, false, calls);
 
-    //     calls = new MultiCall[](0);
+        uint256 gasSpent = gasBefore - gasleft();
 
-    //     uint256 gasBefore = gasleft();
+        emit log_string(string(abi.encodePacked("Gas spent - liquidateCreditAccount with underlying only: ")));
+        emit log_uint(gasSpent);
+    }
 
-    //     evm.prank(FRIEND);
-    //     creditFacade.liquidateCreditAccount(USER, FRIEND, 0, false, calls);
+    /// @dev [G-FA-19]: liquidateCreditAccount with two tokens
+    function test_G_FA_19_liquidateCreditAccount_gas_estimate_2() public {
+        tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
+        tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
+        tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
 
-    //     uint256 gasSpent = gasBefore - gasleft();
+        tokenTestSuite.mint(Tokens.DAI, FRIEND, DAI_ACCOUNT_AMOUNT * 100);
+        tokenTestSuite.approve(Tokens.DAI, FRIEND, address(creditManager));
 
-    //     emit log_string(string(abi.encodePacked("Gas spent - liquidateCreditAccount with underlying only: ")));
-    //     emit log_uint(gasSpent);
-    // }
+        MultiCall[] memory calls = new MultiCall[](2);
 
-    // /// @dev [G-FA-19]: liquidateCreditAccount with two tokens
-    // function test_G_FA_19_liquidateCreditAccount_gas_estimate_2() public {
-    //     tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
-    //     tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
-    //     tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
+        calls[0] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(
+                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                )
+        });
 
-    //     tokenTestSuite.mint(Tokens.DAI, FRIEND, DAI_ACCOUNT_AMOUNT * 100);
-    //     tokenTestSuite.approve(Tokens.DAI, FRIEND, address(creditManager));
+        calls[1] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(
+                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
+                )
+        });
 
-    //     MultiCall[] memory calls = new MultiCall[](2);
+        evm.prank(USER);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
 
-    //     calls[0] = MultiCall({
-    //         target: address(creditFacade),
-    //         callData: abi.encodeCall(
-    //             ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-    //             )
-    //     });
+        evm.roll(block.number + 1);
 
-    //     calls[1] = MultiCall({
-    //         target: address(creditFacade),
-    //         callData: abi.encodeCall(
-    //             ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
-    //             )
-    //     });
+        _zeroAllLTs();
 
-    //     evm.prank(USER);
-    //     creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        calls = new MultiCall[](0);
 
-    //     evm.roll(block.number + 1);
+        uint256 gasBefore = gasleft();
 
-    //     _zeroAllLTs();
+        evm.prank(FRIEND);
+        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 0, false, calls);
 
-    //     calls = new MultiCall[](0);
+        uint256 gasSpent = gasBefore - gasleft();
 
-    //     uint256 gasBefore = gasleft();
+        emit log_string(string(abi.encodePacked("Gas spent - liquidateCreditAccount with 2 tokens: ")));
+        emit log_uint(gasSpent);
+    }
 
-    //     evm.prank(FRIEND);
-    //     creditFacade.liquidateCreditAccount(USER, FRIEND, 0, false, calls);
+    /// @dev [G-FA-20]: liquidateCreditAccount with 2 tokens and active quota interest
+    function test_G_FA_20_liquidateCreditAccount_gas_estimate_3() public {
+        evm.startPrank(CONFIGURATOR);
+        cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
+        cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
+        cft.gaugeMock().updateEpoch();
+        creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
+        evm.stopPrank();
 
-    //     uint256 gasSpent = gasBefore - gasleft();
+        tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
+        tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
 
-    //     emit log_string(string(abi.encodePacked("Gas spent - liquidateCreditAccount with 2 tokens: ")));
-    //     emit log_uint(gasSpent);
-    // }
+        tokenTestSuite.mint(Tokens.DAI, FRIEND, DAI_ACCOUNT_AMOUNT * 100);
+        tokenTestSuite.approve(Tokens.DAI, FRIEND, address(creditManager));
 
-    // /// @dev [G-FA-20]: liquidateCreditAccount with 2 tokens and active quota interest
-    // function test_G_FA_20_liquidateCreditAccount_gas_estimate_3() public {
-    //     evm.startPrank(CONFIGURATOR);
-    //     cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
-    //     cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-    //     cft.gaugeMock().updateEpoch();
-    //     creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
-    //     evm.stopPrank();
+        MultiCall[] memory calls = new MultiCall[](2);
 
-    //     tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
-    //     tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
+        calls[0] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(
+                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
+                )
+        });
 
-    //     tokenTestSuite.mint(Tokens.DAI, FRIEND, DAI_ACCOUNT_AMOUNT * 100);
-    //     tokenTestSuite.approve(Tokens.DAI, FRIEND, address(creditManager));
+        QuotaUpdate[] memory quotaUpdates = new QuotaUpdate[](1);
 
-    //     MultiCall[] memory calls = new MultiCall[](2);
+        quotaUpdates[0] =
+            QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.LINK), quotaChange: int96(int256(LINK_ACCOUNT_AMOUNT))});
 
-    //     calls[0] = MultiCall({
-    //         target: address(creditFacade),
-    //         callData: abi.encodeCall(
-    //             ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
-    //             )
-    //     });
+        calls[1] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(ICreditFacadeMulticall.updateQuotas, (quotaUpdates))
+        });
 
-    //     QuotaUpdate[] memory quotaUpdates = new QuotaUpdate[](1);
+        evm.prank(USER);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
 
-    //     quotaUpdates[0] =
-    //         QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.LINK), quotaChange: int96(int256(LINK_ACCOUNT_AMOUNT))});
+        _zeroAllLTs();
 
-    //     calls[1] = MultiCall({
-    //         target: address(creditFacade),
-    //         callData: abi.encodeCall(ICreditFacadeMulticall.updateQuotas, (quotaUpdates))
-    //     });
+        evm.roll(block.number + 1);
 
-    //     evm.prank(USER);
-    //     creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        evm.warp(block.timestamp + 30 days);
 
-    //     _zeroAllLTs();
+        calls = new MultiCall[](0);
 
-    //     evm.roll(block.number + 1);
+        uint256 gasBefore = gasleft();
 
-    //     evm.warp(block.timestamp + 30 days);
+        evm.prank(FRIEND);
+        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 0, false, calls);
 
-    //     calls = new MultiCall[](0);
+        uint256 gasSpent = gasBefore - gasleft();
 
-    //     uint256 gasBefore = gasleft();
-
-    //     evm.prank(FRIEND);
-    //     creditFacade.liquidateCreditAccount(USER, FRIEND, 0, false, calls);
-
-    //     uint256 gasSpent = gasBefore - gasleft();
-
-    //     emit log_string(
-    //         string(abi.encodePacked("Gas spent - liquidateCreditAccount with underlying and quoted token: "))
-    //     );
-    //     emit log_uint(gasSpent);
-    // }
+        emit log_string(
+            string(abi.encodePacked("Gas spent - liquidateCreditAccount with underlying and quoted token: "))
+        );
+        emit log_uint(gasSpent);
+    }
 }
