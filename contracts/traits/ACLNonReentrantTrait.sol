@@ -35,6 +35,14 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable {
         _;
     }
 
+    /// @dev Modifier that allow pausable admin to call only
+    modifier unpausableAdminsOnly() {
+        if (!_acl.isUnpausableAdmin(msg.sender)) {
+            revert CallerNotPausableAdminException();
+        }
+        _;
+    }
+
     /// @dev Prevents a contract from calling itself, directly or indirectly.
     /// Calling a `nonReentrant` function from another `nonReentrant`
     /// function is not supported. It is possible to prevent this from happening
@@ -78,19 +86,12 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable {
     }
 
     ///@dev Pause contract
-    function pause() external {
-        if (!_acl.isPausableAdmin(msg.sender)) {
-            revert CallerNotPausableAdminException();
-        }
+    function pause() external virtual pausableAdminsOnly {
         _pause();
     }
 
     /// @dev Unpause contract
-    function unpause() external {
-        if (!_acl.isUnpausableAdmin(msg.sender)) {
-            revert CallerNotUnPausableAdminException();
-        }
-
+    function unpause() external virtual unpausableAdminsOnly {
         _unpause();
     }
 
