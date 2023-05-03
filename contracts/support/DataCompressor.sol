@@ -159,8 +159,8 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
             // (result.totalValue,) = creditFacade.calcTotalValue(creditAccount);
             // result.healthFactor = creditFacade.calcCreditAccountHealthFactor(creditAccount);
 
-            (result.borrowedAmount, result.borrowedAmountPlusInterest, result.borrowedAmountPlusInterestAndFees) =
-                creditManagerV2.calcCreditAccountAccruedInterest(creditAccount);
+            // (result.borrowedAmount, result.borrowedAmountPlusInterest, result.borrowedAmountPlusInterestAndFees) =
+            //     creditManagerV2.calcCreditAccountAccruedInterest(creditAccount);
         }
 
         address pool = address((ver == 1) ? creditManager.poolService() : creditManagerV2.pool());

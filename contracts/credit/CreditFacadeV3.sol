@@ -17,7 +17,14 @@ import {QuotaUpdate} from "../interfaces/IPoolQuotaKeeper.sol";
 
 /// INTERFACES
 import "../interfaces/ICreditFacade.sol";
-import {ICreditManagerV3, ClosureAction, ManageDebtAction, RevocationPair} from "../interfaces/ICreditManagerV3.sol";
+import {
+    ICreditManagerV3,
+    ClosureAction,
+    ManageDebtAction,
+    RevocationPair,
+    CollateralDebtData,
+    CollateralCalcTask
+} from "../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
 
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
@@ -283,7 +290,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         // Wraps ETH and sends it back to msg.sender
         _wrapETH(); // F:[FA-3C]
 
-        uint256 enabledTokensMask = _enabledTokenMask(creditAccount);
+        CollateralDebtData memory debtData = _calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_ONLY);
 
         _cancelWithdrawals(creditAccount, CancellationType.PUSH_WITHDRAWALS);
 
@@ -291,24 +298,20 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         if (calls.length != 0) {
             // TODO: CHANGE
             FullCheckParams memory fullCheckParams =
-                _multicall(creditAccount, calls, enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS);
-            enabledTokensMask = fullCheckParams.enabledTokensMaskAfter;
+                _multicall(creditAccount, calls, debtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS);
+            debtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter;
         } // F:[FA-2, 12, 13]
 
         /// HOW TO CHECK QUOTED BALANCES
 
-        (, uint256 debtWithInterest,) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
-
         // Requests the Credit manager to close the Credit Account
-        creditManager.closeCreditAccount({
+        _closeCreditAccount({
             creditAccount: creditAccount,
             closureAction: ClosureAction.CLOSE_ACCOUNT,
-            totalValue: 0,
+            collateralDebtData: debtData,
             payer: msg.sender,
             to: to,
-            enabledTokenMask: enabledTokensMask,
-            skipTokenMask: skipTokenMask,
-            debtWithInterest: debtWithInterest,
+            skipTokensMask: skipTokenMask,
             convertWETH: convertWETH
         }); // F:[FA-2, 12]
 
@@ -357,32 +360,25 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
 
         // Checks that the account hf < 1 and computes the totalValue
         // before the multicall
-        ClosureAction closeAction;
-        uint256 totalValue;
-        uint256 debtWithInterest;
-        uint256 enabledTokensMask;
-        {
-            bool isLiquidatable;
-            (isLiquidatable, closeAction, totalValue, debtWithInterest, enabledTokensMask) =
-                _isAccountLiquidatable(creditAccount); // F:[FA-14]
+        (ClosureAction closeAction, CollateralDebtData memory collateralDebtData) =
+            _isAccountLiquidatable(creditAccount, true); // F:[FA-14]
 
-            if (!isLiquidatable) revert CreditAccountNotLiquidatableException();
-        }
+        if (!collateralDebtData.isLiquidatable) revert CreditAccountNotLiquidatableException();
+
         // Wraps ETH and sends it back to msg.sender
         _wrapETH(); // F:[FA-3D]
 
-        enabledTokensMask |= _cancelWithdrawals(creditAccount, CancellationType.RETURN_FUNDS);
+        collateralDebtData.enabledTokensMask |= _cancelWithdrawals(creditAccount, CancellationType.RETURN_FUNDS);
 
         if (calls.length != 0) {
             // TODO: CHANGE
             FullCheckParams memory fullCheckParams =
-                _multicall(creditAccount, calls, enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS);
-            enabledTokensMask = fullCheckParams.enabledTokensMaskAfter;
+                _multicall(creditAccount, calls, collateralDebtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS);
+            collateralDebtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter;
         } // F:[FA-15]
 
-        uint256 remainingFunds = _liquidateCreditAccount(
-            creditAccount, closeAction, totalValue, to, skipTokenMask, convertWETH, enabledTokensMask, debtWithInterest
-        );
+        uint256 remainingFunds =
+            _liquidateCreditAccount(creditAccount, closeAction, collateralDebtData, to, skipTokenMask, convertWETH);
 
         emit LiquidateCreditAccount(creditAccount, borrower, msg.sender, to, closeAction, remainingFunds); // F:[FA-15]
     }
@@ -391,23 +387,19 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
     function _liquidateCreditAccount(
         address creditAccount,
         ClosureAction closeAction,
-        uint256 totalValue,
+        CollateralDebtData memory collateralDebtData,
         address to,
         uint256 skipTokenMask,
-        bool convertWETH,
-        uint256 enabledTokensMask,
-        uint256 debtWithInterest
+        bool convertWETH
     ) internal returns (uint256 remainingFunds) {
         uint256 reportedLoss;
-        (remainingFunds, reportedLoss) = creditManager.closeCreditAccount({
+        (remainingFunds, reportedLoss) = _closeCreditAccount({
             creditAccount: creditAccount,
             closureAction: closeAction,
-            totalValue: totalValue,
+            collateralDebtData: collateralDebtData,
             payer: msg.sender,
             to: to,
-            enabledTokenMask: enabledTokensMask,
-            skipTokenMask: skipTokenMask,
-            debtWithInterest: debtWithInterest,
+            skipTokensMask: skipTokenMask,
             convertWETH: convertWETH
         }); // F:[FA-15,49]
 
@@ -475,14 +467,14 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         internal
         nonZeroCallsOnly(calls)
     {
-        (uint256 enabledTokenMaskBefore, uint256[] memory forbiddenBalances) = _storeForbiddenBalances(creditAccount);
+        (uint256 enabledTokensMaskBefore, uint256[] memory forbiddenBalances) = _storeForbiddenBalances(creditAccount);
 
-        FullCheckParams memory fullCheckParams = _multicall(creditAccount, calls, enabledTokenMaskBefore, permissions);
+        FullCheckParams memory fullCheckParams = _multicall(creditAccount, calls, enabledTokensMaskBefore, permissions);
 
         // Performs a fullCollateralCheck
         // During a multicall, all intermediary health checks are skipped,
         // as one fullCollateralCheck at the end is sufficient
-        _fullCollateralCheck(creditAccount, enabledTokenMaskBefore, fullCheckParams, forbiddenBalances);
+        _fullCollateralCheck(creditAccount, enabledTokensMaskBefore, fullCheckParams, forbiddenBalances);
     }
 
     /// @dev IMPLEMENTATION: multicall
@@ -835,9 +827,9 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
 
         /// Checks that the account hf > 1, as it is forbidden to transfer
         /// accounts that are liquidatable
-        (bool isLiquidatable,,,,) = _isAccountLiquidatable(creditAccount); // F:[FA-34]
+        (, CollateralDebtData memory collateralDebtData) = _isAccountLiquidatable(creditAccount, false); // F:[FA-34]
 
-        if (isLiquidatable) revert CantTransferLiquidatableAccountException(); // F:[FA-34]
+        if (collateralDebtData.isLiquidatable) revert CantTransferLiquidatableAccountException(); // F:[FA-34]
 
         // Requests the Credit Manager to transfer the account
         creditManager.transferAccountOwnership(creditAccount, to); // F:[FA-35]
@@ -917,11 +909,31 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         mask = creditManager.getTokenMaskOrRevert(token);
     }
 
+    function _closeCreditAccount(
+        address creditAccount,
+        ClosureAction closureAction,
+        CollateralDebtData memory collateralDebtData,
+        address payer,
+        address to,
+        uint256 skipTokensMask,
+        bool convertWETH
+    ) internal returns (uint256 remainingFunds, uint256 reportedLoss) {
+        (remainingFunds, reportedLoss) = creditManager.closeCreditAccount({
+            creditAccount: creditAccount,
+            closureAction: closureAction,
+            collateralDebtData: collateralDebtData,
+            payer: payer,
+            to: to,
+            skipTokensMask: skipTokensMask,
+            convertWETH: convertWETH
+        }); // F:[FA-15,49]
+    }
+
     /// @dev Internal wrapper for `creditManager.fullCollateralCheck()`
     /// @notice The external call is wrapped to optimize contract size
     function _fullCollateralCheck(
         address creditAccount,
-        uint256 enabledTokenMaskBefore,
+        uint256 enabledTokensMaskBefore,
         FullCheckParams memory fullCheckParams,
         uint256[] memory forbiddenBalances
     ) internal {
@@ -935,20 +947,20 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         uint256 forbiddenTokensOnAccount = fullCheckParams.enabledTokensMaskAfter & forbiddenTokenMask;
 
         if (forbiddenTokensOnAccount != 0) {
-            _checkForbiddenBalances(creditAccount, enabledTokenMaskBefore, forbiddenBalances, forbiddenTokensOnAccount);
+            _checkForbiddenBalances(creditAccount, enabledTokensMaskBefore, forbiddenBalances, forbiddenTokensOnAccount);
         }
     }
 
     function _storeForbiddenBalances(address creditAccount)
         internal
         view
-        returns (uint256 enabledTokenMaskBefore, uint256[] memory forbiddenBalances)
+        returns (uint256 enabledTokensMaskBefore, uint256[] memory forbiddenBalances)
     {
-        enabledTokenMaskBefore = creditManager.enabledTokensMap(creditAccount);
-        uint256 forbiddenTokensOnAccount = enabledTokenMaskBefore & forbiddenTokenMask;
+        enabledTokensMaskBefore = creditManager.enabledTokensMap(creditAccount);
+        uint256 forbiddenTokensOnAccount = enabledTokensMaskBefore & forbiddenTokenMask;
 
         if (forbiddenTokensOnAccount != 0) {
-            forbiddenBalances = new uint256[](enabledTokenMaskBefore.calcEnabledTokens());
+            forbiddenBalances = new uint256[](enabledTokensMaskBefore.calcEnabledTokens());
             uint256 tokenMask;
             uint256 j;
             for (uint256 i; tokenMask < forbiddenTokensOnAccount; ++i) {
@@ -965,12 +977,12 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
 
     function _checkForbiddenBalances(
         address creditAccount,
-        uint256 enabledTokenMaskBefore,
+        uint256 enabledTokensMaskBefore,
         uint256[] memory forbiddenBalances,
         uint256 forbiddenTokensOnAccount
     ) internal view {
         unchecked {
-            uint256 forbiddenTokensOnAccountBefore = enabledTokenMaskBefore & forbiddenTokenMask;
+            uint256 forbiddenTokensOnAccountBefore = enabledTokensMaskBefore & forbiddenTokenMask;
 
             if (forbiddenTokensOnAccount & ~forbiddenTokensOnAccountBefore > 0) revert ForbiddenTokensException();
 
@@ -1014,39 +1026,38 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
 
     /// @dev Checks if account is liquidatable (i.e., hf < 1)
     /// @param creditAccount Address of credit account to check
-    function _isAccountLiquidatable(address creditAccount)
+    function _isAccountLiquidatable(address creditAccount, bool isEmergencyLiquidation)
         internal
         view
-        returns (
-            bool isLiquidatable,
-            ClosureAction closeAction,
-            uint256 totalValue,
-            uint256 debtWithInterest,
-            uint256 enabledTokenMask
-        )
+        returns (ClosureAction closeAction, CollateralDebtData memory collateralDebtData)
     {
-        (enabledTokenMask, totalValue,, debtWithInterest, isLiquidatable) = _calcTotalValue(creditAccount);
+        collateralDebtData = _calcDebtAndCollateral(
+            creditAccount,
+            isEmergencyLiquidation
+                ? CollateralCalcTask.DEBT_COLLATERAL_WITH_ALL_WITHDRAWALS
+                : CollateralCalcTask.DEBT_COLLATERAL_WITH_PENDING_WITHDRAWALS
+        );
         closeAction = ClosureAction.LIQUIDATE_ACCOUNT;
 
-        if (!isLiquidatable && _isExpired()) {
-            isLiquidatable = true;
+        if (!collateralDebtData.isLiquidatable && _isExpired()) {
+            collateralDebtData.isLiquidatable = true;
             closeAction = ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT;
         }
     }
 
-    function _calcTotalValue(address creditAccount)
+    function _calcDebtAndCollateral(address creditAccount, CollateralCalcTask task)
         internal
         view
-        returns (uint256 enabledTokenMask, uint256 total, uint256 twv, uint256 debtWithInterest, bool canBeLiquidated)
+        returns (CollateralDebtData memory)
     {
-        return creditManager.calcTotalValue(creditAccount);
+        return creditManager.calcDebtAndCollateral(creditAccount, task);
     }
 
     function _getTokenByMask(uint256 mask) internal view returns (address) {
         return creditManager.getTokenByMask(mask);
     }
 
-    function _enabledTokenMask(address creditAccount) internal view returns (uint256) {
+    function _enabledTokensMask(address creditAccount) internal view returns (uint256) {
         return creditManager.enabledTokensMap(creditAccount);
     }
 

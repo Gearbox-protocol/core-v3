@@ -38,7 +38,7 @@ interface ICreditFacadeMulticall {
     ///         itself and can only be used within a multicall
     function revertIfReceivedLessThan(Balance[] memory expected) external;
 
-    /// @dev Enables token in enabledTokenMask for the Credit Account of msg.sender
+    /// @dev Enables token in enabledTokensMask for the Credit Account of msg.sender
     /// @param token Address of token to enable
     function enableToken(address token) external;
 

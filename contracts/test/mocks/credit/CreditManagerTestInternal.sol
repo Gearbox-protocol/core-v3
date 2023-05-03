@@ -41,17 +41,19 @@ contract CreditManagerTestInternal is CreditManagerV3 {
             _calcNewCumulativeIndex(borrowedAmount, delta, cumulativeIndexNow, cumulativeIndexOpen, isIncrease);
     }
 
-    function calcClosePaymentsPure(
-        uint256 totalValue,
-        ClosureAction closureActionType,
-        uint256 borrowedAmount,
-        uint256 borrowedAmountWithInterest
-    ) external view returns (uint256 amountToPool, uint256 remainingFunds, uint256 profit, uint256 loss) {
-        return calcClosePayments(totalValue, closureActionType, borrowedAmount, borrowedAmountWithInterest);
-    }
+    // function calcClosePaymentsPure(
+    //     uint256 totalValue,
+    //     ClosureAction closureActionType,
+    //     uint256 borrowedAmount,
+    //     uint256 borrowedAmountWithInterest
+    // ) external view returns (uint256 amountToPool, uint256 remainingFunds, uint256 profit, uint256 loss) {
+    //     return calcClosePayments(totalValue, closureActionType, borrowedAmount, borrowedAmountWithInterest);
+    // }
 
-    function transferAssetsTo(address creditAccount, address to, bool convertWETH, uint256 enabledTokenMask) external {
-        _transferAssetsTo(creditAccount, to, convertWETH, enabledTokenMask);
+    function transferAssetsTo(address creditAccount, address to, bool convertWETH, uint256 enabledTokensMask)
+        external
+    {
+        _transferAssetsTo(creditAccount, to, convertWETH, enabledTokensMask);
     }
 
     function safeTokenTransfer(address creditAccount, address token, address to, uint256 amount, bool convertToETH)
@@ -84,8 +86,8 @@ contract CreditManagerTestInternal is CreditManagerV3 {
         return collateralTokensData[tokenMask];
     }
 
-    function setEnabledTokenMask(address creditAccount, uint256 enabledTokenMask) external {
-        creditAccountInfo[creditAccount].enabledTokensMask = uint248(enabledTokenMask);
+    function setenabledTokensMask(address creditAccount, uint256 enabledTokensMask) external {
+        creditAccountInfo[creditAccount].enabledTokensMask = uint248(enabledTokensMask);
     }
 
     function getSlotBytes(uint256 slotNum) external view returns (bytes32 slotVal) {

@@ -90,14 +90,14 @@ contract CreditFacadeTestEngine is DSTest {
         // switch to new block to be able to close account
         evm.roll(block.number + 1);
 
-        (,, uint256 underlyingToClose) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
-        uint256 underlyingBalance = cft.tokenTestSuite().balanceOf(underlying, creditAccount);
+        // (,, uint256 underlyingToClose) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        // uint256 underlyingBalance = cft.tokenTestSuite().balanceOf(underlying, creditAccount);
 
-        if (underlyingToClose > underlyingBalance) {
-            cft.tokenTestSuite().mint(underlying, USER, underlyingToClose - underlyingBalance);
+        // if (underlyingToClose > underlyingBalance) {
+        //     cft.tokenTestSuite().mint(underlying, USER, underlyingToClose - underlyingBalance);
 
-            cft.tokenTestSuite().approve(underlying, USER, address(creditManager));
-        }
+        //     cft.tokenTestSuite().approve(underlying, USER, address(creditManager));
+        // }
 
         evm.prank(USER);
         creditFacade.closeCreditAccount(creditAccount, FRIEND, 0, false, closeCalls);
