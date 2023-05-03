@@ -361,9 +361,9 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         view
         returns (uint256 value, uint256 interest)
     {
-        AccountQuota storage q = accountQuotas[creditManager][creditAccount][token];
+        AccountQuota storage accountQuota = accountQuotas[creditManager][creditAccount][token];
 
-        uint96 quoted = q.quota;
+        uint96 quoted = accountQuota.quota;
 
         if (quoted > 1) {
             uint256 quotaValueUSD = IPriceOracleV2(_priceOracle).convertToUSD(quoted, underlying); // F:[CMQ-8]
@@ -373,7 +373,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
                 if (value > quotaValueUSD) value = quotaValueUSD; // F:[CMQ-8]
             }
 
-            interest = _computeOutstandingQuotaInterest(quoted, cumulativeIndex(token), q.cumulativeIndexLU); // F:[CMQ-8]
+            interest = _computeOutstandingQuotaInterest(quoted, cumulativeIndex(token), accountQuota.cumulativeIndexLU); // F:[CMQ-8]
         }
     }
 
