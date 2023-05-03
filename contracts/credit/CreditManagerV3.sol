@@ -32,7 +32,7 @@ import {
 } from "../interfaces/ICreditManagerV3.sol";
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {IPoolQuotaKeeper, QuotaUpdate, TokenLT} from "../interfaces/IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeper, QuotaUpdate} from "../interfaces/IPoolQuotaKeeper.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 // CONSTANTS
@@ -292,7 +292,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         // Checks that the Credit Account exists for the borrower
         address borrower = getBorrowerOrRevert(creditAccount); // F:[CM-6, 9, 10]
 
-        // Sets borrower's Credit Account to zero address in the map
+        // Sets borrower's Credit Account to zero address
         creditAccountInfo[creditAccount].borrower = address(0); // F:[CM-9]
 
         // Makes all computations needed to close credit account
@@ -311,8 +311,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         }
 
         if (supportsQuotas) {
-            TokenLT[] memory tokens;
-            tokens = _getQuotedTokens(enabledTokenMask);
+            (address[] memory tokens,) = _getQuotedTokens(enabledTokenMask);
 
             if (tokens.length > 0) {
                 poolQuotaKeeper().removeQuotas(creditAccount, tokens); // F: [CMQ-6]
@@ -500,7 +499,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         uint16 _feeInterest = feeInterest;
         uint256 quotaInterestAccrued = creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1;
 
-        TokenLT[] memory tokens = _getQuotedTokens(enabledTokenMask);
+        (address[] memory tokens,) = _getQuotedTokens(enabledTokenMask);
         if (tokens.length > 0) {
             quotaInterestAccrued += poolQuotaKeeper().accrueQuotaInterest(creditAccount, tokens); // F: [CMQ-4,5]
         }
@@ -802,12 +801,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         view
         returns (uint256 totalValueUSD, uint256 twvUSD, uint256 quotaInterest)
     {
-        TokenLT[] memory tokens = _getQuotedTokens(enabledTokenMask);
+        (address[] memory tokens, uint256[] memory lts) = _getQuotedTokens(enabledTokenMask);
 
         if (tokens.length > 0) {
             /// If credit account has any connected token - then check that
             (totalValueUSD, twvUSD, quotaInterest) = poolQuotaKeeper().computeQuotedCollateralUSD(
-                address(this), creditAccount, address(_priceOracle), tokens
+                address(this), creditAccount, address(_priceOracle), tokens, lts
             ); // F: [CMQ-8]
         }
 
@@ -918,23 +917,27 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     }
 
     /// @dev Returns the array of quoted tokens that are enabled on the account
-    function getQuotedTokens(address creditAccount) public view returns (TokenLT[] memory tokens) {
-        return _getQuotedTokens(enabledTokensMap(creditAccount));
+    function getQuotedTokens(address creditAccount) public view returns (address[] memory tokens) {
+        (tokens,) = _getQuotedTokens(enabledTokensMap(creditAccount));
     }
 
-    function _getQuotedTokens(uint256 enabledTokensMask) internal view returns (TokenLT[] memory tokens) {
+    function _getQuotedTokens(uint256 enabledTokensMask)
+        internal
+        view
+        returns (address[] memory tokens, uint256[] memory lts)
+    {
         uint256 quotedMask = enabledTokensMask & quotedTokenMask;
 
         if (quotedMask > 0) {
-            tokens = new TokenLT[](maxAllowedEnabledTokenLength + 1);
+            tokens = new address[](maxAllowedEnabledTokenLength );
+            lts = new uint256[](maxAllowedEnabledTokenLength );
 
             uint256 j;
 
             unchecked {
                 for (uint256 tokenMask = 2; tokenMask <= quotedMask; tokenMask <<= 1) {
                     if (quotedMask & tokenMask != 0) {
-                        (address token, uint16 lt) = collateralTokensByMask(tokenMask);
-                        tokens[j] = TokenLT({token: token, lt: lt});
+                        (tokens[j], lts[j]) = collateralTokensByMask(tokenMask);
                         ++j;
                     }
                 }
@@ -1223,7 +1226,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         uint256 quotaInterest;
 
         if (supportsQuotas) {
-            TokenLT[] memory tokens = getQuotedTokens(creditAccount);
+            address[] memory tokens = getQuotedTokens(creditAccount);
 
             quotaInterest = creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1;
 
@@ -1408,30 +1411,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     // CONFIGURATION
     //
 
-    /// @dev Sets the liquidation threshold for a collateral token
-    /// @notice Liquidation thresholds are weights used to compute
-    ///         TWV with. They denote the risk of the token, with
-    ///         more volatile and unpredictable tokens having lower LTs.
-    /// @param token The collateral token to set the LT for
-    /// @param liquidationThreshold The new LT
-    function setLiquidationThreshold(address token, uint16 liquidationThreshold)
-        external
-        creditConfiguratorOnly // F:[CM-4]
-    {
-        // Underlying is a special case and its LT is stored in Slot1,
-        // to be accessed frequently
-        if (token == underlying) {
-            // F:[CM-47]
-            ltUnderlying = liquidationThreshold; // F:[CM-47]
-        } else {
-            uint256 tokenMask = getTokenMaskOrRevert(token); // F:[CM-47, 54]
-
-            CollateralTokenData memory tokenData = collateralTokensData[tokenMask];
-
-            _setLTRampParams(tokenData, tokenMask, liquidationThreshold, liquidationThreshold, type(uint40).max, 0); // F:[CM-47]
-        }
-    }
-
     /// @dev Sets ramping parameters for a token's liquidation threshold
     /// @notice Ramping parameters allow to decrease the LT gradually over a period of time
     ///         which gives users/bots time to react and adjust their position for the new LT
@@ -1439,34 +1418,27 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     /// @param finalLT The final LT after ramping
     /// @param timestampRampStart Timestamp when the LT starts ramping
     /// @param rampDuration Duration of ramping
-    function rampLiquidationThreshold(address token, uint16 finalLT, uint40 timestampRampStart, uint24 rampDuration)
-        external
-        creditConfiguratorOnly
-    {
-        uint256 tokenMask = getTokenMaskOrRevert(token);
-
-        if (tokenMask == 1) revert CannotRampLTForUnderlyingException();
-
-        CollateralTokenData memory tokenData = collateralTokensData[tokenMask];
-
-        _setLTRampParams(tokenData, tokenMask, tokenData.ltInitial, finalLT, timestampRampStart, rampDuration); // F: [CM-71]
-    }
-
-    /// @dev Internal function that sets the LT params
-    function _setLTRampParams(
-        CollateralTokenData memory tokenData,
-        uint256 tokenMask,
-        uint16 ltInitial,
-        uint16 ltFinal,
+    function setLiquidationThreshold(
+        address token,
+        uint16 initialLT,
+        uint16 finalLT,
         uint40 timestampRampStart,
         uint24 rampDuration
-    ) internal {
-        tokenData.ltInitial = ltInitial;
-        tokenData.ltFinal = ltFinal;
-        tokenData.timestampRampStart = timestampRampStart;
-        tokenData.rampDuration = rampDuration;
+    ) external creditConfiguratorOnly {
+        if (token == underlying) {
+            // F:[CM-47]
+            ltUnderlying = initialLT; // F:[CM-47]
+        } else {
+            uint256 tokenMask = getTokenMaskOrRevert(token);
+            CollateralTokenData memory tokenData = collateralTokensData[tokenMask];
 
-        collateralTokensData[tokenMask] = tokenData;
+            tokenData.ltInitial = initialLT;
+            tokenData.ltFinal = finalLT;
+            tokenData.timestampRampStart = timestampRampStart;
+            tokenData.rampDuration = rampDuration;
+
+            collateralTokensData[tokenMask] = tokenData;
+        }
     }
 
     /// @dev Sets the limited token mask

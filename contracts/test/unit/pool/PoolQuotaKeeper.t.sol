@@ -9,7 +9,6 @@ import {
     IPoolQuotaKeeper,
     QuotaUpdate,
     IPoolQuotaKeeperEvents,
-    TokenLT,
     TokenQuotaParams
 } from "../../../interfaces/IPoolQuotaKeeper.sol";
 import {IGauge} from "../../../interfaces/IGauge.sol";
@@ -130,12 +129,11 @@ contract PoolQuotaKeeperTest is DSTest, BalanceHelper, IPoolQuotaKeeperEvents {
         evm.expectRevert(CallerNotCreditManagerException.selector);
         pqk.updateQuotas(DUMB_ADDRESS, quotaUpdates);
 
-        TokenLT[] memory tokensLT = new TokenLT[](1);
         evm.expectRevert(CallerNotCreditManagerException.selector);
-        pqk.removeQuotas(DUMB_ADDRESS, tokensLT);
+        pqk.removeQuotas(DUMB_ADDRESS, new address[](1));
 
         evm.expectRevert(CallerNotCreditManagerException.selector);
-        pqk.accrueQuotaInterest(DUMB_ADDRESS, tokensLT);
+        pqk.accrueQuotaInterest(DUMB_ADDRESS, new address[](1));
         evm.stopPrank();
     }
 

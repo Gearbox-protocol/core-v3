@@ -8,7 +8,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {CreditManagerV3, ClosureAction} from "../../../credit/CreditManagerV3.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {IPoolQuotaKeeper, QuotaUpdate, TokenLT} from "../../../interfaces/IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeper, QuotaUpdate} from "../../../interfaces/IPoolQuotaKeeper.sol";
 import {CollateralTokenData} from "../../../interfaces/ICreditManagerV3.sol";
 
 // EXCEPTIONS

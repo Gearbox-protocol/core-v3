@@ -81,7 +81,13 @@ contract CreditManagerTestSuite is PoolDeployer {
             if (collateralTokens[i].token != underlying) {
                 address token = collateralTokens[i].token;
                 creditManager.addToken(token);
-                creditManager.setLiquidationThreshold(token, collateralTokens[i].liquidationThreshold);
+                creditManager.setLiquidationThreshold(
+                    token,
+                    collateralTokens[i].liquidationThreshold,
+                    collateralTokens[i].liquidationThreshold,
+                    type(uint40).max,
+                    0
+                );
             }
         }
 
@@ -132,7 +138,11 @@ contract CreditManagerTestSuite is PoolDeployer {
         // Set up real value, which should be configired before CM would be launched
         evm.prank(CONFIGURATOR);
         creditManager.setLiquidationThreshold(
-            underlying, uint16(PERCENTAGE_FACTOR - DEFAULT_FEE_LIQUIDATION - DEFAULT_LIQUIDATION_PREMIUM)
+            underlying,
+            uint16(PERCENTAGE_FACTOR - DEFAULT_FEE_LIQUIDATION - DEFAULT_LIQUIDATION_PREMIUM),
+            uint16(PERCENTAGE_FACTOR - DEFAULT_FEE_LIQUIDATION - DEFAULT_LIQUIDATION_PREMIUM),
+            type(uint40).max,
+            0
         );
 
         borrowedAmount = _borrowedAmount;

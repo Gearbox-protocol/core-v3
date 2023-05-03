@@ -15,7 +15,7 @@ import {
     CollateralTokenData,
     ManageDebtAction
 } from "../../../interfaces/ICreditManagerV3.sol";
-import {IPoolQuotaKeeper, QuotaUpdate, TokenLT, AccountQuota} from "../../../interfaces/IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeper, QuotaUpdate, AccountQuota} from "../../../interfaces/IPoolQuotaKeeper.sol";
 import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
@@ -114,7 +114,7 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
             evm.startPrank(CONFIGURATOR);
             creditManager.addToken(address(t));
             IPriceOracleV2Ext(address(priceOracle)).addPriceFeed(address(t), address(pf));
-            creditManager.setLiquidationThreshold(address(t), 8000);
+            creditManager.setLiquidationThreshold(address(t), 8000, 8000, type(uint40).max, 0);
             evm.stopPrank();
 
             _addQuotedToken(address(t), 100, type(uint96).max);
@@ -649,17 +649,10 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
 
         uint256 enabledTokensMap = tokensToEnable | UNDERLYING_TOKEN_MASK;
 
-        TokenLT[] memory quotedTokens = new TokenLT[](creditManager.maxAllowedEnabledTokenLength() + 1);
+        address[] memory quotedTokens = new address[](creditManager.maxAllowedEnabledTokenLength() + 1);
 
-        quotedTokens[1] = TokenLT({
-            token: tokenTestSuite.addressOf(Tokens.LINK),
-            lt: creditManager.liquidationThresholds(tokenTestSuite.addressOf(Tokens.LINK))
-        });
-
-        quotedTokens[0] = TokenLT({
-            token: tokenTestSuite.addressOf(Tokens.USDT),
-            lt: creditManager.liquidationThresholds(tokenTestSuite.addressOf(Tokens.USDT))
-        });
+        quotedTokens[0] = tokenTestSuite.addressOf(Tokens.LINK);
+        quotedTokens[1] = tokenTestSuite.addressOf(Tokens.USDT);
 
         evm.expectCall(address(poolQuotaKeeper), abi.encodeCall(IPoolQuotaKeeper.setLimitsToZero, (quotedTokens)));
 
@@ -676,9 +669,9 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
         );
 
         for (uint256 i = 0; i < quotedTokens.length; ++i) {
-            if (quotedTokens[i].token == address(0)) continue;
+            if (quotedTokens[i] == address(0)) continue;
 
-            (, uint96 limit,,) = poolQuotaKeeper.totalQuotaParams(quotedTokens[i].token);
+            (, uint96 limit,,) = poolQuotaKeeper.totalQuotaParams(quotedTokens[i]);
 
             assertEq(limit, 1, "Limit was not zeroed");
         }

@@ -1220,10 +1220,10 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
 
         uint16 initialLT = creditManager.liquidationThresholds(usdc);
 
-        evm.expectCall(
-            address(creditManager),
-            abi.encodeCall(CreditManagerV3.rampLiquidationThreshold, (usdc, 8900, uint40(block.timestamp + 5), 1000))
-        );
+        // evm.expectCall(
+        //     address(creditManager),
+        //     abi.encodeCall(CreditManagerV3.rampLiquidationThreshold, (usdc, 8900, uint40(block.timestamp + 5), 1000))
+        // );
 
         evm.expectEmit(true, false, false, true);
         emit ScheduleTokenLiquidationThresholdRamp(

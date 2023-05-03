@@ -4,7 +4,7 @@
 pragma solidity ^0.8.10;
 
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {IPoolQuotaKeeper, QuotaUpdate, TokenLT} from "./IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeper, QuotaUpdate} from "./IPoolQuotaKeeper.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 import {CancellationType} from "./IWithdrawManager.sol";
 
@@ -230,7 +230,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
         returns (address token, uint16 liquidationThreshold);
 
     /// @dev Returns the array of quoted tokens that are enabled on the account
-    function getQuotedTokens(address creditAccount) external view returns (TokenLT[] memory tokens);
+    function getQuotedTokens(address creditAccount) external view returns (address[] memory tokens);
 
     /// @dev Total number of known collateral tokens.
     function collateralTokensCount() external view returns (uint8);

@@ -122,7 +122,7 @@ contract CreditFacadeGasTest is
             (address token,) = creditManager.collateralTokens(i);
 
             evm.prank(address(creditConfigurator));
-            CreditManagerV3(address(creditManager)).setLiquidationThreshold(token, 0);
+            CreditManagerV3(address(creditManager)).setLiquidationThreshold(token, 0, 0, type(uint40).max, 0);
         }
     }
 

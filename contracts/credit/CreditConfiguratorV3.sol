@@ -207,7 +207,10 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
 
         if (currentLT != liquidationThreshold) {
             // Sets the LT in Credit Manager, where token existence is checked
-            creditManager.setLiquidationThreshold(token, liquidationThreshold); // F:[CC-6]
+            //  _setLTRampParams(tokenData, tokenMask, , 0);
+            creditManager.setLiquidationThreshold(
+                token, liquidationThreshold, liquidationThreshold, type(uint40).max, 0
+            ); // F:[CC-6]
             emit SetTokenLiquidationThreshold(token, liquidationThreshold); // F:[CC-6]
         }
     }
@@ -235,7 +238,9 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
 
         if (currentLT != liquidationThresholdFinal) {
             // Sets the LT in Credit Manager, where token existence is checked
-            creditManager.rampLiquidationThreshold(token, liquidationThresholdFinal, timestampRampStart, rampDuration);
+            creditManager.setLiquidationThreshold(
+                token, currentLT, liquidationThresholdFinal, timestampRampStart, rampDuration
+            );
             emit ScheduleTokenLiquidationThresholdRamp(
                 token, currentLT, liquidationThresholdFinal, timestampRampStart, timestampRampStart + rampDuration
             );
@@ -545,20 +550,17 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     /// @dev Updates Liquidation threshold for the underlying asset
     /// @param ltUnderlying New LT for the underlying
     function _updateLiquidationThreshold(uint16 ltUnderlying) internal {
-        creditManager.setLiquidationThreshold(underlying, ltUnderlying); // F:[CC-25]
+        creditManager.setLiquidationThreshold(underlying, ltUnderlying, ltUnderlying, type(uint40).max, 0); // F:[CC-25]
 
         // An LT of an ordinary collateral token cannot be larger than the LT of underlying
         // As such, all LTs need to be checked and reduced if needed
         uint256 len = creditManager.collateralTokensCount();
-        for (uint256 i = 1; i < len;) {
-            (address token, uint16 lt) = creditManager.collateralTokens(i);
-            if (lt > ltUnderlying) {
-                creditManager.setLiquidationThreshold(token, ltUnderlying); // F:[CC-25]
-                emit SetTokenLiquidationThreshold(token, ltUnderlying); // F:[CC-1A,25]
-            }
-
-            unchecked {
-                ++i;
+        unchecked {
+            for (uint256 i = 1; i < len; ++i) {
+                (address token, uint16 lt) = creditManager.collateralTokens(i);
+                if (lt > ltUnderlying) {
+                    _setLiquidationThreshold(token, ltUnderlying); // F:[CC-25]
+                }
             }
         }
     }

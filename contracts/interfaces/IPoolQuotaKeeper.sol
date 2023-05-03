@@ -14,11 +14,6 @@ struct QuotaUpdate {
     int96 quotaChange;
 }
 
-struct TokenLT {
-    address token;
-    uint16 lt;
-}
-
 struct TokenQuotaParams {
     uint96 totalQuoted;
     uint96 limit;
@@ -62,17 +57,17 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
 
     /// @dev Updates all quotas to zero when closing a credit account, and computes the final quota interest change
     /// @param creditAccount Address of the Credit Account being closed
-    /// @param tokensLT Array of all active quoted tokens on the account
-    function removeQuotas(address creditAccount, TokenLT[] memory tokensLT) external;
+    /// @param tokens Array of all active quoted tokens on the account
+    function removeQuotas(address creditAccount, address[] memory tokens) external;
 
     /// @dev Sets limits for a number of tokens to zero, preventing further quota increases
     /// @notice Triggered by the Credit Manager when there is loss during liquidation
-    function setLimitsToZero(TokenLT[] memory tokensLT) external;
+    function setLimitsToZero(address[] memory tokens) external;
 
     /// @dev Computes the accrued quota interest and updates interest indexes
     /// @param creditAccount Address of the Credit Account to accrue interest for
-    /// @param tokensLT Array of all active quoted tokens on the account
-    function accrueQuotaInterest(address creditAccount, TokenLT[] memory tokensLT)
+    /// @param tokens Array of all active quoted tokens on the account
+    function accrueQuotaInterest(address creditAccount, address[] memory tokens)
         external
         returns (uint256 caQuotaInterestChange);
 
@@ -117,11 +112,12 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
         address creditManager,
         address creditAccount,
         address _priceOracle,
-        TokenLT[] memory tokens
+        address[] memory tokens,
+        uint256[] memory lts
     ) external view returns (uint256 totalValue, uint256 twv, uint256 totalQuotaInterest);
 
     /// @dev Computes outstanding quota interest
-    function outstandingQuotaInterest(address creditManager, address creditAccount, TokenLT[] memory tokens)
+    function outstandingQuotaInterest(address creditManager, address creditAccount, address[] memory tokens)
         external
         view
         returns (uint256 caQuotaInterestChange);
