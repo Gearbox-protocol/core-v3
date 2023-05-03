@@ -5,7 +5,7 @@ pragma solidity ^0.8.10;
 
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IPoolQuotaKeeper, QuotaUpdate, TokenLT} from "./IPoolQuotaKeeper.sol";
-import {IWithdrawalManager} from "./IWithdrawalManager.sol";
+import {CancelAction, ClaimAction, IWithdrawalManager} from "./IWithdrawalManager.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 enum ClosureAction {
@@ -307,7 +307,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @dev Address of the connected Price Oracle
     function priceOracle() external view returns (IPriceOracleV2);
 
-    function calcTotalValue(address creditAccount)
+    function calcTotalValue(address creditAccount, CancelAction action)
         external
         view
         returns (uint256 enabledTokenMask, uint256 total, uint256 twv, uint256 debtWithInterest, bool canBeLiquidated);
@@ -315,13 +315,15 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @dev Withdrawal manager
     function withdrawalManager() external view returns (IWithdrawalManager);
 
-    function withdraw(address creditAccount, address token, uint256 amount)
+    function scheduleWithdrawal(address creditAccount, address token, uint256 amount)
         external
         returns (uint256 tokensToDisable);
 
-    function cancelWithdrawals(address creditAccount, bool forceClaim) external returns (uint256 tokensToEnable);
+    function cancelWithdrawals(address creditAccount, address to, CancelAction action)
+        external
+        returns (uint256 tokensToEnable);
 
-    function disableWithdrawalFlag(address creditAccount) external;
+    function claimWithdrawals(address creditAccount, address to, ClaimAction action) external;
 
     /// @notice Revokes allowances for specified spender/token pairs
     /// @param revocations Spender/token pairs to revoke allowances for

@@ -3,33 +3,30 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {
     CallerNotCreditManagerException,
     NoFreeWithdrawalSlotsException,
     NothingToClaimException
 } from "../interfaces/IExceptions.sol";
-import {IWithdrawalManager, IVersion, ScheduledWithdrawal} from "../interfaces/IWithdrawalManager.sol";
+import {
+    CancelAction,
+    ClaimAction,
+    IWithdrawalManager,
+    IVersion,
+    ScheduledWithdrawal
+} from "../interfaces/IWithdrawalManager.sol";
 import {Withdrawals} from "../libraries/Withdrawals.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
 
 /// @title Withdrawal manager
 /// @notice Contract that handles withdrawals from credit accounts.
 ///         There are two kinds of withdrawals: immediate and scheduled.
-///         - Immediate withdrawals can be claimed, well, immediately, and exist to support liquidation of accounts
-///           whose owners are blacklisted in credit manager's underlying.
-///           Also, when scheduled withdrawals are claimed, they turn into immediate withdrawals.
+///         - Immediate withdrawals can be claimed, well, immediately, and exist to support blacklistable tokens.
 ///         - Scheduled withdrawals can be claimed after a certain delay, and exist to support partial withdrawals
-///           from credit accounts. One credit account can have up to two immature withdrawals at the same time.
-///           Additional rules for scheduled withdrawals:
-///           + if account is closed, both mature and immature withdrawals are claimed
-///           + if account is liquidated, immature withdrawals are cancelled and mature ones are claimed
-///           + if account is liquidated in emergency mode, both mature and immature withdrawals are cancelled
-///           + in emergency mode, claiming is disabled
+///           from credit accounts. One credit account can have up to two scheduled withdrawals at the same time.
 contract WithdrawalManager is IWithdrawalManager, ACLTrait {
     using SafeERC20 for IERC20;
     using Withdrawals for ScheduledWithdrawal;
@@ -47,8 +44,8 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait {
     /// @inheritdoc IWithdrawalManager
     uint40 public override delay;
 
-    /// @dev Mapping credit manager => credit account => scheduled withdrawals
-    mapping(address => mapping(address => ScheduledWithdrawal[2])) private _scheduled;
+    /// @dev Mapping credit account => scheduled withdrawals
+    mapping(address => ScheduledWithdrawal[2]) private _scheduled;
 
     /// @notice Ensures that caller of the function is one of registered credit managers
     modifier creditManagerOnly() {
@@ -80,17 +77,10 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait {
 
     /// @inheritdoc IWithdrawalManager
     function claimImmediateWithdrawal(address token, address to) external override {
-        uint256 amount = immediateWithdrawals[msg.sender][token];
-        if (amount < 2) revert NothingToClaimException();
-        unchecked {
-            --amount;
-        }
-        immediateWithdrawals[msg.sender][token] = 1;
-        IERC20(token).safeTransfer(to, amount);
-        emit ClaimImmediateWithdrawal(msg.sender, token, to, amount);
+        _claimImmediateWithdrawal(msg.sender, token, to);
     }
 
-    /// @dev Increases account's immediately withdrawable balance of token
+    /// @dev Increases `account`'s immediately withdrawable balance of `token` by `amount`
     function _addImmediateWithdrawal(address account, address token, uint256 amount) internal {
         if (amount > 1) {
             immediateWithdrawals[account][token] += amount;
@@ -98,140 +88,135 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait {
         }
     }
 
+    /// @dev Sends all `account`'s immediately withdrawable balance of `token` to `to`
+    function _claimImmediateWithdrawal(address account, address token, address to) internal {
+        uint256 amount = immediateWithdrawals[account][token];
+        if (amount < 2) revert NothingToClaimException();
+        unchecked {
+            --amount;
+        }
+        immediateWithdrawals[account][token] = 1;
+        IERC20(token).safeTransfer(to, amount);
+        emit ClaimImmediateWithdrawal(account, token, to, amount);
+    }
+
     /// --------------------- ///
     /// SCHEDULED WITHDRAWALS ///
     /// --------------------- ///
 
     /// @inheritdoc IWithdrawalManager
-    function scheduledWithdrawals(address creditManager, address creditAccount)
+    function scheduledWithdrawals(address creditAccount)
         external
         view
         override
         returns (ScheduledWithdrawal[2] memory)
     {
-        return _scheduled[creditManager][creditAccount];
+        return _scheduled[creditAccount];
     }
 
     /// @inheritdoc IWithdrawalManager
-    function cancellableScheduledWithdrawals(address creditManager, address creditAccount)
+    function cancellableScheduledWithdrawals(address creditAccount, CancelAction action)
         external
         view
         override
-        returns (uint256[2] memory tokenMasks, uint256[2] memory amounts)
+        returns (address[2] memory tokens, uint256[2] memory amounts)
     {
-        ScheduledWithdrawal[2] memory withdrawals = _scheduled[creditManager][creditAccount];
-        (bool[2] memory initialized, bool[2] memory claimable) =
-            withdrawals.status({isEmergency: _isEmergency(creditManager), forceClaim: false});
+        ScheduledWithdrawal[2] memory withdrawals = _scheduled[creditAccount];
+        (, bool[2] memory cancellable) = withdrawals.getCancellable(action);
 
         unchecked {
             for (uint8 i; i < 2; ++i) {
-                if (initialized[i] && !claimable[i]) (tokenMasks[i], amounts[i]) = withdrawals[i].tokenMaskAndAmount();
+                if (cancellable[i]) (tokens[i],, amounts[i]) = withdrawals[i].tokenMaskAndAmount();
             }
         }
     }
 
     /// @inheritdoc IWithdrawalManager
-    function claimableScheduledWithdrawals(address creditManager, address creditAccount)
+    function addScheduledWithdrawal(address creditAccount, address token, uint256 amount, uint8 tokenIndex)
         external
-        view
         override
-        returns (uint256[2] memory tokenMasks, uint256[2] memory amounts)
+        creditManagerOnly
     {
-        ScheduledWithdrawal[2] memory withdrawals = _scheduled[creditManager][creditAccount];
-        (, bool[2] memory claimable) = withdrawals.status({isEmergency: _isEmergency(creditManager), forceClaim: false});
-
-        unchecked {
-            for (uint8 i; i < 2; ++i) {
-                if (claimable[i]) (tokenMasks[i], amounts[i]) = withdrawals[i].tokenMaskAndAmount();
-            }
-        }
-    }
-
-    /// @inheritdoc IWithdrawalManager
-    function addScheduledWithdrawal(
-        address creditAccount,
-        address borrower,
-        address token,
-        uint256 amount,
-        uint8 tokenIndex
-    ) external override creditManagerOnly {
-        ScheduledWithdrawal[2] memory withdrawals = _scheduled[msg.sender][creditAccount];
-        (bool found, bool claim, uint8 slot) = withdrawals.findFreeSlot();
+        ScheduledWithdrawal[2] memory withdrawals = _scheduled[creditAccount];
+        (bool found, uint8 slot) = withdrawals.findFreeSlot();
         if (!found) revert NoFreeWithdrawalSlotsException();
-        if (claim) _executeWithdrawal(msg.sender, creditAccount, withdrawals[slot], true);
 
         uint40 maturity = uint40(block.timestamp) + delay;
-        _scheduled[msg.sender][creditAccount][slot] =
-            ScheduledWithdrawal({tokenIndex: tokenIndex, borrower: borrower, maturity: maturity, amount: amount});
-        emit AddScheduledWithdrawal(creditAccount, borrower, token, amount, maturity);
+        _scheduled[creditAccount][slot] =
+            ScheduledWithdrawal({tokenIndex: tokenIndex, token: token, maturity: maturity, amount: amount});
+        emit AddScheduledWithdrawal(creditAccount, token, amount, maturity);
     }
 
     /// @inheritdoc IWithdrawalManager
-    function cancelScheduledWithdrawals(address creditAccount, bool forceClaim)
+    function cancelScheduledWithdrawals(address creditAccount, address to, CancelAction action)
         external
         override
         creditManagerOnly
         returns (uint256 tokensToEnable)
     {
-        ScheduledWithdrawal[2] memory withdrawals = _scheduled[msg.sender][creditAccount];
-        (bool[2] memory initialized, bool[2] memory claimable) =
-            withdrawals.status({isEmergency: _isEmergency(msg.sender), forceClaim: forceClaim});
+        ScheduledWithdrawal[2] memory withdrawals = _scheduled[creditAccount];
+        (bool[2] memory initialized, bool[2] memory cancellable) = withdrawals.getCancellable(action);
 
         unchecked {
             for (uint8 i; i < 2; ++i) {
                 if (initialized[i]) {
-                    tokensToEnable |= _executeWithdrawal(msg.sender, creditAccount, withdrawals[i], claimable[i]);
-                    _scheduled[msg.sender][creditAccount][i] = withdrawals[i];
+                    if (cancellable[i]) {
+                        tokensToEnable |= _cancel(withdrawals[i], creditAccount);
+                    } else {
+                        _claim(withdrawals[i], creditAccount, to, false);
+                    }
+                    _scheduled[creditAccount][i] = withdrawals[i];
                 }
             }
         }
     }
 
     /// @inheritdoc IWithdrawalManager
-    function claimScheduledWithdrawals(address creditManager, address creditAccount) external override {
-        ScheduledWithdrawal[2] memory withdrawals = _scheduled[creditManager][creditAccount];
-        (, bool[2] memory claimable) = withdrawals.status({isEmergency: _isEmergency(creditManager), forceClaim: false});
+    function claimScheduledWithdrawals(address creditAccount, address to, ClaimAction action)
+        external
+        override
+        creditManagerOnly
+        returns (bool)
+    {
+        ScheduledWithdrawal[2] memory withdrawals = _scheduled[creditAccount];
+        bool[2] memory claimable = withdrawals.getClaimable(action);
         if (!(claimable[0] || claimable[1])) revert NothingToClaimException();
 
         unchecked {
             for (uint8 i; i < 2; ++i) {
                 if (claimable[i]) {
-                    _executeWithdrawal(creditManager, creditAccount, withdrawals[i], true);
-                    _scheduled[creditManager][creditAccount][i] = withdrawals[i];
+                    _claim(withdrawals[i], creditAccount, to, true);
+                    _scheduled[creditAccount][i] = withdrawals[i];
                 }
             }
         }
 
-        if (withdrawals.bothSlotsEmpty()) {
-            ICreditManagerV3(creditManager).disableWithdrawalFlag(creditAccount);
-        }
+        return !withdrawals.bothSlotsEmpty();
     }
 
-    /// @dev Claims or cancels scheduled withdrawal, clears withdrawal slot in memory
-    function _executeWithdrawal(
-        address creditManager,
-        address creditAccount,
-        ScheduledWithdrawal memory withdrawal,
-        bool isClaim
-    ) internal returns (uint256 tokensToEnable) {
-        (uint256 tokenMask, uint256 amount) = withdrawal.tokenMaskAndAmount();
-        (address token,) = ICreditManagerV3(creditManager).collateralTokensByMask(tokenMask);
-
-        if (isClaim) {
-            emit ClaimScheduledWithdrawal(creditAccount, token, amount);
-            _addImmediateWithdrawal(withdrawal.borrower, token, amount);
-        } else {
-            emit CancelScheduledWithdrawal(creditAccount, token, amount);
-            IERC20(token).safeTransfer(creditAccount, amount);
-            tokensToEnable = tokenMask;
-        }
-
+    /// @dev Cancels withdrawal, clears withdrawal in memory
+    function _cancel(ScheduledWithdrawal memory withdrawal, address creditAccount)
+        internal
+        returns (uint256 tokensToEnable)
+    {
+        (address token, uint256 tokenMask, uint256 amount) = withdrawal.tokenMaskAndAmount();
         withdrawal.clear();
+        emit CancelScheduledWithdrawal(creditAccount, token, amount);
+        IERC20(token).safeTransfer(creditAccount, amount);
+        tokensToEnable = tokenMask;
     }
 
-    /// @dev Returns true if facade connected to a given credit manager is paused
-    function _isEmergency(address creditManager) internal view returns (bool) {
-        return Pausable(ICreditManagerV3(creditManager).creditFacade()).paused();
+    /// @dev Claims withdrawal, clears withdrawal in memory
+    function _claim(ScheduledWithdrawal memory withdrawal, address creditAccount, address to, bool send) internal {
+        (address token,, uint256 amount) = withdrawal.tokenMaskAndAmount();
+        withdrawal.clear();
+        emit ClaimScheduledWithdrawal(creditAccount, token, to, amount);
+        // TODO: change logic, try to send to `to`, if fails -- add immediate withdrawal
+        if (send) {
+            IERC20(token).safeTransfer(to, amount);
+        } else {
+            _addImmediateWithdrawal(to, token, amount);
+        }
     }
 
     /// ------------- ///

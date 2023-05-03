@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {ScheduledWithdrawal} from "../interfaces/IWithdrawalManager.sol";
+import {CancelAction, ClaimAction, ScheduledWithdrawal} from "../interfaces/IWithdrawalManager.sol";
 
 library Withdrawals {
     function clear(ScheduledWithdrawal memory w) internal pure {
@@ -26,48 +26,47 @@ library Withdrawals {
     function tokenMaskAndAmount(ScheduledWithdrawal memory w)
         internal
         pure
-        returns (uint256 tokenMask, uint256 amount)
+        returns (address token, uint256 mask, uint256 amount)
     {
         if (w.amount > 1) {
             unchecked {
-                tokenMask = 1 << w.tokenIndex;
+                token = w.token;
+                mask = 1 << w.tokenIndex;
                 amount = w.amount - 1;
             }
         }
     }
 
-    function status(ScheduledWithdrawal[2] memory ws, bool isEmergency, bool forceClaim)
+    function getCancellable(ScheduledWithdrawal[2] memory ws, CancelAction action)
         internal
         view
-        returns (bool[2] memory initialized, bool[2] memory claimable)
+        returns (bool[2] memory initialized, bool[2] memory cancellable)
     {
         unchecked {
             for (uint8 i; i < 2; ++i) {
                 initialized[i] = isInitialized(ws[i]);
-                claimable[i] = initialized[i] && !isEmergency && (forceClaim || isMature(ws[i]));
+                cancellable[i] = initialized[i] && (action == CancelAction.FORCE_CANCEL || isImmature(ws[i]));
             }
         }
     }
 
-    function findFreeSlot(ScheduledWithdrawal[2] memory ws)
+    function getClaimable(ScheduledWithdrawal[2] memory ws, ClaimAction action)
         internal
         view
-        returns (bool found, bool claim, uint8 slot)
+        returns (bool[2] memory claimable)
     {
-        (bool[2] memory initialized, bool[2] memory claimable) = status(ws, false, false);
-
         unchecked {
             for (uint8 i; i < 2; ++i) {
-                if (!initialized[i]) {
-                    return (true, false, i);
-                }
+                claimable[i] = isInitialized(ws[i]) && (action == ClaimAction.FORCE_CLAIM || isMature(ws[i]));
             }
         }
+    }
 
+    function findFreeSlot(ScheduledWithdrawal[2] memory ws) internal pure returns (bool found, uint8 slot) {
         unchecked {
             for (uint8 i; i < 2; ++i) {
-                if (claimable[i]) {
-                    return (true, true, i);
+                if (!isInitialized(ws[i])) {
+                    return (true, i);
                 }
             }
         }

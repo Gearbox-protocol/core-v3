@@ -80,7 +80,7 @@ interface ICreditFacadeMulticall {
     ///                        Cannot be lower than PERCENTAGE_FACTOR.
     function setFullCheckParams(uint256[] memory collateralHints, uint16 minHealthFactor) external;
 
-    function withdraw(address token, uint256 amount) external;
+    function scheduleWithdrawal(address token, uint256 amount) external;
 
     function revokeAdapterAllowances(RevocationPair[] calldata revocations) external;
 }

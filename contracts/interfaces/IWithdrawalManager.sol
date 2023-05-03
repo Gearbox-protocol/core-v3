@@ -5,16 +5,31 @@ pragma solidity ^0.8.17;
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
+/// @notice Withdrawal cancellation type
+///         - `CANCEL` returns immature withdrawals to credit account and claims mature ones
+///         - `FORCE_CANCEL` returns all withdrawals to credit account
+enum CancelAction {
+    CANCEL,
+    FORCE_CANCEL
+}
+
+/// @notice Withdrawal claim type
+///         - `CLAIM` only claims mature withdrawals
+///         - `FORCE_CLAIM` claims both mature and immature withdrawals
+enum ClaimAction {
+    CLAIM,
+    FORCE_CLAIM
+}
+
 /// @notice Scheduled withdrawal data
 /// @param tokenIndex Collateral index of withdrawn token in account's credit manager
-/// @param borrower Account owner that should claim tokens
 /// @param maturity Timestamp after which withdrawal can be claimed
+/// @param token Token to withdraw
 /// @param amount Amount to withdraw
-/// @dev Keeping token index instead of mask allows to pack struct into 2 slots
 struct ScheduledWithdrawal {
     uint8 tokenIndex;
-    address borrower;
     uint40 maturity;
+    address token;
     uint256 amount;
 }
 
@@ -34,13 +49,10 @@ interface IWithdrawalManagerEvents {
 
     /// @notice Emitted when new scheduled withdrawal is added
     /// @param creditAccount Account to withdraw from
-    /// @param borrower Account owner that should claim tokens
     /// @param token Token to withdraw
     /// @param amount Amount to withdraw
     /// @param maturity Timestamp after which withdrawal can be claimed
-    event AddScheduledWithdrawal(
-        address indexed creditAccount, address indexed borrower, address indexed token, uint256 amount, uint40 maturity
-    );
+    event AddScheduledWithdrawal(address indexed creditAccount, address indexed token, uint256 amount, uint40 maturity);
 
     /// @notice Emitted when scheduled withdrawal is cancelled
     /// @param creditAccount Account the token is returned to
@@ -51,8 +63,9 @@ interface IWithdrawalManagerEvents {
     /// @notice Emitted when scheduled withdrawal is claimed
     /// @param creditAccount Account withdrawal was made from
     /// @param token Token claimed
+    /// @param to Token recipient
     /// @param amount Amount claimed
-    event ClaimScheduledWithdrawal(address indexed creditAccount, address indexed token, uint256 amount);
+    event ClaimScheduledWithdrawal(address indexed creditAccount, address indexed token, address to, uint256 amount);
 
     /// @notice Emitted when new scheduled withdrawal delay is set by configurator
     /// @param delay New delay for scheduled withdrawals
@@ -91,66 +104,47 @@ interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
     /// @notice Delay for scheduled withdrawals
     function delay() external view returns (uint40);
 
-    /// @notice Returns withdrawals scheduled for a given credit account in raw form,
-    ///         see `ScheduledWithdrawal` for details
-    function scheduledWithdrawals(address creditManager, address creditAccount)
+    /// @notice Returns withdrawals scheduled for a given credit account
+    /// @param creditAccount Account to get withdrawals for
+    /// @return withdrawals See `ScheduledWithdrawal`
+    function scheduledWithdrawals(address creditAccount)
         external
         view
-        returns (ScheduledWithdrawal[2] memory);
+        returns (ScheduledWithdrawal[2] memory withdrawals);
 
     /// @notice Returns scheduled withdrawals for a given credit account that can be cancelled
-    ///         - Under normal operation, these are all immature withdrawals
-    ///         - In emergency mode, all account's scheduled withdrawals can be cancelled
-    function cancellableScheduledWithdrawals(address creditManager, address creditAccount)
+    function cancellableScheduledWithdrawals(address creditAccount, CancelAction action)
         external
         view
-        returns (uint256[2] memory tokenMasks, uint256[2] memory amounts);
+        returns (address[2] memory tokens, uint256[2] memory amounts);
 
-    /// @notice Returns scheduled withdrawals for a given credit account that can be claimed
-    ///         - Under normal operation, these are all mature withdrawals
-    ///         - In emergency mode, claiming is disabled so no withdrawals can be claimed
-    function claimableScheduledWithdrawals(address creditManager, address creditAccount)
-        external
-        view
-        returns (uint256[2] memory tokenMasks, uint256[2] memory amounts);
-
-    /// @notice Schedules withdrawal of given token from the credit account,
-    ///         might claim a mature withdrawal first if it's needed to free the slot
+    /// @notice Schedules withdrawal from the credit account
     /// @param creditAccount Account to withdraw from
-    /// @param borrower Account owner that should claim tokens
     /// @param token Token to withdraw
     /// @param amount Amount to withdraw
     /// @param tokenIndex Collateral index of withdrawn token in account's credit manager
     /// @custom:expects `amount` is greater than 1
     /// @custom:expects Credit manager transferred `amount` of `token` to this contract prior to calling this function
-    /// @custom:expects Credit manager is not in emergency mode
-    function addScheduledWithdrawal(
-        address creditAccount,
-        address borrower,
-        address token,
-        uint256 amount,
-        uint8 tokenIndex
-    ) external;
+    function addScheduledWithdrawal(address creditAccount, address token, uint256 amount, uint8 tokenIndex) external;
 
     /// @notice Cancels scheduled withdrawals from the credit account
-    ///         - Under normal operation, cancels immature withdrawals and claims mature ones
-    ///         - In emergency mode, cancels all withdrawals
     /// @param creditAccount Account to cancel withdrawals from
-    /// @param forceClaim If true and not in emergency mode, claim both mature and immature withdrawals
+    /// @param to Address to send mature withdrawals to when `action` is `CLAIM`
+    /// @param action See `CancelAction`
     /// @param tokensToEnable Bit mask of tokens that should be enabled as collateral on the credit account
     /// @custom:expects Credit account has at least one scheduled withdrawal
-    function cancelScheduledWithdrawals(address creditAccount, bool forceClaim)
+    function cancelScheduledWithdrawals(address creditAccount, address to, CancelAction action)
         external
         returns (uint256 tokensToEnable);
 
-    /// @notice Claims scheduled withdrawals from the credit account by turning them into immediate withdrawals
-    ///         - Under normal operation, claims all mature withdrawals
-    ///         - In emergency mode, claiming is disabled so it reverts
-    /// @param creditManager Manager the account is connected to
+    /// @notice Claims scheduled withdrawals from the credit account
     /// @param creditAccount Account withdrawal was made from
-    /// @dev If there remains no withdrawals scheduled for account after claiming, disables account's
-    ///       withdrawal flag in the credit manager
-    function claimScheduledWithdrawals(address creditManager, address creditAccount) external;
+    /// @param to Address to send withdrawals to
+    /// @param action See `ClaimAction`
+    /// @param hasWithdrawals If account has at least one scheduled withdrawal after claiming
+    function claimScheduledWithdrawals(address creditAccount, address to, ClaimAction action)
+        external
+        returns (bool hasWithdrawals);
 
     /// ------------- ///
     /// CONFIGURATION ///
