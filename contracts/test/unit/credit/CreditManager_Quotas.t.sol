@@ -114,7 +114,7 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
             evm.startPrank(CONFIGURATOR);
             creditManager.addToken(address(t));
             IPriceOracleV2Ext(address(priceOracle)).addPriceFeed(address(t), address(pf));
-            creditManager.setLiquidationThreshold(address(t), 8000, 8000, type(uint40).max, 0);
+            creditManager.setCollateralTokenData(address(t), 8000, 8000, type(uint40).max, 0);
             evm.stopPrank();
 
             _addQuotedToken(address(t), 100, type(uint96).max);

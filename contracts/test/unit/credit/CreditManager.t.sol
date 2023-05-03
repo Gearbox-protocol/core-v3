@@ -156,7 +156,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
             evm.startPrank(CONFIGURATOR);
             creditManager.addToken(address(t));
             IPriceOracleV2Ext(address(priceOracle)).addPriceFeed(address(t), address(pf));
-            creditManager.setLiquidationThreshold(address(t), 8000, 8000, type(uint40).max, 0);
+            creditManager.setCollateralTokenData(address(t), 8000, 8000, type(uint40).max, 0);
             evm.stopPrank();
 
             t.mint(creditAccount, balance);
@@ -343,7 +343,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         creditManager.setParams(0, 0, 0, 0, 0);
 
         evm.expectRevert(CallerNotConfiguratorException.selector);
-        creditManager.setLiquidationThreshold(DUMB_ADDRESS, 0, 0, 0, 0);
+        creditManager.setCollateralTokenData(DUMB_ADDRESS, 0, 0, 0, 0);
 
         evm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setContractAllowance(DUMB_ADDRESS, DUMB_ADDRESS);
@@ -1387,7 +1387,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
         cm.addToken(linkToken);
         cm.addToken(revertToken);
-        cm.setLiquidationThreshold(
+        cm.setCollateralTokenData(
             linkToken, creditConfig.lt(Tokens.LINK), creditConfig.lt(Tokens.LINK), type(uint40).max, 0
         );
 
@@ -1421,7 +1421,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         creditManager.setCreditFacade(address(this));
         creditManager.setPriceOracle(address(priceOracle));
 
-        creditManager.setLiquidationThreshold(poolMock.underlyingToken(), 9300, 9300, type(uint40).max, 0);
+        creditManager.setCollateralTokenData(poolMock.underlyingToken(), 9300, 9300, type(uint40).max, 0);
         evm.stopPrank();
 
         address creditAccount = creditManager.openCreditAccount(DAI_ACCOUNT_AMOUNT, address(this));
@@ -2033,7 +2033,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     function test_CM_54_setLiquidationThreshold_reverts_for_unknown_token() public {
         evm.prank(CONFIGURATOR);
         evm.expectRevert(TokenNotAllowedException.selector);
-        creditManager.setLiquidationThreshold(DUMB_ADDRESS, 8000, 8000, type(uint40).max, 0);
+        creditManager.setCollateralTokenData(DUMB_ADDRESS, 8000, 8000, type(uint40).max, 0);
     }
 
     // //
@@ -2366,7 +2366,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
 
         evm.prank(CONFIGURATOR);
-        cmi.setLiquidationThreshold(usdc, 8500, 9000, uint40(block.timestamp), 3600 * 24 * 7);
+        cmi.setCollateralTokenData(usdc, 8500, 9000, uint40(block.timestamp), 3600 * 24 * 7);
 
         CollateralTokenData memory cd = cmi.collateralTokensDataExt(cmi.getTokenMaskOrRevert(usdc));
 
@@ -2397,7 +2397,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         // uint256 timestampStart = block.timestamp;
 
         // evm.startPrank(CONFIGURATOR);
-        // creditManager.setLiquidationThreshold(usdc, initialLT);
+        // creditManager.setCollateralTokenData(usdc, initialLT);
         // creditManager.rampLiquidationThreshold(usdc, newLT, uint40(block.timestamp), duration);
 
         // assertEq(creditManager.liquidationThresholds(usdc), initialLT, "LT at ramping start incorrect");
