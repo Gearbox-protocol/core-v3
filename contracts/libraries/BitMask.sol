@@ -25,12 +25,12 @@ library BitMask {
     }
 
     /// @dev Calculates the number of `1` bits
-    /// @param enabledTokenMask Bit mask to compute how many bits are set
-    function calcEnabledTokens(uint256 enabledTokenMask) internal pure returns (uint256 totalTokensEnabled) {
+    /// @param enabledTokensMask Bit mask to compute how many bits are set
+    function calcEnabledTokens(uint256 enabledTokensMask) internal pure returns (uint256 totalTokensEnabled) {
         unchecked {
-            while (enabledTokenMask > 0) {
-                totalTokensEnabled += enabledTokenMask & 1;
-                enabledTokenMask >>= 1;
+            while (enabledTokensMask > 0) {
+                totalTokensEnabled += enabledTokensMask & 1;
+                enabledTokensMask >>= 1;
             }
         }
     }

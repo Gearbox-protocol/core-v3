@@ -4,7 +4,7 @@
 pragma solidity ^0.8.10;
 
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
-import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfigurator.sol";
+import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
@@ -65,7 +65,6 @@ contract CreditManagerTestSuite is PoolDeployer {
         creditManager.setCreditConfigurator(CONFIGURATOR);
 
         evm.startPrank(CONFIGURATOR);
-
         creditManager.setCreditFacade(creditFacade);
 
         creditManager.setParams(
@@ -82,38 +81,33 @@ contract CreditManagerTestSuite is PoolDeployer {
             if (collateralTokens[i].token != underlying) {
                 address token = collateralTokens[i].token;
                 creditManager.addToken(token);
-                creditManager.setLiquidationThreshold(token, collateralTokens[i].liquidationThreshold);
+                creditManager.setCollateralTokenData(
+                    token,
+                    collateralTokens[i].liquidationThreshold,
+                    collateralTokens[i].liquidationThreshold,
+                    type(uint40).max,
+                    0
+                );
             }
         }
 
-        evm.stopPrank();
+        cr.addCreditManager(address(creditManager));
 
         assertEq(creditManager.creditConfigurator(), CONFIGURATOR, "Configurator wasn't set");
 
-        cr.addCreditManager(address(creditManager));
-
         if (supportsQuotas) {
             poolQuotaKeeper.addCreditManager(address(creditManager));
-            // poolQuotaKeeper.setGauge(CONFIGURATOR);
         }
 
         if (accountFactoryVer == 2) {
             AccountFactoryV2(address(af)).addCreditManager(address(creditManager));
         }
 
+        evm.stopPrank();
+
         // Approve USER & LIQUIDATOR to credit manager
         tokenTestSuite.approve(underlying, USER, address(creditManager));
         tokenTestSuite.approve(underlying, LIQUIDATOR, address(creditManager));
-
-        addressProvider.transferOwnership(CONFIGURATOR);
-        acl.transferOwnership(CONFIGURATOR);
-
-        evm.startPrank(CONFIGURATOR);
-
-        acl.claimOwnership();
-        addressProvider.claimOwnership();
-
-        evm.stopPrank();
     }
 
     ///
@@ -143,8 +137,12 @@ contract CreditManagerTestSuite is PoolDeployer {
     {
         // Set up real value, which should be configired before CM would be launched
         evm.prank(CONFIGURATOR);
-        creditManager.setLiquidationThreshold(
-            underlying, uint16(PERCENTAGE_FACTOR - DEFAULT_FEE_LIQUIDATION - DEFAULT_LIQUIDATION_PREMIUM)
+        creditManager.setCollateralTokenData(
+            underlying,
+            uint16(PERCENTAGE_FACTOR - DEFAULT_FEE_LIQUIDATION - DEFAULT_LIQUIDATION_PREMIUM),
+            uint16(PERCENTAGE_FACTOR - DEFAULT_FEE_LIQUIDATION - DEFAULT_LIQUIDATION_PREMIUM),
+            type(uint40).max,
+            0
         );
 
         borrowedAmount = _borrowedAmount;

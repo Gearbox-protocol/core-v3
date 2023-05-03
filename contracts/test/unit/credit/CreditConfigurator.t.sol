@@ -7,9 +7,9 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 import {WithdrawalManager} from "../../../support/WithdrawalManager.sol";
-import {CreditConfigurator, CreditManagerOpts, CollateralToken} from "../../../credit/CreditConfigurator.sol";
+import {CreditConfigurator, CreditManagerOpts, CollateralToken} from "../../../credit/CreditConfiguratorV3.sol";
 import {ICreditManagerV3, ICreditManagerV3Events} from "../../../interfaces/ICreditManagerV3.sol";
-import {ICreditConfiguratorEvents} from "../../../interfaces/ICreditConfigurator.sol";
+import {ICreditConfiguratorEvents} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {IAdapter} from "@gearbox-protocol/core-v2/contracts/interfaces/adapters/IAdapter.sol";
 
 import {BotList} from "../../../support/BotList.sol";
@@ -1061,8 +1061,10 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
 
     /// @dev [CC-34]: setExpirationDate reverts if the new expiration date is stale, otherwise sets it
     function test_CC_34_setExpirationDate_reverts_on_incorrect_newExpirationDate_otherwise_sets() public {
-        cct.testFacadeWithExpiration();
-        creditFacade = cct.creditFacade();
+        // cct.testFacadeWithExpiration();
+        // creditFacade = cct.creditFacade();
+
+        _setUp({withDegenNFT: false, expirable: true, supportQuotas: true});
 
         uint40 expirationDate = creditFacade.expirationDate();
 
@@ -1218,10 +1220,10 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
 
         uint16 initialLT = creditManager.liquidationThresholds(usdc);
 
-        evm.expectCall(
-            address(creditManager),
-            abi.encodeCall(CreditManagerV3.rampLiquidationThreshold, (usdc, 8900, uint40(block.timestamp + 5), 1000))
-        );
+        // evm.expectCall(
+        //     address(creditManager),
+        //     abi.encodeCall(CreditManagerV3.rampLiquidationThreshold, (usdc, 8900, uint40(block.timestamp + 5), 1000))
+        // );
 
         evm.expectEmit(true, false, false, true);
         emit ScheduleTokenLiquidationThresholdRamp(

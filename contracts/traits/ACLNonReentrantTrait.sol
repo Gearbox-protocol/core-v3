@@ -10,7 +10,7 @@ import {
     ZeroAddressException,
     CallerNotConfiguratorException,
     CallerNotPausableAdminException,
-    CallerNotUnPausableAdminException,
+    CallerNotUnpausableAdminException,
     CallerNotControllerException
 } from "../interfaces/IExceptions.sol";
 
@@ -19,6 +19,9 @@ import {ACLTrait} from "./ACLTrait.sol";
 /// @title ACL Trait
 /// @notice Utility class for ACL consumers
 abstract contract ACLNonReentrantTrait is ACLTrait, Pausable {
+    /// @dev Emitted when new external controller is set
+    event NewController(address indexed newController);
+
     uint8 private constant _NOT_ENTERED = 1;
     uint8 private constant _ENTERED = 2;
 
@@ -27,10 +30,32 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable {
 
     uint8 private _status = _NOT_ENTERED;
 
-    /// @dev Modifier that allow pausable admin to call only
+    /// @dev Ensures that caller is external controller (if it is set) or configurator
+    modifier controllerOnly() {
+        if (externalController) {
+            if (msg.sender != controller) {
+                revert CallerNotControllerException();
+            }
+        } else {
+            if (!_acl.isConfigurator(msg.sender)) {
+                revert CallerNotControllerException();
+            }
+        }
+        _;
+    }
+
+    /// @dev Ensures that caller is pausable admin
     modifier pausableAdminsOnly() {
         if (!_acl.isPausableAdmin(msg.sender)) {
             revert CallerNotPausableAdminException();
+        }
+        _;
+    }
+
+    /// @dev Ensures that caller is unpausable admin
+    modifier unpausableAdminsOnly() {
+        if (!_acl.isUnpausableAdmin(msg.sender)) {
+            revert CallerNotUnpausableAdminException();
         }
         _;
     }
@@ -55,45 +80,23 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable {
         _status = _NOT_ENTERED;
     }
 
-    event NewController(address indexed newController);
-
     /// @dev constructor
     /// @param addressProvider Address of address repository
     constructor(address addressProvider) ACLTrait(addressProvider) nonZeroAddress(addressProvider) {
         controller = IACL(AddressProvider(addressProvider).getACL()).owner();
     }
 
-    /// @dev  Reverts if msg.sender is not configurator
-    modifier controllerOnly() {
-        if (externalController) {
-            if (msg.sender != controller) {
-                revert CallerNotControllerException();
-            }
-        } else {
-            if (!_acl.isConfigurator(msg.sender)) {
-                revert CallerNotControllerException();
-            }
-        }
-        _;
-    }
-
-    ///@dev Pause contract
-    function pause() external {
-        if (!_acl.isPausableAdmin(msg.sender)) {
-            revert CallerNotPausableAdminException();
-        }
+    ///@dev Pauses contract
+    function pause() external virtual pausableAdminsOnly {
         _pause();
     }
 
-    /// @dev Unpause contract
-    function unpause() external {
-        if (!_acl.isUnpausableAdmin(msg.sender)) {
-            revert CallerNotUnPausableAdminException();
-        }
-
+    /// @dev Unpauses contract
+    function unpause() external virtual unpausableAdminsOnly {
         _unpause();
     }
 
+    /// @dev Sets new external controller
     function setController(address newController) external configuratorOnly {
         externalController = !_acl.isConfigurator(newController);
         controller = newController;

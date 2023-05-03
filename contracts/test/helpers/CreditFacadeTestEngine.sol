@@ -6,7 +6,7 @@ pragma solidity ^0.8.10;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
-import {CreditConfigurator} from "../../credit/CreditConfigurator.sol";
+import {CreditConfigurator} from "../../credit/CreditConfiguratorV3.sol";
 import {MultiCall} from "../../interfaces/ICreditFacade.sol";
 
 import {ICreditFacadeMulticall} from "../../interfaces/ICreditFacade.sol";
@@ -90,14 +90,14 @@ contract CreditFacadeTestEngine is DSTest {
         // switch to new block to be able to close account
         evm.roll(block.number + 1);
 
-        (,, uint256 underlyingToClose) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
-        uint256 underlyingBalance = cft.tokenTestSuite().balanceOf(underlying, creditAccount);
+        // (,, uint256 underlyingToClose) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        // uint256 underlyingBalance = cft.tokenTestSuite().balanceOf(underlying, creditAccount);
 
-        if (underlyingToClose > underlyingBalance) {
-            cft.tokenTestSuite().mint(underlying, USER, underlyingToClose - underlyingBalance);
+        // if (underlyingToClose > underlyingBalance) {
+        //     cft.tokenTestSuite().mint(underlying, USER, underlyingToClose - underlyingBalance);
 
-            cft.tokenTestSuite().approve(underlying, USER, address(creditManager));
-        }
+        //     cft.tokenTestSuite().approve(underlying, USER, address(creditManager));
+        // }
 
         evm.prank(USER);
         creditFacade.closeCreditAccount(creditAccount, FRIEND, 0, false, closeCalls);

@@ -160,7 +160,7 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     /// @param state True is transfer is allowed, false if forbidden
     function approveAccountTransfer(address from, bool state) external;
 
-    // /// @dev Enables token in enabledTokenMask for the Credit Account of msg.sender
+    // /// @dev Enables token in enabledTokensMask for the Credit Account of msg.sender
     // /// @param token Address of token to enable
     // function enableToken(address token) external;
 

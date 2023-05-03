@@ -87,7 +87,11 @@ contract CreditFacadeGasTest is
             _underlying
         );
 
-        cft = new CreditFacadeTestSuite(creditConfig,  supportQuotas,  withDegenNFT,  withExpiration, 1);
+        cft = new CreditFacadeTestSuite({ _creditConfig: creditConfig,
+         supportQuotas: supportQuotas,
+         withDegenNFT: withDegenNFT,
+         withExpiration:  withExpiration,
+         accountFactoryVer: 1});
 
         // cft.testFacadeWithQuotas();
 
@@ -118,7 +122,7 @@ contract CreditFacadeGasTest is
             (address token,) = creditManager.collateralTokens(i);
 
             evm.prank(address(creditConfigurator));
-            CreditManagerV3(address(creditManager)).setLiquidationThreshold(token, 0);
+            CreditManagerV3(address(creditManager)).setCollateralTokenData(token, 0, 0, type(uint40).max, 0);
         }
     }
 

@@ -28,11 +28,13 @@ import {
     ManageDebtAction,
     CreditAccountInfo,
     RevocationPair,
+    CollateralDebtData,
+    CollateralCalcTask,
     WITHDRAWAL_FLAG
 } from "../interfaces/ICreditManagerV3.sol";
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {IPoolQuotaKeeper, QuotaUpdate, TokenLT} from "../interfaces/IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeper, QuotaUpdate} from "../interfaces/IPoolQuotaKeeper.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 // CONSTANTS
@@ -267,21 +269,19 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     /// - Returns the Credit Account back to factory
     ///
     /// @param creditAccount Credit account address
-    /// @param closureActionType Whether the account is closed, liquidated or liquidated due to expiry
-    /// @param totalValue Portfolio value for liqution, 0 for ordinary closure
+    /// @param closureAction Whether the account is closed, liquidated or liquidated due to expiry
+    // @param totalValue Portfolio value for liqution, 0 for ordinary closure
     /// @param payer Address which would be charged if credit account has not enough funds to cover amountToPool
     /// @param to Address to which the leftover funds will be sent
     /// @param skipTokensMask Tokenmask contains 1 for tokens which needed to be send directly
     /// @param convertWETH If true converts WETH to ETH
     function closeCreditAccount(
         address creditAccount,
-        ClosureAction closureActionType,
-        uint256 totalValue,
+        ClosureAction closureAction,
+        CollateralDebtData memory collateralDebtData,
         address payer,
         address to,
-        uint256 enabledTokenMask,
         uint256 skipTokensMask,
-        uint256 debtWithInterest,
         bool convertWETH
     )
         external
@@ -293,58 +293,17 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         // Checks that the Credit Account exists for the borrower
         address borrower = getBorrowerOrRevert(creditAccount); // F:[CM-6, 9, 10]
 
-        // Sets borrower's Credit Account to zero address in the map
+        // Sets borrower's Credit Account to zero address
         creditAccountInfo[creditAccount].borrower = address(0); // F:[CM-9]
+        creditAccountInfo[creditAccount].flags = 0;
 
         // Makes all computations needed to close credit account
-        {
-            uint256 amountToPool;
-            uint256 debt = creditAccountInfo[creditAccount].debt;
 
-            uint256 profit;
+        uint256 amountToPool;
+        uint256 profit;
 
-            (amountToPool, remainingFunds, profit, loss) =
-                calcClosePayments(totalValue, closureActionType, debt, debtWithInterest); // F:[CM-10,11,12]
+        (amountToPool, remainingFunds, profit, loss) = calcClosePayments(closureAction, collateralDebtData); // F:[CM-10,11,12]
 
-            _transferClosurePayments(
-                creditAccount, payer, to, borrower, convertWETH, amountToPool, remainingFunds, debt, profit, loss
-            );
-        }
-
-        if (supportsQuotas) {
-            TokenLT[] memory tokens;
-            tokens = _getQuotedTokens(enabledTokenMask);
-
-            if (tokens.length > 0) {
-                poolQuotaKeeper().removeQuotas(creditAccount, tokens); // F: [CMQ-6]
-
-                if (loss > 0) {
-                    poolQuotaKeeper().setLimitsToZero(tokens); // F: [CMQ-12]
-                }
-            }
-        }
-
-        enabledTokenMask &= ~skipTokensMask;
-
-        _transferAssetsTo(creditAccount, to, convertWETH, enabledTokenMask); // F:[CM-14,17,19]
-
-        // Returns Credit Account to the factory
-        _accountFactory.returnCreditAccount(creditAccount); // F:[CM-9]
-        creditAccountsSet.remove(creditAccount);
-    }
-
-    function _transferClosurePayments(
-        address creditAccount,
-        address payer,
-        address to,
-        address borrower,
-        bool convertWETH,
-        uint256 amountToPool,
-        uint256 remainingFunds,
-        uint256 debt,
-        uint256 profit,
-        uint256 loss
-    ) internal {
         uint256 underlyingBalance = _balanceOf(underlying, creditAccount);
 
         // If there is an underlying surplus, transfers it to the "to" address
@@ -367,12 +326,30 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         // Signals to the pool that debt has been repaid. The pool relies
         // on the Credit Manager to repay the debt correctly, and does not
         // check internally whether the underlying was actually transferred
-        IPoolService(pool).repayCreditAccount(debt, profit, loss); // F:[CM-10,11,12,13]
+        IPoolService(pool).repayCreditAccount(collateralDebtData.debt, profit, loss); // F:[CM-10,11,12,13]
 
         // transfer remaining funds to the borrower [liquidations only]
         if (remainingFunds > 1) {
             _safeTokenTransfer(creditAccount, underlying, borrower, remainingFunds, false); // F:[CM-13,18]
         }
+
+        if (supportsQuotas && collateralDebtData.quotedTokens.length > 0) {
+            /// In case of amy loss, PQK sets limits to zero for all quoted tokens
+            bool setLimitsToZero = loss > 0;
+            poolQuotaKeeper().removeQuotas({
+                creditAccount: creditAccount,
+                tokens: collateralDebtData.quotedTokens,
+                setLimitsToZero: setLimitsToZero
+            }); // F: [CMQ-6]
+        }
+
+        uint256 enabledTokensMask = collateralDebtData.enabledTokensMask & ~skipTokensMask;
+
+        _transferAssetsTo(creditAccount, to, convertWETH, enabledTokensMask); // F:[CM-14,17,19]
+
+        // Returns Credit Account to the factory
+        _accountFactory.returnCreditAccount(creditAccount); // F:[CM-9]
+        creditAccountsSet.remove(creditAccount);
     }
 
     /// @dev Manages debt size for borrower:
@@ -493,7 +470,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         address creditAccount,
         uint256 _amountRepaid,
         uint256 _amountProfit,
-        uint256 enabledTokenMask
+        uint256 enabledTokensMask
     ) internal returns (uint256 amountRepaid, uint256 amountProfit) {
         amountRepaid = _amountRepaid;
         amountProfit = _amountProfit;
@@ -501,7 +478,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         uint16 _feeInterest = feeInterest;
         uint256 quotaInterestAccrued = creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1;
 
-        TokenLT[] memory tokens = _getQuotedTokens(enabledTokenMask);
+        (address[] memory tokens,) = _getQuotedTokens(enabledTokensMask);
         if (tokens.length > 0) {
             quotaInterestAccrued += poolQuotaKeeper().accrueQuotaInterest(creditAccount, tokens); // F: [CMQ-4,5]
         }
@@ -682,7 +659,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     /// @param minHealthFactor Minimal health factor of the account, in PERCENTAGE format
     function fullCollateralCheck(
         address creditAccount,
-        uint256 enabledTokenMask,
+        uint256 enabledTokensMask,
         uint256[] memory collateralHints,
         uint16 minHealthFactor
     ) external creditFacadeOnly nonReentrant {
@@ -690,19 +667,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
             revert CustomHealthFactorTooLowException();
         }
 
-        IPriceOracleV2 _priceOracle = priceOracle;
+        CollateralDebtData memory collateralDebtData =
+            _calcAllCollateral(creditAccount, enabledTokensMask, minHealthFactor, collateralHints, priceOracle, true);
 
-        uint256 twvUSD;
-        uint256 debtPlusInterestRateAndFeesUSD;
-
-        (enabledTokenMask,, twvUSD, debtPlusInterestRateAndFeesUSD,) =
-            _calcAllCollateral(_priceOracle, creditAccount, enabledTokenMask, minHealthFactor, collateralHints, true);
-
-        if (twvUSD < debtPlusInterestRateAndFeesUSD) {
+        if (collateralDebtData.isLiquidatable) {
             revert NotEnoughCollateralException();
         }
 
-        _saveEnabledTokenMask(creditAccount, enabledTokenMask);
+        _saveEnabledTokensMask(creditAccount, collateralDebtData.enabledTokensMask);
     }
 
     /// @dev Calculates total value for provided Credit Account in underlying
@@ -711,99 +683,122 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     /// @param creditAccount Credit Account address
     // @return total Total value in underlying
     // @return twv Total weighted (discounted by liquidation thresholds) value in underlying
-    function calcTotalValue(address creditAccount, CancelAction action)
+    function calcDebtAndCollateral(address creditAccount, CollateralCalcTask task)
         external
         view
         override
-        returns (uint256 enabledTokenMask, uint256 total, uint256 hf, uint256 debtWithInterest, bool canBeLiquidated)
+        returns (CollateralDebtData memory collateralDebtData)
     {
-        IPriceOracleV2 _priceOracle = priceOracle;
-        uint256[] memory collateralHints;
-        enabledTokenMask = enabledTokensMap(creditAccount);
-        uint256 totalUSD;
-        uint256 twvUSD;
-        uint256 debtPlusInterestRateAndFeesUSD;
-        (, totalUSD, twvUSD, debtPlusInterestRateAndFeesUSD, debtWithInterest) =
-            _calcAllCollateral(_priceOracle, creditAccount, enabledTokenMask, PERCENTAGE_FACTOR, collateralHints, false);
+        uint256 enabledTokensMask = enabledTokensMap(creditAccount);
 
-        if (_hasWithdrawals(creditAccount)) {
-            totalUSD += _calcCancellableWithdrawalsValue(_priceOracle, creditAccount, action);
+        if (task == CollateralCalcTask.DEBT_ONLY) {
+            uint256 quotaInterest;
+
+            if (supportsQuotas) {
+                (address[] memory tokens,) = _getQuotedTokens(enabledTokensMask);
+
+                quotaInterest = creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1;
+
+                if (tokens.length > 0) {
+                    quotaInterest += poolQuotaKeeper().outstandingQuotaInterest(address(this), creditAccount, tokens); // F: [CMQ-10]
+                }
+
+                collateralDebtData.quotedTokens = tokens;
+            }
+
+            (collateralDebtData.debt, collateralDebtData.debtWithInterest, collateralDebtData.debtWithInterestAndFees) =
+                _calcCreditAccountAccruedInterest(creditAccount, quotaInterest);
+        } else {
+            IPriceOracleV2 _priceOracle = priceOracle;
+            uint256[] memory collateralHints;
+
+            collateralDebtData = _calcAllCollateral(
+                creditAccount, enabledTokensMask, PERCENTAGE_FACTOR, collateralHints, _priceOracle, false
+            );
+
+            if (_hasWithdrawals(creditAccount)) {
+                collateralDebtData.totalValueUSD += _calcCancellableWithdrawalsValue(
+                    _priceOracle,
+                    creditAccount,
+                    task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
+                        ? CancelAction.FORCE_CANCEL
+                        : CancelAction.CANCEL
+                );
+            }
+
+            collateralDebtData.totalValue = _convertFromUSD(_priceOracle, collateralDebtData.totalValueUSD, underlying); // F:[FA-41]
         }
 
-        total = _convertFromUSD(_priceOracle, totalUSD, underlying); // F:[FA-41]
-        hf = twvUSD * PERCENTAGE_FACTOR / debtPlusInterestRateAndFeesUSD;
-
-        canBeLiquidated = twvUSD < debtPlusInterestRateAndFeesUSD;
+        // FINALLY
+        collateralDebtData.enabledTokensMask = enabledTokensMask;
     }
 
     /// @dev Calculates total value for provided Credit Account in USD
     // @param _priceOracle Oracle used to convert assets to USD
     // @param creditAccount Address of the Credit Account
-    // @return totalUSD Total value of the account in USD
-    // @return canBeLiquidated True if HF <1
+
     function _calcAllCollateral(
-        IPriceOracleV2 _priceOracle,
         address creditAccount,
-        uint256 enabledTokenMask,
+        uint256 enabledTokensMask,
         uint16 minHealthFactor,
         uint256[] memory collateralHints,
+        IPriceOracleV2 _priceOracle,
         bool lazy
-    )
-        internal
-        view
-        returns (
-            uint256 _enabledTokenMask,
-            uint256 totalUSD,
-            uint256 twvUSD,
-            uint256 debtPlusInterestRateAndFeesUSD,
-            uint256 debtWithInterestAndFees // TODO: without FEES
-        )
-    {
+    ) internal view returns (CollateralDebtData memory collateralDebtData) {
+        uint256 totalUSD;
+        uint256 twvUSD;
+
         uint256 quotaInterest;
 
         if (supportsQuotas) {
-            (totalUSD, twvUSD, quotaInterest) = _calcQuotedCollateral(creditAccount, enabledTokenMask, _priceOracle);
+            (totalUSD, twvUSD, quotaInterest, collateralDebtData.quotedTokens) =
+                _calcQuotedCollateral(creditAccount, enabledTokensMask, _priceOracle);
         }
 
-        {
-            // The total weighted value of a Credit Account has to be compared
-            // with the entire debt sum, including interest and fees
-            (,, debtWithInterestAndFees) = _calcCreditAccountAccruedInterest(creditAccount, quotaInterest);
+        // The total weighted value of a Credit Account has to be compared
+        // with the entire debt sum, including interest and fees
+        (collateralDebtData.debt, collateralDebtData.debtWithInterest, collateralDebtData.debtWithInterestAndFees) =
+            _calcCreditAccountAccruedInterest(creditAccount, quotaInterest);
 
-            debtPlusInterestRateAndFeesUSD = _convertToUSD(
-                _priceOracle,
-                debtWithInterestAndFees * minHealthFactor, // F: [CM-42]
-                underlying
-            ) / PERCENTAGE_FACTOR;
-        }
+        uint256 debtPlusInterestRateAndFeesUSD = _convertToUSD(
+            _priceOracle,
+            collateralDebtData.debtWithInterestAndFees * minHealthFactor, // F: [CM-42]
+            underlying
+        ) / PERCENTAGE_FACTOR;
 
         // If quoted tokens fully cover the debt, we can stop here
         // after performing some additional cleanup
         if (twvUSD < debtPlusInterestRateAndFeesUSD || !lazy) {
-            uint256 limit = lazy ? (debtPlusInterestRateAndFeesUSD - twvUSD) : type(uint256).max;
             uint256 _totalUSD;
             uint256 _twvUSD;
+            uint256 limit = lazy ? (debtPlusInterestRateAndFeesUSD - twvUSD) : type(uint256).max;
 
-            (enabledTokenMask, _totalUSD, _twvUSD) =
-                _calcNotQuotedCollateral(_priceOracle, creditAccount, enabledTokenMask, limit, collateralHints);
+            (enabledTokensMask, _totalUSD, _twvUSD) =
+                _calcNotQuotedCollateral(creditAccount, enabledTokensMask, limit, collateralHints, _priceOracle);
             totalUSD += _totalUSD;
             twvUSD += _twvUSD;
         }
 
-        _enabledTokenMask = enabledTokenMask;
+        collateralDebtData.totalValueUSD = totalUSD;
+        collateralDebtData.twvUSD = twvUSD;
+
+        collateralDebtData.enabledTokensMask = enabledTokensMask;
+        collateralDebtData.hf = uint16(collateralDebtData.twvUSD * PERCENTAGE_FACTOR / debtPlusInterestRateAndFeesUSD);
+        collateralDebtData.isLiquidatable = twvUSD < debtPlusInterestRateAndFeesUSD;
     }
 
-    function _calcQuotedCollateral(address creditAccount, uint256 enabledTokenMask, IPriceOracleV2 _priceOracle)
+    function _calcQuotedCollateral(address creditAccount, uint256 enabledTokensMask, IPriceOracleV2 _priceOracle)
         internal
         view
-        returns (uint256 totalValueUSD, uint256 twvUSD, uint256 quotaInterest)
+        returns (uint256 totalValueUSD, uint256 twvUSD, uint256 quotaInterest, address[] memory tokens)
     {
-        TokenLT[] memory tokens = _getQuotedTokens(enabledTokenMask);
+        uint256[] memory lts;
+        (tokens, lts) = _getQuotedTokens(enabledTokensMask);
 
         if (tokens.length > 0) {
             /// If credit account has any connected token - then check that
             (totalValueUSD, twvUSD, quotaInterest) = poolQuotaKeeper().computeQuotedCollateralUSD(
-                address(this), creditAccount, address(_priceOracle), tokens
+                address(this), creditAccount, address(_priceOracle), tokens, lts
             ); // F: [CMQ-8]
         }
 
@@ -811,12 +806,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     }
 
     function _calcNotQuotedCollateral(
-        IPriceOracleV2 _priceOracle,
         address creditAccount,
         uint256 _enabledTokensMask,
-        uint256 debtPlusInterestRateAndFeesUSD,
-        uint256[] memory collateralHints
-    ) internal view returns (uint256 enabledTokensMask, uint256 totalValue, uint256 twvUSD) {
+        uint256 enoughCollateralUSD,
+        uint256[] memory collateralHints,
+        IPriceOracleV2 _priceOracle
+    ) internal view returns (uint256 enabledTokensMask, uint256 totalValueUSD, uint256 twvUSD) {
         uint256 tokenMask;
         uint256 len = collateralHints.length;
         bool nonZeroBalance;
@@ -824,32 +819,30 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         enabledTokensMask = _enabledTokensMask;
         uint256 checkedTokenMask = supportsQuotas ? enabledTokensMask & (~quotedTokenMask) : enabledTokensMask;
 
-        if (debtPlusInterestRateAndFeesUSD != type(uint256).max) {
-            debtPlusInterestRateAndFeesUSD *= PERCENTAGE_FACTOR;
+        if (enoughCollateralUSD != type(uint256).max) {
+            enoughCollateralUSD *= PERCENTAGE_FACTOR;
         }
-
-        uint256 twvUSDx10K;
 
         unchecked {
             // TODO: add test that we check all values and it's always reachable
             for (uint256 i; checkedTokenMask != 0; ++i) {
                 tokenMask = (i < len) ? collateralHints[i] : 1 << (i - len); // F: [CM-68]
 
-                // CASE enabledTokenMask & tokenMask == 0 F:[CM-38]
+                // CASE enabledTokensMask & tokenMask == 0 F:[CM-38]
                 if (checkedTokenMask & tokenMask != 0) {
-                    (totalValue, twvUSDx10K, nonZeroBalance) =
-                        _calcOneNonQuotedTokenCollateral(_priceOracle, tokenMask, creditAccount, totalValue, twvUSDx10K);
+                    (totalValueUSD, twvUSD, nonZeroBalance) =
+                        _calcOneNonQuotedTokenCollateral(_priceOracle, tokenMask, creditAccount, totalValueUSD, twvUSD);
 
                     // Collateral calculations are only done if there is a non-zero balance
                     if (nonZeroBalance) {
                         // Full collateral check evaluates a Credit Account's health factor lazily;
                         // Once the TWV computed thus far exceeds the debt, the check is considered
                         // successful, and the function returns without evaluating any further collateral
-                        if (twvUSDx10K >= debtPlusInterestRateAndFeesUSD) {
+                        if (twvUSD >= enoughCollateralUSD) {
                             break;
                         }
                         // Zero-balance tokens are disabled; this is done by flipping the
-                        // bit in enabledTokenMask, which is then written into storage at the
+                        // bit in enabledTokensMask, which is then written into storage at the
                         // very end, to avoid redundant storage writes
                     } else {
                         enabledTokensMask &= ~tokenMask; // F:[CM-39]
@@ -860,7 +853,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
             }
         }
 
-        twvUSD = twvUSDx10K / PERCENTAGE_FACTOR;
+        twvUSD /= PERCENTAGE_FACTOR;
     }
 
     function _calcOneNonQuotedTokenCollateral(
@@ -884,23 +877,27 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     }
 
     /// @dev Returns the array of quoted tokens that are enabled on the account
-    function getQuotedTokens(address creditAccount) public view returns (TokenLT[] memory tokens) {
-        return _getQuotedTokens(enabledTokensMap(creditAccount));
+    function getQuotedTokens(address creditAccount) public view returns (address[] memory tokens) {
+        (tokens,) = _getQuotedTokens(enabledTokensMap(creditAccount));
     }
 
-    function _getQuotedTokens(uint256 enabledTokensMask) internal view returns (TokenLT[] memory tokens) {
+    function _getQuotedTokens(uint256 enabledTokensMask)
+        internal
+        view
+        returns (address[] memory tokens, uint256[] memory lts)
+    {
         uint256 quotedMask = enabledTokensMask & quotedTokenMask;
 
         if (quotedMask > 0) {
-            tokens = new TokenLT[](maxAllowedEnabledTokenLength + 1);
+            tokens = new address[](maxAllowedEnabledTokenLength );
+            lts = new uint256[](maxAllowedEnabledTokenLength );
 
             uint256 j;
 
             unchecked {
                 for (uint256 tokenMask = 2; tokenMask <= quotedMask; tokenMask <<= 1) {
                     if (quotedMask & tokenMask != 0) {
-                        (address token, uint16 lt) = collateralTokensByMask(tokenMask);
-                        tokens[j] = TokenLT({token: token, lt: lt});
+                        (tokens[j], lts[j]) = collateralTokensByMask(tokenMask);
                         ++j;
                     }
                 }
@@ -1006,32 +1003,31 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     //
 
     /// @dev Computes amounts that must be sent to various addresses before closing an account
-    /// @param totalValue Credit Accounts total value in underlying
-    /// @param closureActionType Type of account closure
+    /// @param closureAction Type of account closure
     ///        * CLOSE_ACCOUNT: The account is healthy and is closed normally
     ///        * LIQUIDATE_ACCOUNT: The account is unhealthy and is being liquidated to avoid bad debt
     ///        * LIQUIDATE_EXPIRED_ACCOUNT: The account has expired and is being liquidated (lowered liquidation premium)
     ///        * LIQUIDATE_PAUSED: The account is liquidated while the system is paused due to emergency (no liquidation premium)
-    /// @param debt Credit Account's debt principal
-    /// @param debtWithInterest Credit Account's debt principal + interest
     /// @return amountToPool Amount of underlying to be sent to the pool
     /// @return remainingFunds Amount of underlying to be sent to the borrower (only applicable to liquidations)
     /// @return profit Protocol's profit from fees (if any)
     /// @return loss Protocol's loss from bad debt (if any)
-    function calcClosePayments(
-        uint256 totalValue,
-        ClosureAction closureActionType,
-        uint256 debt,
-        uint256 debtWithInterest
-    ) public view override returns (uint256 amountToPool, uint256 remainingFunds, uint256 profit, uint256 loss) {
+    function calcClosePayments(ClosureAction closureAction, CollateralDebtData memory collateralDebtData)
+        public
+        view
+        override
+        returns (uint256 amountToPool, uint256 remainingFunds, uint256 profit, uint256 loss)
+    {
+        uint256 totalValue = collateralDebtData.totalValue;
+        uint256 debtWithInterest = collateralDebtData.debtWithInterest;
         // The amount to be paid to pool is computed with fees included
         // The pool will compute the amount of Diesel tokens to treasury
         // based on profit
-        amountToPool = debtWithInterest + ((debtWithInterest - debt) * feeInterest) / PERCENTAGE_FACTOR; // F:[CM-43]
+        amountToPool =
+            debtWithInterest + ((debtWithInterest - collateralDebtData.debt) * feeInterest) / PERCENTAGE_FACTOR; // F:[CM-43]
 
         if (
-            closureActionType == ClosureAction.LIQUIDATE_ACCOUNT
-                || closureActionType == ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT
+            closureAction == ClosureAction.LIQUIDATE_ACCOUNT || closureAction == ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT
         ) {
             // LIQUIDATION CASE
 
@@ -1047,16 +1043,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
             uint256 totalFunds = (
                 totalValue
-                    * (
-                        closureActionType == ClosureAction.LIQUIDATE_ACCOUNT
-                            ? liquidationDiscount
-                            : liquidationDiscountExpired
-                    )
+                    * (closureAction == ClosureAction.LIQUIDATE_ACCOUNT ? liquidationDiscount : liquidationDiscountExpired)
             ) / PERCENTAGE_FACTOR; // F:[CM-43]
 
             amountToPool += (
-                totalValue
-                    * (closureActionType == ClosureAction.LIQUIDATE_ACCOUNT ? feeLiquidation : feeLiquidationExpired)
+                totalValue * (closureAction == ClosureAction.LIQUIDATE_ACCOUNT ? feeLiquidation : feeLiquidationExpired)
             ) / PERCENTAGE_FACTOR; // F:[CM-43]
 
             /// Adding fee here
@@ -1115,10 +1106,26 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
     /// @dev Returns the collateral token with requested mask and its liquidationThreshold
     /// @param tokenMask Token mask corresponding to the token
+
+    // TODO: naming!
     function collateralTokensByMask(uint256 tokenMask)
         public
         view
         override
+        returns (address token, uint16 liquidationThreshold)
+    {
+        return _collateralTokensByMask({tokenMask: tokenMask, calcLT: true});
+    }
+
+    function getTokenByMask(uint256 tokenMask) public view override returns (address token) {
+        (token,) = _collateralTokensByMask({tokenMask: tokenMask, calcLT: false});
+    }
+
+    /// @dev Returns the collateral token with requested mask and its liquidationThreshold
+    /// @param tokenMask Token mask corresponding to the token
+    function _collateralTokensByMask(uint256 tokenMask, bool calcLT)
+        internal
+        view
         returns (address token, uint16 liquidationThreshold)
     {
         // The underlying is a special case and its mask is always 1
@@ -1127,36 +1134,25 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
             liquidationThreshold = ltUnderlying;
         } else {
             CollateralTokenData memory tokenData = collateralTokensData[tokenMask]; // F:[CM-47]
-
             token = tokenData.token;
 
             if (token == address(0)) {
                 revert TokenNotAllowedException();
             }
 
-            if (block.timestamp < tokenData.timestampRampStart) {
-                liquidationThreshold = tokenData.ltInitial; // F:[CM-47]
-            } else if (block.timestamp < tokenData.timestampRampStart + tokenData.rampDuration) {
-                liquidationThreshold = _getRampingLiquidationThreshold(
-                    tokenData.ltInitial,
-                    tokenData.ltFinal,
-                    tokenData.timestampRampStart,
-                    tokenData.timestampRampStart + tokenData.rampDuration
-                );
-            } else {
-                liquidationThreshold = tokenData.ltFinal;
-            }
-        }
-    }
-
-    function getTokenByMask(uint256 tokenMask) public view override returns (address token) {
-        if (tokenMask == 1) {
-            token = underlying; // F:[CM-47]
-        } else {
-            CollateralTokenData memory tokenData = collateralTokensData[tokenMask]; // F:[CM-47]
-            token = tokenData.token;
-            if (token == address(0)) {
-                revert TokenNotAllowedException();
+            if (calcLT) {
+                if (block.timestamp < tokenData.timestampRampStart) {
+                    liquidationThreshold = tokenData.ltInitial; // F:[CM-47]
+                } else if (block.timestamp < tokenData.timestampRampStart + tokenData.rampDuration) {
+                    liquidationThreshold = _getRampingLiquidationThreshold(
+                        tokenData.ltInitial,
+                        tokenData.ltFinal,
+                        tokenData.timestampRampStart,
+                        tokenData.timestampRampStart + tokenData.rampDuration
+                    );
+                } else {
+                    liquidationThreshold = tokenData.ltFinal;
+                }
             }
         }
     }
@@ -1178,32 +1174,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     function getBorrowerOrRevert(address creditAccount) public view override returns (address borrower) {
         borrower = creditAccountInfo[creditAccount].borrower; // F:[CM-48]
         if (borrower == address(0)) revert CreditAccountNotExistsException(); // F:[CM-48]
-    }
-
-    /// @dev Calculates the debt accrued by a Credit Account
-    /// @param creditAccount Address of the Credit Account
-    /// @return debt The debt principal
-    /// @return debtWithInterest The debt principal + accrued interest
-    /// @return debtWithInterestAndFees The debt principal + accrued interest and protocol fees
-    function calcCreditAccountAccruedInterest(address creditAccount)
-        external
-        view
-        override
-        returns (uint256 debt, uint256 debtWithInterest, uint256 debtWithInterestAndFees)
-    {
-        uint256 quotaInterest;
-
-        if (supportsQuotas) {
-            TokenLT[] memory tokens = getQuotedTokens(creditAccount);
-
-            quotaInterest = creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1;
-
-            if (tokens.length > 0) {
-                quotaInterest += poolQuotaKeeper().outstandingQuotaInterest(address(this), creditAccount, tokens); // F: [CMQ-10]
-            }
-        }
-
-        return _calcCreditAccountAccruedInterest(creditAccount, quotaInterest);
     }
 
     /// @dev IMPLEMENTATION: calcCreditAccountAccruedInterest
@@ -1254,7 +1224,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         if (token == underlying) return ltUnderlying; // F:[CM-47]
 
         uint256 tokenMask = getTokenMaskOrRevert(token);
-        (, lt) = collateralTokensByMask(tokenMask); // F:[CM-47]
+        (, lt) = _collateralTokensByMask({tokenMask: tokenMask, calcLT: true}); // F:[CM-47]
     }
 
     /// @dev Returns the mask for the provided token
@@ -1379,30 +1349,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     // CONFIGURATION
     //
 
-    /// @dev Sets the liquidation threshold for a collateral token
-    /// @notice Liquidation thresholds are weights used to compute
-    ///         TWV with. They denote the risk of the token, with
-    ///         more volatile and unpredictable tokens having lower LTs.
-    /// @param token The collateral token to set the LT for
-    /// @param liquidationThreshold The new LT
-    function setLiquidationThreshold(address token, uint16 liquidationThreshold)
-        external
-        creditConfiguratorOnly // F:[CM-4]
-    {
-        // Underlying is a special case and its LT is stored in Slot1,
-        // to be accessed frequently
-        if (token == underlying) {
-            // F:[CM-47]
-            ltUnderlying = liquidationThreshold; // F:[CM-47]
-        } else {
-            uint256 tokenMask = getTokenMaskOrRevert(token); // F:[CM-47, 54]
-
-            CollateralTokenData memory tokenData = collateralTokensData[tokenMask];
-
-            _setLTRampParams(tokenData, tokenMask, liquidationThreshold, liquidationThreshold, type(uint40).max, 0); // F:[CM-47]
-        }
-    }
-
     /// @dev Sets ramping parameters for a token's liquidation threshold
     /// @notice Ramping parameters allow to decrease the LT gradually over a period of time
     ///         which gives users/bots time to react and adjust their position for the new LT
@@ -1410,34 +1356,26 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     /// @param finalLT The final LT after ramping
     /// @param timestampRampStart Timestamp when the LT starts ramping
     /// @param rampDuration Duration of ramping
-    function rampLiquidationThreshold(address token, uint16 finalLT, uint40 timestampRampStart, uint24 rampDuration)
-        external
-        creditConfiguratorOnly
-    {
-        uint256 tokenMask = getTokenMaskOrRevert(token);
-
-        if (tokenMask == 1) revert CannotRampLTForUnderlyingException();
-
-        CollateralTokenData memory tokenData = collateralTokensData[tokenMask];
-
-        _setLTRampParams(tokenData, tokenMask, tokenData.ltInitial, finalLT, timestampRampStart, rampDuration); // F: [CM-71]
-    }
-
-    /// @dev Internal function that sets the LT params
-    function _setLTRampParams(
-        CollateralTokenData memory tokenData,
-        uint256 tokenMask,
-        uint16 ltInitial,
-        uint16 ltFinal,
+    function setCollateralTokenData(
+        address token,
+        uint16 initialLT,
+        uint16 finalLT,
         uint40 timestampRampStart,
         uint24 rampDuration
-    ) internal {
-        tokenData.ltInitial = ltInitial;
-        tokenData.ltFinal = ltFinal;
-        tokenData.timestampRampStart = timestampRampStart;
-        tokenData.rampDuration = rampDuration;
+    ) external creditConfiguratorOnly {
+        if (token == underlying) {
+            ltUnderlying = initialLT; // F:[CM-47]
+        } else {
+            uint256 tokenMask = getTokenMaskOrRevert(token);
+            CollateralTokenData memory tokenData = collateralTokensData[tokenMask];
 
-        collateralTokensData[tokenMask] = tokenData;
+            tokenData.ltInitial = initialLT;
+            tokenData.ltFinal = finalLT;
+            tokenData.timestampRampStart = timestampRampStart;
+            tokenData.rampDuration = rampDuration;
+
+            collateralTokensData[tokenMask] = tokenData;
+        }
     }
 
     /// @dev Sets the limited token mask
@@ -1504,8 +1442,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         emit SetCreditConfigurator(_creditConfigurator); // F:[CM-58]
     }
 
-    function _checkEnabledTokenLength(uint256 enabledTokenMask) internal view {
-        uint256 totalTokensEnabled = enabledTokenMask.calcEnabledTokens();
+    function _checkEnabledTokenLength(uint256 enabledTokensMask) internal view {
+        uint256 totalTokensEnabled = enabledTokensMask.calcEnabledTokens();
         if (totalTokensEnabled > maxAllowedEnabledTokenLength) {
             revert TooManyEnabledTokensException();
         }
@@ -1631,12 +1569,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         return uint256(creditAccountInfo[creditAccount].enabledTokensMask);
     }
 
-    function _saveEnabledTokenMask(address creditAccount, uint256 enabledTokenMask) internal {
-        if (enabledTokenMask > type(uint248).max) {
+    function _saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) internal {
+        if (enabledTokensMask > type(uint248).max) {
             revert IncorrectParameterException();
         }
-        _checkEnabledTokenLength(enabledTokenMask);
-        creditAccountInfo[creditAccount].enabledTokensMask = uint248(enabledTokenMask);
+        _checkEnabledTokenLength(enabledTokensMask);
+        creditAccountInfo[creditAccount].enabledTokensMask = uint248(enabledTokensMask);
     }
 
     function _convertFromUSD(IPriceOracleV2 _priceOracle, uint256 amountInUSD, address token)

@@ -62,7 +62,7 @@ error CallerNotControllerException();
 error CallerNotPausableAdminException();
 
 /// @dev Thrown on attempting to pause a contract as a non-Unpausable admin
-error CallerNotUnPausableAdminException();
+error CallerNotUnpausableAdminException();
 
 /// @dev Thrown when a gauge-only function is called by non-gauge
 error CallerNotGaugeException();
