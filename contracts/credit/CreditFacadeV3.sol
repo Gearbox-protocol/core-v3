@@ -361,7 +361,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         // Checks that the account hf < 1 and computes the totalValue
         // before the multicall
         (ClosureAction closeAction, CollateralDebtData memory collateralDebtData) =
-            _isAccountLiquidatable(creditAccount, true); // F:[FA-14]
+            _isAccountLiquidatable({creditAccount: creditAccount, isEmergencyLiquidation: paused()}); // F:[FA-14]
 
         if (!collateralDebtData.isLiquidatable) revert CreditAccountNotLiquidatableException();
 
@@ -371,29 +371,12 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         collateralDebtData.enabledTokensMask |= _cancelWithdrawals(creditAccount, CancellationType.RETURN_FUNDS);
 
         if (calls.length != 0) {
-            // TODO: CHANGE
             FullCheckParams memory fullCheckParams =
                 _multicall(creditAccount, calls, collateralDebtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS);
             collateralDebtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter;
         } // F:[FA-15]
 
-        uint256 remainingFunds =
-            _liquidateCreditAccount(creditAccount, closeAction, collateralDebtData, to, skipTokenMask, convertWETH);
-
-        emit LiquidateCreditAccount(creditAccount, borrower, msg.sender, to, closeAction, remainingFunds); // F:[FA-15]
-    }
-
-    /// @dev Closes a liquidated credit account, possibly expired
-    function _liquidateCreditAccount(
-        address creditAccount,
-        ClosureAction closeAction,
-        CollateralDebtData memory collateralDebtData,
-        address to,
-        uint256 skipTokenMask,
-        bool convertWETH
-    ) internal returns (uint256 remainingFunds) {
-        uint256 reportedLoss;
-        (remainingFunds, reportedLoss) = _closeCreditAccount({
+        (uint256 remainingFunds, uint256 reportedLoss) = _closeCreditAccount({
             creditAccount: creditAccount,
             closureAction: closeAction,
             collateralDebtData: collateralDebtData,
@@ -418,6 +401,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         if (convertWETH) {
             _wethWithdrawTo(to);
         }
+
+        emit LiquidateCreditAccount(creditAccount, borrower, msg.sender, to, closeAction, remainingFunds); // F:[FA-15]
     }
 
     /// @dev Executes a batch of transactions within a Multicall, to manage an existing account

@@ -130,7 +130,7 @@ contract PoolQuotaKeeperTest is DSTest, BalanceHelper, IPoolQuotaKeeperEvents {
         pqk.updateQuotas(DUMB_ADDRESS, quotaUpdates);
 
         evm.expectRevert(CallerNotCreditManagerException.selector);
-        pqk.removeQuotas(DUMB_ADDRESS, new address[](1));
+        pqk.removeQuotas(DUMB_ADDRESS, new address[](1), false);
 
         evm.expectRevert(CallerNotCreditManagerException.selector);
         pqk.accrueQuotaInterest(DUMB_ADDRESS, new address[](1));

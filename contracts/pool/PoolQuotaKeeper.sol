@@ -201,7 +201,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
     /// @dev Updates all accountQuotas to zero when closing a credit account, and computes the final quota interest change
     /// @param creditAccount Address of the Credit Account being closed
     /// @param tokens Array of all active quoted tokens on the account
-    function removeQuotas(address creditAccount, address[] memory tokens)
+    function removeQuotas(address creditAccount, address[] memory tokens, bool setLimitsToZero)
         external
         override
         creditManagerOnly // F:[PQK-4]
@@ -214,7 +214,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
             address token = tokens[i];
             if (token == address(0)) break;
 
-            quotaRevenueChange += _removeQuota(msg.sender, creditAccount, token); // F:[CMQ-06]
+            quotaRevenueChange += _removeQuota(msg.sender, creditAccount, token, setLimitsToZero); // F:[CMQ-06]
 
             unchecked {
                 ++i;
@@ -227,7 +227,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
     }
 
     /// @dev Internal function to zero the quota for a single quoted token
-    function _removeQuota(address creditManager, address creditAccount, address token)
+    function _removeQuota(address creditManager, address creditAccount, address token, bool setLimitsToZero)
         internal
         returns (int128 quotaRevenueChange)
     {
@@ -240,19 +240,10 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
             tq.totalQuoted -= quoted;
             accountQuota.quota = 1;
             quotaRevenueChange = -int128(int16(tq.rate)) * int96(quoted);
-        }
-    }
 
-    /// @dev Sets limits for a number of tokens to zero, preventing further quota increases
-    /// @notice Triggered by the Credit Manager when there is loss during liquidation
-    function setLimitsToZero(address[] memory tokens) external creditManagerOnly {
-        uint256 len = tokens.length;
-
-        unchecked {
-            for (uint256 i; i < len; ++i) {
-                address token = tokens[i];
-                if (token == address(0)) break;
+            if (setLimitsToZero) {
                 totalQuotaParams[token].limit = 1; // F: [CMQ-12]
+                emit SetTokenLimit(token, 1);
             }
         }
     }

@@ -208,9 +208,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         if (currentLT != liquidationThreshold) {
             // Sets the LT in Credit Manager, where token existence is checked
             //  _setLTRampParams(tokenData, tokenMask, , 0);
-            creditManager.setLiquidationThreshold(
-                token, liquidationThreshold, liquidationThreshold, type(uint40).max, 0
-            ); // F:[CC-6]
+            creditManager.setCollateralTokenData(token, liquidationThreshold, liquidationThreshold, type(uint40).max, 0); // F:[CC-6]
             emit SetTokenLiquidationThreshold(token, liquidationThreshold); // F:[CC-6]
         }
     }
@@ -238,7 +236,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
 
         if (currentLT != liquidationThresholdFinal) {
             // Sets the LT in Credit Manager, where token existence is checked
-            creditManager.setLiquidationThreshold(
+            creditManager.setCollateralTokenData(
                 token, currentLT, liquidationThresholdFinal, timestampRampStart, rampDuration
             );
             emit ScheduleTokenLiquidationThresholdRamp(
@@ -550,7 +548,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     /// @dev Updates Liquidation threshold for the underlying asset
     /// @param ltUnderlying New LT for the underlying
     function _updateLiquidationThreshold(uint16 ltUnderlying) internal {
-        creditManager.setLiquidationThreshold(underlying, ltUnderlying, ltUnderlying, type(uint40).max, 0); // F:[CC-25]
+        creditManager.setCollateralTokenData(underlying, ltUnderlying, ltUnderlying, type(uint40).max, 0); // F:[CC-25]
 
         // An LT of an ordinary collateral token cannot be larger than the LT of underlying
         // As such, all LTs need to be checked and reduced if needed

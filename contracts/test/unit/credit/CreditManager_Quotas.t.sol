@@ -654,7 +654,7 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
         quotedTokens[0] = tokenTestSuite.addressOf(Tokens.LINK);
         quotedTokens[1] = tokenTestSuite.addressOf(Tokens.USDT);
 
-        evm.expectCall(address(poolQuotaKeeper), abi.encodeCall(IPoolQuotaKeeper.setLimitsToZero, (quotedTokens)));
+        // evm.expectCall(address(poolQuotaKeeper), abi.encodeCall(IPoolQuotaKeeper.setLimitsToZero, (quotedTokens)));
 
         // creditManager.closeCreditAccount(
         //     creditAccount,
