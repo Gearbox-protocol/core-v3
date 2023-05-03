@@ -1015,25 +1015,24 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
 
     /// @dev Checks if account is liquidatable (i.e., hf < 1)
     /// @param creditAccount Address of credit account to check
-
     function _isAccountLiquidatable(address creditAccount)
         internal
         view
         returns (
             bool isLiquidatable,
-            ClosureAction ca,
+            ClosureAction closeAction,
             uint256 totalValue,
             uint256 debtWithInterest,
             uint256 enabledTokenMask
         )
     {
         (enabledTokenMask, totalValue,, debtWithInterest, isLiquidatable) = _calcTotalValue(creditAccount);
+        closeAction = ClosureAction.LIQUIDATE_ACCOUNT;
 
-        if (isLiquidatable || !_isExpired()) {
-            return (isLiquidatable, ClosureAction.LIQUIDATE_ACCOUNT, totalValue, debtWithInterest, enabledTokenMask);
+        if (!isLiquidatable && _isExpired()) {
+            isLiquidatable = true;
+            closeAction = ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT;
         }
-
-        return (true, ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT, totalValue, debtWithInterest, enabledTokenMask);
     }
 
     function _calcTotalValue(address creditAccount)
