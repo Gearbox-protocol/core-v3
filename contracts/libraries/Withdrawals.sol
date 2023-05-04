@@ -11,16 +11,16 @@ library Withdrawals {
         w.amount = 1;
     }
 
-    function isInitialized(ScheduledWithdrawal memory w) internal pure returns (bool) {
+    function isScheduled(ScheduledWithdrawal memory w) internal pure returns (bool) {
         return w.maturity > 1;
     }
 
     function isMature(ScheduledWithdrawal memory w) internal view returns (bool) {
-        return isInitialized(w) && block.timestamp >= w.maturity;
+        return isScheduled(w) && block.timestamp >= w.maturity;
     }
 
     function isImmature(ScheduledWithdrawal memory w) internal view returns (bool) {
-        return isInitialized(w) && block.timestamp < w.maturity;
+        return isScheduled(w) && block.timestamp < w.maturity;
     }
 
     function tokenMaskAndAmount(ScheduledWithdrawal memory w)
@@ -40,12 +40,12 @@ library Withdrawals {
     function getCancellable(ScheduledWithdrawal[2] memory ws, CancelAction action)
         internal
         view
-        returns (bool[2] memory initialized, bool[2] memory cancellable)
+        returns (bool[2] memory scheduled, bool[2] memory cancellable)
     {
         unchecked {
             for (uint8 i; i < 2; ++i) {
-                initialized[i] = isInitialized(ws[i]);
-                cancellable[i] = initialized[i] && (action == CancelAction.FORCE_CANCEL || isImmature(ws[i]));
+                scheduled[i] = isScheduled(ws[i]);
+                cancellable[i] = scheduled[i] && (action == CancelAction.FORCE_CANCEL || isImmature(ws[i]));
             }
         }
     }
@@ -57,7 +57,7 @@ library Withdrawals {
     {
         unchecked {
             for (uint8 i; i < 2; ++i) {
-                claimable[i] = isInitialized(ws[i]) && (action == ClaimAction.FORCE_CLAIM || isMature(ws[i]));
+                claimable[i] = isScheduled(ws[i]) && (action == ClaimAction.FORCE_CLAIM || isMature(ws[i]));
             }
         }
     }
@@ -65,14 +65,14 @@ library Withdrawals {
     function findFreeSlot(ScheduledWithdrawal[2] memory ws) internal pure returns (bool found, uint8 slot) {
         unchecked {
             for (uint8 i; i < 2; ++i) {
-                if (!isInitialized(ws[i])) {
+                if (!isScheduled(ws[i])) {
                     return (true, i);
                 }
             }
         }
     }
 
-    function bothSlotsEmpty(ScheduledWithdrawal[2] memory ws) internal pure returns (bool) {
-        return !(isInitialized(ws[0]) || isInitialized(ws[1]));
+    function hasScheduled(ScheduledWithdrawal[2] memory ws) internal pure returns (bool) {
+        return isScheduled(ws[0]) || isScheduled(ws[1]);
     }
 }
