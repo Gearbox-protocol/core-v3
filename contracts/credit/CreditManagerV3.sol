@@ -306,15 +306,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
         uint256 underlyingBalance = _balanceOf(underlying, creditAccount);
 
-        // If there is an underlying surplus, transfers it to the "to" address
         if (underlyingBalance > amountToPool + remainingFunds + 1) {
+            // If there is an underlying surplus, transfers it to the "to" address
             unchecked {
                 _safeTokenTransfer(
                     creditAccount, underlying, to, underlyingBalance - amountToPool - remainingFunds - 1, convertWETH
                 ); // F:[CM-10,12,16]
             }
+        } else if (underlyingBalance < amountToPool + remainingFunds + 1) {
             // If there is an underlying shortfall, attempts to transfer it from the payer
-        } else {
             unchecked {
                 _transferFrom(
                     underlying,
@@ -404,9 +404,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
                 totalValue * (closureAction == ClosureAction.LIQUIDATE_ACCOUNT ? feeLiquidation : feeLiquidationExpired)
             ) / PERCENTAGE_FACTOR; // F:[CM-43]
 
-            /// Adding fee here
-            uint256 amountToPoolWithFee = _amountWithFee(amountToPool);
-
             // If there are any funds left after all respective payments (this
             // includes the liquidation premium, since totalFunds is already
             // discounted from totalValue), they are recorded to remainingFunds
@@ -420,14 +417,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
             // Since values are compared to each other before subtracting,
             // this can be marked as unchecked to optimize gas
 
+            uint256 amountToPoolWithFee = _amountWithFee(amountToPool);
             unchecked {
                 if (totalFunds > amountToPoolWithFee) {
                     remainingFunds = totalFunds - amountToPoolWithFee - 1; // F:[CM-43]
                 } else {
-                    amountToPool = totalFunds; // F:[CM-43]
+                    amountToPool = _amountMinusFee(totalFunds); // F:[CM-43]
                 }
 
-                if (totalFunds >= _amountWithFee(debtWithInterest)) {
+                if (amountToPool >= debtWithInterest) {
                     profit = amountToPool - debtWithInterest; // F:[CM-43]
                 } else {
                     loss = debtWithInterest - amountToPool; // F:[CM-43]
@@ -446,9 +444,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
             unchecked {
                 profit = amountToPool - debtWithInterest; // F:[CM-43]
             }
-
-            amountToPool = _amountWithFee(amountToPool);
         }
+
+        amountToPool = _amountWithFee(amountToPool);
     }
 
     /// @dev Manages debt size for borrower:
@@ -1599,10 +1597,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         amountInUSD = _priceOracle.convertToUSD(amountInToken, token);
     }
 
-    //
-    // FEE TOKEN SUPPORT
+    ///
+    /// FEE TOKEN SUPPORT
+    ///
 
     function _amountWithFee(uint256 amount) internal view virtual returns (uint256) {
+        return amount;
+    }
+
+    function _amountMinusFee(uint256 amount) internal view virtual returns (uint256) {
         return amount;
     }
 
