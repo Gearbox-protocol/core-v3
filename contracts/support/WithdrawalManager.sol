@@ -9,13 +9,7 @@ import {
     NoFreeWithdrawalSlotsException,
     NothingToClaimException
 } from "../interfaces/IExceptions.sol";
-import {
-    CancelAction,
-    ClaimAction,
-    IWithdrawalManager,
-    IVersion,
-    ScheduledWithdrawal
-} from "../interfaces/IWithdrawalManager.sol";
+import {ClaimAction, IWithdrawalManager, IVersion, ScheduledWithdrawal} from "../interfaces/IWithdrawalManager.sol";
 import {Withdrawals} from "../libraries/Withdrawals.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
 import {IERC20HelperTrait} from "../traits/IERC20HelperTrait.sol";
@@ -113,20 +107,18 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait, IERC20HelperTrait {
     }
 
     /// @inheritdoc IWithdrawalManager
-    function cancellableScheduledWithdrawals(address creditAccount, CancelAction action)
+    function cancellableScheduledWithdrawals(address creditAccount, bool isForceCancel)
         external
         view
         override
-        returns (address[2] memory tokens, uint256[2] memory amounts)
+        returns (address token1, uint256 amount1, address token2, uint256 amount2)
     {
         ScheduledWithdrawal[2] memory withdrawals = _scheduled[creditAccount];
-        (, bool[2] memory cancellable) = withdrawals.getCancellable(action);
+        (, bool[2] memory cancellable) =
+            withdrawals.getStatus(isForceCancel ? ClaimAction.FORCE_CANCEL : ClaimAction.CANCEL);
 
-        unchecked {
-            for (uint8 i; i < 2; ++i) {
-                if (cancellable[i]) (tokens[i],, amounts[i]) = withdrawals[i].tokenMaskAndAmount();
-            }
-        }
+        if (cancellable[0]) (token1,, amount1) = withdrawals[0].tokenMaskAndAmount();
+        if (cancellable[1]) (token2,, amount2) = withdrawals[1].tokenMaskAndAmount();
     }
 
     /// @inheritdoc IWithdrawalManager
@@ -149,50 +141,29 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait, IERC20HelperTrait {
     }
 
     /// @inheritdoc IWithdrawalManager
-    function cancelScheduledWithdrawals(address creditAccount, address to, CancelAction action)
-        external
-        override
-        creditManagerOnly
-        returns (uint256 tokensToEnable)
-    {
-        ScheduledWithdrawal[2] memory withdrawals = _scheduled[creditAccount];
-        (bool[2] memory scheduled, bool[2] memory cancellable) = withdrawals.getCancellable(action);
-
-        unchecked {
-            for (uint8 i; i < 2; ++i) {
-                if (scheduled[i]) {
-                    if (cancellable[i]) {
-                        tokensToEnable |= _cancel(withdrawals[i], creditAccount);
-                    } else {
-                        _claim(withdrawals[i], creditAccount, to, false);
-                    }
-                    _scheduled[creditAccount][i] = withdrawals[i];
-                }
-            }
-        }
-    }
-
-    /// @inheritdoc IWithdrawalManager
     function claimScheduledWithdrawals(address creditAccount, address to, ClaimAction action)
         external
         override
         creditManagerOnly
-        returns (bool)
+        returns (bool hasScheduled, uint256 tokensToEnable)
     {
         ScheduledWithdrawal[2] memory withdrawals = _scheduled[creditAccount];
-        bool[2] memory claimable = withdrawals.getClaimable(action);
-        if (!(claimable[0] || claimable[1])) revert NothingToClaimException();
+        (bool[2] memory cancellable, bool[2] memory claimable) = withdrawals.getStatus(action);
+        if (action == ClaimAction.CLAIM && !(claimable[0] || claimable[1])) revert NothingToClaimException();
 
         unchecked {
             for (uint8 i; i < 2; ++i) {
-                if (claimable[i]) {
-                    _claim(withdrawals[i], creditAccount, to, true);
-                    _scheduled[creditAccount][i] = withdrawals[i];
+                if (cancellable[i]) {
+                    tokensToEnable |= _cancel(withdrawals[i], creditAccount);
                 }
+                if (claimable[i]) {
+                    _claim(withdrawals[i], creditAccount, to);
+                }
+                if (claimable[i] || cancellable[i]) _scheduled[creditAccount][i] = withdrawals[i];
             }
         }
 
-        return withdrawals.hasScheduled();
+        hasScheduled = withdrawals.hasScheduled();
     }
 
     /// @dev Cancels withdrawal, clears withdrawal in memory
@@ -203,18 +174,18 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait, IERC20HelperTrait {
         (address token, uint256 tokenMask, uint256 amount) = withdrawal.tokenMaskAndAmount();
         withdrawal.clear();
         emit CancelScheduledWithdrawal(creditAccount, token, amount);
+
         _safeTransfer(token, creditAccount, amount);
         tokensToEnable = tokenMask;
     }
 
     /// @dev Claims withdrawal, clears withdrawal in memory
-    function _claim(ScheduledWithdrawal memory withdrawal, address creditAccount, address to, bool safe) internal {
+    function _claim(ScheduledWithdrawal memory withdrawal, address creditAccount, address to) internal {
         (address token,, uint256 amount) = withdrawal.tokenMaskAndAmount();
         withdrawal.clear();
         emit ClaimScheduledWithdrawal(creditAccount, token, to, amount);
-        if (safe) {
-            _safeTransfer(token, to, amount);
-        } else if (!_unsafeTransfer(token, to, amount)) {
+
+        if (!_unsafeTransfer(token, to, amount)) {
             _addImmediateWithdrawal(to, token, amount);
         }
     }

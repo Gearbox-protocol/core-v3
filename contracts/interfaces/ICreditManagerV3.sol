@@ -5,7 +5,7 @@ pragma solidity ^0.8.10;
 
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IPoolQuotaKeeper, QuotaUpdate} from "./IPoolQuotaKeeper.sol";
-import {CancelAction, ClaimAction, IWithdrawalManager} from "./IWithdrawalManager.sol";
+import {ClaimAction, IWithdrawalManager} from "./IWithdrawalManager.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 enum ClosureAction {
@@ -321,11 +321,9 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
         external
         returns (uint256 tokensToDisable);
 
-    function cancelWithdrawals(address creditAccount, address to, CancelAction action)
+    function claimWithdrawals(address creditAccount, address to, ClaimAction action)
         external
         returns (uint256 tokensToEnable);
-
-    function claimWithdrawals(address creditAccount, address to, ClaimAction action) external;
 
     /// @notice Revokes allowances for specified spender/token pairs
     /// @param revocations Spender/token pairs to revoke allowances for

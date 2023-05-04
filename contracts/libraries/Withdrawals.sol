@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {CancelAction, ClaimAction, ScheduledWithdrawal} from "../interfaces/IWithdrawalManager.sol";
+import {ClaimAction, ScheduledWithdrawal} from "../interfaces/IWithdrawalManager.sol";
 
 library Withdrawals {
     function clear(ScheduledWithdrawal memory w) internal pure {
@@ -37,27 +37,19 @@ library Withdrawals {
         }
     }
 
-    function getCancellable(ScheduledWithdrawal[2] memory ws, CancelAction action)
+    function getStatus(ScheduledWithdrawal[2] memory ws, ClaimAction action)
         internal
         view
-        returns (bool[2] memory scheduled, bool[2] memory cancellable)
+        returns (bool[2] memory cancellable, bool[2] memory claimable)
     {
+        bool scheduled;
         unchecked {
             for (uint8 i; i < 2; ++i) {
-                scheduled[i] = isScheduled(ws[i]);
-                cancellable[i] = scheduled[i] && (action == CancelAction.FORCE_CANCEL || isImmature(ws[i]));
-            }
-        }
-    }
-
-    function getClaimable(ScheduledWithdrawal[2] memory ws, ClaimAction action)
-        internal
-        view
-        returns (bool[2] memory claimable)
-    {
-        unchecked {
-            for (uint8 i; i < 2; ++i) {
-                claimable[i] = isScheduled(ws[i]) && (action == ClaimAction.FORCE_CLAIM || isMature(ws[i]));
+                scheduled = isScheduled(ws[i]);
+                cancellable[i] = scheduled && action != ClaimAction.FORCE_CLAIM
+                    && (action == ClaimAction.FORCE_CANCEL || isImmature(ws[i]));
+                claimable[i] = scheduled && action != ClaimAction.FORCE_CANCEL
+                    && (action == ClaimAction.FORCE_CLAIM || isMature(ws[i]));
             }
         }
     }

@@ -26,7 +26,7 @@ import {
     CollateralCalcTask
 } from "../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
-import {CancelAction, ClaimAction} from "../interfaces/IWithdrawalManager.sol";
+import {ClaimAction} from "../interfaces/IWithdrawalManager.sol";
 
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 
@@ -364,13 +364,13 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         ClosureAction closeAction;
         CollateralDebtData memory collateralDebtData;
         {
-            CancelAction cancelAction;
-            (cancelAction, closeAction, collateralDebtData) =
+            ClaimAction claimAction;
+            (claimAction, closeAction, collateralDebtData) =
                 _isAccountLiquidatable({creditAccount: creditAccount, isEmergency: paused()}); // F:[FA-14]
 
             if (!collateralDebtData.isLiquidatable) revert CreditAccountNotLiquidatableException();
             collateralDebtData.enabledTokensMask |=
-                _cancelWithdrawals({action: cancelAction, creditAccount: creditAccount, to: borrower});
+                _claimWithdrawals({action: claimAction, creditAccount: creditAccount, to: borrower});
         }
 
         // Wraps ETH and sends it back to msg.sender
@@ -1026,9 +1026,9 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
     function _isAccountLiquidatable(address creditAccount, bool isEmergency)
         internal
         view
-        returns (CancelAction cancelAction, ClosureAction closeAction, CollateralDebtData memory collateralDebtData)
+        returns (ClaimAction claimAction, ClosureAction closeAction, CollateralDebtData memory collateralDebtData)
     {
-        cancelAction = isEmergency ? CancelAction.FORCE_CANCEL : CancelAction.CANCEL;
+        claimAction = isEmergency ? ClaimAction.FORCE_CANCEL : ClaimAction.CANCEL;
         collateralDebtData = _calcDebtAndCollateral(
             creditAccount,
             isEmergency
@@ -1067,15 +1067,11 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         tokensToDisable = creditManager.scheduleWithdrawal(creditAccount, token, amount);
     }
 
-    function _cancelWithdrawals(address creditAccount, address to, CancelAction action)
+    function _claimWithdrawals(address creditAccount, address to, ClaimAction action)
         internal
         returns (uint256 tokensToEnable)
     {
-        tokensToEnable = creditManager.cancelWithdrawals(creditAccount, to, action);
-    }
-
-    function _claimWithdrawals(address creditAccount, address to, ClaimAction action) internal {
-        creditManager.claimWithdrawals(creditAccount, to, action);
+        tokensToEnable = creditManager.claimWithdrawals(creditAccount, to, action);
     }
 
     function _wethWithdrawTo(address to) internal {
