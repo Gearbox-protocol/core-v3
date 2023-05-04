@@ -3,8 +3,9 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {CollateralDebtData} from "../interfaces/ICreditManagerV3.sol";
+import {CollateralDebtData, CollateralTokenData} from "../interfaces/ICreditManagerV3.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import "../interfaces/IExceptions.sol";
 
 /// @title Quota Library
 library CreditLogic {
@@ -84,5 +85,40 @@ library CreditLogic {
         returns (uint256 amountToPool)
     {
         amountToPool = debtWithInterest + ((debtWithInterest - debt) * feeInterest) / PERCENTAGE_FACTOR;
+    }
+
+    function getTokenOrRevert(CollateralTokenData storage tokenData) internal view returns (address token) {
+        token = tokenData.token;
+
+        if (token == address(0)) {
+            revert TokenNotAllowedException();
+        }
+    }
+
+    function getLiquidationThreshold(CollateralTokenData storage tokenData) internal view returns (uint16) {
+        if (block.timestamp < tokenData.timestampRampStart) {
+            return tokenData.ltInitial; // F:[CM-47]
+        }
+        if (block.timestamp < tokenData.timestampRampStart + tokenData.rampDuration) {
+            return _getRampingLiquidationThreshold(
+                tokenData.ltInitial,
+                tokenData.ltFinal,
+                tokenData.timestampRampStart,
+                tokenData.timestampRampStart + tokenData.rampDuration
+            );
+        }
+        return tokenData.ltFinal;
+    }
+
+    function _getRampingLiquidationThreshold(
+        uint16 ltInitial,
+        uint16 ltFinal,
+        uint40 timestampRampStart,
+        uint40 timestampRampEnd
+    ) internal view returns (uint16) {
+        return uint16(
+            (ltInitial * (timestampRampEnd - block.timestamp) + ltFinal * (block.timestamp - timestampRampStart))
+                / (timestampRampEnd - timestampRampStart)
+        ); // F: [CM-72]
     }
 }

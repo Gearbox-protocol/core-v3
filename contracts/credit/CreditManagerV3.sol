@@ -63,6 +63,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     using Address for address payable;
     using BitMask for uint256;
     using CreditLogic for CollateralDebtData;
+    using CreditLogic for CollateralTokenData;
 
     // IMMUTABLE PARAMS
     /// @dev contract version
@@ -1069,40 +1070,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
             token = underlying; // F:[CM-47]
             liquidationThreshold = ltUnderlying;
         } else {
-            CollateralTokenData memory tokenData = collateralTokensData[tokenMask]; // F:[CM-47]
-            token = tokenData.token;
-
-            if (token == address(0)) {
-                revert TokenNotAllowedException();
-            }
+            CollateralTokenData storage tokenData = collateralTokensData[tokenMask]; // F:[CM-47]
+            token = tokenData.getTokenOrRevert();
 
             if (calcLT) {
-                if (block.timestamp < tokenData.timestampRampStart) {
-                    liquidationThreshold = tokenData.ltInitial; // F:[CM-47]
-                } else if (block.timestamp < tokenData.timestampRampStart + tokenData.rampDuration) {
-                    liquidationThreshold = _getRampingLiquidationThreshold(
-                        tokenData.ltInitial,
-                        tokenData.ltFinal,
-                        tokenData.timestampRampStart,
-                        tokenData.timestampRampStart + tokenData.rampDuration
-                    );
-                } else {
-                    liquidationThreshold = tokenData.ltFinal;
-                }
+                liquidationThreshold = tokenData.getLiquidationThreshold();
             }
         }
-    }
-
-    function _getRampingLiquidationThreshold(
-        uint16 ltInitial,
-        uint16 ltFinal,
-        uint40 timestampRampStart,
-        uint40 timestampRampEnd
-    ) internal view returns (uint16) {
-        return uint16(
-            (ltInitial * (timestampRampEnd - block.timestamp) + ltFinal * (block.timestamp - timestampRampStart))
-                / (timestampRampEnd - timestampRampStart)
-        ); // F: [CM-72]
     }
 
     /// @dev Returns the address of a borrower's Credit Account, or reverts if there is none.
