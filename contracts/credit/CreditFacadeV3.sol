@@ -828,7 +828,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         external
         override
         whenNotPaused
-        whenNotExpired
+        nonZeroAddress(to)
         creditAccountOwnerOnly(creditAccount)
         nonReentrant
     {

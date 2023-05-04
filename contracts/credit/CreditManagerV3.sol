@@ -316,7 +316,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         } else if (underlyingBalance < amountToPool + remainingFunds + 1) {
             // If there is an underlying shortfall, attempts to transfer it from the payer
             unchecked {
-                _transferFrom(
+                _safeTransferFrom(
                     underlying,
                     payer,
                     creditAccount,
@@ -655,7 +655,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         returns (uint256 tokenMask)
     {
         tokenMask = getTokenMaskOrRevert(token);
-        _transferFrom(token, payer, creditAccount, amount); // F:[CM-22]
+        _safeTransferFrom(token, payer, creditAccount, amount); // F:[CM-22]
     }
 
     /// @dev Transfers Credit Account ownership to another address
