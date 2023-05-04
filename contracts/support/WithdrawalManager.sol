@@ -4,6 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {
+    AmountCantBeZeroException,
     CallerNotCreditManagerException,
     NoFreeWithdrawalSlotsException,
     NothingToClaimException
@@ -134,6 +135,9 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait, IERC20HelperTrait {
         override
         creditManagerOnly
     {
+        if (amount < 2) {
+            revert AmountCantBeZeroException();
+        }
         ScheduledWithdrawal[2] memory withdrawals = _scheduled[creditAccount];
         (bool found, uint8 slot) = withdrawals.findFreeSlot();
         if (!found) revert NoFreeWithdrawalSlotsException();

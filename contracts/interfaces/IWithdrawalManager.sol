@@ -123,7 +123,6 @@ interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
     /// @param token Token to withdraw
     /// @param amount Amount to withdraw
     /// @param tokenIndex Collateral index of withdrawn token in account's credit manager
-    /// @custom:expects `amount` is greater than 1
     /// @custom:expects Credit manager transferred `amount` of `token` to this contract prior to calling this function
     function addScheduledWithdrawal(address creditAccount, address token, uint256 amount, uint8 tokenIndex) external;
 
@@ -133,7 +132,6 @@ interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
     ///           If `to` is blacklisted in token, turns scheduled withdrawal into immediate
     /// @param action See `CancelAction`
     /// @param tokensToEnable Bit mask of tokens that should be enabled as collateral on the credit account
-    /// @custom:expects Credit account has at least one scheduled withdrawal
     function cancelScheduledWithdrawals(address creditAccount, address to, CancelAction action)
         external
         returns (uint256 tokensToEnable);
