@@ -30,16 +30,16 @@ contract CreditManagerTestInternal is CreditManagerV3 {
         // cumulativeDropAtFastCheckRAY[creditAccount] = value;
     }
 
-    function calcNewCumulativeIndex(
-        uint256 borrowedAmount,
-        uint256 delta,
-        uint256 cumulativeIndexNow,
-        uint256 cumulativeIndexOpen,
-        bool isIncrease
-    ) external pure returns (uint256 newCumulativeIndex) {
-        newCumulativeIndex =
-            _calcNewCumulativeIndex(borrowedAmount, delta, cumulativeIndexNow, cumulativeIndexOpen, isIncrease);
-    }
+    // function calcNewCumulativeIndex(
+    //     uint256 borrowedAmount,
+    //     uint256 delta,
+    //     uint256 cumulativeIndexNow,
+    //     uint256 cumulativeIndexOpen,
+    //     bool isIncrease
+    // ) external pure returns (uint256 newCumulativeIndex) {
+    //     newCumulativeIndex =
+    //         _calcNewCumulativeIndex(borrowedAmount, delta, cumulativeIndexNow, cumulativeIndexOpen, isIncrease);
+    // }
 
     // function calcClosePaymentsPure(
     //     uint256 totalValue,
