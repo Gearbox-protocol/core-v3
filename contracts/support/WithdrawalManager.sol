@@ -3,10 +3,8 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-
 import {
+    AmountCantBeZeroException,
     CallerNotCreditManagerException,
     NoFreeWithdrawalSlotsException,
     NothingToClaimException
@@ -20,6 +18,7 @@ import {
 } from "../interfaces/IWithdrawalManager.sol";
 import {Withdrawals} from "../libraries/Withdrawals.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
+import {IERC20HelperTrait} from "../traits/IERC20HelperTrait.sol";
 
 /// @title Withdrawal manager
 /// @notice Contract that handles withdrawals from credit accounts.
@@ -27,8 +26,7 @@ import {ACLTrait} from "../traits/ACLTrait.sol";
 ///         - Immediate withdrawals can be claimed, well, immediately, and exist to support blacklistable tokens.
 ///         - Scheduled withdrawals can be claimed after a certain delay, and exist to support partial withdrawals
 ///           from credit accounts. One credit account can have up to two scheduled withdrawals at the same time.
-contract WithdrawalManager is IWithdrawalManager, ACLTrait {
-    using SafeERC20 for IERC20;
+contract WithdrawalManager is IWithdrawalManager, ACLTrait, IERC20HelperTrait {
     using Withdrawals for ScheduledWithdrawal;
     using Withdrawals for ScheduledWithdrawal[2];
 
@@ -96,7 +94,7 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait {
             --amount;
         }
         immediateWithdrawals[account][token] = 1;
-        IERC20(token).safeTransfer(to, amount);
+        _safeTransfer(token, to, amount);
         emit ClaimImmediateWithdrawal(account, token, to, amount);
     }
 
@@ -137,6 +135,9 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait {
         override
         creditManagerOnly
     {
+        if (amount < 2) {
+            revert AmountCantBeZeroException();
+        }
         ScheduledWithdrawal[2] memory withdrawals = _scheduled[creditAccount];
         (bool found, uint8 slot) = withdrawals.findFreeSlot();
         if (!found) revert NoFreeWithdrawalSlotsException();
@@ -155,11 +156,11 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait {
         returns (uint256 tokensToEnable)
     {
         ScheduledWithdrawal[2] memory withdrawals = _scheduled[creditAccount];
-        (bool[2] memory initialized, bool[2] memory cancellable) = withdrawals.getCancellable(action);
+        (bool[2] memory scheduled, bool[2] memory cancellable) = withdrawals.getCancellable(action);
 
         unchecked {
             for (uint8 i; i < 2; ++i) {
-                if (initialized[i]) {
+                if (scheduled[i]) {
                     if (cancellable[i]) {
                         tokensToEnable |= _cancel(withdrawals[i], creditAccount);
                     } else {
@@ -191,7 +192,7 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait {
             }
         }
 
-        return !withdrawals.bothSlotsEmpty();
+        return withdrawals.hasScheduled();
     }
 
     /// @dev Cancels withdrawal, clears withdrawal in memory
@@ -202,19 +203,18 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait {
         (address token, uint256 tokenMask, uint256 amount) = withdrawal.tokenMaskAndAmount();
         withdrawal.clear();
         emit CancelScheduledWithdrawal(creditAccount, token, amount);
-        IERC20(token).safeTransfer(creditAccount, amount);
+        _safeTransfer(token, creditAccount, amount);
         tokensToEnable = tokenMask;
     }
 
     /// @dev Claims withdrawal, clears withdrawal in memory
-    function _claim(ScheduledWithdrawal memory withdrawal, address creditAccount, address to, bool send) internal {
+    function _claim(ScheduledWithdrawal memory withdrawal, address creditAccount, address to, bool safe) internal {
         (address token,, uint256 amount) = withdrawal.tokenMaskAndAmount();
         withdrawal.clear();
         emit ClaimScheduledWithdrawal(creditAccount, token, to, amount);
-        // TODO: change logic, try to send to `to`, if fails -- add immediate withdrawal
-        if (send) {
-            IERC20(token).safeTransfer(to, amount);
-        } else {
+        if (safe) {
+            _safeTransfer(token, to, amount);
+        } else if (!_unsafeTransfer(token, to, amount)) {
             _addImmediateWithdrawal(to, token, amount);
         }
     }

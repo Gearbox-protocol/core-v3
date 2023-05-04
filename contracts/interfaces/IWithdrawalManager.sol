@@ -123,16 +123,15 @@ interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
     /// @param token Token to withdraw
     /// @param amount Amount to withdraw
     /// @param tokenIndex Collateral index of withdrawn token in account's credit manager
-    /// @custom:expects `amount` is greater than 1
     /// @custom:expects Credit manager transferred `amount` of `token` to this contract prior to calling this function
     function addScheduledWithdrawal(address creditAccount, address token, uint256 amount, uint8 tokenIndex) external;
 
     /// @notice Cancels scheduled withdrawals from the credit account
     /// @param creditAccount Account to cancel withdrawals from
     /// @param to Address to send mature withdrawals to when `action` is `CLAIM`
+    ///           If `to` is blacklisted in token, turns scheduled withdrawal into immediate
     /// @param action See `CancelAction`
     /// @param tokensToEnable Bit mask of tokens that should be enabled as collateral on the credit account
-    /// @custom:expects Credit account has at least one scheduled withdrawal
     function cancelScheduledWithdrawals(address creditAccount, address to, CancelAction action)
         external
         returns (uint256 tokensToEnable);
@@ -141,10 +140,10 @@ interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
     /// @param creditAccount Account withdrawal was made from
     /// @param to Address to send withdrawals to
     /// @param action See `ClaimAction`
-    /// @param hasWithdrawals If account has at least one scheduled withdrawal after claiming
+    /// @param hasScheduled If account has at least one scheduled withdrawal after claiming
     function claimScheduledWithdrawals(address creditAccount, address to, ClaimAction action)
         external
-        returns (bool hasWithdrawals);
+        returns (bool hasScheduled);
 
     /// ------------- ///
     /// CONFIGURATION ///

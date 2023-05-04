@@ -1376,10 +1376,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         _creditAccountSafeTransfer(creditAccount, token, address(withdrawalManager), amount);
         amount = _balanceOf(token, address(withdrawalManager)) - balanceBefore;
 
-        if (amount > 1) {
-            withdrawalManager.addScheduledWithdrawal(creditAccount, token, amount, tokenMask.calcIndex());
-            _enableWithdrawalFlag(creditAccount);
-        }
+        withdrawalManager.addScheduledWithdrawal(creditAccount, token, amount, tokenMask.calcIndex());
+        _enableWithdrawalFlag(creditAccount);
 
         // We need to disable empty tokens in case they could be forbidden, to finally eliminate them
         if (_balanceOf(token, creditAccount) <= 1) {
