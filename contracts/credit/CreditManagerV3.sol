@@ -10,6 +10,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // LIBS & TRAITS
 import {UNDERLYING_TOKEN_MASK, BitMask} from "../libraries/BitMask.sol";
+import {CreditLogic} from "../libraries/CreditLogic.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 import {IERC20HelperTrait} from "../traits/IERC20HelperTrait.sol";
@@ -61,6 +62,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     using EnumerableSet for EnumerableSet.AddressSet;
     using Address for address payable;
     using BitMask for uint256;
+    using CreditLogic for CollateralDebtData;
+    using CreditLogic for CollateralTokenData;
 
     // IMMUTABLE PARAMS
     /// @dev contract version
@@ -290,9 +293,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         creditFacadeOnly // F:[CM-2]
         returns (uint256 remainingFunds, uint256 loss)
     {
-        // Checks that the Credit Account exists for the borrower
-        address borrower = getBorrowerOrRevert(creditAccount); // F:[CM-6, 9, 10]
-
         // Sets borrower's Credit Account to zero address
         creditAccountInfo[creditAccount].borrower = address(0); // F:[CM-9]
         creditAccountInfo[creditAccount].flags = 0;
@@ -302,7 +302,32 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         uint256 amountToPool;
         uint256 profit;
 
-        (amountToPool, remainingFunds, profit, loss) = calcClosePayments(closureAction, collateralDebtData); // F:[CM-10,11,12]
+        if (closureAction == ClosureAction.CLOSE_ACCOUNT) {
+            (amountToPool, profit) =
+                collateralDebtData.calcClosePayments({feeInterest: feeInterest, amountWithFeeFn: _amountWithFee});
+        } else {
+            // During liquidation, totalValue of the account is discounted
+            // by (1 - liquidationPremium). This means that totalValue * liquidationPremium
+            // is removed from all calculations and can be claimed by the liquidator at the end of transaction
+
+            // The liquidation premium depends on liquidation type:
+            // * For normal unhealthy account or emergency liquidations, usual premium applies
+            // * For expiry liquidations, the premium is typically reduced,
+            //   since the account does not risk bad debt, so the liquidation
+            //   is not as urgent
+            (amountToPool, remainingFunds, profit, loss) = collateralDebtData.calcLiquidationPayments({
+                feeInterest: feeInterest,
+                liquidationDiscount: closureAction == ClosureAction.LIQUIDATE_ACCOUNT
+                    ? liquidationDiscount
+                    : liquidationDiscountExpired,
+                feeLiquidation: closureAction == ClosureAction.LIQUIDATE_ACCOUNT ? feeLiquidation : feeLiquidationExpired,
+                amountWithFeeFn: _amountWithFee,
+                amountMinusFeeFn: _amountWithFee
+            });
+        }
+
+        // Checks that the Credit Account exists for the borrower
+        address borrower = getBorrowerOrRevert(creditAccount); // F:[CM-6, 9, 10]
 
         uint256 underlyingBalance = _balanceOf(underlying, creditAccount);
 
@@ -355,98 +380,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         // Returns Credit Account to the factory
         _accountFactory.returnCreditAccount(creditAccount); // F:[CM-9]
         creditAccountsSet.remove(creditAccount);
-    }
-
-    /// @dev Computes amounts that must be sent to various addresses before closing an account
-    /// @param closureAction Type of account closure
-    ///        * CLOSE_ACCOUNT: The account is healthy and is closed normally
-    ///        * LIQUIDATE_ACCOUNT: The account is unhealthy and is being liquidated to avoid bad debt
-    ///        * LIQUIDATE_EXPIRED_ACCOUNT: The account has expired and is being liquidated (lowered liquidation premium)
-    ///        * LIQUIDATE_PAUSED: The account is liquidated while the system is paused due to emergency (no liquidation premium)
-    /// @return amountToPool Amount of underlying to be sent to the pool
-    /// @return remainingFunds Amount of underlying to be sent to the borrower (only applicable to liquidations)
-    /// @return profit Protocol's profit from fees (if any)
-    /// @return loss Protocol's loss from bad debt (if any)
-    function calcClosePayments(ClosureAction closureAction, CollateralDebtData memory collateralDebtData)
-        public
-        view
-        override
-        returns (uint256 amountToPool, uint256 remainingFunds, uint256 profit, uint256 loss)
-    {
-        uint256 debtWithInterest = collateralDebtData.debtWithInterest;
-        // The amount to be paid to pool is computed with fees included
-        // The pool will compute the amount of Diesel tokens to treasury
-        // based on profit
-        amountToPool =
-            debtWithInterest + ((debtWithInterest - collateralDebtData.debt) * feeInterest) / PERCENTAGE_FACTOR; // F:[CM-43]
-
-        if (
-            closureAction == ClosureAction.LIQUIDATE_ACCOUNT || closureAction == ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT
-        ) {
-            // LIQUIDATION CASE
-            uint256 totalValue = collateralDebtData.totalValue;
-            // During liquidation, totalValue of the account is discounted
-            // by (1 - liquidationPremium). This means that totalValue * liquidationPremium
-            // is removed from all calculations and can be claimed by the liquidator at the end of transaction
-
-            // The liquidation premium depends on liquidation type:
-            // * For normal unhealthy account or emergency liquidations, usual premium applies
-            // * For expiry liquidations, the premium is typically reduced,
-            //   since the account does not risk bad debt, so the liquidation
-            //   is not as urgent
-
-            uint256 totalFunds = (
-                totalValue
-                    * (closureAction == ClosureAction.LIQUIDATE_ACCOUNT ? liquidationDiscount : liquidationDiscountExpired)
-            ) / PERCENTAGE_FACTOR; // F:[CM-43]
-
-            amountToPool += (
-                totalValue * (closureAction == ClosureAction.LIQUIDATE_ACCOUNT ? feeLiquidation : feeLiquidationExpired)
-            ) / PERCENTAGE_FACTOR; // F:[CM-43]
-
-            // If there are any funds left after all respective payments (this
-            // includes the liquidation premium, since totalFunds is already
-            // discounted from totalValue), they are recorded to remainingFunds
-            // and will later be sent to the borrower.
-
-            // If totalFunds is not sufficient to cover the entire payment to pool,
-            // the Credit Manager will repay what it can. When totalFunds >= debt + interest,
-            // this simply means that part of protocol fees will be waived (profit is reduced). Otherwise,
-            // there is bad debt (loss > 0).
-
-            // Since values are compared to each other before subtracting,
-            // this can be marked as unchecked to optimize gas
-
-            uint256 amountToPoolWithFee = _amountWithFee(amountToPool);
-            unchecked {
-                if (totalFunds > amountToPoolWithFee) {
-                    remainingFunds = totalFunds - amountToPoolWithFee - 1; // F:[CM-43]
-                } else {
-                    amountToPool = _amountMinusFee(totalFunds); // F:[CM-43]
-                }
-
-                if (amountToPool >= debtWithInterest) {
-                    profit = amountToPool - debtWithInterest; // F:[CM-43]
-                } else {
-                    loss = debtWithInterest - amountToPool; // F:[CM-43]
-                }
-            }
-        } else {
-            // CLOSURE CASE
-
-            // During closure, it is assumed that the user has enough to cover
-            // the principal + interest + fees. closeCreditAccount, thus, will
-            // attempt to charge them the entire amount.
-
-            // Since in this case amountToPool + debtWithInterest + fee,
-            // this block can be marked as unchecked
-
-            unchecked {
-                profit = amountToPool - debtWithInterest; // F:[CM-43]
-            }
-        }
-
-        amountToPool = _amountWithFee(amountToPool);
     }
 
     /// @dev Manages debt size for borrower:
@@ -1133,40 +1066,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
             token = underlying; // F:[CM-47]
             liquidationThreshold = ltUnderlying;
         } else {
-            CollateralTokenData memory tokenData = collateralTokensData[tokenMask]; // F:[CM-47]
-            token = tokenData.token;
-
-            if (token == address(0)) {
-                revert TokenNotAllowedException();
-            }
+            CollateralTokenData storage tokenData = collateralTokensData[tokenMask]; // F:[CM-47]
+            token = tokenData.getTokenOrRevert();
 
             if (calcLT) {
-                if (block.timestamp < tokenData.timestampRampStart) {
-                    liquidationThreshold = tokenData.ltInitial; // F:[CM-47]
-                } else if (block.timestamp < tokenData.timestampRampStart + tokenData.rampDuration) {
-                    liquidationThreshold = _getRampingLiquidationThreshold(
-                        tokenData.ltInitial,
-                        tokenData.ltFinal,
-                        tokenData.timestampRampStart,
-                        tokenData.timestampRampStart + tokenData.rampDuration
-                    );
-                } else {
-                    liquidationThreshold = tokenData.ltFinal;
-                }
+                liquidationThreshold = tokenData.getLiquidationThreshold();
             }
         }
-    }
-
-    function _getRampingLiquidationThreshold(
-        uint16 ltInitial,
-        uint16 ltFinal,
-        uint40 timestampRampStart,
-        uint40 timestampRampEnd
-    ) internal view returns (uint16) {
-        return uint16(
-            (ltInitial * (timestampRampEnd - block.timestamp) + ltFinal * (block.timestamp - timestampRampStart))
-                / (timestampRampEnd - timestampRampStart)
-        ); // F: [CM-72]
     }
 
     /// @dev Returns the address of a borrower's Credit Account, or reverts if there is none.
