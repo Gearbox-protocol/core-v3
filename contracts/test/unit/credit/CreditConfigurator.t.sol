@@ -6,7 +6,7 @@ pragma solidity ^0.8.10;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
-import {WithdrawManager} from "../../../support/WithdrawManager.sol";
+import {WithdrawalManager} from "../../../support/WithdrawalManager.sol";
 import {CreditConfigurator, CreditManagerOpts, CollateralToken} from "../../../credit/CreditConfiguratorV3.sol";
 import {ICreditManagerV3, ICreditManagerV3Events} from "../../../interfaces/ICreditManagerV3.sol";
 import {ICreditConfiguratorEvents} from "../../../interfaces/ICreditConfiguratorV3.sol";
@@ -51,7 +51,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
     CreditManagerV3 public creditManager;
     CreditFacadeV3 public creditFacade;
     CreditConfigurator public creditConfigurator;
-    WithdrawManager public withdrawManager;
+    WithdrawalManager public withdrawalManager;
     address underlying;
 
     AdapterMock adapter1;
@@ -79,7 +79,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
         creditManager = cct.creditManager();
         creditFacade = cct.creditFacade();
         creditConfigurator = cct.creditConfigurator();
-        withdrawManager = cct.withdrawManager();
+        withdrawalManager = cct.withdrawalManager();
 
         TARGET_CONTRACT = address(new TargetContractMock());
 
@@ -251,11 +251,11 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
             maxBorrowedAmount: uint128(150000 * WAD),
             collateralTokens: cTokens,
             degenNFT: address(0),
-            withdrawManager: address(0),
+            withdrawalManager: address(0),
             expirable: false
         });
 
-        creditManager = new CreditManagerV3(address(cct.poolMock()), address(withdrawManager));
+        creditManager = new CreditManagerV3(address(cct.poolMock()), address(withdrawalManager));
         creditFacade = new CreditFacadeV3(
             address(creditManager),
             creditOpts.degenNFT,
@@ -1175,7 +1175,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
             maxBorrowedAmount: uint128(150000 * WAD),
             collateralTokens: cTokens,
             degenNFT: address(0),
-            withdrawManager: address(0),
+            withdrawalManager: address(0),
             expirable: false
         });
 

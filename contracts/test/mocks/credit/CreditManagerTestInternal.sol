@@ -24,7 +24,7 @@ contract CreditManagerTestInternal is CreditManagerV3 {
 
     /// @dev Constructor
     /// @param _poolService Address of pool service
-    constructor(address _poolService, address _withdrawManager) CreditManagerV3(_poolService, _withdrawManager) {}
+    constructor(address _poolService, address _withdrawalManager) CreditManagerV3(_poolService, _withdrawalManager) {}
 
     function setCumulativeDropAtFastCheck(address creditAccount, uint16 value) external {
         // cumulativeDropAtFastCheckRAY[creditAccount] = value;

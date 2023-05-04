@@ -171,6 +171,8 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     /// @param to Address to transfer the account to
     function transferAccountOwnership(address creditAccount, address to) external;
 
+    function claimWithdrawals(address creditAccount, address to) external;
+
     //
     // GETTERS
     //

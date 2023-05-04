@@ -7,7 +7,7 @@ import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
-import {WithdrawManager} from "../../support/WithdrawManager.sol";
+import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
 import {AccountFactoryV2} from "../../core/AccountFactory.sol";
 
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
@@ -57,8 +57,8 @@ contract CreditManagerTestSuite is PoolDeployer {
         tokenTestSuite = creditConfig.tokenTestSuite();
 
         creditManager = internalSuite
-            ? new CreditManagerTestInternal(address(poolMock), address(withdrawManager))
-            : new CreditManagerV3(address(poolMock), address(withdrawManager));
+            ? new CreditManagerTestInternal(address(poolMock), address(withdrawalManager))
+            : new CreditManagerV3(address(poolMock), address(withdrawalManager));
 
         creditFacade = msg.sender;
 

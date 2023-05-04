@@ -18,7 +18,7 @@ import {
 
 import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IWETHGateway} from "../../../interfaces/IWETHGateway.sol";
-import {IWithdrawManager} from "../../../interfaces/IWithdrawManager.sol";
+import {IWithdrawalManager} from "../../../interfaces/IWithdrawalManager.sol";
 
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 
@@ -78,7 +78,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     PoolServiceMock poolMock;
     IPriceOracleV2 priceOracle;
     IWETHGateway wethGateway;
-    IWithdrawManager withdrawManager;
+    IWithdrawalManager withdrawalManager;
     ACL acl;
     address underlying;
 
@@ -104,7 +104,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         af = cms.af();
 
         poolMock = cms.poolMock();
-        withdrawManager = cms.withdrawManager();
+        withdrawalManager = cms.withdrawalManager();
 
         creditManager = cms.creditManager();
 
@@ -233,7 +233,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     ///
     /// @dev [CM-1]: credit manager reverts if were called non-creditFacade
     function test_CM_01_constructor_sets_correct_values() public {
-        creditManager = new CreditManagerV3(address(poolMock), address(withdrawManager));
+        creditManager = new CreditManagerV3(address(poolMock), address(withdrawalManager));
 
         assertEq(address(creditManager.poolService()), address(poolMock), "Incorrect poolSerivice");
 
@@ -1113,7 +1113,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         //     assertEq(cumulativeIndexAtOpenAfter, cumulativeIndexNow, "Incorrect cumulativeIndexAtOpen");
         // } else {
         //     CreditManagerTestInternal cmi = new CreditManagerTestInternal(
-        //         creditManager.poolService(), address(withdrawManager)
+        //         creditManager.poolService(), address(withdrawalManager)
         //     );
 
         //     {
@@ -1365,7 +1365,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     ) public {
         evm.startPrank(CONFIGURATOR);
 
-        CreditManagerV3 cm = new CreditManagerV3(address(poolMock), address(withdrawManager));
+        CreditManagerV3 cm = new CreditManagerV3(address(poolMock), address(withdrawalManager));
         cms.cr().addCreditManager(address(cm));
 
         cm.setCreditFacade(address(this));
@@ -1415,7 +1415,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         evm.startPrank(CONFIGURATOR);
 
         // We use clean CreditManagerV3 to have only one underlying token for testing
-        creditManager = new CreditManagerV3(address(poolMock), address(withdrawManager));
+        creditManager = new CreditManagerV3(address(poolMock), address(withdrawalManager));
         cms.cr().addCreditManager(address(creditManager));
 
         creditManager.setCreditFacade(address(this));
@@ -2226,7 +2226,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         if (!isIncrease && (delta > interest)) delta %= uint128(interest);
 
         CreditManagerTestInternal cmi = new CreditManagerTestInternal(
-            creditManager.poolService(), address(withdrawManager)
+            creditManager.poolService(), address(withdrawalManager)
         );
 
         if (isIncrease) {

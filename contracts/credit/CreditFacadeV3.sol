@@ -26,6 +26,7 @@ import {
     CollateralCalcTask
 } from "../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
+import {CancelAction, ClaimAction} from "../interfaces/IWithdrawalManager.sol";
 
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 
@@ -34,8 +35,6 @@ import {IDegenNFT} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNF
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
 import {IBotList} from "../interfaces/IBotList.sol";
-
-import {CancellationType} from "../interfaces/IWithdrawManager.sol";
 
 // CONSTANTS
 import {LEVERAGE_DECIMALS} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
@@ -273,6 +272,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
     ///      from the Credit Account and proceeds. If not, tries to transfer the shortfall from msg.sender.
     ///    + Transfers all enabled assets with non-zero balances to the "to" address, unless they are marked
     ///      to be skipped in skipTokenMask
+    ///    + If there are withdrawals scheduled for Credit Account, claims them all to `to`
     ///    + If convertWETH is true, converts WETH into ETH before sending to the recipient
     /// - Emits a CloseCreditAccount event
     ///
@@ -292,7 +292,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
 
         CollateralDebtData memory debtData = _calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_ONLY);
 
-        _cancelWithdrawals(creditAccount, CancellationType.PUSH_WITHDRAWALS);
+        _claimWithdrawals(creditAccount, to, ClaimAction.FORCE_CLAIM);
 
         // [FA-13]: Calls to CreditFacadeV3 are forbidden during closure
         if (calls.length != 0) {
@@ -341,6 +341,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
     ///    + Transfers all enabled assets with non-zero balances to the "to" address, unless they are marked
     ///      to be skipped in skipTokenMask. If the liquidator is confident that all assets were converted
     ///      during the multicall, they can set the mask to uint256.max - 1, to only transfer the underlying
+    ///    + If there are withdrawals scheduled for Credit Account, cancels immature withdrawals and claims mature ones
     ///    + If convertWETH is true, converts WETH into ETH before sending
     /// - Emits LiquidateCreditAccount event
     ///
@@ -360,15 +361,20 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
 
         // Checks that the account hf < 1 and computes the totalValue
         // before the multicall
-        (ClosureAction closeAction, CollateralDebtData memory collateralDebtData) =
-            _isAccountLiquidatable({creditAccount: creditAccount, isEmergencyLiquidation: paused()}); // F:[FA-14]
+        ClosureAction closeAction;
+        CollateralDebtData memory collateralDebtData;
+        {
+            CancelAction cancelAction;
+            (cancelAction, closeAction, collateralDebtData) =
+                _isAccountLiquidatable({creditAccount: creditAccount, isEmergency: paused()}); // F:[FA-14]
 
-        if (!collateralDebtData.isLiquidatable) revert CreditAccountNotLiquidatableException();
+            if (!collateralDebtData.isLiquidatable) revert CreditAccountNotLiquidatableException();
+            collateralDebtData.enabledTokensMask |=
+                _cancelWithdrawals({action: cancelAction, creditAccount: creditAccount, to: borrower});
+        }
 
         // Wraps ETH and sends it back to msg.sender
         _wrapETH(); // F:[FA-3D]
-
-        collateralDebtData.enabledTokensMask |= _cancelWithdrawals(creditAccount, CancellationType.RETURN_FUNDS);
 
         if (calls.length != 0) {
             FullCheckParams memory fullCheckParams =
@@ -583,9 +589,9 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
                     //
                     // WITHDRAW
                     //
-                    else if (method == ICreditFacadeMulticall.withdraw.selector) {
+                    else if (method == ICreditFacadeMulticall.scheduleWithdrawal.selector) {
                         _revertIfNoPermission(flags, WITHDRAW_PERMISSION);
-                        uint256 tokensToDisable = _withdraw(creditAccount, callData);
+                        uint256 tokensToDisable = _scheduleWithdrawal(creditAccount, callData);
                         /// IGNORE QUOTED TOKEN MASK
                         enabledTokensMask = enabledTokensMask & (~(tokensToDisable & quotedTokenMaskInverted));
                     }
@@ -702,11 +708,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         creditManager.revokeAdapterAllowances(creditAccount, revocations);
     }
 
-    function _withdraw(address creditAccount, bytes memory callData) internal returns (uint256 tokensToDisable) {
-        (address to, address token, uint256 amount) = abi.decode(callData, (address, address, uint256));
-        tokensToDisable = creditManager.withdraw(creditAccount, to, token, amount);
-    }
-
     /// @dev Adds expected deltas to current balances on a Credit account and returns the result
 
     /// @param creditAccount Credit Account to compute balances for
@@ -812,7 +813,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
 
         /// Checks that the account hf > 1, as it is forbidden to transfer
         /// accounts that are liquidatable
-        (, CollateralDebtData memory collateralDebtData) = _isAccountLiquidatable(creditAccount, false); // F:[FA-34]
+        (,, CollateralDebtData memory collateralDebtData) = _isAccountLiquidatable(creditAccount, false); // F:[FA-34]
 
         if (collateralDebtData.isLiquidatable) revert CantTransferLiquidatableAccountException(); // F:[FA-34]
 
@@ -821,6 +822,17 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
 
         // Emits event
         emit TransferAccount(creditAccount, msg.sender, to); // F:[FA-35]
+    }
+
+    function claimWithdrawals(address creditAccount, address to)
+        external
+        override
+        whenNotPaused
+        whenNotExpired
+        creditAccountOwnerOnly(creditAccount)
+        nonReentrant
+    {
+        _claimWithdrawals(creditAccount, to, ClaimAction.CLAIM);
     }
 
     /// @dev Checks that transfer is allowed
@@ -1011,16 +1023,17 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
 
     /// @dev Checks if account is liquidatable (i.e., hf < 1)
     /// @param creditAccount Address of credit account to check
-    function _isAccountLiquidatable(address creditAccount, bool isEmergencyLiquidation)
+    function _isAccountLiquidatable(address creditAccount, bool isEmergency)
         internal
         view
-        returns (ClosureAction closeAction, CollateralDebtData memory collateralDebtData)
+        returns (CancelAction cancelAction, ClosureAction closeAction, CollateralDebtData memory collateralDebtData)
     {
+        cancelAction = isEmergency ? CancelAction.FORCE_CANCEL : CancelAction.CANCEL;
         collateralDebtData = _calcDebtAndCollateral(
             creditAccount,
-            isEmergencyLiquidation
-                ? CollateralCalcTask.DEBT_COLLATERAL_WITH_ALL_WITHDRAWALS
-                : CollateralCalcTask.DEBT_COLLATERAL_WITH_PENDING_WITHDRAWALS
+            isEmergency
+                ? CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
+                : CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS
         );
         closeAction = ClosureAction.LIQUIDATE_ACCOUNT;
 
@@ -1046,11 +1059,23 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         return creditManager.enabledTokensMap(creditAccount);
     }
 
-    function _cancelWithdrawals(address creditAccount, CancellationType ctype)
+    function _scheduleWithdrawal(address creditAccount, bytes memory callData)
+        internal
+        returns (uint256 tokensToDisable)
+    {
+        (address token, uint256 amount) = abi.decode(callData, (address, uint256));
+        tokensToDisable = creditManager.scheduleWithdrawal(creditAccount, token, amount);
+    }
+
+    function _cancelWithdrawals(address creditAccount, address to, CancelAction action)
         internal
         returns (uint256 tokensToEnable)
     {
-        tokensToEnable = creditManager.cancelWithdrawals(creditAccount, ctype);
+        tokensToEnable = creditManager.cancelWithdrawals(creditAccount, to, action);
+    }
+
+    function _claimWithdrawals(address creditAccount, address to, ClaimAction action) internal {
+        creditManager.claimWithdrawals(creditAccount, to, action);
     }
 
     function _wethWithdrawTo(address to) internal {
