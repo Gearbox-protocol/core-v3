@@ -199,21 +199,6 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @return borrower Borrower's address
     function getBorrowerOrRevert(address creditAccount) external view returns (address borrower);
 
-    /// @dev Computes amounts that must be sent to various addresses before closing an account
-    /// @param closureActionType Type of account closure
-    ///        * CLOSE_ACCOUNT: The account is healthy and is closed normally
-    ///        * LIQUIDATE_ACCOUNT: The account is unhealthy and is being liquidated to avoid bad debt
-    ///        * LIQUIDATE_EXPIRED_ACCOUNT: The account has expired and is being liquidated (lowered liquidation premium)
-    ///        * LIQUIDATE_PAUSED: The account is liquidated while the system is paused due to emergency (no liquidation premium)
-
-    // @return remainingFunds Amount of underlying to be sent to the borrower (only applicable to liquidations)
-    // @return profit Protocol's profit from fees (if any)
-    // @return loss Protocol's loss from bad debt (if any)
-    function calcClosePayments(ClosureAction closureActionType, CollateralDebtData memory collateralDebtData)
-        external
-        view
-        returns (uint256 amountToPool, uint256 remainingFunds, uint256 profit, uint256 loss);
-
     /// @dev Maps Credit Accounts to bit masks encoding their enabled token sets
     /// Only enabled tokens are counted as collateral for the Credit Account
     /// @notice An enabled token mask encodes an enabled token by setting

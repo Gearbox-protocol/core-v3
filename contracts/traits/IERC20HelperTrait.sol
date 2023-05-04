@@ -15,7 +15,7 @@ abstract contract IERC20HelperTrait {
         return IERC20(token).balanceOf(holder);
     }
 
-    function _transferFrom(address token, address from, address to, uint256 amount) internal {
+    function _safeTransferFrom(address token, address from, address to, uint256 amount) internal {
         IERC20(token).safeTransferFrom(from, to, amount);
     }
 }
