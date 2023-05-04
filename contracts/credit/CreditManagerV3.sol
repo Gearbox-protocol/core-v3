@@ -1449,7 +1449,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
         CollateralTokenData memory tokenData = collateralTokensData[tokenMask];
 
-        _setLTRampParams(tokenData, tokenMask, tokenData.ltInitial, finalLT, timestampRampStart, rampDuration); // F: [CM-71]
+        (, uint16 currentLT) = collateralTokensByMask(tokenMask);
+
+        _setLTRampParams(tokenData, tokenMask, currentLT, finalLT, timestampRampStart, rampDuration); // F: [CM-71]
     }
 
     /// @dev Internal function that sets the LT params
