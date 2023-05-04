@@ -11,7 +11,7 @@ import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/Contra
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 import {GenesisFactory} from "./GenesisFactory.sol";
 import {PoolFactory, PoolOpts} from "@gearbox-protocol/core-v2/contracts/factories/PoolFactory.sol";
-import {WithdrawManager} from "../../support/WithdrawManager.sol";
+import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
 
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 import {PoolServiceMock} from "../mocks/pool/PoolServiceMock.sol";
@@ -44,7 +44,7 @@ contract PoolDeployer is DSTest {
     PoolQuotaKeeper public poolQuotaKeeper;
     GaugeMock public gaugeMock;
     ContractsRegister public cr;
-    WithdrawManager public withdrawManager;
+    WithdrawalManager public withdrawalManager;
     ACL public acl;
 
     IPriceOracleV2Ext public priceOracle;
@@ -84,7 +84,7 @@ contract PoolDeployer is DSTest {
 
         cr = ContractsRegister(addressProvider.getContractsRegister());
 
-        withdrawManager = new WithdrawManager(address(addressProvider));
+        withdrawalManager = new WithdrawalManager(address(addressProvider), 1 days);
 
         underlying = _underlying;
 

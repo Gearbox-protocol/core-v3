@@ -5,8 +5,8 @@ pragma solidity ^0.8.10;
 
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IPoolQuotaKeeper, QuotaUpdate} from "./IPoolQuotaKeeper.sol";
+import {CancelAction, ClaimAction, IWithdrawalManager} from "./IWithdrawalManager.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
-import {CancellationType} from "./IWithdrawManager.sol";
 
 enum ClosureAction {
     CLOSE_ACCOUNT,
@@ -33,9 +33,8 @@ struct CreditAccountInfo {
 
 enum CollateralCalcTask {
     DEBT_ONLY,
-    DEBT_COLLATERAL_WITHOUT_PENDING_WITHDRAWALS,
-    DEBT_COLLATERAL_WITH_PENDING_WITHDRAWALS,
-    DEBT_COLLATERAL_WITH_ALL_WITHDRAWALS
+    DEBT_COLLATERAL_CANCEL_WITHDRAWALS,
+    DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
 }
 
 struct CollateralDebtData {
@@ -315,19 +314,22 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
         view
         returns (CollateralDebtData memory collateralDebtData);
 
-    function withdraw(address creditAccount, address borrower, address token, uint256 amount)
+    /// @dev Withdrawal manager
+    function withdrawalManager() external view returns (IWithdrawalManager);
+
+    function scheduleWithdrawal(address creditAccount, address token, uint256 amount)
         external
         returns (uint256 tokensToDisable);
 
-    function cancelWithdrawals(address creditAccount, CancellationType ctype)
+    function cancelWithdrawals(address creditAccount, address to, CancelAction action)
         external
         returns (uint256 tokensToEnable);
+
+    function claimWithdrawals(address creditAccount, address to, ClaimAction action) external;
 
     /// @notice Revokes allowances for specified spender/token pairs
     /// @param revocations Spender/token pairs to revoke allowances for
     function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external;
-
-    function disableWithdrawalFlag(address creditAccount) external;
 
     function setCaForExternalCall(address creditAccount) external;
 
