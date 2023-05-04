@@ -1049,7 +1049,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         override
         returns (uint256 amountToPool, uint256 remainingFunds, uint256 profit, uint256 loss)
     {
-        uint256 totalValue = collateralDebtData.totalValue;
         uint256 debtWithInterest = collateralDebtData.debtWithInterest;
         // The amount to be paid to pool is computed with fees included
         // The pool will compute the amount of Diesel tokens to treasury
@@ -1061,7 +1060,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
             closureAction == ClosureAction.LIQUIDATE_ACCOUNT || closureAction == ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT
         ) {
             // LIQUIDATION CASE
-
+            uint256 totalValue = collateralDebtData.totalValue;
             // During liquidation, totalValue of the account is discounted
             // by (1 - liquidationPremium). This means that totalValue * liquidationPremium
             // is removed from all calculations and can be claimed by the liquidator at the end of transaction
@@ -1082,7 +1081,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
             ) / PERCENTAGE_FACTOR; // F:[CM-43]
 
             /// Adding fee here
-            // amountToPool = _amountWithFee(amountToPool);
+            uint256 amountToPoolWithFee = _amountWithFee(amountToPool);
 
             // If there are any funds left after all respective payments (this
             // includes the liquidation premium, since totalFunds is already
@@ -1098,13 +1097,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
             // this can be marked as unchecked to optimize gas
 
             unchecked {
-                if (totalFunds > amountToPool) {
-                    remainingFunds = totalFunds - amountToPool - 1; // F:[CM-43]
+                if (totalFunds > amountToPoolWithFee) {
+                    remainingFunds = totalFunds - amountToPoolWithFee - 1; // F:[CM-43]
                 } else {
                     amountToPool = totalFunds; // F:[CM-43]
                 }
 
-                if (totalFunds >= debtWithInterest) {
+                if (totalFunds >= _amountWithFee(debtWithInterest)) {
                     profit = amountToPool - debtWithInterest; // F:[CM-43]
                 } else {
                     loss = debtWithInterest - amountToPool; // F:[CM-43]
@@ -1123,6 +1122,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
             unchecked {
                 profit = amountToPool - debtWithInterest; // F:[CM-43]
             }
+
+            amountToPool = _amountWithFee(amountToPool);
         }
     }
 
