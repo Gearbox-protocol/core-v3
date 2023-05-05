@@ -110,7 +110,7 @@ contract CreditFacadeTestEngine is DSTest {
     function expectTokenIsEnabled(address creditAccount, address token, bool expectedState, string memory reason)
         internal
     {
-        bool state = creditManager.getTokenMaskOrRevert(token) & creditManager.enabledTokensMap(creditAccount) != 0;
+        bool state = creditManager.getTokenMaskOrRevert(token) & creditManager.enabledTokensMaskOf(creditAccount) != 0;
 
         if (state != expectedState && bytes(reason).length != 0) {
             emit log_string(reason);

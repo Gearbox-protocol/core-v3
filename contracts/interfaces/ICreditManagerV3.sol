@@ -20,14 +20,14 @@ enum ManageDebtAction {
 }
 
 uint8 constant WITHDRAWAL_FLAG = 1;
-uint8 constant BOT_PERMISSIONS_SET = 2;
+uint8 constant BOT_PERMISSIONS_SET_FLAG = 1 << 1;
 
 struct CreditAccountInfo {
     uint256 debt;
     uint256 cumulativeIndexAtOpen;
     uint256 cumulativeQuotaInterest;
     uint256 enabledTokensMask;
-    uint8 flags;
+    uint16 flags;
     address borrower;
 }
 
@@ -203,7 +203,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// Only enabled tokens are counted as collateral for the Credit Account
     /// @notice An enabled token mask encodes an enabled token by setting
     ///         the bit at the position equal to token's index to 1
-    function enabledTokensMap(address creditAccount) external view returns (uint256);
+    function enabledTokensMaskOf(address creditAccount) external view returns (uint256);
 
     /// @dev Returns the collateral token at requested index and its liquidation threshold
     /// @param id The index of token to return
@@ -319,4 +319,8 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     function externalCallCreditAccountOrRevert() external view returns (address creditAccount);
 
     function getTokenByMask(uint256 tokenMask) external view returns (address token);
+
+    function flagsOf(address creditAccount) external view returns (uint16);
+
+    function setFlagFor(address creditAccount, uint16 flag, bool value) external;
 }

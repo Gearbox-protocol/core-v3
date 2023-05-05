@@ -6,13 +6,14 @@ pragma solidity ^0.8.10;
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 // LIBS & TRAITS
+import {CreditLogic} from "../libraries/CreditLogic.sol";
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {IERC20HelperTrait} from "../traits/IERC20HelperTrait.sol";
-import {UNDERLYING_TOKEN_MASK, BitMask} from "../libraries/BitMask.sol";
+import {UNDERLYING_TOKEN_MASK} from "../libraries/BitMask.sol";
 
 //  DATA
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
-import {Balance, BalanceOps} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
+import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 import {QuotaUpdate} from "../interfaces/IPoolQuotaKeeper.sol";
 
 /// INTERFACES
@@ -23,7 +24,8 @@ import {
     ManageDebtAction,
     RevocationPair,
     CollateralDebtData,
-    CollateralCalcTask
+    CollateralCalcTask,
+    BOT_PERMISSIONS_SET_FLAG
 } from "../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
 import {ClaimAction} from "../interfaces/IWithdrawalManager.sol";
@@ -73,7 +75,6 @@ struct CumulativeLossParams {
 /// - Through adapters, which call the Credit Manager directly, but only allow interactions with specific target contracts
 contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrait {
     using Address for address;
-    using BitMask for uint256;
 
     /// @dev Credit Manager connected to this Credit Facade
     ICreditManagerV3 public immutable creditManager;
@@ -260,7 +261,9 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         }); // F:[FA-8]
 
         // Checks that the new credit account has enough collateral to cover the debt
-        _fullCollateralCheck(creditAccount, UNDERLYING_TOKEN_MASK, fullCheckParams, forbiddenBalances); // F:[FA-8, 9]
+        _fullCollateralCheck(
+            creditAccount, UNDERLYING_TOKEN_MASK, fullCheckParams, forbiddenBalances, forbiddenTokenMask
+        ); // F:[FA-8, 9]
     }
 
     /// @dev Runs a batch of transactions within a multicall and closes the account
@@ -458,14 +461,25 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         internal
         nonZeroCallsOnly(calls)
     {
-        (uint256 enabledTokensMaskBefore, uint256[] memory forbiddenBalances) = _storeForbiddenBalances(creditAccount);
+        uint256 _forbiddenTokenMask = forbiddenTokenMask;
+
+        uint256 enabledTokensMaskBefore = creditManager.enabledTokensMaskOf(creditAccount);
+
+        uint256[] memory forbiddenBalances = CreditLogic.storeForbiddenBalances({
+            creditAccount: creditAccount,
+            forbiddenTokenMask: _forbiddenTokenMask,
+            enabledTokensMask: enabledTokensMaskBefore,
+            getTokenByMaskFn: _getTokenByMask
+        });
 
         FullCheckParams memory fullCheckParams = _multicall(creditAccount, calls, enabledTokensMaskBefore, permissions);
 
         // Performs a fullCollateralCheck
         // During a multicall, all intermediary health checks are skipped,
         // as one fullCollateralCheck at the end is sufficient
-        _fullCollateralCheck(creditAccount, enabledTokensMaskBefore, fullCheckParams, forbiddenBalances);
+        _fullCollateralCheck(
+            creditAccount, enabledTokensMaskBefore, fullCheckParams, forbiddenBalances, _forbiddenTokenMask
+        );
     }
 
     /// @dev IMPLEMENTATION: multicall
@@ -519,8 +533,16 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
                     // REVERT_IF_RECEIVED_LESS_THAN
                     //
                     if (method == ICreditFacadeMulticall.revertIfReceivedLessThan.selector) {
+                        // Method can only be called once since the provided Balance array
+                        // contains deltas that are added to the current balances
+                        // Calling this function again could potentially override old values
+                        // and cause confusion, especially if called later in the MultiCall
+                        if (expectedBalances.length != 0) {
+                            revert ExpectedBalancesAlreadySetException();
+                        } // F:[FA-45A]
+
                         // Sets expected balances to currentBalance + delta
-                        expectedBalances = _storeBalances(creditAccount, callData, expectedBalances); // F:[FA-45]
+                        expectedBalances = CreditLogic.storeBalances(creditAccount, callData); // F:[FA-45]
                     }
                     //
                     // SET FULL CHECK PARAMS
@@ -641,7 +663,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         // If expectedBalances was set by calling revertIfGetLessThan,
         // checks that actual token balances are not less than expected balances
         if (expectedBalances.length != 0) {
-            _compareBalances(creditAccount, expectedBalances);
+            CreditLogic.compareBalances(creditAccount, expectedBalances);
         }
 
         /// @dev Checks that there are no intersections between the user's enabled tokens
@@ -709,51 +731,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
     }
 
     /// @dev Adds expected deltas to current balances on a Credit account and returns the result
-
-    /// @param creditAccount Credit Account to compute balances for
-    /// @param callData Bytes calldata for parsing
-    /// @param expectedBalances Current value of expected balances, used for checking that we run the function only once
-
-    function _storeBalances(address creditAccount, bytes memory callData, Balance[] memory expectedBalances)
-        internal
-        view
-        returns (Balance[] memory expected)
-    {
-        // Method can only be called once since the provided Balance array
-        // contains deltas that are added to the current balances
-        // Calling this function again could potentially override old values
-        // and cause confusion, especially if called later in the MultiCall
-        if (expectedBalances.length != 0) {
-            revert ExpectedBalancesAlreadySetException();
-        } // F:[FA-45A]
-
-        // Retrieves the balance list from calldata
-        expected = abi.decode(callData, (Balance[])); // F:[FA-45]
-        uint256 len = expected.length; // F:[FA-45]
-
-        for (uint256 i = 0; i < len;) {
-            expected[i].balance += _balanceOf(expected[i].token, creditAccount); // F:[FA-45]
-            unchecked {
-                ++i;
-            }
-        }
-    }
-
-    /// @dev Compares current balances to previously saved expected balances.
-    /// Reverts if at least one balance is lower than expected
-    /// @param creditAccount Credit Account to check
-    /// @param expected Expected balances after all operations
-
-    function _compareBalances(address creditAccount, Balance[] memory expected) internal view {
-        uint256 len = expected.length; // F:[FA-45]
-        unchecked {
-            for (uint256 i = 0; i < len; ++i) {
-                if (_balanceOf(expected[i].token, creditAccount) < expected[i].balance) {
-                    revert BalanceLessThanMinimumDesiredException(expected[i].token);
-                } // F:[FA-45]
-            }
-        }
-    }
 
     /// @dev Increases debt for a Credit Account
     /// @param creditAccount CA to increase debt for
@@ -932,7 +909,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
         address creditAccount,
         uint256 enabledTokensMaskBefore,
         FullCheckParams memory fullCheckParams,
-        uint256[] memory forbiddenBalances
+        uint256[] memory forbiddenBalances,
+        uint256 _forbiddenTokenMask
     ) internal {
         creditManager.fullCollateralCheck(
             creditAccount,
@@ -941,66 +919,14 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
             fullCheckParams.minHealthFactor
         );
 
-        uint256 forbiddenTokensOnAccount = fullCheckParams.enabledTokensMaskAfter & forbiddenTokenMask;
-
-        if (forbiddenTokensOnAccount != 0) {
-            _checkForbiddenBalances(creditAccount, enabledTokensMaskBefore, forbiddenBalances, forbiddenTokensOnAccount);
-        }
-    }
-
-    function _storeForbiddenBalances(address creditAccount)
-        internal
-        view
-        returns (uint256 enabledTokensMaskBefore, uint256[] memory forbiddenBalances)
-    {
-        enabledTokensMaskBefore = creditManager.enabledTokensMap(creditAccount);
-        uint256 forbiddenTokensOnAccount = enabledTokensMaskBefore & forbiddenTokenMask;
-
-        if (forbiddenTokensOnAccount != 0) {
-            forbiddenBalances = new uint256[](enabledTokensMaskBefore.calcEnabledTokens());
-            uint256 tokenMask;
-            uint256 j;
-            for (uint256 i; tokenMask < forbiddenTokensOnAccount; ++i) {
-                tokenMask = 1 << i; // F: [CM-68]
-
-                if (forbiddenTokensOnAccount & tokenMask != 0) {
-                    address token = _getTokenByMask(tokenMask);
-                    forbiddenBalances[j] = _balanceOf(token, creditAccount);
-                    ++j;
-                }
-            }
-        }
-    }
-
-    function _checkForbiddenBalances(
-        address creditAccount,
-        uint256 enabledTokensMaskBefore,
-        uint256[] memory forbiddenBalances,
-        uint256 forbiddenTokensOnAccount
-    ) internal view {
-        unchecked {
-            uint256 forbiddenTokensOnAccountBefore = enabledTokensMaskBefore & forbiddenTokenMask;
-
-            if (forbiddenTokensOnAccount & ~forbiddenTokensOnAccountBefore > 0) revert ForbiddenTokensException();
-
-            uint256 tokenMask;
-            uint256 j;
-            for (uint256 i; tokenMask < forbiddenTokensOnAccountBefore; ++i) {
-                tokenMask = 1 << i; // F: [CM-68]
-
-                if (forbiddenTokensOnAccountBefore & tokenMask != 0) {
-                    if (forbiddenTokensOnAccount & tokenMask != 0) {
-                        address token = _getTokenByMask(tokenMask);
-                        uint256 balance = _balanceOf(token, creditAccount);
-                        if (balance > forbiddenBalances[j]) {
-                            revert ForbiddenTokensException();
-                        }
-                    }
-
-                    ++j;
-                }
-            }
-        }
+        CreditLogic.checkForbiddenBalances({
+            creditAccount: creditAccount,
+            enabledTokensMaskBefore: enabledTokensMaskBefore,
+            enabledTokensMaskAfter: fullCheckParams.enabledTokensMaskAfter,
+            forbiddenBalances: forbiddenBalances,
+            forbiddenTokenMask: _forbiddenTokenMask,
+            getTokenByMaskFn: _getTokenByMask
+        });
     }
 
     /// @dev Returns whether the Credit Facade is expired
@@ -1056,7 +982,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
     }
 
     function _enabledTokensMask(address creditAccount) internal view returns (uint256) {
-        return creditManager.enabledTokensMap(creditAccount);
+        return creditManager.enabledTokensMaskOf(creditAccount);
     }
 
     function _scheduleWithdrawal(address creditAccount, bytes memory callData)

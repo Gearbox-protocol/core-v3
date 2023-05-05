@@ -170,7 +170,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
             (ver == 1) ? creditFilter.allowedTokensCount() : creditManagerV2.collateralTokensCount();
 
         result.enabledTokenMask =
-            (ver == 1) ? creditFilter.enabledTokens(creditAccount) : creditManagerV2.enabledTokensMap(creditAccount);
+            (ver == 1) ? creditFilter.enabledTokens(creditAccount) : creditManagerV2.enabledTokensMaskOf(creditAccount);
 
         result.balances = new TokenBalance[](collateralTokenCount);
         for (uint256 i = 0; i < collateralTokenCount;) {

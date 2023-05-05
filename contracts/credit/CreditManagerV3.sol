@@ -605,7 +605,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         override
         returns (CollateralDebtData memory collateralDebtData)
     {
-        uint256 enabledTokensMask = enabledTokensMap(creditAccount);
+        uint256 enabledTokensMask = enabledTokensMaskOf(creditAccount);
 
         if (task == CollateralCalcTask.DEBT_ONLY) {
             uint256 quotaInterest;
@@ -790,7 +790,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
     /// @dev Returns the array of quoted tokens that are enabled on the account
     function getQuotedTokens(address creditAccount) public view returns (address[] memory tokens) {
-        (tokens,) = _getQuotedTokens(enabledTokensMap(creditAccount));
+        (tokens,) = _getQuotedTokens(enabledTokensMaskOf(creditAccount));
     }
 
     function _getQuotedTokens(uint256 enabledTokensMask)
@@ -1338,8 +1338,20 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         if (creditAccount == address(1)) revert ExternalCallCreditAccountNotSetException();
     }
 
-    function enabledTokensMap(address creditAccount) public view override returns (uint256) {
+    function enabledTokensMaskOf(address creditAccount) public view override returns (uint256) {
         return uint256(creditAccountInfo[creditAccount].enabledTokensMask);
+    }
+
+    function flagsOf(address creditAccount) external view override returns (uint16) {
+        return creditAccountInfo[creditAccount].flags;
+    }
+
+    function setFlagFor(address creditAccount, uint16 flag, bool value) external override creditFacadeOnly {
+        if (value) {
+            creditAccountInfo[creditAccount].flags |= flag;
+        } else {
+            creditAccountInfo[creditAccount].flags &= ~flag;
+        }
     }
 
     function _saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) internal {

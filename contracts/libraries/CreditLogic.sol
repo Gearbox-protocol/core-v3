@@ -3,14 +3,19 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
+import {BitMask} from "./BitMask.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {CollateralDebtData, CollateralTokenData} from "../interfaces/ICreditManagerV3.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 import "../interfaces/IExceptions.sol";
 
 uint256 constant INDEX_PRECISION = 10 ** 9;
 
 /// @title Quota Library
 library CreditLogic {
+    using BitMask for uint256;
+
     function calcClosePayments(
         CollateralDebtData memory collateralDebtData,
         uint16 feeInterest,
@@ -169,25 +174,25 @@ library CreditLogic {
         returns (
             uint256 newDebt,
             uint256 newCumulativeIndex,
-            uint256 amountRepaid,
-            uint256 amountProfit,
+            uint256 amountToRepay,
+            uint256 profit,
             uint256 cumulativeQuotaInterest
         )
     {
-        amountRepaid = amount;
+        amountToRepay = amount;
 
         if (quotaInterestAccrued > 1) {
             uint256 quotaProfit = (quotaInterestAccrued * feeInterest) / PERCENTAGE_FACTOR;
 
-            if (amountRepaid >= quotaInterestAccrued + quotaProfit) {
-                amountRepaid -= quotaInterestAccrued + quotaProfit; // F: [CMQ-5]
-                amountProfit += quotaProfit; // F: [CMQ-5]
+            if (amountToRepay >= quotaInterestAccrued + quotaProfit) {
+                amountToRepay -= quotaInterestAccrued + quotaProfit; // F: [CMQ-5]
+                profit += quotaProfit; // F: [CMQ-5]
                 cumulativeQuotaInterest = 1; // F: [CMQ-5]
             } else {
-                uint256 amountToPool = (amountRepaid * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
+                uint256 amountToPool = (amountToRepay * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
 
-                amountProfit += amountRepaid - amountToPool; // F: [CMQ-4]
-                amountRepaid = 0; // F: [CMQ-4]
+                profit += amountToRepay - amountToPool; // F: [CMQ-4]
+                amountToRepay = 0; // F: [CMQ-4]
 
                 cumulativeQuotaInterest = quotaInterestAccrued - amountToPool + 1; // F: [CMQ-4]
 
@@ -196,21 +201,21 @@ library CreditLogic {
             }
         }
 
-        if (amountRepaid > 0) {
+        if (amountToRepay > 0) {
             // Computes the interest accrued thus far
             uint256 interestAccrued = (debt * newCumulativeIndex) / cumulativeIndexAtOpen_RAY - debt; // F:[CM-21]
 
             // Computes profit, taken as a percentage of the interest rate
-            uint256 profit = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR; // F:[CM-21]
+            uint256 profitFromInterest = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR; // F:[CM-21]
 
-            if (amountRepaid >= interestAccrued + profit) {
+            if (amountToRepay >= interestAccrued + profitFromInterest) {
                 // If the amount covers all of the interest and fees, they are
                 // paid first, and the remainder is used to pay the principal
 
-                amountRepaid -= interestAccrued + profit;
-                newDebt = debt - amountRepaid; //  + interestAccrued + profit - amount;
+                amountToRepay -= interestAccrued + profitFromInterest;
+                newDebt = debt - amountToRepay; //  + interestAccrued + profit - amount;
 
-                amountProfit += profit;
+                profit += profitFromInterest;
 
                 // Since interest is fully repaid, the Credit Account's cumulativeIndexAtOpen
                 // is set to the current cumulative index - which means interest starts accruing
@@ -222,10 +227,10 @@ library CreditLogic {
                 // of interest, this ensures that the new fee is consistent with the
                 // new pending interest
 
-                uint256 amountToPool = (amountRepaid * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
+                uint256 amountToPool = (amountToRepay * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
 
-                amountProfit += amountRepaid - amountToPool;
-                amountRepaid = 0;
+                profit += amountToRepay - amountToPool;
+                amountToRepay = 0;
 
                 // Since interest and fees are paid out first, the principal
                 // remains unchanged
@@ -245,9 +250,100 @@ library CreditLogic {
                         INDEX_PRECISION * cumulativeIndexNow_RAY
                             - (INDEX_PRECISION * amountToPool * cumulativeIndexAtOpen_RAY) / debt
                     );
+            }
+        }
+    }
 
-                // newCumulativeIndex =
-                //     calcNewCumulativeIndex(debt, amountToPool, cumulativeIndexNow_RAY, cumulativeIndexAtOpen_RAY, false);
+    /// @param creditAccount Credit Account to compute balances for
+    /// @param callData Bytes calldata for parsing
+    function storeBalances(address creditAccount, bytes memory callData)
+        internal
+        view
+        returns (Balance[] memory expected)
+    {
+        // Retrieves the balance list from calldata
+        expected = abi.decode(callData, (Balance[])); // F:[FA-45]
+        uint256 len = expected.length; // F:[FA-45]
+
+        for (uint256 i = 0; i < len;) {
+            expected[i].balance += _balanceOf(expected[i].token, creditAccount); // F:[FA-45]
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /// @dev Compares current balances to previously saved expected balances.
+    /// Reverts if at least one balance is lower than expected
+    /// @param creditAccount Credit Account to check
+    /// @param expected Expected balances after all operations
+
+    function compareBalances(address creditAccount, Balance[] memory expected) internal view {
+        uint256 len = expected.length; // F:[FA-45]
+        unchecked {
+            for (uint256 i = 0; i < len; ++i) {
+                if (_balanceOf(expected[i].token, creditAccount) < expected[i].balance) {
+                    revert BalanceLessThanMinimumDesiredException(expected[i].token);
+                } // F:[FA-45]
+            }
+        }
+    }
+
+    function _balanceOf(address token, address holder) internal view returns (uint256) {
+        return IERC20(token).balanceOf(holder);
+    }
+
+    function storeForbiddenBalances(
+        address creditAccount,
+        uint256 enabledTokensMask,
+        uint256 forbiddenTokenMask,
+        function (uint256) view returns (address) getTokenByMaskFn
+    ) internal view returns (uint256[] memory forbiddenBalances) {
+        uint256 forbiddenTokensOnAccount = enabledTokensMask & forbiddenTokenMask;
+
+        if (forbiddenTokensOnAccount != 0) {
+            forbiddenBalances = new uint256[](forbiddenTokensOnAccount.calcEnabledTokens());
+            unchecked {
+                uint256 i;
+                for (uint256 tokenMask; tokenMask < forbiddenTokensOnAccount; tokenMask <<= 1) {
+                    if (forbiddenTokensOnAccount & tokenMask != 0) {
+                        address token = getTokenByMaskFn(tokenMask);
+                        forbiddenBalances[i] = _balanceOf(token, creditAccount);
+                        ++i;
+                    }
+                }
+            }
+        }
+    }
+
+    function checkForbiddenBalances(
+        address creditAccount,
+        uint256 enabledTokensMaskBefore,
+        uint256 enabledTokensMaskAfter,
+        uint256[] memory forbiddenBalances,
+        uint256 forbiddenTokenMask,
+        function (uint256) view returns (address) getTokenByMaskFn
+    ) internal view {
+        uint256 forbiddenTokensOnAccount = enabledTokensMaskAfter & forbiddenTokenMask;
+        if (forbiddenTokensOnAccount == 0) return;
+
+        uint256 forbiddenTokensOnAccountBefore = enabledTokensMaskBefore & forbiddenTokenMask;
+        if (forbiddenTokensOnAccount & ~forbiddenTokensOnAccountBefore > 0) revert ForbiddenTokensException();
+
+        unchecked {
+            uint256 i;
+            for (uint256 tokenMask; tokenMask < forbiddenTokensOnAccountBefore; tokenMask <<= 1) {
+                if (forbiddenTokensOnAccountBefore & tokenMask != 0) {
+                    if (forbiddenTokensOnAccount & tokenMask != 0) {
+                        address token = getTokenByMaskFn(tokenMask);
+                        uint256 balance = _balanceOf(token, creditAccount);
+                        if (balance > forbiddenBalances[i]) {
+                            revert ForbiddenTokensException();
+                        }
+                    }
+
+                    ++i;
+                }
             }
         }
     }

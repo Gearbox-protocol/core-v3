@@ -2122,7 +2122,7 @@ contract CreditFacadeTest is
         uint256[] memory collateralHints = new uint256[](1);
         collateralHints[0] = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.USDC));
 
-        uint256 enabledTokensMap = creditManager.enabledTokensMap(creditAccount);
+        uint256 enabledTokensMap = creditManager.enabledTokensMaskOf(creditAccount);
 
         evm.expectCall(
             address(creditManager),

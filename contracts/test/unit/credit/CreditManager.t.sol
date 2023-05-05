@@ -128,7 +128,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
     function expectTokenIsEnabled(address creditAccount, Tokens t, bool expectedState) internal {
         bool state = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(t))
-            & creditManager.enabledTokensMap(creditAccount) != 0;
+            & creditManager.enabledTokensMaskOf(creditAccount) != 0;
         assertTrue(
             state == expectedState,
             string(
@@ -485,7 +485,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         assertEq(poolMock.lendAmount(), DAI_ACCOUNT_AMOUNT, "Incorrect DAI_ACCOUNT_AMOUNT in Pool call");
         assertEq(poolMock.lendAccount(), creditAccount, "Incorrect credit account in lendCreditAccount call");
         // assertEq(creditManager.creditAccounts(USER), creditAccount, "Credit account is not associated with user");
-        assertEq(creditManager.enabledTokensMap(creditAccount), 0, "Incorrect enabled token mask");
+        assertEq(creditManager.enabledTokensMaskOf(creditAccount), 0, "Incorrect enabled token mask");
     }
 
     //
@@ -1469,7 +1469,9 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         creditManager.fullCollateralCheck(creditAccount, 2 ** (totalTokens) - 1, hints, 10000);
 
         assertEq(
-            creditManager.enabledTokensMap(creditAccount).calcEnabledTokens(), 1, "Incorrect number of tokens enabled"
+            creditManager.enabledTokensMaskOf(creditAccount).calcEnabledTokens(),
+            1,
+            "Incorrect number of tokens enabled"
         );
     }
 
