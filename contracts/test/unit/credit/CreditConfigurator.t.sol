@@ -379,7 +379,7 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
         creditConfigurator.setMaxEnabledTokens(1);
 
         evm.expectRevert(CallerNotControllerException.selector);
-        creditConfigurator.rampLiquidationThreshold(DUMB_ADDRESS, 0, 0, 0);
+        creditConfigurator.rampLiquidationThreshold(DUMB_ADDRESS, 0, 0);
     }
 
     //
@@ -1212,11 +1212,11 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
 
         evm.expectRevert(SetLTForUnderlyingException.selector);
         evm.prank(CONFIGURATOR);
-        creditConfigurator.rampLiquidationThreshold(dai, 9000, uint40(block.timestamp), 1);
+        creditConfigurator.rampLiquidationThreshold(dai, 9000, 1);
 
         evm.expectRevert(IncorrectLiquidationThresholdException.selector);
         evm.prank(CONFIGURATOR);
-        creditConfigurator.rampLiquidationThreshold(usdc, 9999, uint40(block.timestamp), 1);
+        creditConfigurator.rampLiquidationThreshold(usdc, 9999, 1);
 
         uint16 initialLT = creditManager.liquidationThresholds(usdc);
 
@@ -1227,10 +1227,10 @@ contract CreditConfiguratorTest is DSTest, ICreditManagerV3Events, ICreditConfig
 
         evm.expectEmit(true, false, false, true);
         emit ScheduleTokenLiquidationThresholdRamp(
-            usdc, initialLT, 8900, uint40(block.timestamp + 5), uint40(block.timestamp + 1005)
+            usdc, initialLT, 8900, uint40(block.timestamp), uint40(block.timestamp + 1000)
         );
 
         evm.prank(CONFIGURATOR);
-        creditConfigurator.rampLiquidationThreshold(usdc, 8900, uint40(block.timestamp + 5), 1000);
+        creditConfigurator.rampLiquidationThreshold(usdc, 8900, 1000);
     }
 }
