@@ -304,8 +304,12 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 5_00, uint96(1_000_000 * WAD));
 
-        (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen, uint256 cumulativeIndexAtClose, address creditAccount) =
-            cms.openCreditAccount();
+        (
+            uint256 borrowedAmount,
+            uint256 cumulativeIndexLastUpdate,
+            uint256 cumulativeIndexAtClose,
+            address creditAccount
+        ) = cms.openCreditAccount();
 
         tokenTestSuite.mint(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT * 2);
 
@@ -327,7 +331,7 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
 
         (uint16 feeInterest,,,,) = creditManager.fees();
 
-        uint256 interestAccured = (borrowedAmount * cumulativeIndexAtClose / cumulativeIndexAtOpen - borrowedAmount)
+        uint256 interestAccured = (borrowedAmount * cumulativeIndexAtClose / cumulativeIndexLastUpdate - borrowedAmount)
             * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR;
 
         uint256 expectedQuotasInterest = (100 * WAD * 10_00 / PERCENTAGE_FACTOR + 200 * WAD * 5_00 / PERCENTAGE_FACTOR)
@@ -578,7 +582,7 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
         // _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         // _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
-        // (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen, uint256 cumulativeIndexAtClose, address creditAccount) =
+        // (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexAtClose, address creditAccount) =
         //     cms.openCreditAccount();
 
         // evm.assume(quotaLink < type(uint96).max / 2);
@@ -607,7 +611,7 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
 
         // (,, uint256 totalDebt) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
 
-        // uint256 expectedTotalDebt = (borrowedAmount * cumulativeIndexAtClose) / cumulativeIndexAtOpen;
+        // uint256 expectedTotalDebt = (borrowedAmount * cumulativeIndexAtClose) / cumulativeIndexLastUpdate;
         // expectedTotalDebt += (quotaLink * 1000 + quotaUsdt * 500) / PERCENTAGE_FACTOR;
 
         // (uint16 feeInterest,,,,) = creditManager.fees();

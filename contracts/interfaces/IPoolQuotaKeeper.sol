@@ -55,6 +55,10 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
         external
         returns (uint256 caQuotaInterestChange, uint256 tokensToEnable, uint256 tokensToDisable);
 
+    function updateQuota(address creditAccount, address token, int96 quotaChange)
+        external
+        returns (uint256 caQuotaInterestChange, uint256 tokensToEnable, uint256 tokensToDisable);
+
     /// @dev Updates all quotas to zero when closing a credit account, and computes the final quota interest change
     /// @param creditAccount Address of the Credit Account being closed
     /// @param tokens Array of all active quoted tokens on the account

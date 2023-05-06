@@ -74,6 +74,8 @@ interface ICreditFacadeMulticall {
     /// @param quotaUpdates Requested quota updates, see `QuotaUpdate`
     function updateQuotas(QuotaUpdate[] memory quotaUpdates) external;
 
+    function updateQuota(address token, int96 quotaChange) external;
+
     /// @dev Set collateral hints for a full check
     /// @param collateralHints Array of token mask in the desired order of checking
     /// @param minHealthFactor Minimal HF threshold to pass the collateral check in PERCENTAGE format.

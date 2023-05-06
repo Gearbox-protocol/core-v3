@@ -16,37 +16,43 @@ uint256 constant INDEX_PRECISION = 10 ** 9;
 library CreditLogic {
     using BitMask for uint256;
 
+    function calcAccruedInterest(uint256 amount, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow)
+        internal
+        pure
+        returns (uint256)
+    {
+        return (amount * cumulativeIndexNow) / cumulativeIndexLastUpdate - amount;
+    }
+
+    function calcTotalDebt(CollateralDebtData memory collateralDebtData) internal pure returns (uint256) {
+        return collateralDebtData.debt + collateralDebtData.accruedInterest + collateralDebtData.accruedFees;
+    }
+
     function calcClosePayments(
         CollateralDebtData memory collateralDebtData,
-        uint16 feeInterest,
         function (uint256) view returns (uint256) amountWithFeeFn
     ) internal view returns (uint256 amountToPool, uint256 profit) {
-        uint256 debtWithInterest = collateralDebtData.debtWithInterest;
         // The amount to be paid to pool is computed with fees included
         // The pool will compute the amount of Diesel tokens to treasury
         // based on profit
-        amountToPool = _calcAmountToPool(collateralDebtData.debt, debtWithInterest, feeInterest);
+        amountToPool = amountWithFeeFn(calcTotalDebt(collateralDebtData));
 
-        unchecked {
-            profit = amountToPool - debtWithInterest; // F:[CM-43]
-        }
-
-        amountToPool = amountWithFeeFn(amountToPool);
+        profit = collateralDebtData.accruedFees;
     }
 
     function calcLiquidationPayments(
         CollateralDebtData memory collateralDebtData,
-        uint16 feeInterest,
         uint16 feeLiquidation,
         uint16 liquidationDiscount,
         function (uint256) view returns (uint256) amountWithFeeFn,
         function (uint256) view returns (uint256) amountMinusFeeFn
     ) internal view returns (uint256 amountToPool, uint256 remainingFunds, uint256 profit, uint256 loss) {
-        uint256 debtWithInterest = collateralDebtData.debtWithInterest;
         // The amount to be paid to pool is computed with fees included
         // The pool will compute the amount of Diesel tokens to treasury
         // based on profit
-        amountToPool = _calcAmountToPool(collateralDebtData.debt, debtWithInterest, feeInterest);
+        amountToPool = calcTotalDebt(collateralDebtData);
+
+        uint256 debtWithInterest = collateralDebtData.debt + collateralDebtData.accruedInterest;
 
         // LIQUIDATION CASE
         uint256 totalValue = collateralDebtData.totalValue;
@@ -166,8 +172,8 @@ library CreditLogic {
         uint256 quotaInterestAccrued,
         uint16 feeInterest,
         uint256 debt,
-        uint256 cumulativeIndexNow_RAY,
-        uint256 cumulativeIndexAtOpen_RAY
+        uint256 cumulativeIndexNow,
+        uint256 cumulativeIndexLastUpdate
     )
         internal
         pure
@@ -197,13 +203,13 @@ library CreditLogic {
                 cumulativeQuotaInterest = quotaInterestAccrued - amountToPool + 1; // F: [CMQ-4]
 
                 newDebt = debt;
-                newCumulativeIndex = cumulativeIndexAtOpen_RAY;
+                newCumulativeIndex = cumulativeIndexLastUpdate;
             }
         }
 
         if (amountToRepay > 0) {
             // Computes the interest accrued thus far
-            uint256 interestAccrued = (debt * newCumulativeIndex) / cumulativeIndexAtOpen_RAY - debt; // F:[CM-21]
+            uint256 interestAccrued = (debt * newCumulativeIndex) / cumulativeIndexLastUpdate - debt; // F:[CM-21]
 
             // Computes profit, taken as a percentage of the interest rate
             uint256 profitFromInterest = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR; // F:[CM-21]
@@ -217,10 +223,10 @@ library CreditLogic {
 
                 profit += profitFromInterest;
 
-                // Since interest is fully repaid, the Credit Account's cumulativeIndexAtOpen
+                // Since interest is fully repaid, the Credit Account's cumulativeIndexLastUpdate
                 // is set to the current cumulative index - which means interest starts accruing
                 // on the new principal from zero
-                newCumulativeIndex = cumulativeIndexNow_RAY; // F:[CM-21]
+                newCumulativeIndex = cumulativeIndexNow; // F:[CM-21]
             } else {
                 // If the amount is not enough to cover interest and fees,
                 // then the sum is split between dao fees and pool profits pro-rata. Since the fee is the percentage
@@ -237,7 +243,7 @@ library CreditLogic {
                 newDebt = debt;
 
                 // Since the interest was only repaid partially, we need to recompute the
-                // cumulativeIndexAtOpen, so that "debt * (indexNow / indexAtOpenNew - 1)"
+                // cumulativeIndexLastUpdate, so that "debt * (indexNow / indexAtOpenNew - 1)"
                 // is equal to interestAccrued - amountToInterest
 
                 // In case of debt decrease, the principal is the same, but the interest is reduced exactly by delta
@@ -245,10 +251,10 @@ library CreditLogic {
                 // debt * (cumulativeIndexNow / cumulativeIndexOpen - 1) - delta ==
                 // == debt * (cumulativeIndexNow / newCumulativeIndex - 1)
 
-                newCumulativeIndex = (INDEX_PRECISION * cumulativeIndexNow_RAY * cumulativeIndexAtOpen_RAY)
+                newCumulativeIndex = (INDEX_PRECISION * cumulativeIndexNow * cumulativeIndexLastUpdate)
                     / (
-                        INDEX_PRECISION * cumulativeIndexNow_RAY
-                            - (INDEX_PRECISION * amountToPool * cumulativeIndexAtOpen_RAY) / debt
+                        INDEX_PRECISION * cumulativeIndexNow
+                            - (INDEX_PRECISION * amountToPool * cumulativeIndexLastUpdate) / debt
                     );
             }
         }

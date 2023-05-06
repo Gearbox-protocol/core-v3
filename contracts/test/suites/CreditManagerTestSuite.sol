@@ -118,7 +118,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         external
         returns (
             uint256 borrowedAmount,
-            uint256 cumulativeIndexAtOpen,
+            uint256 cumulativeIndexLastUpdate,
             uint256 cumulativeIndexAtClose,
             address creditAccount
         )
@@ -130,7 +130,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         public
         returns (
             uint256 borrowedAmount,
-            uint256 cumulativeIndexAtOpen,
+            uint256 cumulativeIndexLastUpdate,
             uint256 cumulativeIndexAtClose,
             address creditAccount
         )
@@ -147,8 +147,8 @@ contract CreditManagerTestSuite is PoolDeployer {
 
         borrowedAmount = _borrowedAmount;
 
-        cumulativeIndexAtOpen = RAY;
-        poolMock.setCumulative_RAY(cumulativeIndexAtOpen);
+        cumulativeIndexLastUpdate = RAY;
+        poolMock.setCumulative_RAY(cumulativeIndexLastUpdate);
 
         evm.prank(creditFacade);
 
@@ -158,7 +158,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         // Increase block number cause it's forbidden to close credit account in the same block
         evm.roll(block.number + 1);
 
-        cumulativeIndexAtClose = (cumulativeIndexAtOpen * 12) / 10;
+        cumulativeIndexAtClose = (cumulativeIndexLastUpdate * 12) / 10;
         poolMock.setCumulative_RAY(cumulativeIndexAtClose);
     }
 

@@ -18,6 +18,7 @@ import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
 
+/// LIBS & TRAITS
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
@@ -148,7 +149,6 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
                 )
             )
         ) // F:[P4-01]
-        nonZeroAddress(opts.addressProvider) // F:[P4-02]
         nonZeroAddress(opts.underlyingToken) // F:[P4-02]
         nonZeroAddress(opts.interestRateModel) // F:[P4-02]
     {
@@ -344,6 +344,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
     }
 
     /// @dev See {IERC4626-maxDeposit}.
+    /// TODO: add pause case (?)
     function maxDeposit(address) public view override(ERC4626, IERC4626) returns (uint256) {
         return (_expectedLiquidityLimit == type(uint128).max)
             ? type(uint256).max
@@ -740,9 +741,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
 
         uint256 available = interestRateModel.availableToBorrow(expectedLiquidity(), availableLiquidity()); // F:[P4-27]
 
-        if (canBorrow > available) {
-            canBorrow = available; // F:[P4-27]
-        }
+        canBorrow = Math.max(canBorrow, available); // F:[P4-27]
 
         CreditManagerDebt memory cmDebt = creditManagersDebt[_creditManager];
         if (cmDebt.totalBorrowed >= cmDebt.limit) {
@@ -751,9 +750,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
 
         unchecked {
             uint256 cmLimit = cmDebt.limit - cmDebt.totalBorrowed;
-            if (canBorrow > cmLimit) {
-                canBorrow = cmLimit; // F:[P4-27]
-            }
+            canBorrow = Math.max(canBorrow, cmLimit); // F:[P4-27]
         }
     }
 

@@ -7,20 +7,20 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title IERC20HelperTrait
 /// @notice Saves size by providing internal call for balanceOf
-abstract contract IERC20HelperTrait {
-    function _balanceOf(address token, address holder) internal view returns (uint256) {
-        return IERC20(token).balanceOf(holder);
+library IERC20Helper {
+    function _balanceOf(IERC20 token, address holder) internal view returns (uint256) {
+        return token.balanceOf(holder);
     }
 
-    function _unsafeTransfer(address token, address to, uint256 amount) internal returns (bool success) {
-        return _unsafeCall(token, abi.encodeCall(IERC20.transfer, (to, amount)));
+    function unsafeTransfer(IERC20 token, address to, uint256 amount) internal returns (bool success) {
+        return _unsafeCall(address(token), abi.encodeCall(IERC20.transfer, (to, amount)));
     }
 
-    function _unsafeTransferFrom(address token, address from, address to, uint256 amount)
+    function unsafeTransferFrom(IERC20 token, address from, address to, uint256 amount)
         internal
         returns (bool success)
     {
-        return _unsafeCall(token, abi.encodeCall(IERC20.transferFrom, (from, to, amount)));
+        return _unsafeCall(address(token), abi.encodeCall(IERC20.transferFrom, (from, to, amount)));
     }
 
     function _unsafeCall(address addr, bytes memory data) private returns (bool) {

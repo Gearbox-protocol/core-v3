@@ -24,7 +24,7 @@ uint8 constant BOT_PERMISSIONS_SET_FLAG = 1 << 1;
 
 struct CreditAccountInfo {
     uint256 debt;
-    uint256 cumulativeIndexAtOpen;
+    uint256 cumulativeIndexLastUpdate;
     uint256 cumulativeQuotaInterest;
     uint256 enabledTokensMask;
     uint16 flags;
@@ -39,8 +39,8 @@ enum CollateralCalcTask {
 
 struct CollateralDebtData {
     uint256 debt;
-    uint256 debtWithInterest;
-    uint256 debtWithInterestAndFees;
+    uint256 accruedInterest;
+    uint256 accruedFees;
     uint256 totalValue;
     uint256 totalValueUSD;
     uint256 twvUSD;
@@ -187,6 +187,10 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @param creditAccount Address of credit account
     /// @param quotaUpdates Requested quota updates, see `QuotaUpdate`
     function updateQuotas(address creditAccount, QuotaUpdate[] memory quotaUpdates)
+        external
+        returns (uint256 tokensToEnable, uint256 tokensToDisable);
+
+    function updateQuota(address creditAccount, address token, int96 quotaChange)
         external
         returns (uint256 tokensToEnable, uint256 tokensToDisable);
 

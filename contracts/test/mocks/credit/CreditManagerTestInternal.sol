@@ -69,7 +69,7 @@ contract CreditManagerTestInternal is CreditManagerV3 {
     function getCreditAccountParameters(address creditAccount)
         external
         view
-        returns (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen, uint256 cumulativeIndexNow)
+        returns (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow)
     {
         return _getCreditAccountParameters(creditAccount);
     }

@@ -6,6 +6,7 @@ pragma solidity ^0.8.17;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
@@ -118,6 +119,24 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
                 ++i;
             }
         }
+
+        if (quotaRevenueChange != 0) {
+            pool.changeQuotaRevenue(quotaRevenueChange);
+        }
+    }
+
+    /// @dev Updates credit account's accountQuotas for multiple tokens
+    /// @param creditAccount Address of credit account
+    function updateQuota(address creditAccount, address token, int96 quotaChange)
+        external
+        override
+        creditManagerOnly // F:[PQK-4]
+        returns (uint256 caQuotaInterestChange, uint256 tokensToEnable, uint256 tokensToDisable)
+    {
+        int128 quotaRevenueChange;
+
+        (quotaRevenueChange, caQuotaInterestChange, tokensToEnable, tokensToDisable) =
+            _updateQuota(msg.sender, creditAccount, token, quotaChange); // F:[CMQ-03]
 
         if (quotaRevenueChange != 0) {
             pool.changeQuotaRevenue(quotaRevenueChange);
@@ -242,7 +261,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
             quotaRevenueChange = -int128(int16(tq.rate)) * int96(quoted);
 
             if (setLimitsToZero) {
-                totalQuotaParams[token].limit = 1; // F: [CMQ-12]
+                tq.limit = 1; // F: [CMQ-12]
                 emit SetTokenLimit(token, 1);
             }
         }

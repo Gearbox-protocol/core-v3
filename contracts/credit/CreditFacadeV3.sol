@@ -8,7 +8,6 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 // LIBS & TRAITS
 import {CreditLogic} from "../libraries/CreditLogic.sol";
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
-import {IERC20HelperTrait} from "../traits/IERC20HelperTrait.sol";
 import {UNDERLYING_TOKEN_MASK} from "../libraries/BitMask.sol";
 
 //  DATA
@@ -73,7 +72,7 @@ struct CumulativeLossParams {
 /// - Through CreditFacadeV3, which provides all the required account management function: open / close / liquidate / manageDebt,
 /// as well as Multicalls that allow to perform multiple actions within a single transaction, with a single health check
 /// - Through adapters, which call the Credit Manager directly, but only allow interactions with specific target contracts
-contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrait {
+contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     using Address for address;
 
     /// @dev Credit Manager connected to this Credit Facade
@@ -613,6 +612,9 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
                     else if (method == ICreditFacadeMulticall.updateQuotas.selector) {
                         _revertIfNoPermission(flags, UPDATE_QUOTAS_PERMISSION);
                         enabledTokensMask = _updateQuotas(creditAccount, callData, enabledTokensMask);
+                    } else if (method == ICreditFacadeMulticall.updateQuota.selector) {
+                        _revertIfNoPermission(flags, UPDATE_QUOTAS_PERMISSION);
+                        enabledTokensMask = _updateQuota(creditAccount, callData, enabledTokensMask);
                     }
                     //
                     // WITHDRAW
@@ -728,6 +730,15 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait, IERC20HelperTrai
     {
         QuotaUpdate[] memory quotaUpdates = abi.decode(callData, (QuotaUpdate[]));
         (uint256 tokensToEnable, uint256 tokensToDisable) = creditManager.updateQuotas(creditAccount, quotaUpdates);
+        return (enabledTokensMask | tokensToEnable) & (~tokensToDisable);
+    }
+
+    function _updateQuota(address creditAccount, bytes memory callData, uint256 enabledTokensMask)
+        internal
+        returns (uint256)
+    {
+        (address token, int96 quotaChange) = abi.decode(callData, (address, int96));
+        (uint256 tokensToEnable, uint256 tokensToDisable) = creditManager.updateQuota(creditAccount, token, quotaChange);
         return (enabledTokensMask | tokensToEnable) & (~tokensToDisable);
     }
 
