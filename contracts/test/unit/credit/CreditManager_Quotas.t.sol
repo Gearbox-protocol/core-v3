@@ -383,13 +383,12 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
             "Incorrect pool balance"
         );
 
-        AccountQuota memory quota =
-            poolQuotaKeeper.getQuota(address(creditManager), creditAccount, tokenTestSuite.addressOf(Tokens.LINK));
+        AccountQuota memory quota = poolQuotaKeeper.getQuota(creditAccount, tokenTestSuite.addressOf(Tokens.LINK));
 
         assertEq(uint256(quota.quota), 1, "Quota was not set to 0");
         // assertEq(uint256(quota.cumulativeIndexLU), 0, "Cumulative index was not updated");
 
-        quota = poolQuotaKeeper.getQuota(address(creditManager), creditAccount, tokenTestSuite.addressOf(Tokens.USDT));
+        quota = poolQuotaKeeper.getQuota(creditAccount, tokenTestSuite.addressOf(Tokens.USDT));
         assertEq(uint256(quota.quota), 1, "Quota was not set to 0");
         // assertEq(uint256(quota.cumulativeIndexLU), 0, "Cumulative index was not updated");
     }

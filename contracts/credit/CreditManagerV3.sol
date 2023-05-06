@@ -619,7 +619,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
                 quotaInterest = creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1;
 
                 if (tokens.length > 0) {
-                    quotaInterest += poolQuotaKeeper().outstandingQuotaInterest(address(this), creditAccount, tokens); // F: [CMQ-10]
+                    quotaInterest += poolQuotaKeeper().outstandingQuotaInterest(creditAccount, tokens); // F: [CMQ-10]
                 }
 
                 collateralDebtData.quotedTokens = tokens;
@@ -712,9 +712,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
 
         if (tokens.length > 0) {
             /// If credit account has any connected token - then check that
-            (totalValueUSD, twvUSD, quotaInterest) = poolQuotaKeeper().computeQuotedCollateralUSD(
-                address(this), creditAccount, address(_priceOracle), tokens, lts
-            ); // F: [CMQ-8]
+            (totalValueUSD, twvUSD, quotaInterest) =
+                poolQuotaKeeper().computeQuotedCollateralUSD(creditAccount, address(_priceOracle), tokens, lts); // F: [CMQ-8]
         }
 
         quotaInterest += creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1; // F: [CMQ-8]
