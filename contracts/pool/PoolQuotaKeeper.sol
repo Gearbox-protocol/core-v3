@@ -140,8 +140,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
                 QuotasLogic.removeQuota({tokenQuotaParams: tokenQuotaParams, accountQuota: accountQuota}); // F:[CMQ-06]
 
             if (setLimitsToZero) {
-                tokenQuotaParams.limit = 1; // F: [CMQ-12]
-                emit SetTokenLimit(token, 1);
+                _setTokenLimit({tokenQuotaParams: tokenQuotaParams, token: token, limit: 1});
             }
 
             unchecked {
@@ -215,7 +214,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         address _priceOracle,
         address[] memory tokens,
         uint256[] memory lts
-    ) external view override returns (uint256 totalValue, uint256 twv, uint256 totalQuotaInterest) {
+    ) external view override returns (uint256 totalValueUSD, uint256 twvUSD, uint256 totalQuotaInterest) {
         uint256 len = tokens.length;
         for (uint256 i; i < len;) {
             address token = tokens[i];
@@ -223,8 +222,8 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
 
             (uint256 currentUSD, uint256 outstandingInterest) = _getCollateralValue(creditAccount, token, _priceOracle); // F:[CMQ-8]
 
-            totalValue += currentUSD;
-            twv += currentUSD * lts[i]; // F:[CMQ-8]
+            totalValueUSD += currentUSD;
+            twvUSD += currentUSD * lts[i]; // F:[CMQ-8]
             totalQuotaInterest += outstandingInterest; // F:[CMQ-8]
 
             unchecked {
@@ -232,7 +231,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
             }
         }
 
-        twv /= PERCENTAGE_FACTOR;
+        twvUSD /= PERCENTAGE_FACTOR;
     }
 
     /// @dev Gets the effective value (i.e., value in underlying included into TWV) for a quoted token on an account
@@ -309,9 +308,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         }
 
         quotaTokensSet.add(token); // F:[PQK-5]
-
-        TokenQuotaParams storage qp = totalQuotaParams[token]; // F:[PQK-5]
-        qp.cumulativeIndexLU_RAY = uint192(RAY); // F:[PQK-5]
+        totalQuotaParams[token].initialise(); // F:[PQK-5]
 
         emit NewQuotaTokenAdded(token); // F:[PQK-5]
     }
@@ -325,20 +322,18 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         address[] memory tokens = quotaTokensSet.values();
         uint16[] memory rates = IGauge(gauge).getRates(tokens); // F:[PQK-7]
 
-        uint256 timeFromLastUpdate = block.timestamp - lastQuotaRateUpdate;
-        uint128 quotaRevenue;
+        /// TODO: add check for equal length(?)
 
+        uint128 quotaRevenue;
+        uint256 timeFromLastUpdate = block.timestamp - lastQuotaRateUpdate;
         uint256 len = tokens.length;
+
         for (uint256 i; i < len;) {
             address token = tokens[i];
             uint16 rate = rates[i];
 
-            TokenQuotaParams storage tq = totalQuotaParams[token];
-
-            tq.cumulativeIndexLU_RAY = tq.calcLinearCumulativeIndex(rate, timeFromLastUpdate); // F:[PQK-7]
-            tq.rate = rate; // F:[PQK-7]
-
-            quotaRevenue += rate * tq.totalQuoted;
+            TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
+            quotaRevenue += tokenQuotaParams.updateRate(timeFromLastUpdate, rate);
 
             emit UpdateTokenQuotaRate(token, rate); // F:[PQK-7]
 
@@ -394,15 +389,13 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         external
         controllerOnly // F:[PQK-2]
     {
-        TokenQuotaParams storage tq = totalQuotaParams[token];
+        TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
+        _setTokenLimit(tokenQuotaParams, token, limit);
+    }
 
-        if (!tq.isTokenRegistered()) {
-            revert TokenIsNotQuotedException(); // F:[PQK-11]
-        }
-
-        if (tq.limit != limit) {
-            tq.limit = limit; // F:[PQK-12]
-            emit SetTokenLimit(token, limit); // F:[PQK-12]
-        }
+    function _setTokenLimit(TokenQuotaParams storage tokenQuotaParams, address token, uint96 limit) internal {
+        if (tokenQuotaParams.setLimit(limit)) {
+            emit SetTokenLimit(token, limit);
+        } // F:[PQK-12]
     }
 }

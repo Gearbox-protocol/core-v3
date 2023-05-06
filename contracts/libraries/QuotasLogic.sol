@@ -15,8 +15,19 @@ uint192 constant RAY_DIVIDED_BY_PERCENTAGE = uint192(RAY / PERCENTAGE_FACTOR);
 
 /// @title Quota Library
 library QuotasLogic {
-    function isTokenRegistered(TokenQuotaParams memory q) internal pure returns (bool) {
-        return q.cumulativeIndexLU_RAY != 0;
+    modifier initializedQuotasOnly(TokenQuotaParams storage tokenQuotaParams) {
+        if (!isInitialised(tokenQuotaParams)) {
+            revert TokenIsNotQuotedException(); // F:[PQK-13]
+        }
+        _;
+    }
+
+    function isInitialised(TokenQuotaParams storage tokenQuotaParams) internal view returns (bool) {
+        return tokenQuotaParams.cumulativeIndexLU_RAY != 0;
+    }
+
+    function initialise(TokenQuotaParams storage tokenQuotaParams) internal returns (bool) {
+        tokenQuotaParams.cumulativeIndexLU_RAY = uint192(RAY); // F:[PQK-5]
     }
 
     function cumulativeIndexSince(TokenQuotaParams storage tq, uint256 lastQuotaRateUpdate)
@@ -27,14 +38,14 @@ library QuotasLogic {
         return calcLinearCumulativeIndex(tq, tq.rate, (block.timestamp - lastQuotaRateUpdate));
     }
 
-    function calcLinearCumulativeIndex(TokenQuotaParams storage tq, uint16 rate, uint256 deltaTimestamp)
+    function calcLinearCumulativeIndex(TokenQuotaParams storage tokenQuotaParams, uint16 rate, uint256 deltaTimestamp)
         internal
         view
         returns (uint192)
     {
         return uint192(
             (
-                uint256(tq.cumulativeIndexLU_RAY)
+                uint256(tokenQuotaParams.cumulativeIndexLU_RAY)
                     * (RAY + (RAY_DIVIDED_BY_PERCENTAGE * (deltaTimestamp) * rate) / SECONDS_PER_YEAR) / RAY
             )
         );
@@ -64,12 +75,9 @@ library QuotasLogic {
         int96 quotaChange
     )
         internal
+        initializedQuotasOnly(tokenQuotaParams)
         returns (uint256 caQuotaInterestChange, int128 quotaRevenueChange, bool enableToken, bool disableToken)
     {
-        if (!isTokenRegistered(tokenQuotaParams)) {
-            revert TokenIsNotQuotedException(); // F:[PQK-13]
-        }
-
         caQuotaInterestChange = accrueAccountQuotaInterest({
             tokenQuotaParams: tokenQuotaParams,
             accountQuota: accountQuota,
@@ -114,7 +122,7 @@ library QuotasLogic {
         TokenQuotaParams storage tokenQuotaParams,
         AccountQuota storage accountQuota,
         uint256 lastQuotaRateUpdate
-    ) internal returns (uint256 caQuotaInterestChange) {
+    ) internal initializedQuotasOnly(tokenQuotaParams) returns (uint256 caQuotaInterestChange) {
         uint192 cumulativeIndexNow = cumulativeIndexSince(tokenQuotaParams, lastQuotaRateUpdate); // F:[CMQ-03]
 
         uint96 quoted = accountQuota.quota;
@@ -132,6 +140,7 @@ library QuotasLogic {
     /// @dev Internal function to zero the quota for a single quoted token
     function removeQuota(TokenQuotaParams storage tokenQuotaParams, AccountQuota storage accountQuota)
         internal
+        initializedQuotasOnly(tokenQuotaParams)
         returns (int128 quotaRevenueChange)
     {
         uint96 quoted = accountQuota.quota;
@@ -143,5 +152,26 @@ library QuotasLogic {
             accountQuota.quota = 1;
             quotaRevenueChange = -int128(int16(tokenQuotaParams.rate)) * int96(quoted);
         }
+    }
+
+    function setLimit(TokenQuotaParams storage tokenQuotaParams, uint96 limit)
+        internal
+        initializedQuotasOnly(tokenQuotaParams)
+        returns (bool changed)
+    {
+        if (tokenQuotaParams.limit != limit) {
+            tokenQuotaParams.limit = limit; // F:[PQK-12]
+            changed = true;
+        }
+    }
+
+    function updateRate(TokenQuotaParams storage tokenQuotaParams, uint256 timeFromLastUpdate, uint16 rate)
+        internal
+        returns (uint128 quotaRevenue)
+    {
+        tokenQuotaParams.cumulativeIndexLU_RAY = calcLinearCumulativeIndex(tokenQuotaParams, rate, timeFromLastUpdate); // F:[PQK-7]
+        tokenQuotaParams.rate = rate;
+
+        return rate * tokenQuotaParams.totalQuoted;
     }
 }
