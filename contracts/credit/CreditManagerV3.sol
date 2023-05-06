@@ -36,7 +36,7 @@ import {
 } from "../interfaces/ICreditManagerV3.sol";
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {IPoolQuotaKeeper, QuotaUpdate} from "../interfaces/IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 // CONSTANTS
@@ -322,6 +322,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             // * For expiry liquidations, the premium is typically reduced,
             //   since the account does not risk bad debt, so the liquidation
             //   is not as urgent
+
             (amountToPool, remainingFunds, profit, loss) = collateralDebtData.calcLiquidationPayments({
                 liquidationDiscount: closureAction == ClosureAction.LIQUIDATE_ACCOUNT
                     ? liquidationDiscount
@@ -825,31 +826,20 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
 
     /// @dev Updates credit account's quotas for multiple tokens
     /// @param creditAccount Address of credit account
-    /// @param quotaUpdates Requested quota updates, see `QuotaUpdate`
-    function updateQuotas(address creditAccount, QuotaUpdate[] memory quotaUpdates)
-        external
-        override
-        creditFacadeOnly // F: [CMQ-3]
-        returns (uint256 tokensToEnable, uint256 tokensToDisable)
-    {
-        uint256 caInterestChange;
-        (caInterestChange, tokensToEnable, tokensToDisable) =
-            poolQuotaKeeper().updateQuotas(creditAccount, quotaUpdates); // F: [CMQ-3]
-
-        creditAccountInfo[creditAccount].cumulativeQuotaInterest += caInterestChange; // F: [CMQ-3]
-    }
-
-    /// @dev Updates credit account's quotas for multiple tokens
-    /// @param creditAccount Address of credit account
     function updateQuota(address creditAccount, address token, int96 quotaChange)
         external
         override
         creditFacadeOnly // F: [CMQ-3]
         returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
-        uint256 caInterestChange;
-        (caInterestChange, tokensToEnable, tokensToDisable) =
+        (uint256 caInterestChange, bool enable, bool disable) =
             poolQuotaKeeper().updateQuota(creditAccount, token, quotaChange); // F: [CMQ-3]
+
+        if (enable) {
+            tokensToEnable = getTokenMaskOrRevert(token);
+        } else if (disable) {
+            tokensToDisable = getTokenMaskOrRevert(token);
+        }
 
         creditAccountInfo[creditAccount].cumulativeQuotaInterest += caInterestChange; // F: [CMQ-3]
     }

@@ -13,7 +13,6 @@ import {UNDERLYING_TOKEN_MASK} from "../libraries/BitMask.sol";
 //  DATA
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
-import {QuotaUpdate} from "../interfaces/IPoolQuotaKeeper.sol";
 
 /// INTERFACES
 import "../interfaces/ICreditFacade.sol";
@@ -607,12 +606,9 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                         enabledTokensMask &= ~(_getTokenMaskOrRevert(token) & quotedTokenMaskInverted);
                     }
                     //
-                    // UPDATE QUOTAS
+                    // UPDATE QUOTA
                     //
-                    else if (method == ICreditFacadeMulticall.updateQuotas.selector) {
-                        _revertIfNoPermission(flags, UPDATE_QUOTAS_PERMISSION);
-                        enabledTokensMask = _updateQuotas(creditAccount, callData, enabledTokensMask);
-                    } else if (method == ICreditFacadeMulticall.updateQuota.selector) {
+                    else if (method == ICreditFacadeMulticall.updateQuota.selector) {
                         _revertIfNoPermission(flags, UPDATE_QUOTAS_PERMISSION);
                         enabledTokensMask = _updateQuota(creditAccount, callData, enabledTokensMask);
                     }
@@ -722,15 +718,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         if (flags & permission == 0) {
             revert NoPermissionException(permission);
         }
-    }
-
-    function _updateQuotas(address creditAccount, bytes memory callData, uint256 enabledTokensMask)
-        internal
-        returns (uint256)
-    {
-        QuotaUpdate[] memory quotaUpdates = abi.decode(callData, (QuotaUpdate[]));
-        (uint256 tokensToEnable, uint256 tokensToDisable) = creditManager.updateQuotas(creditAccount, quotaUpdates);
-        return (enabledTokensMask | tokensToEnable) & (~tokensToDisable);
     }
 
     function _updateQuota(address creditAccount, bytes memory callData, uint256 enabledTokensMask)

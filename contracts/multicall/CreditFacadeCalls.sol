@@ -5,7 +5,6 @@ pragma solidity ^0.8.17;
 
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 import {Balance, BalanceOps} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
-import {QuotaUpdate} from "../interfaces/IPoolQuotaKeeper.sol";
 import {ICreditFacade, ICreditFacadeMulticall} from "../interfaces/ICreditFacade.sol";
 
 interface CreditFacadeMulticaller {}
@@ -77,14 +76,14 @@ library CreditFacadeCalls {
         });
     }
 
-    function updateQuotas(CreditFacadeMulticaller creditFacade, QuotaUpdate[] memory quotaUpdates)
+    function updateQuota(CreditFacadeMulticaller creditFacade, address token, int96 quotaChange)
         internal
         pure
         returns (MultiCall memory)
     {
         return MultiCall({
             target: address(creditFacade),
-            callData: abi.encodeCall(ICreditFacadeMulticall.updateQuotas, quotaUpdates)
+            callData: abi.encodeCall(ICreditFacadeMulticall.updateQuota, (token, quotaChange))
         });
     }
 

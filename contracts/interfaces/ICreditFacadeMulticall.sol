@@ -4,7 +4,6 @@
 pragma solidity ^0.8.10;
 
 import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
-import {QuotaUpdate} from "./IPoolQuotaKeeper.sol";
 import {RevocationPair} from "./ICreditManagerV3.sol";
 
 uint256 constant ADD_COLLATERAL_PERMISSION = 1;
@@ -70,10 +69,7 @@ interface ICreditFacadeMulticall {
     /// @param amount Amount to increase borrowed amount
     function decreaseDebt(uint256 amount) external;
 
-    /// @dev Update msg.sender's Credit Account quotas for multiple tokens
-    /// @param quotaUpdates Requested quota updates, see `QuotaUpdate`
-    function updateQuotas(QuotaUpdate[] memory quotaUpdates) external;
-
+    /// @dev Update msg.sender's Credit Account quota
     function updateQuota(address token, int96 quotaChange) external;
 
     /// @dev Set collateral hints for a full check

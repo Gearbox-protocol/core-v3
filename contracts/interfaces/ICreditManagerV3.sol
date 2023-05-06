@@ -4,7 +4,7 @@
 pragma solidity ^0.8.10;
 
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {IPoolQuotaKeeper, QuotaUpdate} from "./IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeper} from "./IPoolQuotaKeeper.sol";
 import {ClaimAction, IWithdrawalManager} from "./IWithdrawalManager.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
@@ -183,13 +183,8 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     // QUOTAS MANAGEMENT
     //
 
-    /// @dev Updates credit account's quotas for multiple tokens
+    /// @dev Updates credit account's quotas
     /// @param creditAccount Address of credit account
-    /// @param quotaUpdates Requested quota updates, see `QuotaUpdate`
-    function updateQuotas(address creditAccount, QuotaUpdate[] memory quotaUpdates)
-        external
-        returns (uint256 tokensToEnable, uint256 tokensToDisable);
-
     function updateQuota(address creditAccount, address token, int96 quotaChange)
         external
         returns (uint256 tokensToEnable, uint256 tokensToDisable);
