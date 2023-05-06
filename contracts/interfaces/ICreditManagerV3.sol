@@ -82,7 +82,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     ///  @dev Opens credit account and borrows funds from the pool.
     /// @param debt Amount to be borrowed by the Credit Account
     /// @param onBehalfOf The owner of the newly opened Credit Account
-    function openCreditAccount(uint256 debt, address onBehalfOf) external returns (address);
+    function openCreditAccount(uint256 debt, address onBehalfOf, bool deployNew) external returns (address);
 
     ///  @dev Closes a Credit Account - covers both normal closure and liquidation
     /// - Checks whether the contract is paused, and, if so, if the payer is an emergency liquidator.

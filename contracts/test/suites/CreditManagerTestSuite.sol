@@ -100,7 +100,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         }
 
         if (accountFactoryVer == 2) {
-            AccountFactoryV2(address(af)).addCreditManager(address(creditManager));
+            AccountFactoryV2(address(af)).addCreditManager(address(creditManager), 1);
         }
 
         evm.stopPrank();
@@ -153,7 +153,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         evm.prank(creditFacade);
 
         // Existing address case
-        creditAccount = creditManager.openCreditAccount(borrowedAmount, USER);
+        creditAccount = creditManager.openCreditAccount(borrowedAmount, USER, false);
 
         // Increase block number cause it's forbidden to close credit account in the same block
         evm.roll(block.number + 1);

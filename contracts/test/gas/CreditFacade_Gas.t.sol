@@ -148,7 +148,7 @@ contract CreditFacadeGasTest is
         uint256 gasBefore = gasleft();
 
         evm.prank(USER);
-        creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         uint256 gasSpent = gasBefore - gasleft();
 
@@ -180,7 +180,7 @@ contract CreditFacadeGasTest is
         uint256 gasBefore = gasleft();
 
         evm.prank(USER);
-        creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         uint256 gasSpent = gasBefore - gasleft();
 
@@ -222,7 +222,7 @@ contract CreditFacadeGasTest is
         uint256 gasBefore = gasleft();
 
         evm.prank(USER);
-        creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         uint256 gasSpent = gasBefore - gasleft();
 
@@ -266,7 +266,7 @@ contract CreditFacadeGasTest is
         uint256 gasBefore = gasleft();
 
         evm.prank(USER);
-        creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         uint256 gasSpent = gasBefore - gasleft();
 
@@ -320,7 +320,7 @@ contract CreditFacadeGasTest is
         uint256 gasBefore = gasleft();
 
         evm.prank(USER);
-        creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         uint256 gasSpent = gasBefore - gasleft();
 
@@ -344,7 +344,7 @@ contract CreditFacadeGasTest is
         });
 
         evm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         calls[0] = MultiCall({
             target: address(creditFacade),
@@ -376,7 +376,7 @@ contract CreditFacadeGasTest is
         });
 
         evm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         calls[0] = MultiCall({
             target: address(creditFacade),
@@ -426,7 +426,7 @@ contract CreditFacadeGasTest is
         });
 
         evm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         evm.warp(block.timestamp + 30 days);
 
@@ -460,7 +460,7 @@ contract CreditFacadeGasTest is
         });
 
         evm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         calls[0] = MultiCall({
             target: address(creditFacade),
@@ -497,7 +497,7 @@ contract CreditFacadeGasTest is
         });
 
         evm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         calls[0] = MultiCall({
             target: address(creditFacade),
@@ -529,7 +529,7 @@ contract CreditFacadeGasTest is
         });
 
         evm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         calls[0] = MultiCall({
             target: address(adapterMock),
@@ -564,7 +564,7 @@ contract CreditFacadeGasTest is
         });
 
         evm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         calls = new MultiCall[](2);
 
@@ -616,7 +616,7 @@ contract CreditFacadeGasTest is
         });
 
         evm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         tokenTestSuite.burn(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT * 2);
         tokenTestSuite.mint(Tokens.LINK, creditAccount, LINK_ACCOUNT_AMOUNT * 3);
@@ -674,7 +674,7 @@ contract CreditFacadeGasTest is
         });
 
         evm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         evm.roll(block.number + 1);
 
@@ -714,7 +714,7 @@ contract CreditFacadeGasTest is
         });
 
         evm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         evm.roll(block.number + 1);
 
@@ -763,7 +763,7 @@ contract CreditFacadeGasTest is
         });
 
         evm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         evm.roll(block.number + 1);
 
@@ -796,7 +796,7 @@ contract CreditFacadeGasTest is
         });
 
         evm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         evm.roll(block.number + 1);
 
@@ -833,7 +833,7 @@ contract CreditFacadeGasTest is
         });
 
         evm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         evm.roll(block.number + 1);
 
@@ -878,7 +878,7 @@ contract CreditFacadeGasTest is
         });
 
         evm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         evm.roll(block.number + 1);
 
@@ -932,7 +932,7 @@ contract CreditFacadeGasTest is
         });
 
         evm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         _zeroAllLTs();
 

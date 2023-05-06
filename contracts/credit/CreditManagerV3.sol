@@ -7,6 +7,7 @@ pragma solidity ^0.8.17;
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 // LIBS & TRAITS
 import {UNDERLYING_TOKEN_MASK, BitMask} from "../libraries/BitMask.sol";
@@ -16,7 +17,7 @@ import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 import {IERC20HelperTrait} from "../traits/IERC20HelperTrait.sol";
 
 // INTERFACES
-import {IAccountFactory} from "../interfaces/IAccountFactory.sol";
+import {IAccountFactory, TakeAccountAction} from "../interfaces/IAccountFactory.sol";
 import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
 import {IPool4626} from "../interfaces/IPool4626.sol";
@@ -62,13 +63,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     using BitMask for uint256;
     using CreditLogic for CollateralDebtData;
     using CreditLogic for CollateralTokenData;
+    using SafeERC20 for IERC20;
 
     // IMMUTABLE PARAMS
     /// @dev contract version
     uint256 public constant override version = 3_00;
 
     /// @dev Factory contract for Credit Accounts
-    IAccountFactory public immutable _accountFactory;
+    IAccountFactory public immutable accountFactory;
 
     /// @dev Address of the underlying asset
     address public immutable override underlying;
@@ -84,6 +86,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
     /// @dev Whether the CM supports quota-related logic
     bool public immutable override supportsQuotas;
+
+    uint256 private immutable deployAccountAction;
 
     /// @dev The maximal number of enabled tokens on a single Credit Account
     uint8 public override maxAllowedEnabledTokenLength = 12;
@@ -206,7 +210,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
         // Price oracle is stored in Slot1, as it is accessed frequently with fees
         priceOracle = IPriceOracleV2(addressProvider.getPriceOracle()); // F:[CM-1]
-        _accountFactory = IAccountFactory(addressProvider.getAccountFactory()); // F:[CM-1]
+        accountFactory = IAccountFactory(addressProvider.getAccountFactory()); // F:[CM-1]
+
+        deployAccountAction = accountFactory.version() == 3_00 ? uint256(TakeAccountAction.DEPLOY_NEW_ONE) : 0;
         creditConfigurator = msg.sender; // F:[CM-1]
 
         withdrawalManager = IWithdrawalManager(_withdrawalManager);
@@ -224,7 +230,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     ///
     /// @param debt Amount to be borrowed by the Credit Account
     /// @param onBehalfOf The owner of the newly opened Credit Account
-    function openCreditAccount(uint256 debt, address onBehalfOf)
+    function openCreditAccount(uint256 debt, address onBehalfOf, bool deployNew)
         external
         override
         nonReentrant
@@ -233,7 +239,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     {
         // Takes a Credit Account from the factory and sets initial parameters
         // The Credit Account will be connected to this Credit Manager until closing
-        creditAccount = _accountFactory.takeCreditAccount(0, 0); // F:[CM-8]
+        creditAccount = accountFactory.takeCreditAccount(deployNew ? deployAccountAction : 0, 0); // F:[CM-8]
 
         creditAccountInfo[creditAccount].debt = debt;
         creditAccountInfo[creditAccount].cumulativeIndexAtOpen = IPoolService(pool).calcLinearCumulative_RAY();
@@ -339,11 +345,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         } else if (underlyingBalance < amountToPool + remainingFunds + 1) {
             // If there is an underlying shortfall, attempts to transfer it from the payer
             unchecked {
-                _safeTransferFrom(
-                    underlying,
-                    payer,
-                    creditAccount,
-                    _amountWithFee(amountToPool + remainingFunds - underlyingBalance + 1)
+                IERC20(underlying).safeTransferFrom(
+                    payer, creditAccount, _amountWithFee(amountToPool + remainingFunds - underlyingBalance + 1)
                 ); // F:[CM-11,13]
             }
         }
@@ -376,7 +379,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         _transferAssetsTo(creditAccount, to, convertWETH, enabledTokensMask); // F:[CM-14,17,19]
 
         // Returns Credit Account to the factory
-        _accountFactory.returnCreditAccount(creditAccount); // F:[CM-9]
+        accountFactory.returnCreditAccount(creditAccount); // F:[CM-9]
         creditAccountsSet.remove(creditAccount);
     }
 
@@ -474,7 +477,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         returns (uint256 tokenMask)
     {
         tokenMask = getTokenMaskOrRevert(token);
-        _safeTransferFrom(token, payer, creditAccount, amount); // F:[CM-22]
+        IERC20(token).safeTransferFrom(payer, creditAccount, amount); // F:[CM-22]
     }
 
     /// @dev Transfers Credit Account ownership to another address

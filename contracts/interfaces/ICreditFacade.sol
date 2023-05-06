@@ -73,10 +73,13 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     /// @param calls The array of MultiCall structs encoding the required operations. Generally must have
     /// at least a call to addCollateral, as otherwise the health check at the end will fail.
     /// @param referralCode Referral code which is used for potential rewards. 0 if no referral code provided
-    function openCreditAccount(uint256 debt, address onBehalfOf, MultiCall[] calldata calls, uint16 referralCode)
-        external
-        payable
-        returns (address creditAccount);
+    function openCreditAccount(
+        uint256 debt,
+        address onBehalfOf,
+        MultiCall[] calldata calls,
+        bool deployNewAccount,
+        uint16 referralCode
+    ) external payable returns (address creditAccount);
 
     /// @dev Runs a batch of transactions within a multicall and closes the account
     /// - Wraps ETH to WETH and sends it msg.sender if value > 0

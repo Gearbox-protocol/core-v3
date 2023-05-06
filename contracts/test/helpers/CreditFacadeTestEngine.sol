@@ -50,6 +50,7 @@ contract CreditFacadeTestEngine is DSTest {
                     callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, amount))
                 })
             ),
+            false,
             referralCode
         );
     }

@@ -276,7 +276,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         evm.startPrank(USER);
 
         evm.expectRevert(CallerNotCreditFacadeException.selector);
-        creditManager.openCreditAccount(200000, address(this));
+        creditManager.openCreditAccount(200000, address(this), false);
 
         // evm.expectRevert(CallerNotCreditFacadeException.selector);
         // creditManager.closeCreditAccount(
@@ -471,7 +471,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         poolMock.setCumulative_RAY(cumulativeAtOpen);
 
         // Existing address case
-        address creditAccount = creditManager.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER);
+        address creditAccount = creditManager.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, false);
         assertEq(creditAccount, expectedCreditAccount, "Incorrecct credit account address");
 
         (uint256 debt, uint256 cumulativeIndexAtOpen,,,,) = creditManager.creditAccountInfo(creditAccount);
@@ -1373,7 +1373,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
         evm.stopPrank();
 
-        address creditAccount = cm.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER);
+        address creditAccount = cm.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, false);
         cm.transferAccountOwnership(creditAccount, address(this));
 
         address revertToken = DUMB_ADDRESS;
@@ -1424,7 +1424,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         creditManager.setCollateralTokenData(poolMock.underlyingToken(), 9300, 9300, type(uint40).max, 0);
         evm.stopPrank();
 
-        address creditAccount = creditManager.openCreditAccount(DAI_ACCOUNT_AMOUNT, address(this));
+        address creditAccount = creditManager.openCreditAccount(DAI_ACCOUNT_AMOUNT, address(this), false);
         tokenTestSuite.mint(Tokens.DAI, creditAccount, 2 * DAI_ACCOUNT_AMOUNT);
 
         enableTokensMoreThanLimit(creditAccount);

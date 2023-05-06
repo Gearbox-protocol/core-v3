@@ -88,7 +88,7 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait, IERC20HelperTrait {
             --amount;
         }
         immediateWithdrawals[account][token] = 1;
-        _safeTransfer(token, to, amount);
+        // _safeTransfer(token, to, amount);
         emit ClaimImmediateWithdrawal(account, token, to, amount);
     }
 
@@ -175,7 +175,7 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait, IERC20HelperTrait {
         withdrawal.clear();
         emit CancelScheduledWithdrawal(creditAccount, token, amount);
 
-        _safeTransfer(token, creditAccount, amount);
+        // _safeTransfer(token, creditAccount, amount);
         tokensToEnable = tokenMask;
     }
 
