@@ -6,11 +6,13 @@ pragma solidity ^0.8.17;
 import {ACLNonReentrantTrait} from "../../traits/ACLNonReentrantTrait.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
-/// @dev Metaparameters are values that govern changes to a mission-critical system parameter
-struct MetaParameters {
-    /// @dev Determines whether the metaparameters were initialized
-    bool initialized;
-    /// @dev Bitmask of flags that determine which metaparameters to apply on parameter change:
+/// @dev Policy that determines checks performed on a parameter
+///      Each policy is defined for a contract group
+struct Policy {
+    /// @dev Determines whether the policy is enabled
+    ///      A disabled policy will auto-fail the policy check
+    bool enabled;
+    /// @dev Bitmask of flags that determine which policy checks to apply on parameter change:
     ///      0 - check exact value
     ///      1 - check min value
     ///      2 - check max value
@@ -28,6 +30,7 @@ struct MetaParameters {
     /// @dev A reference value of a parameter to check change magnitudes against;
     ///      When the reference update period has elapsed since the last reference point update,
     ///      the reference point is updated to the 'current' value on the next parameter change
+    ///      NB: Should not be changed manually in most cases
     uint256 referencePoint;
     /// @dev The minimal time period after which the RP can be updated
     uint40 referencePointUpdatePeriod;
@@ -41,8 +44,8 @@ struct MetaParameters {
     uint256 maxChange;
 }
 
-/// @dev A contract for managing bounds and conditions (called metaparameters) for mission-critical protocol params
-contract MetaParamManager is ACLNonReentrantTrait {
+/// @dev A contract for managing bounds and conditions for mission-critical protocol params
+contract PolicyManager is ACLNonReentrantTrait {
     uint256 public constant CHECK_EXACT_VALUE_FLAG = 1;
     uint256 public constant CHECK_MIN_VALUE_FLAG = 1 << 1;
     uint256 public constant CHECK_MAX_VALUE_FLAG = 1 << 2;
@@ -52,59 +55,70 @@ contract MetaParamManager is ACLNonReentrantTrait {
     uint256 public constant CHECK_MAX_PCT_CHANGE_FLAG = 1 << 6;
 
     /// @dev Mapping from parameter hashes to metaparameters
-    mapping(bytes32 => MetaParameters) internal _metas;
+    mapping(bytes32 => Policy) internal _policies;
+
+    /// @dev Mapping from a contract address to its group
+    mapping(address => string) internal _group;
 
     constructor(address _addressProvider) ACLNonReentrantTrait(_addressProvider) {}
 
-    /// @dev Sets the metaparameters, using the hashed parameter name as key
-    function setParameterMetas(string memory paramName, MetaParameters memory initialMetas) external configuratorOnly {
-        _setParameterMetas(keccak256(abi.encode(paramName)), initialMetas);
+    /// @dev Sets the policy, using policy UID as key
+    /// @param policyHash A unique identifier for a policy
+    ///                   Generally, this should be a hash of (PARAMETER_NAME, GROUP_NAME)
+    /// @param initialPolicy The initial policy values
+    function setPolicy(bytes32 policyHash, Policy memory initialPolicy) public configuratorOnly {
+        initialPolicy.enabled = true;
+        _policies[policyHash] = initialPolicy;
     }
 
-    /// @dev Sets the metaparameters, using any hash as key
-    function setParameterMetas(bytes32 paramHash, MetaParameters memory initialMetas) public configuratorOnly {
-        _setParameterMetas(paramHash, initialMetas);
+    /// @dev Disables the policy which makes all requested checks for the passed policy hash to auto-fail
+    /// @param policyHash A unique identifier for a policy
+    function disablePolicy(bytes32 policyHash) public configuratorOnly {
+        _policies[policyHash].enabled = false;
     }
 
-    /// @dev IMPLEMENTATION: setParameterMetas
-    function _setParameterMetas(bytes32 paramHash, MetaParameters memory initialMetas) internal configuratorOnly {
-        initialMetas.initialized = true;
-        _metas[paramHash] = initialMetas;
+    /// @dev Retrieves policy from policy UID
+    function getPolicy(bytes32 policyHash) external view returns (Policy memory) {
+        return _policies[policyHash];
     }
 
-    /// @dev Retrieves metaparameters from parameter name
-    function getParameterMetas(string memory paramName) external view returns (MetaParameters memory) {
-        return _metas[keccak256(abi.encode(paramName))];
+    /// @dev Sets the policy group of the address
+    function setGroup(address contractAddress, string memory group) external configuratorOnly {
+        _group[contractAddress] = group;
     }
 
-    /// @dev Retrieves metaparameters from arbitrary parameter hash
-    function getParameterMetas(bytes32 paramHash) external view returns (MetaParameters memory) {
-        return _metas[paramHash];
+    /// @dev Retrieves the group associated with a contract
+    function getGroup(address contractAddress) external view returns (string memory) {
+        return _group[contractAddress];
     }
 
-    /// @dev Performs parameter checks, with metaparameters retrieved from parameter name
-    function _checkParameter(string memory paramName, uint256 oldValue, uint256 newValue) internal returns (bool) {
-        return _checkParameter(keccak256(abi.encode(paramName)), oldValue, newValue);
+    /// @dev Performs parameter checks, with policy retrieved based on contract and parameter name
+    function _checkPolicy(address contractAddress, string memory paramName, uint256 oldValue, uint256 newValue)
+        internal
+        returns (bool)
+    {
+        bytes32 policyHash = keccak256(abi.encode(_group[contractAddress], paramName));
+        return _checkPolicy(policyHash, oldValue, newValue);
     }
 
-    /// @dev Performs parameter checks, with metaparameters retrieved from arbitrary hash
-    function _checkParameter(bytes32 paramHash, uint256 oldValue, uint256 newValue) internal returns (bool) {
-        MetaParameters storage metas = _metas[paramHash];
+    /// @dev Performs parameter checks, with policy retrieved based on policy UID
+    function _checkPolicy(bytes32 policyHash, uint256 oldValue, uint256 newValue) internal returns (bool) {
+        Policy storage policy = _policies[policyHash];
 
-        if (!metas.initialized) return false;
+        if (!policy.enabled) return false;
 
-        uint8 flags = metas.flags;
+        uint8 flags = policy.flags;
 
         if (flags & CHECK_EXACT_VALUE_FLAG > 0) {
-            if (newValue != metas.exactValue) return false;
+            if (newValue != policy.exactValue) return false;
         }
 
         if (flags & CHECK_MIN_VALUE_FLAG > 0) {
-            if (newValue < metas.minValue) return false;
+            if (newValue < policy.minValue) return false;
         }
 
         if (flags & CHECK_MAX_VALUE_FLAG > 0) {
-            if (newValue > metas.maxValue) return false;
+            if (newValue > policy.maxValue) return false;
         }
 
         uint256 rp;
@@ -114,32 +128,32 @@ contract MetaParamManager is ACLNonReentrantTrait {
                 & (CHECK_MIN_CHANGE_FLAG | CHECK_MAX_CHANGE_FLAG | CHECK_MIN_PCT_CHANGE_FLAG | CHECK_MAX_PCT_CHANGE_FLAG)
                 > 0
         ) {
-            if (block.timestamp > metas.referencePointTimestampLU + metas.referencePointUpdatePeriod) {
-                metas.referencePoint = oldValue;
+            if (block.timestamp > policy.referencePointTimestampLU + policy.referencePointUpdatePeriod) {
+                policy.referencePoint = oldValue;
             }
-            rp = metas.referencePoint;
+            rp = policy.referencePoint;
         }
 
         if (flags & CHECK_MIN_CHANGE_FLAG > 0) {
             uint256 diff = newValue > rp ? newValue - rp : rp - newValue;
-            if (diff < metas.minChange) return false;
+            if (diff < policy.minChange) return false;
         }
 
         if (flags & CHECK_MAX_CHANGE_FLAG > 0) {
             uint256 diff = newValue > rp ? newValue - rp : rp - newValue;
-            if (diff > metas.maxChange) return false;
+            if (diff > policy.maxChange) return false;
         }
 
         if (flags & CHECK_MIN_PCT_CHANGE_FLAG > 0) {
             uint256 diff = newValue > rp ? newValue - rp : rp - newValue;
             uint16 pctDiff = uint16(diff * PERCENTAGE_FACTOR / rp);
-            if (pctDiff < metas.minPctChange) return false;
+            if (pctDiff < policy.minPctChange) return false;
         }
 
         if (flags & CHECK_MAX_PCT_CHANGE_FLAG > 0) {
             uint256 diff = newValue > rp ? newValue - rp : rp - newValue;
             uint16 pctDiff = uint16(diff * PERCENTAGE_FACTOR / rp);
-            if (pctDiff > metas.maxPctChange) return false;
+            if (pctDiff > policy.maxPctChange) return false;
         }
 
         return true;
