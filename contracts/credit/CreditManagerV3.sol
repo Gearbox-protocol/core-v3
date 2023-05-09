@@ -68,7 +68,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     uint256 public constant override version = 3_00;
 
     /// @dev Factory contract for Credit Accounts
-    IAccountFactory public immutable _accountFactory;
+    IAccountFactory public immutable accountFactory;
 
     /// @dev Address of the underlying asset
     address public immutable override underlying;
@@ -206,7 +206,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
 
         // Price oracle is stored in Slot1, as it is accessed frequently with fees
         priceOracle = IPriceOracleV2(addressProvider.getPriceOracle()); // F:[CM-1]
-        _accountFactory = IAccountFactory(addressProvider.getAccountFactory()); // F:[CM-1]
+        accountFactory = IAccountFactory(addressProvider.getAccountFactory()); // F:[CM-1]
         creditConfigurator = msg.sender; // F:[CM-1]
 
         withdrawalManager = IWithdrawalManager(_withdrawalManager);
@@ -233,7 +233,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
     {
         // Takes a Credit Account from the factory and sets initial parameters
         // The Credit Account will be connected to this Credit Manager until closing
-        creditAccount = _accountFactory.takeCreditAccount(0, 0); // F:[CM-8]
+        creditAccount = accountFactory.takeCreditAccount(0, 0); // F:[CM-8]
 
         creditAccountInfo[creditAccount].debt = debt;
         creditAccountInfo[creditAccount].cumulativeIndexAtOpen = IPoolService(pool).calcLinearCumulative_RAY();
@@ -376,7 +376,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard,
         _transferAssetsTo(creditAccount, to, convertWETH, enabledTokensMask); // F:[CM-14,17,19]
 
         // Returns Credit Account to the factory
-        _accountFactory.returnCreditAccount(creditAccount); // F:[CM-9]
+        accountFactory.returnCreditAccount(creditAccount); // F:[CM-9]
         creditAccountsSet.remove(creditAccount);
     }
 
