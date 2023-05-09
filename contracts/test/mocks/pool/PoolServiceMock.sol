@@ -225,15 +225,15 @@ contract PoolServiceMock is IPoolService {
     //    function calcCumulativeIndexAtBorrowMore(
     //        uint256 amount,
     //        uint256 dAmount,
-    //        uint256 cumulativeIndexAtOpen
+    //        uint256 cumulativeIndexLastUpdate
     //    ) external view override returns (uint256) {
     //        return
     //            (calcLinearCumulative_RAY() *
-    //                (cumulativeIndexAtOpen) *
+    //                (cumulativeIndexLastUpdate) *
     //                (amount + dAmount)) /
     //            (calcLinearCumulative_RAY() *
     //                amount +
     //                dAmount *
-    //                cumulativeIndexAtOpen);
+    //                cumulativeIndexLastUpdate);
     //    }
 }

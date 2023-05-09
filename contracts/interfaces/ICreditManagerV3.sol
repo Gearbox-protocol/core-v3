@@ -4,7 +4,7 @@
 pragma solidity ^0.8.10;
 
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {IPoolQuotaKeeper, QuotaUpdate} from "./IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeper} from "./IPoolQuotaKeeper.sol";
 import {ClaimAction, IWithdrawalManager} from "./IWithdrawalManager.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
@@ -20,27 +20,28 @@ enum ManageDebtAction {
 }
 
 uint8 constant WITHDRAWAL_FLAG = 1;
-uint8 constant BOT_PERMISSIONS_SET = 2;
+uint8 constant BOT_PERMISSIONS_SET_FLAG = 1 << 1;
 
 struct CreditAccountInfo {
     uint256 debt;
-    uint256 cumulativeIndexAtOpen;
+    uint256 cumulativeIndexLastUpdate;
     uint256 cumulativeQuotaInterest;
     uint256 enabledTokensMask;
-    uint8 flags;
+    uint16 flags;
     address borrower;
 }
 
 enum CollateralCalcTask {
     DEBT_ONLY,
+    DEBT_COLLATERAL_WITHOUT_WITHDRAWALS,
     DEBT_COLLATERAL_CANCEL_WITHDRAWALS,
     DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
 }
 
 struct CollateralDebtData {
     uint256 debt;
-    uint256 debtWithInterest;
-    uint256 debtWithInterestAndFees;
+    uint256 accruedInterest;
+    uint256 accruedFees;
     uint256 totalValue;
     uint256 totalValueUSD;
     uint256 twvUSD;
@@ -82,7 +83,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     ///  @dev Opens credit account and borrows funds from the pool.
     /// @param debt Amount to be borrowed by the Credit Account
     /// @param onBehalfOf The owner of the newly opened Credit Account
-    function openCreditAccount(uint256 debt, address onBehalfOf) external returns (address);
+    function openCreditAccount(uint256 debt, address onBehalfOf, bool deployNew) external returns (address);
 
     ///  @dev Closes a Credit Account - covers both normal closure and liquidation
     /// - Checks whether the contract is paused, and, if so, if the payer is an emergency liquidator.
@@ -183,10 +184,9 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     // QUOTAS MANAGEMENT
     //
 
-    /// @dev Updates credit account's quotas for multiple tokens
+    /// @dev Updates credit account's quotas
     /// @param creditAccount Address of credit account
-    /// @param quotaUpdates Requested quota updates, see `QuotaUpdate`
-    function updateQuotas(address creditAccount, QuotaUpdate[] memory quotaUpdates)
+    function updateQuota(address creditAccount, address token, int96 quotaChange)
         external
         returns (uint256 tokensToEnable, uint256 tokensToDisable);
 
@@ -203,7 +203,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// Only enabled tokens are counted as collateral for the Credit Account
     /// @notice An enabled token mask encodes an enabled token by setting
     ///         the bit at the position equal to token's index to 1
-    function enabledTokensMap(address creditAccount) external view returns (uint256);
+    function enabledTokensMaskOf(address creditAccount) external view returns (uint256);
 
     /// @dev Returns the collateral token at requested index and its liquidation threshold
     /// @param id The index of token to return
@@ -314,9 +314,13 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @param revocations Spender/token pairs to revoke allowances for
     function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external;
 
-    function setCaForExternalCall(address creditAccount) external;
+    function setCreditAccountForExternalCall(address creditAccount) external;
 
     function externalCallCreditAccountOrRevert() external view returns (address creditAccount);
 
     function getTokenByMask(uint256 tokenMask) external view returns (address token);
+
+    function flagsOf(address creditAccount) external view returns (uint16);
+
+    function setFlagFor(address creditAccount, uint16 flag, bool value) external;
 }

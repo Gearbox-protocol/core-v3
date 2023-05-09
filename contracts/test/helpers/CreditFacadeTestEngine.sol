@@ -17,11 +17,11 @@ import {CreditFacadeTestSuite} from "../suites/CreditFacadeTestSuite.sol";
 import {LEVERAGE_DECIMALS} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import "../lib/constants.sol";
 
+import {Test} from "forge-std/Test.sol";
+
 /// @title CreditManagerTestSuite
 /// @notice Deploys contract for unit testing of CreditManagerV3.sol
-contract CreditFacadeTestEngine is DSTest {
-    CheatCodes evm = CheatCodes(HEVM_ADDRESS);
-
+contract CreditFacadeTestEngine is Test {
     // Suites
     ICreditManagerV3 public creditManager;
     CreditFacadeV3 public creditFacade;
@@ -50,6 +50,7 @@ contract CreditFacadeTestEngine is DSTest {
                     callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, amount))
                 })
             ),
+            false,
             referralCode
         );
     }
@@ -59,27 +60,27 @@ contract CreditFacadeTestEngine is DSTest {
 
         cft.tokenTestSuite().mint(underlying, USER, accountAmount);
 
-        evm.startPrank(USER);
+        vm.startPrank(USER);
         creditAccount = _openCreditAccount(accountAmount, USER, 100, 0);
 
-        evm.stopPrank();
+        vm.stopPrank();
 
         balance = IERC20(underlying).balanceOf(creditAccount);
 
-        evm.label(creditAccount, "creditAccount");
+        vm.label(creditAccount, "creditAccount");
     }
 
     function _openExtraTestCreditAccount() internal returns (address creditAccount, uint256 balance) {
         uint256 accountAmount = cft.creditAccountAmount();
 
         /// TODO: FIX
-        // evm.prank(FRIEND);
+        // vm.prank(FRIEND);
         // creditFacade.openCreditAccount(accountAmount, FRIEND, 100, 0);
 
-        evm.startPrank(USER);
+        vm.startPrank(USER);
         creditAccount = _openCreditAccount(accountAmount, USER, 100, 0);
 
-        evm.stopPrank();
+        vm.stopPrank();
 
         balance = IERC20(underlying).balanceOf(creditAccount);
     }
@@ -88,7 +89,7 @@ contract CreditFacadeTestEngine is DSTest {
         MultiCall[] memory closeCalls;
 
         // switch to new block to be able to close account
-        evm.roll(block.number + 1);
+        vm.roll(block.number + 1);
 
         // (,, uint256 underlyingToClose) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
         // uint256 underlyingBalance = cft.tokenTestSuite().balanceOf(underlying, creditAccount);
@@ -99,7 +100,7 @@ contract CreditFacadeTestEngine is DSTest {
         //     cft.tokenTestSuite().approve(underlying, USER, address(creditManager));
         // }
 
-        evm.prank(USER);
+        vm.prank(USER);
         creditFacade.closeCreditAccount(creditAccount, FRIEND, 0, false, closeCalls);
     }
 
@@ -110,7 +111,7 @@ contract CreditFacadeTestEngine is DSTest {
     function expectTokenIsEnabled(address creditAccount, address token, bool expectedState, string memory reason)
         internal
     {
-        bool state = creditManager.getTokenMaskOrRevert(token) & creditManager.enabledTokensMap(creditAccount) != 0;
+        bool state = creditManager.getTokenMaskOrRevert(token) & creditManager.enabledTokensMaskOf(creditAccount) != 0;
 
         if (state != expectedState && bytes(reason).length != 0) {
             emit log_string(reason);
@@ -131,25 +132,25 @@ contract CreditFacadeTestEngine is DSTest {
     function addCollateral(address token, uint256 amount) internal {
         // tokenTestSuite.mint(t, USER, amount);
 
-        evm.startPrank(USER);
+        vm.startPrank(USER);
         IERC20(token).approve(address(creditManager), type(uint256).max);
 
         // TODO: rewrite as collateral
         // creditFacade.addCollateral(USER, token, amount);
 
-        evm.stopPrank();
+        vm.stopPrank();
     }
 
     function _makeAccountsLiquitable() internal {
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditConfigurator.setFees(1000, 200, 9000, 100, 9500);
 
         // switch to new block to be able to close account
-        evm.roll(block.number + 1);
+        vm.roll(block.number + 1);
     }
 
     function executeOneLineMulticall(address creditAccount, address targetContract, bytes memory callData) internal {
-        evm.prank(USER);
+        vm.prank(USER);
         creditFacade.multicall(creditAccount, multicallBuilder(MultiCall({target: targetContract, callData: callData})));
     }
 

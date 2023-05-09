@@ -13,6 +13,7 @@ import {ICreditConfig} from "../interfaces/ICreditConfig.sol";
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 
 import "../lib/constants.sol";
+import {Test} from "forge-std/Test.sol";
 
 struct CollateralTokensItem {
     Tokens token;
@@ -21,7 +22,7 @@ struct CollateralTokensItem {
 
 /// @title CreditManagerTestSuite
 /// @notice Deploys contract for unit testing of CreditManagerV3.sol
-contract CreditConfig is DSTest, ICreditConfig {
+contract CreditConfig is Test, ICreditConfig {
     uint128 public minBorrowedAmount;
     uint128 public maxBorrowedAmount;
 
@@ -63,14 +64,14 @@ contract CreditConfig is DSTest, ICreditConfig {
 
     function getCollateralTokens() public override returns (CollateralToken[] memory collateralTokens) {
         CollateralTokensItem[8] memory collateralTokenOpts = [
-            CollateralTokensItem({token: Tokens.USDC, liquidationThreshold: 9000}),
-            CollateralTokensItem({token: Tokens.USDT, liquidationThreshold: 8800}),
-            CollateralTokensItem({token: Tokens.DAI, liquidationThreshold: 8300}),
-            CollateralTokensItem({token: Tokens.WETH, liquidationThreshold: 8300}),
-            CollateralTokensItem({token: Tokens.LINK, liquidationThreshold: 7300}),
-            CollateralTokensItem({token: Tokens.CRV, liquidationThreshold: 7300}),
-            CollateralTokensItem({token: Tokens.CVX, liquidationThreshold: 7300}),
-            CollateralTokensItem({token: Tokens.STETH, liquidationThreshold: 7300})
+            CollateralTokensItem({token: Tokens.USDC, liquidationThreshold: 90_00}),
+            CollateralTokensItem({token: Tokens.USDT, liquidationThreshold: 88_00}),
+            CollateralTokensItem({token: Tokens.DAI, liquidationThreshold: 83_00}),
+            CollateralTokensItem({token: Tokens.WETH, liquidationThreshold: 83_00}),
+            CollateralTokensItem({token: Tokens.LINK, liquidationThreshold: 73_00}),
+            CollateralTokensItem({token: Tokens.CRV, liquidationThreshold: 73_00}),
+            CollateralTokensItem({token: Tokens.CVX, liquidationThreshold: 73_00}),
+            CollateralTokensItem({token: Tokens.STETH, liquidationThreshold: 73_00})
         ];
 
         lt[underlyingSymbol] = DEFAULT_UNDERLYING_LT;

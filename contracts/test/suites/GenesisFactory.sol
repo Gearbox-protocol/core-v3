@@ -10,7 +10,7 @@ import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/Contra
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {DataCompressor} from "@gearbox-protocol/core-v2/contracts/core/DataCompressor.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
-import {AccountFactoryV2} from "../../core/AccountFactory.sol";
+import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
 
 import {WETHGateway} from "../../support/WETHGateway.sol";
 import {PriceOracle, PriceFeedConfig} from "@gearbox-protocol/core-v2/contracts/oracles/PriceOracle.sol";
@@ -54,7 +54,7 @@ contract GenesisFactory is Ownable {
 
             accountFactory = address(af);
         } else {
-            accountFactory = address(new  AccountFactoryV2( address(addressProvider))); // T:[GD-1]
+            accountFactory = address(new  AccountFactoryV3( address(addressProvider))); // T:[GD-1]
         }
 
         addressProvider.setAccountFactory(accountFactory); // T:[GD-1]

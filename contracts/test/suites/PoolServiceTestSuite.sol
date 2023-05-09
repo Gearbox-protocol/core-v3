@@ -8,7 +8,7 @@ import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/Contra
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {DieselToken} from "@gearbox-protocol/core-v2/contracts/tokens/DieselToken.sol";
 
-import {IPool4626, Pool4626Opts} from "../../interfaces/IPool4626.sol";
+import {IPool4626} from "../../interfaces/IPool4626.sol";
 import {TestPoolService} from "@gearbox-protocol/core-v2/contracts/test/mocks/pool/TestPoolService.sol";
 import {Tokens} from "../config/Tokens.sol";
 
@@ -27,6 +27,8 @@ import {GaugeMock} from "../mocks/pool/GaugeMock.sol";
 
 import {Pool4626_USDT} from "../../pool/Pool4626_USDT.sol";
 
+import {Test} from "forge-std/Test.sol";
+
 uint256 constant liquidityProviderInitBalance = 100 ether;
 uint256 constant addLiquidity = 10 ether;
 uint256 constant removeLiquidity = 5 ether;
@@ -34,9 +36,7 @@ uint16 constant referral = 12333;
 
 /// @title PoolServiceTestSuite
 /// @notice Deploys contract for unit testing of PoolService.sol
-contract PoolServiceTestSuite {
-    CheatCodes evm = CheatCodes(HEVM_ADDRESS);
-
+contract PoolServiceTestSuite is Test {
     ACL public acl;
     WETHMock public weth;
 
@@ -64,7 +64,7 @@ contract PoolServiceTestSuite {
             false
         );
 
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
 
         acl = new ACL();
         weth = WETHMock(payable(_tokenTestSuite.wethToken()));
@@ -90,14 +90,21 @@ contract PoolServiceTestSuite {
         } catch {}
 
         if (is4626) {
-            Pool4626Opts memory opts = Pool4626Opts({
-                addressProvider: address(addressProvider),
-                underlyingToken: _underlying,
-                interestRateModel: address(linearIRModel),
-                expectedLiquidityLimit: type(uint256).max,
-                supportsQuotas: supportQuotas
-            });
-            pool4626 = isFeeToken ? new Pool4626_USDT(opts) : new Pool4626(opts);
+            pool4626 = isFeeToken
+                ? new Pool4626_USDT({
+                                _addressProvider: address(addressProvider),
+                                _underlyingToken: _underlying,
+                                _interestRateModel: address(linearIRModel),
+                                _expectedLiquidityLimit: type(uint256).max,
+                                _supportsQuotas: supportQuotas
+                            })
+                : new Pool4626({
+                                _addressProvider: address(addressProvider),
+                                _underlyingToken: _underlying,
+                                _interestRateModel: address(linearIRModel),
+                                _expectedLiquidityLimit: type(uint256).max,
+                                _supportsQuotas: supportQuotas
+                            });
             newPool = address(pool4626);
 
             if (supportQuotas) {
@@ -112,40 +119,40 @@ contract PoolServiceTestSuite {
             );
             newPool = address(poolService);
             dieselToken = DieselToken(poolService.dieselToken());
-            evm.label(address(dieselToken), "DieselToken");
+            vm.label(address(dieselToken), "DieselToken");
         }
 
-        evm.stopPrank();
+        vm.stopPrank();
 
-        evm.prank(USER);
+        vm.prank(USER);
         underlying.approve(newPool, type(uint256).max);
 
-        evm.prank(INITIAL_LP);
+        vm.prank(INITIAL_LP);
         underlying.approve(newPool, type(uint256).max);
 
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
 
         cmMock = new CreditManagerMockForPoolTest(newPool);
 
         cr.addPool(newPool);
         cr.addCreditManager(address(cmMock));
 
-        evm.label(newPool, "Pool");
+        vm.label(newPool, "Pool");
 
-        // evm.label(address(underlying), "UnderlyingToken");
+        // vm.label(address(underlying), "UnderlyingToken");
 
-        evm.stopPrank();
+        vm.stopPrank();
     }
 
     function _deployAndConnectPoolQuotaKeeper() internal {
         poolQuotaKeeper = new PoolQuotaKeeper(address(pool4626));
 
-        // evm.prank(CONFIGURATOR);
+        // vm.prank(CONFIGURATOR);
         pool4626.connectPoolQuotaManager(address(poolQuotaKeeper));
 
         gaugeMock = new GaugeMock(address(pool4626));
 
-        // evm.prank(CONFIGURATOR);
+        // vm.prank(CONFIGURATOR);
         poolQuotaKeeper.setGauge(address(gaugeMock));
     }
 }

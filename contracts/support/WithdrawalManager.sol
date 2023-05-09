@@ -12,7 +12,6 @@ import {
 import {ClaimAction, IWithdrawalManager, IVersion, ScheduledWithdrawal} from "../interfaces/IWithdrawalManager.sol";
 import {WithdrawalsLogic} from "../libraries/WithdrawalsLogic.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
-import {IERC20HelperTrait} from "../traits/IERC20HelperTrait.sol";
 
 /// @title Withdrawal manager
 /// @notice Contract that handles withdrawals from credit accounts.
@@ -20,7 +19,7 @@ import {IERC20HelperTrait} from "../traits/IERC20HelperTrait.sol";
 ///         - Immediate withdrawals can be claimed, well, immediately, and exist to support blacklistable tokens.
 ///         - Scheduled withdrawals can be claimed after a certain delay, and exist to support partial withdrawals
 ///           from credit accounts. One credit account can have up to two scheduled withdrawals at the same time.
-contract WithdrawalManager is IWithdrawalManager, ACLTrait, IERC20HelperTrait {
+contract WithdrawalManager is IWithdrawalManager, ACLTrait {
     using WithdrawalsLogic for ClaimAction;
     using WithdrawalsLogic for ScheduledWithdrawal;
     using WithdrawalsLogic for ScheduledWithdrawal[2];

@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
+pragma abicoder v1;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -18,17 +18,17 @@ import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
 
+/// LIBS & TRAITS
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
 import {IInterestRateModel} from "../interfaces/IInterestRateModel.sol";
-import {IPool4626, Pool4626Opts} from "../interfaces/IPool4626.sol";
+import {IPool4626} from "../interfaces/IPool4626.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
 
 import {RAY, SECONDS_PER_YEAR, MAX_WITHDRAW_FEE} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
-import {Errors} from "@gearbox-protocol/core-v2/contracts/libraries/Errors.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
@@ -44,7 +44,6 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
     using Math for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
-    using Address for address payable;
 
     /// @dev Address provider
     AddressProvider public immutable override addressProvider;
@@ -94,7 +93,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
     uint128 internal _totalBorrowedLimit;
 
     /// @dev The limit on expected (total) liquidity
-    uint128 internal _expectedLiquidityLimit;
+    uint128 internal expectedLiquidityLimit128;
 
     // [SLOT #5]: POOL QUOTA KEEPER
 
@@ -131,41 +130,40 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
     //
 
     /// @dev Constructor
-    /// @param opts Core pool options
-    constructor(Pool4626Opts memory opts)
-        ACLNonReentrantTrait(opts.addressProvider)
-        ContractsRegisterTrait(opts.addressProvider)
-        ERC4626(IERC20(opts.underlyingToken))
+
+    constructor(
+        address _addressProvider,
+        address _underlyingToken,
+        address _interestRateModel,
+        uint256 _expectedLiquidityLimit,
+        bool _supportsQuotas
+    )
+        ACLNonReentrantTrait(_addressProvider)
+        ContractsRegisterTrait(_addressProvider)
+        ERC4626(IERC20(_underlyingToken))
         ERC20(
             string(
-                abi.encodePacked(
-                    "diesel ", opts.underlyingToken != address(0) ? IERC20Metadata(opts.underlyingToken).name() : ""
-                )
+                abi.encodePacked("diesel ", _underlyingToken != address(0) ? IERC20Metadata(_underlyingToken).name() : "")
             ),
-            string(
-                abi.encodePacked(
-                    "d", opts.underlyingToken != address(0) ? IERC20Metadata(opts.underlyingToken).symbol() : ""
-                )
-            )
+            string(abi.encodePacked("d", _underlyingToken != address(0) ? IERC20Metadata(_underlyingToken).symbol() : ""))
         ) // F:[P4-01]
-        nonZeroAddress(opts.addressProvider) // F:[P4-02]
-        nonZeroAddress(opts.underlyingToken) // F:[P4-02]
-        nonZeroAddress(opts.interestRateModel) // F:[P4-02]
+        nonZeroAddress(_underlyingToken) // F:[P4-02]
+        nonZeroAddress(_interestRateModel) // F:[P4-02]
     {
-        addressProvider = AddressProvider(opts.addressProvider); // F:[P4-01]
-        underlyingToken = opts.underlyingToken; // F:[P4-01]
+        addressProvider = AddressProvider(_addressProvider); // F:[P4-01]
+        underlyingToken = _underlyingToken; // F:[P4-01]
 
-        treasury = AddressProvider(opts.addressProvider).getTreasuryContract(); // F:[P4-01]
+        treasury = AddressProvider(_addressProvider).getTreasuryContract(); // F:[P4-01]
 
         timestampLU = uint64(block.timestamp); // F:[P4-01]
         cumulativeIndexLU_RAY = uint128(RAY); // F:[P4-01]
 
-        interestRateModel = IInterestRateModel(opts.interestRateModel);
-        emit SetInterestRateModel(opts.interestRateModel); // F:[P4-03]
+        interestRateModel = IInterestRateModel(_interestRateModel);
+        emit SetInterestRateModel(_interestRateModel); // F:[P4-03]
 
-        _setExpectedLiquidityLimit(opts.expectedLiquidityLimit); // F:[P4-01, 03]
-        _setTotalBorrowedLimit(opts.expectedLiquidityLimit); // F:[P4-03]
-        supportsQuotas = opts.supportsQuotas; // F:[P4-01]
+        _setExpectedLiquidityLimit(_expectedLiquidityLimit); // F:[P4-01, 03]
+        _setTotalBorrowedLimit(_expectedLiquidityLimit); // F:[P4-03]
+        supportsQuotas = _supportsQuotas; // F:[P4-01]
     }
 
     //
@@ -223,7 +221,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
 
     function _deposit(address receiver, uint256 assetsSent, uint256 assetsDelivered, uint256 shares) internal {
         /// Interst rate calculatiuon??
-        if (expectedLiquidity() + assetsDelivered > uint256(_expectedLiquidityLimit)) {
+        if (expectedLiquidity() + assetsDelivered > uint256(expectedLiquidityLimit128)) {
             revert ExpectedLiquidityLimitException(); // F:[P4-7]
         }
 
@@ -344,10 +342,11 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
     }
 
     /// @dev See {IERC4626-maxDeposit}.
+    /// TODO: add pause case (?)
     function maxDeposit(address) public view override(ERC4626, IERC4626) returns (uint256) {
-        return (_expectedLiquidityLimit == type(uint128).max)
+        return (expectedLiquidityLimit128 == type(uint128).max)
             ? type(uint256).max
-            : _amountWithFee(_expectedLiquidityLimit - expectedLiquidity());
+            : _amountWithFee(expectedLiquidityLimit128 - expectedLiquidity());
     }
 
     /// @dev See {IERC4626-previewDeposit}.
@@ -357,7 +356,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
 
     /// @dev See {IERC4626-maxMint}.
     function maxMint(address) public view override(ERC4626, IERC4626) returns (uint256) {
-        uint128 limit = _expectedLiquidityLimit;
+        uint128 limit = expectedLiquidityLimit128;
         return (limit == type(uint128).max) ? type(uint256).max : previewMint(limit - expectedLiquidity());
     }
 
@@ -417,13 +416,14 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
     /// @dev Computes interest rate accrued from last update (LU)
     function _calcBaseInterestAccrued() internal view returns (uint256) {
         // timeDifference = blockTime - previous timeStamp
-        uint256 timeDifference = block.timestamp - timestampLU;
 
         //                                    currentBorrowRate * timeDifference
         //  interestAccrued = totalBorrow *  ------------------------------------
         //                                             SECONDS_PER_YEAR
         //
-        return (uint256(_totalBorrowed) * _borrowRate * timeDifference) / RAY / SECONDS_PER_YEAR;
+
+        // TODO: move to lib
+        return (uint256(_totalBorrowed) * _borrowRate * (block.timestamp - timestampLU)) / RAY / SECONDS_PER_YEAR;
     }
 
     function _calcOutstandingQuotaRevenue() internal view returns (uint128) {
@@ -682,7 +682,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
     }
 
     function _setExpectedLiquidityLimit(uint256 limit) internal {
-        _expectedLiquidityLimit = _convertToU128(limit); // F:[P4-24]
+        expectedLiquidityLimit128 = _convertToU128(limit); // F:[P4-24]
         emit SetExpectedLiquidityLimit(limit); // F:[P4-03,24]
     }
 
@@ -740,9 +740,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
 
         uint256 available = interestRateModel.availableToBorrow(expectedLiquidity(), availableLiquidity()); // F:[P4-27]
 
-        if (canBorrow > available) {
-            canBorrow = available; // F:[P4-27]
-        }
+        canBorrow = Math.max(canBorrow, available); // F:[P4-27]
 
         CreditManagerDebt memory cmDebt = creditManagersDebt[_creditManager];
         if (cmDebt.totalBorrowed >= cmDebt.limit) {
@@ -751,14 +749,12 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
 
         unchecked {
             uint256 cmLimit = cmDebt.limit - cmDebt.totalBorrowed;
-            if (canBorrow > cmLimit) {
-                canBorrow = cmLimit; // F:[P4-27]
-            }
+            canBorrow = Math.max(canBorrow, cmLimit); // F:[P4-27]
         }
     }
 
     function expectedLiquidityLimit() external view override returns (uint256) {
-        return _convertToU256(_expectedLiquidityLimit);
+        return _convertToU256(expectedLiquidityLimit128);
     }
 
     function expectedLiquidityLU() external view returns (uint256) {

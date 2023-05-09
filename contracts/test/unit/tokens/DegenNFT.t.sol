@@ -26,12 +26,15 @@ import {CreditFacadeTestSuite} from "../../suites/CreditFacadeTestSuite.sol";
 import {CreditConfig} from "../../config/CreditConfig.sol";
 import {Tokens} from "../../config/Tokens.sol";
 
+import {Test} from "forge-std/Test.sol";
+import "forge-std/console.sol";
+
 uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
 uint16 constant REFERRAL_CODE = 23;
 
 /// @title CreditFacadeTest
 /// @notice Designed for unit test purposes only
-contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
+contract DegenNFTTest is Test, CreditFacadeTestHelper, IDegenNFTExceptions {
     DegenNFT degenNFT;
     AddressProvider addressProvider;
     AccountFactory accountFactory;
@@ -81,45 +84,45 @@ contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
 
     // @dev [DNFT-2A]: setBaseUri reverts on non-Configurator
     function test_DNFT_02A_setBaseUri_reverts_on_non_Configurator() public {
-        evm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         degenNFT.setBaseUri("Degeneracy");
     }
 
     // @dev [DNFT-2B]: setMinter reverts on non-Configurator
     function test_DNFT_02B_setMinter_reverts_on_non_Configurator() public {
-        evm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         degenNFT.setMinter(DUMB_ADDRESS);
     }
 
     // @dev [DNFT-2C]: addCreditFacade reverts on non-Configurator
     function test_DNFT_02C_addCreditFacade_reverts_on_non_Configurator() public {
-        evm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         degenNFT.addCreditFacade(DUMB_ADDRESS);
     }
 
     // @dev [DNFT-2D]: removeCreditFacade reverts on non-Configurator
     function test_DNFT_02D_addCreditFacade_reverts_on_non_Configurator() public {
-        evm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         degenNFT.removeCreditFacade(DUMB_ADDRESS);
     }
 
     // @dev [DNFT-3]: mint reverts on non-Minter
     function test_DNFT_03_mint_reverts_on_non_minter() public {
-        evm.expectRevert(abi.encodeWithSelector(MinterOnlyException.selector));
-        evm.prank(FRIEND);
+        vm.expectRevert(abi.encodeWithSelector(MinterOnlyException.selector));
+        vm.prank(FRIEND);
         degenNFT.mint(USER, 1);
     }
 
     // @dev [DNFT-4]: burn reverts on non-CreditFacadeV3 or configurator
     function test_DNFT_04_burn_reverts_on_non_CreditFacade() public {
-        evm.expectRevert(abi.encodeWithSelector(CreditFacadeOrConfiguratorOnlyException.selector));
-        evm.prank(FRIEND);
+        vm.expectRevert(abi.encodeWithSelector(CreditFacadeOrConfiguratorOnlyException.selector));
+        vm.prank(FRIEND);
         degenNFT.burn(USER, 1);
     }
 
     // @dev [DNFT-5]: setBaseUri correctly sets URI
     function test_DNFT_05_setBasUri_correctly_sets_uri() public {
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         degenNFT.setBaseUri("Degeneracy");
 
         assertEq(degenNFT.baseURI(), "Degeneracy", "Base URI was set incorrectly");
@@ -127,7 +130,7 @@ contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
 
     // @dev [DNFT-5A]: setMinter correctly sets minter
     function test_DNFT_05A_setBasUri_correctly_sets_uri() public {
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         degenNFT.setMinter(DUMB_ADDRESS);
 
         assertEq(degenNFT.minter(), DUMB_ADDRESS, "Minter was set incorrectly");
@@ -135,12 +138,12 @@ contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
 
     // @dev [DNFT-6]: addCreditFacade reverts on invalid address
     function test_DNFT_06_addCreditFacade_reverts_on_invalid_address() public {
-        evm.expectRevert(InvalidCreditFacadeException.selector);
-        evm.prank(CONFIGURATOR);
+        vm.expectRevert(InvalidCreditFacadeException.selector);
+        vm.prank(CONFIGURATOR);
         degenNFT.addCreditFacade(DUMB_ADDRESS);
 
-        evm.expectRevert(InvalidCreditFacadeException.selector);
-        evm.prank(CONFIGURATOR);
+        vm.expectRevert(InvalidCreditFacadeException.selector);
+        vm.prank(CONFIGURATOR);
         degenNFT.addCreditFacade(address(accountFactory));
 
         ICreditManagerV3 fakeCM = new CreditManagerV3(creditManager.pool(), address(0));
@@ -150,8 +153,8 @@ contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
             false
         );
 
-        evm.expectRevert(InvalidCreditFacadeException.selector);
-        evm.prank(CONFIGURATOR);
+        vm.expectRevert(InvalidCreditFacadeException.selector);
+        vm.prank(CONFIGURATOR);
         degenNFT.addCreditFacade(address(fakeCF));
 
         fakeCF = new CreditFacadeV3(
@@ -160,8 +163,8 @@ contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
             false
         );
 
-        evm.expectRevert(InvalidCreditFacadeException.selector);
-        evm.prank(CONFIGURATOR);
+        vm.expectRevert(InvalidCreditFacadeException.selector);
+        vm.prank(CONFIGURATOR);
         degenNFT.addCreditFacade(address(fakeCF));
 
         fakeCF = new CreditFacadeV3(
@@ -170,14 +173,14 @@ contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
             false
         );
 
-        evm.expectRevert(InvalidCreditFacadeException.selector);
-        evm.prank(CONFIGURATOR);
+        vm.expectRevert(InvalidCreditFacadeException.selector);
+        vm.prank(CONFIGURATOR);
         degenNFT.addCreditFacade(address(fakeCF));
     }
 
     // @dev [DNFT-7]: mint works correctly and updates all values
     function test_DNFT_07_mint_is_correct() public {
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         degenNFT.mint(USER, 3);
 
         assertEq(degenNFT.balanceOf(USER), 3, "User balance is incorrect");
@@ -192,22 +195,22 @@ contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
 
     // @dev [DNFT-8]: burn works correctly and updates all values
     function test_DNFT_08_burn_is_correct() public {
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         degenNFT.mint(USER, 3);
 
-        evm.prank(address(creditFacade));
+        vm.prank(address(creditFacade));
         degenNFT.burn(USER, 2);
 
         assertEq(degenNFT.balanceOf(USER), 1, "User balance is incorrect");
 
         uint256 tokenId = uint256(uint160(USER)) + 2;
 
-        evm.expectRevert("ERC721: invalid token ID");
+        vm.expectRevert("ERC721: invalid token ID");
         degenNFT.ownerOf(tokenId);
 
         tokenId = uint256(uint160(USER)) + 1;
 
-        evm.expectRevert("ERC721: invalid token ID");
+        vm.expectRevert("ERC721: invalid token ID");
         degenNFT.ownerOf(tokenId);
 
         assertEq(degenNFT.totalSupply(), 1, "Total supply is incorrect");
@@ -215,11 +218,11 @@ contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
 
     // @dev [DNFT-8A]: burn reverts on insufficient balance
     function test_DNFT_08A_burn_reverts_on_insufficient_balance() public {
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         degenNFT.mint(USER, 3);
 
-        evm.expectRevert(InsufficientBalanceException.selector);
-        evm.prank(CONFIGURATOR);
+        vm.expectRevert(InsufficientBalanceException.selector);
+        vm.prank(CONFIGURATOR);
         degenNFT.burn(USER, 4);
     }
 
@@ -227,7 +230,7 @@ contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
     function test_DNFT_09_removeCreditFacade_sets_value() public {
         assertTrue(degenNFT.isSupportedCreditFacade(address(creditFacade)), "Expected Credit Facade is not added");
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         degenNFT.removeCreditFacade(address(creditFacade));
 
         assertTrue(!degenNFT.isSupportedCreditFacade(address(creditFacade)), "Credit Facade was not removed");
@@ -237,12 +240,12 @@ contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
     function test_DNFT_10_addCreditFacade_sets_value() public {
         assertTrue(degenNFT.isSupportedCreditFacade(address(creditFacade)), "Expected Credit Facade is not added");
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         degenNFT.removeCreditFacade(address(creditFacade));
 
         assertTrue(!degenNFT.isSupportedCreditFacade(address(creditFacade)), "Credit Facade was not removed");
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         degenNFT.addCreditFacade(address(creditFacade));
 
         assertTrue(degenNFT.isSupportedCreditFacade(address(creditFacade)), "Credit Facade was not added");
@@ -254,19 +257,19 @@ contract DegenNFTTest is DSTest, CreditFacadeTestHelper, IDegenNFTExceptions {
 
     // @dev [DNFT-11]: ERC721 transferability functions revert
     function test_DNFT_11_transfer_and_approval_functions_revert() public {
-        evm.expectRevert(NotImplementedException.selector);
+        vm.expectRevert(NotImplementedException.selector);
         degenNFT.transferFrom(USER, USER, 0);
 
-        evm.expectRevert(NotImplementedException.selector);
+        vm.expectRevert(NotImplementedException.selector);
         degenNFT.safeTransferFrom(USER, USER, 0);
 
-        evm.expectRevert(NotImplementedException.selector);
+        vm.expectRevert(NotImplementedException.selector);
         degenNFT.safeTransferFrom(USER, USER, 0, "");
 
-        evm.expectRevert(NotImplementedException.selector);
+        vm.expectRevert(NotImplementedException.selector);
         degenNFT.setApprovalForAll(FRIEND, true);
 
-        evm.expectRevert(NotImplementedException.selector);
+        vm.expectRevert(NotImplementedException.selector);
         degenNFT.approve(FRIEND, 0);
     }
 }
