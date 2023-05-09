@@ -8,7 +8,7 @@ import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfigurato
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
-import {AccountFactoryV2} from "../../core/AccountFactory.sol";
+import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
 
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
@@ -100,7 +100,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         }
 
         if (accountFactoryVer == 2) {
-            AccountFactoryV2(address(af)).addCreditManager(address(creditManager), 1);
+            AccountFactoryV3(address(af)).addCreditManager(address(creditManager), 1);
         }
 
         evm.stopPrank();

@@ -9,13 +9,11 @@ import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWE
 import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 
-import {CreditAccount} from "@gearbox-protocol/core-v2/contracts/credit/CreditAccount.sol";
-import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
-
 import {BotList} from "../../support/BotList.sol";
 
 import {ICreditFacade, ICreditFacadeMulticall, ICreditFacadeEvents} from "../../interfaces/ICreditFacade.sol";
 import {ICreditManagerV3, ICreditManagerV3Events, ClosureAction} from "../../interfaces/ICreditManagerV3.sol";
+import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 
 import {IDegenNFT, IDegenNFTExceptions} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
 import {IWithdrawalManager} from "../../interfaces/IWithdrawalManager.sol";

@@ -693,8 +693,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             uint256 _twvUSD;
             uint256 limit = lazy ? (debtPlusInterestRateAndFeesUSD - twvUSD) : type(uint256).max;
 
-            (enabledTokensMask, _totalUSD, _twvUSD) =
+            uint256 tokensToDisable;
+            (tokensToDisable, _totalUSD, _twvUSD) =
                 _calcNotQuotedCollateral(creditAccount, enabledTokensMask, limit, collateralHints, _priceOracle);
+
+            enabledTokensMask &= ~tokensToDisable;
             totalUSD += _totalUSD;
             twvUSD += _twvUSD;
         }
@@ -726,16 +729,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
 
     function _calcNotQuotedCollateral(
         address creditAccount,
-        uint256 _enabledTokensMask,
+        uint256 enabledTokensMask,
         uint256 enoughCollateralUSD,
         uint256[] memory collateralHints,
         IPriceOracleV2 _priceOracle
-    ) internal view returns (uint256 enabledTokensMask, uint256 totalValueUSD, uint256 twvUSD) {
+    ) internal view returns (uint256 tokensToDisable, uint256 totalValueUSD, uint256 twvUSD) {
         uint256 tokenMask;
         uint256 len = collateralHints.length;
         bool nonZeroBalance;
 
-        enabledTokensMask = _enabledTokensMask;
         uint256 checkedTokenMask = supportsQuotas ? enabledTokensMask & (~quotedTokenMask) : enabledTokensMask;
 
         if (enoughCollateralUSD != type(uint256).max) {
@@ -765,7 +767,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
                         // bit in enabledTokensMask, which is then written into storage at the
                         // very end, to avoid redundant storage writes
                     } else {
-                        enabledTokensMask &= ~tokenMask; // F:[CM-39]
+                        tokensToDisable |= tokenMask; // F:[CM-39]
                     }
                 }
 

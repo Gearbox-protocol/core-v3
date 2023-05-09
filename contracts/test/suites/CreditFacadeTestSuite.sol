@@ -8,7 +8,7 @@ import {CreditConfigurator} from "../../credit/CreditConfiguratorV3.sol";
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
 
-import {AccountFactoryV2} from "../../core/AccountFactory.sol";
+import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
 import {CreditManagerFactory} from "../../factories/CreditManagerFactory.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -110,7 +110,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
 
         if (accountFactoryVer == 2) {
             evm.prank(CONFIGURATOR);
-            AccountFactoryV2(address(af)).addCreditManager(address(creditManager), 1);
+            AccountFactoryV3(address(af)).addCreditManager(address(creditManager), 1);
         }
 
         if (supportQuotas) {

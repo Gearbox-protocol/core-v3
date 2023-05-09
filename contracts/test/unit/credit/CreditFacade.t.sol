@@ -9,11 +9,11 @@ import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWE
 import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 
-import {CreditAccount} from "@gearbox-protocol/core-v2/contracts/credit/CreditAccount.sol";
+import {BotList} from "../../../support/BotList.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 
-import {BotList} from "../../../support/BotList.sol";
-
+import "../../../interfaces/IAccountFactory.sol";
+import "../../../interfaces/ICreditAccount.sol";
 import "../../../interfaces/ICreditFacade.sol";
 import {
     ICreditManagerV3,
@@ -705,7 +705,7 @@ contract CreditFacadeTest is
         evm.expectEmit(true, false, false, true);
         emit ExecuteOrder(address(targetMock));
 
-        evm.expectCall(creditAccount, abi.encodeCall(CreditAccount.execute, (address(targetMock), DUMB_CALLDATA)));
+        evm.expectCall(creditAccount, abi.encodeCall(ICreditAccount.execute, (address(targetMock), DUMB_CALLDATA)));
 
         evm.expectCall(address(targetMock), DUMB_CALLDATA);
 
@@ -791,7 +791,7 @@ contract CreditFacadeTest is
         evm.expectEmit(true, false, false, false);
         emit ExecuteOrder(address(targetMock));
 
-        evm.expectCall(creditAccount, abi.encodeCall(CreditAccount.execute, (address(targetMock), DUMB_CALLDATA)));
+        evm.expectCall(creditAccount, abi.encodeCall(ICreditAccount.execute, (address(targetMock), DUMB_CALLDATA)));
 
         evm.expectCall(address(targetMock), DUMB_CALLDATA);
 
@@ -1378,7 +1378,7 @@ contract CreditFacadeTest is
         evm.expectEmit(true, false, false, true);
         emit ExecuteOrder(address(targetMock));
 
-        evm.expectCall(creditAccount, abi.encodeCall(CreditAccount.execute, (address(targetMock), DUMB_CALLDATA)));
+        evm.expectCall(creditAccount, abi.encodeCall(ICreditAccount.execute, (address(targetMock), DUMB_CALLDATA)));
 
         evm.expectCall(address(targetMock), DUMB_CALLDATA);
 
@@ -1881,7 +1881,7 @@ contract CreditFacadeTest is
         // evm.expectEmit(true, false, false, false);
         // emit ExecuteOrder(address(targetMock));
 
-        // evm.expectCall(creditAccount, abi.encodeCall(CreditAccount.execute, (address(targetMock), DUMB_CALLDATA)));
+        // evm.expectCall(creditAccount, abi.encodeCall(ICreditAccount.execute, (address(targetMock), DUMB_CALLDATA)));
 
         // evm.expectCall(address(targetMock), DUMB_CALLDATA);
 
@@ -2086,7 +2086,7 @@ contract CreditFacadeTest is
         evm.expectEmit(true, false, false, true);
         emit ExecuteOrder(address(targetMock));
 
-        evm.expectCall(creditAccount, abi.encodeCall(CreditAccount.execute, (address(targetMock), DUMB_CALLDATA)));
+        evm.expectCall(creditAccount, abi.encodeCall(ICreditAccount.execute, (address(targetMock), DUMB_CALLDATA)));
 
         evm.expectCall(address(targetMock), DUMB_CALLDATA);
 

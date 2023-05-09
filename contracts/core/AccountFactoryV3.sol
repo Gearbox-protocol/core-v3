@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 
-import {CreditAccount} from "../credit/CreditAccount.sol";
+import {CreditAccountV3} from "../credit/CreditAccountV3.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
 
 import {IAccountFactory, TakeAccountAction} from "../interfaces/IAccountFactory.sol";
@@ -24,7 +24,7 @@ struct CreditManagerFactory {
 }
 
 /// @title Disposable credit accounts factory
-contract AccountFactoryV2 is IAccountFactory, ACLTrait, ContractsRegisterTrait {
+contract AccountFactoryV3 is IAccountFactory, ACLTrait, ContractsRegisterTrait {
     /// @dev Address of master credit account for cloning
     mapping(address => CreditManagerFactory) public masterCreditAccounts;
 
@@ -85,7 +85,7 @@ contract AccountFactoryV2 is IAccountFactory, ACLTrait, ContractsRegisterTrait {
         }
 
         masterCreditAccounts[creditManager] = CreditManagerFactory({
-            masterCreditAccount: address(new CreditAccount(creditManager)),
+            masterCreditAccount: address(new CreditAccountV3(creditManager)),
             head: 0,
             tail: 0,
             minUsedInQueue: minUsedInQueue
