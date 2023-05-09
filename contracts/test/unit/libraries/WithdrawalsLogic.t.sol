@@ -3,10 +3,10 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {Test} from "forge-std/Test.sol";
-
 import {ClaimAction, ScheduledWithdrawal} from "../../../interfaces/IWithdrawalManager.sol";
 import {WithdrawalsLogic} from "../../../libraries/WithdrawalsLogic.sol";
+
+import {TestHelper} from "../../lib/helper.sol";
 
 enum ScheduleTask {
     IMMATURE,
@@ -16,7 +16,7 @@ enum ScheduleTask {
 
 /// @title Withdrawals logic test
 /// @notice [WL]: Unit tests for withdrawals library
-contract WithdrawalsLogicTest is Test {
+contract WithdrawalsLogicTest is TestHelper {
     using WithdrawalsLogic for ClaimAction;
     using WithdrawalsLogic for ScheduledWithdrawal;
     using WithdrawalsLogic for ScheduledWithdrawal[2];
@@ -104,9 +104,9 @@ contract WithdrawalsLogicTest is Test {
             _setupWithdrawalSlot(1, cases[i].task1);
 
             (bool found, uint8 slot) = withdrawals.findFreeSlot();
-            assertEq(found, cases[i].expectedFound, _format("incorrect found value", cases[i].name));
+            assertEq(found, cases[i].expectedFound, _testCaseErr(cases[i].name, "incorrect found value"));
             if (found) {
-                assertEq(slot, cases[i].expectedSlot, _format("incorrect slot", cases[i].name));
+                assertEq(slot, cases[i].expectedSlot, _testCaseErr(cases[i].name, "incorrect slot"));
             }
         }
     }
@@ -200,7 +200,7 @@ contract WithdrawalsLogicTest is Test {
             assertEq(
                 cases[i].action.claimAllowed(withdrawals[0].maturity),
                 cases[i].expectedResult,
-                _format("incorrect result", cases[i].name)
+                _testCaseErr(cases[i].name, "incorrect result")
             );
         }
     }
@@ -287,7 +287,7 @@ contract WithdrawalsLogicTest is Test {
             assertEq(
                 cases[i].action.cancelAllowed(withdrawals[0].maturity),
                 cases[i].expectedResult,
-                _format("incorrect result", cases[i].name)
+                _testCaseErr(cases[i].name, "incorrect result")
             );
         }
     }
@@ -304,9 +304,5 @@ contract WithdrawalsLogicTest is Test {
             withdrawals[slot] =
                 ScheduledWithdrawal({maturity: maturity, amount: 1 ether, token: address(0xdead), tokenIndex: 1});
         }
-    }
-
-    function _format(string memory reason, string memory caseName) internal pure returns (string memory) {
-        return string(abi.encodePacked(reason, ", case: ", caseName));
     }
 }

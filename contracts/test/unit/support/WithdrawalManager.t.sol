@@ -3,7 +3,6 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {Test} from "forge-std/Test.sol";
 import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
 
 import {ClaimAction, IWithdrawalManagerEvents, ScheduledWithdrawal} from "../../../interfaces/IWithdrawalManager.sol";
@@ -17,6 +16,8 @@ import {
 } from "../../../interfaces/IExceptions.sol";
 import {WithdrawalManager} from "../../../support/WithdrawalManager.sol";
 
+import {USER} from "../../lib/constants.sol";
+import {TestHelper} from "../../lib/helper.sol";
 import {AddressProviderACLMock} from "../../mocks/core/AddressProviderACLMock.sol";
 import {ERC20BlacklistableMock} from "../../mocks/token/ERC20Blacklistable.sol";
 
@@ -51,13 +52,12 @@ enum ScheduleTask {
 
 /// @title Withdrawal manager test
 /// @notice [WM]: Unit tests for withdrawal manager
-contract WithdrawalManagerTest is Test, IWithdrawalManagerEvents {
+contract WithdrawalManagerTest is TestHelper, IWithdrawalManagerEvents {
     WithdrawalManagerHarness manager;
     AddressProviderACLMock acl;
     ERC20BlacklistableMock token0;
     ERC20Mock token1;
 
-    address user;
     address configurator;
     address creditAccount;
     address creditManager;
@@ -71,7 +71,6 @@ contract WithdrawalManagerTest is Test, IWithdrawalManagerEvents {
     uint8 constant TOKEN1_MASK = 2;
 
     function setUp() public {
-        user = makeAddr("USER");
         configurator = makeAddr("CONFIGURATOR");
         creditAccount = makeAddr("CREDIT_ACCOUNT");
         creditManager = makeAddr("CREDIT_MANAGER");
@@ -97,7 +96,7 @@ contract WithdrawalManagerTest is Test, IWithdrawalManagerEvents {
 
     /// @notice [WM-2]: External functions have correct access
     function test_WM_02_external_functions_have_correct_access() public {
-        vm.startPrank(user);
+        vm.startPrank(USER);
 
         vm.expectRevert(CallerNotCreditManagerException.selector);
         manager.addImmediateWithdrawal(address(0), address(0), 0);
@@ -129,26 +128,26 @@ contract WithdrawalManagerTest is Test, IWithdrawalManagerEvents {
         deal(address(token0), address(manager), AMOUNT);
 
         vm.expectEmit(true, true, false, true);
-        emit AddImmediateWithdrawal(user, address(token0), AMOUNT);
+        emit AddImmediateWithdrawal(USER, address(token0), AMOUNT);
 
-        manager.addImmediateWithdrawal(user, address(token0), AMOUNT);
+        manager.addImmediateWithdrawal(USER, address(token0), AMOUNT);
 
         assertEq(
-            manager.immediateWithdrawals(user, address(token0)),
+            manager.immediateWithdrawals(USER, address(token0)),
             AMOUNT,
             "Incorrect claimable balance after adding first withdrawal"
         );
 
-        // add second withdrawal in the same token0
+        // add second withdrawal in the same token
         deal(address(token0), address(manager), AMOUNT);
 
         vm.expectEmit(true, true, false, true);
-        emit AddImmediateWithdrawal(user, address(token0), AMOUNT);
+        emit AddImmediateWithdrawal(USER, address(token0), AMOUNT);
 
-        manager.addImmediateWithdrawal(user, address(token0), AMOUNT);
+        manager.addImmediateWithdrawal(USER, address(token0), AMOUNT);
 
         assertEq(
-            manager.immediateWithdrawals(user, address(token0)),
+            manager.immediateWithdrawals(USER, address(token0)),
             2 * AMOUNT,
             "Incorrect claimable balance after adding second withdrawal"
         );
@@ -159,15 +158,15 @@ contract WithdrawalManagerTest is Test, IWithdrawalManagerEvents {
     /// @notice [WM-4A]: `claimImmediateWithdrawal` reverts on zero recipient
     function test_WM_04A_claimImmediateWithdrawal_reverts_on_zero_recipient() public {
         vm.expectRevert(ZeroAddressException.selector);
-        vm.prank(user);
+        vm.prank(USER);
         manager.claimImmediateWithdrawal(address(token0), address(0));
     }
 
     /// @notice [WM-4B]: `claimImmediateWithdrawal` reverts on nothing to claim
     function test_WM_04B_claimImmediateWithdrawal_reverts_on_nothing_to_claim() public {
         vm.expectRevert(NothingToClaimException.selector);
-        vm.prank(user);
-        manager.claimImmediateWithdrawal(address(token0), address(user));
+        vm.prank(USER);
+        manager.claimImmediateWithdrawal(address(token0), address(USER));
     }
 
     /// @notice [WM-4C]: `claimImmediateWithdrawal` works correctly
@@ -175,16 +174,16 @@ contract WithdrawalManagerTest is Test, IWithdrawalManagerEvents {
         deal(address(token0), address(manager), AMOUNT);
 
         vm.prank(creditManager);
-        manager.addImmediateWithdrawal(user, address(token0), 10 ether);
+        manager.addImmediateWithdrawal(USER, address(token0), 10 ether);
 
         vm.expectEmit(true, true, false, true);
-        emit ClaimImmediateWithdrawal(user, address(token0), user, AMOUNT - 1);
+        emit ClaimImmediateWithdrawal(USER, address(token0), USER, AMOUNT - 1);
 
-        vm.prank(user);
-        manager.claimImmediateWithdrawal(address(token0), user);
+        vm.prank(USER);
+        manager.claimImmediateWithdrawal(address(token0), USER);
 
-        assertEq(manager.immediateWithdrawals(user, address(token0)), 1, "Incorrect claimable balance");
-        assertEq(token0.balanceOf(user), AMOUNT - 1, "Incorrect claimed amount");
+        assertEq(manager.immediateWithdrawals(USER, address(token0)), 1, "Incorrect claimable balance");
+        assertEq(token0.balanceOf(USER), AMOUNT - 1, "Incorrect claimed amount");
     }
 
     /// ----------------------------------------------- ///
@@ -260,10 +259,10 @@ contract WithdrawalManagerTest is Test, IWithdrawalManagerEvents {
 
             if (!cases[i].shouldRevert) {
                 ScheduledWithdrawal memory w = manager.scheduledWithdrawals(creditAccount)[cases[i].expectedSlot];
-                assertEq(w.tokenIndex, TOKEN0_INDEX, _format("incorrect token index", cases[i].name));
-                assertEq(w.token, address(token0), _format("incorrect token", cases[i].name));
-                assertEq(w.maturity, expectedMaturity, _format("incorrect maturity", cases[i].name));
-                assertEq(w.amount, AMOUNT, _format("incorrect amount", cases[i].name));
+                assertEq(w.tokenIndex, TOKEN0_INDEX, _testCaseErr(cases[i].name, "incorrect token index"));
+                assertEq(w.token, address(token0), _testCaseErr(cases[i].name, "incorrect token"));
+                assertEq(w.maturity, expectedMaturity, _testCaseErr(cases[i].name, "incorrect maturity"));
+                assertEq(w.amount, AMOUNT, _testCaseErr(cases[i].name, "incorrect amount"));
             }
 
             vm.revertTo(snapshot);
@@ -276,7 +275,7 @@ contract WithdrawalManagerTest is Test, IWithdrawalManagerEvents {
         _addScheduledWithdrawal({slot: 1, task: ScheduleTask.NON_SCHEDULED});
         vm.expectRevert(NothingToClaimException.selector);
         vm.prank(creditManager);
-        manager.claimScheduledWithdrawals(creditAccount, user, ClaimAction.CLAIM);
+        manager.claimScheduledWithdrawals(creditAccount, USER, ClaimAction.CLAIM);
     }
 
     struct ClaimScheduledWithdrawalsCase {
@@ -383,11 +382,11 @@ contract WithdrawalManagerTest is Test, IWithdrawalManagerEvents {
 
             vm.prank(creditManager);
             (bool hasScheduled, uint256 tokensToEnable) =
-                manager.claimScheduledWithdrawals(creditAccount, user, cases[i].action);
+                manager.claimScheduledWithdrawals(creditAccount, USER, cases[i].action);
 
-            assertEq(hasScheduled, cases[i].expectedHasScheduled, _format("incorrect hasScheduled", cases[i].name));
+            assertEq(hasScheduled, cases[i].expectedHasScheduled, _testCaseErr(cases[i].name, "incorrect hasScheduled"));
             assertEq(
-                tokensToEnable, cases[i].expectedTokensToEnable, _format("incorrect tokensToEnable", cases[i].name)
+                tokensToEnable, cases[i].expectedTokensToEnable, _testCaseErr(cases[i].name, "incorrect tokensToEnable")
             );
 
             vm.revertTo(snapshot);
@@ -460,10 +459,10 @@ contract WithdrawalManagerTest is Test, IWithdrawalManagerEvents {
             (address token0_, uint256 amount0, address token1_, uint256 amount1) =
                 manager.cancellableScheduledWithdrawals(creditAccount, cases[i].isForceCancel);
 
-            assertEq(token0_, cases[i].expectedToken0, _format("incorrect token0", cases[i].name));
-            assertEq(amount0, cases[i].expectedAmount0, _format("incorrect amount0", cases[i].name));
-            assertEq(token1_, cases[i].expectedToken1, _format("incorrect token0", cases[i].name));
-            assertEq(amount1, cases[i].expectedAmount1, _format("incorrect amount1", cases[i].name));
+            assertEq(token0_, cases[i].expectedToken0, _testCaseErr(cases[i].name, "incorrect token0"));
+            assertEq(amount0, cases[i].expectedAmount0, _testCaseErr(cases[i].name, "incorrect amount0"));
+            assertEq(token1_, cases[i].expectedToken1, _testCaseErr(cases[i].name, "incorrect token0"));
+            assertEq(amount1, cases[i].expectedAmount1, _testCaseErr(cases[i].name, "incorrect amount1"));
 
             vm.revertTo(snapshot);
         }
@@ -629,13 +628,13 @@ contract WithdrawalManagerTest is Test, IWithdrawalManagerEvents {
                 creditAccount: creditAccount,
                 slot: 0,
                 action: cases[i].action,
-                to: user
+                to: USER
             });
 
-            assertEq(scheduled, cases[i].expectedScheduled, _format("incorrect scheduled", cases[i].name));
-            assertEq(claimed, cases[i].expectedClaimed, _format("incorrect claimed", cases[i].name));
+            assertEq(scheduled, cases[i].expectedScheduled, _testCaseErr(cases[i].name, "incorrect scheduled"));
+            assertEq(claimed, cases[i].expectedClaimed, _testCaseErr(cases[i].name, "incorrect claimed"));
             assertEq(
-                tokensToEnable, cases[i].expectedTokensToEnable, _format("incorrect tokensToEnable", cases[i].name)
+                tokensToEnable, cases[i].expectedTokensToEnable, _testCaseErr(cases[i].name, "incorrect tokensToEnable")
             );
 
             vm.revertTo(snapshot);
@@ -647,12 +646,12 @@ contract WithdrawalManagerTest is Test, IWithdrawalManagerEvents {
         _addScheduledWithdrawal({slot: 0, task: ScheduleTask.MATURE});
 
         vm.expectEmit(true, true, false, true);
-        emit ClaimScheduledWithdrawal(creditAccount, address(token0), user, AMOUNT - 1);
+        emit ClaimScheduledWithdrawal(creditAccount, address(token0), USER, AMOUNT - 1);
 
-        manager.claimScheduledWithdrawal({creditAccount: creditAccount, slot: 0, to: user});
+        manager.claimScheduledWithdrawal({creditAccount: creditAccount, slot: 0, to: USER});
 
         assertEq(token0.balanceOf(address(manager)), 1, "Incorrect manager balance");
-        assertEq(token0.balanceOf(user), AMOUNT - 1, "Incorrect recipient balance");
+        assertEq(token0.balanceOf(USER), AMOUNT - 1, "Incorrect recipient balance");
 
         ScheduledWithdrawal memory w = manager.scheduledWithdrawals(creditAccount)[0];
         assertEq(w.maturity, 1, "Withdrawal not cleared");
@@ -661,15 +660,15 @@ contract WithdrawalManagerTest is Test, IWithdrawalManagerEvents {
     /// @notice [WM-9B]: `_claimScheduledWithdrawal` works correctly with blacklisted recipient
     function test_WM_09B_claimScheduledWithdrawal_works_correctly_with_blacklisted_recipient() public {
         _addScheduledWithdrawal({slot: 0, task: ScheduleTask.MATURE});
-        token0.setBlacklisted(user, true);
+        token0.setBlacklisted(USER, true);
 
         vm.expectEmit(true, true, false, true);
-        emit ClaimScheduledWithdrawal(creditAccount, address(token0), user, AMOUNT - 1);
+        emit ClaimScheduledWithdrawal(creditAccount, address(token0), USER, AMOUNT - 1);
 
         vm.expectEmit(true, true, false, true);
-        emit AddImmediateWithdrawal(user, address(token0), AMOUNT - 1);
+        emit AddImmediateWithdrawal(USER, address(token0), AMOUNT - 1);
 
-        manager.claimScheduledWithdrawal({creditAccount: creditAccount, slot: 0, to: user});
+        manager.claimScheduledWithdrawal({creditAccount: creditAccount, slot: 0, to: USER});
 
         assertEq(token0.balanceOf(address(manager)), AMOUNT, "Incorrect manager balance");
 
@@ -740,9 +739,5 @@ contract WithdrawalManagerTest is Test, IWithdrawalManagerEvents {
                 task == ScheduleTask.MATURE ? uint40(block.timestamp - 1) : uint40(block.timestamp + 1);
         }
         manager.setWithdrawalSlot(creditAccount, slot, withdrawal);
-    }
-
-    function _format(string memory reason, string memory caseName) internal pure returns (string memory) {
-        return string(abi.encodePacked(reason, ", case: ", caseName));
     }
 }
