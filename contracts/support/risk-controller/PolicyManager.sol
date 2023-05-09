@@ -6,6 +6,8 @@ pragma solidity ^0.8.17;
 import {ACLNonReentrantTrait} from "../../traits/ACLNonReentrantTrait.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
+import "forge-std/console.sol";
+
 /// @dev Policy that determines checks performed on a parameter
 ///      Each policy is defined for a contract group
 struct Policy {
@@ -35,6 +37,7 @@ struct Policy {
     /// @dev The minimal time period after which the RP can be updated
     uint40 referencePointUpdatePeriod;
     /// @dev Last timestamp at which the reference point was updated
+    ///      NB: Should not be changed manually in most cases
     uint40 referencePointTimestampLU;
     /// @dev Min and max absolute percentage changes for new values, relative to reference point
     uint16 minPctChange;
@@ -130,6 +133,7 @@ contract PolicyManager is ACLNonReentrantTrait {
         ) {
             if (block.timestamp > policy.referencePointTimestampLU + policy.referencePointUpdatePeriod) {
                 policy.referencePoint = oldValue;
+                policy.referencePointTimestampLU = uint40(block.timestamp);
             }
             rp = policy.referencePoint;
         }
@@ -146,13 +150,13 @@ contract PolicyManager is ACLNonReentrantTrait {
 
         if (flags & CHECK_MIN_PCT_CHANGE_FLAG > 0) {
             uint256 diff = newValue > rp ? newValue - rp : rp - newValue;
-            uint16 pctDiff = uint16(diff * PERCENTAGE_FACTOR / rp);
+            uint256 pctDiff = diff * PERCENTAGE_FACTOR / rp;
             if (pctDiff < policy.minPctChange) return false;
         }
 
         if (flags & CHECK_MAX_PCT_CHANGE_FLAG > 0) {
             uint256 diff = newValue > rp ? newValue - rp : rp - newValue;
-            uint16 pctDiff = uint16(diff * PERCENTAGE_FACTOR / rp);
+            uint256 pctDiff = diff * PERCENTAGE_FACTOR / rp;
             if (pctDiff > policy.maxPctChange) return false;
         }
 
