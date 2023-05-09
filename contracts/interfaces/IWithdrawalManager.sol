@@ -108,12 +108,6 @@ interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
         view
         returns (ScheduledWithdrawal[2] memory withdrawals);
 
-    /// @notice Returns scheduled withdrawals for a given credit account that can be cancelled
-    function cancellableScheduledWithdrawals(address creditAccount, bool isForceCancel)
-        external
-        view
-        returns (address token1, uint256 amount1, address token2, uint256 amount2);
-
     /// @notice Schedules withdrawal from the credit account
     /// @param creditAccount Account to withdraw from
     /// @param token Token to withdraw
@@ -133,6 +127,12 @@ interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
     function claimScheduledWithdrawals(address creditAccount, address to, ClaimAction action)
         external
         returns (bool hasScheduled, uint256 tokensToEnable);
+
+    /// @notice Returns scheduled withdrawals from the credit account that can be cancelled
+    function cancellableScheduledWithdrawals(address creditAccount, bool isForceCancel)
+        external
+        view
+        returns (address token1, uint256 amount1, address token2, uint256 amount2);
 
     /// ------------- ///
     /// CONFIGURATION ///
