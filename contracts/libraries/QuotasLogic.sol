@@ -26,7 +26,7 @@ library QuotasLogic {
         return tokenQuotaParams.cumulativeIndexLU_RAY != 0;
     }
 
-    function initialise(TokenQuotaParams storage tokenQuotaParams) internal returns (bool) {
+    function initialise(TokenQuotaParams storage tokenQuotaParams) internal {
         tokenQuotaParams.cumulativeIndexLU_RAY = uint192(RAY); // F:[PQK-5]
     }
 

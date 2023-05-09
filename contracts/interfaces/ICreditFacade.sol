@@ -58,7 +58,7 @@ interface ICreditFacadeEvents {
     event TransferAccount(address indexed creditAccount, address indexed oldOwner, address indexed newOwner);
 
     /// @dev Emits when the user changes approval for account transfers to itself from another address
-    event AllowAccountTransfer(address indexed from, address indexed to, bool state);
+    event SetAccountTransferAllowance(address indexed from, address indexed to, bool state);
 }
 
 interface ICreditFacade is ICreditFacadeEvents, IVersion {

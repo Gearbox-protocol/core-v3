@@ -587,7 +587,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         }
 
         CollateralDebtData memory collateralDebtData =
-            _calcAllCollateral(creditAccount, enabledTokensMask, minHealthFactor, collateralHints, priceOracle, true);
+            _calcFullCollateral(creditAccount, enabledTokensMask, minHealthFactor, collateralHints, priceOracle, true);
 
         if (collateralDebtData.isLiquidatable) {
             revert NotEnoughCollateralException();
@@ -631,11 +631,16 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             IPriceOracleV2 _priceOracle = priceOracle;
             uint256[] memory collateralHints;
 
-            collateralDebtData = _calcAllCollateral(
+            collateralDebtData = _calcFullCollateral(
                 creditAccount, enabledTokensMask, PERCENTAGE_FACTOR, collateralHints, _priceOracle, false
             );
 
-            if (_hasWithdrawals(creditAccount)) {
+            if (
+                (
+                    task == CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS
+                        || task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
+                ) && _hasWithdrawals(creditAccount)
+            ) {
                 collateralDebtData.totalValueUSD += _calcCancellableWithdrawalsValue(
                     _priceOracle, creditAccount, task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
                 );
@@ -652,7 +657,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     // @param _priceOracle Oracle used to convert assets to USD
     // @param creditAccount Address of the Credit Account
 
-    function _calcAllCollateral(
+    function _calcFullCollateral(
         address creditAccount,
         uint256 enabledTokensMask,
         uint16 minHealthFactor,
@@ -740,6 +745,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         unchecked {
             // TODO: add test that we check all values and it's always reachable
             for (uint256 i; checkedTokenMask != 0; ++i) {
+                // TODO: add check for super long collateralnhints and for double masks
                 tokenMask = (i < len) ? collateralHints[i] : 1 << (i - len); // F: [CM-68]
 
                 // CASE enabledTokensMask & tokenMask == 0 F:[CM-38]
@@ -859,33 +865,31 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     {
         // Since underlying should have been transferred to "to" before this function is called
         // (if there is a surplus), its tokenMask of 1 is skipped
-        uint256 tokenMask = 2;
 
         // Since enabledTokensMask encodes all enabled tokens as 1,
         // tokenMask > enabledTokensMask is equivalent to the last 1 bit being passed
         // The loop can be ended at this point
-        while (tokenMask <= enabledTokensMask) {
-            // enabledTokensMask & tokenMask == tokenMask when the token is enabled,
-            // and 0 otherwise
-            if (enabledTokensMask & tokenMask != 0) {
-                address token = getTokenByMask(tokenMask); // F:[CM-44]
-                uint256 amount = IERC20(token)._balanceOf(creditAccount); // F:[CM-44]
-                if (amount > 1) {
-                    // 1 is subtracted from amount to leave a non-zero value
-                    // in the balance mapping, optimizing future writes
-                    // Since the amount is checked to be more than 1,
-                    // the block can be marked as unchecked
+        unchecked {
+            for (uint256 tokenMask = 2; tokenMask <= enabledTokensMask; tokenMask = tokenMask << 1) {
+                // enabledTokensMask & tokenMask == tokenMask when the token is enabled,
+                // and 0 otherwise
+                if (enabledTokensMask & tokenMask != 0) {
+                    address token = getTokenByMask(tokenMask); // F:[CM-44]
+                    uint256 amount = IERC20(token)._balanceOf(creditAccount); // F:[CM-44]
+                    if (amount > 1) {
+                        // 1 is subtracted from amount to leave a non-zero value
+                        // in the balance mapping, optimizing future writes
+                        // Since the amount is checked to be more than 1,
+                        // the block can be marked as unchecked
 
-                    // F:[CM-44]
-                    unchecked {
+                        // F:[CM-44]
                         _safeTokenTransfer(creditAccount, token, to, amount - 1, convertWETH); // F:[CM-44]
                     }
                 }
             }
-
             // The loop iterates by moving 1 bit to the left,
             // which corresponds to moving on to the next token
-            tokenMask = tokenMask << 1; // F:[CM-44]
+            // F:[CM-44]
         }
     }
 
@@ -904,16 +908,24 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         } else {
             try ICreditAccount(creditAccount).safeTransfer(token, to, amount) { // F:[CM-45]
             } catch {
-                uint256 balanceBefore = IERC20(token)._balanceOf(address(withdrawalManager));
-                _creditAccountSafeTransfer(creditAccount, token, address(withdrawalManager), amount);
-                amount = IERC20(token)._balanceOf(address(withdrawalManager)) - balanceBefore;
-                withdrawalManager.addImmediateWithdrawal(to, token, amount);
+                uint256 delivered =
+                    _creditAccountSafeTransferBalanceControl(creditAccount, token, address(withdrawalManager), amount);
+                withdrawalManager.addImmediateWithdrawal(to, token, delivered);
             }
         }
     }
 
     function _creditAccountSafeTransfer(address creditAccount, address token, address to, uint256 amount) internal {
         ICreditAccount(creditAccount).safeTransfer(token, to, amount);
+    }
+
+    function _creditAccountSafeTransferBalanceControl(address creditAccount, address token, address to, uint256 amount)
+        internal
+        returns (uint256 delivered)
+    {
+        uint256 balanceBefore = IERC20(token)._balanceOf(to);
+        _creditAccountSafeTransfer(creditAccount, token, to, amount);
+        delivered = IERC20(token)._balanceOf(to) - balanceBefore;
     }
 
     //
@@ -1166,14 +1178,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             ltUnderlying = initialLT; // F:[CM-47]
         } else {
             uint256 tokenMask = getTokenMaskOrRevert(token);
-            CollateralTokenData memory tokenData = collateralTokensData[tokenMask];
+            CollateralTokenData storage tokenData = collateralTokensData[tokenMask];
 
             tokenData.ltInitial = initialLT;
             tokenData.ltFinal = finalLT;
             tokenData.timestampRampStart = timestampRampStart;
             tokenData.rampDuration = rampDuration;
-
-            collateralTokensData[tokenMask] = tokenData;
         }
     }
 
@@ -1205,6 +1215,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     ///         to disallow a particular target or adapter, since this would set values in respective
     ///         mappings to address(0).
     function setContractAllowance(address adapter, address targetContract) external creditConfiguratorOnly {
+        if (targetContract == address(this) || adapter == address(this)) {
+            revert TargetContractNotAllowedException();
+        } // F:[CC-13]
+
         if (adapter != address(0)) {
             adapterToContract[adapter] = targetContract; // F:[CM-56]
         }
@@ -1261,11 +1275,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     {
         uint256 tokenMask = getTokenMaskOrRevert(token);
 
-        uint256 balanceBefore = IERC20(token)._balanceOf(address(withdrawalManager));
-        _creditAccountSafeTransfer(creditAccount, token, address(withdrawalManager), amount);
-        amount = IERC20(token)._balanceOf(address(withdrawalManager)) - balanceBefore;
+        uint256 delivered =
+            _creditAccountSafeTransferBalanceControl(creditAccount, token, address(withdrawalManager), amount);
 
-        withdrawalManager.addScheduledWithdrawal(creditAccount, token, amount, tokenMask.calcIndex());
+        withdrawalManager.addScheduledWithdrawal(creditAccount, token, delivered, tokenMask.calcIndex());
         _enableWithdrawalFlag(creditAccount);
 
         // We need to disable empty tokens in case they could be forbidden, to finally eliminate them

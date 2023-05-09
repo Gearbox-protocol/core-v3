@@ -1532,7 +1532,7 @@ contract CreditFacadeTest is
         assertTrue(creditFacade.transfersAllowed(USER, FRIEND) == false, "Transfer is unexpectedly allowed ");
 
         evm.expectEmit(true, true, false, true);
-        emit AllowAccountTransfer(USER, FRIEND, true);
+        emit SetAccountTransferAllowance(USER, FRIEND, true);
 
         evm.prank(FRIEND);
         creditFacade.approveAccountTransfer(USER, true);
@@ -1540,7 +1540,7 @@ contract CreditFacadeTest is
         assertTrue(creditFacade.transfersAllowed(USER, FRIEND) == true, "Transfer is unexpectedly not allowed ");
 
         evm.expectEmit(true, true, false, true);
-        emit AllowAccountTransfer(USER, FRIEND, false);
+        emit SetAccountTransferAllowance(USER, FRIEND, false);
 
         evm.prank(FRIEND);
         creditFacade.approveAccountTransfer(USER, false);
@@ -1687,11 +1687,7 @@ contract CreditFacadeTest is
 
         evm.expectRevert(CallerNotConfiguratorException.selector);
         evm.prank(USER);
-        creditFacade.addEmergencyLiquidator(DUMB_ADDRESS);
-
-        evm.expectRevert(CallerNotConfiguratorException.selector);
-        evm.prank(USER);
-        creditFacade.removeEmergencyLiquidator(DUMB_ADDRESS);
+        creditFacade.setEmergencyLiquidator(DUMB_ADDRESS, AllowanceAction.ALLOW);
     }
 
     /// CHECK SLIPPAGE PROTECTION
@@ -2155,20 +2151,14 @@ contract CreditFacadeTest is
     //
 
     /// @dev [FA-62]: addEmergencyLiquidator correctly sets value
-    function test_FA_62_addEmergencyLiquidator_works_correctly() public {
+    function test_FA_62_setEmergencyLiquidator_works_correctly() public {
         evm.prank(address(creditConfigurator));
-        creditFacade.addEmergencyLiquidator(DUMB_ADDRESS);
+        creditFacade.setEmergencyLiquidator(DUMB_ADDRESS, AllowanceAction.ALLOW);
 
         assertTrue(creditFacade.canLiquidateWhilePaused(DUMB_ADDRESS), "Value was not set");
-    }
-
-    /// @dev [FA-63]: removeEmergencyLiquidator correctly sets value
-    function test_FA_63_removeEmergencyLiquidator_works_correctly() public {
-        evm.prank(address(creditConfigurator));
-        creditFacade.addEmergencyLiquidator(DUMB_ADDRESS);
 
         evm.prank(address(creditConfigurator));
-        creditFacade.removeEmergencyLiquidator(DUMB_ADDRESS);
+        creditFacade.setEmergencyLiquidator(DUMB_ADDRESS, AllowanceAction.FORBID);
 
         assertTrue(!creditFacade.canLiquidateWhilePaused(DUMB_ADDRESS), "Value was is still set");
     }

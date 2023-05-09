@@ -265,10 +265,6 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         return totalQuotaParams[token].cumulativeIndexSince(lastQuotaRateUpdate);
     }
 
-    // function _cumulativeIndexNow(TokenQuotaParams storage tq) internal view returns (uint192) {
-    //     return tq.cumulativeIndexSince(lastQuotaRateUpdate);
-    // }
-
     /// @dev Returns quota rate in PERCENTAGE FORMAT
     function getQuotaRate(address token) external view override returns (uint16) {
         return totalQuotaParams[token].rate;
