@@ -314,7 +314,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @param revocations Spender/token pairs to revoke allowances for
     function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external;
 
-    function setCaForExternalCall(address creditAccount) external;
+    function setCreditAccountForExternalCall(address creditAccount) external;
 
     function externalCallCreditAccountOrRevert() external view returns (address creditAccount);
 

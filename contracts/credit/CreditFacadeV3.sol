@@ -710,7 +710,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     }
 
     function _setExternalCallCreditAccount(address creditAccount) internal {
-        creditManager.setCaForExternalCall(creditAccount); // F:[FA-26]
+        creditManager.setCreditAccountForExternalCall(creditAccount); // F:[FA-26]
     }
 
     function _revertIfNoPermission(uint256 flags, uint256 permission) internal pure {

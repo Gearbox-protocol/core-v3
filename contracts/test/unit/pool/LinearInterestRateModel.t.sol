@@ -315,7 +315,7 @@ contract LinearInterestRateModelTest is DSTest {
                 expectedLiquidity: 100,
                 availableLiquidity: 60,
                 /// EXPECTED VALUES
-                // 15% + 5% (r1) * 40% (utilisation) / 80% (u1)
+                // 15% (rBase) + 5% (r1) * 40% (utilisation) / 80% (u1)
                 expectedBorrowRate: (15_00 + 5_00 * 40 / 80) * RAY / PERCENTAGE_FACTOR,
                 expectedAvailableToBorrow: 55,
                 expectedRevert: false

@@ -423,7 +423,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             if (supportsQuotas) {
                 cumulativeQuotaInterest = creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1;
                 {
-                    (address[] memory tokens,) = _getQuotedTokens(enabledTokensMask);
+                    (address[] memory tokens,) =
+                        _getQuotedTokens({enabledTokensMask: enabledTokensMask, withLTs: false});
                     if (tokens.length > 0) {
                         cumulativeQuotaInterest += poolQuotaKeeper().accrueQuotaInterest(creditAccount, tokens); // F: [CMQ-4,5]
                     }
@@ -614,7 +615,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             uint256 quotaInterest;
 
             if (supportsQuotas) {
-                (address[] memory tokens,) = _getQuotedTokens(enabledTokensMask);
+                (address[] memory tokens,) = _getQuotedTokens({enabledTokensMask: enabledTokensMask, withLTs: false});
 
                 quotaInterest = creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1;
 
@@ -716,7 +717,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         returns (uint256 totalValueUSD, uint256 twvUSD, uint256 quotaInterest, address[] memory tokens)
     {
         uint256[] memory lts;
-        (tokens, lts) = _getQuotedTokens(enabledTokensMask);
+        (tokens, lts) = _getQuotedTokens({enabledTokensMask: enabledTokensMask, withLTs: true});
 
         if (tokens.length > 0) {
             /// If credit account has any connected token - then check that
@@ -798,12 +799,16 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         }
     }
 
+    //
+    // QUOTAS MANAGEMENT
+    //
+
     /// @dev Returns the array of quoted tokens that are enabled on the account
     function getQuotedTokens(address creditAccount) public view returns (address[] memory tokens) {
-        (tokens,) = _getQuotedTokens(enabledTokensMaskOf(creditAccount));
+        (tokens,) = _getQuotedTokens({enabledTokensMask: enabledTokensMaskOf(creditAccount), withLTs: false});
     }
 
-    function _getQuotedTokens(uint256 enabledTokensMask)
+    function _getQuotedTokens(uint256 enabledTokensMask, bool withLTs)
         internal
         view
         returns (address[] memory tokens, uint256[] memory lts)
@@ -819,17 +824,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             unchecked {
                 for (uint256 tokenMask = 2; tokenMask <= quotedMask; tokenMask <<= 1) {
                     if (quotedMask & tokenMask != 0) {
-                        (tokens[j], lts[j]) = collateralTokensByMask(tokenMask);
+                        (tokens[j], lts[j]) = _collateralTokensByMask({tokenMask: tokenMask, calcLT: withLTs});
                         ++j;
                     }
                 }
             }
         }
     }
-
-    //
-    // QUOTAS MANAGEMENT
-    //
 
     /// @dev Updates credit account's quotas for multiple tokens
     /// @param creditAccount Address of credit account
@@ -928,6 +929,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         uint256 balanceBefore = IERC20(token)._balanceOf(to);
         _creditAccountSafeTransfer(creditAccount, token, to, amount);
         delivered = IERC20(token)._balanceOf(to) - balanceBefore;
+    }
+
+    function _checkEnabledTokenLength(uint256 enabledTokensMask) internal view {
+        uint256 totalTokensEnabled = enabledTokensMask.calcEnabledTokens();
+        if (totalTokensEnabled > maxAllowedEnabledTokenLength) {
+            revert TooManyEnabledTokensException();
+        }
     }
 
     //
@@ -1257,13 +1265,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         emit SetCreditConfigurator(_creditConfigurator); // F:[CM-58]
     }
 
-    function _checkEnabledTokenLength(uint256 enabledTokensMask) internal view {
-        uint256 totalTokensEnabled = enabledTokensMask.calcEnabledTokens();
-        if (totalTokensEnabled > maxAllowedEnabledTokenLength) {
-            revert TooManyEnabledTokensException();
-        }
-    }
-
     /// ----------- ///
     /// WITHDRAWALS ///
     /// ----------- ///
@@ -1351,7 +1352,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     }
 
     ///
-    function setCaForExternalCall(address creditAccount) external override creditFacadeOnly {
+    function setCreditAccountForExternalCall(address creditAccount) external override creditFacadeOnly {
         _externalCallCreditAccount = creditAccount;
     }
 

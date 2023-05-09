@@ -218,6 +218,6 @@ contract AbstractAdapterTest is DSTest, BalanceHelper, CreditFacadeTestHelper {
     function _openExternalCallCreditAccount() internal returns (address creditAccount) {
         (creditAccount,) = _openTestCreditAccount();
         evm.prank(address(creditFacade));
-        creditManager.setCaForExternalCall(creditAccount);
+        creditManager.setCreditAccountForExternalCall(creditAccount);
     }
 }
