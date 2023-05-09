@@ -1282,7 +1282,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             _creditAccountSafeTransferBalanceControl(creditAccount, token, address(withdrawalManager), amount);
 
         withdrawalManager.addScheduledWithdrawal(creditAccount, token, delivered, tokenMask.calcIndex());
-        _enableWithdrawalFlag(creditAccount);
+
+        /// @dev enables withdrawal flag
+        creditAccountInfo[creditAccount].flags |= WITHDRAWAL_FLAG;
 
         // We need to disable empty tokens in case they could be forbidden, to finally eliminate them
         if (IERC20(token)._balanceOf(creditAccount) <= 1) {
@@ -1300,20 +1302,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         if (_hasWithdrawals(creditAccount)) {
             bool hasScheduled;
             (hasScheduled, tokensToEnable) = withdrawalManager.claimScheduledWithdrawals(creditAccount, to, action);
-            if (!hasScheduled) _disableWithdrawalFlag(creditAccount);
+            if (!hasScheduled) {
+                /// @dev disables withdrawal flag
+                creditAccountInfo[creditAccount].flags &= ~WITHDRAWAL_FLAG;
+            }
         }
     }
 
     function _hasWithdrawals(address creditAccount) internal view returns (bool) {
         return creditAccountInfo[creditAccount].flags & WITHDRAWAL_FLAG != 0;
-    }
-
-    function _enableWithdrawalFlag(address creditAccount) internal {
-        creditAccountInfo[creditAccount].flags |= WITHDRAWAL_FLAG;
-    }
-
-    function _disableWithdrawalFlag(address creditAccount) internal {
-        creditAccountInfo[creditAccount].flags &= ~WITHDRAWAL_FLAG;
     }
 
     function _calcCancellableWithdrawalsValue(IPriceOracleV2 _priceOracle, address creditAccount, bool isForceCancel)
