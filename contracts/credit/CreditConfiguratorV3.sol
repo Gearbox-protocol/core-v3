@@ -680,7 +680,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         (, uint128 maxCumulativeLossCurrent) = creditFacade().lossParams();
 
         if (_maxCumulativeLoss != maxCumulativeLossCurrent) {
-            creditFacade().setMaxCumulativeLoss(_maxCumulativeLoss);
+            creditFacade().setCumulativeLossParams(_maxCumulativeLoss, false);
             emit SetMaxCumulativeLoss(_maxCumulativeLoss);
         }
     }
@@ -690,7 +690,8 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         external
         configuratorOnly // F: [CC-02]
     {
-        creditFacade().resetCumulativeLoss();
+        (, uint128 maxCumulativeLossCurrent) = creditFacade().lossParams();
+        creditFacade().setCumulativeLossParams(maxCumulativeLossCurrent, true);
         emit ResetCumulativeLoss();
     }
 
@@ -795,7 +796,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         // Checks that the address is not already in the list,
         // to avoid redundant events
         if (!statusCurrent) {
-            creditFacade().addEmergencyLiquidator(liquidator); // F: [CC-38]
+            creditFacade().setEmergencyLiquidator(liquidator, AllowanceAction.ALLOW); // F: [CC-38]
             emit AddEmergencyLiquidator(liquidator); // F: [CC-38]
         }
     }
@@ -816,7 +817,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         // Checks that the address is in the list
         // to avoid redundant events
         if (statusCurrent) {
-            creditFacade().removeEmergencyLiquidator(liquidator); // F: [CC-38]
+            creditFacade().setEmergencyLiquidator(liquidator, AllowanceAction.FORBID); // F: [CC-38]
             emit RemoveEmergencyLiquidator(liquidator); // F: [CC-38]
         }
     }

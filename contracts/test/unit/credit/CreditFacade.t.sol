@@ -276,6 +276,7 @@ contract CreditFacadeTest is
                     callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
                 })
             ),
+            false,
             0
         );
         _checkForWETHTest();
@@ -350,7 +351,7 @@ contract CreditFacadeTest is
             })
         );
         evm.expectRevert(AccountTransferNotAllowedException.selector);
-        creditFacade.openCreditAccount(minBorrowedAmount, FRIEND, calls, 0);
+        creditFacade.openCreditAccount(minBorrowedAmount, FRIEND, calls, false, 0);
 
         evm.stopPrank();
     }
@@ -379,6 +380,7 @@ contract CreditFacadeTest is
                     callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
                 })
             ),
+            false,
             0
         );
     }
@@ -418,6 +420,7 @@ contract CreditFacadeTest is
                     callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT))
                 })
             ),
+            false,
             0
         );
 
@@ -479,7 +482,7 @@ contract CreditFacadeTest is
 
         evm.expectRevert(BorrowedBlockLimitException.selector);
         evm.prank(USER);
-        creditFacade.openCreditAccount(minBorrowedAmount, USER, calls, 0);
+        creditFacade.openCreditAccount(minBorrowedAmount, USER, calls, false, 0);
     }
 
     /// @dev [FA-8]: openCreditAccount runs operations in correct order
@@ -510,7 +513,8 @@ contract CreditFacadeTest is
         // EXPECTED STACK TRACE & EVENTS
 
         evm.expectCall(
-            address(creditManager), abi.encodeCall(ICreditManagerV3.openCreditAccount, (DAI_ACCOUNT_AMOUNT, FRIEND))
+            address(creditManager),
+            abi.encodeCall(ICreditManagerV3.openCreditAccount, (DAI_ACCOUNT_AMOUNT, FRIEND, false))
         );
 
         evm.expectEmit(true, true, false, true);
@@ -546,7 +550,7 @@ contract CreditFacadeTest is
         );
 
         evm.prank(USER);
-        creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, FRIEND, calls, REFERRAL_CODE);
+        creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, FRIEND, calls, false, REFERRAL_CODE);
     }
 
     /// @dev [FA-9]: openCreditAccount cant open credit account with hf <1;
@@ -597,6 +601,7 @@ contract CreditFacadeTest is
                     callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (collateral, amount))
                 })
             ),
+            false,
             REFERRAL_CODE
         );
     }
@@ -616,6 +621,7 @@ contract CreditFacadeTest is
                     callData: abi.encodeCall(ICreditFacadeMulticall.decreaseDebt, 812)
                 })
             ),
+            false,
             REFERRAL_CODE
         );
     }
@@ -645,12 +651,12 @@ contract CreditFacadeTest is
         );
 
         evm.prank(FRIEND);
-        creditFacade.openCreditAccount(_maxDebt - _minDebt, FRIEND, calls, 0);
+        creditFacade.openCreditAccount(_maxDebt - _minDebt, FRIEND, calls, false, 0);
 
         evm.expectRevert(BorrowedBlockLimitException.selector);
 
         evm.prank(USER);
-        creditFacade.openCreditAccount(_minDebt + 1, USER, calls, 0);
+        creditFacade.openCreditAccount(_minDebt + 1, USER, calls, false, 0);
     }
 
     /// @dev [FA-11B]: openCreditAccount reverts if amount < minAmount or amount > maxAmount
@@ -668,11 +674,11 @@ contract CreditFacadeTest is
 
         evm.expectRevert(BorrowAmountOutOfLimitsException.selector);
         evm.prank(USER);
-        creditFacade.openCreditAccount(minBorrowedAmount - 1, USER, calls, 0);
+        creditFacade.openCreditAccount(minBorrowedAmount - 1, USER, calls, false, 0);
 
         evm.expectRevert(BorrowAmountOutOfLimitsException.selector);
         evm.prank(USER);
-        creditFacade.openCreditAccount(maxBorrowedAmount + 1, USER, calls, 0);
+        creditFacade.openCreditAccount(maxBorrowedAmount + 1, USER, calls, false, 0);
     }
 
     //
@@ -1526,7 +1532,7 @@ contract CreditFacadeTest is
         assertTrue(creditFacade.transfersAllowed(USER, FRIEND) == false, "Transfer is unexpectedly allowed ");
 
         evm.expectEmit(true, true, false, true);
-        emit AllowAccountTransfer(USER, FRIEND, true);
+        emit SetAccountTransferAllowance(USER, FRIEND, true);
 
         evm.prank(FRIEND);
         creditFacade.approveAccountTransfer(USER, true);
@@ -1534,7 +1540,7 @@ contract CreditFacadeTest is
         assertTrue(creditFacade.transfersAllowed(USER, FRIEND) == true, "Transfer is unexpectedly not allowed ");
 
         evm.expectEmit(true, true, false, true);
-        emit AllowAccountTransfer(USER, FRIEND, false);
+        emit SetAccountTransferAllowance(USER, FRIEND, false);
 
         evm.prank(FRIEND);
         creditFacade.approveAccountTransfer(USER, false);
@@ -1681,11 +1687,7 @@ contract CreditFacadeTest is
 
         evm.expectRevert(CallerNotConfiguratorException.selector);
         evm.prank(USER);
-        creditFacade.addEmergencyLiquidator(DUMB_ADDRESS);
-
-        evm.expectRevert(CallerNotConfiguratorException.selector);
-        evm.prank(USER);
-        creditFacade.removeEmergencyLiquidator(DUMB_ADDRESS);
+        creditFacade.setEmergencyLiquidator(DUMB_ADDRESS, AllowanceAction.ALLOW);
     }
 
     /// CHECK SLIPPAGE PROTECTION
@@ -1807,6 +1809,7 @@ contract CreditFacadeTest is
                     callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
                 })
             ),
+            false,
             0
         );
     }
@@ -2148,20 +2151,14 @@ contract CreditFacadeTest is
     //
 
     /// @dev [FA-62]: addEmergencyLiquidator correctly sets value
-    function test_FA_62_addEmergencyLiquidator_works_correctly() public {
+    function test_FA_62_setEmergencyLiquidator_works_correctly() public {
         evm.prank(address(creditConfigurator));
-        creditFacade.addEmergencyLiquidator(DUMB_ADDRESS);
+        creditFacade.setEmergencyLiquidator(DUMB_ADDRESS, AllowanceAction.ALLOW);
 
         assertTrue(creditFacade.canLiquidateWhilePaused(DUMB_ADDRESS), "Value was not set");
-    }
-
-    /// @dev [FA-63]: removeEmergencyLiquidator correctly sets value
-    function test_FA_63_removeEmergencyLiquidator_works_correctly() public {
-        evm.prank(address(creditConfigurator));
-        creditFacade.addEmergencyLiquidator(DUMB_ADDRESS);
 
         evm.prank(address(creditConfigurator));
-        creditFacade.removeEmergencyLiquidator(DUMB_ADDRESS);
+        creditFacade.setEmergencyLiquidator(DUMB_ADDRESS, AllowanceAction.FORBID);
 
         assertTrue(!creditFacade.canLiquidateWhilePaused(DUMB_ADDRESS), "Value was is still set");
     }

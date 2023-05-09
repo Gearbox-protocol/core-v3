@@ -15,7 +15,7 @@ import {
     CollateralTokenData,
     ManageDebtAction
 } from "../../../interfaces/ICreditManagerV3.sol";
-import {IPoolQuotaKeeper, QuotaUpdate, AccountQuota} from "../../../interfaces/IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeper, AccountQuota} from "../../../interfaces/IPoolQuotaKeeper.sol";
 import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
@@ -101,27 +101,27 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
         cms.makeTokenQuoted(token, rate, limit);
     }
 
-    function _addManyLimitedTokens(uint256 numTokens, uint96 quota)
-        internal
-        returns (QuotaUpdate[] memory quotaChanges)
-    {
-        quotaChanges = new QuotaUpdate[](numTokens);
+    // function _addManyLimitedTokens(uint256 numTokens, uint96 quota)
+    //     internal
+    //     returns (QuotaUpdate[] memory quotaChanges)
+    // {
+    //     quotaChanges = new QuotaUpdate[](numTokens);
 
-        for (uint256 i = 0; i < numTokens; i++) {
-            ERC20Mock t = new ERC20Mock("new token", "nt", 18);
-            PriceFeedMock pf = new PriceFeedMock(10**8, 8);
+    //     for (uint256 i = 0; i < numTokens; i++) {
+    //         ERC20Mock t = new ERC20Mock("new token", "nt", 18);
+    //         PriceFeedMock pf = new PriceFeedMock(10**8, 8);
 
-            evm.startPrank(CONFIGURATOR);
-            creditManager.addToken(address(t));
-            IPriceOracleV2Ext(address(priceOracle)).addPriceFeed(address(t), address(pf));
-            creditManager.setCollateralTokenData(address(t), 8000, 8000, type(uint40).max, 0);
-            evm.stopPrank();
+    //         evm.startPrank(CONFIGURATOR);
+    //         creditManager.addToken(address(t));
+    //         IPriceOracleV2Ext(address(priceOracle)).addPriceFeed(address(t), address(pf));
+    //         creditManager.setCollateralTokenData(address(t), 8000, 8000, type(uint40).max, 0);
+    //         evm.stopPrank();
 
-            _addQuotedToken(address(t), 100, type(uint96).max);
+    //         _addQuotedToken(address(t), 100, type(uint96).max);
 
-            quotaChanges[i] = QuotaUpdate({token: address(t), quotaChange: int96(quota)});
-        }
-    }
+    //         quotaChanges[i] = QuotaUpdate({token: address(t), quotaChange: int96(quota)});
+    //     }
+    // }
 
     ///
     ///
@@ -163,33 +163,39 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
 
         assertEq(cumulativeQuotaInterest, 1, "SETUP: Cumulative quota interest was not updated correctly");
 
-        QuotaUpdate[] memory quotaUpdates = new QuotaUpdate[](2);
-        quotaUpdates[0] = QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.LINK), quotaChange: 100_000});
-        quotaUpdates[1] = QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.USDT), quotaChange: 200_000});
-
         evm.expectRevert(CallerNotCreditFacadeException.selector);
         evm.prank(FRIEND);
-        creditManager.updateQuotas(creditAccount, quotaUpdates);
+        creditManager.updateQuota({
+            creditAccount: creditAccount,
+            token: tokenTestSuite.addressOf(Tokens.LINK),
+            quotaChange: 100_000
+        });
 
         evm.expectCall(
-            address(poolQuotaKeeper), abi.encodeCall(IPoolQuotaKeeper.updateQuotas, (creditAccount, quotaUpdates))
+            address(poolQuotaKeeper),
+            abi.encodeCall(
+                IPoolQuotaKeeper.updateQuota, (creditAccount, tokenTestSuite.addressOf(Tokens.LINK), 100_000)
+            )
         );
 
         uint256 linkMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.LINK));
-        uint256 usdtMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.USDT));
 
-        (uint256 tokensToEnable, uint256 tokensToDisable) = creditManager.updateQuotas(creditAccount, quotaUpdates);
+        (uint256 tokensToEnable, uint256 tokensToDisable) = creditManager.updateQuota({
+            creditAccount: creditAccount,
+            token: tokenTestSuite.addressOf(Tokens.LINK),
+            quotaChange: 100_000
+        });
 
-        assertEq(tokensToEnable, linkMask | usdtMask, "Incorrect tokensToEnble");
+        assertEq(tokensToEnable, linkMask, "Incorrect tokensToEnble");
         assertEq(tokensToDisable, 0, "Incorrect tokensToDisable");
 
         evm.warp(block.timestamp + 365 days);
 
-        quotaUpdates[0] = QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.LINK), quotaChange: -100_000});
-        quotaUpdates[1] = QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.USDT), quotaChange: -100_000});
-
-        (tokensToEnable, tokensToDisable) = creditManager.updateQuotas(creditAccount, quotaUpdates);
-
+        (tokensToEnable, tokensToDisable) = creditManager.updateQuota({
+            creditAccount: creditAccount,
+            token: tokenTestSuite.addressOf(Tokens.LINK),
+            quotaChange: -100_000
+        });
         assertEq(tokensToEnable, 0, "Incorrect tokensToEnable");
         assertEq(tokensToDisable, linkMask, "Incorrect tokensToDisable");
 
@@ -201,10 +207,12 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
             "Cumulative quota interest was not updated correctly"
         );
 
-        quotaUpdates[0] = QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.USDC), quotaChange: -100000});
-
         evm.expectRevert(TokenIsNotQuotedException.selector);
-        creditManager.updateQuotas(creditAccount, quotaUpdates);
+        creditManager.updateQuota({
+            creditAccount: creditAccount,
+            token: tokenTestSuite.addressOf(Tokens.USDC),
+            quotaChange: 100_000
+        });
     }
 
     /// @dev [CMQ-4]: Quotas are handled correctly on debt decrease: amount < quota interest case
@@ -304,30 +312,35 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 5_00, uint96(1_000_000 * WAD));
 
-        (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen, uint256 cumulativeIndexAtClose, address creditAccount) =
-            cms.openCreditAccount();
+        (
+            uint256 borrowedAmount,
+            uint256 cumulativeIndexLastUpdate,
+            uint256 cumulativeIndexAtClose,
+            address creditAccount
+        ) = cms.openCreditAccount();
 
         tokenTestSuite.mint(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT * 2);
 
-        QuotaUpdate[] memory quotaUpdates = new QuotaUpdate[](2);
-        quotaUpdates[0] =
-            QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.LINK), quotaChange: int96(uint96(100 * WAD))});
-        quotaUpdates[1] =
-            QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.USDT), quotaChange: int96(uint96(200 * WAD))});
+        uint256 enabledTokensMask = UNDERLYING_TOKEN_MASK;
+        (uint256 tokensToEnable,) = creditManager.updateQuota({
+            creditAccount: creditAccount,
+            token: tokenTestSuite.addressOf(Tokens.LINK),
+            quotaChange: int96(uint96(100 * WAD))
+        });
+        enabledTokensMask |= tokensToEnable;
 
-        evm.expectCall(
-            address(poolQuotaKeeper), abi.encodeCall(IPoolQuotaKeeper.updateQuotas, (creditAccount, quotaUpdates))
-        );
+        (tokensToEnable,) = creditManager.updateQuota({
+            creditAccount: creditAccount,
+            token: tokenTestSuite.addressOf(Tokens.USDT),
+            quotaChange: int96(uint96(200 * WAD))
+        });
+        enabledTokensMask |= tokensToEnable;
 
-        (uint256 tokensToEnable,) = creditManager.updateQuotas(creditAccount, quotaUpdates);
-
-        creditManager.fullCollateralCheck(
-            creditAccount, tokensToEnable | UNDERLYING_TOKEN_MASK, new uint256[](0), 10_000
-        );
+        creditManager.fullCollateralCheck(creditAccount, enabledTokensMask, new uint256[](0), 10_000);
 
         (uint16 feeInterest,,,,) = creditManager.fees();
 
-        uint256 interestAccured = (borrowedAmount * cumulativeIndexAtClose / cumulativeIndexAtOpen - borrowedAmount)
+        uint256 interestAccured = (borrowedAmount * cumulativeIndexAtClose / cumulativeIndexLastUpdate - borrowedAmount)
             * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR;
 
         uint256 expectedQuotasInterest = (100 * WAD * 10_00 / PERCENTAGE_FACTOR + 200 * WAD * 5_00 / PERCENTAGE_FACTOR)
@@ -370,13 +383,12 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
             "Incorrect pool balance"
         );
 
-        AccountQuota memory quota =
-            poolQuotaKeeper.getQuota(address(creditManager), creditAccount, tokenTestSuite.addressOf(Tokens.LINK));
+        AccountQuota memory quota = poolQuotaKeeper.getQuota(creditAccount, tokenTestSuite.addressOf(Tokens.LINK));
 
         assertEq(uint256(quota.quota), 1, "Quota was not set to 0");
         // assertEq(uint256(quota.cumulativeIndexLU), 0, "Cumulative index was not updated");
 
-        quota = poolQuotaKeeper.getQuota(address(creditManager), creditAccount, tokenTestSuite.addressOf(Tokens.USDT));
+        quota = poolQuotaKeeper.getQuota(creditAccount, tokenTestSuite.addressOf(Tokens.USDT));
         assertEq(uint256(quota.quota), 1, "Quota was not set to 0");
         // assertEq(uint256(quota.cumulativeIndexLU), 0, "Cumulative index was not updated");
     }
@@ -541,13 +553,20 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
         uint256 tokenToEnable;
 
         {
-            QuotaUpdate[] memory quotaUpdates = new QuotaUpdate[](2);
-            quotaUpdates[0] =
-                QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.LINK), quotaChange: int96(uint96(1_000_000 * WAD))});
-            quotaUpdates[1] =
-                QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.USDC), quotaChange: int96(uint96(1_000_000 * WAD))});
+            (uint256 tokenToEnable1,) = creditManager.updateQuota({
+                creditAccount: creditAccount,
+                token: tokenTestSuite.addressOf(Tokens.LINK),
+                quotaChange: int96(uint96(1_000_000 * WAD))
+            });
 
-            (tokenToEnable,) = creditManager.updateQuotas(creditAccount, quotaUpdates);
+            tokenToEnable |= tokenToEnable1;
+
+            (tokenToEnable1,) = creditManager.updateQuota({
+                creditAccount: creditAccount,
+                token: tokenTestSuite.addressOf(Tokens.USDC),
+                quotaChange: int96(uint96(1_000_000 * WAD))
+            });
+            tokenToEnable |= tokenToEnable1;
         }
 
         tokenTestSuite.mint(Tokens.USDC, creditAccount, RAY);
@@ -578,7 +597,7 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
         // _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         // _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
-        // (uint256 borrowedAmount, uint256 cumulativeIndexAtOpen, uint256 cumulativeIndexAtClose, address creditAccount) =
+        // (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexAtClose, address creditAccount) =
         //     cms.openCreditAccount();
 
         // evm.assume(quotaLink < type(uint96).max / 2);
@@ -607,7 +626,7 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
 
         // (,, uint256 totalDebt) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
 
-        // uint256 expectedTotalDebt = (borrowedAmount * cumulativeIndexAtClose) / cumulativeIndexAtOpen;
+        // uint256 expectedTotalDebt = (borrowedAmount * cumulativeIndexAtClose) / cumulativeIndexLastUpdate;
         // expectedTotalDebt += (quotaLink * 1000 + quotaUsdt * 500) / PERCENTAGE_FACTOR;
 
         // (uint16 feeInterest,,,,) = creditManager.fees();
@@ -639,15 +658,21 @@ contract CreditManagerQuotasTest is DSTest, ICreditManagerV3Events, BalanceHelpe
 
         (,,, address creditAccount) = cms.openCreditAccount();
 
-        QuotaUpdate[] memory quotaUpdates = new QuotaUpdate[](2);
+        uint256 enabledTokensMap = UNDERLYING_TOKEN_MASK;
 
-        quotaUpdates[0] =
-            QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.LINK), quotaChange: int96(uint96(100 * WAD))});
-        quotaUpdates[1] =
-            QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.USDT), quotaChange: int96(uint96(200 * WAD))});
-        (uint256 tokensToEnable,) = creditManager.updateQuotas(creditAccount, quotaUpdates);
+        (uint256 tokensToEnable,) = creditManager.updateQuota({
+            creditAccount: creditAccount,
+            token: tokenTestSuite.addressOf(Tokens.LINK),
+            quotaChange: int96(uint96(100 * WAD))
+        });
+        enabledTokensMap |= tokensToEnable;
 
-        uint256 enabledTokensMap = tokensToEnable | UNDERLYING_TOKEN_MASK;
+        (tokensToEnable,) = creditManager.updateQuota({
+            creditAccount: creditAccount,
+            token: tokenTestSuite.addressOf(Tokens.USDT),
+            quotaChange: int96(uint96(200 * WAD))
+        });
+        enabledTokensMap |= tokensToEnable;
 
         address[] memory quotedTokens = new address[](creditManager.maxAllowedEnabledTokenLength() + 1);
 

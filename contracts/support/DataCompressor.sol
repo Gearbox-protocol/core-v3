@@ -194,7 +194,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
             }
         }
 
-        result.cumulativeIndexAtOpen = ICreditAccount(creditAccount).cumulativeIndexAtOpen();
+        // result.cumulativeIndexLastUpdate = ICreditAccount(creditAccount).cumulativeIndexLastUpdate();
 
         result.since = ICreditAccount(creditAccount).since();
     }

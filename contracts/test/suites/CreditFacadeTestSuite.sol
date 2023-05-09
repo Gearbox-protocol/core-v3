@@ -110,7 +110,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
 
         if (accountFactoryVer == 2) {
             evm.prank(CONFIGURATOR);
-            AccountFactoryV2(address(af)).addCreditManager(address(creditManager));
+            AccountFactoryV2(address(af)).addCreditManager(address(creditManager), 1);
         }
 
         if (supportQuotas) {
