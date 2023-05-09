@@ -91,7 +91,10 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
     function isQuotedToken(address token) external view returns (bool);
 
     /// @dev Returns quota parameters for a single (account, token) pair
-    function getQuota(address creditAccount, address token) external view returns (AccountQuota memory);
+    function getQuota(address creditAccount, address token)
+        external
+        view
+        returns (uint96 quota, uint192 cumulativeIndexLU);
 
     /// @dev Computes collateral value for quoted tokens on the account, as well as accrued quota interest
     function computeQuotedCollateralUSD(

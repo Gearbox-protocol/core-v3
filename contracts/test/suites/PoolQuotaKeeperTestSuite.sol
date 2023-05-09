@@ -8,7 +8,7 @@ import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/Contra
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {DieselToken} from "@gearbox-protocol/core-v2/contracts/tokens/DieselToken.sol";
 
-import {IPool4626, Pool4626Opts} from "../../interfaces/IPool4626.sol";
+import {IPool4626} from "../../interfaces/IPool4626.sol";
 import {TestPoolService} from "@gearbox-protocol/core-v2/contracts/test/mocks/pool/TestPoolService.sol";
 import {Tokens} from "../config/Tokens.sol";
 

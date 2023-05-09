@@ -8,7 +8,7 @@ import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/Contra
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {DieselToken} from "@gearbox-protocol/core-v2/contracts/tokens/DieselToken.sol";
 
-import {IPool4626, Pool4626Opts} from "../../interfaces/IPool4626.sol";
+import {IPool4626} from "../../interfaces/IPool4626.sol";
 import {TestPoolService} from "@gearbox-protocol/core-v2/contracts/test/mocks/pool/TestPoolService.sol";
 import {Tokens} from "../config/Tokens.sol";
 
@@ -90,14 +90,28 @@ contract PoolServiceTestSuite {
         } catch {}
 
         if (is4626) {
-            Pool4626Opts memory opts = Pool4626Opts({
-                addressProvider: address(addressProvider),
-                underlyingToken: _underlying,
-                interestRateModel: address(linearIRModel),
-                expectedLiquidityLimit: type(uint256).max,
-                supportsQuotas: supportQuotas
-            });
-            pool4626 = isFeeToken ? new Pool4626_USDT(opts) : new Pool4626(opts);
+            // Pool4626Opts memory opts = Pool4626Opts({
+            //     addressProvider: address(addressProvider),
+            //     underlyingToken: _underlying,
+            //     interestRateModel: address(linearIRModel),
+            //     expectedLiquidityLimit: type(uint256).max,
+            //     supportsQuotas: supportQuotas
+            // });
+            pool4626 = isFeeToken
+                ? new Pool4626_USDT({
+                                _addressProvider: address(addressProvider),
+                                _underlyingToken: _underlying,
+                                _interestRateModel: address(linearIRModel),
+                                _expectedLiquidityLimit: type(uint256).max,
+                                _supportsQuotas: supportQuotas
+                            })
+                : new Pool4626({
+                                _addressProvider: address(addressProvider),
+                                _underlyingToken: _underlying,
+                                _interestRateModel: address(linearIRModel),
+                                _expectedLiquidityLimit: type(uint256).max,
+                                _supportsQuotas: supportQuotas
+                            });
             newPool = address(pool4626);
 
             if (supportQuotas) {

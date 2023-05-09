@@ -12,7 +12,7 @@ import {LinearInterestRateModel} from "../../../pool/LinearInterestRateModel.sol
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {Pool4626} from "../../../pool/Pool4626.sol";
-import {IPool4626Events, Pool4626Opts} from "../../../interfaces/IPool4626.sol";
+import {IPool4626Events} from "../../../interfaces/IPool4626.sol";
 import {IERC4626Events} from "../../../interfaces/IERC4626.sol";
 
 import {IInterestRateModel} from "../../../interfaces/IInterestRateModel.sol";
@@ -194,40 +194,43 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
     // [P4-2]: constructor reverts for zero addresses
     function test_P4_02_constructor_reverts_for_zero_addresses() public {
-        Pool4626Opts memory opts = Pool4626Opts({
-            addressProvider: address(0),
-            underlyingToken: underlying,
-            interestRateModel: address(psts.linearIRModel()),
-            expectedLiquidityLimit: type(uint128).max,
-            supportsQuotas: false
+        evm.expectRevert(ZeroAddressException.selector);
+        new Pool4626({
+            _addressProvider: address(0),
+            _underlyingToken: underlying,
+            _interestRateModel: address(psts.linearIRModel()),
+            _expectedLiquidityLimit: type(uint128).max,
+            _supportsQuotas: false
         });
 
-        evm.expectRevert(ZeroAddressException.selector);
-        new Pool4626(opts);
-
-        opts.addressProvider = address(psts.addressProvider());
-        opts.interestRateModel = address(0);
+        // opts.addressProvider = address(psts.addressProvider());
+        // opts.interestRateModel = address(0);
 
         evm.expectRevert(ZeroAddressException.selector);
-        new Pool4626(opts);
+        new Pool4626({
+              _addressProvider:address(psts.addressProvider()),
+            _underlyingToken: underlying,
+            _interestRateModel: address(0),
+            _expectedLiquidityLimit: type(uint128).max,
+            _supportsQuotas: false
+        });
 
-        opts.interestRateModel = address(psts.linearIRModel());
-        opts.underlyingToken = address(0);
+        // opts.interestRateModel = address(psts.linearIRModel());
+        // opts.underlyingToken = address(0);
 
         evm.expectRevert(ZeroAddressException.selector);
-        new Pool4626(opts);
+        new Pool4626({
+            _addressProvider: address(psts.addressProvider()),
+            _underlyingToken: address(0),
+            _interestRateModel: address(psts.linearIRModel()),
+            _expectedLiquidityLimit: type(uint128).max,
+            _supportsQuotas: false
+        });
     }
 
     // [P4-3]: constructor emits events
     function test_P4_03_constructor_emits_events() public {
         uint256 limit = 15890;
-        Pool4626Opts memory opts = Pool4626Opts({
-            addressProvider: address(psts.addressProvider()),
-            underlyingToken: underlying,
-            interestRateModel: address(psts.linearIRModel()),
-            expectedLiquidityLimit: limit,
-            supportsQuotas: false
-        });
 
         evm.expectEmit(true, false, false, false);
         emit SetInterestRateModel(address(psts.linearIRModel()));
@@ -238,7 +241,13 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         evm.expectEmit(false, false, false, true);
         emit SetTotalBorrowedLimit(limit);
 
-        new Pool4626(opts);
+        new Pool4626({
+            _addressProvider: address(psts.addressProvider()),
+            _underlyingToken: underlying,
+            _interestRateModel: address(psts.linearIRModel()),
+            _expectedLiquidityLimit: limit,
+            _supportsQuotas: false
+        });
     }
 
     // [P4-4]: addLiquidity, removeLiquidity, lendCreditAccount, repayCreditAccount reverts if contract is paused
@@ -1543,16 +1552,15 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
     }
 
     // [P4-23]: connectPoolQuotaManager updates quotaRevenue and emits event
-    function test_P4_23_connectPoolQuotaManager_updates_quotaRevenue_and_emits_event() public {
-        Pool4626Opts memory opts = Pool4626Opts({
-            addressProvider: address(psts.addressProvider()),
-            underlyingToken: tokenTestSuite.addressOf(Tokens.DAI),
-            interestRateModel: address(irm),
-            expectedLiquidityLimit: type(uint256).max,
-            supportsQuotas: true
-        });
 
-        pool = new Pool4626(opts);
+    function test_P4_23_connectPoolQuotaManager_updates_quotaRevenue_and_emits_event() public {
+        pool = new Pool4626({
+            _addressProvider: address(psts.addressProvider()),
+            _underlyingToken: tokenTestSuite.addressOf(Tokens.DAI),
+            _interestRateModel: address(irm),
+            _expectedLiquidityLimit: type(uint256).max,
+            _supportsQuotas: true
+        });
 
         pqk = new PoolQuotaKeeper(address(pool));
 

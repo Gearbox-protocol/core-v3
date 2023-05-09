@@ -2,6 +2,7 @@
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
+pragma abicoder v1;
 
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";

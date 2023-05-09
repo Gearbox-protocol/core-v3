@@ -2,6 +2,7 @@
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
+pragma abicoder v1;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
@@ -281,8 +282,13 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
     }
 
     /// @dev Returns quota parameters for a single (account, token) pair
-    function getQuota(address creditAccount, address token) external view returns (AccountQuota memory) {
-        return accountQuotas[creditAccount][token];
+    function getQuota(address creditAccount, address token)
+        external
+        view
+        returns (uint96 quota, uint192 cumulativeIndexLU)
+    {
+        AccountQuota storage aq = accountQuotas[creditAccount][token];
+        return (aq.quota, aq.cumulativeIndexLU);
     }
 
     /// @dev Returns list of connected credit managers
