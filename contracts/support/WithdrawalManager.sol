@@ -3,6 +3,9 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 import {
     AmountCantBeZeroException,
     CallerNotCreditManagerException,
@@ -10,6 +13,7 @@ import {
     NothingToClaimException
 } from "../interfaces/IExceptions.sol";
 import {ClaimAction, IWithdrawalManager, IVersion, ScheduledWithdrawal} from "../interfaces/IWithdrawalManager.sol";
+import {IERC20Helper} from "../libraries/IERC20Helper.sol";
 import {WithdrawalsLogic} from "../libraries/WithdrawalsLogic.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
 
@@ -20,6 +24,8 @@ import {ACLTrait} from "../traits/ACLTrait.sol";
 ///         - Scheduled withdrawals can be claimed after a certain delay, and exist to support partial withdrawals
 ///           from credit accounts. One credit account can have up to two scheduled withdrawals at the same time.
 contract WithdrawalManager is IWithdrawalManager, ACLTrait {
+    using SafeERC20 for IERC20;
+    using IERC20Helper for IERC20;
     using WithdrawalsLogic for ClaimAction;
     using WithdrawalsLogic for ScheduledWithdrawal;
     using WithdrawalsLogic for ScheduledWithdrawal[2];
@@ -92,7 +98,7 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait {
             --amount; // F: [WM-4C]
         }
         immediateWithdrawals[account][token] = 1; // F: [WM-4C]
-        _safeTransfer(token, to, amount); // F: [WM-4C]
+        IERC20(token).safeTransfer(to, amount); // F: [WM-4C]
         emit ClaimImmediateWithdrawal(account, token, to, amount); // F: [WM-4C]
     }
 
@@ -194,7 +200,7 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait {
         w.clear(); // F: [WM-9A]
         emit ClaimScheduledWithdrawal(creditAccount, token, to, amount); // F: [WM-9A]
 
-        bool success = _unsafeTransfer(token, to, amount); // F: [WM-9A]
+        bool success = IERC20(token).unsafeTransfer(to, amount); // F: [WM-9A]
         if (!success) _addImmediateWithdrawal(to, token, amount); // F: [WM-9B]
     }
 
@@ -208,7 +214,7 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait {
         w.clear(); // F: [WM-10]
         emit CancelScheduledWithdrawal(creditAccount, token, amount); // F: [WM-10]
 
-        _safeTransfer(token, creditAccount, amount); // F: [WM-10]
+        IERC20(token).safeTransfer(creditAccount, amount); // F: [WM-10]
         tokensToEnable = tokenMask; // F: [WM-10]
     }
 
