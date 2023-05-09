@@ -9,8 +9,8 @@ import {ClaimAction, ScheduledWithdrawal} from "../interfaces/IWithdrawalManager
 library WithdrawalsLogic {
     /// @dev Clears withdrawal in storage
     function clear(ScheduledWithdrawal storage w) internal {
-        w.maturity = 1;
-        w.amount = 1;
+        w.maturity = 1; // F: [WL-1]
+        w.amount = 1; // F: [WL-1]
     }
 
     /// @dev If withdrawal is scheduled, returns withdrawn token, its mask in credit manager and withdrawn amount
@@ -22,9 +22,9 @@ library WithdrawalsLogic {
         uint256 amount_ = w.amount;
         if (amount_ > 1) {
             unchecked {
-                token = w.token;
-                mask = 1 << w.tokenIndex;
-                amount = amount_ - 1;
+                token = w.token; // F: [WL-2]
+                mask = 1 << w.tokenIndex; // F: [WL-2]
+                amount = amount_ - 1; // F: [WL-2]
             }
         }
     }
@@ -32,10 +32,10 @@ library WithdrawalsLogic {
     /// @dev Returns flag indicating whether there are free withdrawal slots and the index of first such slot
     function findFreeSlot(ScheduledWithdrawal[2] storage ws) internal view returns (bool found, uint8 slot) {
         if (ws[0].maturity < 2) {
-            found = true;
+            found = true; // F: [WL-3]
         } else if (ws[1].maturity < 2) {
-            found = true;
-            slot = 1;
+            found = true; // F: [WL-3]
+            slot = 1; // F: [WL-3]
         }
     }
 
