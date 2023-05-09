@@ -13,6 +13,7 @@ import {ICreditConfig} from "../interfaces/ICreditConfig.sol";
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 
 import "../lib/constants.sol";
+import {Test} from "forge-std/Test.sol";
 
 struct CollateralTokensItem {
     Tokens token;
@@ -21,7 +22,7 @@ struct CollateralTokensItem {
 
 /// @title CreditManagerTestSuite
 /// @notice Deploys contract for unit testing of CreditManagerV3.sol
-contract CreditConfig is DSTest, ICreditConfig {
+contract CreditConfig is Test, ICreditConfig {
     uint128 public minBorrowedAmount;
     uint128 public maxBorrowedAmount;
 

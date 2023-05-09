@@ -59,14 +59,14 @@ import {CreditConfig} from "../../config/CreditConfig.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
+
+import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 /// @title AddressRepository
 /// @notice Stores addresses of deployed contracts
-contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
+contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
     using BitMask for uint256;
-
-    CheatCodes evm = CheatCodes(HEVM_ADDRESS);
 
     CreditManagerTestSuite cms;
 
@@ -153,11 +153,11 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
             ERC20Mock t = new ERC20Mock("new token", "nt", 18);
             PriceFeedMock pf = new PriceFeedMock(10**8, 8);
 
-            evm.startPrank(CONFIGURATOR);
+            vm.startPrank(CONFIGURATOR);
             creditManager.addToken(address(t));
             IPriceOracleV2Ext(address(priceOracle)).addPriceFeed(address(t), address(pf));
             creditManager.setCollateralTokenData(address(t), 8000, 8000, type(uint40).max, 0);
-            evm.stopPrank();
+            vm.stopPrank();
 
             t.mint(creditAccount, balance);
 
@@ -273,26 +273,26 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     function test_CM_02_credit_account_management_functions_revert_if_not_called_by_creditFacadeCall() public {
         assertEq(creditManager.creditFacade(), address(this));
 
-        evm.startPrank(USER);
+        vm.startPrank(USER);
 
-        evm.expectRevert(CallerNotCreditFacadeException.selector);
+        vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.openCreditAccount(200000, address(this), false);
 
-        // evm.expectRevert(CallerNotCreditFacadeException.selector);
+        // vm.expectRevert(CallerNotCreditFacadeException.selector);
         // creditManager.closeCreditAccount(
         //     DUMB_ADDRESS, ClosureAction.LIQUIDATE_ACCOUNT, 0, DUMB_ADDRESS, DUMB_ADDRESS, type(uint256).max, false
         // );
 
-        evm.expectRevert(CallerNotCreditFacadeException.selector);
+        vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.manageDebt(DUMB_ADDRESS, 100, 0, ManageDebtAction.INCREASE_DEBT);
 
-        evm.expectRevert(CallerNotCreditFacadeException.selector);
+        vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.addCollateral(DUMB_ADDRESS, DUMB_ADDRESS, DUMB_ADDRESS, 100);
 
-        evm.expectRevert(CallerNotCreditFacadeException.selector);
+        vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.transferAccountOwnership(DUMB_ADDRESS, DUMB_ADDRESS);
 
-        evm.stopPrank();
+        vm.stopPrank();
     }
 
     /// @dev [CM-3]:credit account execution functions revert if were called non-creditFacade & non-adapters
@@ -306,18 +306,18 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     function test_CM_03_credit_account_execution_functions_revert_if_not_called_by_creditFacade_or_adapters() public {
         assertEq(creditManager.creditFacade(), address(this));
 
-        evm.startPrank(USER);
+        vm.startPrank(USER);
 
-        evm.expectRevert(CallerNotAdapterException.selector);
+        vm.expectRevert(CallerNotAdapterException.selector);
         creditManager.approveCreditAccount(DUMB_ADDRESS, 100);
 
-        evm.expectRevert(CallerNotAdapterException.selector);
+        vm.expectRevert(CallerNotAdapterException.selector);
         creditManager.executeOrder(bytes("0"));
 
-        evm.expectRevert(CallerNotCreditFacadeException.selector);
+        vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.fullCollateralCheck(DUMB_ADDRESS, 0, new uint256[](0), 10000);
 
-        evm.stopPrank();
+        vm.stopPrank();
     }
 
     /// @dev [CM-4]:credit account configuration functions revert if were called non-configurator
@@ -334,33 +334,33 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     function test_CM_04_credit_account_configurator_functions_revert_if_not_called_by_creditConfigurator() public {
         assertEq(creditManager.creditFacade(), address(this));
 
-        evm.startPrank(USER);
+        vm.startPrank(USER);
 
-        evm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.addToken(DUMB_ADDRESS);
 
-        evm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setParams(0, 0, 0, 0, 0);
 
-        evm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setCollateralTokenData(DUMB_ADDRESS, 0, 0, 0, 0);
 
-        evm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setContractAllowance(DUMB_ADDRESS, DUMB_ADDRESS);
 
-        evm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setCreditFacade(DUMB_ADDRESS);
 
-        evm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setPriceOracle(DUMB_ADDRESS);
 
-        evm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setCreditConfigurator(DUMB_ADDRESS);
 
-        evm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setMaxEnabledTokens(255);
 
-        evm.stopPrank();
+        vm.stopPrank();
     }
 
     // TODO: REMOVE OUTDATED
@@ -374,36 +374,36 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     // /// All these functions have whenNotPaused modifier
     // function test_CM_05_pause_pauses_management_functions() public {
     //     address root = acl.owner();
-    //     evm.prank(root);
+    //     vm.prank(root);
 
     //     acl.addPausableAdmin(root);
 
-    //     evm.prank(root);
+    //     vm.prank(root);
     //     creditManager.pause();
 
     //     assertEq(creditManager.creditFacade(), address(this));
 
-    //     evm.expectRevert(bytes(PAUSABLE_ERROR));
+    //     vm.expectRevert(bytes(PAUSABLE_ERROR));
     //     creditManager.openCreditAccount(200000, address(this));
 
-    //     // evm.expectRevert(bytes(PAUSABLE_ERROR));
+    //     // vm.expectRevert(bytes(PAUSABLE_ERROR));
     //     // creditManager.closeCreditAccount(
     //     //     DUMB_ADDRESS, ClosureAction.LIQUIDATE_ACCOUNT, 0, DUMB_ADDRESS, DUMB_ADDRESS, type(uint256).max, false
     //     // );
 
-    //     evm.expectRevert(bytes(PAUSABLE_ERROR));
+    //     vm.expectRevert(bytes(PAUSABLE_ERROR));
     //     creditManager.manageDebt(DUMB_ADDRESS, 100, ManageDebtAction.INCREASE_DEBT);
 
-    //     evm.expectRevert(bytes(PAUSABLE_ERROR));
+    //     vm.expectRevert(bytes(PAUSABLE_ERROR));
     //     creditManager.addCollateral(DUMB_ADDRESS, DUMB_ADDRESS, DUMB_ADDRESS, 100);
 
-    //     evm.expectRevert(bytes(PAUSABLE_ERROR));
+    //     vm.expectRevert(bytes(PAUSABLE_ERROR));
     //     creditManager.transferAccountOwnership(DUMB_ADDRESS, DUMB_ADDRESS);
 
-    //     evm.expectRevert(bytes(PAUSABLE_ERROR));
+    //     vm.expectRevert(bytes(PAUSABLE_ERROR));
     //     creditManager.approveCreditAccount(DUMB_ADDRESS, DUMB_ADDRESS, 100);
 
-    //     evm.expectRevert(bytes(PAUSABLE_ERROR));
+    //     vm.expectRevert(bytes(PAUSABLE_ERROR));
     //     creditManager.executeOrder(DUMB_ADDRESS, bytes("dd"));
     // }
 
@@ -418,15 +418,15 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     /// - transferOwnership
 
     function test_CM_06A_management_functions_revert_if_account_does_not_exist() public {
-        // evm.expectRevert(CreditAccountNotExistsException.selector);
+        // vm.expectRevert(CreditAccountNotExistsException.selector);
         // creditManager.getCreditAccountOrRevert(USER);
 
-        // evm.expectRevert(CreditAccountNotExistsException.selector);
+        // vm.expectRevert(CreditAccountNotExistsException.selector);
         // creditManager.closeCreditAccount(
         //     USER, ClosureAction.LIQUIDATE_ACCOUNT, 0, DUMB_ADDRESS, DUMB_ADDRESS, type(uint256).max, false
         // );
 
-        evm.expectRevert(CreditAccountNotExistsException.selector);
+        vm.expectRevert(CreditAccountNotExistsException.selector);
         creditManager.transferAccountOwnership(USER, DUMB_ADDRESS);
     }
 
@@ -437,16 +437,16 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     function test_CM_06B_extenrnal_ca_only_functions_revert_when_ec_is_not_set() public {
         address token = tokenTestSuite.addressOf(Tokens.DAI);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
 
-        evm.prank(ADAPTER);
-        evm.expectRevert(ExternalCallCreditAccountNotSetException.selector);
+        vm.prank(ADAPTER);
+        vm.expectRevert(ExternalCallCreditAccountNotSetException.selector);
         creditManager.approveCreditAccount(token, 100);
 
         // / TODO: decide about test
-        evm.prank(ADAPTER);
-        evm.expectRevert(ExternalCallCreditAccountNotSetException.selector);
+        vm.prank(ADAPTER);
+        vm.expectRevert(ExternalCallCreditAccountNotSetException.selector);
         creditManager.executeOrder(bytes("dd"));
     }
 
@@ -458,7 +458,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     function test_CM_07_openCreditAccount_reverts_if_address_exists() public {
         // // Existing address case
         // creditManager.openCreditAccount(1, USER);
-        // evm.expectRevert(UserAlreadyHasAccountException.selector);
+        // vm.expectRevert(UserAlreadyHasAccountException.selector);
         // creditManager.openCreditAccount(1, USER);
     }
 
@@ -506,7 +506,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
 
         // Increase block number cause it's forbidden to close credit account in the same block
-        evm.roll(block.number + 1);
+        vm.roll(block.number + 1);
 
         // creditManager.closeCreditAccount(
         //     creditAccount, ClosureAction.CLOSE_ACCOUNT, 0, USER, USER, 0, 0, DAI_ACCOUNT_AMOUNT, false
@@ -518,7 +518,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
             "credit account is not in accountFactory tail!"
         );
 
-        // evm.expectRevert(CreditAccountNotExistsException.selector);
+        // vm.expectRevert(CreditAccountNotExistsException.selector);
         // creditManager.getCreditAccountOrRevert(USER);
     }
 
@@ -550,7 +550,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
         uint256 amountToPool = borrowedAmount + interestAccrued + profit;
 
-        evm.expectCall(
+        vm.expectCall(
             address(poolMock),
             abi.encodeWithSelector(IPoolService.repayCreditAccount.selector, borrowedAmount, profit, 0)
         );
@@ -606,7 +606,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
         uint256 amountToPool = borrowedAmount + interestAccrued + profit;
 
-        evm.expectCall(
+        vm.expectCall(
             address(poolMock),
             abi.encodeWithSelector(IPoolService.repayCreditAccount.selector, borrowedAmount, profit, 0)
         );
@@ -675,7 +675,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
             {
                 uint256 loss = borrowedAmount + interestAccrued - amountToPool;
 
-                evm.expectCall(
+                vm.expectCall(
                     address(poolMock),
                     abi.encodeWithSelector(IPoolService.repayCreditAccount.selector, borrowedAmount, 0, loss)
                 );
@@ -780,7 +780,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
             expectBalance(Tokens.DAI, creditAccount, borrowedAmount, "creditAccount has incorrect initial balance");
 
-            evm.expectCall(
+            vm.expectCall(
                 address(poolMock),
                 abi.encodeWithSelector(IPoolService.repayCreditAccount.selector, borrowedAmount, profit, 0)
             );
@@ -1188,7 +1188,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         // creditManager.openCreditAccount(1, FRIEND);
 
         // // Existing account case
-        // evm.expectRevert(UserAlreadyHasAccountException.selector);
+        // vm.expectRevert(UserAlreadyHasAccountException.selector);
         // creditManager.transferAccountOwnership(FRIEND, USER);
     }
 
@@ -1203,7 +1203,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
         // assertEq(creditManager.creditAccounts(FRIEND), creditAccount, "To account isn't correct");
 
-        // evm.expectRevert(CreditAccountNotExistsException.selector);
+        // vm.expectRevert(CreditAccountNotExistsException.selector);
         // creditManager.getCreditAccountOrRevert(USER);
     }
 
@@ -1216,12 +1216,12 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         (,,, address creditAccount) = _openCreditAccount();
         creditManager.setCreditAccountForExternalCall(creditAccount);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
 
-        evm.expectRevert(TokenNotAllowedException.selector);
+        vm.expectRevert(TokenNotAllowedException.selector);
 
-        evm.prank(ADAPTER);
+        vm.prank(ADAPTER);
         creditManager.approveCreditAccount(DUMB_ADDRESS, 100);
     }
 
@@ -1230,7 +1230,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         (,,, address creditAccount) = _openCreditAccount();
         creditManager.setCreditAccountForExternalCall(creditAccount);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
 
         // Case, when current allowance > Allowance_THRESHOLD
@@ -1238,7 +1238,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
         address dai = tokenTestSuite.addressOf(Tokens.DAI);
 
-        evm.prank(ADAPTER);
+        vm.prank(ADAPTER);
         creditManager.approveCreditAccount(dai, DAI_EXCHANGE_AMOUNT);
 
         expectAllowance(Tokens.DAI, creditAccount, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
@@ -1249,18 +1249,18 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         (,,, address creditAccount) = _openCreditAccount();
         creditManager.setCreditAccountForExternalCall(creditAccount);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
 
         address approveRevertToken = address(new ERC20ApproveRestrictedRevert());
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditManager.addToken(approveRevertToken);
 
-        evm.prank(ADAPTER);
+        vm.prank(ADAPTER);
         creditManager.approveCreditAccount(approveRevertToken, DAI_EXCHANGE_AMOUNT);
 
-        evm.prank(ADAPTER);
+        vm.prank(ADAPTER);
         creditManager.approveCreditAccount(approveRevertToken, 2 * DAI_EXCHANGE_AMOUNT);
 
         expectAllowance(approveRevertToken, creditAccount, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
@@ -1273,16 +1273,16 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
         address approveFalseToken = address(new ERC20ApproveRestrictedFalse());
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditManager.addToken(approveFalseToken);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
 
-        evm.prank(ADAPTER);
+        vm.prank(ADAPTER);
         creditManager.approveCreditAccount(approveFalseToken, DAI_EXCHANGE_AMOUNT);
 
-        evm.prank(ADAPTER);
+        vm.prank(ADAPTER);
         creditManager.approveCreditAccount(approveFalseToken, 2 * DAI_EXCHANGE_AMOUNT);
 
         expectAllowance(approveFalseToken, creditAccount, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
@@ -1299,20 +1299,20 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
         TargetContractMock targetMock = new TargetContractMock();
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditManager.setContractAllowance(ADAPTER, address(targetMock));
 
         bytes memory callData = bytes("Hello, world!");
 
         // we emit the event we expect to see.
-        evm.expectEmit(true, false, false, false);
+        vm.expectEmit(true, false, false, false);
         emit ExecuteOrder(address(targetMock));
 
         // stack trace check
-        evm.expectCall(creditAccount, abi.encodeWithSignature("execute(address,bytes)", address(targetMock), callData));
-        evm.expectCall(address(targetMock), callData);
+        vm.expectCall(creditAccount, abi.encodeWithSignature("execute(address,bytes)", address(targetMock), callData));
+        vm.expectCall(address(targetMock), callData);
 
-        evm.prank(ADAPTER);
+        vm.prank(ADAPTER);
         creditManager.executeOrder(callData);
 
         assertEq0(targetMock.callData(), callData, "Incorrect calldata");
@@ -1328,7 +1328,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
         tokenTestSuite.mint(Tokens.USDC, creditAccount, USDC_ACCOUNT_AMOUNT);
 
-        evm.expectRevert(NotEnoughCollateralException.selector);
+        vm.expectRevert(NotEnoughCollateralException.selector);
         _baseFullCollateralCheck(creditAccount);
 
         // fullCollateralCheck doesn't revert when token is enabled
@@ -1377,7 +1377,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     /// @dev [CM-40]: fullCollateralCheck breaks loop if total >= borrowAmountPlusInterestRateUSD and pass the check
     function test_CM_40_fullCollateralCheck_breaks_loop_if_total_gte_borrowAmountPlusInterestRateUSD_and_pass_the_check(
     ) public {
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
 
         CreditManagerV3 cm = new CreditManagerV3(address(poolMock), address(withdrawalManager));
         cms.cr().addCreditManager(address(cm));
@@ -1385,7 +1385,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         cm.setCreditFacade(address(this));
         cm.setPriceOracle(address(priceOracle));
 
-        evm.stopPrank();
+        vm.stopPrank();
 
         address creditAccount = cm.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, false);
         cm.transferAccountOwnership(creditAccount, address(this));
@@ -1397,7 +1397,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         // If (total >= borrowAmountPlusInterestRateUSD) doesn't break the loop, it would be called
         // cause we enable this token using checkAndEnableToken.
         // If fullCollateralCheck doesn't revert, it means that the break works
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
 
         cm.addToken(linkToken);
         cm.addToken(revertToken);
@@ -1405,7 +1405,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
             linkToken, creditConfig.lt(Tokens.LINK), creditConfig.lt(Tokens.LINK), type(uint40).max, 0
         );
 
-        evm.stopPrank();
+        vm.stopPrank();
 
         // cm.checkAndEnableToken(revertToken);
         // cm.checkAndEnableToken(linkToken);
@@ -1426,7 +1426,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
     /// @dev [CM-41]: fullCollateralCheck reverts if CA has more than allowed enabled tokens
     function test_CM_41_fullCollateralCheck_reverts_if_CA_has_more_than_allowed_enabled_tokens() public {
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
 
         // We use clean CreditManagerV3 to have only one underlying token for testing
         creditManager = new CreditManagerV3(address(poolMock), address(withdrawalManager));
@@ -1436,13 +1436,13 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         creditManager.setPriceOracle(address(priceOracle));
 
         creditManager.setCollateralTokenData(poolMock.underlyingToken(), 9300, 9300, type(uint40).max, 0);
-        evm.stopPrank();
+        vm.stopPrank();
 
         address creditAccount = creditManager.openCreditAccount(DAI_ACCOUNT_AMOUNT, address(this), false);
         tokenTestSuite.mint(Tokens.DAI, creditAccount, 2 * DAI_ACCOUNT_AMOUNT);
 
         enableTokensMoreThanLimit(creditAccount);
-        evm.expectRevert(TooManyEnabledTokensException.selector);
+        vm.expectRevert(TooManyEnabledTokensException.selector);
 
         creditManager.fullCollateralCheck(creditAccount, 2 ** 13 - 1, new uint256[](0), 10000);
     }
@@ -1501,9 +1501,9 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         bool enableWETH,
         uint16 minHealthFactor
     ) public {
-        // evm.assume(borrowedAmount > WAD);
+        // vm.assume(borrowedAmount > WAD);
 
-        // evm.assume(minHealthFactor > 10_000 && minHealthFactor < 50_000);
+        // vm.assume(minHealthFactor > 10_000 && minHealthFactor < 50_000);
 
         // tokenTestSuite.mint(Tokens.DAI, address(poolMock), borrowedAmount);
 
@@ -1569,7 +1569,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         // }
 
         // if (shouldRevert) {
-        //     evm.expectRevert(NotEnoughCollateralException.selector);
+        //     vm.expectRevert(NotEnoughCollateralException.selector);
         // }
 
         // creditManager.fullCollateralCheck(creditAccount, enabledTokensMap, new uint256[](0), minHealthFactor);
@@ -1592,7 +1592,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
     /// @dev [CM-43]: calcClosePayments computes
     function test_CM_43_calcClosePayments_test() public {
-        // evm.prank(CONFIGURATOR);
+        // vm.prank(CONFIGURATOR);
 
         // creditManager.setParams(
         //     1000, // feeInterest: 10% , it doesn't matter this test
@@ -1865,9 +1865,9 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
     /// @dev [CM-47]: collateralTokens works as expected
     function test_CM_47_collateralTokens_works_as_expected(address newToken, uint16 newLT) public {
-        // evm.assume(newToken != underlying && newToken != address(0));
+        // vm.assume(newToken != underlying && newToken != address(0));
 
-        // evm.startPrank(CONFIGURATOR);
+        // vm.startPrank(CONFIGURATOR);
 
         // // reset connected tokens
         // CreditManagerV3 cm = new CreditManagerV3(address(poolMock), address(0));
@@ -1900,7 +1900,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
         // assertEq(ltAlt, newLT, "incorrect lt for  newToken token");
 
-        // evm.stopPrank();
+        // vm.stopPrank();
     }
 
     //
@@ -1913,7 +1913,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
     //     assertEq(creditManager.getCreditAccountOrRevert(USER), creditAccount, "Incorrect credit account");
 
-    //     evm.expectRevert(CreditAccountNotExistsException.selector);
+    //     vm.expectRevert(CreditAccountNotExistsException.selector);
     //     creditManager.getCreditAccountOrRevert(DUMB_ADDRESS);
     // }
 
@@ -1989,7 +1989,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         uint16 s_feeLiquidationExpired = 1221;
         uint16 s_liquidationPremiumExpired = 7777;
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditManager.setParams(
             s_feeInterest, s_feeLiquidation, s_liquidationPremium, s_feeLiquidationExpired, s_liquidationPremiumExpired
         );
@@ -2014,26 +2014,26 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
     /// @dev [CM-52]: addToken reverts if token exists and if collateralTokens > 256
     function test_CM_52_addToken_reverts_if_token_exists_and_if_collateralTokens_more_256() public {
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
 
-        evm.expectRevert(TokenAlreadyAddedException.selector);
+        vm.expectRevert(TokenAlreadyAddedException.selector);
         creditManager.addToken(underlying);
 
         for (uint256 i = creditManager.collateralTokensCount(); i < 248; i++) {
             creditManager.addToken(address(uint160(uint256(keccak256(abi.encodePacked(i))))));
         }
 
-        evm.expectRevert(TooManyTokensException.selector);
+        vm.expectRevert(TooManyTokensException.selector);
         creditManager.addToken(DUMB_ADDRESS);
 
-        evm.stopPrank();
+        vm.stopPrank();
     }
 
     /// @dev [CM-53]: addToken adds token and set tokenMaskMap correctly
     function test_CM_53_addToken_adds_token_and_set_tokenMaskMap_correctly() public {
         uint256 count = creditManager.collateralTokensCount();
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditManager.addToken(DUMB_ADDRESS);
 
         assertEq(creditManager.collateralTokensCount(), count + 1, "collateralTokensCount want incremented");
@@ -2047,8 +2047,8 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
     /// @dev [CM-54]: setLiquidationThreshold reverts for unknown token
     function test_CM_54_setLiquidationThreshold_reverts_for_unknown_token() public {
-        evm.prank(CONFIGURATOR);
-        evm.expectRevert(TokenNotAllowedException.selector);
+        vm.prank(CONFIGURATOR);
+        vm.expectRevert(TokenNotAllowedException.selector);
         creditManager.setCollateralTokenData(DUMB_ADDRESS, 8000, 8000, type(uint40).max, 0);
     }
 
@@ -2061,7 +2061,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
     //     assertTrue(creditManager.forbiddenTokenMask() != expectedForbidMask, "expectedForbidMask is already the same");
 
-    //     evm.prank(CONFIGURATOR);
+    //     vm.prank(CONFIGURATOR);
     //     creditManager.setForbidMask(expectedForbidMask);
 
     //     assertEq(creditManager.forbiddenTokenMask(), expectedForbidMask, "ForbidMask is not set correctly");
@@ -2077,36 +2077,36 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
             creditManager.adapterToContract(ADAPTER) != DUMB_ADDRESS, "adapterToContract(ADAPTER) is already the same"
         );
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
 
         assertEq(creditManager.adapterToContract(ADAPTER), DUMB_ADDRESS, "adapterToContract is not set correctly");
 
         assertEq(creditManager.contractToAdapter(DUMB_ADDRESS), ADAPTER, "adapterToContract is not set correctly");
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditManager.setContractAllowance(ADAPTER, address(0));
 
         assertEq(creditManager.adapterToContract(ADAPTER), address(0), "adapterToContract is not set correctly");
 
         assertEq(creditManager.contractToAdapter(address(0)), address(0), "adapterToContract is not set correctly");
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditManager.setContractAllowance(address(0), DUMB_ADDRESS);
 
         assertEq(creditManager.adapterToContract(address(0)), address(0), "adapterToContract is not set correctly");
 
         assertEq(creditManager.contractToAdapter(DUMB_ADDRESS), address(0), "adapterToContract is not set correctly");
 
-        // evm.prank(CONFIGURATOR);
+        // vm.prank(CONFIGURATOR);
         // creditManager.setContractAllowance(ADAPTER, UNIVERSAL_CONTRACT);
 
         // assertEq(creditManager.universalAdapter(), ADAPTER, "Universal adapter is not correctly set");
 
-        // evm.prank(CONFIGURATOR);
+        // vm.prank(CONFIGURATOR);
         // creditManager.setContractAllowance(address(0), UNIVERSAL_CONTRACT);
 
         // assertEq(creditManager.universalAdapter(), address(0), "Universal adapter is not correctly set");
@@ -2120,7 +2120,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     function test_CM_57A_setCreditFacade_updates_contract_correctly() public {
         assertTrue(creditManager.creditFacade() != DUMB_ADDRESS, "creditFacade( is already the same");
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditManager.setCreditFacade(DUMB_ADDRESS);
 
         assertEq(creditManager.creditFacade(), DUMB_ADDRESS, "creditFacade is not set correctly");
@@ -2130,7 +2130,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     function test_CM_57_setPriceOracle_updates_contract_correctly() public {
         assertTrue(address(creditManager.priceOracle()) != DUMB_ADDRESS2, "priceOracle is already the same");
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditManager.setPriceOracle(DUMB_ADDRESS2);
 
         assertEq(address(creditManager.priceOracle()), DUMB_ADDRESS2, "priceOracle is not set correctly");
@@ -2144,9 +2144,9 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     function test_CM_58_setCreditConfigurator_sets_creditConfigurator_correctly_and_emits_event() public {
         assertTrue(creditManager.creditConfigurator() != DUMB_ADDRESS, "creditConfigurator is already the same");
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
 
-        evm.expectEmit(true, false, false, false);
+        vm.expectEmit(true, false, false, false);
         emit SetCreditConfigurator(DUMB_ADDRESS);
 
         creditManager.setCreditConfigurator(DUMB_ADDRESS);
@@ -2172,23 +2172,23 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     // function test_CM_60_universal_adapter_can_call_adapter_restricted_functions() public {
     //     TargetContractMock targetMock = new TargetContractMock();
 
-    //     evm.prank(CONFIGURATOR);
+    //     vm.prank(CONFIGURATOR);
     //     creditManager.setContractAllowance(ADAPTER, UNIVERSAL_CONTRACT_ADDRESS);
 
     //     _openAccountAndTransferToCF();
 
-    //     evm.prank(ADAPTER);
+    //     vm.prank(ADAPTER);
     //     creditManager.approveCreditAccount(DUMB_ADDRESS, underlying, type(uint256).max);
 
     //     bytes memory callData = bytes("Hello");
 
-    //     evm.prank(ADAPTER);
+    //     vm.prank(ADAPTER);
     //     creditManager.executeOrder(address(targetMock), callData);
     // }
 
     /// @dev [CM-61]: setMaxEnabledToken correctly sets value
     function test_CM_61_setMaxEnabledTokens_works_correctly() public {
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditManager.setMaxEnabledTokens(255);
 
         assertEq(creditManager.maxAllowedEnabledTokenLength(), 255, "Incorrect max enabled tokens");
@@ -2198,22 +2198,22 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     // /// and the payer is not set as emergency liquidator
 
     // function test_CM_64_closeCreditAccount_reverts_when_paused_and_liquidator_not_privileged() public {
-    //     evm.prank(CONFIGURATOR);
+    //     vm.prank(CONFIGURATOR);
     //     creditManager.pause();
 
-    //     evm.expectRevert("Pausable: paused");
+    //     vm.expectRevert("Pausable: paused");
     //     // creditManager.closeCreditAccount(USER, ClosureAction.LIQUIDATE_ACCOUNT, 0, LIQUIDATOR, FRIEND, 0, false);
     // }
 
     // /// @dev [CM-65]: Emergency liquidator can't close an account instead of liquidating
 
     // function test_CM_65_closeCreditAccount_reverts_when_paused_and_liquidator_tries_to_close() public {
-    //     evm.startPrank(CONFIGURATOR);
+    //     vm.startPrank(CONFIGURATOR);
     //     creditManager.pause();
     //     creditManager.addEmergencyLiquidator(LIQUIDATOR);
-    //     evm.stopPrank();
+    //     vm.stopPrank();
 
-    //     evm.expectRevert("Pausable: paused");
+    //     vm.expectRevert("Pausable: paused");
     //     // creditManager.closeCreditAccount(USER, ClosureAction.CLOSE_ACCOUNT, 0, LIQUIDATOR, FRIEND, 0, false);
     // }
 
@@ -2225,19 +2225,19 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         uint128 delta,
         bool isIncrease
     ) public {
-        // evm.assume(borrowedAmount > 100);
-        // evm.assume(uint256(borrowedAmount) + uint256(delta) <= 2 ** 128 - 1);
+        // vm.assume(borrowedAmount > 100);
+        // vm.assume(uint256(borrowedAmount) + uint256(delta) <= 2 ** 128 - 1);
 
         // indexNow = indexNow < RAY ? indexNow + RAY : indexNow;
         // indexAtOpen = indexAtOpen < RAY ? indexAtOpen + RAY : indexNow;
 
-        // evm.assume(indexNow <= 100 * RAY);
-        // evm.assume(indexNow >= indexAtOpen);
-        // evm.assume(indexNow - indexAtOpen < 10 * RAY);
+        // vm.assume(indexNow <= 100 * RAY);
+        // vm.assume(indexNow >= indexAtOpen);
+        // vm.assume(indexNow - indexAtOpen < 10 * RAY);
 
         // uint256 interest = uint256((borrowedAmount * indexNow) / indexAtOpen - borrowedAmount);
 
-        // evm.assume(interest > 1);
+        // vm.assume(interest > 1);
 
         // if (!isIncrease && (delta > interest)) delta %= uint128(interest);
 
@@ -2279,23 +2279,23 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     //     assertTrue(!p, "Incorrect paused() value for non-paused state");
     //     assertTrue(!creditManager.emergencyLiquidation(), "Emergency liquidation true when expected false");
 
-    //     evm.prank(CONFIGURATOR);
+    //     vm.prank(CONFIGURATOR);
     //     creditManager.pause();
 
     //     p = creditManager.checkEmergencyPausable(DUMB_ADDRESS, true);
     //     assertTrue(p, "Incorrect paused() value for paused state");
     //     assertTrue(!creditManager.emergencyLiquidation(), "Emergency liquidation true when expected false");
 
-    //     evm.prank(CONFIGURATOR);
+    //     vm.prank(CONFIGURATOR);
     //     creditManager.unpause();
 
-    //     evm.prank(CONFIGURATOR);
+    //     vm.prank(CONFIGURATOR);
     //     creditManager.addEmergencyLiquidator(DUMB_ADDRESS);
     //     p = creditManager.checkEmergencyPausable(DUMB_ADDRESS, true);
     //     assertTrue(!p, "Incorrect paused() value for non-paused state");
     //     assertTrue(!creditManager.emergencyLiquidation(), "Emergency liquidation true when expected false");
 
-    //     evm.prank(CONFIGURATOR);
+    //     vm.prank(CONFIGURATOR);
     //     creditManager.pause();
 
     //     p = creditManager.checkEmergencyPausable(DUMB_ADDRESS, true);
@@ -2341,8 +2341,8 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         collateralHints[0] = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.USDT));
         collateralHints[1] = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.LINK));
 
-        evm.expectCall(tokenTestSuite.addressOf(Tokens.USDT), abi.encodeCall(IERC20.balanceOf, (creditAccount)));
-        evm.expectCall(tokenTestSuite.addressOf(Tokens.LINK), abi.encodeCall(IERC20.balanceOf, (creditAccount)));
+        vm.expectCall(tokenTestSuite.addressOf(Tokens.USDT), abi.encodeCall(IERC20.balanceOf, (creditAccount)));
+        vm.expectCall(tokenTestSuite.addressOf(Tokens.LINK), abi.encodeCall(IERC20.balanceOf, (creditAccount)));
 
         uint256 enabledTokensMap = 1 | creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.USDC))
             | creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.USDT))
@@ -2363,7 +2363,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
     function test_CM_70_fullCollateralCheck_reverts_for_illegal_mask_in_hints() public {
         (,,, address creditAccount) = _openCreditAccount();
 
-        evm.expectRevert(TokenNotAllowedException.selector);
+        vm.expectRevert(TokenNotAllowedException.selector);
 
         uint256[] memory ch = new uint256[](1);
         ch[0] = 3;
@@ -2381,7 +2381,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
         CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         cmi.setCollateralTokenData(usdc, 8500, 9000, uint40(block.timestamp), 3600 * 24 * 7);
 
         CollateralTokenData memory cd = cmi.collateralTokensDataExt(cmi.getTokenMaskOrRevert(usdc));
@@ -2412,7 +2412,7 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
 
         // uint256 timestampStart = block.timestamp;
 
-        // evm.startPrank(CONFIGURATOR);
+        // vm.startPrank(CONFIGURATOR);
         // creditManager.setCollateralTokenData(usdc, initialLT);
         // creditManager.rampLiquidationThreshold(usdc, newLT, uint40(block.timestamp), duration);
 
@@ -2431,13 +2431,13 @@ contract CreditManagerTest is DSTest, ICreditManagerV3Events, BalanceHelper {
         //     );
         // }
 
-        // evm.warp(timestampCheck);
+        // vm.warp(timestampCheck);
         // uint16 actualLT = creditManager.liquidationThresholds(usdc);
         // uint16 diff = actualLT > expectedLT ? actualLT - expectedLT : expectedLT - actualLT;
 
         // assertLe(diff, 1, "LT off by more than 1");
 
-        // evm.warp(timestampStart + duration + 1);
+        // vm.warp(timestampStart + duration + 1);
 
         // assertEq(creditManager.liquidationThresholds(usdc), newLT, "LT at ramping end incorrect");
     }

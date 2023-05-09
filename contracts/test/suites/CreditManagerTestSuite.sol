@@ -64,7 +64,7 @@ contract CreditManagerTestSuite is PoolDeployer {
 
         creditManager.setCreditConfigurator(CONFIGURATOR);
 
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
         creditManager.setCreditFacade(creditFacade);
 
         creditManager.setParams(
@@ -103,7 +103,7 @@ contract CreditManagerTestSuite is PoolDeployer {
             AccountFactoryV3(address(af)).addCreditManager(address(creditManager), 1);
         }
 
-        evm.stopPrank();
+        vm.stopPrank();
 
         // Approve USER & LIQUIDATOR to credit manager
         tokenTestSuite.approve(underlying, USER, address(creditManager));
@@ -136,7 +136,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         )
     {
         // Set up real value, which should be configired before CM would be launched
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditManager.setCollateralTokenData(
             underlying,
             uint16(PERCENTAGE_FACTOR - DEFAULT_FEE_LIQUIDATION - DEFAULT_LIQUIDATION_PREMIUM),
@@ -150,13 +150,13 @@ contract CreditManagerTestSuite is PoolDeployer {
         cumulativeIndexLastUpdate = RAY;
         poolMock.setCumulative_RAY(cumulativeIndexLastUpdate);
 
-        evm.prank(creditFacade);
+        vm.prank(creditFacade);
 
         // Existing address case
         creditAccount = creditManager.openCreditAccount(borrowedAmount, USER, false);
 
         // Increase block number cause it's forbidden to close credit account in the same block
-        evm.roll(block.number + 1);
+        vm.roll(block.number + 1);
 
         cumulativeIndexAtClose = (cumulativeIndexLastUpdate * 12) / 10;
         poolMock.setCumulative_RAY(cumulativeIndexAtClose);
@@ -165,7 +165,7 @@ contract CreditManagerTestSuite is PoolDeployer {
     function makeTokenQuoted(address token, uint16 rate, uint96 limit) external {
         require(supportsQuotas, "Test suite does not support quotas");
 
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
         gaugeMock.addQuotaToken(token, rate);
         poolQuotaKeeper.setTokenLimit(token, limit);
 
@@ -176,6 +176,6 @@ contract CreditManagerTestSuite is PoolDeployer {
 
         creditManager.setQuotedMask(limitedMask | tokenMask);
 
-        evm.stopPrank();
+        vm.stopPrank();
     }
 }

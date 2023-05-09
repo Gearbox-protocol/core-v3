@@ -19,6 +19,7 @@ import {GaugeMock} from "../mocks/pool/GaugeMock.sol";
 import {PoolQuotaKeeper} from "../../pool/PoolQuotaKeeper.sol";
 
 import "../lib/constants.sol";
+import {Test} from "forge-std/Test.sol";
 
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 
@@ -27,16 +28,9 @@ struct PoolCreditOpts {
     CreditManagerOpts creditOpts;
 }
 
-// struct CollateralTokensItem {
-//     Tokens token;
-//     uint16 liquidationThreshold;
-// }
-
 /// @title CreditManagerTestSuite
 /// @notice Deploys contract for unit testing of CreditManagerV3.sol
-contract PoolDeployer is DSTest {
-    CheatCodes evm = CheatCodes(HEVM_ADDRESS);
-
+contract PoolDeployer is Test {
     AddressProvider public addressProvider;
     GenesisFactory public gp;
     AccountFactory public af;
@@ -101,7 +95,7 @@ contract PoolDeployer is DSTest {
 
         gaugeMock = new GaugeMock(address(poolMock));
 
-        evm.label(address(gaugeMock), "Gauge");
+        vm.label(address(gaugeMock), "Gauge");
 
         poolQuotaKeeper.setGauge(address(gaugeMock));
 
@@ -110,11 +104,11 @@ contract PoolDeployer is DSTest {
         addressProvider.transferOwnership(CONFIGURATOR);
         acl.transferOwnership(CONFIGURATOR);
 
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
 
         acl.claimOwnership();
         addressProvider.claimOwnership();
 
-        evm.stopPrank();
+        vm.stopPrank();
     }
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import {
     WAD,
@@ -7,8 +7,7 @@ import {
     DEFAULT_FEE_LIQUIDATION,
     DEFAULT_LIQUIDATION_PREMIUM
 } from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-import "../lib/test.sol";
-import {CheatCodes, HEVM_ADDRESS} from "../lib/cheatCodes.sol";
+import {Test} from "forge-std/Test.sol";
 
 uint16 constant DEFAULT_UNDERLYING_LT = 10000 - DEFAULT_FEE_LIQUIDATION - DEFAULT_LIQUIDATION_PREMIUM;
 
@@ -58,16 +57,14 @@ uint256 constant WETH_EXCHANGE_AMOUNT = 3 * WAD;
 uint256 constant STETH_ACCOUNT_AMOUNT = 150 * WAD;
 uint256 constant wstETH_ACCOUNT_AMOUNT = 50 * WAD;
 
-contract Roles is DSTest {
-    CheatCodes evm = CheatCodes(HEVM_ADDRESS);
-
+contract Roles is Test {
     constructor() {
-        evm.label(USER, "USER");
-        evm.label(FRIEND, "FRIEND");
-        evm.label(LIQUIDATOR, "LIQUIDATOR");
-        evm.label(INITIAL_LP, "INITIAL_LP");
+        vm.label(USER, "USER");
+        vm.label(FRIEND, "FRIEND");
+        vm.label(LIQUIDATOR, "LIQUIDATOR");
+        vm.label(INITIAL_LP, "INITIAL_LP");
 
-        evm.label(DUMB_ADDRESS, "DUMB_ADDRESS");
-        evm.label(ADAPTER, "ADAPTER");
+        vm.label(DUMB_ADDRESS, "DUMB_ADDRESS");
+        vm.label(ADAPTER, "ADAPTER");
     }
 }

@@ -20,11 +20,12 @@ import {Tokens} from "../../config/Tokens.sol";
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
+import {Test} from "forge-std/Test.sol";
+import "forge-std/console.sol";
+
 /// @title LPPriceFeedTest
 /// @notice Designed for unit test purposes only
-contract BotListTest is IBotListEvents, DSTest {
-    CheatCodes evm = CheatCodes(HEVM_ADDRESS);
-
+contract BotListTest is Test, IBotListEvents {
     AddressProviderACLMock public addressProvider;
 
     BotList botList;
@@ -32,7 +33,7 @@ contract BotListTest is IBotListEvents, DSTest {
     TokensTestSuite tokenTestSuite;
 
     function setUp() public {
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         addressProvider = new AddressProviderACLMock();
 
         tokenTestSuite = new TokensTestSuite();
@@ -54,13 +55,13 @@ contract BotListTest is IBotListEvents, DSTest {
 
     /// @dev [BL-2]: setDAOFee works correctly
     function test_BL_02_setDAOFee_works_correctly() public {
-        evm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         botList.setDAOFee(1);
 
-        evm.expectEmit(false, false, false, true);
+        vm.expectEmit(false, false, false, true);
         emit SetBotDAOFee(15);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         botList.setDAOFee(15);
 
         assertEq(botList.daoFee(), 15, "DAO fee incorrect");
@@ -68,36 +69,36 @@ contract BotListTest is IBotListEvents, DSTest {
 
     /// @dev [BL-3]: increaseBotFunding works correctly
     function test_BL_03_increaseBotFunding_works_correctly() public {
-        evm.deal(USER, 10 ether);
+        vm.deal(USER, 10 ether);
 
-        evm.expectRevert(AmountCantBeZeroException.selector);
+        vm.expectRevert(AmountCantBeZeroException.selector);
         botList.increaseBotFunding(FRIEND);
 
-        evm.expectRevert(InvalidBotException.selector);
-        evm.prank(USER);
+        vm.expectRevert(InvalidBotException.selector);
+        vm.prank(USER);
         botList.increaseBotFunding{value: 1 ether}(FRIEND);
 
-        evm.prank(USER);
+        vm.prank(USER);
         botList.setBotPermissions(address(addressProvider), type(uint192).max);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         botList.setBotForbiddenStatus(address(addressProvider), true);
 
-        evm.expectRevert(InvalidBotException.selector);
-        evm.prank(USER);
+        vm.expectRevert(InvalidBotException.selector);
+        vm.prank(USER);
         botList.increaseBotFunding{value: 1 ether}(address(addressProvider));
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         botList.setBotForbiddenStatus(address(addressProvider), false);
 
-        evm.prank(USER);
+        vm.prank(USER);
         botList.increaseBotFunding{value: 1 ether}(address(addressProvider));
 
         (uint72 remainingFunds,,,) = botList.botFunding(USER, address(addressProvider));
 
         assertEq(remainingFunds, 1 ether, "Remaining funds incorrect");
 
-        evm.prank(USER);
+        vm.prank(USER);
         botList.increaseBotFunding{value: 1 ether}(address(addressProvider));
 
         (remainingFunds,,,) = botList.botFunding(USER, address(addressProvider));
@@ -107,15 +108,15 @@ contract BotListTest is IBotListEvents, DSTest {
 
     /// @dev [BL-4]: decreaseBotFunding works correctly
     function test_BL_04_decreaseBotFunding_works_correctly() public {
-        evm.deal(USER, 10 ether);
+        vm.deal(USER, 10 ether);
 
-        evm.prank(USER);
+        vm.prank(USER);
         botList.setBotPermissions(address(addressProvider), type(uint192).max);
 
-        evm.prank(USER);
+        vm.prank(USER);
         botList.increaseBotFunding{value: 2 ether}(address(addressProvider));
 
-        evm.prank(USER);
+        vm.prank(USER);
         botList.decreaseBotFunding(address(addressProvider), 1 ether);
 
         (uint72 remainingFunds,,,) = botList.botFunding(USER, address(addressProvider));
@@ -127,25 +128,25 @@ contract BotListTest is IBotListEvents, DSTest {
 
     /// @dev [BL-5]: setWeeklyAllowance works correctly
     function test_BL_05_setWeeklyAllowance_works_correctly() public {
-        evm.deal(USER, 10 ether);
+        vm.deal(USER, 10 ether);
 
-        evm.prank(USER);
+        vm.prank(USER);
         botList.setBotPermissions(address(addressProvider), type(uint192).max);
 
-        evm.prank(USER);
+        vm.prank(USER);
         botList.setWeeklyBotAllowance(address(addressProvider), 1 ether);
 
         (, uint72 maxWeeklyAllowance,,) = botList.botFunding(USER, address(addressProvider));
 
         assertEq(maxWeeklyAllowance, 1 ether, "Incorrect new allowance");
 
-        evm.prank(USER);
+        vm.prank(USER);
         botList.increaseBotFunding{value: 1 ether}(address(addressProvider));
 
-        evm.prank(address(addressProvider));
+        vm.prank(address(addressProvider));
         botList.pullPayment(USER, 1 ether / 10);
 
-        evm.prank(USER);
+        vm.prank(USER);
         botList.setWeeklyBotAllowance(address(addressProvider), 1 ether / 2);
 
         uint72 remainingWeeklyAllowance;
@@ -159,18 +160,18 @@ contract BotListTest is IBotListEvents, DSTest {
 
     /// @dev [BL-6]: pullPayment works correctly
     function test_BL_06_pullPayment_works_correctly() public {
-        evm.deal(USER, 10 ether);
+        vm.deal(USER, 10 ether);
 
-        evm.prank(USER);
+        vm.prank(USER);
         botList.setBotPermissions(address(addressProvider), type(uint192).max);
 
-        evm.prank(USER);
+        vm.prank(USER);
         botList.setWeeklyBotAllowance(address(addressProvider), 1 ether);
 
-        evm.prank(USER);
+        vm.prank(USER);
         botList.increaseBotFunding{value: 2 ether}(address(addressProvider));
 
-        evm.prank(address(addressProvider));
+        vm.prank(address(addressProvider));
         botList.pullPayment(USER, 1 ether / 10);
 
         (uint72 remainingFunds,, uint72 remainingWeeklyAllowance,) = botList.botFunding(USER, address(addressProvider));
@@ -181,10 +182,10 @@ contract BotListTest is IBotListEvents, DSTest {
 
         assertEq(address(addressProvider).balance, 1 ether / 10, "Incorrect amount sent to bot");
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         botList.setDAOFee(10000);
 
-        evm.prank(address(addressProvider));
+        vm.prank(address(addressProvider));
         botList.pullPayment(USER, 1 ether / 10);
 
         (remainingFunds,, remainingWeeklyAllowance,) = botList.botFunding(USER, address(addressProvider));

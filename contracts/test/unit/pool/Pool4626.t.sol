@@ -36,11 +36,12 @@ import {ERC20FeeMock} from "../../mocks/token/ERC20FeeMock.sol";
 import {PoolQuotaKeeper} from "../../../pool/PoolQuotaKeeper.sol";
 
 // TEST
+import {Test} from "forge-std/Test.sol";
+import "forge-std/console.sol";
+
 import "../../lib/constants.sol";
 import "../../lib/StringUtils.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
-
-import "forge-std/console.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
@@ -49,11 +50,9 @@ uint256 constant fee = 6000;
 
 /// @title pool
 /// @notice Business logic for borrowing liquidity pools
-contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events {
+contract Pool4626Test is Test, BalanceHelper, IPool4626Events, IERC4626Events {
     using Math for uint256;
     using StringUtils for string;
-
-    CheatCodes evm = CheatCodes(HEVM_ADDRESS);
 
     PoolServiceTestSuite psts;
     PoolQuotaKeeper pqk;
@@ -117,12 +116,12 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
         if (utilisation > 0) _borrowToUtilisation(utilisation);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         pool.setWithdrawFee(withdrawFee);
     }
 
     function _connectAndSetLimit() internal {
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         pool.setCreditManagerLimit(address(cmMock), type(uint128).max);
     }
 
@@ -141,7 +140,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
     }
 
     function _updateBorrowrate() internal {
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         pool.updateInterestRateModel(address(irm));
     }
 
@@ -152,10 +151,10 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
     function _initPoolLiquidity(uint256 availableLiquidity, uint256 dieselRate) internal {
         assertEq(pool.convertToAssets(RAY), RAY, "Incorrect diesel rate!");
 
-        evm.prank(INITIAL_LP);
+        vm.prank(INITIAL_LP);
         pool.mint(availableLiquidity, INITIAL_LP);
 
-        evm.prank(INITIAL_LP);
+        vm.prank(INITIAL_LP);
         pool.burn((availableLiquidity * (dieselRate - RAY)) / dieselRate);
 
         // assertEq(pool.expectedLiquidityLU(), availableLiquidity * dieselRate / RAY, "ExpectedLU is not correct!");
@@ -194,7 +193,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
     // [P4-2]: constructor reverts for zero addresses
     function test_P4_02_constructor_reverts_for_zero_addresses() public {
-        evm.expectRevert(ZeroAddressException.selector);
+        vm.expectRevert(ZeroAddressException.selector);
         new Pool4626({
             _addressProvider: address(0),
             _underlyingToken: underlying,
@@ -206,7 +205,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         // opts.addressProvider = address(psts.addressProvider());
         // opts.interestRateModel = address(0);
 
-        evm.expectRevert(ZeroAddressException.selector);
+        vm.expectRevert(ZeroAddressException.selector);
         new Pool4626({
               _addressProvider:address(psts.addressProvider()),
             _underlyingToken: underlying,
@@ -218,7 +217,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         // opts.interestRateModel = address(psts.linearIRModel());
         // opts.underlyingToken = address(0);
 
-        evm.expectRevert(ZeroAddressException.selector);
+        vm.expectRevert(ZeroAddressException.selector);
         new Pool4626({
             _addressProvider: address(psts.addressProvider()),
             _underlyingToken: address(0),
@@ -232,13 +231,13 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
     function test_P4_03_constructor_emits_events() public {
         uint256 limit = 15890;
 
-        evm.expectEmit(true, false, false, false);
+        vm.expectEmit(true, false, false, false);
         emit SetInterestRateModel(address(psts.linearIRModel()));
 
-        evm.expectEmit(true, false, false, true);
+        vm.expectEmit(true, false, false, true);
         emit SetExpectedLiquidityLimit(limit);
 
-        evm.expectEmit(false, false, false, true);
+        vm.expectEmit(false, false, false, true);
         emit SetTotalBorrowedLimit(limit);
 
         new Pool4626({
@@ -252,35 +251,35 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
     // [P4-4]: addLiquidity, removeLiquidity, lendCreditAccount, repayCreditAccount reverts if contract is paused
     function test_P4_04_cannot_be_used_while_paused() public {
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
         acl.addPausableAdmin(CONFIGURATOR);
         pool.pause();
-        evm.stopPrank();
+        vm.stopPrank();
 
-        evm.startPrank(USER);
+        vm.startPrank(USER);
 
-        evm.expectRevert(bytes(PAUSABLE_ERROR));
+        vm.expectRevert(bytes(PAUSABLE_ERROR));
         pool.deposit(addLiquidity, FRIEND);
 
-        evm.expectRevert(bytes(PAUSABLE_ERROR));
+        vm.expectRevert(bytes(PAUSABLE_ERROR));
         pool.depositReferral(addLiquidity, FRIEND, referral);
 
-        evm.expectRevert(bytes(PAUSABLE_ERROR));
+        vm.expectRevert(bytes(PAUSABLE_ERROR));
         pool.mint(addLiquidity, FRIEND);
 
-        evm.expectRevert(bytes(PAUSABLE_ERROR));
+        vm.expectRevert(bytes(PAUSABLE_ERROR));
         pool.withdraw(removeLiquidity, FRIEND, FRIEND);
 
-        evm.expectRevert(bytes(PAUSABLE_ERROR));
+        vm.expectRevert(bytes(PAUSABLE_ERROR));
         pool.redeem(removeLiquidity, FRIEND, FRIEND);
 
-        evm.expectRevert(bytes(PAUSABLE_ERROR));
+        vm.expectRevert(bytes(PAUSABLE_ERROR));
         pool.lendCreditAccount(1, FRIEND);
 
-        evm.expectRevert(bytes(PAUSABLE_ERROR));
+        vm.expectRevert(bytes(PAUSABLE_ERROR));
         pool.repayCreditAccount(1, 0, 0);
 
-        evm.stopPrank();
+        vm.stopPrank();
     }
 
     struct DepositTestCase {
@@ -362,18 +361,18 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                     false
                 );
 
-                evm.expectEmit(true, true, false, true);
+                vm.expectEmit(true, true, false, true);
                 emit Transfer(address(0), FRIEND, testCase.expectedShares);
 
-                evm.expectEmit(true, true, false, true);
+                vm.expectEmit(true, true, false, true);
                 emit Deposit(USER, FRIEND, testCase.amountToDeposit, testCase.expectedShares);
 
                 if (withReferralCode) {
-                    evm.expectEmit(true, true, false, true);
+                    vm.expectEmit(true, true, false, true);
                     emit DepositWithReferral(USER, FRIEND, testCase.amountToDeposit, referral);
                 }
 
-                evm.prank(USER);
+                vm.prank(USER);
                 uint256 shares = withReferralCode
                     ? pool.depositReferral(testCase.amountToDeposit, FRIEND, referral)
                     : pool.deposit(testCase.amountToDeposit, FRIEND);
@@ -482,13 +481,13 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                 false
             );
 
-            evm.expectEmit(true, true, false, true);
+            vm.expectEmit(true, true, false, true);
             emit Transfer(address(0), FRIEND, testCase.desiredShares);
 
-            evm.expectEmit(true, true, false, true);
+            vm.expectEmit(true, true, false, true);
             emit Deposit(USER, FRIEND, testCase.expectedAssetsWithdrawal, testCase.desiredShares);
 
-            evm.prank(USER);
+            vm.prank(USER);
             uint256 assets = pool.mint(testCase.desiredShares, FRIEND);
 
             expectBalance(
@@ -532,7 +531,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
                 _setUpTestCase(asset, feeToken ? 60_00 : 0, 50_00, addLiquidity, 2 * RAY, 0, false);
 
-                evm.prank(CONFIGURATOR);
+                vm.prank(CONFIGURATOR);
                 pool.setExpectedLiquidityLimit(1237882323 * WAD);
 
                 uint256 assetsToReachLimit = pool.expectedLiquidityLimit() - pool.expectedLiquidity();
@@ -547,11 +546,11 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
                 if (j == 0) {
                     // DEPOSIT CASE
-                    evm.prank(USER);
+                    vm.prank(USER);
                     pool.deposit(assetsToReachLimit, FRIEND);
                 } else {
                     // MINT CASE
-                    evm.prank(USER);
+                    vm.prank(USER);
                     pool.mint(sharesToReachLimit, FRIEND);
                 }
             }
@@ -691,19 +690,19 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                     false
                 );
 
-                evm.prank(USER);
+                vm.prank(USER);
                 pool.mint(testCase.sharesToMint, FRIEND);
 
-                evm.prank(FRIEND);
+                vm.prank(FRIEND);
                 pool.approve(USER, approveCase == 0 ? testCase.expectedSharesBurnt + 1 : type(uint256).max);
 
-                evm.expectEmit(true, true, false, true);
+                vm.expectEmit(true, true, false, true);
                 emit Transfer(FRIEND, address(0), testCase.expectedSharesBurnt);
 
-                evm.expectEmit(true, true, false, true);
+                vm.expectEmit(true, true, false, true);
                 emit Withdraw(USER, FRIEND2, FRIEND, testCase.assetsToWithdraw, testCase.expectedSharesBurnt);
 
-                evm.prank(USER);
+                vm.prank(USER);
                 uint256 shares = pool.withdraw(testCase.assetsToWithdraw, FRIEND2, FRIEND);
 
                 expectBalance(
@@ -889,19 +888,19 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                     false
                 );
 
-                evm.prank(USER);
+                vm.prank(USER);
                 pool.mint(testCase.sharesToMint, FRIEND);
 
-                evm.prank(FRIEND);
+                vm.prank(FRIEND);
                 pool.approve(USER, approveCase == 0 ? testCase.sharesToRedeem + 1 : type(uint256).max);
 
-                evm.expectEmit(true, true, false, true);
+                vm.expectEmit(true, true, false, true);
                 emit Transfer(FRIEND, address(0), testCase.sharesToRedeem);
 
-                evm.expectEmit(true, true, false, true);
+                vm.expectEmit(true, true, false, true);
                 emit Withdraw(USER, FRIEND2, FRIEND, testCase.expectedAssetsDelivered, testCase.sharesToRedeem);
 
-                evm.prank(USER);
+                vm.prank(USER);
                 uint256 assets = pool.redeem(testCase.sharesToRedeem, FRIEND2, FRIEND);
 
                 expectBalance(
@@ -959,7 +958,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
     function test_P4_10_burn_works_as_expected() public {
         _setUpTestCase(Tokens.DAI, 0, 50_00, addLiquidity, 2 * RAY, 0, false);
 
-        evm.prank(USER);
+        vm.prank(USER);
         pool.mint(addLiquidity, USER);
 
         expectBalance(address(pool), USER, addLiquidity, "SETUP: Incorrect USER balance");
@@ -972,7 +971,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         uint256 availableLiquidity = pool.availableLiquidity();
         uint256 expectedLiquidity = pool.expectedLiquidity();
 
-        evm.prank(USER);
+        vm.prank(USER);
         pool.burn(addLiquidity / 4);
 
         expectBalance(address(pool), USER, (addLiquidity * 3) / 4, "Incorrect USER balance");
@@ -1001,10 +1000,10 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         uint256 availableLiquidityBefore = pool.availableLiquidity();
         uint256 expectedLiquidityBefore = pool.expectedLiquidity();
 
-        evm.expectEmit(true, true, false, true);
+        vm.expectEmit(true, true, false, true);
         emit Transfer(address(pool), creditAccount, borrowAmount);
 
-        evm.expectEmit(true, true, false, true);
+        vm.expectEmit(true, true, false, true);
         emit Borrow(address(cmMock), creditAccount, borrowAmount);
 
         cmMock.lendCreditAccount(borrowAmount, creditAccount);
@@ -1028,23 +1027,23 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
         _setUpTestCase(Tokens.DAI, 0, 0, addLiquidity, 2 * RAY, 0, false);
 
-        evm.expectRevert(CreditManagerCantBorrowException.selector);
+        vm.expectRevert(CreditManagerCantBorrowException.selector);
         cmMock.lendCreditAccount(0, creditAccount);
 
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
         pool.setCreditManagerLimit(address(cmMock), type(uint128).max);
         pool.setTotalBorrowedLimit(addLiquidity);
-        evm.stopPrank();
+        vm.stopPrank();
 
-        evm.expectRevert(CreditManagerCantBorrowException.selector);
+        vm.expectRevert(CreditManagerCantBorrowException.selector);
         cmMock.lendCreditAccount(addLiquidity + 1, creditAccount);
 
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
         pool.setCreditManagerLimit(address(cmMock), addLiquidity);
         pool.setTotalBorrowedLimit(type(uint128).max);
-        evm.stopPrank();
+        vm.stopPrank();
 
-        evm.expectRevert(CreditManagerCantBorrowException.selector);
+        vm.expectRevert(CreditManagerCantBorrowException.selector);
         cmMock.lendCreditAccount(addLiquidity + 1, creditAccount);
     }
 
@@ -1057,14 +1056,14 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         _setUpTestCase(Tokens.DAI, 0, 0, addLiquidity, 2 * RAY, 0, false);
 
         /// Case for unknown CM
-        evm.expectRevert(CallerNotCreditManagerException.selector);
-        evm.prank(USER);
+        vm.expectRevert(CallerNotCreditManagerException.selector);
+        vm.prank(USER);
         pool.repayCreditAccount(1, 0, 0);
 
         /// Case for CM with zero debt
         assertEq(pool.creditManagerBorrowed(address(cmMock)), 0, "SETUP: Incorrect CM limit");
 
-        evm.expectRevert(CallerNotCreditManagerException.selector);
+        vm.expectRevert(CallerNotCreditManagerException.selector);
         cmMock.repayCreditAccount(1, 0, 0);
     }
 
@@ -1232,7 +1231,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
             address treasury = pool.treasury();
 
-            evm.prank(INITIAL_LP);
+            vm.prank(INITIAL_LP);
             pool.transfer(treasury, testCase.sharesInTreasury);
 
             cmMock.lendCreditAccount(testCase.borrowBefore, creditAccount);
@@ -1240,16 +1239,16 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
             assertEq(pool.totalBorrowed(), testCase.borrowBefore, "SETUP: incorrect totalBorrowed");
             assertEq(pool.creditManagerBorrowed(address(cmMock)), testCase.borrowBefore, "SETUP: Incorrect CM limit");
 
-            evm.startPrank(creditAccount);
+            vm.startPrank(creditAccount);
             IERC20(pool.asset()).transfer(address(pool), testCase.borrowAmount + testCase.profit - testCase.loss);
-            evm.stopPrank();
+            vm.stopPrank();
 
             if (testCase.uncoveredLoss > 0) {
-                evm.expectEmit(true, false, false, true);
+                vm.expectEmit(true, false, false, true);
                 emit ReceiveUncoveredLoss(address(cmMock), testCase.uncoveredLoss);
             }
 
-            evm.expectEmit(true, true, false, true);
+            vm.expectEmit(true, true, false, true);
             emit Repay(address(cmMock), testCase.borrowAmount, testCase.profit, testCase.loss);
 
             uint256 dieselRate = pool.convertToAssets(RAY);
@@ -1306,7 +1305,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
         uint256 timeWarp = 180 days;
 
-        evm.warp(block.timestamp + timeWarp);
+        vm.warp(block.timestamp + timeWarp);
 
         uint256 borrowRate = pool.borrowRate();
 
@@ -1325,7 +1324,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
             _setUpTestCase(Tokens.DAI, 0, 50_00, addLiquidity, 2 * RAY, 0, supportQuotas);
 
             if (supportQuotas) {
-                evm.startPrank(CONFIGURATOR);
+                vm.startPrank(CONFIGURATOR);
                 psts.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 100_00);
 
                 pqk.addCreditManager(address(cmMock));
@@ -1342,13 +1341,13 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
                 psts.gaugeMock().updateEpoch();
 
-                evm.stopPrank();
+                vm.stopPrank();
             }
 
             uint256 borrowRate = pool.borrowRate();
             uint256 timeWarp = 365 days;
 
-            evm.warp(block.timestamp + timeWarp);
+            vm.warp(block.timestamp + timeWarp);
 
             uint256 expectedInterest = ((addLiquidity / 2) * borrowRate) / RAY;
             uint256 expectedLiquidity = addLiquidity + expectedInterest + (supportQuotas ? quotaInterestPerYear : 0);
@@ -1401,7 +1400,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         assertEq(pool.quotaRevenue(), 0, "SETUP: Incorrect quotaRevenue");
         assertEq(pool.expectedLiquidityLU(), 0, "SETUP: Incorrect expectedLiquidityLU");
 
-        evm.prank(POOL_QUOTA_KEEPER);
+        vm.prank(POOL_QUOTA_KEEPER);
         pool.updateQuotaRevenue(qu1);
 
         assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "#1: Incorrect lastQuotaRevenuUpdate");
@@ -1411,11 +1410,11 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
         uint256 year = 365 days;
 
-        evm.warp(block.timestamp + year);
+        vm.warp(block.timestamp + year);
 
         uint96 qu2 = uint96(WAD * 15);
 
-        evm.prank(POOL_QUOTA_KEEPER);
+        vm.prank(POOL_QUOTA_KEEPER);
         pool.updateQuotaRevenue(qu2);
 
         assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "#2: Incorrect lastQuotaRevenuUpdate");
@@ -1423,11 +1422,11 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
         assertEq(pool.expectedLiquidityLU(), qu1 / PERCENTAGE_FACTOR, "#2: Incorrect expectedLiquidityLU");
 
-        evm.warp(block.timestamp + year);
+        vm.warp(block.timestamp + year);
 
         uint96 dqu = uint96(WAD * 5);
 
-        evm.prank(POOL_QUOTA_KEEPER);
+        vm.prank(POOL_QUOTA_KEEPER);
         pool.changeQuotaRevenue(-int96(dqu));
 
         assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "#3: Incorrect lastQuotaRevenuUpdate");
@@ -1438,34 +1437,34 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
     // [P4-18]: connectCreditManager, forbidCreditManagerToBorrow, newInterestRateModel, setExpecetedLiquidityLimit reverts if called with non-configurator
     function test_P4_18_admin_functions_revert_on_non_admin() public {
-        evm.startPrank(USER);
+        vm.startPrank(USER);
 
-        evm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerException.selector);
         pool.setCreditManagerLimit(DUMB_ADDRESS, 1);
 
-        evm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         pool.updateInterestRateModel(DUMB_ADDRESS);
 
-        evm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         pool.connectPoolQuotaManager(DUMB_ADDRESS);
 
-        evm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerException.selector);
         pool.setExpectedLiquidityLimit(0);
 
-        evm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerException.selector);
         pool.setTotalBorrowedLimit(0);
 
-        evm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerException.selector);
         pool.setWithdrawFee(0);
 
-        evm.stopPrank();
+        vm.stopPrank();
     }
 
     // [P4-19]: setCreditManagerLimit reverts if not in register
     function test_P4_19_connectCreditManager_reverts_if_not_in_register() public {
-        evm.expectRevert(RegisteredCreditManagerOnlyException.selector);
+        vm.expectRevert(RegisteredCreditManagerOnlyException.selector);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         pool.setCreditManagerLimit(DUMB_ADDRESS, 1);
     }
 
@@ -1473,9 +1472,9 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
     function test_P4_20_connectCreditManager_fails_on_incompatible_CM() public {
         cmMock.changePoolService(DUMB_ADDRESS);
 
-        evm.expectRevert(IncompatibleCreditManagerException.selector);
+        vm.expectRevert(IncompatibleCreditManagerException.selector);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         pool.setCreditManagerLimit(address(cmMock), 1);
     }
 
@@ -1484,13 +1483,13 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         address[] memory cms = pool.creditManagers();
         assertEq(cms.length, 0, "Credit manager is already connected!");
 
-        evm.expectEmit(true, true, false, false);
+        vm.expectEmit(true, true, false, false);
         emit AddCreditManager(address(cmMock));
 
-        evm.expectEmit(true, true, false, true);
+        vm.expectEmit(true, true, false, true);
         emit BorrowLimitChanged(address(cmMock), 230);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         pool.setCreditManagerLimit(address(cmMock), 230);
 
         cms = pool.creditManagers();
@@ -1499,10 +1498,10 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
         assertEq(pool.creditManagerLimit(address(cmMock)), 230, "#1: Incorrect CM limit");
 
-        evm.expectEmit(true, true, false, true);
+        vm.expectEmit(true, true, false, true);
         emit BorrowLimitChanged(address(cmMock), 150);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         pool.setCreditManagerLimit(address(cmMock), 150);
 
         cms = pool.creditManagers();
@@ -1510,7 +1509,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
         assertEq(cms[0], address(cmMock), "#2: Credit manager is not connected!");
         assertEq(pool.creditManagerLimit(address(cmMock)), 150, "#2: Incorrect CM limit");
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         pool.setCreditManagerLimit(address(cmMock), type(uint256).max);
 
         assertEq(pool.creditManagerLimit(address(cmMock)), type(uint256).max, "#3: Incorrect CM limit");
@@ -1533,17 +1532,17 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
             false
         );
 
-        evm.expectEmit(true, false, false, false);
+        vm.expectEmit(true, false, false, false);
         emit SetInterestRateModel(address(newIR));
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         pool.updateInterestRateModel(address(newIR));
 
         assertEq(address(pool.interestRateModel()), address(newIR), "Interest rate model was not set correctly");
 
         // Add elUpdate
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         pool.updateInterestRateModel(address(newIR));
 
         assertEq(
@@ -1566,31 +1565,31 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
         address POOL_QUOTA_KEEPER = address(pqk);
 
-        evm.expectEmit(true, true, false, false);
+        vm.expectEmit(true, true, false, false);
         emit SetPoolQuotaKeeper(POOL_QUOTA_KEEPER);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         pool.connectPoolQuotaManager(POOL_QUOTA_KEEPER);
 
         uint96 qu = uint96(WAD * 10);
 
         assertEq(pool.poolQuotaKeeper(), POOL_QUOTA_KEEPER, "Incorrect Pool QuotaKeeper");
 
-        evm.prank(POOL_QUOTA_KEEPER);
+        vm.prank(POOL_QUOTA_KEEPER);
         pool.updateQuotaRevenue(qu);
 
         uint256 year = 365 days;
 
-        evm.warp(block.timestamp + year);
+        vm.warp(block.timestamp + year);
 
         PoolQuotaKeeper pqk2 = new PoolQuotaKeeper(address(pool));
 
         address POOL_QUOTA_KEEPER2 = address(pqk2);
 
-        evm.expectEmit(true, true, false, false);
+        vm.expectEmit(true, true, false, false);
         emit SetPoolQuotaKeeper(POOL_QUOTA_KEEPER2);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         pool.connectPoolQuotaManager(POOL_QUOTA_KEEPER2);
 
         assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "Incorrect lastQuotaRevenuUpdate");
@@ -1601,10 +1600,10 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
     // [P4-24]: setExpectedLiquidityLimit() sets limit & emits event
     function test_P4_24_setExpectedLiquidityLimit_correct_and_emits_event() public {
-        evm.expectEmit(false, false, false, true);
+        vm.expectEmit(false, false, false, true);
         emit SetExpectedLiquidityLimit(10005);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         pool.setExpectedLiquidityLimit(10005);
 
         assertEq(pool.expectedLiquidityLimit(), 10005, "expectedLiquidityLimit not set correctly");
@@ -1612,10 +1611,10 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
     // [P4-25]: setTotalBorrowedLimit sets limit & emits event
     function test_P4_25_setTotalBorrowedLimit_correct_and_emits_event() public {
-        evm.expectEmit(false, false, false, true);
+        vm.expectEmit(false, false, false, true);
         emit SetTotalBorrowedLimit(10005);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         pool.setTotalBorrowedLimit(10005);
 
         assertEq(pool.totalBorrowedLimit(), 10005, "totalBorrowedLimit not set correctly");
@@ -1623,15 +1622,15 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
     // [P4-26]: setWithdrawFee works correctly
     function test_P4_26_setWithdrawFee_works_correctly() public {
-        evm.expectRevert(IncorrectParameterException.selector);
+        vm.expectRevert(IncorrectParameterException.selector);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         pool.setWithdrawFee(101);
 
-        evm.expectEmit(false, false, false, true);
+        vm.expectEmit(false, false, false, true);
         emit SetWithdrawFee(50);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         pool.setWithdrawFee(50);
 
         assertEq(pool.withdrawFee(), 50, "withdrawFee not set correctly");
@@ -1738,7 +1737,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                     address(pool)
                 );
 
-            evm.startPrank(CONFIGURATOR);
+            vm.startPrank(CONFIGURATOR);
             psts.cr().addCreditManager(address(cmMock2));
 
             pool.updateInterestRateModel(address(newIR));
@@ -1753,7 +1752,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
             pool.setCreditManagerLimit(address(cmMock2), testCase.cmBorrowLimit);
 
-            evm.stopPrank();
+            vm.stopPrank();
 
             assertEq(
                 pool.creditManagerCanBorrow(address(cmMock2)),
@@ -1838,13 +1837,13 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
             if (supportQuotas) {
                 address POOL_QUOTA_KEEPER = address(pqk);
 
-                evm.prank(CONFIGURATOR);
+                vm.prank(CONFIGURATOR);
                 pool.connectPoolQuotaManager(POOL_QUOTA_KEEPER);
 
-                evm.prank(CONFIGURATOR);
+                vm.prank(CONFIGURATOR);
                 pool.connectPoolQuotaManager(POOL_QUOTA_KEEPER);
 
-                evm.prank(POOL_QUOTA_KEEPER);
+                vm.prank(POOL_QUOTA_KEEPER);
                 pool.updateQuotaRevenue(testCase.quotaRevenue);
             }
 
@@ -1856,7 +1855,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
                 uint256 depositAmount = addLiquidity / 10;
                 uint256 sharesGot = pool.previewDeposit(depositAmount);
 
-                evm.warp(block.timestamp + 365 days);
+                vm.warp(block.timestamp + 365 days);
 
                 uint256 depositInAYear = pool.previewRedeem(sharesGot);
 
@@ -1879,7 +1878,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
     // function test_PX_23_diesel_conversion_is_correct() public {
     //     _connectAndSetLimit();
 
-    //     evm.prank(USER);
+    //     vm.prank(USER);
     //     pool.deposit(addLiquidity, USER);
 
     //     address ca = cmMock.getCreditAccountOrRevert(DUMB_ADDRESS);
@@ -1888,7 +1887,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
     //     uint256 timeWarp = 365 days;
 
-    //     evm.warp(block.timestamp + timeWarp);
+    //     vm.warp(block.timestamp + timeWarp);
 
     //     uint256 dieselRate = pool.getDieselRate_RAY();
 
@@ -1905,7 +1904,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
     // function test_PX_28_expectedLiquidity_correct() public {
     //     _connectAndSetLimit();
 
-    //     evm.prank(USER);
+    //     vm.prank(USER);
     //     pool.deposit(addLiquidity, USER);
 
     //     address ca = cmMock.getCreditAccountOrRevert(DUMB_ADDRESS);
@@ -1915,7 +1914,7 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
     //     uint256 borrowRate = pool.borrowRate();
     //     uint256 timeWarp = 365 days;
 
-    //     evm.warp(block.timestamp + timeWarp);
+    //     vm.warp(block.timestamp + timeWarp);
 
     //     uint256 expectedInterest = ((addLiquidity / 2) * borrowRate) / RAY;
     //     uint256 expectedLiquidity = pool.expectedLiquidityLU() + expectedInterest;
@@ -1925,8 +1924,8 @@ contract Pool4626Test is DSTest, BalanceHelper, IPool4626Events, IERC4626Events 
 
     // // [P4-35]: updateInterestRateModel reverts on zero address
     // function test_PX_35_updateInterestRateModel_reverts_on_zero_address() public {
-    //     evm.expectRevert(ZeroAddressException.selector);
-    //     evm.prank(CONFIGURATOR);
+    //     vm.expectRevert(ZeroAddressException.selector);
+    //     vm.prank(CONFIGURATOR);
     //     pool.updateInterestRateModel(address(0));
     // }
 }

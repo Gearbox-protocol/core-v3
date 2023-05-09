@@ -51,6 +51,7 @@ import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
 import {Tokens} from "../config/Tokens.sol";
 import {CreditFacadeTestSuite} from "../suites/CreditFacadeTestSuite.sol";
 import {CreditConfig} from "../config/CreditConfig.sol";
+import {Test} from "forge-std/Test.sol";
 
 uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
 uint16 constant REFERRAL_CODE = 23;
@@ -58,7 +59,7 @@ uint16 constant REFERRAL_CODE = 23;
 /// @title CreditFacadeTest
 /// @notice Designed for unit test purposes only
 contract CreditFacadeGasTest is
-    DSTest,
+    Test,
     BalanceHelper,
     CreditFacadeTestHelper,
     ICreditManagerV3Events,
@@ -105,11 +106,11 @@ contract CreditFacadeGasTest is
             address(targetMock)
         );
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditConfigurator.allowContract(address(targetMock), address(adapterMock));
 
-        evm.label(address(adapterMock), "AdapterMock");
-        evm.label(address(targetMock), "TargetContractMock");
+        vm.label(address(adapterMock), "AdapterMock");
+        vm.label(address(targetMock), "TargetContractMock");
     }
 
     function _zeroAllLTs() internal {
@@ -118,7 +119,7 @@ contract CreditFacadeGasTest is
         for (uint256 i = 0; i < collateralTokensCount; ++i) {
             (address token,) = creditManager.collateralTokens(i);
 
-            evm.prank(address(creditConfigurator));
+            vm.prank(address(creditConfigurator));
             CreditManagerV3(address(creditManager)).setCollateralTokenData(token, 0, 0, type(uint40).max, 0);
         }
     }
@@ -144,7 +145,7 @@ contract CreditFacadeGasTest is
 
         uint256 gasBefore = gasleft();
 
-        evm.prank(USER);
+        vm.prank(USER);
         creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         uint256 gasSpent = gasBefore - gasleft();
@@ -176,7 +177,7 @@ contract CreditFacadeGasTest is
 
         uint256 gasBefore = gasleft();
 
-        evm.prank(USER);
+        vm.prank(USER);
         creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         uint256 gasSpent = gasBefore - gasleft();
@@ -218,7 +219,7 @@ contract CreditFacadeGasTest is
 
         uint256 gasBefore = gasleft();
 
-        evm.prank(USER);
+        vm.prank(USER);
         creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         uint256 gasSpent = gasBefore - gasleft();
@@ -231,7 +232,7 @@ contract CreditFacadeGasTest is
 
     /// @dev [G-FA-5]: openCreditAccount with adding quoted collateral and updating quota
     function test_G_FA_05_openCreditAccountMulticall_gas_estimate_4() public {
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
         cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
         cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
         cft.gaugeMock().updateEpoch();
@@ -246,7 +247,7 @@ contract CreditFacadeGasTest is
         cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.WETH), type(uint96).max);
         cft.gaugeMock().updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.WETH));
-        evm.stopPrank();
+        vm.stopPrank();
 
         tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
         tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
@@ -286,7 +287,7 @@ contract CreditFacadeGasTest is
 
         uint256 gasBefore = gasleft();
 
-        evm.prank(USER);
+        vm.prank(USER);
         creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         uint256 gasSpent = gasBefore - gasleft();
@@ -297,12 +298,12 @@ contract CreditFacadeGasTest is
 
     /// @dev [G-FA-6]: openCreditAccount with swapping and updating quota
     function test_G_FA_06_openCreditAccountMulticall_gas_estimate_5() public {
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
         cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
         cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
         cft.gaugeMock().updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
-        evm.stopPrank();
+        vm.stopPrank();
 
         tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
         tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
@@ -334,7 +335,7 @@ contract CreditFacadeGasTest is
 
         uint256 gasBefore = gasleft();
 
-        evm.prank(USER);
+        vm.prank(USER);
         creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         uint256 gasSpent = gasBefore - gasleft();
@@ -358,7 +359,7 @@ contract CreditFacadeGasTest is
                 )
         });
 
-        evm.prank(USER);
+        vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         calls[0] = MultiCall({
@@ -368,7 +369,7 @@ contract CreditFacadeGasTest is
 
         uint256 gasBefore = gasleft();
 
-        evm.prank(USER);
+        vm.prank(USER);
         creditFacade.multicall(creditAccount, calls);
 
         uint256 gasSpent = gasBefore - gasleft();
@@ -390,7 +391,7 @@ contract CreditFacadeGasTest is
                 )
         });
 
-        evm.prank(USER);
+        vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         calls[0] = MultiCall({
@@ -400,7 +401,7 @@ contract CreditFacadeGasTest is
 
         uint256 gasBefore = gasleft();
 
-        evm.prank(USER);
+        vm.prank(USER);
         creditFacade.multicall(creditAccount, calls);
 
         uint256 gasSpent = gasBefore - gasleft();
@@ -411,12 +412,12 @@ contract CreditFacadeGasTest is
 
     /// @dev [G-FA-9]: multicall with decreaseDebt and active quota interest
     function test_G_FA_09_decreaseDebt_gas_estimate_2() public {
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
         cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
         cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
         cft.gaugeMock().updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
-        evm.stopPrank();
+        vm.stopPrank();
 
         tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
         tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
@@ -438,10 +439,10 @@ contract CreditFacadeGasTest is
                 )
         });
 
-        evm.prank(USER);
+        vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
-        evm.warp(block.timestamp + 30 days);
+        vm.warp(block.timestamp + 30 days);
 
         calls[0] = MultiCall({
             target: address(creditFacade),
@@ -450,7 +451,7 @@ contract CreditFacadeGasTest is
 
         uint256 gasBefore = gasleft();
 
-        evm.prank(USER);
+        vm.prank(USER);
         creditFacade.multicall(creditAccount, calls);
 
         uint256 gasSpent = gasBefore - gasleft();
@@ -472,7 +473,7 @@ contract CreditFacadeGasTest is
                 )
         });
 
-        evm.prank(USER);
+        vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         calls[0] = MultiCall({
@@ -482,7 +483,7 @@ contract CreditFacadeGasTest is
 
         uint256 gasBefore = gasleft();
 
-        evm.prank(USER);
+        vm.prank(USER);
         creditFacade.multicall(creditAccount, calls);
 
         uint256 gasSpent = gasBefore - gasleft();
@@ -509,7 +510,7 @@ contract CreditFacadeGasTest is
             callData: abi.encodeCall(ICreditFacadeMulticall.enableToken, (tokenTestSuite.addressOf(Tokens.LINK)))
         });
 
-        evm.prank(USER);
+        vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         calls[0] = MultiCall({
@@ -519,7 +520,7 @@ contract CreditFacadeGasTest is
 
         uint256 gasBefore = gasleft();
 
-        evm.prank(USER);
+        vm.prank(USER);
         creditFacade.multicall(creditAccount, calls);
 
         uint256 gasSpent = gasBefore - gasleft();
@@ -541,7 +542,7 @@ contract CreditFacadeGasTest is
                 )
         });
 
-        evm.prank(USER);
+        vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         calls[0] = MultiCall({
@@ -554,7 +555,7 @@ contract CreditFacadeGasTest is
 
         uint256 gasBefore = gasleft();
 
-        evm.prank(USER);
+        vm.prank(USER);
         creditFacade.multicall(creditAccount, calls);
 
         uint256 gasSpent = gasBefore - gasleft();
@@ -576,7 +577,7 @@ contract CreditFacadeGasTest is
                 )
         });
 
-        evm.prank(USER);
+        vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         calls = new MultiCall[](2);
@@ -599,7 +600,7 @@ contract CreditFacadeGasTest is
 
         uint256 gasBefore = gasleft();
 
-        evm.prank(USER);
+        vm.prank(USER);
         creditFacade.multicall(creditAccount, calls);
 
         uint256 gasSpent = gasBefore - gasleft();
@@ -610,12 +611,12 @@ contract CreditFacadeGasTest is
 
     /// @dev [G-FA-13]: multicall with a single swap into quoted token
     function test_G_FA_13_multicall_gas_estimate_2() public {
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
         cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
         cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
         cft.gaugeMock().updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
-        evm.stopPrank();
+        vm.stopPrank();
 
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
@@ -628,7 +629,7 @@ contract CreditFacadeGasTest is
                 )
         });
 
-        evm.prank(USER);
+        vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         tokenTestSuite.burn(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT * 2);
@@ -654,7 +655,7 @@ contract CreditFacadeGasTest is
 
         uint256 gasBefore = gasleft();
 
-        evm.prank(USER);
+        vm.prank(USER);
         creditFacade.multicall(creditAccount, calls);
 
         uint256 gasSpent = gasBefore - gasleft();
@@ -682,16 +683,16 @@ contract CreditFacadeGasTest is
                 )
         });
 
-        evm.prank(USER);
+        vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
-        evm.roll(block.number + 1);
+        vm.roll(block.number + 1);
 
         calls = new MultiCall[](0);
 
         uint256 gasBefore = gasleft();
 
-        evm.prank(USER);
+        vm.prank(USER);
         creditFacade.closeCreditAccount(creditAccount, USER, 0, false, calls);
 
         uint256 gasSpent = gasBefore - gasleft();
@@ -722,16 +723,16 @@ contract CreditFacadeGasTest is
                 )
         });
 
-        evm.prank(USER);
+        vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
-        evm.roll(block.number + 1);
+        vm.roll(block.number + 1);
 
         calls = new MultiCall[](0);
 
         uint256 gasBefore = gasleft();
 
-        evm.prank(USER);
+        vm.prank(USER);
         creditFacade.closeCreditAccount(creditAccount, USER, 0, false, calls);
 
         uint256 gasSpent = gasBefore - gasleft();
@@ -742,12 +743,12 @@ contract CreditFacadeGasTest is
 
     /// @dev [G-FA-16]: closeCreditAccount with 2 tokens and active quota interest
     function test_G_FA_16_closeCreditAccount_gas_estimate_3() public {
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
         cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
         cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
         cft.gaugeMock().updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
-        evm.stopPrank();
+        vm.stopPrank();
 
         tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
         tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
@@ -769,18 +770,18 @@ contract CreditFacadeGasTest is
                 )
         });
 
-        evm.prank(USER);
+        vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
-        evm.roll(block.number + 1);
+        vm.roll(block.number + 1);
 
-        evm.warp(block.timestamp + 30 days);
+        vm.warp(block.timestamp + 30 days);
 
         calls = new MultiCall[](0);
 
         uint256 gasBefore = gasleft();
 
-        evm.prank(USER);
+        vm.prank(USER);
         creditFacade.closeCreditAccount(creditAccount, USER, 0, false, calls);
 
         uint256 gasSpent = gasBefore - gasleft();
@@ -802,10 +803,10 @@ contract CreditFacadeGasTest is
                 )
         });
 
-        evm.prank(USER);
+        vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
-        evm.roll(block.number + 1);
+        vm.roll(block.number + 1);
 
         calls[0] = MultiCall({
             target: address(adapterMock),
@@ -817,7 +818,7 @@ contract CreditFacadeGasTest is
 
         uint256 gasBefore = gasleft();
 
-        evm.prank(USER);
+        vm.prank(USER);
         creditFacade.closeCreditAccount(creditAccount, USER, 0, false, calls);
 
         uint256 gasSpent = gasBefore - gasleft();
@@ -839,10 +840,10 @@ contract CreditFacadeGasTest is
                 )
         });
 
-        evm.prank(USER);
+        vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
-        evm.roll(block.number + 1);
+        vm.roll(block.number + 1);
 
         _zeroAllLTs();
 
@@ -850,7 +851,7 @@ contract CreditFacadeGasTest is
 
         uint256 gasBefore = gasleft();
 
-        evm.prank(FRIEND);
+        vm.prank(FRIEND);
         creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 0, false, calls);
 
         uint256 gasSpent = gasBefore - gasleft();
@@ -884,10 +885,10 @@ contract CreditFacadeGasTest is
                 )
         });
 
-        evm.prank(USER);
+        vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
-        evm.roll(block.number + 1);
+        vm.roll(block.number + 1);
 
         _zeroAllLTs();
 
@@ -895,7 +896,7 @@ contract CreditFacadeGasTest is
 
         uint256 gasBefore = gasleft();
 
-        evm.prank(FRIEND);
+        vm.prank(FRIEND);
         creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 0, false, calls);
 
         uint256 gasSpent = gasBefore - gasleft();
@@ -906,12 +907,12 @@ contract CreditFacadeGasTest is
 
     /// @dev [G-FA-20]: liquidateCreditAccount with 2 tokens and active quota interest
     function test_G_FA_20_liquidateCreditAccount_gas_estimate_3() public {
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
         cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
         cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
         cft.gaugeMock().updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
-        evm.stopPrank();
+        vm.stopPrank();
 
         tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
         tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
@@ -936,20 +937,20 @@ contract CreditFacadeGasTest is
                 )
         });
 
-        evm.prank(USER);
+        vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, false, 0);
 
         _zeroAllLTs();
 
-        evm.roll(block.number + 1);
+        vm.roll(block.number + 1);
 
-        evm.warp(block.timestamp + 30 days);
+        vm.warp(block.timestamp + 30 days);
 
         calls = new MultiCall[](0);
 
         uint256 gasBefore = gasleft();
 
-        evm.prank(FRIEND);
+        vm.prank(FRIEND);
         creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 0, false, calls);
 
         uint256 gasSpent = gasBefore - gasleft();

@@ -37,7 +37,7 @@ pragma solidity ^0.8.10;
 //     bool public isBlacklistableUnderlying = true;
 
 //     function setUp() public {
-//         evm.prank(CONFIGURATOR);
+//         vm.prank(CONFIGURATOR);
 //         addressProvider = new AddressProviderACLMock();
 
 //         tokenTestSuite = new TokensTestSuite();
@@ -68,7 +68,7 @@ pragma solidity ^0.8.10;
 //         ERC20BlacklistableMock(usdc).setBlacklisted(USER, true);
 //         ERC20BlacklistableMock(usdc).setBlackListed(USER, true);
 
-//         evm.expectCall(usdc, abi.encodeWithSignature("isBlacklisted(address)", USER));
+//         vm.expectCall(usdc, abi.encodeWithSignature("isBlacklisted(address)", USER));
 
 //         bool status = withdrawalManager.isBlacklisted(usdc, USER);
 
@@ -78,7 +78,7 @@ pragma solidity ^0.8.10;
 //             address(addressProvider)
 //         );
 
-//         evm.expectCall(usdc, abi.encodeWithSignature("isBlackListed(address)", USER));
+//         vm.expectCall(usdc, abi.encodeWithSignature("isBlackListed(address)", USER));
 
 //         status = withdrawalManager.isBlacklisted(usdc, USER);
 
@@ -87,57 +87,57 @@ pragma solidity ^0.8.10;
 
 //     /// @dev [BH-3]: addCreditFacade / removeCreditFacade work correctly and revert on non-configurator
 //     function test_BH_03_add_removeCreditFacade_work_correctly() public {
-//         evm.prank(CONFIGURATOR);
+//         vm.prank(CONFIGURATOR);
 //         withdrawalManager.addCreditFacade(address(this));
 
 //         assertTrue(withdrawalManager.isSupportedCreditFacade(address(this)), "Incorrect credit facade status");
 
-//         evm.prank(CONFIGURATOR);
+//         vm.prank(CONFIGURATOR);
 //         withdrawalManager.removeCreditFacade(address(this));
 
 //         assertTrue(!withdrawalManager.isSupportedCreditFacade(address(this)), "Incorrect credit facade status");
 
-//         evm.expectRevert(CallerNotConfiguratorException.selector);
-//         evm.prank(DUMB_ADDRESS);
+//         vm.expectRevert(CallerNotConfiguratorException.selector);
+//         vm.prank(DUMB_ADDRESS);
 //         withdrawalManager.addCreditFacade(address(this));
 
 //         isBlacklistableUnderlying = false;
 
-//         evm.expectRevert(CreditFacadeNonBlacklistable.selector);
-//         evm.prank(CONFIGURATOR);
+//         vm.expectRevert(CreditFacadeNonBlacklistable.selector);
+//         vm.prank(CONFIGURATOR);
 //         withdrawalManager.addCreditFacade(address(this));
 //     }
 
 //     /// @dev [BH-4]: addWithdrawal works correctly and reverts on non-Credit Facade
 //     function test_BH_04_addWithdrawal_works_correctly() public {
-//         evm.prank(CONFIGURATOR);
+//         vm.prank(CONFIGURATOR);
 //         withdrawalManager.addCreditFacade(address(this));
 
 //         withdrawalManager.addWithdrawal(usdc, USER, 10000);
 
 //         assertEq(withdrawalManager.claimable(usdc, USER), 10000);
 
-//         evm.expectRevert(CallerNotCreditFacadeException.selector);
-//         evm.prank(DUMB_ADDRESS);
+//         vm.expectRevert(CallerNotCreditFacadeException.selector);
+//         vm.prank(DUMB_ADDRESS);
 //         withdrawalManager.addWithdrawal(usdc, USER, 10000);
 //     }
 
 //     /// @dev [BH-5]: claim works correctly
 //     function test_BH_05_claim_works_correctly() public {
-//         evm.prank(CONFIGURATOR);
+//         vm.prank(CONFIGURATOR);
 //         withdrawalManager.addCreditFacade(address(this));
 
 //         withdrawalManager.addWithdrawal(usdc, USER, 10000);
 
 //         tokenTestSuite.mint(Tokens.USDC, address(withdrawalManager), 10000);
 
-//         evm.prank(USER);
+//         vm.prank(USER);
 //         withdrawalManager.claim(usdc, FRIEND);
 
 //         assertEq(tokenTestSuite.balanceOf(Tokens.USDC, FRIEND), 10000);
 
-//         evm.expectRevert(NothingToClaimException.selector);
-//         evm.prank(USER);
+//         vm.expectRevert(NothingToClaimException.selector);
+//         vm.prank(USER);
 //         withdrawalManager.claim(usdc, FRIEND);
 //     }
 // }

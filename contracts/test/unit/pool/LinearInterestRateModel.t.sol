@@ -16,15 +16,14 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
+import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 /// @title pool
 /// @notice Business logic for borrowing liquidity pools
-contract LinearInterestRateModelTest is DSTest {
+contract LinearInterestRateModelTest is Test {
     using Math for uint256;
     using StringUtils for string;
-
-    CheatCodes evm = CheatCodes(HEVM_ADDRESS);
 
     LinearInterestRateModel irm;
 
@@ -163,7 +162,7 @@ contract LinearInterestRateModelTest is DSTest {
         for (uint256 i; i < cases.length; ++i) {
             IncorrectParamCase memory testCase = cases[i];
 
-            evm.expectRevert(IncorrectParameterException.selector);
+            vm.expectRevert(IncorrectParameterException.selector);
             irm = new LinearInterestRateModel(
             testCase.U_1,
              testCase.U_2,
@@ -459,7 +458,7 @@ contract LinearInterestRateModelTest is DSTest {
         );
 
             if (testCase.expectedRevert) {
-                evm.expectRevert(BorrowingMoreU2ForbiddenException.selector);
+                vm.expectRevert(BorrowingMoreU2ForbiddenException.selector);
             }
 
             irm.calcBorrowRate(testCase.expectedLiquidity, testCase.availableLiquidity, true);
