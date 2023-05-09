@@ -19,6 +19,7 @@ import {IPoolQuotaKeeper, AccountQuota} from "../../../interfaces/IPoolQuotaKeep
 import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
+import {UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
 
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
 

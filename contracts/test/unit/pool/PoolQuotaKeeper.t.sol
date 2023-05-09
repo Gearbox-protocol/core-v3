@@ -17,8 +17,6 @@ import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {CreditManagerMockForPoolTest} from "../../mocks/pool/CreditManagerMockForPoolTest.sol";
 import {addLiquidity, referral, PoolQuotaKeeperTestSuite} from "../../suites/PoolQuotaKeeperTestSuite.sol";
 
-import "@gearbox-protocol/core-v2/contracts/libraries/Errors.sol";
-
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
@@ -28,20 +26,19 @@ import {GaugeMock} from "../../mocks/pool/GaugeMock.sol";
 
 // TEST
 import "../../lib/constants.sol";
-import "../../lib/StringUtils.sol";
+
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
-import {Test} from "forge-std/Test.sol";
+import {TestHelper} from "../../lib/helper.sol";
 import "forge-std/console.sol";
 
 /// @title pool
 /// @notice Business logic for borrowing liquidity pools
-contract PoolQuotaKeeperTest is Test, BalanceHelper, IPoolQuotaKeeperEvents {
+contract PoolQuotaKeeperTest is TestHelper, BalanceHelper, IPoolQuotaKeeperEvents {
     using Math for uint256;
-    using StringUtils for string;
 
     PoolQuotaKeeperTestSuite psts;
     PoolQuotaKeeper pqk;
@@ -70,10 +67,6 @@ contract PoolQuotaKeeperTest is Test, BalanceHelper, IPoolQuotaKeeperEvents {
         acl = psts.acl();
         pqk = psts.poolQuotaKeeper();
         gaugeMock = psts.gaugeMock();
-    }
-
-    function _testCaseErr(string memory caseName, string memory err) internal pure returns (string memory) {
-        return string("\nCase: ").concat(caseName).concat("\n").concat("Error: ").concat(err);
     }
 
     //

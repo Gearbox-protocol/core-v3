@@ -10,20 +10,19 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 // TEST
 import "../../lib/constants.sol";
-import "../../lib/StringUtils.sol";
+
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
-import {Test} from "forge-std/Test.sol";
+import {TestHelper} from "../../lib/helper.sol";
 import "forge-std/console.sol";
 
 /// @title pool
 /// @notice Business logic for borrowing liquidity pools
-contract LinearInterestRateModelTest is Test {
+contract LinearInterestRateModelTest is TestHelper {
     using Math for uint256;
-    using StringUtils for string;
 
     LinearInterestRateModel irm;
 
@@ -37,10 +36,6 @@ contract LinearInterestRateModelTest is Test {
             4000,
             true
         );
-    }
-
-    function _testCaseErr(string memory caseName, string memory err) internal pure returns (string memory) {
-        return string("\nCase: ").concat(caseName).concat("\n").concat("Error: ").concat(err);
     }
 
     //

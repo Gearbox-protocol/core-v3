@@ -27,12 +27,8 @@ address constant FRIEND2 = 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65;
 
 address constant ADAPTER = 0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc;
 
-address constant UNIVERSAL_CONTRACT_ADDRESS = 0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC;
-
 string constant PAUSABLE_ERROR = "Pausable: paused";
 string constant OWNABLE_ERROR = "Ownable: caller is not the owner";
-
-uint256 constant UNDERLYING_TOKEN_MASK = 1;
 
 uint128 constant DAI_MIN_BORROWED_AMOUNT = uint128(1000 * WAD);
 uint128 constant DAI_MAX_BORROWED_AMOUNT = uint128(10000 * WAD);
@@ -63,7 +59,6 @@ contract Roles is Test {
         vm.label(FRIEND, "FRIEND");
         vm.label(LIQUIDATOR, "LIQUIDATOR");
         vm.label(INITIAL_LP, "INITIAL_LP");
-
         vm.label(DUMB_ADDRESS, "DUMB_ADDRESS");
         vm.label(ADAPTER, "ADAPTER");
     }

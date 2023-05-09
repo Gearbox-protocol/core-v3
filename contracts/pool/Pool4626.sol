@@ -9,7 +9,6 @@ import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.so
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -30,7 +29,6 @@ import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
 
 import {RAY, SECONDS_PER_YEAR, MAX_WITHDRAW_FEE} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
-import {Errors} from "@gearbox-protocol/core-v2/contracts/libraries/Errors.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
@@ -46,7 +44,6 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
     using Math for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
-    using Address for address payable;
 
     /// @dev Address provider
     AddressProvider public immutable override addressProvider;
@@ -419,13 +416,14 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
     /// @dev Computes interest rate accrued from last update (LU)
     function _calcBaseInterestAccrued() internal view returns (uint256) {
         // timeDifference = blockTime - previous timeStamp
-        uint256 timeDifference = block.timestamp - timestampLU;
 
         //                                    currentBorrowRate * timeDifference
         //  interestAccrued = totalBorrow *  ------------------------------------
         //                                             SECONDS_PER_YEAR
         //
-        return (uint256(_totalBorrowed) * _borrowRate * timeDifference) / RAY / SECONDS_PER_YEAR;
+
+        // TODO: move to lib
+        return (uint256(_totalBorrowed) * _borrowRate * (block.timestamp - timestampLU)) / RAY / SECONDS_PER_YEAR;
     }
 
     function _calcOutstandingQuotaRevenue() internal view returns (uint128) {

@@ -18,7 +18,6 @@ import {IPool4626} from "../interfaces/IPool4626.sol";
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
-import {Errors} from "@gearbox-protocol/core-v2/contracts/libraries/Errors.sol";
 
 import {
     RegisteredPoolOnlyException,

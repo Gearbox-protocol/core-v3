@@ -13,7 +13,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {Pool4626} from "../../../pool/Pool4626.sol";
 import {IPool4626Events} from "../../../interfaces/IPool4626.sol";
-import {IERC4626Events} from "../../../interfaces/IERC4626.sol";
+import {IERC4626Events} from "../../interfaces/IERC4626.sol";
 
 import {IInterestRateModel} from "../../../interfaces/IInterestRateModel.sol";
 
@@ -27,8 +27,6 @@ import {
     PoolServiceTestSuite
 } from "../../suites/PoolServiceTestSuite.sol";
 
-import "@gearbox-protocol/core-v2/contracts/libraries/Errors.sol";
-
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
@@ -36,11 +34,11 @@ import {ERC20FeeMock} from "../../mocks/token/ERC20FeeMock.sol";
 import {PoolQuotaKeeper} from "../../../pool/PoolQuotaKeeper.sol";
 
 // TEST
-import {Test} from "forge-std/Test.sol";
+import {TestHelper} from "../../lib/helper.sol";
 import "forge-std/console.sol";
 
 import "../../lib/constants.sol";
-import "../../lib/StringUtils.sol";
+
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // EXCEPTIONS
@@ -50,9 +48,8 @@ uint256 constant fee = 6000;
 
 /// @title pool
 /// @notice Business logic for borrowing liquidity pools
-contract Pool4626Test is Test, BalanceHelper, IPool4626Events, IERC4626Events {
+contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Events {
     using Math for uint256;
-    using StringUtils for string;
 
     PoolServiceTestSuite psts;
     PoolQuotaKeeper pqk;
@@ -159,10 +156,6 @@ contract Pool4626Test is Test, BalanceHelper, IPool4626Events, IERC4626Events {
 
         // assertEq(pool.expectedLiquidityLU(), availableLiquidity * dieselRate / RAY, "ExpectedLU is not correct!");
         assertEq(pool.convertToAssets(RAY), dieselRate, "Incorrect diesel rate!");
-    }
-
-    function _testCaseErr(string memory caseName, string memory err) internal pure returns (string memory) {
-        return string("\nCase: ").concat(caseName).concat("\n").concat("Error: ").concat(err);
     }
 
     //
