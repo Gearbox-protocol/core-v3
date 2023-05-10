@@ -12,19 +12,18 @@ import "../../lib/constants.sol";
 
 // MOCKS
 import {AddressProviderACLMock} from "../../mocks/core/AddressProviderACLMock.sol";
+import {Test} from "forge-std/Test.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
-contract PolicyManagerTest is DSTest {
-    CheatCodes evm = CheatCodes(HEVM_ADDRESS);
-
+contract PolicyManagerTest is Test {
     AddressProviderACLMock public addressProvider;
 
     PolicyManagerInternal public policyManager;
 
     function setUp() public {
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         addressProvider = new AddressProviderACLMock();
 
         policyManager = new PolicyManagerInternal(address(addressProvider));
@@ -53,11 +52,11 @@ contract PolicyManagerTest is DSTest {
             maxChange: 4
         });
 
-        evm.expectRevert(CallerNotConfiguratorException.selector);
-        evm.prank(USER);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.prank(USER);
         policyManager.setPolicy(bytes32(uint256(1)), policy);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         policyManager.setPolicy(bytes32(uint256(1)), policy);
 
         Policy memory policy2 = policyManager.getPolicy(bytes32(uint256(1)));
@@ -104,10 +103,10 @@ contract PolicyManagerTest is DSTest {
             maxChange: 4
         });
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         policyManager.setPolicy(bytes32(uint256(1)), policy);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         policyManager.disablePolicy(bytes32(uint256(1)));
 
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), 0, 1));
@@ -130,7 +129,7 @@ contract PolicyManagerTest is DSTest {
             maxChange: 0
         });
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         policyManager.setPolicy(bytes32(uint256(1)), policy);
 
         assertTrue(newValue == 15 || !policyManager.checkPolicy(bytes32(uint256(1)), 0, newValue));
@@ -153,7 +152,7 @@ contract PolicyManagerTest is DSTest {
             maxChange: 0
         });
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         policyManager.setPolicy(bytes32(uint256(1)), policy);
 
         assertTrue(newValue >= minValue || !policyManager.checkPolicy(bytes32(uint256(1)), 0, newValue));
@@ -176,7 +175,7 @@ contract PolicyManagerTest is DSTest {
             maxChange: 0
         });
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         policyManager.setPolicy(bytes32(uint256(1)), policy);
 
         assertTrue(newValue <= maxValue || !policyManager.checkPolicy(bytes32(uint256(1)), 0, newValue));
@@ -199,7 +198,7 @@ contract PolicyManagerTest is DSTest {
             maxChange: 0
         });
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         policyManager.setPolicy(bytes32(uint256(1)), policy);
 
         policyManager.checkPolicy(bytes32(uint256(1)), 20, 20);
@@ -234,20 +233,20 @@ contract PolicyManagerTest is DSTest {
             maxChange: 0
         });
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         policyManager.setPolicy(bytes32(uint256(1)), policy);
 
         uint256 diff = newValue1 > oldValue ? newValue1 - oldValue : oldValue - newValue1;
 
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), oldValue, newValue1) || diff >= minChange);
 
-        evm.warp(block.timestamp + 1);
+        vm.warp(block.timestamp + 1);
 
         diff = newValue2 > oldValue ? newValue2 - oldValue : oldValue - newValue2;
 
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), newValue1, newValue2) || diff >= minChange);
 
-        evm.warp(block.timestamp + 1 days);
+        vm.warp(block.timestamp + 1 days);
 
         diff = newValue3 > newValue2 ? newValue3 - newValue2 : newValue2 - newValue3;
 
@@ -283,20 +282,20 @@ contract PolicyManagerTest is DSTest {
             maxChange: maxChange
         });
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         policyManager.setPolicy(bytes32(uint256(1)), policy);
 
         uint256 diff = newValue1 > oldValue ? newValue1 - oldValue : oldValue - newValue1;
 
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), oldValue, newValue1) || diff <= maxChange);
 
-        evm.warp(block.timestamp + 1);
+        vm.warp(block.timestamp + 1);
 
         diff = newValue2 > oldValue ? newValue2 - oldValue : oldValue - newValue2;
 
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), newValue1, newValue2) || diff <= maxChange);
 
-        evm.warp(block.timestamp + 1 days);
+        vm.warp(block.timestamp + 1 days);
 
         diff = newValue3 > newValue2 ? newValue3 - newValue2 : newValue2 - newValue3;
 
@@ -317,13 +316,13 @@ contract PolicyManagerTest is DSTest {
         uint256 newValue3,
         uint16 minPctChange
     ) public {
-        evm.assume(oldValue > 0);
-        evm.assume(newValue2 > 0);
+        vm.assume(oldValue > 0);
+        vm.assume(newValue2 > 0);
 
-        evm.assume(oldValue < type(uint128).max);
-        evm.assume(newValue1 < type(uint128).max);
-        evm.assume(newValue2 < type(uint128).max);
-        evm.assume(newValue3 < type(uint128).max);
+        vm.assume(oldValue < type(uint128).max);
+        vm.assume(newValue1 < type(uint128).max);
+        vm.assume(newValue2 < type(uint128).max);
+        vm.assume(newValue3 < type(uint128).max);
 
         Policy memory policy = Policy({
             enabled: false,
@@ -340,20 +339,20 @@ contract PolicyManagerTest is DSTest {
             maxChange: 0
         });
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         policyManager.setPolicy(bytes32(uint256(1)), policy);
 
         uint256 pctDiff =
             (newValue1 > oldValue ? newValue1 - oldValue : oldValue - newValue1) * PERCENTAGE_FACTOR / oldValue;
 
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), oldValue, newValue1) || pctDiff >= minPctChange);
-        evm.warp(block.timestamp + 1);
+        vm.warp(block.timestamp + 1);
 
         pctDiff = (newValue2 > oldValue ? newValue2 - oldValue : oldValue - newValue2) * PERCENTAGE_FACTOR / oldValue;
 
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), newValue1, newValue2) || pctDiff >= minPctChange);
 
-        evm.warp(block.timestamp + 1 days);
+        vm.warp(block.timestamp + 1 days);
 
         pctDiff =
             (newValue3 > newValue2 ? newValue3 - newValue2 : newValue2 - newValue3) * PERCENTAGE_FACTOR / newValue2;
@@ -375,13 +374,13 @@ contract PolicyManagerTest is DSTest {
         uint256 newValue3,
         uint16 maxPctChange
     ) public {
-        evm.assume(oldValue > 0);
-        evm.assume(newValue2 > 0);
+        vm.assume(oldValue > 0);
+        vm.assume(newValue2 > 0);
 
-        evm.assume(oldValue < type(uint128).max);
-        evm.assume(newValue1 < type(uint128).max);
-        evm.assume(newValue2 < type(uint128).max);
-        evm.assume(newValue3 < type(uint128).max);
+        vm.assume(oldValue < type(uint128).max);
+        vm.assume(newValue1 < type(uint128).max);
+        vm.assume(newValue2 < type(uint128).max);
+        vm.assume(newValue3 < type(uint128).max);
 
         Policy memory policy = Policy({
             enabled: false,
@@ -398,20 +397,20 @@ contract PolicyManagerTest is DSTest {
             maxChange: 0
         });
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         policyManager.setPolicy(bytes32(uint256(1)), policy);
 
         uint256 pctDiff =
             (newValue1 > oldValue ? newValue1 - oldValue : oldValue - newValue1) * PERCENTAGE_FACTOR / oldValue;
 
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), oldValue, newValue1) || pctDiff <= maxPctChange);
-        evm.warp(block.timestamp + 1);
+        vm.warp(block.timestamp + 1);
 
         pctDiff = (newValue2 > oldValue ? newValue2 - oldValue : oldValue - newValue2) * PERCENTAGE_FACTOR / oldValue;
 
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), newValue1, newValue2) || pctDiff <= maxPctChange);
 
-        evm.warp(block.timestamp + 1 days);
+        vm.warp(block.timestamp + 1 days);
 
         pctDiff =
             (newValue3 > newValue2 ? newValue3 - newValue2 : newValue2 - newValue3) * PERCENTAGE_FACTOR / newValue2;
