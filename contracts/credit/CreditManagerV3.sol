@@ -447,8 +447,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             });
 
             IPoolService(pool).repayCreditAccount(amountToRepay, profit, 0); // F:[CM-21]
-                // TODO: delete after tests or write Invaraiant test
-            require(debt - newDebt == amountToRepay, "Ooops, something was wring");
 
             if (supportsQuotas) {
                 creditAccountInfo[creditAccount].cumulativeQuotaInterest = cumulativeQuotaInterest;

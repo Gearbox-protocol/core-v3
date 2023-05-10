@@ -258,6 +258,9 @@ library CreditLogic {
                     );
             }
         }
+
+        // TODO: delete after tests or write Invaraiant test
+        require(debt - newDebt == amountToRepay, "Ooops, something was wring");
     }
 
     /// @param creditAccount Credit Account to compute balances for

@@ -3,12 +3,14 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
+import {IncorrectParameterException} from "../interfaces/IExceptions.sol";
+
 uint256 constant UNDERLYING_TOKEN_MASK = 1;
 
-/// @title Quota Library
+/// @title BitMask library
 library BitMask {
     function calcIndex(uint256 mask) internal pure returns (uint8) {
-        require(mask > 0);
+        if (mask == 0) revert IncorrectParameterException();
         uint16 lb = 0;
         uint16 ub = 256;
         uint16 mid = 128;
