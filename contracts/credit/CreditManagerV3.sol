@@ -399,11 +399,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     /// @param amount Amount to increase / decrease the principal by
     /// @param action Increase/decrease bed debt
     /// @return newDebt The new debt principal
-    function manageDebt(address creditAccount, uint256 amount, uint256 _enabledTokensMask, ManageDebtAction action)
+    function manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)
         external
         nonReentrant
         creditFacadeOnly // F:[CM-2]
-        returns (uint256 newDebt, uint256 enabledTokensMask)
+        returns (uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable)
     {
         (uint256 debt, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow) =
             _getCreditAccountParameters(creditAccount);
@@ -415,7 +415,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
 
             // Requests the pool to lend additional funds to the Credit Account
             IPoolService(pool).lendCreditAccount(amount, creditAccount); // F:[CM-20]
-            enabledTokensMask = _enabledTokensMask | UNDERLYING_TOKEN_MASK;
+            tokensToEnable = UNDERLYING_TOKEN_MASK;
         } else {
             // Decrease
             uint256 cumulativeQuotaInterest;
@@ -433,28 +433,29 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
 
             // Pays the amount back to the pool
             _creditAccountSafeTransfer(creditAccount, underlying, pool, amount); // F:[CM-21]
+            {
+                uint256 amountToRepay;
+                uint256 profit;
 
-            uint256 amountToRepay;
-            uint256 profit;
+                (newDebt, newCumulativeIndex, amountToRepay, profit, cumulativeQuotaInterest) = CreditLogic
+                    .calcDescrease({
+                    amount: amount,
+                    quotaInterestAccrued: cumulativeQuotaInterest,
+                    feeInterest: feeInterest,
+                    debt: debt,
+                    cumulativeIndexNow: cumulativeIndexNow,
+                    cumulativeIndexLastUpdate: cumulativeIndexLastUpdate
+                });
 
-            (newDebt, newCumulativeIndex, amountToRepay, profit, cumulativeQuotaInterest) = CreditLogic.calcDescrease({
-                amount: amount,
-                quotaInterestAccrued: cumulativeQuotaInterest,
-                feeInterest: feeInterest,
-                debt: debt,
-                cumulativeIndexNow: cumulativeIndexNow,
-                cumulativeIndexLastUpdate: cumulativeIndexLastUpdate
-            });
-
-            IPoolService(pool).repayCreditAccount(amountToRepay, profit, 0); // F:[CM-21]
-
+                IPoolService(pool).repayCreditAccount(amountToRepay, profit, 0); // F:[CM-21]
+            }
             if (supportsQuotas) {
                 creditAccountInfo[creditAccount].cumulativeQuotaInterest = cumulativeQuotaInterest;
             }
 
-            enabledTokensMask = IERC20(underlying)._balanceOf(creditAccount) <= 1
-                ? _enabledTokensMask & (~UNDERLYING_TOKEN_MASK)
-                : _enabledTokensMask;
+            if (IERC20(underlying)._balanceOf(creditAccount) <= 1) {
+                tokensToDisable = UNDERLYING_TOKEN_MASK;
+            }
         }
         //
         // Sets new parameters on the Credit Account if they were changed
@@ -696,7 +697,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             (tokensToDisable, _totalUSD, _twvUSD) =
                 _calcNotQuotedCollateral(creditAccount, enabledTokensMask, limit, collateralHints, _priceOracle);
 
-            enabledTokensMask &= ~tokensToDisable;
+            /// @notice tokensToDisable doesn't have any quoted tokens, no need to mask it
+            enabledTokensMask = enabledTokensMask.disable(tokensToDisable);
             totalUSD += _totalUSD;
             twvUSD += _twvUSD;
         }
@@ -737,7 +739,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         uint256 len = collateralHints.length;
         bool nonZeroBalance;
 
-        uint256 checkedTokenMask = supportsQuotas ? enabledTokensMask & (~quotedTokenMask) : enabledTokensMask;
+        uint256 checkedTokenMask = supportsQuotas ? enabledTokensMask.disable(quotedTokenMask) : enabledTokensMask;
 
         if (enoughCollateralUSD != type(uint256).max) {
             enoughCollateralUSD *= PERCENTAGE_FACTOR;

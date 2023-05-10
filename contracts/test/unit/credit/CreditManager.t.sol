@@ -1055,7 +1055,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         uint256 expectedNewCulumativeIndex =
             (2 * cumulativeIndexLastUpdate * (borrowedAmount + amount)) / (2 * borrowedAmount + amount);
 
-        (uint256 newBorrowedAmount,) =
+        (uint256 newBorrowedAmount,,) =
             creditManager.manageDebt(creditAccount, amount, 1, ManageDebtAction.INCREASE_DEBT);
 
         assertEq(newBorrowedAmount, borrowedAmount + amount, "Incorrect returned newBorrowedAmount");

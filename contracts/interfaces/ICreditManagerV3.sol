@@ -135,10 +135,10 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @param creditAccount Address of the Credit Account to change debt for
     /// @param amount Amount to increase / decrease the principal by
     /// @param action Increase/decrease
-    /// @return newdebt The new debt principal
-    function manageDebt(address creditAccount, uint256 amount, uint256 _enabledTokensMask, ManageDebtAction action)
+    // @return newdebt The new debt principal
+    function manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)
         external
-        returns (uint256 newdebt, uint256 enableTokenMask);
+        returns (uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable);
 
     /// @dev Adds collateral to borrower's credit account
     /// @param payer Address of the account which will be charged to provide additional collateral

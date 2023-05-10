@@ -36,4 +36,45 @@ library BitMask {
             }
         }
     }
+
+    function enable(uint256 enabledTokenMask, uint256 bitsToEnable) internal pure returns (uint256) {
+        return enabledTokenMask | bitsToEnable;
+    }
+
+    function disable(uint256 enabledTokenMask, uint256 bitsToDisable) internal pure returns (uint256) {
+        return enabledTokenMask & ~bitsToDisable;
+    }
+
+    function enableDisable(uint256 enabledTokensMask, uint256 bitsToEnable, uint256 bitsToDisable)
+        internal
+        pure
+        returns (uint256)
+    {
+        return enabledTokensMask | bitsToEnable & (~bitsToDisable);
+    }
+
+    function enable(uint256 enabledTokenMask, uint256 bitsToEnable, uint256 invertedSkipMask)
+        internal
+        pure
+        returns (uint256)
+    {
+        return enabledTokenMask | (bitsToEnable & invertedSkipMask);
+    }
+
+    function disable(uint256 enabledTokenMask, uint256 bitsToDisable, uint256 invertedSkipMask)
+        internal
+        pure
+        returns (uint256)
+    {
+        return enabledTokenMask & (~(bitsToDisable & invertedSkipMask));
+    }
+
+    function enableDisable(
+        uint256 enabledTokensMask,
+        uint256 bitsToEnable,
+        uint256 bitsToDisable,
+        uint256 invertedSkipMask
+    ) internal pure returns (uint256) {
+        return (enabledTokensMask | (bitsToEnable & invertedSkipMask)) & (~(bitsToDisable & invertedSkipMask));
+    }
 }
