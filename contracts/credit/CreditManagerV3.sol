@@ -885,6 +885,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         } else {
             try ICreditAccount(creditAccount).safeTransfer(token, to, amount) { // F:[CM-45]
             } catch {
+                it(to == pool) revert; // TODO: add exception
                 uint256 delivered = ICreditAccount(creditAccount).safeTransferDeliveredBalanceControl(
                     token, address(withdrawalManager), amount
                 );
