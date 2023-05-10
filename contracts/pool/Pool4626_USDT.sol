@@ -5,13 +5,22 @@ pragma solidity ^0.8.10;
 
 import {Pool4626} from "./Pool4626.sol";
 import {USDT_Transfer} from "../traits/USDT_Transfer.sol";
-import {IPool4626, Pool4626Opts} from "../interfaces/IPool4626.sol";
+import {IPool4626} from "../interfaces/IPool4626.sol";
 
 /// @title Core pool contract compatible with ERC4626
 /// @notice Implements pool & dieselUSDT_Transferogic
 
 contract Pool4626_USDT is Pool4626, USDT_Transfer {
-    constructor(Pool4626Opts memory opts) Pool4626(opts) USDT_Transfer(opts.underlyingToken) {
+    constructor(
+        address _addressProvider,
+        address _underlyingToken,
+        address _interestRateModel,
+        uint256 _expectedLiquidityLimit,
+        bool _supportsQuotas
+    )
+        Pool4626(_addressProvider, _underlyingToken, _interestRateModel, _expectedLiquidityLimit, _supportsQuotas)
+        USDT_Transfer(_underlyingToken)
+    {
         // Additional check that receiver is not address(0)
     }
 

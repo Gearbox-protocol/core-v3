@@ -17,13 +17,13 @@ import {ERC20FeeMock} from "../mocks/token/ERC20FeeMock.sol";
 
 import {PriceFeedMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/oracles/PriceFeedMock.sol";
 
-import "../lib/test.sol";
+import {Test} from "forge-std/Test.sol";
 
 import {TokensTestSuiteHelper} from "./TokensTestSuiteHelper.sol";
 import {TokensData, TestToken} from "../config/TokensData.sol";
 import {Tokens} from "../config/Tokens.sol";
 
-contract TokensTestSuite is DSTest, TokensData, TokensTestSuiteHelper {
+contract TokensTestSuite is Test, TokensData, TokensTestSuiteHelper {
     mapping(Tokens => address) public addressOf;
     mapping(Tokens => string) public symbols;
     mapping(Tokens => uint256) public prices;
@@ -65,7 +65,7 @@ contract TokensTestSuite is DSTest, TokensData, TokensTestSuiteHelper {
             t = new ERC20Mock(token.symbol, token.symbol, token.decimals);
         }
 
-        evm.label(address(t), token.symbol);
+        vm.label(address(t), token.symbol);
 
         AggregatorV3Interface priceFeed = new PriceFeedMock(token.price, 8);
 

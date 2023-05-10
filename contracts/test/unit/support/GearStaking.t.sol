@@ -24,11 +24,12 @@ import {Tokens} from "../../config/Tokens.sol";
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
+import {Test} from "forge-std/Test.sol";
+import "forge-std/console.sol";
+
 uint256 constant EPOCH_LENGTH = 7 days;
 
-contract GearStakingTest is IGearStakingEvents, DSTest {
-    CheatCodes evm = CheatCodes(HEVM_ADDRESS);
-
+contract GearStakingTest is Test, IGearStakingEvents {
     address gearToken;
 
     AddressProviderACLMock public addressProvider;
@@ -40,7 +41,7 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
     TokensTestSuite tokenTestSuite;
 
     function setUp() public {
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         addressProvider = new AddressProviderACLMock();
 
         tokenTestSuite = new TokensTestSuite();
@@ -53,7 +54,7 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
 
         votingContract = new TargetContractMock();
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         gearStaking.setVotingContractStatus(address(votingContract), VotingContractStatus.ALLOWED);
     }
 
@@ -63,7 +64,7 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
 
         assertEq(gearStaking.getCurrentEpoch(), 0, "First epoch timestamp incorrect");
 
-        evm.warp(block.timestamp + 1);
+        vm.warp(block.timestamp + 1);
 
         assertEq(gearStaking.getCurrentEpoch(), 1, "First epoch timestamp incorrect");
     }
@@ -81,12 +82,12 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
         tokenTestSuite.mint(gearToken, USER, WAD);
         tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
-        evm.expectEmit(true, false, false, true);
+        vm.expectEmit(true, false, false, true);
         emit DepositGear(USER, WAD);
 
-        evm.expectCall(address(votingContract), abi.encodeCall(IVotingContract.vote, (USER, uint96(WAD / 2), "")));
+        vm.expectCall(address(votingContract), abi.encodeCall(IVotingContract.vote, (USER, uint96(WAD / 2), "")));
 
-        evm.prank(USER);
+        vm.prank(USER);
         gearStaking.deposit(WAD, votes);
 
         assertEq(gearStaking.balanceOf(USER), WAD);
@@ -107,7 +108,7 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
         tokenTestSuite.mint(gearToken, USER, WAD);
         tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
-        evm.prank(USER);
+        vm.prank(USER);
         gearStaking.deposit(WAD, votes);
 
         votes = new MultiVote[](1);
@@ -118,12 +119,12 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
             extraData: ""
         });
 
-        evm.expectCall(address(votingContract), abi.encodeCall(IVotingContract.unvote, (USER, uint96(WAD / 2), "")));
+        vm.expectCall(address(votingContract), abi.encodeCall(IVotingContract.unvote, (USER, uint96(WAD / 2), "")));
 
-        evm.expectEmit(true, false, false, true);
+        vm.expectEmit(true, false, false, true);
         emit ScheduleGearWithdrawal(USER, WAD);
 
-        evm.prank(USER);
+        vm.prank(USER);
         gearStaking.withdraw(WAD, FRIEND, votes);
 
         assertEq(gearStaking.balanceOf(USER), WAD);
@@ -144,12 +145,12 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
         tokenTestSuite.mint(gearToken, USER, WAD);
         tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
-        evm.prank(USER);
+        vm.prank(USER);
         gearStaking.deposit(WAD, votes);
 
         TargetContractMock votingContract2 = new TargetContractMock();
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         gearStaking.setVotingContractStatus(address(votingContract2), VotingContractStatus.ALLOWED);
 
         votes = new MultiVote[](3);
@@ -174,15 +175,15 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
             extraData: "foobar"
         });
 
-        evm.expectCall(address(votingContract), abi.encodeCall(IVotingContract.vote, (USER, uint96(WAD / 2), "foo")));
+        vm.expectCall(address(votingContract), abi.encodeCall(IVotingContract.vote, (USER, uint96(WAD / 2), "foo")));
 
-        evm.expectCall(address(votingContract2), abi.encodeCall(IVotingContract.vote, (USER, uint96(WAD / 3), "bar")));
+        vm.expectCall(address(votingContract2), abi.encodeCall(IVotingContract.vote, (USER, uint96(WAD / 3), "bar")));
 
-        evm.expectCall(
+        vm.expectCall(
             address(votingContract2), abi.encodeCall(IVotingContract.unvote, (USER, uint96(WAD / 4), "foobar"))
         );
 
-        evm.prank(USER);
+        vm.prank(USER);
         gearStaking.multivote(votes);
 
         assertEq(gearStaking.availableBalance(USER), (WAD - WAD / 2 - WAD / 3) + WAD / 4);
@@ -201,10 +202,10 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
         tokenTestSuite.mint(gearToken, USER, WAD);
         tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
-        evm.prank(USER);
+        vm.prank(USER);
         gearStaking.deposit(WAD, votes);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         gearStaking.setVotingContractStatus(address(votingContract), VotingContractStatus.NOT_ALLOWED);
 
         votes = new MultiVote[](1);
@@ -215,9 +216,9 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
             extraData: "foo"
         });
 
-        evm.expectRevert(VotingContractNotAllowedException.selector);
+        vm.expectRevert(VotingContractNotAllowedException.selector);
 
-        evm.prank(USER);
+        vm.prank(USER);
         gearStaking.multivote(votes);
 
         votes = new MultiVote[](1);
@@ -228,12 +229,12 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
             extraData: "foo"
         });
 
-        evm.expectRevert(VotingContractNotAllowedException.selector);
+        vm.expectRevert(VotingContractNotAllowedException.selector);
 
-        evm.prank(USER);
+        vm.prank(USER);
         gearStaking.multivote(votes);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         gearStaking.setVotingContractStatus(address(votingContract), VotingContractStatus.UNVOTE_ONLY);
 
         votes = new MultiVote[](1);
@@ -244,9 +245,9 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
             extraData: "foo"
         });
 
-        evm.expectRevert(VotingContractNotAllowedException.selector);
+        vm.expectRevert(VotingContractNotAllowedException.selector);
 
-        evm.prank(USER);
+        vm.prank(USER);
         gearStaking.multivote(votes);
 
         votes = new MultiVote[](1);
@@ -257,7 +258,7 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
             extraData: "foo"
         });
 
-        evm.prank(USER);
+        vm.prank(USER);
         gearStaking.multivote(votes);
     }
 
@@ -268,25 +269,25 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
         tokenTestSuite.mint(gearToken, USER, WAD);
         tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
-        evm.prank(USER);
+        vm.prank(USER);
         gearStaking.deposit(WAD, votes);
 
-        evm.prank(USER);
+        vm.prank(USER);
         gearStaking.withdraw(1000, FRIEND, votes);
 
-        evm.warp(block.timestamp + EPOCH_LENGTH);
+        vm.warp(block.timestamp + EPOCH_LENGTH);
 
-        evm.prank(USER);
+        vm.prank(USER);
         gearStaking.withdraw(2000, FRIEND, votes);
 
-        evm.warp(block.timestamp + EPOCH_LENGTH);
+        vm.warp(block.timestamp + EPOCH_LENGTH);
 
-        evm.prank(USER);
+        vm.prank(USER);
         gearStaking.withdraw(3000, FRIEND, votes);
 
-        evm.warp(block.timestamp + EPOCH_LENGTH);
+        vm.warp(block.timestamp + EPOCH_LENGTH);
 
-        evm.prank(USER);
+        vm.prank(USER);
         gearStaking.withdraw(4000, FRIEND, votes);
 
         (uint256 withdrawableNow, uint256[4] memory withdrawableInEpochs) = gearStaking.getWithdrawableAmounts(USER);
@@ -301,12 +302,12 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
 
         assertEq(withdrawableNow, 0, "Incorrect withdrawable now");
 
-        evm.warp(block.timestamp + 2 * EPOCH_LENGTH);
+        vm.warp(block.timestamp + 2 * EPOCH_LENGTH);
 
-        evm.expectEmit(true, false, false, true);
+        vm.expectEmit(true, false, false, true);
         emit ClaimGearWithdrawal(USER, FRIEND, 3000);
 
-        evm.prank(USER);
+        vm.prank(USER);
         gearStaking.claimWithdrawals(FRIEND);
 
         (withdrawableNow, withdrawableInEpochs) = gearStaking.getWithdrawableAmounts(USER);
@@ -327,12 +328,12 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
 
         assertEq(tokenTestSuite.balanceOf(gearToken, FRIEND), 3000);
 
-        evm.warp(block.timestamp + EPOCH_LENGTH);
+        vm.warp(block.timestamp + EPOCH_LENGTH);
 
-        evm.expectEmit(true, false, false, true);
+        vm.expectEmit(true, false, false, true);
         emit ClaimGearWithdrawal(USER, FRIEND, 3000);
 
-        evm.prank(USER);
+        vm.prank(USER);
         gearStaking.withdraw(10000, FRIEND, votes);
 
         (withdrawableNow, withdrawableInEpochs) = gearStaking.getWithdrawableAmounts(USER);
@@ -354,13 +355,13 @@ contract GearStakingTest is IGearStakingEvents, DSTest {
 
     /// @dev [GS-06]: setVotingContractStatus respects access control and emits event
     function test_GS_06_setVotingContractStatus_works_correctly() public {
-        evm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         gearStaking.setVotingContractStatus(DUMB_ADDRESS, VotingContractStatus.ALLOWED);
 
-        evm.expectEmit(true, false, false, true);
+        vm.expectEmit(true, false, false, true);
         emit SetVotingContractStatus(DUMB_ADDRESS, VotingContractStatus.UNVOTE_ONLY);
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         gearStaking.setVotingContractStatus(DUMB_ADDRESS, VotingContractStatus.UNVOTE_ONLY);
     }
 }

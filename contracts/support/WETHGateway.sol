@@ -2,6 +2,7 @@
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
+pragma abicoder v1;
 
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
@@ -17,7 +18,6 @@ import {IPool4626} from "../interfaces/IPool4626.sol";
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
-import {Errors} from "@gearbox-protocol/core-v2/contracts/libraries/Errors.sol";
 
 import {
     RegisteredPoolOnlyException,

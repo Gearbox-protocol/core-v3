@@ -42,7 +42,7 @@ This directory contains code used for third-party integration. Since this reposi
 
 This directory contains protocol contracts related to access, contract discovery, data reporting, etc.
 
-1. `AccountFactory.sol` is used to deploy Credit Accounts and managed the existing Credit Account queue. Credit Managers take accounts from the factory when a new account in Gearbox is opened and return them after the account is closed.
+1. `AccountFactoryV3.sol` is used to deploy Credit Accounts and managed the existing Credit Account queue. Credit Managers take accounts from the factory when a new account in Gearbox is opened and return them after the account is closed.
 2. `ACL.sol` is the main access control contract in the system. Contracts that inherit `ACLNonReentrantTrait.sol` use `ACL.sol` to determine access to configurator-only functions.
 3. `AddressProvider.sol` is used by other contracts in the system to determine the up-to-date addresses of core contracts, such as `ACL`, `PriceOracle`, `GearToken`, etc.
 4. `ContractsRegister.sol` contains a list of legitimate Gearbox Credit Managers and pools connected to the system.
@@ -53,7 +53,7 @@ This directory contains protocol contracts related to access, contract discovery
 
 This directory contains the contracts responsible for managing Credit Accounts, tracking Credit Account collateral and debt, facilitating interactions with third-party contracts, etc. These contracts encapsulate the primary functions of the protocol.
 
-1. `CreditAccount.sol` is a contract that acts as a user's smart wallet with out-of-the-box leverage. Credit Accounts store all of the user's collateral and borrowed assets, and can execute calls to third-party protocols routed to them by the user. In essence, a Credit Account acts as a substitute to the user's own EOA/Smart Wallet when interacting with protocols, but can also hold borrowed assets and only executes operations that are allowed by its respective Credit Manager.
+1. `CreditAccountV3.sol` is a contract that acts as a user's smart wallet with out-of-the-box leverage. Credit Accounts store all of the user's collateral and borrowed assets, and can execute calls to third-party protocols routed to them by the user. In essence, a Credit Account acts as a substitute to the user's own EOA/Smart Wallet when interacting with protocols, but can also hold borrowed assets and only executes operations that are allowed by its respective Credit Manager.
 2. `CreditManager.sol` is the primary backend contract of the Gearbox protocol, responsible for opening and closing accounts, routing calls to third-party protocols on behalf of Credit Account owners, performing account health checks, and tracking the lists of allowed third-party contracts and collateral tokens. Credit Managers cannot be interacted with directly by users - this has to be done through either an adapter or Credit Facade.
 3. `CreditFacade.sol` is the main interface through which users interact with the Gearbox protocol. It allows users to manage their accounts and carry out multicalls, while performing necessary access and security checks for all operations.
 4. `CreditConfiguratorV3.sol` is an admin contract used to configure various security properties of the connected Credit Manager / Credit Facade, such as allowing new collateral tokens and adapters, changing fee parameters, etc.

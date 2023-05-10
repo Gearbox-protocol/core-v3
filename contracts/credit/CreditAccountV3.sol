@@ -2,23 +2,18 @@
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
+pragma abicoder v1;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ICreditAccount} from "../interfaces/ICreditAccount.sol";
 
 import "../interfaces/IExceptions.sol";
 
-/// @title Credit Account
-/// @notice Implements generic credit account logic:
-///   - Holds collateral assets
-///   - Stores general parameters: borrowed amount, cumulative index at open and block when it was initialized
-///   - Transfers assets
-///   - Executes financial orders by calling connected protocols on its behalf
-///
-///  More: https://dev.gearbox.fi/developers/credit/credit_account
-contract CreditAccount {
+/// @title Credit AccountV3
+contract CreditAccountV3 is ICreditAccount {
     using SafeERC20 for IERC20;
     using Address for address;
     /// @dev Address of the currently connected Credit Manager

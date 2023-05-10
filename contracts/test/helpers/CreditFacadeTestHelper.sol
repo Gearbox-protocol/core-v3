@@ -23,10 +23,10 @@ contract CreditFacadeTestHelper is CreditFacadeTestEngine {
         tokenTestSuite().mint(t, USER, amount);
         tokenTestSuite().approve(t, USER, address(creditManager));
 
-        evm.startPrank(USER);
+        vm.startPrank(USER);
         // TODO: rewrite using addCollateral in mc
         // creditFacade.addCollateral(USER, tokenTestSuite().addressOf(t), amount);
-        evm.stopPrank();
+        vm.stopPrank();
     }
 
     function tokenTestSuite() private view returns (TokensTestSuite) {

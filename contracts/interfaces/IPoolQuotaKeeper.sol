@@ -6,14 +6,6 @@ pragma solidity ^0.8.10;
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 import {IPool4626} from "./IPool4626.sol";
 
-/// @notice Quota update params
-/// @param token Address of the token to change the quota for
-/// @param quotaChange Requested quota change in pool's underlying asset units
-struct QuotaUpdate {
-    address token;
-    int96 quotaChange;
-}
-
 struct TokenQuotaParams {
     uint96 totalQuoted;
     uint96 limit;
@@ -50,10 +42,11 @@ interface IPoolQuotaKeeperEvents {
 interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
     /// @dev Updates credit account's quotas for multiple tokens
     /// @param creditAccount Address of credit account
-    /// @param quotaUpdates Requested quota updates, see `QuotaUpdate`
-    function updateQuotas(address creditAccount, QuotaUpdate[] memory quotaUpdates)
+    /// @param token Address of the token to change the quota for
+    /// @param quotaChange Requested quota change in pool's underlying asset units
+    function updateQuota(address creditAccount, address token, int96 quotaChange)
         external
-        returns (uint256 caQuotaInterestChange, uint256 tokensToEnable, uint256 tokensToDisable);
+        returns (uint256 caQuotaInterestChange, bool enableToken, bool disableToken);
 
     /// @dev Updates all quotas to zero when closing a credit account, and computes the final quota interest change
     /// @param creditAccount Address of the Credit Account being closed
@@ -98,14 +91,13 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
     function isQuotedToken(address token) external view returns (bool);
 
     /// @dev Returns quota parameters for a single (account, token) pair
-    function getQuota(address creditManager, address creditAccount, address token)
+    function getQuota(address creditAccount, address token)
         external
         view
-        returns (AccountQuota memory);
+        returns (uint96 quota, uint192 cumulativeIndexLU);
 
     /// @dev Computes collateral value for quoted tokens on the account, as well as accrued quota interest
     function computeQuotedCollateralUSD(
-        address creditManager,
         address creditAccount,
         address _priceOracle,
         address[] memory tokens,
@@ -113,7 +105,7 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
     ) external view returns (uint256 totalValue, uint256 twv, uint256 totalQuotaInterest);
 
     /// @dev Computes outstanding quota interest
-    function outstandingQuotaInterest(address creditManager, address creditAccount, address[] memory tokens)
+    function outstandingQuotaInterest(address creditAccount, address[] memory tokens)
         external
         view
         returns (uint256 caQuotaInterestChange);

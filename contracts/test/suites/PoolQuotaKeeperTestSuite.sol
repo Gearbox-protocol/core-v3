@@ -8,7 +8,7 @@ import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/Contra
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {DieselToken} from "@gearbox-protocol/core-v2/contracts/tokens/DieselToken.sol";
 
-import {IPool4626, Pool4626Opts} from "../../interfaces/IPool4626.sol";
+import {IPool4626} from "../../interfaces/IPool4626.sol";
 import {TestPoolService} from "@gearbox-protocol/core-v2/contracts/test/mocks/pool/TestPoolService.sol";
 import {Tokens} from "../config/Tokens.sol";
 
@@ -26,6 +26,7 @@ import {PoolQuotaKeeper} from "../../pool/PoolQuotaKeeper.sol";
 import {GaugeMock} from "../mocks/pool/GaugeMock.sol";
 
 import {PoolServiceMock} from "../mocks/pool/PoolServiceMock.sol";
+import {Test} from "forge-std/Test.sol";
 
 uint256 constant liquidityProviderInitBalance = 100 ether;
 uint256 constant addLiquidity = 10 ether;
@@ -34,9 +35,7 @@ uint16 constant referral = 12333;
 
 /// @title PoolServiceTestSuite
 /// @notice Deploys contract for unit testing of PoolService.sol
-contract PoolQuotaKeeperTestSuite {
-    CheatCodes evm = CheatCodes(HEVM_ADDRESS);
-
+contract PoolQuotaKeeperTestSuite is Test {
     ACL public acl;
     WETHMock public weth;
 
@@ -53,7 +52,7 @@ contract PoolQuotaKeeperTestSuite {
     address public treasury;
 
     constructor(ITokenTestSuite _tokenTestSuite, address _underlying) {
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
 
         acl = new ACL();
         weth = WETHMock(payable(_tokenTestSuite.wethToken()));
@@ -74,25 +73,25 @@ contract PoolQuotaKeeperTestSuite {
 
         poolQuotaKeeper = new PoolQuotaKeeper(address(pool4626));
 
-        // evm.prank(CONFIGURATOR);
+        // vm.prank(CONFIGURATOR);
         pool4626.connectPoolQuotaManager(address(poolQuotaKeeper));
 
         gaugeMock = new GaugeMock(address(pool4626));
 
-        // evm.prank(CONFIGURATOR);
+        // vm.prank(CONFIGURATOR);
         poolQuotaKeeper.setGauge(address(gaugeMock));
 
-        evm.stopPrank();
+        vm.stopPrank();
 
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
 
         cmMock = new CreditManagerMockForPoolTest(address(pool4626));
 
         cr.addPool(address(pool4626));
         cr.addCreditManager(address(cmMock));
 
-        evm.label(address(pool4626), "Pool");
+        vm.label(address(pool4626), "Pool");
 
-        evm.stopPrank();
+        vm.stopPrank();
     }
 }

@@ -18,7 +18,6 @@ import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 import {CreditFacadeTestHelper} from "../../helpers/CreditFacadeTestHelper.sol";
 
 import {CONFIGURATOR, USER} from "../../lib/constants.sol";
-import {DSTest} from "../../lib/test.sol";
 
 import {AdapterMock} from "../../mocks/adapters/AdapterMock.sol";
 import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
@@ -26,9 +25,11 @@ import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks
 import {CreditFacadeTestSuite} from "../../suites/CreditFacadeTestSuite.sol";
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 
+import {Test} from "forge-std/Test.sol";
+
 /// @title AbstractAdapterTest
 /// @notice Designed for unit test purposes only
-contract AbstractAdapterTest is DSTest, BalanceHelper, CreditFacadeTestHelper {
+contract AbstractAdapterTest is Test, BalanceHelper, CreditFacadeTestHelper {
     TargetContractMock targetMock;
     AdapterMock adapterMock;
 
@@ -56,11 +57,11 @@ contract AbstractAdapterTest is DSTest, BalanceHelper, CreditFacadeTestHelper {
             address(targetMock)
         );
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditConfigurator.allowContract(address(targetMock), address(adapterMock));
 
-        evm.label(address(adapterMock), "AdapterMock");
-        evm.label(address(targetMock), "TargetContractMock");
+        vm.label(address(adapterMock), "AdapterMock");
+        vm.label(address(targetMock), "TargetContractMock");
 
         usdc = tokenTestSuite.addressOf(Tokens.USDC);
         dai = tokenTestSuite.addressOf(Tokens.DAI);
@@ -72,10 +73,10 @@ contract AbstractAdapterTest is DSTest, BalanceHelper, CreditFacadeTestHelper {
 
     /// @notice [AA-1]: Constructor reverts when passed zero-address as credit manager or target contract
     function test_AA_01_constructor_reverts_on_zero_address() public {
-        evm.expectRevert();
+        vm.expectRevert();
         new AdapterMock(address(0), address(0));
 
-        evm.expectRevert(ZeroAddressException.selector);
+        vm.expectRevert(ZeroAddressException.selector);
         new AdapterMock(address(creditManager), address(0));
     }
 
@@ -94,15 +95,15 @@ contract AbstractAdapterTest is DSTest, BalanceHelper, CreditFacadeTestHelper {
 
     /// @notice [AA-3]: `creditFacadeOnly` functions revert if called not by the credit facade
     function test_AA_03_creditFacadeOnly_function_reverts_if_called_not_by_credit_facade() public {
-        evm.expectRevert(CallerNotCreditFacadeException.selector);
-        evm.prank(USER);
+        vm.expectRevert(CallerNotCreditFacadeException.selector);
+        vm.prank(USER);
         adapterMock.dumbCall(0, 0);
     }
 
     /// @notice [AA-4]: AbstractAdapter uses correct credit account
     function test_AA_04_adapter_uses_correct_credit_account() public {
-        evm.expectRevert(ExternalCallCreditAccountNotSetException.selector);
-        evm.prank(address(creditFacade));
+        vm.expectRevert(ExternalCallCreditAccountNotSetException.selector);
+        vm.prank(address(creditFacade));
         adapterMock.creditAccount();
 
         address creditAccount = _openExternalCallCreditAccount();
@@ -111,7 +112,7 @@ contract AbstractAdapterTest is DSTest, BalanceHelper, CreditFacadeTestHelper {
 
     /// @notice [AA-5]: `_getMaskOrRevert` works correctly
     function test_AA_05_getMaskOrRevert_works_correctly() public {
-        evm.expectRevert(TokenNotAllowedException.selector);
+        vm.expectRevert(TokenNotAllowedException.selector);
         adapterMock.getMaskOrRevert(address(0xdead));
 
         assertEq(
@@ -124,8 +125,8 @@ contract AbstractAdapterTest is DSTest, BalanceHelper, CreditFacadeTestHelper {
     function test_AA_06_approveToken_correctly_passes_to_credit_manager() public {
         _openExternalCallCreditAccount();
 
-        evm.expectCall(address(creditManager), abi.encodeCall(creditManager.approveCreditAccount, (usdc, 10)));
-        evm.prank(USER);
+        vm.expectCall(address(creditManager), abi.encodeCall(creditManager.approveCreditAccount, (usdc, 10)));
+        vm.prank(USER);
         adapterMock.approveToken(usdc, 10);
     }
 
@@ -135,8 +136,8 @@ contract AbstractAdapterTest is DSTest, BalanceHelper, CreditFacadeTestHelper {
 
         bytes memory callData = adapterMock.dumbCallData();
 
-        evm.expectCall(address(creditManager), abi.encodeCall(creditManager.executeOrder, (callData)));
-        evm.prank(USER);
+        vm.expectCall(address(creditManager), abi.encodeCall(creditManager.executeOrder, (callData)));
+        vm.prank(USER);
         adapterMock.execute(callData);
     }
 
@@ -148,9 +149,9 @@ contract AbstractAdapterTest is DSTest, BalanceHelper, CreditFacadeTestHelper {
         for (uint256 dt = 0; dt < 2; ++dt) {
             bool disableTokenIn = dt == 1;
 
-            evm.expectCall(address(creditManager), abi.encodeCall(creditManager.executeOrder, (callData)));
+            vm.expectCall(address(creditManager), abi.encodeCall(creditManager.executeOrder, (callData)));
 
-            evm.prank(USER);
+            vm.prank(USER);
             (uint256 tokensToEnable, uint256 tokensToDisable,) =
                 adapterMock.executeSwapNoApprove(usdc, dai, callData, disableTokenIn);
 
@@ -170,13 +171,13 @@ contract AbstractAdapterTest is DSTest, BalanceHelper, CreditFacadeTestHelper {
         for (uint256 dt = 0; dt < 2; ++dt) {
             bool disableTokenIn = dt == 1;
 
-            evm.expectCall(
+            vm.expectCall(
                 address(creditManager), abi.encodeCall(creditManager.approveCreditAccount, (usdc, type(uint256).max))
             );
-            evm.expectCall(address(creditManager), abi.encodeCall(creditManager.executeOrder, (callData)));
-            evm.expectCall(address(creditManager), abi.encodeCall(creditManager.approveCreditAccount, (usdc, 1)));
+            vm.expectCall(address(creditManager), abi.encodeCall(creditManager.executeOrder, (callData)));
+            vm.expectCall(address(creditManager), abi.encodeCall(creditManager.approveCreditAccount, (usdc, 1)));
 
-            evm.prank(USER);
+            vm.prank(USER);
             (uint256 tokensToEnable, uint256 tokensToDisable,) =
                 adapterMock.executeSwapSafeApprove(usdc, dai, callData, disableTokenIn);
 
@@ -199,8 +200,8 @@ contract AbstractAdapterTest is DSTest, BalanceHelper, CreditFacadeTestHelper {
             for (uint256 dt; dt < 2; ++dt) {
                 bool disableTokenIn = dt == 1;
                 for (uint256 sa; sa < 2; ++sa) {
-                    evm.expectRevert(TokenNotAllowedException.selector);
-                    evm.prank(USER);
+                    vm.expectRevert(TokenNotAllowedException.selector);
+                    vm.prank(USER);
                     if (sa == 1) {
                         adapterMock.executeSwapSafeApprove(tokenIn, tokenOut, callData, disableTokenIn);
                     } else {
@@ -217,7 +218,7 @@ contract AbstractAdapterTest is DSTest, BalanceHelper, CreditFacadeTestHelper {
 
     function _openExternalCallCreditAccount() internal returns (address creditAccount) {
         (creditAccount,) = _openTestCreditAccount();
-        evm.prank(address(creditFacade));
-        creditManager.setCaForExternalCall(creditAccount);
+        vm.prank(address(creditFacade));
+        creditManager.setCreditAccountForExternalCall(creditAccount);
     }
 }

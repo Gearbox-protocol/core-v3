@@ -68,16 +68,16 @@ pragma solidity ^0.8.17;
 //         adapterMock1 = new AdapterMock(address(creditManager), address(targetMock1));
 //         adapterMock2 = new AdapterMock(address(creditManager), address(targetMock2));
 
-//         evm.startPrank(CONFIGURATOR);
+//         vm.startPrank(CONFIGURATOR);
 //         creditConfigurator.allowContract(address(targetMock1), address(adapterMock1));
 //         creditConfigurator.allowContract(address(targetMock2), address(adapterMock2));
 //         creditConfigurator.allowContract(UNIVERSAL_CONTRACT, address(universalAdapter));
-//         evm.stopPrank();
+//         vm.stopPrank();
 
-//         evm.label(address(adapterMock1), "AdapterMock1");
-//         evm.label(address(targetMock1), "TargetContractMock1");
-//         evm.label(address(adapterMock2), "AdapterMock1");
-//         evm.label(address(targetMock2), "TargetContractMock1");
+//         vm.label(address(adapterMock1), "AdapterMock1");
+//         vm.label(address(targetMock1), "TargetContractMock1");
+//         vm.label(address(adapterMock2), "AdapterMock1");
+//         vm.label(address(targetMock2), "TargetContractMock1");
 
 //         usdc = tokenTestSuite.addressOf(Tokens.USDC);
 //         dai = tokenTestSuite.addressOf(Tokens.DAI);
@@ -95,8 +95,8 @@ pragma solidity ^0.8.17;
 
 //     /// @notice [UA-2]: UniversalAdapter `revokeAllowances` reverts if called not from multicall
 //     function test_UA_02_revokeAllowances_reverts_if_called_not_from_multicall() public {
-//         evm.prank(USER);
-//         evm.expectRevert(CallerNotCreditFacadeException.selector);
+//         vm.prank(USER);
+//         vm.expectRevert(CallerNotCreditFacadeException.selector);
 //         universalAdapter.revokeAdapterAllowances(new RevocationPair[](0));
 //     }
 
@@ -106,9 +106,9 @@ pragma solidity ^0.8.17;
 
 //         RevocationPair[] memory revocations = new RevocationPair[](1);
 
-//         evm.prank(USER);
+//         vm.prank(USER);
 //         revocations[0] = RevocationPair({spender: address(0), token: usdc});
-//         evm.expectRevert(ZeroAddressException.selector);
+//         vm.expectRevert(ZeroAddressException.selector);
 //         creditFacade.multicall(
 //             multicallBuilder(
 //                 MultiCall({
@@ -118,9 +118,9 @@ pragma solidity ^0.8.17;
 //             )
 //         );
 
-//         evm.prank(USER);
+//         vm.prank(USER);
 //         revocations[0] = RevocationPair({spender: address(targetMock1), token: address(0)});
-//         evm.expectRevert(ZeroAddressException.selector);
+//         vm.expectRevert(ZeroAddressException.selector);
 //         creditFacade.multicall(
 //             multicallBuilder(
 //                 MultiCall({
@@ -135,7 +135,7 @@ pragma solidity ^0.8.17;
 //     function test_UA_04_revokeAllowances_works_as_expected() public {
 //         (address creditAccount,) = _openTestCreditAccount();
 
-//         evm.prank(USER);
+//         vm.prank(USER);
 //         creditFacade.multicall(
 //             multicallBuilder(
 //                 MultiCall({
@@ -158,16 +158,16 @@ pragma solidity ^0.8.17;
 //         revocations[1] = RevocationPair({spender: address(targetMock2), token: usdc});
 //         revocations[2] = RevocationPair({spender: address(targetMock2), token: dai});
 
-//         evm.expectCall(
+//         vm.expectCall(
 //             address(creditManager),
 //             abi.encodeCall(ICreditManagerV3.approveCreditAccount, (address(targetMock1), usdc, 1))
 //         );
-//         evm.expectCall(
+//         vm.expectCall(
 //             address(creditManager),
 //             abi.encodeCall(ICreditManagerV3.approveCreditAccount, (address(targetMock2), dai, 1))
 //         );
 
-//         evm.prank(USER);
+//         vm.prank(USER);
 //         creditFacade.multicall(
 //             multicallBuilder(
 //                 MultiCall({

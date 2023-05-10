@@ -8,7 +8,7 @@ import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfigurato
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
-import {AccountFactoryV2} from "../../core/AccountFactory.sol";
+import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
 
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
@@ -64,7 +64,7 @@ contract CreditManagerTestSuite is PoolDeployer {
 
         creditManager.setCreditConfigurator(CONFIGURATOR);
 
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
         creditManager.setCreditFacade(creditFacade);
 
         creditManager.setParams(
@@ -100,10 +100,10 @@ contract CreditManagerTestSuite is PoolDeployer {
         }
 
         if (accountFactoryVer == 2) {
-            AccountFactoryV2(address(af)).addCreditManager(address(creditManager));
+            AccountFactoryV3(address(af)).addCreditManager(address(creditManager), 1);
         }
 
-        evm.stopPrank();
+        vm.stopPrank();
 
         // Approve USER & LIQUIDATOR to credit manager
         tokenTestSuite.approve(underlying, USER, address(creditManager));
@@ -118,7 +118,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         external
         returns (
             uint256 borrowedAmount,
-            uint256 cumulativeIndexAtOpen,
+            uint256 cumulativeIndexLastUpdate,
             uint256 cumulativeIndexAtClose,
             address creditAccount
         )
@@ -130,13 +130,13 @@ contract CreditManagerTestSuite is PoolDeployer {
         public
         returns (
             uint256 borrowedAmount,
-            uint256 cumulativeIndexAtOpen,
+            uint256 cumulativeIndexLastUpdate,
             uint256 cumulativeIndexAtClose,
             address creditAccount
         )
     {
         // Set up real value, which should be configired before CM would be launched
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditManager.setCollateralTokenData(
             underlying,
             uint16(PERCENTAGE_FACTOR - DEFAULT_FEE_LIQUIDATION - DEFAULT_LIQUIDATION_PREMIUM),
@@ -147,25 +147,25 @@ contract CreditManagerTestSuite is PoolDeployer {
 
         borrowedAmount = _borrowedAmount;
 
-        cumulativeIndexAtOpen = RAY;
-        poolMock.setCumulative_RAY(cumulativeIndexAtOpen);
+        cumulativeIndexLastUpdate = RAY;
+        poolMock.setCumulative_RAY(cumulativeIndexLastUpdate);
 
-        evm.prank(creditFacade);
+        vm.prank(creditFacade);
 
         // Existing address case
-        creditAccount = creditManager.openCreditAccount(borrowedAmount, USER);
+        creditAccount = creditManager.openCreditAccount(borrowedAmount, USER, false);
 
         // Increase block number cause it's forbidden to close credit account in the same block
-        evm.roll(block.number + 1);
+        vm.roll(block.number + 1);
 
-        cumulativeIndexAtClose = (cumulativeIndexAtOpen * 12) / 10;
+        cumulativeIndexAtClose = (cumulativeIndexLastUpdate * 12) / 10;
         poolMock.setCumulative_RAY(cumulativeIndexAtClose);
     }
 
     function makeTokenQuoted(address token, uint16 rate, uint96 limit) external {
         require(supportsQuotas, "Test suite does not support quotas");
 
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
         gaugeMock.addQuotaToken(token, rate);
         poolQuotaKeeper.setTokenLimit(token, limit);
 
@@ -176,6 +176,6 @@ contract CreditManagerTestSuite is PoolDeployer {
 
         creditManager.setQuotedMask(limitedMask | tokenMask);
 
-        evm.stopPrank();
+        vm.stopPrank();
     }
 }

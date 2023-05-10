@@ -8,7 +8,7 @@ import {CreditConfigurator} from "../../credit/CreditConfiguratorV3.sol";
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
 
-import {AccountFactoryV2} from "../../core/AccountFactory.sol";
+import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
 import {CreditManagerFactory} from "../../factories/CreditManagerFactory.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -77,7 +77,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
             "Gear-Degen"
         );
 
-            evm.prank(CONFIGURATOR);
+            vm.prank(CONFIGURATOR);
             degenNFT.setMinter(CONFIGURATOR);
 
             cmOpts.degenNFT = address(degenNFT);
@@ -95,40 +95,40 @@ contract CreditFacadeTestSuite is PoolDeployer {
         creditFacade = cmf.creditFacade();
         creditConfigurator = cmf.creditConfigurator();
 
-        evm.prank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         cr.addCreditManager(address(creditManager));
 
         if (withDegenNFT) {
-            evm.prank(CONFIGURATOR);
+            vm.prank(CONFIGURATOR);
             degenNFT.addCreditFacade(address(creditFacade));
         }
 
         if (withExpiration) {
-            evm.prank(CONFIGURATOR);
+            vm.prank(CONFIGURATOR);
             creditConfigurator.setExpirationDate(uint40(block.timestamp + 1));
         }
 
         if (accountFactoryVer == 2) {
-            evm.prank(CONFIGURATOR);
-            AccountFactoryV2(address(af)).addCreditManager(address(creditManager));
+            vm.prank(CONFIGURATOR);
+            AccountFactoryV3(address(af)).addCreditManager(address(creditManager), 1);
         }
 
         if (supportQuotas) {
-            evm.prank(CONFIGURATOR);
+            vm.prank(CONFIGURATOR);
             poolQuotaKeeper.addCreditManager(address(creditManager));
         }
 
-        evm.label(address(poolMock), "Pool");
-        evm.label(address(creditFacade), "CreditFacadeV3");
-        evm.label(address(creditManager), "CreditManagerV3");
-        evm.label(address(creditConfigurator), "CreditConfigurator");
+        vm.label(address(poolMock), "Pool");
+        vm.label(address(creditFacade), "CreditFacadeV3");
+        vm.label(address(creditManager), "CreditManagerV3");
+        vm.label(address(creditConfigurator), "CreditConfigurator");
 
         tokenTestSuite.mint(underlying, USER, creditAccountAmount);
         tokenTestSuite.mint(underlying, FRIEND, creditAccountAmount);
 
-        evm.prank(USER);
+        vm.prank(USER);
         IERC20(underlying).approve(address(creditManager), type(uint256).max);
-        evm.prank(FRIEND);
+        vm.prank(FRIEND);
         IERC20(underlying).approve(address(creditManager), type(uint256).max);
     }
 }
