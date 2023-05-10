@@ -2441,4 +2441,88 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
 
         // assertEq(creditManager.liquidationThresholds(usdc), newLT, "LT at ramping end incorrect");
     }
+
+    //     /// @notice [UA-3]: UniversalAdapter `revokeAllowances` reverts if passed zero address
+    //     function test_UA_03_revokeAllowances_reverts_if_passed_zero_address() public {
+    //         _openTestCreditAccount();
+
+    //         RevocationPair[] memory revocations = new RevocationPair[](1);
+
+    //         vm.prank(USER);
+    //         revocations[0] = RevocationPair({spender: address(0), token: usdc});
+    //         vm.expectRevert(ZeroAddressException.selector);
+    //         creditFacade.multicall(
+    //             multicallBuilder(
+    //                 MultiCall({
+    //                     target: address(universalAdapter),
+    //                     callData: abi.encodeCall(universalAdapter.revokeAdapterAllowances, (revocations))
+    //                 })
+    //             )
+    //         );
+
+    //         vm.prank(USER);
+    //         revocations[0] = RevocationPair({spender: address(targetMock1), token: address(0)});
+    //         vm.expectRevert(ZeroAddressException.selector);
+    //         creditFacade.multicall(
+    //             multicallBuilder(
+    //                 MultiCall({
+    //                     target: address(universalAdapter),
+    //                     callData: abi.encodeCall(universalAdapter.revokeAdapterAllowances, (revocations))
+    //                 })
+    //             )
+    //         );
+    //     }
+
+    //     /// @notice [UA-4]: UniversalAdapter `revokeAllowances` works as expected
+    //     function test_UA_04_revokeAllowances_works_as_expected() public {
+    //         (address creditAccount,) = _openTestCreditAccount();
+
+    //         vm.prank(USER);
+    //         creditFacade.multicall(
+    //             multicallBuilder(
+    //                 MultiCall({
+    //                     target: address(adapterMock1),
+    //                     callData: abi.encodeCall(adapterMock1.approveToken, (usdc, 10))
+    //                 }),
+    //                 MultiCall({
+    //                     target: address(adapterMock1),
+    //                     callData: abi.encodeCall(adapterMock1.approveToken, (dai, 20))
+    //                 }),
+    //                 MultiCall({
+    //                     target: address(adapterMock2),
+    //                     callData: abi.encodeCall(adapterMock2.approveToken, (dai, 30))
+    //                 })
+    //             )
+    //         );
+
+    //         RevocationPair[] memory revocations = new RevocationPair[](3);
+    //         revocations[0] = RevocationPair({spender: address(targetMock1), token: usdc});
+    //         revocations[1] = RevocationPair({spender: address(targetMock2), token: usdc});
+    //         revocations[2] = RevocationPair({spender: address(targetMock2), token: dai});
+
+    //         vm.expectCall(
+    //             address(creditManager),
+    //             abi.encodeCall(ICreditManagerV3.approveCreditAccount, (address(targetMock1), usdc, 1))
+    //         );
+    //         vm.expectCall(
+    //             address(creditManager),
+    //             abi.encodeCall(ICreditManagerV3.approveCreditAccount, (address(targetMock2), dai, 1))
+    //         );
+
+    //         vm.prank(USER);
+    //         creditFacade.multicall(
+    //             multicallBuilder(
+    //                 MultiCall({
+    //                     target: address(universalAdapter),
+    //                     callData: abi.encodeCall(universalAdapter.revokeAdapterAllowances, (revocations))
+    //                 })
+    //             )
+    //         );
+
+    //         expectAllowance(usdc, creditAccount, address(targetMock1), 1);
+    //         expectAllowance(dai, creditAccount, address(targetMock1), 20);
+    //         expectAllowance(usdc, creditAccount, address(targetMock2), 0);
+    //         expectAllowance(dai, creditAccount, address(targetMock2), 1);
+    //     }
+    // }
 }

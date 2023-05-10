@@ -12,7 +12,7 @@ import "../interfaces/IExceptions.sol";
 
 uint256 constant INDEX_PRECISION = 10 ** 9;
 
-/// @title Quota Library
+/// @title Credit Logic Library
 library CreditLogic {
     using BitMask for uint256;
 

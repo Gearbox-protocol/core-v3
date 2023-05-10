@@ -12,13 +12,15 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 // LIBS & TRAITS
 import {UNDERLYING_TOKEN_MASK, BitMask} from "../libraries/BitMask.sol";
 import {CreditLogic} from "../libraries/CreditLogic.sol";
+import {CreditAccountHelper} from "../libraries/CreditAccountHelper.sol";
+
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 import {IERC20Helper} from "../libraries/IERC20Helper.sol";
 
 // INTERFACES
 import {IAccountFactory, TakeAccountAction} from "../interfaces/IAccountFactory.sol";
-import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
+import {ICreditAccount} from "../interfaces/ICreditAccount.sol";
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
 import {IPool4626} from "../interfaces/IPool4626.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
@@ -65,6 +67,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     using CreditLogic for CollateralTokenData;
     using SafeERC20 for IERC20;
     using IERC20Helper for IERC20;
+    using CreditAccountHelper for ICreditAccount;
 
     // IMMUTABLE PARAMS
     /// @dev contract version
@@ -432,7 +435,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             }
 
             // Pays the amount back to the pool
-            _creditAccountSafeTransfer(creditAccount, underlying, pool, amount); // F:[CM-21]
+            ICreditAccount(creditAccount)._safeTransfer(underlying, pool, amount); // F:[CM-21]
             {
                 uint256 amountToRepay;
                 uint256 profit;
@@ -510,36 +513,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         // sell them off
         getTokenMaskOrRevert(token);
 
-        // Attempts to set allowance directly to the required amount
-        // If unsuccessful, assumes that the token requires setting allowance to zero first
-        if (!_approve(token, targetContract, creditAccount, amount, false)) {
-            _approve(token, targetContract, creditAccount, 0, true); // F:
-            _approve(token, targetContract, creditAccount, amount, true);
-        }
-    }
-
-    /// @dev Internal function used to approve token from a Credit Account
-    /// Uses Credit Account's execute to properly handle both ERC20-compliant and
-    /// non-compliant (no returned value from "approve") tokens
-    function _approve(address token, address targetContract, address creditAccount, uint256 amount, bool revertIfFailed)
-        internal
-        returns (bool)
-    {
-        // Makes a low-level call to approve from the Credit Account
-        // and parses the value. If nothing or true was returned,
-        // assumes that the call succeeded
-        try ICreditAccount(creditAccount).execute(token, abi.encodeCall(IERC20.approve, (targetContract, amount)))
-        returns (bytes memory result) {
-            if (result.length == 0 || abi.decode(result, (bool)) == true) {
-                return true;
-            }
-        } catch {}
-
-        // On the first try, failure is allowed to handle tokens
-        // that prohibit changing allowance from non-zero value;
-        // After that, failure results in a revert
-        if (revertIfFailed) revert AllowanceFailedException();
-        return false;
+        ICreditAccount(creditAccount).safeApprove(token, targetContract, amount);
     }
 
     /// @dev Requests a Credit Account to make a low-level call with provided data
@@ -906,29 +880,17 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         internal
     {
         if (convertToETH && token == wethAddress) {
-            _creditAccountSafeTransfer(creditAccount, token, wethGateway, amount); // F:[CM-45]
+            ICreditAccount(creditAccount).safeTransfer(token, wethGateway, amount); // F:[CM-45]
             IWETHGateway(wethGateway).depositFor(to, amount); // F:[CM-45]
         } else {
             try ICreditAccount(creditAccount).safeTransfer(token, to, amount) { // F:[CM-45]
             } catch {
-                uint256 delivered =
-                    _creditAccountSafeTransferBalanceControl(creditAccount, token, address(withdrawalManager), amount);
+                uint256 delivered = ICreditAccount(creditAccount).safeTransferDeliveredBalanceControl(
+                    token, address(withdrawalManager), amount
+                );
                 withdrawalManager.addImmediateWithdrawal(to, token, delivered);
             }
         }
-    }
-
-    function _creditAccountSafeTransfer(address creditAccount, address token, address to, uint256 amount) internal {
-        ICreditAccount(creditAccount).safeTransfer(token, to, amount);
-    }
-
-    function _creditAccountSafeTransferBalanceControl(address creditAccount, address token, address to, uint256 amount)
-        internal
-        returns (uint256 delivered)
-    {
-        uint256 balanceBefore = IERC20(token)._balanceOf(to);
-        _creditAccountSafeTransfer(creditAccount, token, to, amount);
-        delivered = IERC20(token)._balanceOf(to) - balanceBefore;
     }
 
     function _checkEnabledTokenLength(uint256 enabledTokensMask) internal view {
@@ -1279,7 +1241,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         uint256 tokenMask = getTokenMaskOrRevert(token);
 
         uint256 delivered =
-            _creditAccountSafeTransferBalanceControl(creditAccount, token, address(withdrawalManager), amount);
+            ICreditAccount(creditAccount).safeTransferDeliveredBalanceControl(token, address(withdrawalManager), amount);
 
         withdrawalManager.addScheduledWithdrawal(creditAccount, token, delivered, tokenMask.calcIndex());
 
