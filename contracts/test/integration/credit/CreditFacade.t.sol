@@ -65,7 +65,7 @@ uint16 constant REFERRAL_CODE = 23;
 
 /// @title CreditFacadeTest
 /// @notice Designed for unit test purposes only
-contract CreditFacadeTest is
+contract CreditFacadeIntegrationTest is
     Test,
     BalanceHelper,
     CreditFacadeTestHelper,

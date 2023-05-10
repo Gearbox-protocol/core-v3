@@ -314,7 +314,7 @@ library CreditLogic {
             forbiddenBalances = new uint256[](forbiddenTokensOnAccount.calcEnabledTokens());
             unchecked {
                 uint256 i;
-                for (uint256 tokenMask; tokenMask < forbiddenTokensOnAccount; tokenMask <<= 1) {
+                for (uint256 tokenMask = 1; tokenMask < forbiddenTokensOnAccount; tokenMask <<= 1) {
                     if (forbiddenTokensOnAccount & tokenMask != 0) {
                         address token = getTokenByMaskFn(tokenMask);
                         forbiddenBalances[i] = _balanceOf(token, creditAccount);
@@ -341,7 +341,7 @@ library CreditLogic {
 
         unchecked {
             uint256 i;
-            for (uint256 tokenMask; tokenMask < forbiddenTokensOnAccountBefore; tokenMask <<= 1) {
+            for (uint256 tokenMask = 1; tokenMask < forbiddenTokensOnAccountBefore; tokenMask <<= 1) {
                 if (forbiddenTokensOnAccountBefore & tokenMask != 0) {
                     if (forbiddenTokensOnAccount & tokenMask != 0) {
                         address token = getTokenByMaskFn(tokenMask);

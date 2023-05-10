@@ -57,7 +57,6 @@ import {Tokens} from "../../config/Tokens.sol";
 import {CreditFacadeTestSuite} from "../../suites/CreditFacadeTestSuite.sol";
 import {CreditConfig} from "../../config/CreditConfig.sol";
 
-import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
@@ -65,13 +64,7 @@ uint16 constant REFERRAL_CODE = 23;
 
 /// @title CreditFacadeTest
 /// @notice Designed for unit test purposes only
-contract CreditFacadeTest is
-    Test,
-    BalanceHelper,
-    CreditFacadeTestHelper,
-    ICreditManagerV3Events,
-    ICreditFacadeEvents
-{
+contract CreditFacadeTest is BalanceHelper, CreditFacadeTestHelper, ICreditManagerV3Events, ICreditFacadeEvents {
     using CreditFacadeCalls for CreditFacadeMulticaller;
 
     AccountFactory accountFactory;
@@ -922,9 +915,9 @@ contract CreditFacadeTest is
         creditFacade.liquidateCreditAccount(USER, address(0), 10, true, calls);
     }
 
-    //
-    // INCREASE & DECREASE DEBT
-    //
+    // //
+    // // INCREASE & DECREASE DEBT
+    // //
 
     /// @dev [FA-17]: increaseDebt executes function as expected
     function test_FA_17_increaseDebt_executes_actions_as_expected() public {
