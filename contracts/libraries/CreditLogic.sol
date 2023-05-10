@@ -337,7 +337,7 @@ library CreditLogic {
         if (forbiddenTokensOnAccount == 0) return;
 
         uint256 forbiddenTokensOnAccountBefore = enabledTokensMaskBefore & forbiddenTokenMask;
-        if (forbiddenTokensOnAccount & ~forbiddenTokensOnAccountBefore > 0) revert ForbiddenTokensException();
+        if (forbiddenTokensOnAccount & ~forbiddenTokensOnAccountBefore != 0) revert ForbiddenTokensException();
 
         unchecked {
             uint256 i;
