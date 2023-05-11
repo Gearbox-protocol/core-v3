@@ -311,7 +311,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
 
         // Sets borrower's Credit Account to zero address
         creditAccountInfo[creditAccount].borrower = address(0); // F:[CM-9]
-        creditAccountInfo[creditAccount].flags = 0;
 
         // Makes all computations needed to close credit account
 
