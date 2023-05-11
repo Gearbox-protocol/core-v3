@@ -176,6 +176,8 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
 
     function claimWithdrawals(address creditAccount, address to) external;
 
+    function setBotPermissions(address creditAccount, address bot, uint192 permissions) external;
+
     //
     // GETTERS
     //

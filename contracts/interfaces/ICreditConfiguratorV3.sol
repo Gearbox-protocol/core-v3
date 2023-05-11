@@ -146,7 +146,12 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
     /// @param token Token to ramp LT for
     /// @param liquidationThresholdFinal Liquidation threshold after ramping
     /// @param rampDuration Duration of ramping
-    function rampLiquidationThreshold(address token, uint16 liquidationThresholdFinal, uint24 rampDuration) external;
+    function rampLiquidationThreshold(
+        address token,
+        uint16 liquidationThresholdFinal,
+        uint40 rampStart,
+        uint24 rampDuration
+    ) external;
 
     /// @dev Allow a known collateral token if it was forbidden before.
     /// @param token Address of collateral token

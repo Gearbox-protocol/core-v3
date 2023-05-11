@@ -1231,6 +1231,6 @@ contract CreditConfiguratorTest is Test, ICreditManagerV3Events, ICreditConfigur
         );
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.rampLiquidationThreshold(usdc, 8900, 1000);
+        creditConfigurator.rampLiquidationThreshold(usdc, 8900, uint40(block.timestamp + 5), 1000);
     }
 }

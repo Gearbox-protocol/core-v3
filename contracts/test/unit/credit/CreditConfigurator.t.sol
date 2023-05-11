@@ -379,7 +379,7 @@ contract CreditConfiguratorTest is Test, ICreditManagerV3Events, ICreditConfigur
         creditConfigurator.setMaxEnabledTokens(1);
 
         vm.expectRevert(CallerNotControllerException.selector);
-        creditConfigurator.rampLiquidationThreshold(DUMB_ADDRESS, 0, 0);
+        creditConfigurator.rampLiquidationThreshold(DUMB_ADDRESS, 0, 0, 0);
     }
 
     //
@@ -1212,11 +1212,11 @@ contract CreditConfiguratorTest is Test, ICreditManagerV3Events, ICreditConfigur
 
         vm.expectRevert(SetLTForUnderlyingException.selector);
         vm.prank(CONFIGURATOR);
-        creditConfigurator.rampLiquidationThreshold(dai, 9000, 1);
+        creditConfigurator.rampLiquidationThreshold(dai, 9000, uint40(block.timestamp), 1);
 
         vm.expectRevert(IncorrectLiquidationThresholdException.selector);
         vm.prank(CONFIGURATOR);
-        creditConfigurator.rampLiquidationThreshold(usdc, 9999, 1);
+        creditConfigurator.rampLiquidationThreshold(usdc, 9999, uint40(block.timestamp), 1);
 
         uint16 initialLT = creditManager.liquidationThresholds(usdc);
 
@@ -1231,6 +1231,6 @@ contract CreditConfiguratorTest is Test, ICreditManagerV3Events, ICreditConfigur
         );
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.rampLiquidationThreshold(usdc, 8900, 1000);
+        creditConfigurator.rampLiquidationThreshold(usdc, 8900, uint40(block.timestamp), 1000);
     }
 }
