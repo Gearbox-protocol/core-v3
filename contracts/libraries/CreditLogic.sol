@@ -304,7 +304,7 @@ library CreditLogic {
         uint256 len = expected.length; // F:[FA-45]
         unchecked {
             for (uint256 i = 0; i < len; ++i) {
-                if (IERC20(expected[i].token)._balanceOf(creditAccount) < expected[i].balance) {
+                if (IERC20Helper._balanceOf(expected[i].token, creditAccount) < expected[i].balance) {
                     revert BalanceLessThanMinimumDesiredException(expected[i].token);
                 } // F:[FA-45]
             }
