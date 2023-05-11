@@ -9,7 +9,7 @@ import {ICreditManagerV3} from "./ICreditManagerV3.sol";
 
 /// @title Adapter interface
 interface IAdapter {
-    /// @notice Credit Manager the adapter is connected to
+    /// @notice Credit manager the adapter is connected to
     function creditManager() external view returns (ICreditManagerV3);
 
     /// @notice Address of the contract the adapter is interacting with
