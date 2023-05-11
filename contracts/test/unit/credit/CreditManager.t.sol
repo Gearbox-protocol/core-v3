@@ -1180,18 +1180,6 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
     // TRANSFER ACCOUNT OWNERSHIP
     //
 
-    /// @dev [CM-23]: transferAccountOwnership reverts if to equals 0 or creditAccount is linked with "to" address
-
-    function test_CM_23_transferAccountOwnership_reverts_if_account_exists() public {
-        // _openCreditAccount();
-
-        // creditManager.openCreditAccount(1, FRIEND);
-
-        // // Existing account case
-        // vm.expectRevert(UserAlreadyHasAccountException.selector);
-        // creditManager.transferAccountOwnership(FRIEND, USER);
-    }
-
     /// @dev [CM-24]: transferAccountOwnership changes creditAccounts map properly
 
     function test_CM_24_transferAccountOwnership_changes_creditAccounts_map_properly() public {
@@ -1532,153 +1520,6 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
     }
 
     //
-    // CALC CLOSE PAYMENT PURE
-    //
-    struct CalcClosePaymentsPureTestCase {
-        string name;
-        uint256 totalValue;
-        ClosureAction closureActionType;
-        uint256 borrowedAmount;
-        uint256 borrowedAmountWithInterest;
-        uint256 amountToPool;
-        uint256 remainingFunds;
-        uint256 profit;
-        uint256 loss;
-    }
-
-    /// @dev [CM-43]: calcClosePayments computes
-    function test_CM_43_calcClosePayments_test() public {
-        // vm.prank(CONFIGURATOR);
-
-        // creditManager.setParams(
-        //     1000, // feeInterest: 10% , it doesn't matter this test
-        //     200, // feeLiquidation: 2%, it doesn't matter this test
-        //     9500, // liquidationPremium: 5%, it doesn't matter this test
-        //     100, // feeLiquidationExpired: 1%
-        //     9800 // liquidationPremiumExpired: 2%
-        // );
-
-        // CalcClosePaymentsPureTestCase[7] memory cases = [
-        //     CalcClosePaymentsPureTestCase({
-        //         name: "CLOSURE",
-        //         totalValue: 0,
-        //         closureActionType: ClosureAction.CLOSE_ACCOUNT,
-        //         borrowedAmount: 1000,
-        //         borrowedAmountWithInterest: 1100,
-        //         amountToPool: 1110, // amountToPool = 1100 + 100 * 10% = 1110
-        //         remainingFunds: 0,
-        //         profit: 10, // profit: 100 (interest) * 10% = 10
-        //         loss: 0
-        //     }),
-        //     CalcClosePaymentsPureTestCase({
-        //         name: "LIQUIDATION WITH PROFIT & REMAINING FUNDS",
-        //         totalValue: 2000,
-        //         closureActionType: ClosureAction.LIQUIDATE_ACCOUNT,
-        //         borrowedAmount: 1000,
-        //         borrowedAmountWithInterest: 1100,
-        //         amountToPool: 1150, // amountToPool = 1100 + 100 * 10% + 2000 * 2% = 1150
-        //         remainingFunds: 749, //remainingFunds: 2000 * (100% - 5%) - 1150 - 1 = 749
-        //         profit: 50,
-        //         loss: 0
-        //     }),
-        //     CalcClosePaymentsPureTestCase({
-        //         name: "LIQUIDATION WITH PROFIT & ZERO REMAINING FUNDS",
-        //         totalValue: 2100,
-        //         closureActionType: ClosureAction.LIQUIDATE_ACCOUNT,
-        //         borrowedAmount: 900,
-        //         borrowedAmountWithInterest: 1900,
-        //         amountToPool: 1995, // amountToPool =  1900 + 1000 * 10% + 2100 * 2% = 2042,  totalFunds = 2100 * 95% = 1995, so, amount to pool would be 1995
-        //         remainingFunds: 0, // remainingFunds: 2000 * (100% - 5%) - 1150 - 1 = 749
-        //         profit: 95,
-        //         loss: 0
-        //     }),
-        //     CalcClosePaymentsPureTestCase({
-        //         name: "LIQUIDATION WITH LOSS",
-        //         totalValue: 1000,
-        //         closureActionType: ClosureAction.LIQUIDATE_ACCOUNT,
-        //         borrowedAmount: 900,
-        //         borrowedAmountWithInterest: 1900,
-        //         amountToPool: 950, // amountToPool =  1900 + 1000 * 10% + 1000 * 2% = 2020, totalFunds = 1000 * 95% = 950, So, amount to pool would be 950
-        //         remainingFunds: 0, // 0, cause it's loss
-        //         profit: 0,
-        //         loss: 950
-        //     }),
-        //     CalcClosePaymentsPureTestCase({
-        //         name: "LIQUIDATION OF EXPIRED WITH PROFIT & REMAINING FUNDS",
-        //         totalValue: 2000,
-        //         closureActionType: ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT,
-        //         borrowedAmount: 1000,
-        //         borrowedAmountWithInterest: 1100,
-        //         amountToPool: 1130, // amountToPool = 1100 + 100 * 10% + 2000 * 1% = 1130
-        //         remainingFunds: 829, //remainingFunds: 2000 * (100% - 2%) - 1130 - 1 = 829
-        //         profit: 30,
-        //         loss: 0
-        //     }),
-        //     CalcClosePaymentsPureTestCase({
-        //         name: "LIQUIDATION OF EXPIRED WITH PROFIT & ZERO REMAINING FUNDS",
-        //         totalValue: 2100,
-        //         closureActionType: ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT,
-        //         borrowedAmount: 900,
-        //         borrowedAmountWithInterest: 2000,
-        //         amountToPool: 2058, // amountToPool =  2000 + 1100 * 10% + 2100 * 1% = 2131,  totalFunds = 2100 * 98% = 2058, so, amount to pool would be 2058
-        //         remainingFunds: 0,
-        //         profit: 58,
-        //         loss: 0
-        //     }),
-        //     CalcClosePaymentsPureTestCase({
-        //         name: "LIQUIDATION OF EXPIRED WITH LOSS",
-        //         totalValue: 1000,
-        //         closureActionType: ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT,
-        //         borrowedAmount: 900,
-        //         borrowedAmountWithInterest: 1900,
-        //         amountToPool: 980, // amountToPool =  1900 + 1000 * 10% + 1000 * 2% = 2020, totalFunds = 1000 * 98% = 980, So, amount to pool would be 980
-        //         remainingFunds: 0, // 0, cause it's loss
-        //         profit: 0,
-        //         loss: 920
-        //     })
-        //     // CalcClosePaymentsPureTestCase({
-        //     //     name: "LIQUIDATION WHILE PAUSED WITH REMAINING FUNDS",
-        //     //     totalValue: 2000,
-        //     //     closureActionType: ClosureAction.LIQUIDATE_PAUSED,
-        //     //     borrowedAmount: 1000,
-        //     //     borrowedAmountWithInterest: 1100,
-        //     //     amountToPool: 1150, // amountToPool = 1100 + 100 * 10%  + 2000 * 2% = 1150
-        //     //     remainingFunds: 849, //remainingFunds: 2000 - 1150 - 1 = 869
-        //     //     profit: 50,
-        //     //     loss: 0
-        //     // }),
-        //     // CalcClosePaymentsPureTestCase({
-        //     //     name: "LIQUIDATION OF EXPIRED WITH LOSS",
-        //     //     totalValue: 1000,
-        //     //     closureActionType: ClosureAction.LIQUIDATE_PAUSED,
-        //     //     borrowedAmount: 900,
-        //     //     borrowedAmountWithInterest: 1900,
-        //     //     amountToPool: 1000, // amountToPool =  1900 + 1000 * 10% + 1000 * 2% = 2020, totalFunds = 1000 * 98% = 980, So, amount to pool would be 980
-        //     //     remainingFunds: 0, // 0, cause it's loss
-        //     //     profit: 0,
-        //     //     loss: 900
-        //     // })
-        // ];
-
-        // for (uint256 i = 0; i < cases.length; i++) {
-        //     (uint256 amountToPool, uint256 remainingFunds, uint256 profit, uint256 loss) = creditManager
-        //         .calcClosePayments(
-        //         cases[i].totalValue,
-        //         cases[i].closureActionType,
-        //         cases[i].borrowedAmount,
-        //         cases[i].borrowedAmountWithInterest
-        //     );
-
-        //     assertEq(amountToPool, cases[i].amountToPool, string(abi.encodePacked(cases[i].name, ": amountToPool")));
-        //     assertEq(
-        //         remainingFunds, cases[i].remainingFunds, string(abi.encodePacked(cases[i].name, ": remainingFunds"))
-        //     );
-        //     assertEq(profit, cases[i].profit, string(abi.encodePacked(cases[i].name, ": profit")));
-        //     assertEq(loss, cases[i].loss, string(abi.encodePacked(cases[i].name, ": loss")));
-        // }
-    }
-
-    //
     // TRASNFER ASSETS TO
     //
 
@@ -1793,31 +1634,6 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
             // );
         }
     }
-
-    //
-    // DISABLE TOKEN
-    //
-
-    // /// @dev [CM-46]: _disableToken disabale tokens and do not enable it if called twice
-    // function test_CM_46__disableToken_disabale_tokens_and_do_not_enable_it_if_called_twice() public {
-    //     // It enables  CreditManagerTestInternal for some test cases
-    //     _connectCreditManagerSuite(Tokens.DAI, true);
-
-    //     address creditAccount = _openAccountAndTransferToCF();
-
-    //     address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
-    //     // creditManager.checkAndEnableToken(usdcToken);
-
-    //     expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
-
-    //     CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
-
-    //     cmi.disableToken(usdcToken);
-    //     expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
-
-    //     cmi.disableToken(usdcToken);
-    //     expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
-    // }
 
     /// @dev [CM-47]: collateralTokens works as expected
     function test_CM_47_collateralTokens_works_as_expected(address newToken, uint16 newLT) public {
@@ -2008,21 +1824,6 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         creditManager.setCollateralTokenData(DUMB_ADDRESS, 8000, 8000, type(uint40).max, 0);
     }
 
-    // //
-    // // SET FORBID MASK
-    // //
-    // /// @dev [CM-55]: setForbidMask sets forbidMask correctly
-    // function test_CM_55_setForbidMask_sets_forbidMask_correctly() public {
-    //     uint256 expectedForbidMask = 244;
-
-    //     assertTrue(creditManager.forbiddenTokenMask() != expectedForbidMask, "expectedForbidMask is already the same");
-
-    //     vm.prank(CONFIGURATOR);
-    //     creditManager.setForbidMask(expectedForbidMask);
-
-    //     assertEq(creditManager.forbiddenTokenMask(), expectedForbidMask, "ForbidMask is not set correctly");
-    // }
-
     //
     // CHANGE CONTRACT AllowanceAction
     //
@@ -2148,85 +1949,6 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         creditManager.setMaxEnabledTokens(255);
 
         assertEq(creditManager.maxAllowedEnabledTokenLength(), 255, "Incorrect max enabled tokens");
-    }
-
-    // /// @dev [CM-64]: closeCreditAccount reverts when attempting to liquidate while paused,
-    // /// and the payer is not set as emergency liquidator
-
-    // function test_CM_64_closeCreditAccount_reverts_when_paused_and_liquidator_not_privileged() public {
-    //     vm.prank(CONFIGURATOR);
-    //     creditManager.pause();
-
-    //     vm.expectRevert("Pausable: paused");
-    //     // creditManager.closeCreditAccount(USER, ClosureAction.LIQUIDATE_ACCOUNT, 0, LIQUIDATOR, FRIEND, 0, false);
-    // }
-
-    // /// @dev [CM-65]: Emergency liquidator can't close an account instead of liquidating
-
-    // function test_CM_65_closeCreditAccount_reverts_when_paused_and_liquidator_tries_to_close() public {
-    //     vm.startPrank(CONFIGURATOR);
-    //     creditManager.pause();
-    //     creditManager.addEmergencyLiquidator(LIQUIDATOR);
-    //     vm.stopPrank();
-
-    //     vm.expectRevert("Pausable: paused");
-    //     // creditManager.closeCreditAccount(USER, ClosureAction.CLOSE_ACCOUNT, 0, LIQUIDATOR, FRIEND, 0, false);
-    // }
-
-    /// @dev [CM-66]: calcNewCumulativeIndex works correctly for various values
-    function test_CM_66_calcNewCumulativeIndex_is_correct(
-        uint128 borrowedAmount,
-        uint256 indexAtOpen,
-        uint256 indexNow,
-        uint128 delta,
-        bool isIncrease
-    ) public {
-        // vm.assume(borrowedAmount > 100);
-        // vm.assume(uint256(borrowedAmount) + uint256(delta) <= 2 ** 128 - 1);
-
-        // indexNow = indexNow < RAY ? indexNow + RAY : indexNow;
-        // indexAtOpen = indexAtOpen < RAY ? indexAtOpen + RAY : indexNow;
-
-        // vm.assume(indexNow <= 100 * RAY);
-        // vm.assume(indexNow >= indexAtOpen);
-        // vm.assume(indexNow - indexAtOpen < 10 * RAY);
-
-        // uint256 interest = uint256((borrowedAmount * indexNow) / indexAtOpen - borrowedAmount);
-
-        // vm.assume(interest > 1);
-
-        // if (!isIncrease && (delta > interest)) delta %= uint128(interest);
-
-        // CreditManagerTestInternal cmi = new CreditManagerTestInternal(
-        //     creditManager.poolService(), address(withdrawalManager)
-        // );
-
-        // if (isIncrease) {
-        //     uint256 newIndex = CreditLogic.calcNewCumulativeIndex(borrowedAmount, delta, indexNow, indexAtOpen, true);
-
-        //     uint256 newInterestError = ((borrowedAmount + delta) * indexNow) / newIndex - (borrowedAmount + delta)
-        //         - ((borrowedAmount * indexNow) / indexAtOpen - borrowedAmount);
-
-        //     uint256 newTotalDebt = ((borrowedAmount + delta) * indexNow) / newIndex;
-
-        //     assertLe((RAY * newInterestError) / newTotalDebt, 10000, "Interest error is larger than 10 ** -23");
-        // } else {
-        //     uint256 newIndex = cmi.calcNewCumulativeIndex(borrowedAmount, delta, indexNow, indexAtOpen, false);
-
-        //     uint256 newTotalDebt = ((borrowedAmount * indexNow) / newIndex);
-        //     uint256 newInterestError = newTotalDebt - borrowedAmount - (interest - delta);
-
-        //     emit log_uint(indexNow);
-        //     emit log_uint(indexAtOpen);
-        //     emit log_uint(interest);
-        //     emit log_uint(delta);
-        //     emit log_uint(interest - delta);
-        //     emit log_uint(newTotalDebt);
-        //     emit log_uint(borrowedAmount);
-        //     emit log_uint(newInterestError);
-
-        //     assertLe((RAY * newInterestError) / newTotalDebt, 10000, "Interest error is larger than 10 ** -23");
-        // }
     }
 
     // /// @dev [CM-67]: checkEmergencyPausable returns pause state and enable emergencyLiquidation if needed
