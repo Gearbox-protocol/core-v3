@@ -4,7 +4,6 @@
 pragma solidity ^0.8.10;
 
 import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
-import {QuotaUpdate} from "./IPoolQuotaKeeper.sol";
 import {RevocationPair} from "./ICreditManagerV3.sol";
 
 uint256 constant ADD_COLLATERAL_PERMISSION = 1;
@@ -13,13 +12,13 @@ uint256 constant DECREASE_DEBT_PERMISSION = 2 ** 2;
 uint256 constant ENABLE_TOKEN_PERMISSION = 2 ** 3;
 uint256 constant DISABLE_TOKEN_PERMISSION = 2 ** 4;
 uint256 constant WITHDRAW_PERMISSION = 2 ** 5;
-uint256 constant UPDATE_QUOTAS_PERMISSION = 2 ** 6;
+uint256 constant UPDATE_QUOTA_PERMISSION = 2 ** 6;
 uint256 constant REVOKE_ALLOWANCES_PERMISSION = 2 ** 7;
 uint256 constant EXTERNAL_CALLS_PERMISSION = 2 ** 16;
 
 uint256 constant ALL_CREDIT_FACADE_CALLS_PERMISSION = ADD_COLLATERAL_PERMISSION | INCREASE_DEBT_PERMISSION
     | DECREASE_DEBT_PERMISSION | ENABLE_TOKEN_PERMISSION | DISABLE_TOKEN_PERMISSION | WITHDRAW_PERMISSION
-    | UPDATE_QUOTAS_PERMISSION | REVOKE_ALLOWANCES_PERMISSION;
+    | UPDATE_QUOTA_PERMISSION | REVOKE_ALLOWANCES_PERMISSION;
 
 uint256 constant ALL_PERMISSIONS = ALL_CREDIT_FACADE_CALLS_PERMISSION | EXTERNAL_CALLS_PERMISSION;
 
@@ -38,7 +37,7 @@ interface ICreditFacadeMulticall {
     ///         itself and can only be used within a multicall
     function revertIfReceivedLessThan(Balance[] memory expected) external;
 
-    /// @dev Enables token in enabledTokenMask for the Credit Account of msg.sender
+    /// @dev Enables token in enabledTokensMask for the Credit Account of msg.sender
     /// @param token Address of token to enable
     function enableToken(address token) external;
 
@@ -70,9 +69,8 @@ interface ICreditFacadeMulticall {
     /// @param amount Amount to increase borrowed amount
     function decreaseDebt(uint256 amount) external;
 
-    /// @dev Update msg.sender's Credit Account quotas for multiple tokens
-    /// @param quotaUpdates Requested quota updates, see `QuotaUpdate`
-    function updateQuotas(QuotaUpdate[] memory quotaUpdates) external;
+    /// @dev Update msg.sender's Credit Account quota
+    function updateQuota(address token, int96 quotaChange) external;
 
     /// @dev Set collateral hints for a full check
     /// @param collateralHints Array of token mask in the desired order of checking
@@ -80,7 +78,7 @@ interface ICreditFacadeMulticall {
     ///                        Cannot be lower than PERCENTAGE_FACTOR.
     function setFullCheckParams(uint256[] memory collateralHints, uint16 minHealthFactor) external;
 
-    function withdraw(address to, address token, uint256 amount) external;
+    function scheduleWithdrawal(address token, uint256 amount) external;
 
     function revokeAdapterAllowances(RevocationPair[] calldata revocations) external;
 }

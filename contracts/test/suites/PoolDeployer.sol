@@ -11,14 +11,15 @@ import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/Contra
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 import {GenesisFactory} from "./GenesisFactory.sol";
 import {PoolFactory, PoolOpts} from "@gearbox-protocol/core-v2/contracts/factories/PoolFactory.sol";
-import {WithdrawManager} from "../../support/WithdrawManager.sol";
+import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
 
-import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfigurator.sol";
+import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 import {PoolServiceMock} from "../mocks/pool/PoolServiceMock.sol";
 import {GaugeMock} from "../mocks/pool/GaugeMock.sol";
 import {PoolQuotaKeeper} from "../../pool/PoolQuotaKeeper.sol";
 
 import "../lib/constants.sol";
+import {Test} from "forge-std/Test.sol";
 
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 
@@ -27,16 +28,9 @@ struct PoolCreditOpts {
     CreditManagerOpts creditOpts;
 }
 
-// struct CollateralTokensItem {
-//     Tokens token;
-//     uint16 liquidationThreshold;
-// }
-
 /// @title CreditManagerTestSuite
 /// @notice Deploys contract for unit testing of CreditManagerV3.sol
-contract PoolDeployer is DSTest {
-    CheatCodes evm = CheatCodes(HEVM_ADDRESS);
-
+contract PoolDeployer is Test {
     AddressProvider public addressProvider;
     GenesisFactory public gp;
     AccountFactory public af;
@@ -44,7 +38,7 @@ contract PoolDeployer is DSTest {
     PoolQuotaKeeper public poolQuotaKeeper;
     GaugeMock public gaugeMock;
     ContractsRegister public cr;
-    WithdrawManager public withdrawManager;
+    WithdrawalManager public withdrawalManager;
     ACL public acl;
 
     IPriceOracleV2Ext public priceOracle;
@@ -84,7 +78,7 @@ contract PoolDeployer is DSTest {
 
         cr = ContractsRegister(addressProvider.getContractsRegister());
 
-        withdrawManager = new WithdrawManager(address(addressProvider));
+        withdrawalManager = new WithdrawalManager(address(addressProvider), 1 days);
 
         underlying = _underlying;
 
@@ -101,10 +95,20 @@ contract PoolDeployer is DSTest {
 
         gaugeMock = new GaugeMock(address(poolMock));
 
-        evm.label(address(gaugeMock), "Gauge");
+        vm.label(address(gaugeMock), "Gauge");
 
         poolQuotaKeeper.setGauge(address(gaugeMock));
 
         poolMock.setPoolQuotaKeeper(address(poolQuotaKeeper));
+
+        addressProvider.transferOwnership(CONFIGURATOR);
+        acl.transferOwnership(CONFIGURATOR);
+
+        vm.startPrank(CONFIGURATOR);
+
+        acl.claimOwnership();
+        addressProvider.claimOwnership();
+
+        vm.stopPrank();
     }
 }

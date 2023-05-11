@@ -4,9 +4,9 @@
 pragma solidity ^0.8.10;
 
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {IPoolQuotaKeeper, QuotaUpdate, TokenLT} from "./IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeper} from "./IPoolQuotaKeeper.sol";
+import {ClaimAction, IWithdrawalManager} from "./IWithdrawalManager.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
-import {CancellationType} from "./IWithdrawManager.sol";
 
 enum ClosureAction {
     CLOSE_ACCOUNT,
@@ -20,14 +20,35 @@ enum ManageDebtAction {
 }
 
 uint8 constant WITHDRAWAL_FLAG = 1;
+uint8 constant BOT_PERMISSIONS_SET_FLAG = 1 << 1;
 
 struct CreditAccountInfo {
     uint256 debt;
-    uint256 cumulativeIndexAtOpen;
+    uint256 cumulativeIndexLastUpdate;
     uint256 cumulativeQuotaInterest;
-    uint8 flags;
-    uint248 enabledTokensMask;
+    uint256 enabledTokensMask;
+    uint16 flags;
     address borrower;
+}
+
+enum CollateralCalcTask {
+    DEBT_ONLY,
+    DEBT_COLLATERAL_WITHOUT_WITHDRAWALS,
+    DEBT_COLLATERAL_CANCEL_WITHDRAWALS,
+    DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
+}
+
+struct CollateralDebtData {
+    uint256 debt;
+    uint256 accruedInterest;
+    uint256 accruedFees;
+    uint256 totalValue;
+    uint256 totalValueUSD;
+    uint256 twvUSD;
+    uint16 hf;
+    uint256 enabledTokensMask;
+    address[] quotedTokens;
+    bool isLiquidatable;
 }
 
 struct CollateralTokenData {
@@ -62,7 +83,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     ///  @dev Opens credit account and borrows funds from the pool.
     /// @param debt Amount to be borrowed by the Credit Account
     /// @param onBehalfOf The owner of the newly opened Credit Account
-    function openCreditAccount(uint256 debt, address onBehalfOf) external returns (address);
+    function openCreditAccount(uint256 debt, address onBehalfOf, bool deployNew) external returns (address);
 
     ///  @dev Closes a Credit Account - covers both normal closure and liquidation
     /// - Checks whether the contract is paused, and, if so, if the payer is an emergency liquidator.
@@ -83,22 +104,19 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// - If convertWETH is true, the function converts WETH into ETH before sending
     /// - Returns the Credit Account back to factory
     ///
-    /// @param borrower Borrower address
-    /// @param closureActionType Whether the account is closed, liquidated or liquidated due to expiry
-    /// @param totalValue Portfolio value for liqution, 0 for ordinary closure
+    /// @param creditAccount Credit account address
+    /// @param closureAction Whether the account is closed, liquidated or liquidated due to expiry
     /// @param payer Address which would be charged if credit account has not enough funds to cover amountToPool
     /// @param to Address to which the leftover funds will be sent
-    /// @param skipTokenMask Tokenmask contains 1 for tokens which needed to be skipped for sending
+    /// @param skipTokensMask Tokenmask contains 1 for tokens which needed to be skipped for sending
     /// @param convertWETH If true converts WETH to ETH
     function closeCreditAccount(
-        address borrower,
-        ClosureAction closureActionType,
-        uint256 totalValue,
+        address creditAccount,
+        ClosureAction closureAction,
+        CollateralDebtData memory collateralDebtData,
         address payer,
         address to,
-        uint256 enabledTokenMask,
-        uint256 skipTokenMask,
-        uint256 debtWithInterest,
+        uint256 skipTokensMask,
         bool convertWETH
     ) external returns (uint256 remainingFunds, uint256 loss);
 
@@ -117,10 +135,10 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @param creditAccount Address of the Credit Account to change debt for
     /// @param amount Amount to increase / decrease the principal by
     /// @param action Increase/decrease
-    /// @return newdebt The new debt principal
-    function manageDebt(address creditAccount, uint256 amount, uint256 _enabledTokensMask, ManageDebtAction action)
+    // @return newdebt The new debt principal
+    function manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)
         external
-        returns (uint256 newdebt, uint256 enableTokenMask);
+        returns (uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable);
 
     /// @dev Adds collateral to borrower's credit account
     /// @param payer Address of the account which will be charged to provide additional collateral
@@ -157,7 +175,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @param minHealthFactor Minimal health factor of the account, in PERCENTAGE format
     function fullCollateralCheck(
         address creditAccount,
-        uint256 enabledTokenMaskBefore,
+        uint256 enabledTokensMaskBefore,
         uint256[] memory collateralHints,
         uint16 minHealthFactor
     ) external;
@@ -166,10 +184,9 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     // QUOTAS MANAGEMENT
     //
 
-    /// @dev Updates credit account's quotas for multiple tokens
+    /// @dev Updates credit account's quotas
     /// @param creditAccount Address of credit account
-    /// @param quotaUpdates Requested quota updates, see `QuotaUpdate`
-    function updateQuotas(address creditAccount, QuotaUpdate[] memory quotaUpdates)
+    function updateQuota(address creditAccount, address token, int96 quotaChange)
         external
         returns (uint256 tokensToEnable, uint256 tokensToDisable);
 
@@ -182,41 +199,11 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @return borrower Borrower's address
     function getBorrowerOrRevert(address creditAccount) external view returns (address borrower);
 
-    /// @dev Computes amounts that must be sent to various addresses before closing an account
-    /// @param totalValue Credit Accounts total value in underlying
-    /// @param closureActionType Type of account closure
-    ///        * CLOSE_ACCOUNT: The account is healthy and is closed normally
-    ///        * LIQUIDATE_ACCOUNT: The account is unhealthy and is being liquidated to avoid bad debt
-    ///        * LIQUIDATE_EXPIRED_ACCOUNT: The account has expired and is being liquidated (lowered liquidation premium)
-    ///        * LIQUIDATE_PAUSED: The account is liquidated while the system is paused due to emergency (no liquidation premium)
-    /// @param debt Credit Account's debt principal
-    /// @param debtWithInterest Credit Account's debt principal + interest
-    /// @return amountToPool Amount of underlying to be sent to the pool
-    /// @return remainingFunds Amount of underlying to be sent to the borrower (only applicable to liquidations)
-    /// @return profit Protocol's profit from fees (if any)
-    /// @return loss Protocol's loss from bad debt (if any)
-    function calcClosePayments(
-        uint256 totalValue,
-        ClosureAction closureActionType,
-        uint256 debt,
-        uint256 debtWithInterest
-    ) external view returns (uint256 amountToPool, uint256 remainingFunds, uint256 profit, uint256 loss);
-
-    /// @dev Calculates the debt accrued by a Credit Account
-    /// @param creditAccount Address of the Credit Account
-    /// @return debt The debt principal
-    /// @return debtWithInterest The debt principal + accrued interest
-    /// @return debtWithInterestAndFees The debt principal + accrued interest and protocol fees
-    function calcCreditAccountAccruedInterest(address creditAccount)
-        external
-        view
-        returns (uint256 debt, uint256 debtWithInterest, uint256 debtWithInterestAndFees);
-
     /// @dev Maps Credit Accounts to bit masks encoding their enabled token sets
     /// Only enabled tokens are counted as collateral for the Credit Account
     /// @notice An enabled token mask encodes an enabled token by setting
     ///         the bit at the position equal to token's index to 1
-    function enabledTokensMap(address creditAccount) external view returns (uint256);
+    function enabledTokensMaskOf(address creditAccount) external view returns (uint256);
 
     /// @dev Returns the collateral token at requested index and its liquidation threshold
     /// @param id The index of token to return
@@ -230,7 +217,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
         returns (address token, uint16 liquidationThreshold);
 
     /// @dev Returns the array of quoted tokens that are enabled on the account
-    function getQuotedTokens(address creditAccount) external view returns (TokenLT[] memory tokens);
+    function getQuotedTokens(address creditAccount) external view returns (address[] memory tokens);
 
     /// @dev Total number of known collateral tokens.
     function collateralTokensCount() external view returns (uint8);
@@ -307,16 +294,19 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @dev Address of the connected Price Oracle
     function priceOracle() external view returns (IPriceOracleV2);
 
-    function calcTotalValue(address creditAccount)
+    function calcDebtAndCollateral(address creditAccount, CollateralCalcTask task)
         external
         view
-        returns (uint256 enabledTokenMask, uint256 total, uint256 twv, uint256 debtWithInterest, bool canBeLiquidated);
+        returns (CollateralDebtData memory collateralDebtData);
 
-    function withdraw(address creditAccount, address borrower, address token, uint256 amount)
+    /// @dev Withdrawal manager
+    function withdrawalManager() external view returns (IWithdrawalManager);
+
+    function scheduleWithdrawal(address creditAccount, address token, uint256 amount)
         external
         returns (uint256 tokensToDisable);
 
-    function cancelWithdrawals(address creditAccount, CancellationType ctype)
+    function claimWithdrawals(address creditAccount, address to, ClaimAction action)
         external
         returns (uint256 tokensToEnable);
 
@@ -324,11 +314,13 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @param revocations Spender/token pairs to revoke allowances for
     function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external;
 
-    function disableWithdrawalFlag(address creditAccount) external;
-
-    function setCaForExternalCall(address creditAccount) external;
+    function setCreditAccountForExternalCall(address creditAccount) external;
 
     function externalCallCreditAccountOrRevert() external view returns (address creditAccount);
 
     function getTokenByMask(uint256 tokenMask) external view returns (address token);
+
+    function flagsOf(address creditAccount) external view returns (uint16);
+
+    function setFlagFor(address creditAccount, uint16 flag, bool value) external;
 }

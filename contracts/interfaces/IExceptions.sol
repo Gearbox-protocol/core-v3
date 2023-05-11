@@ -62,7 +62,7 @@ error CallerNotControllerException();
 error CallerNotPausableAdminException();
 
 /// @dev Thrown on attempting to pause a contract as a non-Unpausable admin
-error CallerNotUnPausableAdminException();
+error CallerNotUnpausableAdminException();
 
 /// @dev Thrown when a gauge-only function is called by non-gauge
 error CallerNotGaugeException();
@@ -76,6 +76,9 @@ error CallerNotVoterException();
 /// @dev Thrown if an access-restricted function is called by an address that is not
 ///      the connected Credit Facade, or an allowed adapter
 error CallerNotAdapterException();
+
+/// @dev Thrown if an access-restricted function is called by an address that is not withdrawal manager
+error CallerNotWithdrawalManagerException();
 
 /// interface ICreditConfiguratorExceptions {
 
@@ -227,7 +230,8 @@ error LiquiditySanityCheckException();
 
 error ZeroCallsException();
 
-error NoFreeQithdrawalSlotsException();
+/// @dev Thrown when attempting to schedule withdrawal from a credit account that has no free withdrawal slots
+error NoFreeWithdrawalSlotsException();
 
 error NoPermissionException(uint256 permission);
 

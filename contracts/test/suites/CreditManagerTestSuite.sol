@@ -4,11 +4,11 @@
 pragma solidity ^0.8.10;
 
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
-import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfigurator.sol";
+import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
-import {WithdrawManager} from "../../support/WithdrawManager.sol";
-import {AccountFactoryV2} from "../../core/AccountFactory.sol";
+import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
+import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
 
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
@@ -57,15 +57,14 @@ contract CreditManagerTestSuite is PoolDeployer {
         tokenTestSuite = creditConfig.tokenTestSuite();
 
         creditManager = internalSuite
-            ? new CreditManagerTestInternal(address(poolMock), address(withdrawManager))
-            : new CreditManagerV3(address(poolMock), address(withdrawManager));
+            ? new CreditManagerTestInternal(address(poolMock), address(withdrawalManager))
+            : new CreditManagerV3(address(poolMock), address(withdrawalManager));
 
         creditFacade = msg.sender;
 
         creditManager.setCreditConfigurator(CONFIGURATOR);
 
-        evm.startPrank(CONFIGURATOR);
-
+        vm.startPrank(CONFIGURATOR);
         creditManager.setCreditFacade(creditFacade);
 
         creditManager.setParams(
@@ -82,38 +81,33 @@ contract CreditManagerTestSuite is PoolDeployer {
             if (collateralTokens[i].token != underlying) {
                 address token = collateralTokens[i].token;
                 creditManager.addToken(token);
-                creditManager.setLiquidationThreshold(token, collateralTokens[i].liquidationThreshold);
+                creditManager.setCollateralTokenData(
+                    token,
+                    collateralTokens[i].liquidationThreshold,
+                    collateralTokens[i].liquidationThreshold,
+                    type(uint40).max,
+                    0
+                );
             }
         }
 
-        evm.stopPrank();
+        cr.addCreditManager(address(creditManager));
 
         assertEq(creditManager.creditConfigurator(), CONFIGURATOR, "Configurator wasn't set");
 
-        cr.addCreditManager(address(creditManager));
-
         if (supportsQuotas) {
             poolQuotaKeeper.addCreditManager(address(creditManager));
-            // poolQuotaKeeper.setGauge(CONFIGURATOR);
         }
 
         if (accountFactoryVer == 2) {
-            AccountFactoryV2(address(af)).addCreditManager(address(creditManager));
+            AccountFactoryV3(address(af)).addCreditManager(address(creditManager), 1);
         }
+
+        vm.stopPrank();
 
         // Approve USER & LIQUIDATOR to credit manager
         tokenTestSuite.approve(underlying, USER, address(creditManager));
         tokenTestSuite.approve(underlying, LIQUIDATOR, address(creditManager));
-
-        addressProvider.transferOwnership(CONFIGURATOR);
-        acl.transferOwnership(CONFIGURATOR);
-
-        evm.startPrank(CONFIGURATOR);
-
-        acl.claimOwnership();
-        addressProvider.claimOwnership();
-
-        evm.stopPrank();
     }
 
     ///
@@ -124,7 +118,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         external
         returns (
             uint256 borrowedAmount,
-            uint256 cumulativeIndexAtOpen,
+            uint256 cumulativeIndexLastUpdate,
             uint256 cumulativeIndexAtClose,
             address creditAccount
         )
@@ -136,38 +130,42 @@ contract CreditManagerTestSuite is PoolDeployer {
         public
         returns (
             uint256 borrowedAmount,
-            uint256 cumulativeIndexAtOpen,
+            uint256 cumulativeIndexLastUpdate,
             uint256 cumulativeIndexAtClose,
             address creditAccount
         )
     {
         // Set up real value, which should be configired before CM would be launched
-        evm.prank(CONFIGURATOR);
-        creditManager.setLiquidationThreshold(
-            underlying, uint16(PERCENTAGE_FACTOR - DEFAULT_FEE_LIQUIDATION - DEFAULT_LIQUIDATION_PREMIUM)
+        vm.prank(CONFIGURATOR);
+        creditManager.setCollateralTokenData(
+            underlying,
+            uint16(PERCENTAGE_FACTOR - DEFAULT_FEE_LIQUIDATION - DEFAULT_LIQUIDATION_PREMIUM),
+            uint16(PERCENTAGE_FACTOR - DEFAULT_FEE_LIQUIDATION - DEFAULT_LIQUIDATION_PREMIUM),
+            type(uint40).max,
+            0
         );
 
         borrowedAmount = _borrowedAmount;
 
-        cumulativeIndexAtOpen = RAY;
-        poolMock.setCumulative_RAY(cumulativeIndexAtOpen);
+        cumulativeIndexLastUpdate = RAY;
+        poolMock.setCumulative_RAY(cumulativeIndexLastUpdate);
 
-        evm.prank(creditFacade);
+        vm.prank(creditFacade);
 
         // Existing address case
-        creditAccount = creditManager.openCreditAccount(borrowedAmount, USER);
+        creditAccount = creditManager.openCreditAccount(borrowedAmount, USER, false);
 
         // Increase block number cause it's forbidden to close credit account in the same block
-        evm.roll(block.number + 1);
+        vm.roll(block.number + 1);
 
-        cumulativeIndexAtClose = (cumulativeIndexAtOpen * 12) / 10;
+        cumulativeIndexAtClose = (cumulativeIndexLastUpdate * 12) / 10;
         poolMock.setCumulative_RAY(cumulativeIndexAtClose);
     }
 
     function makeTokenQuoted(address token, uint16 rate, uint96 limit) external {
         require(supportsQuotas, "Test suite does not support quotas");
 
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
         gaugeMock.addQuotaToken(token, rate);
         poolQuotaKeeper.setTokenLimit(token, limit);
 
@@ -178,6 +176,6 @@ contract CreditManagerTestSuite is PoolDeployer {
 
         creditManager.setQuotedMask(limitedMask | tokenMask);
 
-        evm.stopPrank();
+        vm.stopPrank();
     }
 }

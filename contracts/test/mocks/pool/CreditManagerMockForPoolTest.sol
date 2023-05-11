@@ -4,7 +4,7 @@
 pragma solidity ^0.8.10;
 
 import {IPool4626} from "../../../interfaces/IPool4626.sol";
-import {IPoolQuotaKeeper, QuotaUpdate} from "../../../interfaces/IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeper} from "../../../interfaces/IPoolQuotaKeeper.sol";
 import "../../lib/constants.sol";
 
 contract CreditManagerMockForPoolTest {
@@ -47,11 +47,12 @@ contract CreditManagerMockForPoolTest {
         result = creditAccount;
     }
 
-    function updateQuotas(address _creditAccount, QuotaUpdate[] memory quotaUpdates)
+    function updateQuota(address _creditAccount, address token, int96 quotaChange)
         external
-        returns (uint256 caQuotaInterestChange, uint256 tokensToEnable, uint256 tokensToDisable)
+        returns (uint256 caQuotaInterestChange, bool tokensToEnable, uint256 tokensToDisable)
     {
-        return IPoolQuotaKeeper(IPool4626(pool).poolQuotaKeeper()).updateQuotas(_creditAccount, quotaUpdates);
+        (caQuotaInterestChange,,) =
+            IPoolQuotaKeeper(IPool4626(pool).poolQuotaKeeper()).updateQuota(_creditAccount, token, quotaChange);
     }
 
     function addToken(address token, uint256 mask) external {

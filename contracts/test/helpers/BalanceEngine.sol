@@ -6,11 +6,11 @@ pragma solidity ^0.8.10;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import "../lib/test.sol";
+import {Test} from "forge-std/Test.sol";
 
 /// @title CreditManagerTestSuite
 /// @notice Deploys contract for unit testing of CreditManagerV3.sol
-contract BalanceEngine is DSTest {
+contract BalanceEngine is Test {
     function expectBalance(address token, address holder, uint256 expectedBalance) internal {
         expectBalance(token, holder, expectedBalance, "");
     }

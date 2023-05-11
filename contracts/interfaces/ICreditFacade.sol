@@ -58,7 +58,7 @@ interface ICreditFacadeEvents {
     event TransferAccount(address indexed creditAccount, address indexed oldOwner, address indexed newOwner);
 
     /// @dev Emits when the user changes approval for account transfers to itself from another address
-    event AllowAccountTransfer(address indexed from, address indexed to, bool state);
+    event SetAccountTransferAllowance(address indexed from, address indexed to, bool state);
 }
 
 interface ICreditFacade is ICreditFacadeEvents, IVersion {
@@ -73,10 +73,13 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     /// @param calls The array of MultiCall structs encoding the required operations. Generally must have
     /// at least a call to addCollateral, as otherwise the health check at the end will fail.
     /// @param referralCode Referral code which is used for potential rewards. 0 if no referral code provided
-    function openCreditAccount(uint256 debt, address onBehalfOf, MultiCall[] calldata calls, uint16 referralCode)
-        external
-        payable
-        returns (address creditAccount);
+    function openCreditAccount(
+        uint256 debt,
+        address onBehalfOf,
+        MultiCall[] calldata calls,
+        bool deployNewAccount,
+        uint16 referralCode
+    ) external payable returns (address creditAccount);
 
     /// @dev Runs a batch of transactions within a multicall and closes the account
     /// - Wraps ETH to WETH and sends it msg.sender if value > 0
@@ -160,7 +163,7 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     /// @param state True is transfer is allowed, false if forbidden
     function approveAccountTransfer(address from, bool state) external;
 
-    // /// @dev Enables token in enabledTokenMask for the Credit Account of msg.sender
+    // /// @dev Enables token in enabledTokensMask for the Credit Account of msg.sender
     // /// @param token Address of token to enable
     // function enableToken(address token) external;
 
@@ -170,6 +173,8 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     /// This is done to prevent malicious actors from transferring compromised accounts to other users.
     /// @param to Address to transfer the account to
     function transferAccountOwnership(address creditAccount, address to) external;
+
+    function claimWithdrawals(address creditAccount, address to) external;
 
     //
     // GETTERS
@@ -208,4 +213,7 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     /// In the interest of fairness, emergency liquidators do not receive a premium
     /// And are compensated by the Gearbox DAO separately.
     function canLiquidateWhilePaused(address) external view returns (bool);
+
+    /// @dev Timestamp at which accounts on an expirable CM will be liquidated
+    function expirationDate() external view returns (uint40);
 }

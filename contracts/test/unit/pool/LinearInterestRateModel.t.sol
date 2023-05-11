@@ -10,21 +10,19 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 // TEST
 import "../../lib/constants.sol";
-import "../../lib/StringUtils.sol";
+
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
+import {TestHelper} from "../../lib/helper.sol";
 import "forge-std/console.sol";
 
 /// @title pool
 /// @notice Business logic for borrowing liquidity pools
-contract LinearInterestRateModelTest is DSTest {
+contract LinearInterestRateModelTest is TestHelper {
     using Math for uint256;
-    using StringUtils for string;
-
-    CheatCodes evm = CheatCodes(HEVM_ADDRESS);
 
     LinearInterestRateModel irm;
 
@@ -38,10 +36,6 @@ contract LinearInterestRateModelTest is DSTest {
             4000,
             true
         );
-    }
-
-    function _testCaseErr(string memory caseName, string memory err) internal pure returns (string memory) {
-        return string("\nCase: ").concat(caseName).concat("\n").concat("Error: ").concat(err);
     }
 
     //
@@ -163,7 +157,7 @@ contract LinearInterestRateModelTest is DSTest {
         for (uint256 i; i < cases.length; ++i) {
             IncorrectParamCase memory testCase = cases[i];
 
-            evm.expectRevert(IncorrectParameterException.selector);
+            vm.expectRevert(IncorrectParameterException.selector);
             irm = new LinearInterestRateModel(
             testCase.U_1,
              testCase.U_2,
@@ -315,7 +309,7 @@ contract LinearInterestRateModelTest is DSTest {
                 expectedLiquidity: 100,
                 availableLiquidity: 60,
                 /// EXPECTED VALUES
-                // 15% + 5% (r1) * 40% (utilisation) / 80% (u1)
+                // 15% (rBase) + 5% (r1) * 40% (utilisation) / 80% (u1)
                 expectedBorrowRate: (15_00 + 5_00 * 40 / 80) * RAY / PERCENTAGE_FACTOR,
                 expectedAvailableToBorrow: 55,
                 expectedRevert: false
@@ -459,7 +453,7 @@ contract LinearInterestRateModelTest is DSTest {
         );
 
             if (testCase.expectedRevert) {
-                evm.expectRevert(BorrowingMoreU2ForbiddenException.selector);
+                vm.expectRevert(BorrowingMoreU2ForbiddenException.selector);
             }
 
             irm.calcBorrowRate(testCase.expectedLiquidity, testCase.availableLiquidity, true);

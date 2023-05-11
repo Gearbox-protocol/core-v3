@@ -12,7 +12,7 @@ import {ICreditManager as ICreditManagerV1} from "@gearbox-protocol/core-v2/cont
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {ICreditFacade} from "../interfaces/ICreditFacade.sol";
 import {ICreditFilter} from "@gearbox-protocol/core-v2/contracts/interfaces/V1/ICreditFilter.sol";
-import {ICreditConfigurator} from "../interfaces/ICreditConfigurator.sol";
+import {ICreditConfigurator} from "../interfaces/ICreditConfiguratorV3.sol";
 import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
 import {IPool4626} from "../interfaces/IPool4626.sol";
@@ -159,8 +159,8 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
             // (result.totalValue,) = creditFacade.calcTotalValue(creditAccount);
             // result.healthFactor = creditFacade.calcCreditAccountHealthFactor(creditAccount);
 
-            (result.borrowedAmount, result.borrowedAmountPlusInterest, result.borrowedAmountPlusInterestAndFees) =
-                creditManagerV2.calcCreditAccountAccruedInterest(creditAccount);
+            // (result.borrowedAmount, result.borrowedAmountPlusInterest, result.borrowedAmountPlusInterestAndFees) =
+            //     creditManagerV2.calcCreditAccountAccruedInterest(creditAccount);
         }
 
         address pool = address((ver == 1) ? creditManager.poolService() : creditManagerV2.pool());
@@ -170,7 +170,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
             (ver == 1) ? creditFilter.allowedTokensCount() : creditManagerV2.collateralTokensCount();
 
         result.enabledTokenMask =
-            (ver == 1) ? creditFilter.enabledTokens(creditAccount) : creditManagerV2.enabledTokensMap(creditAccount);
+            (ver == 1) ? creditFilter.enabledTokens(creditAccount) : creditManagerV2.enabledTokensMaskOf(creditAccount);
 
         result.balances = new TokenBalance[](collateralTokenCount);
         for (uint256 i = 0; i < collateralTokenCount;) {
@@ -194,7 +194,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
             }
         }
 
-        result.cumulativeIndexAtOpen = ICreditAccount(creditAccount).cumulativeIndexAtOpen();
+        // result.cumulativeIndexLastUpdate = ICreditAccount(creditAccount).cumulativeIndexLastUpdate();
 
         result.since = ICreditAccount(creditAccount).since();
     }

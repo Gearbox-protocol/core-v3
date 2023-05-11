@@ -2,18 +2,11 @@
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
+pragma abicoder v1;
 
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
-
-struct Pool4626Opts {
-    address addressProvider;
-    address underlyingToken;
-    address interestRateModel;
-    uint256 expectedLiquidityLimit;
-    bool supportsQuotas;
-}
 
 interface IPool4626Events {
     /// @dev Emits on new liquidity being added to the pool

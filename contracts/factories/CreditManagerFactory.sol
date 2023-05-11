@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/utils/Create2.sol";
 
 import {CreditManagerV3} from "../credit/CreditManagerV3.sol";
 import {CreditFacadeV3} from "../credit/CreditFacadeV3.sol";
-import {CreditConfigurator, CreditManagerOpts} from "../credit/CreditConfigurator.sol";
+import {CreditConfigurator, CreditManagerOpts} from "../credit/CreditConfiguratorV3.sol";
 
 /// @title CreditManagerFactory
 /// @notice Deploys 3 core interdependent contracts: CreditManage, CreditFacadeV3 and CredigConfigurator
@@ -18,7 +18,7 @@ contract CreditManagerFactory {
     CreditConfigurator public creditConfigurator;
 
     constructor(address _pool, CreditManagerOpts memory opts, bytes32 salt) {
-        creditManager = new CreditManagerV3(_pool, opts.withdrawManager);
+        creditManager = new CreditManagerV3(_pool, opts.withdrawalManager);
         creditFacade = new CreditFacadeV3(
             address(creditManager),
             opts.degenNFT,

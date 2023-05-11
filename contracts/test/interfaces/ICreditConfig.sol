@@ -5,7 +5,7 @@ pragma solidity ^0.8.10;
 
 import {ITokenTestSuite} from "./ITokenTestSuite.sol";
 import {PriceFeedConfig} from "@gearbox-protocol/core-v2/contracts/oracles/PriceOracle.sol";
-import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfigurator.sol";
+import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 
 interface ICreditConfig {
     function getCreditOpts() external returns (CreditManagerOpts memory);
