@@ -30,7 +30,7 @@ contract CreditManagerV3Harness is CreditManagerV3 {
     }
 
     function calcQuotedCollateral(address creditAccount, uint256 enabledTokensMask, IPriceOracleV2 _priceOracle)
-        internal
+        external
         view
         returns (uint256 totalValueUSD, uint256 twvUSD, uint256 quotaInterest, address[] memory tokens)
     {
@@ -43,7 +43,7 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         uint256 enoughCollateralUSD,
         uint256[] memory collateralHints,
         IPriceOracleV2 _priceOracle
-    ) internal view returns (uint256 tokensToDisable, uint256 totalValueUSD, uint256 twvUSD) {
+    ) external view returns (uint256 tokensToDisable, uint256 totalValueUSD, uint256 twvUSD) {
         return _calcNotQuotedCollateral(
             creditAccount, enabledTokensMask, enoughCollateralUSD, collateralHints, _priceOracle
         );
@@ -55,12 +55,12 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         address creditAccount,
         uint256 _totalValueUSD,
         uint256 _twvUSDx10K
-    ) internal view returns (uint256 totalValueUSD, uint256 twvUSDx10K, bool nonZeroBalance) {
+    ) external view returns (uint256 totalValueUSD, uint256 twvUSDx10K, bool nonZeroBalance) {
         return _calcOneNonQuotedTokenCollateral(_priceOracle, tokenMask, creditAccount, _totalValueUSD, _twvUSDx10K);
     }
 
     function _getQuotedTokensLT(uint256 enabledTokensMask, bool withLTs)
-        internal
+        external
         view
         returns (address[] memory tokens, uint256[] memory lts)
     {
@@ -74,17 +74,17 @@ contract CreditManagerV3Harness is CreditManagerV3 {
     }
 
     function safeTokenTransfer(address creditAccount, address token, address to, uint256 amount, bool convertToETH)
-        internal
+        external
     {
         _safeTokenTransfer(creditAccount, token, to, amount, convertToETH);
     }
 
-    function checkEnabledTokenLength(uint256 enabledTokensMask) internal view {
+    function checkEnabledTokenLength(uint256 enabledTokensMask) external view {
         _checkEnabledTokenLength(enabledTokensMask);
     }
 
     function collateralTokensByMaskCalcLT(uint256 tokenMask, bool calcLT)
-        internal
+        external
         view
         returns (address token, uint16 liquidationThreshold)
     {
@@ -92,7 +92,7 @@ contract CreditManagerV3Harness is CreditManagerV3 {
     }
 
     function calcCreditAccountAccruedInterest(address creditAccount, uint256 quotaInterest)
-        internal
+        external
         view
         returns (uint256 debt, uint256 accruedInterest, uint256 accruedFees)
     {
@@ -100,14 +100,14 @@ contract CreditManagerV3Harness is CreditManagerV3 {
     }
 
     function getCreditAccountParameters(address creditAccount)
-        internal
+        external
         view
         returns (uint256 debt, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow)
     {
         return _getCreditAccountParameters(creditAccount);
     }
 
-    function hasWithdrawals(address creditAccount) internal view returns (bool) {
+    function hasWithdrawals(address creditAccount) external view returns (bool) {
         return hasWithdrawals(creditAccount);
     }
 
@@ -117,7 +117,7 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         _calcCancellableWithdrawalsValue(_priceOracle, creditAccount, isForceCancel);
     }
 
-    function saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) internal {
+    function saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) external {
         _saveEnabledTokensMask(creditAccount, enabledTokensMask);
     }
 
