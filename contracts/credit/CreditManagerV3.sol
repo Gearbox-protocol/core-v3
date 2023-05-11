@@ -363,7 +363,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         }
 
         // Transfers the due funds to the pool
-        ICreditAccount(creditAccount)._safeTransfer(underlying, pool, amountToPool); // F:[CM-10,11,12,13]
+        ICreditAccount(creditAccount).transfer(underlying, pool, amountToPool); // F:[CM-10,11,12,13]
 
         // Signals to the pool that debt has been repaid. The pool relies
         // on the Credit Manager to repay the debt correctly, and does not
@@ -443,7 +443,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             }
 
             // Pays the amount back to the pool
-            ICreditAccount(creditAccount)._safeTransfer(underlying, pool, amount); // F:[CM-21]
+            ICreditAccount(creditAccount).transfer(underlying, pool, amount); // F:[CM-21]
             {
                 uint256 amountToRepay;
                 uint256 profit;
@@ -888,12 +888,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         internal
     {
         if (convertToETH && token == wethAddress) {
-            ICreditAccount(creditAccount)._safeTransfer(token, wethGateway, amount); // F:[CM-45]
+            ICreditAccount(creditAccount).transfer(token, wethGateway, amount); // F:[CM-45]
             IWETHGateway(wethGateway).depositFor(to, amount); // F:[CM-45]
         } else {
             try ICreditAccount(creditAccount).safeTransfer(token, to, amount) { // F:[CM-45]
             } catch {
-                uint256 delivered = ICreditAccount(creditAccount).safeTransferDeliveredBalanceControl(
+                uint256 delivered = ICreditAccount(creditAccount).transferDeliveredBalanceControl(
                     token, address(withdrawalManager), amount
                 );
                 withdrawalManager.addImmediateWithdrawal(to, token, delivered);
@@ -1249,7 +1249,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         uint256 tokenMask = getTokenMaskOrRevert(token);
 
         uint256 delivered =
-            ICreditAccount(creditAccount).safeTransferDeliveredBalanceControl(token, address(withdrawalManager), amount);
+            ICreditAccount(creditAccount).transferDeliveredBalanceControl(token, address(withdrawalManager), amount);
 
         withdrawalManager.addScheduledWithdrawal(creditAccount, token, delivered, tokenMask.calcIndex());
 
