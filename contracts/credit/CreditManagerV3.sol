@@ -628,7 +628,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
                 );
             }
 
-            collateralDebtData.totalValue = _convertFromUSD(_priceOracle, collateralDebtData.totalValueUSD, underlying); // F:[FA-41]
+            collateralDebtData.totalValue = _priceOracle.convertFromUSD(collateralDebtData.totalValueUSD, underlying); // F:[FA-41]
         }
 
         // FINALLY
@@ -1350,14 +1350,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         }
         _checkEnabledTokenLength(enabledTokensMask);
         creditAccountInfo[creditAccount].enabledTokensMask = uint248(enabledTokensMask);
-    }
-
-    function _convertFromUSD(IPriceOracleV2 _priceOracle, uint256 amountInUSD, address token)
-        internal
-        view
-        returns (uint256 amountInToken)
-    {
-        amountInToken = _priceOracle.convertFromUSD(amountInUSD, token);
     }
 
     function _convertToUSD(IPriceOracleV2 _priceOracle, uint256 amountInToken, address token)
