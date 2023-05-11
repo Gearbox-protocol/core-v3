@@ -79,7 +79,7 @@ contract BotListTest is Test, IBotListEvents {
         botList.increaseBotFunding{value: 1 ether}(FRIEND);
 
         vm.prank(USER);
-        botList.setBotPermissions(address(addressProvider), type(uint192).max);
+        botList.setBotPermissions(DUMB_ADDRESS, address(addressProvider), type(uint192).max);
 
         vm.prank(CONFIGURATOR);
         botList.setBotForbiddenStatus(address(addressProvider), true);
@@ -111,7 +111,7 @@ contract BotListTest is Test, IBotListEvents {
         vm.deal(USER, 10 ether);
 
         vm.prank(USER);
-        botList.setBotPermissions(address(addressProvider), type(uint192).max);
+        botList.setBotPermissions(DUMB_ADDRESS, address(addressProvider), type(uint192).max);
 
         vm.prank(USER);
         botList.increaseBotFunding{value: 2 ether}(address(addressProvider));
@@ -131,7 +131,7 @@ contract BotListTest is Test, IBotListEvents {
         vm.deal(USER, 10 ether);
 
         vm.prank(USER);
-        botList.setBotPermissions(address(addressProvider), type(uint192).max);
+        botList.setBotPermissions(DUMB_ADDRESS, address(addressProvider), type(uint192).max);
 
         vm.prank(USER);
         botList.setWeeklyBotAllowance(address(addressProvider), 1 ether);
@@ -163,7 +163,7 @@ contract BotListTest is Test, IBotListEvents {
         vm.deal(USER, 10 ether);
 
         vm.prank(USER);
-        botList.setBotPermissions(address(addressProvider), type(uint192).max);
+        botList.setBotPermissions(DUMB_ADDRESS, address(addressProvider), type(uint192).max);
 
         vm.prank(USER);
         botList.setWeeklyBotAllowance(address(addressProvider), 1 ether);

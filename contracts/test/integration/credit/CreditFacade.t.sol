@@ -2081,7 +2081,7 @@ contract CreditFacadeIntegrationTest is
         address bot = address(new TargetContractMock());
 
         vm.prank(USER);
-        botList.setBotPermissions(bot, type(uint192).max);
+        botList.setBotPermissions(creditAccount, bot, type(uint192).max);
 
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
 

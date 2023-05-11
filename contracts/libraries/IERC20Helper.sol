@@ -8,8 +8,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 /// @title IERC20HelperTrait
 /// @notice Saves size by providing internal call for balanceOf
 library IERC20Helper {
-    function _balanceOf(IERC20 token, address holder) internal view returns (uint256) {
-        return token.balanceOf(holder);
+    function balanceOf(address token, address holder) internal view returns (uint256) {
+        return IERC20(token).balanceOf(holder);
     }
 
     function unsafeTransfer(IERC20 token, address to, uint256 amount) internal returns (bool success) {

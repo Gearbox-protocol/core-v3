@@ -12,13 +12,15 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 // LIBS & TRAITS
 import {UNDERLYING_TOKEN_MASK, BitMask} from "../libraries/BitMask.sol";
 import {CreditLogic} from "../libraries/CreditLogic.sol";
+import {CreditAccountHelper} from "../libraries/CreditAccountHelper.sol";
+
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 import {IERC20Helper} from "../libraries/IERC20Helper.sol";
 
 // INTERFACES
 import {IAccountFactory, TakeAccountAction} from "../interfaces/IAccountFactory.sol";
-import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
+import {ICreditAccount} from "../interfaces/ICreditAccount.sol";
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
 import {IPool4626} from "../interfaces/IPool4626.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
@@ -65,6 +67,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     using CreditLogic for CollateralTokenData;
     using SafeERC20 for IERC20;
     using IERC20Helper for IERC20;
+    using CreditAccountHelper for ICreditAccount;
 
     // IMMUTABLE PARAMS
     /// @dev contract version
@@ -88,7 +91,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     /// @dev Whether the CM supports quota-related logic
     bool public immutable override supportsQuotas;
 
-    uint256 private immutable deployAccountAction;
+    TakeAccountAction private immutable deployAccountAction;
 
     /// @dev The maximal number of enabled tokens on a single Credit Account
     uint8 public override maxAllowedEnabledTokenLength = 12;
@@ -213,7 +216,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         priceOracle = IPriceOracleV2(addressProvider.getPriceOracle()); // F:[CM-1]
         accountFactory = IAccountFactory(addressProvider.getAccountFactory()); // F:[CM-1]
 
-        deployAccountAction = accountFactory.version() == 3_00 ? uint256(TakeAccountAction.DEPLOY_NEW_ONE) : 0;
+        deployAccountAction =
+            accountFactory.version() == 3_00 ? TakeAccountAction.DEPLOY_NEW_ONE : TakeAccountAction.TAKE_USED_ONE;
         creditConfigurator = msg.sender; // F:[CM-1]
 
         withdrawalManager = IWithdrawalManager(_withdrawalManager);
@@ -240,10 +244,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     {
         // Takes a Credit Account from the factory and sets initial parameters
         // The Credit Account will be connected to this Credit Manager until closing
-        creditAccount = accountFactory.takeCreditAccount(deployNew ? deployAccountAction : 0, 0); // F:[CM-8]
+        creditAccount = accountFactory.takeCreditAccount(
+            uint256(deployNew ? deployAccountAction : TakeAccountAction.TAKE_USED_ONE), 0
+        ); // F:[CM-8]
 
         creditAccountInfo[creditAccount].debt = debt;
         creditAccountInfo[creditAccount].cumulativeIndexLastUpdate = IPoolService(pool).calcLinearCumulative_RAY();
+        creditAccountInfo[creditAccount].flags = 0;
         creditAccountInfo[creditAccount].borrower = onBehalfOf;
 
         if (supportsQuotas) creditAccountInfo[creditAccount].cumulativeQuotaInterest = 1; // F: [CMQ-1]
@@ -303,7 +310,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
 
         // Sets borrower's Credit Account to zero address
         creditAccountInfo[creditAccount].borrower = address(0); // F:[CM-9]
-        creditAccountInfo[creditAccount].flags = 0;
 
         // Makes all computations needed to close credit account
 
@@ -332,27 +338,32 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
                 amountMinusFeeFn: _amountWithFee
             });
         }
+        {
+            uint256 underlyingBalance = IERC20Helper.balanceOf(underlying, creditAccount);
 
-        uint256 underlyingBalance = IERC20(underlying)._balanceOf(creditAccount);
-
-        if (underlyingBalance > amountToPool + remainingFunds + 1) {
-            // If there is an underlying surplus, transfers it to the "to" address
-            unchecked {
-                _safeTokenTransfer(
-                    creditAccount, underlying, to, underlyingBalance - amountToPool - remainingFunds - 1, convertWETH
-                ); // F:[CM-10,12,16]
-            }
-        } else if (underlyingBalance < amountToPool + remainingFunds + 1) {
-            // If there is an underlying shortfall, attempts to transfer it from the payer
-            unchecked {
-                IERC20(underlying).safeTransferFrom(
-                    payer, creditAccount, _amountWithFee(amountToPool + remainingFunds - underlyingBalance + 1)
-                ); // F:[CM-11,13]
+            if (underlyingBalance > amountToPool + remainingFunds + 1) {
+                // If there is an underlying surplus, transfers it to the "to" address
+                unchecked {
+                    _safeTokenTransfer(
+                        creditAccount,
+                        underlying,
+                        to,
+                        underlyingBalance - amountToPool - remainingFunds - 1,
+                        convertWETH
+                    ); // F:[CM-10,12,16]
+                }
+            } else if (underlyingBalance < amountToPool + remainingFunds + 1) {
+                // If there is an underlying shortfall, attempts to transfer it from the payer
+                unchecked {
+                    IERC20(underlying).safeTransferFrom(
+                        payer, creditAccount, _amountWithFee(amountToPool + remainingFunds - underlyingBalance + 1)
+                    ); // F:[CM-11,13]
+                }
             }
         }
 
         // Transfers the due funds to the pool
-        _safeTokenTransfer(creditAccount, underlying, pool, amountToPool, false); // F:[CM-10,11,12,13]
+        ICreditAccount(creditAccount).transfer(underlying, pool, amountToPool); // F:[CM-10,11,12,13]
 
         // Signals to the pool that debt has been repaid. The pool relies
         // on the Credit Manager to repay the debt correctly, and does not
@@ -374,7 +385,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             }); // F: [CMQ-6]
         }
 
-        uint256 enabledTokensMask = collateralDebtData.enabledTokensMask & ~skipTokensMask;
+        uint256 enabledTokensMask = collateralDebtData.enabledTokensMask.disable(skipTokensMask);
 
         _transferAssetsTo(creditAccount, to, convertWETH, enabledTokensMask); // F:[CM-14,17,19]
 
@@ -432,7 +443,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             }
 
             // Pays the amount back to the pool
-            _creditAccountSafeTransfer(creditAccount, underlying, pool, amount); // F:[CM-21]
+            ICreditAccount(creditAccount).transfer(underlying, pool, amount); // F:[CM-21]
             {
                 uint256 amountToRepay;
                 uint256 profit;
@@ -453,7 +464,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
                 creditAccountInfo[creditAccount].cumulativeQuotaInterest = cumulativeQuotaInterest;
             }
 
-            if (IERC20(underlying)._balanceOf(creditAccount) <= 1) {
+            if (IERC20Helper.balanceOf(underlying, creditAccount) <= 1) {
                 tokensToDisable = UNDERLYING_TOKEN_MASK;
             }
         }
@@ -510,36 +521,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         // sell them off
         getTokenMaskOrRevert(token);
 
-        // Attempts to set allowance directly to the required amount
-        // If unsuccessful, assumes that the token requires setting allowance to zero first
-        if (!_approve(token, targetContract, creditAccount, amount, false)) {
-            _approve(token, targetContract, creditAccount, 0, true); // F:
-            _approve(token, targetContract, creditAccount, amount, true);
-        }
-    }
-
-    /// @dev Internal function used to approve token from a Credit Account
-    /// Uses Credit Account's execute to properly handle both ERC20-compliant and
-    /// non-compliant (no returned value from "approve") tokens
-    function _approve(address token, address targetContract, address creditAccount, uint256 amount, bool revertIfFailed)
-        internal
-        returns (bool)
-    {
-        // Makes a low-level call to approve from the Credit Account
-        // and parses the value. If nothing or true was returned,
-        // assumes that the call succeeded
-        try ICreditAccount(creditAccount).execute(token, abi.encodeCall(IERC20.approve, (targetContract, amount)))
-        returns (bytes memory result) {
-            if (result.length == 0 || abi.decode(result, (bool)) == true) {
-                return true;
-            }
-        } catch {}
-
-        // On the first try, failure is allowed to handle tokens
-        // that prohibit changing allowance from non-zero value;
-        // After that, failure results in a revert
-        if (revertIfFailed) revert AllowanceFailedException();
-        return false;
+        ICreditAccount(creditAccount).safeApprove(token, targetContract, amount);
     }
 
     /// @dev Requests a Credit Account to make a low-level call with provided data
@@ -787,7 +769,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         uint256 _twvUSDx10K
     ) internal view returns (uint256 totalValueUSD, uint256 twvUSDx10K, bool nonZeroBalance) {
         (address token, uint16 liquidationThreshold) = collateralTokensByMask(tokenMask);
-        uint256 balance = IERC20(token)._balanceOf(creditAccount);
+        uint256 balance = IERC20Helper.balanceOf(token, creditAccount);
 
         // Collateral calculations are only done if there is a non-zero balance
         if (balance > 1) {
@@ -878,7 +860,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
                 // and 0 otherwise
                 if (enabledTokensMask & tokenMask != 0) {
                     address token = getTokenByMask(tokenMask); // F:[CM-44]
-                    uint256 amount = IERC20(token)._balanceOf(creditAccount); // F:[CM-44]
+                    uint256 amount = IERC20Helper.balanceOf(token, creditAccount); // F:[CM-44]
                     if (amount > 1) {
                         // 1 is subtracted from amount to leave a non-zero value
                         // in the balance mapping, optimizing future writes
@@ -906,29 +888,17 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         internal
     {
         if (convertToETH && token == wethAddress) {
-            _creditAccountSafeTransfer(creditAccount, token, wethGateway, amount); // F:[CM-45]
+            ICreditAccount(creditAccount).transfer(token, wethGateway, amount); // F:[CM-45]
             IWETHGateway(wethGateway).depositFor(to, amount); // F:[CM-45]
         } else {
             try ICreditAccount(creditAccount).safeTransfer(token, to, amount) { // F:[CM-45]
             } catch {
-                uint256 delivered =
-                    _creditAccountSafeTransferBalanceControl(creditAccount, token, address(withdrawalManager), amount);
+                uint256 delivered = ICreditAccount(creditAccount).transferDeliveredBalanceControl(
+                    token, address(withdrawalManager), amount
+                );
                 withdrawalManager.addImmediateWithdrawal(to, token, delivered);
             }
         }
-    }
-
-    function _creditAccountSafeTransfer(address creditAccount, address token, address to, uint256 amount) internal {
-        ICreditAccount(creditAccount).safeTransfer(token, to, amount);
-    }
-
-    function _creditAccountSafeTransferBalanceControl(address creditAccount, address token, address to, uint256 amount)
-        internal
-        returns (uint256 delivered)
-    {
-        uint256 balanceBefore = IERC20(token)._balanceOf(to);
-        _creditAccountSafeTransfer(creditAccount, token, to, amount);
-        delivered = IERC20(token)._balanceOf(to) - balanceBefore;
     }
 
     function _checkEnabledTokenLength(uint256 enabledTokensMask) internal view {
@@ -1279,7 +1249,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         uint256 tokenMask = getTokenMaskOrRevert(token);
 
         uint256 delivered =
-            _creditAccountSafeTransferBalanceControl(creditAccount, token, address(withdrawalManager), amount);
+            ICreditAccount(creditAccount).transferDeliveredBalanceControl(token, address(withdrawalManager), amount);
 
         withdrawalManager.addScheduledWithdrawal(creditAccount, token, delivered, tokenMask.calcIndex());
 
@@ -1287,7 +1257,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         creditAccountInfo[creditAccount].flags |= WITHDRAWAL_FLAG;
 
         // We need to disable empty tokens in case they could be forbidden, to finally eliminate them
-        if (IERC20(token)._balanceOf(creditAccount) <= 1) {
+        if (IERC20Helper.balanceOf(token, creditAccount) <= 1) {
             tokensToDisable = tokenMask;
         }
     }

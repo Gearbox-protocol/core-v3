@@ -214,13 +214,13 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     }
 
     /// @dev Schedules an LT ramping for any token except underlying
+    /// @param token Token to ramp LT for
     /// @param liquidationThresholdFinal Liquidation threshold after ramping
-    /// @param timestampRampStart Timestamp when ramping starts
     /// @param rampDuration Duration of ramping
     function rampLiquidationThreshold(
         address token,
         uint16 liquidationThresholdFinal,
-        uint40 timestampRampStart,
+        uint40 rampStart,
         uint24 rampDuration
     ) external controllerOnly {
         // Checks that the token is not underlying, since its LT is determined by Credit Manager params
@@ -232,15 +232,15 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
             revert IncorrectLiquidationThresholdException();
         }
 
+        rampStart = block.timestamp > rampStart ? uint40(block.timestamp) : rampStart;
+
         uint16 currentLT = creditManager.liquidationThresholds(token);
 
         if (currentLT != liquidationThresholdFinal) {
             // Sets the LT in Credit Manager, where token existence is checked
-            creditManager.setCollateralTokenData(
-                token, currentLT, liquidationThresholdFinal, timestampRampStart, rampDuration
-            );
+            creditManager.setCollateralTokenData(token, currentLT, liquidationThresholdFinal, rampStart, rampDuration);
             emit ScheduleTokenLiquidationThresholdRamp(
-                token, currentLT, liquidationThresholdFinal, timestampRampStart, timestampRampStart + rampDuration
+                token, currentLT, liquidationThresholdFinal, rampStart, uint40(block.timestamp) + rampDuration
             );
         }
     }

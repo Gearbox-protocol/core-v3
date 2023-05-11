@@ -176,6 +176,8 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
 
     function claimWithdrawals(address creditAccount, address to) external;
 
+    function setBotPermissions(address creditAccount, address bot, uint192 permissions) external;
+
     //
     // GETTERS
     //
@@ -213,4 +215,7 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     /// In the interest of fairness, emergency liquidators do not receive a premium
     /// And are compensated by the Gearbox DAO separately.
     function canLiquidateWhilePaused(address) external view returns (bool);
+
+    /// @dev Timestamp at which accounts on an expirable CM will be liquidated
+    function expirationDate() external view returns (uint40);
 }

@@ -1227,10 +1227,10 @@ contract CreditConfiguratorTest is Test, ICreditManagerV3Events, ICreditConfigur
 
         vm.expectEmit(true, false, false, true);
         emit ScheduleTokenLiquidationThresholdRamp(
-            usdc, initialLT, 8900, uint40(block.timestamp + 5), uint40(block.timestamp + 1005)
+            usdc, initialLT, 8900, uint40(block.timestamp), uint40(block.timestamp + 1000)
         );
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.rampLiquidationThreshold(usdc, 8900, uint40(block.timestamp + 5), 1000);
+        creditConfigurator.rampLiquidationThreshold(usdc, 8900, uint40(block.timestamp), 1000);
     }
 }
