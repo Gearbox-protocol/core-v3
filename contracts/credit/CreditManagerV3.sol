@@ -91,7 +91,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     /// @dev Whether the CM supports quota-related logic
     bool public immutable override supportsQuotas;
 
-    uint256 private immutable deployAccountAction;
+    TakeAccountAction private immutable deployAccountAction;
 
     /// @dev The maximal number of enabled tokens on a single Credit Account
     uint8 public override maxAllowedEnabledTokenLength = 12;
@@ -216,7 +216,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         priceOracle = IPriceOracleV2(addressProvider.getPriceOracle()); // F:[CM-1]
         accountFactory = IAccountFactory(addressProvider.getAccountFactory()); // F:[CM-1]
 
-        deployAccountAction = accountFactory.version() == 3_00 ? uint256(TakeAccountAction.DEPLOY_NEW_ONE) : 0;
+        deployAccountAction = accountFactory.version() == 3_00
+            ? uint256(TakeAccountAction.DEPLOY_NEW_ONE)
+            : TakeAccountAction.TAKE_USED_ONE;
         creditConfigurator = msg.sender; // F:[CM-1]
 
         withdrawalManager = IWithdrawalManager(_withdrawalManager);
@@ -243,10 +245,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     {
         // Takes a Credit Account from the factory and sets initial parameters
         // The Credit Account will be connected to this Credit Manager until closing
-        creditAccount = accountFactory.takeCreditAccount(deployNew ? deployAccountAction : 0, 0); // F:[CM-8]
+        creditAccount = accountFactory.takeCreditAccount(
+            uint256(deployNew ? deployAccountAction : TakeAccountAction.TAKE_USED_ONE), 0
+        ); // F:[CM-8]
 
         creditAccountInfo[creditAccount].debt = debt;
         creditAccountInfo[creditAccount].cumulativeIndexLastUpdate = IPoolService(pool).calcLinearCumulative_RAY();
+        creditAccountInfo[creditAccount].flags = 0;
         creditAccountInfo[creditAccount].borrower = onBehalfOf;
 
         if (supportsQuotas) creditAccountInfo[creditAccount].cumulativeQuotaInterest = 1; // F: [CMQ-1]

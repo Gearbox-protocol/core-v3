@@ -546,7 +546,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                         } // F:[FA-45A]
 
                         // Sets expected balances to currentBalance + delta
-                        expectedBalances = CreditLogic.storeBalances(creditAccount, mcall.callData[4:]); // F:[FA-45]
+                        Balance[] memory expected = abi.decode(mcall.callData[4:], (Balance[])); // F:[FA-45]
+                        expectedBalances = CreditLogic.storeBalances(creditAccount, expected); // F:[FA-45]
                     }
                     //
                     // SET FULL CHECK PARAMS

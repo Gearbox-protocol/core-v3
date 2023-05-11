@@ -275,14 +275,14 @@ library CreditLogic {
     }
 
     /// @param creditAccount Credit Account to compute balances for
-    /// @param callData Bytes calldata for parsing
-    function storeBalances(address creditAccount, bytes memory callData)
+    function storeBalances(address creditAccount, Balance[] memory desired)
         internal
         view
         returns (Balance[] memory expected)
     {
         // Retrieves the balance list from calldata
-        expected = abi.decode(callData, (Balance[])); // F:[FA-45]
+
+        expected = desired; // F:[FA-45]
         uint256 len = expected.length; // F:[FA-45]
 
         for (uint256 i = 0; i < len;) {

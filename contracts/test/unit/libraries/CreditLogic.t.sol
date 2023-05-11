@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {IncorrectParameterException} from "../../../interfaces/IExceptions.sol";
 import {CreditLogic} from "../../../libraries/CreditLogic.sol";
-
+import {ClosureAction} from "../../../interfaces/ICreditManagerV3.sol";
 import {TestHelper} from "../../lib/helper.sol";
 import "forge-std/console.sol";
 
