@@ -497,24 +497,36 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
         vm.expectRevert(CallerNotAdminException.selector);
         vm.prank(USER);
-        controllerTimelock.rampLiquidationThreshold(creditManager, token, 6000, 7 days);
+        controllerTimelock.rampLiquidationThreshold(
+            creditManager, token, 6000, uint40(block.timestamp + 14 days), 7 days
+        );
 
         // VERIFY THAT POLICY CHECKS ARE PERFORMED
         vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(admin);
-        controllerTimelock.rampLiquidationThreshold(creditManager, token, 5000, 7 days);
+        controllerTimelock.rampLiquidationThreshold(
+            creditManager, token, 5000, uint40(block.timestamp + 14 days), 7 days
+        );
 
         // VERIFY THAT EXTRA CHECKS ARE PERFORMED
         vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(admin);
-        controllerTimelock.rampLiquidationThreshold(creditManager, token, 6000, 1 days);
+        controllerTimelock.rampLiquidationThreshold(
+            creditManager, token, 6000, uint40(block.timestamp + 14 days), 1 days
+        );
+
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.rampLiquidationThreshold(
+            creditManager, token, 6000, uint40(block.timestamp + 6 days), 7 days
+        );
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
             abi.encode(
                 creditConfigurator,
-                "rampLiquidationThreshold(address,uint16,uint24)",
-                abi.encode(token, 6000, 7 days),
+                "rampLiquidationThreshold(address,uint16,uint40,uint24)",
+                abi.encode(token, 6000, block.timestamp + 14 days, 7 days),
                 block.timestamp + 1 days
             )
         );
@@ -523,17 +535,25 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         emit QueueTransaction(
             txHash,
             creditConfigurator,
-            "rampLiquidationThreshold(address,uint16,uint24)",
-            abi.encode(token, 6000, 7 days),
+            "rampLiquidationThreshold(address,uint16,uint40,uint24)",
+            abi.encode(token, 6000, block.timestamp + 14 days, 7 days),
             uint40(block.timestamp + 1 days)
         );
 
         vm.prank(admin);
-        controllerTimelock.rampLiquidationThreshold(creditManager, token, 6000, 7 days);
+        controllerTimelock.rampLiquidationThreshold(
+            creditManager, token, 6000, uint40(block.timestamp + 14 days), 7 days
+        );
 
         vm.expectCall(
             creditConfigurator,
-            abi.encodeWithSelector(ICreditConfigurator.rampLiquidationThreshold.selector, token, 6000, 7 days)
+            abi.encodeWithSelector(
+                ICreditConfigurator.rampLiquidationThreshold.selector,
+                token,
+                6000,
+                uint40(block.timestamp + 14 days),
+                7 days
+            )
         );
 
         vm.warp(block.timestamp + 1 days);

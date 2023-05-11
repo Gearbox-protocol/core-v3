@@ -184,6 +184,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
         address creditManager,
         address token,
         uint16 liquidationThresholdFinal,
+        uint40 rampStart,
         uint24 rampDuration
     )
         external
@@ -194,15 +195,17 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
         address creditConfigurator = ICreditManagerV3(creditManager).creditConfigurator();
         uint256 ltCurrent = ICreditManagerV3(creditManager).liquidationThresholds(token);
 
-        if (!_checkPolicy(policyHash, uint256(ltCurrent), uint256(liquidationThresholdFinal)) || rampDuration < 7 days)
-        {
+        if (
+            !_checkPolicy(policyHash, uint256(ltCurrent), uint256(liquidationThresholdFinal)) || rampDuration < 7 days
+                || rampStart < block.timestamp + delay
+        ) {
             revert ParameterChecksFailedException(); // F: [RCT-06]
         }
 
         _queueTransaction({
             target: creditConfigurator,
-            signature: "rampLiquidationThreshold(address,uint16,uint24)",
-            data: abi.encode(token, liquidationThresholdFinal, rampDuration)
+            signature: "rampLiquidationThreshold(address,uint16,uint40,uint24)",
+            data: abi.encode(token, liquidationThresholdFinal, rampStart, rampDuration)
         }); // F: [RCT-06]
     }
 

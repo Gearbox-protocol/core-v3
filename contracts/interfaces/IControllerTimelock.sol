@@ -87,6 +87,7 @@ interface IControllerTimelock is IControllerTimelockErrors, IControllerTimelockE
         address creditManager,
         address token,
         uint16 liquidationThresholdFinal,
+        uint40 rampStart,
         uint24 rampDuration
     ) external;
 

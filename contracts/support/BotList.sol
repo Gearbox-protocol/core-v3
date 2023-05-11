@@ -3,12 +3,15 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {IBotList, BotFunding} from "../interfaces/IBotList.sol";
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
+import {ICreditAccount} from "../interfaces/ICreditAccount.sol";
+import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 
 import "../interfaces/IExceptions.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
@@ -20,9 +23,18 @@ contract BotList is ACLNonReentrantTrait, IBotList {
     using SafeCast for uint256;
     using Address for address;
     using Address for address payable;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
-    /// @dev Mapping from (borrower, bot) to bot approval status
+    error CallerNotCreditAccountOwner();
+    error CallerNotCreditAccountFacade();
+
+    event EraseBots(address creditAccount);
+
+    /// @dev Mapping from (creditAccount, bot) to bit permissions
     mapping(address => mapping(address => uint192)) public botPermissions;
+
+    /// @dev Mapping from credit account to the set of bots with non-zero permissions
+    mapping(address => EnumerableSet.AddressSet) internal activeBots;
 
     /// @dev Whether the bot is forbidden system-wide
     mapping(address => bool) public forbiddenBot;
@@ -43,10 +55,23 @@ contract BotList is ACLNonReentrantTrait, IBotList {
         treasury = IAddressProvider(_addressProvider).getTreasuryContract();
     }
 
+    modifier onlyCreditAccountFacade(address creditAccount) {
+        address creditManager = ICreditAccount(creditAccount).creditManager();
+        if (msg.sender != ICreditManagerV3(creditManager).creditFacade()) {
+            revert CallerNotCreditAccountFacade();
+        }
+        _;
+    }
+
     /// @dev Adds or removes allowance for a bot to execute multicalls on behalf of sender
     /// @param bot Bot address
     /// @param permissions Whether allowance is added or removed
-    function setBotPermissions(address bot, uint192 permissions) external nonZeroAddress(bot) {
+    function setBotPermissions(address creditAccount, address bot, uint192 permissions)
+        external
+        nonZeroAddress(bot)
+        onlyCreditAccountFacade(creditAccount)
+        returns (uint256 activeBotsRemaining)
+    {
         if (!bot.isContract()) {
             revert AddressIsNotContractException(bot);
         }
@@ -55,9 +80,37 @@ contract BotList is ACLNonReentrantTrait, IBotList {
             revert InvalidBotException();
         }
 
-        botPermissions[msg.sender][bot] = permissions;
+        uint192 currentPermissions = botPermissions[creditAccount][bot];
 
-        emit ApproveBot(msg.sender, bot, permissions);
+        if (currentPermissions == 0 && permissions != 0) {
+            activeBots[creditAccount].add(bot);
+        } else if (currentPermissions != 0 && permissions == 0) {
+            activeBots[creditAccount].remove(bot);
+        }
+
+        botPermissions[creditAccount][bot] = permissions;
+        activeBotsRemaining = activeBots[creditAccount].length();
+
+        emit ApproveBot(creditAccount, bot, permissions);
+    }
+
+    /// @dev Removes permissions for all bots with non-zero permissions for a credit account
+    /// @param creditAccount Credit Account to erase permissions for
+    function eraseAllBotPermissions(address creditAccount) external onlyCreditAccountFacade(creditAccount) {
+        uint256 len = activeBots[creditAccount].length();
+
+        for (uint256 i = 0; i < len;) {
+            address bot = activeBots[creditAccount].at(0);
+            botPermissions[creditAccount][bot] = 0;
+            activeBots[creditAccount].remove(bot);
+            unchecked {
+                ++i;
+            }
+        }
+
+        if (len > 0) {
+            emit EraseBots(creditAccount);
+        }
     }
 
     /// @dev Adds funds to user's balance for a particular bot. The entire sent value in ETH is added

@@ -116,7 +116,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @dev Keeps parameters that are used to pause the system after too much bad debt over a short period
     CumulativeLossParams public override lossParams;
 
-    /// @dev Contract containing the list of approval statuses for borrowers / bots
+    /// @dev Contract containing permissions from borrowers to bots
     address public botList;
 
     /// @dev
@@ -312,6 +312,10 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
         /// HOW TO CHECK QUOTED BALANCES
 
+        /// Bot permissions are specific to (owner, creditAccount),
+        /// so they need to be erased on account closure
+        _eraseAllBotPermissions({creditAccount: creditAccount, setFlag: false});
+
         // Requests the Credit manager to close the Credit Account
         _closeCreditAccount({
             creditAccount: creditAccount,
@@ -391,6 +395,10 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                 _multicall(creditAccount, calls, collateralDebtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS);
             collateralDebtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter;
         } // F:[FA-15]
+
+        /// Bot permissions are specific to (owner, creditAccount),
+        /// so they need to be erased on account closure
+        _eraseAllBotPermissions({creditAccount: creditAccount, setFlag: false});
 
         (uint256 remainingFunds, uint256 reportedLoss) = _closeCreditAccount({
             creditAccount: creditAccount,
@@ -827,6 +835,10 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
         if (collateralDebtData.isLiquidatable) revert CantTransferLiquidatableAccountException(); // F:[FA-34]
 
+        /// Bot permissions are specific to (owner, creditAccount),
+        /// so they need to be erased on account transfer
+        _eraseAllBotPermissions(creditAccount, true);
+
         // Requests the Credit Manager to transfer the account
         creditManager.transferAccountOwnership(creditAccount, to); // F:[FA-35]
 
@@ -843,6 +855,37 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         nonReentrant
     {
         _claimWithdrawals(creditAccount, to, ClaimAction.CLAIM);
+    }
+
+    function setBotPermissions(address creditAccount, address bot, uint192 permissions)
+        external
+        override
+        whenNotPaused
+        creditAccountOwnerOnly(creditAccount)
+        nonReentrant
+    {
+        uint16 flags = creditManager.flagsOf(creditAccount);
+
+        if (flags & BOT_PERMISSIONS_SET_FLAG == 0) {
+            _eraseAllBotPermissions(creditAccount, false);
+
+            if (permissions != 0) {
+                creditManager.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, true);
+            }
+        }
+
+        uint256 remainingBots = IBotList(botList).setBotPermissions(creditAccount, bot, permissions);
+        if (remainingBots == 0) {
+            creditManager.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, false);
+        }
+    }
+
+    function _eraseAllBotPermissions(address creditAccount, bool setFlag) internal {
+        IBotList(botList).eraseAllBotPermissions(creditAccount);
+
+        if (setFlag) {
+            creditManager.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, false);
+        }
     }
 
     /// @dev Checks that transfer is allowed

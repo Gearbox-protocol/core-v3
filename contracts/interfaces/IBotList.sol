@@ -14,7 +14,7 @@ struct BotFunding {
 
 interface IBotListEvents {
     /// @dev Emits when a borrower enables or disables a bot for their account
-    event ApproveBot(address indexed borrower, address indexed bot, uint256 permissions);
+    event ApproveBot(address indexed creditAccount, address indexed bot, uint256 permissions);
 
     /// @dev Emits when a bot is forbidden system-wide
     event BotForbiddenStatusChanged(address indexed bot, bool status);
@@ -35,7 +35,13 @@ interface IBotListEvents {
 /// @title IBotList
 interface IBotList is IBotListEvents, IVersion {
     /// @dev Sets approval from msg.sender to bot
-    function setBotPermissions(address bot, uint192 permissions) external;
+    function setBotPermissions(address creditAccount, address bot, uint192 permissions)
+        external
+        returns (uint256 remainingBots);
+
+    /// @dev Removes permissions for all bots with non-zero permissions for a credit account
+    /// @param creditAccount Credit Account to erase permissions for
+    function eraseAllBotPermissions(address creditAccount) external;
 
     /// @dev Returns whether the bot is approved by the borrower
     function botPermissions(address borrower, address bot) external view returns (uint192);
