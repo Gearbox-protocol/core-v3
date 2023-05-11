@@ -36,7 +36,7 @@ contract PolicyManagerTest is Test {
     ///
 
     /// @dev [PM-1]: setPolicy and getPolicy work correctly
-    function test_PM_01_setPolicy_getPolicy_work_correctly() public {
+    function test_PM_01_setPolicy_getPolicy_setGroup_getGroup_work_correctly() public {
         Policy memory policy = Policy({
             enabled: false,
             flags: 2 + 4 + 16,
@@ -84,6 +84,15 @@ contract PolicyManagerTest is Test {
         assertEq(policy2.minChange, 3, "minChange is incorrect");
 
         assertEq(policy2.maxChange, 4, "maxChange is incorrect");
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.prank(USER);
+        policyManager.setGroup(DUMB_ADDRESS, "GROUP");
+
+        vm.prank(CONFIGURATOR);
+        policyManager.setGroup(DUMB_ADDRESS, "GROUP");
+
+        assertEq(policyManager.getGroup(DUMB_ADDRESS), "GROUP");
     }
 
     /// @dev [PM-2]: checkPolicy fails on disabled policy

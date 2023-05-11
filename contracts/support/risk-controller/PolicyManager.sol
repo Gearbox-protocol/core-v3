@@ -67,20 +67,26 @@ contract PolicyManager is ACLNonReentrantTrait {
     /// @param policyHash A unique identifier for a policy
     ///                   Generally, this should be a hash of (PARAMETER_NAME, GROUP_NAME)
     /// @param initialPolicy The initial policy values
-    function setPolicy(bytes32 policyHash, Policy memory initialPolicy) public configuratorOnly {
-        initialPolicy.enabled = true;
-        _policies[policyHash] = initialPolicy;
+    function setPolicy(bytes32 policyHash, Policy memory initialPolicy)
+        external
+        configuratorOnly // F: [PM-01]
+    {
+        initialPolicy.enabled = true; // F: [PM-01]
+        _policies[policyHash] = initialPolicy; // F: [PM-01]
     }
 
     /// @dev Disables the policy which makes all requested checks for the passed policy hash to auto-fail
     /// @param policyHash A unique identifier for a policy
-    function disablePolicy(bytes32 policyHash) public configuratorOnly {
-        _policies[policyHash].enabled = false;
+    function disablePolicy(bytes32 policyHash)
+        public
+        configuratorOnly // F: [PM-02]
+    {
+        _policies[policyHash].enabled = false; // F: [PM-02]
     }
 
     /// @dev Retrieves policy from policy UID
     function getPolicy(bytes32 policyHash) external view returns (Policy memory) {
-        return _policies[policyHash];
+        return _policies[policyHash]; // F: [PM-01]
     }
 
     /// @dev Sets the policy group of the address
@@ -106,20 +112,20 @@ contract PolicyManager is ACLNonReentrantTrait {
     function _checkPolicy(bytes32 policyHash, uint256 oldValue, uint256 newValue) internal returns (bool) {
         Policy storage policy = _policies[policyHash];
 
-        if (!policy.enabled) return false;
+        if (!policy.enabled) return false; // F: [PM-02]
 
         uint8 flags = policy.flags;
 
         if (flags & CHECK_EXACT_VALUE_FLAG > 0) {
-            if (newValue != policy.exactValue) return false;
+            if (newValue != policy.exactValue) return false; // F: [PM-03]
         }
 
         if (flags & CHECK_MIN_VALUE_FLAG > 0) {
-            if (newValue < policy.minValue) return false;
+            if (newValue < policy.minValue) return false; // F: [PM-04]
         }
 
         if (flags & CHECK_MAX_VALUE_FLAG > 0) {
-            if (newValue > policy.maxValue) return false;
+            if (newValue > policy.maxValue) return false; // F: [PM-05]
         }
 
         uint256 rp;
@@ -130,32 +136,32 @@ contract PolicyManager is ACLNonReentrantTrait {
                 > 0
         ) {
             if (block.timestamp > policy.referencePointTimestampLU + policy.referencePointUpdatePeriod) {
-                policy.referencePoint = oldValue;
-                policy.referencePointTimestampLU = uint40(block.timestamp);
+                policy.referencePoint = oldValue; // F: [PM-06]
+                policy.referencePointTimestampLU = uint40(block.timestamp); // F: [PM-06]
             }
             rp = policy.referencePoint;
         }
 
         if (flags & CHECK_MIN_CHANGE_FLAG > 0) {
             uint256 diff = newValue > rp ? newValue - rp : rp - newValue;
-            if (diff < policy.minChange) return false;
+            if (diff < policy.minChange) return false; // F: [PM-07]
         }
 
         if (flags & CHECK_MAX_CHANGE_FLAG > 0) {
             uint256 diff = newValue > rp ? newValue - rp : rp - newValue;
-            if (diff > policy.maxChange) return false;
+            if (diff > policy.maxChange) return false; // F: [PM-08]
         }
 
         if (flags & CHECK_MIN_PCT_CHANGE_FLAG > 0) {
             uint256 diff = newValue > rp ? newValue - rp : rp - newValue;
             uint256 pctDiff = diff * PERCENTAGE_FACTOR / rp;
-            if (pctDiff < policy.minPctChange) return false;
+            if (pctDiff < policy.minPctChange) return false; // F: [PM-09]
         }
 
         if (flags & CHECK_MAX_PCT_CHANGE_FLAG > 0) {
             uint256 diff = newValue > rp ? newValue - rp : rp - newValue;
             uint256 pctDiff = diff * PERCENTAGE_FACTOR / rp;
-            if (pctDiff > policy.maxPctChange) return false;
+            if (pctDiff > policy.maxPctChange) return false; // F: [PM-10]
         }
 
         return true;
