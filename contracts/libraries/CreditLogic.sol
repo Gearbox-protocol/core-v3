@@ -5,6 +5,7 @@ pragma solidity ^0.8.17;
 
 import {BitMask} from "./BitMask.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Helper} from "./IERC20Helper.sol";
 import {CollateralDebtData, CollateralTokenData} from "../interfaces/ICreditManagerV3.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 import {SECONDS_PER_YEAR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
@@ -16,6 +17,7 @@ uint256 constant INDEX_PRECISION = 10 ** 9;
 /// @title Credit Logic Library
 library CreditLogic {
     using BitMask for uint256;
+    using IERC20Helper for IERC20;
 
     function calcLinearGrowth(uint256 value, uint256 timestampLastUpdate) internal view returns (uint256) {
         // timeDifference = blockTime - previous timeStamp
@@ -286,7 +288,7 @@ library CreditLogic {
         uint256 len = expected.length; // F:[FA-45]
 
         for (uint256 i = 0; i < len;) {
-            expected[i].balance += _balanceOf(expected[i].token, creditAccount); // F:[FA-45]
+            expected[i].balance += IERC20(expected[i].token)._balanceOf(creditAccount); // F:[FA-45]
             unchecked {
                 ++i;
             }
@@ -302,15 +304,11 @@ library CreditLogic {
         uint256 len = expected.length; // F:[FA-45]
         unchecked {
             for (uint256 i = 0; i < len; ++i) {
-                if (_balanceOf(expected[i].token, creditAccount) < expected[i].balance) {
+                if (IERC20(expected[i].token)._balanceOf(creditAccount) < expected[i].balance) {
                     revert BalanceLessThanMinimumDesiredException(expected[i].token);
                 } // F:[FA-45]
             }
         }
-    }
-
-    function _balanceOf(address token, address holder) internal view returns (uint256) {
-        return IERC20(token).balanceOf(holder);
     }
 
     function storeForbiddenBalances(
@@ -328,7 +326,7 @@ library CreditLogic {
                 for (uint256 tokenMask = 1; tokenMask < forbiddenTokensOnAccount; tokenMask <<= 1) {
                     if (forbiddenTokensOnAccount & tokenMask != 0) {
                         address token = getTokenByMaskFn(tokenMask);
-                        forbiddenBalances[i] = _balanceOf(token, creditAccount);
+                        forbiddenBalances[i] = IERC20(token)._balanceOf(creditAccount);
                         ++i;
                     }
                 }
@@ -356,7 +354,7 @@ library CreditLogic {
                 if (forbiddenTokensOnAccountBefore & tokenMask != 0) {
                     if (forbiddenTokensOnAccount & tokenMask != 0) {
                         address token = getTokenByMaskFn(tokenMask);
-                        uint256 balance = _balanceOf(token, creditAccount);
+                        uint256 balance = IERC20(token)._balanceOf(creditAccount);
                         if (balance > forbiddenBalances[i]) {
                             revert ForbiddenTokensException();
                         }

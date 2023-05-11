@@ -386,7 +386,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             }); // F: [CMQ-6]
         }
 
-        uint256 enabledTokensMask = collateralDebtData.enabledTokensMask & ~skipTokensMask;
+        uint256 enabledTokensMask = collateralDebtData.enabledTokensMask.disable(skipTokensMask);
 
         _transferAssetsTo(creditAccount, to, convertWETH, enabledTokensMask); // F:[CM-14,17,19]
 
