@@ -216,9 +216,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         priceOracle = IPriceOracleV2(addressProvider.getPriceOracle()); // F:[CM-1]
         accountFactory = IAccountFactory(addressProvider.getAccountFactory()); // F:[CM-1]
 
-        deployAccountAction = accountFactory.version() == 3_00
-            ? uint256(TakeAccountAction.DEPLOY_NEW_ONE)
-            : TakeAccountAction.TAKE_USED_ONE;
+        deployAccountAction =
+            accountFactory.version() == 3_00 ? TakeAccountAction.DEPLOY_NEW_ONE : TakeAccountAction.TAKE_USED_ONE;
         creditConfigurator = msg.sender; // F:[CM-1]
 
         withdrawalManager = IWithdrawalManager(_withdrawalManager);
@@ -340,7 +339,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             });
         }
         {
-            uint256 underlyingBalance = IERC20(underlying)._balanceOf(creditAccount);
+            uint256 underlyingBalance = IERC20Helper.balanceOf(underlying, creditAccount);
 
             if (underlyingBalance > amountToPool + remainingFunds + 1) {
                 // If there is an underlying surplus, transfers it to the "to" address
@@ -386,7 +385,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             }); // F: [CMQ-6]
         }
 
-        uint256 enabledTokensMask = collateralDebtData.enabledTokensMask & ~skipTokensMask;
+        uint256 enabledTokensMask = collateralDebtData.enabledTokensMask.disable(skipTokensMask);
 
         _transferAssetsTo(creditAccount, to, convertWETH, enabledTokensMask); // F:[CM-14,17,19]
 
@@ -465,7 +464,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
                 creditAccountInfo[creditAccount].cumulativeQuotaInterest = cumulativeQuotaInterest;
             }
 
-            if (IERC20(underlying)._balanceOf(creditAccount) <= 1) {
+            if (IERC20Helper.balanceOf(underlying, creditAccount) <= 1) {
                 tokensToDisable = UNDERLYING_TOKEN_MASK;
             }
         }
@@ -770,7 +769,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         uint256 _twvUSDx10K
     ) internal view returns (uint256 totalValueUSD, uint256 twvUSDx10K, bool nonZeroBalance) {
         (address token, uint16 liquidationThreshold) = collateralTokensByMask(tokenMask);
-        uint256 balance = IERC20(token)._balanceOf(creditAccount);
+        uint256 balance = IERC20Helper.balanceOf(token, creditAccount);
 
         // Collateral calculations are only done if there is a non-zero balance
         if (balance > 1) {
@@ -861,7 +860,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
                 // and 0 otherwise
                 if (enabledTokensMask & tokenMask != 0) {
                     address token = getTokenByMask(tokenMask); // F:[CM-44]
-                    uint256 amount = IERC20(token)._balanceOf(creditAccount); // F:[CM-44]
+                    uint256 amount = IERC20Helper.balanceOf(token, creditAccount); // F:[CM-44]
                     if (amount > 1) {
                         // 1 is subtracted from amount to leave a non-zero value
                         // in the balance mapping, optimizing future writes
@@ -1258,7 +1257,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         creditAccountInfo[creditAccount].flags |= WITHDRAWAL_FLAG;
 
         // We need to disable empty tokens in case they could be forbidden, to finally eliminate them
-        if (IERC20(token)._balanceOf(creditAccount) <= 1) {
+        if (IERC20Helper.balanceOf(token, creditAccount) <= 1) {
             tokensToDisable = tokenMask;
         }
     }
