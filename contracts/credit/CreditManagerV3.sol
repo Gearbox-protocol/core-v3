@@ -1248,15 +1248,18 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     {
         uint256 tokenMask = getTokenMaskOrRevert(token);
 
-        uint256 delivered =
-            ICreditAccount(creditAccount).transferDeliveredBalanceControl(token, address(withdrawalManager), amount);
+        if (withdrawalManager.delay() == 0) {
+            address borrower = creditAccountInfo[creditAccount].borrower;
+            _safeTokenTransfer(creditAccount, token, borrower, amount, false);
+        } else {
+            uint256 delivered =
+                ICreditAccount(creditAccount).transferDeliveredBalanceControl(token, address(withdrawalManager), amount);
 
-        withdrawalManager.addScheduledWithdrawal(creditAccount, token, delivered, tokenMask.calcIndex());
+            withdrawalManager.addScheduledWithdrawal(creditAccount, token, delivered, tokenMask.calcIndex());
+            // enables withdrawal flag
+            creditAccountInfo[creditAccount].flags |= WITHDRAWAL_FLAG;
+        }
 
-        /// @dev enables withdrawal flag
-        creditAccountInfo[creditAccount].flags |= WITHDRAWAL_FLAG;
-
-        // We need to disable empty tokens in case they could be forbidden, to finally eliminate them
         if (IERC20Helper.balanceOf(token, creditAccount) <= 1) {
             tokensToDisable = tokenMask;
         }
@@ -1273,7 +1276,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             bool hasScheduled;
             (hasScheduled, tokensToEnable) = withdrawalManager.claimScheduledWithdrawals(creditAccount, to, action);
             if (!hasScheduled) {
-                /// @dev disables withdrawal flag
+                // disables withdrawal flag
                 creditAccountInfo[creditAccount].flags &= ~WITHDRAWAL_FLAG;
             }
         }
@@ -1291,8 +1294,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         (address token1, uint256 amount1, address token2, uint256 amount2) =
             withdrawalManager.cancellableScheduledWithdrawals(creditAccount, isForceCancel);
 
-        if (amount1 > 0) withdrawalsValueUSD += _convertToUSD(_priceOracle, amount1, token1);
-        if (amount2 > 0) withdrawalsValueUSD += _convertToUSD(_priceOracle, amount2, token2);
+        if (amount1 != 0) withdrawalsValueUSD += _convertToUSD(_priceOracle, amount1, token1);
+        if (amount2 != 0) withdrawalsValueUSD += _convertToUSD(_priceOracle, amount2, token2);
     }
 
     /// @notice Revokes allowances for specified spender/token pairs
