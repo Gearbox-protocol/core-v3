@@ -56,8 +56,8 @@ library CreditAccountHelper {
         address to,
         uint256 amount
     ) internal returns (uint256 delivered) {
-        uint256 balanceBefore = IERC20(token)._balanceOf(to);
+        uint256 balanceBefore = IERC20Helper.balanceOf(token, to);
         _safeTransfer(creditAccount, token, to, amount);
-        delivered = IERC20(token)._balanceOf(to) - balanceBefore;
+        delivered = IERC20Helper.balanceOf(token, to) - balanceBefore;
     }
 }

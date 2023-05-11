@@ -288,7 +288,7 @@ library CreditLogic {
         uint256 len = expected.length; // F:[FA-45]
 
         for (uint256 i = 0; i < len;) {
-            expected[i].balance += IERC20(expected[i].token)._balanceOf(creditAccount); // F:[FA-45]
+            expected[i].balance += IERC20Helper.balanceOf(expected[i].token, creditAccount); // F:[FA-45]
             unchecked {
                 ++i;
             }
@@ -304,7 +304,7 @@ library CreditLogic {
         uint256 len = expected.length; // F:[FA-45]
         unchecked {
             for (uint256 i = 0; i < len; ++i) {
-                if (IERC20Helper._balanceOf(expected[i].token, creditAccount) < expected[i].balance) {
+                if (IERC20Helper.balanceOf(expected[i].token, creditAccount) < expected[i].balance) {
                     revert BalanceLessThanMinimumDesiredException(expected[i].token);
                 } // F:[FA-45]
             }
@@ -326,7 +326,7 @@ library CreditLogic {
                 for (uint256 tokenMask = 1; tokenMask < forbiddenTokensOnAccount; tokenMask <<= 1) {
                     if (forbiddenTokensOnAccount & tokenMask != 0) {
                         address token = getTokenByMaskFn(tokenMask);
-                        forbiddenBalances[i] = IERC20(token)._balanceOf(creditAccount);
+                        forbiddenBalances[i] = IERC20Helper.balanceOf(token, creditAccount);
                         ++i;
                     }
                 }
@@ -354,7 +354,7 @@ library CreditLogic {
                 if (forbiddenTokensOnAccountBefore & tokenMask != 0) {
                     if (forbiddenTokensOnAccount & tokenMask != 0) {
                         address token = getTokenByMaskFn(tokenMask);
-                        uint256 balance = IERC20(token)._balanceOf(creditAccount);
+                        uint256 balance = IERC20Helper.balanceOf(token, creditAccount);
                         if (balance > forbiddenBalances[i]) {
                             revert ForbiddenTokensException();
                         }
