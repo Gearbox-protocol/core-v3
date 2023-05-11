@@ -1244,50 +1244,6 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         expectAllowance(Tokens.DAI, creditAccount, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
     }
 
-    /// @dev [CM-27A]: approveCreditAccount works for ERC20 that revert if allowance > 0 before approve
-    function test_CM_27A_approveCreditAccount_works_for_ERC20_with_approve_restrictions() public {
-        (,,, address creditAccount) = _openCreditAccount();
-        creditManager.setCreditAccountForExternalCall(creditAccount);
-
-        vm.prank(CONFIGURATOR);
-        creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
-
-        address approveRevertToken = address(new ERC20ApproveRestrictedRevert());
-
-        vm.prank(CONFIGURATOR);
-        creditManager.addToken(approveRevertToken);
-
-        vm.prank(ADAPTER);
-        creditManager.approveCreditAccount(approveRevertToken, DAI_EXCHANGE_AMOUNT);
-
-        vm.prank(ADAPTER);
-        creditManager.approveCreditAccount(approveRevertToken, 2 * DAI_EXCHANGE_AMOUNT);
-
-        expectAllowance(approveRevertToken, creditAccount, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
-    }
-
-    // /// @dev [CM-27B]: approveCreditAccount works for ERC20 that returns false if allowance > 0 before approve
-    function test_CM_27B_approveCreditAccount_works_for_ERC20_with_approve_restrictions() public {
-        (,,, address creditAccount) = _openCreditAccount();
-        creditManager.setCreditAccountForExternalCall(creditAccount);
-
-        address approveFalseToken = address(new ERC20ApproveRestrictedFalse());
-
-        vm.prank(CONFIGURATOR);
-        creditManager.addToken(approveFalseToken);
-
-        vm.prank(CONFIGURATOR);
-        creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
-
-        vm.prank(ADAPTER);
-        creditManager.approveCreditAccount(approveFalseToken, DAI_EXCHANGE_AMOUNT);
-
-        vm.prank(ADAPTER);
-        creditManager.approveCreditAccount(approveFalseToken, 2 * DAI_EXCHANGE_AMOUNT);
-
-        expectAllowance(approveFalseToken, creditAccount, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
-    }
-
     //
     // EXECUTE ORDER
     //

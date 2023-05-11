@@ -21,13 +21,14 @@ import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressP
 /// LIBS & TRAITS
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
+import {CreditLogic} from "../libraries/CreditLogic.sol";
 
 import {IInterestRateModel} from "../interfaces/IInterestRateModel.sol";
 import {IPool4626} from "../interfaces/IPool4626.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
 
-import {RAY, SECONDS_PER_YEAR, MAX_WITHDRAW_FEE} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {RAY, MAX_WITHDRAW_FEE} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // EXCEPTIONS
@@ -44,6 +45,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
     using Math for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
+    using CreditLogic for uint256;
 
     /// @dev Address provider
     AddressProvider public immutable override addressProvider;
@@ -415,21 +417,12 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
 
     /// @dev Computes interest rate accrued from last update (LU)
     function _calcBaseInterestAccrued() internal view returns (uint256) {
-        // timeDifference = blockTime - previous timeStamp
-
-        //                                    currentBorrowRate * timeDifference
-        //  interestAccrued = totalBorrow *  ------------------------------------
-        //                                             SECONDS_PER_YEAR
-        //
-
-        // TODO: move to lib
-        return (uint256(_totalBorrowed) * _borrowRate * (block.timestamp - timestampLU)) / RAY / SECONDS_PER_YEAR;
+        // TODO: add comment why we divide by RAY
+        return uint256(_totalBorrowed * _borrowRate).calcLinearGrowth(timestampLU) / RAY;
     }
 
     function _calcOutstandingQuotaRevenue() internal view returns (uint128) {
-        return uint128(
-            (quotaRevenue * (block.timestamp - lastQuotaRevenueUpdate)) / (SECONDS_PER_YEAR * PERCENTAGE_FACTOR)
-        ); // F:[P4-17]
+        return uint128(uint256(quotaRevenue).calcLinearGrowth(lastQuotaRevenueUpdate) / PERCENTAGE_FACTOR); // F:[P4-17]
     }
 
     /// @dev Returns available liquidity in the pool (pool balance)
@@ -536,10 +529,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
     ///
     /// @return Current cumulative index in RAY
     function calcLinearCumulative_RAY() public view override returns (uint256) {
-        uint256 timeDifference = block.timestamp - timestampLU; // F:[P4-15]
-        uint256 linearAccumulated_RAY = RAY + (_borrowRate * timeDifference) / SECONDS_PER_YEAR; // F:[P4-15]
-
-        return (cumulativeIndexLU_RAY * linearAccumulated_RAY) / RAY; // F:[P4-15]
+        return cumulativeIndexLU_RAY * (RAY + uint256(_borrowRate).calcLinearGrowth(timestampLU)) / RAY; // F:[P4-15]
     }
 
     /// @dev Updates core popo when liquidity parameters are changed

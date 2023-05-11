@@ -1,0 +1,66 @@
+// SPDX-License-Identifier: UNLICENSED
+// Gearbox Protocol. Generalized leverage for DeFi protocols
+// (c) Gearbox Holdings, 2023
+pragma solidity ^0.8.17;
+
+import {IncorrectParameterException} from "../../../interfaces/IExceptions.sol";
+import {CreditAccountHelper} from "../../../libraries/CreditAccountHelper.sol";
+import {ICreditAccount} from "../../../interfaces/ICreditAccount.sol";
+import {CreditAccountV3} from "../../../credit/CreditAccountV3.sol";
+
+import {
+    ERC20ApproveRestrictedRevert,
+    ERC20ApproveRestrictedFalse
+} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20ApproveRestricted.sol";
+
+import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
+import {Tokens} from "../../config/Tokens.sol";
+import {TestHelper} from "../../lib/helper.sol";
+import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
+
+import "../../lib/constants.sol";
+import "forge-std/console.sol";
+
+/// @title CreditAccountHelper logic test
+/// @notice [CAH]: Unit tests for credit account helper
+contract CreditAccountHelperTest is TestHelper, BalanceHelper {
+    using CreditAccountHelper for ICreditAccount;
+
+    address creditAccount;
+
+    function setUp() public {
+        tokenTestSuite = new TokensTestSuite();
+        creditAccount = address(new CreditAccountV3(address(this)));
+    }
+
+    /// @notice U:[CAH-01]: approveCreditAccount approves with desired allowance
+    function test_CAH_01_safeApprove_approves_with_desired_allowance() public {
+        // Case, when current allowance > Allowance_THRESHOLD
+        tokenTestSuite.approve(Tokens.DAI, creditAccount, DUMB_ADDRESS, 200);
+
+        address dai = tokenTestSuite.addressOf(Tokens.DAI);
+
+        ICreditAccount(creditAccount).safeApprove(dai, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
+
+        expectAllowance(Tokens.DAI, creditAccount, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
+    }
+
+    /// @dev U:[CAH-02]: approveCreditAccount works for ERC20 that revert if allowance > 0 before approve
+    function test_CAH_02_safeApprove_works_for_ERC20_with_approve_restrictions() public {
+        address approveRevertToken = address(new ERC20ApproveRestrictedRevert());
+
+        ICreditAccount(creditAccount).safeApprove(approveRevertToken, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
+
+        ICreditAccount(creditAccount).safeApprove(approveRevertToken, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
+
+        expectAllowance(approveRevertToken, creditAccount, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
+
+        address approveFalseToken = address(new ERC20ApproveRestrictedFalse());
+
+        ICreditAccount(creditAccount).safeApprove(approveFalseToken, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
+
+        ICreditAccount(creditAccount).safeApprove(approveFalseToken, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
+
+        expectAllowance(approveFalseToken, creditAccount, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
+    }
+}

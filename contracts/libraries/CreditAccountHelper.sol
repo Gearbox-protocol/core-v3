@@ -15,8 +15,9 @@ library CreditAccountHelper {
 
     function safeApprove(ICreditAccount creditAccount, address token, address spender, uint256 amount) internal {
         if (!_approve(creditAccount, token, spender, amount, false)) {
-            _approve(creditAccount, token, spender, 0, true); // F:
-            _approve(creditAccount, token, spender, amount, true);
+            // U:[CAH-1,2]
+            _approve(creditAccount, token, spender, 0, true); //U:[CAH-1,2]
+            _approve(creditAccount, token, spender, amount, true); // U:[CAH-1,2]
         }
     }
 

@@ -7,6 +7,7 @@ import {BitMask} from "./BitMask.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {CollateralDebtData, CollateralTokenData} from "../interfaces/ICreditManagerV3.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {SECONDS_PER_YEAR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 import "../interfaces/IExceptions.sol";
 
@@ -15,6 +16,16 @@ uint256 constant INDEX_PRECISION = 10 ** 9;
 /// @title Credit Logic Library
 library CreditLogic {
     using BitMask for uint256;
+
+    function calcLinearGrowth(uint256 value, uint256 timestampLastUpdate) internal view returns (uint256) {
+        // timeDifference = blockTime - previous timeStamp
+
+        //                             timeDifference
+        //  grownVluaed = value  *  -------------------
+        //                           SECONDS_PER_YEAR
+        //
+        return value * (block.timestamp - timestampLastUpdate) / SECONDS_PER_YEAR;
+    }
 
     function calcAccruedInterest(uint256 amount, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow)
         internal

@@ -335,27 +335,32 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
                 amountMinusFeeFn: _amountWithFee
             });
         }
+        {
+            uint256 underlyingBalance = IERC20(underlying)._balanceOf(creditAccount);
 
-        uint256 underlyingBalance = IERC20(underlying)._balanceOf(creditAccount);
-
-        if (underlyingBalance > amountToPool + remainingFunds + 1) {
-            // If there is an underlying surplus, transfers it to the "to" address
-            unchecked {
-                _safeTokenTransfer(
-                    creditAccount, underlying, to, underlyingBalance - amountToPool - remainingFunds - 1, convertWETH
-                ); // F:[CM-10,12,16]
-            }
-        } else if (underlyingBalance < amountToPool + remainingFunds + 1) {
-            // If there is an underlying shortfall, attempts to transfer it from the payer
-            unchecked {
-                IERC20(underlying).safeTransferFrom(
-                    payer, creditAccount, _amountWithFee(amountToPool + remainingFunds - underlyingBalance + 1)
-                ); // F:[CM-11,13]
+            if (underlyingBalance > amountToPool + remainingFunds + 1) {
+                // If there is an underlying surplus, transfers it to the "to" address
+                unchecked {
+                    _safeTokenTransfer(
+                        creditAccount,
+                        underlying,
+                        to,
+                        underlyingBalance - amountToPool - remainingFunds - 1,
+                        convertWETH
+                    ); // F:[CM-10,12,16]
+                }
+            } else if (underlyingBalance < amountToPool + remainingFunds + 1) {
+                // If there is an underlying shortfall, attempts to transfer it from the payer
+                unchecked {
+                    IERC20(underlying).safeTransferFrom(
+                        payer, creditAccount, _amountWithFee(amountToPool + remainingFunds - underlyingBalance + 1)
+                    ); // F:[CM-11,13]
+                }
             }
         }
 
         // Transfers the due funds to the pool
-        _safeTokenTransfer(creditAccount, underlying, pool, amountToPool, false); // F:[CM-10,11,12,13]
+        ICreditAccount(creditAccount)._safeTransfer(underlying, pool, amountToPool); // F:[CM-10,11,12,13]
 
         // Signals to the pool that debt has been repaid. The pool relies
         // on the Credit Manager to repay the debt correctly, and does not
@@ -880,12 +885,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         internal
     {
         if (convertToETH && token == wethAddress) {
-            ICreditAccount(creditAccount).safeTransfer(token, wethGateway, amount); // F:[CM-45]
+            ICreditAccount(creditAccount)._safeTransfer(token, wethGateway, amount); // F:[CM-45]
             IWETHGateway(wethGateway).depositFor(to, amount); // F:[CM-45]
         } else {
             try ICreditAccount(creditAccount).safeTransfer(token, to, amount) { // F:[CM-45]
             } catch {
-                it(to == pool) revert; // TODO: add exception
                 uint256 delivered = ICreditAccount(creditAccount).safeTransferDeliveredBalanceControl(
                     token, address(withdrawalManager), amount
                 );
