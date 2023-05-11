@@ -16,7 +16,12 @@ contract AddressProviderACLMock {
     address public getPriceOracle;
     mapping(address => address) public priceFeeds;
 
+    mapping(address => bool) public isPool;
+    mapping(address => bool) public isCreditManager;
+
     address public getTreasuryContract;
+
+    address public getContractsRegister;
 
     address public owner;
 
@@ -25,6 +30,7 @@ contract AddressProviderACLMock {
     constructor() {
         getACL = address(this);
         getPriceOracle = address(this);
+        getContractsRegister = address(this);
         getTreasuryContract = FRIEND2;
         isConfigurator[msg.sender] = true;
         owner = msg.sender;
@@ -36,6 +42,14 @@ contract AddressProviderACLMock {
 
     function setGearToken(address gearToken) external {
         getGearToken = gearToken;
+    }
+
+    function addPool(address pool) external {
+        isPool[pool] = true;
+    }
+
+    function addCreditManager(address creditManager) external {
+        isCreditManager[creditManager] = true;
     }
 
     receive() external payable {}
