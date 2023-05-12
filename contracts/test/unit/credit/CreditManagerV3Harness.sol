@@ -3,7 +3,7 @@ import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPr
 import {CollateralDebtData} from "../../../interfaces/ICreditManagerV3.sol";
 
 contract CreditManagerV3Harness is CreditManagerV3 {
-    constructor(address _pool, address _withdrawalManager) CreditManagerV3(_pool, _withdrawalManager) {}
+    constructor(address _addressProvider, address _pool) CreditManagerV3(_addressProvider, _pool) {}
 
     function setDebt(address creditAccount, CreditAccountInfo memory _creditAccountInfo) external {
         creditAccountInfo[creditAccount] = _creditAccountInfo;
@@ -22,14 +22,14 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         uint256 enabledTokensMask,
         uint16 minHealthFactor,
         uint256[] memory collateralHints,
-        IPriceOracleV2 _priceOracle,
+        address _priceOracle,
         bool lazy
     ) external view returns (CollateralDebtData memory collateralDebtData) {
         return
             _calcFullCollateral(creditAccount, enabledTokensMask, minHealthFactor, collateralHints, _priceOracle, lazy);
     }
 
-    function calcQuotedCollateral(address creditAccount, uint256 enabledTokensMask, IPriceOracleV2 _priceOracle)
+    function calcQuotedCollateral(address creditAccount, uint256 enabledTokensMask, address _priceOracle)
         external
         view
         returns (uint256 totalValueUSD, uint256 twvUSD, uint256 quotaInterest, address[] memory tokens)
@@ -42,7 +42,7 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         uint256 enabledTokensMask,
         uint256 enoughCollateralUSD,
         uint256[] memory collateralHints,
-        IPriceOracleV2 _priceOracle
+        address _priceOracle
     ) external view returns (uint256 tokensToDisable, uint256 totalValueUSD, uint256 twvUSD) {
         return _calcNotQuotedCollateral(
             creditAccount, enabledTokensMask, enoughCollateralUSD, collateralHints, _priceOracle
@@ -50,7 +50,7 @@ contract CreditManagerV3Harness is CreditManagerV3 {
     }
 
     function calcOneNonQuotedTokenCollateral(
-        IPriceOracleV2 _priceOracle,
+        address _priceOracle,
         uint256 tokenMask,
         address creditAccount,
         uint256 _totalValueUSD,
@@ -111,7 +111,7 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         return _hasWithdrawals(creditAccount);
     }
 
-    function calcCancellableWithdrawalsValue(IPriceOracleV2 _priceOracle, address creditAccount, bool isForceCancel)
+    function calcCancellableWithdrawalsValue(address _priceOracle, address creditAccount, bool isForceCancel)
         external
     {
         _calcCancellableWithdrawalsValue(_priceOracle, creditAccount, isForceCancel);
@@ -121,7 +121,7 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         _saveEnabledTokensMask(creditAccount, enabledTokensMask);
     }
 
-    function convertToUSD(IPriceOracleV2 _priceOracle, uint256 amountInToken, address token)
+    function convertToUSD(address _priceOracle, uint256 amountInToken, address token)
         external
         returns (uint256 amountInUSD)
     {

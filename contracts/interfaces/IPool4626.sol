@@ -42,13 +42,7 @@ interface IPool4626Events {
     event SetWithdrawFee(uint256 fee);
 }
 
-/// @title Pool 4626
-/// More: https://dev.gearbox.fi/developers/pool/abstractpoolservice
-interface IPool4626 is IPool4626Events, IERC4626, IVersion {
-    function depositReferral(uint256 assets, address receiver, uint16 referralCode) external returns (uint256 shares);
-
-    function burn(uint256 shares) external;
-
+interface IPoolBase {
     /// CREDIT MANAGERS FUNCTIONS
 
     /// @dev Lends pool funds to a Credit Account
@@ -64,14 +58,8 @@ interface IPool4626 is IPool4626Events, IERC4626, IVersion {
     ///         was already transferred
     function repayCreditAccount(uint256 borrowedAmount, uint256 profit, uint256 loss) external;
 
-    /// @dev Updates quota index
-    function changeQuotaRevenue(int128 _quotaRevenueChange) external;
-
-    function updateQuotaRevenue(uint128 newQuotaRevenue) external;
-
-    //
-    // GETTERS
-    //
+    /// @dev Address of the underlying
+    function underlyingToken() external view returns (address);
 
     /// @dev The same value like in total assets in ERC4626 standrt
     function expectedLiquidity() external view returns (uint256);
@@ -84,15 +72,29 @@ interface IPool4626 is IPool4626Events, IERC4626, IVersion {
 
     /// @dev Current interest index, RAY format
     function calcLinearCumulative_RAY() external view returns (uint256);
+}
+
+/// @title Pool 4626
+/// More: https://dev.gearbox.fi/developers/pool/abstractpoolservice
+interface IPool4626 is IPool4626Events, IPoolBase, IERC4626, IVersion {
+    function depositReferral(uint256 assets, address receiver, uint16 referralCode) external returns (uint256 shares);
+
+    function burn(uint256 shares) external;
+
+    /// @dev Updates quota index
+    function changeQuotaRevenue(int128 _quotaRevenueChange) external;
+
+    function updateQuotaRevenue(uint128 newQuotaRevenue) external;
+
+    //
+    // GETTERS
+    //
 
     /// @dev Calculates the current borrow rate, RAY format
     function borrowRate() external view returns (uint256);
 
     ///  @dev Total borrowed amount (includes principal only)
     function totalBorrowed() external view returns (uint256);
-
-    /// @dev Address of the underlying
-    function underlyingToken() external view returns (address);
 
     /// @dev Addresses of all connected credit managers
     function creditManagers() external view returns (address[] memory);
