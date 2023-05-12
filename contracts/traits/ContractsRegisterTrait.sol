@@ -28,8 +28,8 @@ abstract contract ContractsRegisterTrait is SanityCheckTrait {
         return _cr.isPool(_pool);
     }
 
-    function isRegisteredCreditManager(address _pool) internal view returns (bool) {
-        return _cr.isCreditManager(_pool);
+    function isRegisteredCreditManager(address _creditManager) internal view returns (bool) {
+        return _cr.isCreditManager(_creditManager);
     }
 
     /// @dev Checks that credit manager is registered

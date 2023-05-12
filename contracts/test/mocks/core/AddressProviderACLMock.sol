@@ -23,6 +23,9 @@ contract AddressProviderACLMock is Test, IAddressProviderV3 {
 
     address public getPriceOracle;
 
+    mapping(address => bool) public isPool;
+    mapping(address => bool) public isCreditManager;
+
     address public getTreasuryContract;
 
     address public getGearToken;
@@ -56,6 +59,14 @@ contract AddressProviderACLMock is Test, IAddressProviderV3 {
 
     function setGearToken(address gearToken) external {
         getGearToken = gearToken;
+    }
+
+    function addPool(address pool) external {
+        isPool[pool] = true;
+    }
+
+    function addCreditManager(address creditManager) external {
+        isCreditManager[creditManager] = true;
     }
 
     receive() external payable {}
