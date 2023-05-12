@@ -66,11 +66,6 @@ interface IWithdrawalManagerEvents {
     /// @notice Emitted when new scheduled withdrawal delay is set by configurator
     /// @param delay New delay for scheduled withdrawals
     event SetWithdrawalDelay(uint40 delay);
-
-    /// @notice Emitted when new credit manager status is set by configurator
-    /// @param creditManager Credit manager for which the status is set
-    /// @param status New status of the credit manager
-    event SetCreditManagerStatus(address indexed creditManager, bool status);
 }
 
 interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
@@ -138,15 +133,7 @@ interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
     /// CONFIGURATION ///
     /// ------------- ///
 
-    /// @notice Whether given address is a supported credit manager
-    function creditManagerStatus(address) external view returns (bool);
-
     /// @notice Sets delay for scheduled withdrawals, only affects new withdrawal requests
     /// @param delay New delay for scheduled withdrawals
     function setWithdrawalDelay(uint40 delay) external;
-
-    /// @notice Sets status for the credit manager
-    /// @param creditManager Credit manager to set the status for
-    /// @param status New status of the credit manager
-    function setCreditManagerStatus(address creditManager, bool status) external;
 }

@@ -9,40 +9,18 @@ import {ClaimAction, IWithdrawalManagerEvents, ScheduledWithdrawal} from "../../
 import {
     AmountCantBeZeroException,
     CallerNotConfiguratorException,
-    CallerNotCreditManagerException,
     NoFreeWithdrawalSlotsException,
     NothingToClaimException,
+    RegisteredCreditManagerOnlyException,
     ZeroAddressException
 } from "../../../interfaces/IExceptions.sol";
-import {WithdrawalManager} from "../../../support/WithdrawalManager.sol";
 
 import {USER} from "../../lib/constants.sol";
 import {TestHelper} from "../../lib/helper.sol";
 import {AddressProviderACLMock} from "../../mocks/core/AddressProviderACLMock.sol";
 import {ERC20BlacklistableMock} from "../../mocks/token/ERC20Blacklistable.sol";
 
-contract WithdrawalManagerHarness is WithdrawalManager {
-    constructor(address _addressProvider, uint40 _delay) WithdrawalManager(_addressProvider, _delay) {}
-
-    function setWithdrawalSlot(address creditAccount, uint8 slot, ScheduledWithdrawal memory w) external {
-        _scheduled[creditAccount][slot] = w;
-    }
-
-    function processScheduledWithdrawal(address creditAccount, uint8 slot, ClaimAction action, address to)
-        external
-        returns (bool scheduled, bool claimed, uint256 tokensToEnable)
-    {
-        return _processScheduledWithdrawal(_scheduled[creditAccount][slot], action, creditAccount, to);
-    }
-
-    function claimScheduledWithdrawal(address creditAccount, uint8 slot, address to) external {
-        _claimScheduledWithdrawal(_scheduled[creditAccount][slot], creditAccount, to);
-    }
-
-    function cancelScheduledWithdrawal(address creditAccount, uint8 slot) external returns (uint256 tokensToEnable) {
-        return _cancelScheduledWithdrawal(_scheduled[creditAccount][slot], creditAccount);
-    }
-}
+import {WithdrawalManagerHarness} from "./WithdrawalManagerHarness.sol";
 
 enum ScheduleTask {
     IMMATURE,
@@ -50,9 +28,9 @@ enum ScheduleTask {
     NON_SCHEDULED
 }
 
-/// @title Withdrawal manager test
-/// @notice [WM]: Unit tests for withdrawal manager
-contract WithdrawalManagerTest is TestHelper, IWithdrawalManagerEvents {
+/// @title Withdrawal manager unit test
+/// @notice U:[WM]: Unit tests for withdrawal manager
+contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerEvents {
     WithdrawalManagerHarness manager;
     AddressProviderACLMock acl;
     ERC20BlacklistableMock token0;
@@ -77,8 +55,8 @@ contract WithdrawalManagerTest is TestHelper, IWithdrawalManagerEvents {
 
         vm.startPrank(configurator);
         acl = new AddressProviderACLMock();
+        acl.addCreditManager(creditManager);
         manager = new WithdrawalManagerHarness(address(acl), DELAY);
-        manager.setCreditManagerStatus(creditManager, true);
         vm.stopPrank();
 
         token0 = new ERC20BlacklistableMock("Test token 1", "TEST1", 18);
@@ -89,29 +67,26 @@ contract WithdrawalManagerTest is TestHelper, IWithdrawalManagerEvents {
     /// GENERAL TESTS ///
     /// ------------- ///
 
-    /// @notice [WM-1]: Constructor sets correct values
-    function test_WM_01_constructor_sets_correct_values() public {
+    /// @notice U:[WM-1]: Constructor sets correct values
+    function test_U_WM_01_constructor_sets_correct_values() public {
         assertEq(manager.delay(), DELAY, "Incorrect delay");
     }
 
-    /// @notice [WM-2]: External functions have correct access
-    function test_WM_02_external_functions_have_correct_access() public {
+    /// @notice U:[WM-2]: External functions have correct access
+    function test_U_WM_02_external_functions_have_correct_access() public {
         vm.startPrank(USER);
 
-        vm.expectRevert(CallerNotCreditManagerException.selector);
+        vm.expectRevert(RegisteredCreditManagerOnlyException.selector);
         manager.addImmediateWithdrawal(address(0), address(0), 0);
 
-        vm.expectRevert(CallerNotCreditManagerException.selector);
+        vm.expectRevert(RegisteredCreditManagerOnlyException.selector);
         manager.addScheduledWithdrawal(address(0), address(0), 0, 0);
 
-        vm.expectRevert(CallerNotCreditManagerException.selector);
+        vm.expectRevert(RegisteredCreditManagerOnlyException.selector);
         manager.claimScheduledWithdrawals(address(0), address(0), ClaimAction(0));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         manager.setWithdrawalDelay(0);
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        manager.setCreditManagerStatus(address(0), false);
 
         vm.stopPrank();
     }
@@ -120,8 +95,8 @@ contract WithdrawalManagerTest is TestHelper, IWithdrawalManagerEvents {
     /// IMMEDIATE WITHDRAWALS TESTS ///
     /// --------------------------- ///
 
-    /// @notice [WM-3]: `addImmediateWithdrawal` works correctly
-    function test_WM_03_addImmediateWithdrawal_works_correctly() public {
+    /// @notice U:[WM-3]: `addImmediateWithdrawal` works correctly
+    function test_U_WM_03_addImmediateWithdrawal_works_correctly() public {
         vm.startPrank(creditManager);
 
         // add first withdrawal
@@ -155,22 +130,22 @@ contract WithdrawalManagerTest is TestHelper, IWithdrawalManagerEvents {
         vm.stopPrank();
     }
 
-    /// @notice [WM-4A]: `claimImmediateWithdrawal` reverts on zero recipient
-    function test_WM_04A_claimImmediateWithdrawal_reverts_on_zero_recipient() public {
+    /// @notice U:[WM-4A]: `claimImmediateWithdrawal` reverts on zero recipient
+    function test_U_WM_04A_claimImmediateWithdrawal_reverts_on_zero_recipient() public {
         vm.expectRevert(ZeroAddressException.selector);
         vm.prank(USER);
         manager.claimImmediateWithdrawal(address(token0), address(0));
     }
 
-    /// @notice [WM-4B]: `claimImmediateWithdrawal` reverts on nothing to claim
-    function test_WM_04B_claimImmediateWithdrawal_reverts_on_nothing_to_claim() public {
+    /// @notice U:[WM-4B]: `claimImmediateWithdrawal` reverts on nothing to claim
+    function test_U_WM_04B_claimImmediateWithdrawal_reverts_on_nothing_to_claim() public {
         vm.expectRevert(NothingToClaimException.selector);
         vm.prank(USER);
         manager.claimImmediateWithdrawal(address(token0), address(USER));
     }
 
-    /// @notice [WM-4C]: `claimImmediateWithdrawal` works correctly
-    function test_WM_04C_claimImmediateWithdrawal_works_correctly() public {
+    /// @notice U:[WM-4C]: `claimImmediateWithdrawal` works correctly
+    function test_U_WM_04C_claimImmediateWithdrawal_works_correctly() public {
         deal(address(token0), address(manager), AMOUNT);
 
         vm.prank(creditManager);
@@ -190,8 +165,8 @@ contract WithdrawalManagerTest is TestHelper, IWithdrawalManagerEvents {
     /// SCHEDULED WITHDRAWALS: EXTERNAL FUNCTIONS TESTS ///
     /// ----------------------------------------------- ///
 
-    /// @notice [WM-5A]: `addScheduledWithdrawal` reverts on zero amount
-    function test_WM_05A_addScheduledWithdrawal_reverts_on_zero_amount() public {
+    /// @notice U:[WM-5A]: `addScheduledWithdrawal` reverts on zero amount
+    function test_U_WM_05A_addScheduledWithdrawal_reverts_on_zero_amount() public {
         vm.expectRevert(AmountCantBeZeroException.selector);
         vm.prank(creditManager);
         manager.addScheduledWithdrawal(creditAccount, address(token0), 1, TOKEN0_INDEX);
@@ -207,8 +182,8 @@ contract WithdrawalManagerTest is TestHelper, IWithdrawalManagerEvents {
         uint8 expectedSlot;
     }
 
-    /// @notice [WM-5B]: `addScheduledWithdrawal` works correctly
-    function test_WM_05B_addScheduledWithdrawal_works_correctly() public {
+    /// @notice U:[WM-5B]: `addScheduledWithdrawal` works correctly
+    function test_U_WM_05B_addScheduledWithdrawal_works_correctly() public {
         AddScheduledWithdrawalCase[4] memory cases = [
             AddScheduledWithdrawalCase({
                 name: "both slots non-scheduled",
@@ -269,8 +244,8 @@ contract WithdrawalManagerTest is TestHelper, IWithdrawalManagerEvents {
         }
     }
 
-    /// @notice [WM-6A]: `claimScheduledWithdrawals` reverts on nothing to claim when action is `CLAIM`
-    function test_WM_06A_claimScheduledWithdrawals_reverts_on_nothing_to_claim() public {
+    /// @notice U:[WM-6A]: `claimScheduledWithdrawals` reverts on nothing to claim when action is `CLAIM`
+    function test_U_WM_06A_claimScheduledWithdrawals_reverts_on_nothing_to_claim() public {
         _addScheduledWithdrawal({slot: 0, task: ScheduleTask.IMMATURE});
         _addScheduledWithdrawal({slot: 1, task: ScheduleTask.NON_SCHEDULED});
         vm.expectRevert(NothingToClaimException.selector);
@@ -293,8 +268,8 @@ contract WithdrawalManagerTest is TestHelper, IWithdrawalManagerEvents {
         uint256 expectedTokensToEnable;
     }
 
-    /// @notice [WM-6B]: `claimScheduledWithdrawals` works correctly
-    function test_WM_06B_claimScheduledWithdrawals_works_correctly() public {
+    /// @notice U:[WM-6B]: `claimScheduledWithdrawals` works correctly
+    function test_U_WM_06B_claimScheduledWithdrawals_works_correctly() public {
         ClaimScheduledWithdrawalsCase[5] memory cases = [
             ClaimScheduledWithdrawalsCase({
                 name: "action == CLAIM, slot 0 mature, slot 1 immature",
@@ -406,8 +381,8 @@ contract WithdrawalManagerTest is TestHelper, IWithdrawalManagerEvents {
         uint256 expectedAmount1;
     }
 
-    /// @notice [WM-7]: `cancellableScheduledWithdrawals` works correctly
-    function test_WM_07_cancellableScheduledWithdrawals_works_correctly() public {
+    /// @notice U:[WM-7]: `cancellableScheduledWithdrawals` works correctly
+    function test_U_WM_07_cancellableScheduledWithdrawals_works_correctly() public {
         CancellableScheduledWithdrawalsCase[4] memory cases = [
             CancellableScheduledWithdrawalsCase({
                 name: "cancel, both slots mature",
@@ -485,8 +460,8 @@ contract WithdrawalManagerTest is TestHelper, IWithdrawalManagerEvents {
         uint256 expectedTokensToEnable;
     }
 
-    /// @notice [WM-8]: `_processScheduledWithdrawal` works correctly
-    function test_WM_08_processScheduledWithdrawal_works_correctly() public {
+    /// @notice U:[WM-8]: `_processScheduledWithdrawal` works correctly
+    function test_U_WM_08_processScheduledWithdrawal_works_correctly() public {
         ProcessScheduledWithdrawalCase[12] memory cases = [
             ProcessScheduledWithdrawalCase({
                 name: "immature withdrawal, action == CLAIM",
@@ -641,8 +616,8 @@ contract WithdrawalManagerTest is TestHelper, IWithdrawalManagerEvents {
         }
     }
 
-    /// @notice [WM-9A]: `_claimScheduledWithdrawal` works correctly
-    function test_WM_09A_claimScheduledWithdrawal_works_correctly() public {
+    /// @notice U:[WM-9A]: `_claimScheduledWithdrawal` works correctly
+    function test_U_WM_09A_claimScheduledWithdrawal_works_correctly() public {
         _addScheduledWithdrawal({slot: 0, task: ScheduleTask.MATURE});
 
         vm.expectEmit(true, true, false, true);
@@ -657,8 +632,8 @@ contract WithdrawalManagerTest is TestHelper, IWithdrawalManagerEvents {
         assertEq(w.maturity, 1, "Withdrawal not cleared");
     }
 
-    /// @notice [WM-9B]: `_claimScheduledWithdrawal` works correctly with blacklisted recipient
-    function test_WM_09B_claimScheduledWithdrawal_works_correctly_with_blacklisted_recipient() public {
+    /// @notice U:[WM-9B]: `_claimScheduledWithdrawal` works correctly with blacklisted recipient
+    function test_U_WM_09B_claimScheduledWithdrawal_works_correctly_with_blacklisted_recipient() public {
         _addScheduledWithdrawal({slot: 0, task: ScheduleTask.MATURE});
         token0.setBlacklisted(USER, true);
 
@@ -676,8 +651,8 @@ contract WithdrawalManagerTest is TestHelper, IWithdrawalManagerEvents {
         assertEq(w.maturity, 1, "Withdrawal not cleared");
     }
 
-    /// @notice [WM-10]: `_cancelScheduledWithdrawal` works correctly
-    function test_WM_10_cancelScheduledWithdrawal_works_correctly() public {
+    /// @notice U:[WM-10]: `_cancelScheduledWithdrawal` works correctly
+    function test_U_WM_10_cancelScheduledWithdrawal_works_correctly() public {
         _addScheduledWithdrawal({slot: 0, task: ScheduleTask.MATURE});
 
         vm.expectEmit(true, true, false, true);
@@ -694,8 +669,8 @@ contract WithdrawalManagerTest is TestHelper, IWithdrawalManagerEvents {
     /// CONFIGURATION TESTS ///
     /// ------------------- ///
 
-    /// @notice [WM-12]: `setWithdrawalDelay` works correctly
-    function test_WM_12_setWithdrawalDelay_works_correctly() public {
+    /// @notice U:[WM-11]: `setWithdrawalDelay` works correctly
+    function test_U_WM_11_setWithdrawalDelay_works_correctly() public {
         uint40 newDelay = 2 days;
 
         vm.expectEmit(false, false, false, true);
@@ -705,19 +680,6 @@ contract WithdrawalManagerTest is TestHelper, IWithdrawalManagerEvents {
         manager.setWithdrawalDelay(newDelay);
 
         assertEq(manager.delay(), newDelay, "Incorrect delay");
-    }
-
-    /// @notice [WM-11]: `setCreditManagerStatus` works correctly
-    function test_WM_11_setCreditManagerStatus_works_correctly() public {
-        address newCreditManager = makeAddr("NEW_CREDIT_MANAGER");
-
-        vm.expectEmit(true, false, false, true);
-        emit SetCreditManagerStatus(newCreditManager, true);
-
-        vm.prank(configurator);
-        manager.setCreditManagerStatus(newCreditManager, true);
-
-        assertTrue(manager.creditManagerStatus(newCreditManager), "Incorrect credit manager status");
     }
 
     /// ------- ///
