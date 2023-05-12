@@ -65,7 +65,7 @@ import "forge-std/console.sol";
 
 /// @title AddressRepository
 /// @notice Stores addresses of deployed contracts
-contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
+contract OldCreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
     using BitMask for uint256;
 
     CreditManagerTestSuite cms;

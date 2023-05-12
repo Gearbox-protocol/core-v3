@@ -38,6 +38,9 @@ error IncorrectTokenContractException();
 ///      correct price feed
 error IncorrectPriceFeedException();
 
+/// @dev Thrown on attempting to get a result for a token that does not have a price feed
+error PriceFeedNotExistsException();
+
 ///
 /// ACCESS
 ///

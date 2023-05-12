@@ -108,7 +108,7 @@ contract CreditManagerV3Harness is CreditManagerV3 {
     }
 
     function hasWithdrawals(address creditAccount) external view returns (bool) {
-        return hasWithdrawals(creditAccount);
+        return _hasWithdrawals(creditAccount);
     }
 
     function calcCancellableWithdrawalsValue(IPriceOracleV2 _priceOracle, address creditAccount, bool isForceCancel)
