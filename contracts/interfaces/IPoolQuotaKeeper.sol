@@ -97,12 +97,10 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
         returns (uint96 quota, uint192 cumulativeIndexLU);
 
     /// @dev Computes collateral value for quoted tokens on the account, as well as accrued quota interest
-    function computeQuotedCollateralUSD(
-        address creditAccount,
-        address _priceOracle,
-        address[] memory tokens,
-        uint256[] memory lts
-    ) external view returns (uint256 totalValue, uint256 twv, uint256 totalQuotaInterest);
+    function getQuotaAndInterest(address creditAccount, address token)
+        external
+        view
+        returns (uint256 quoted, uint256 outstandingInterest);
 
     /// @dev Computes outstanding quota interest
     function outstandingQuotaInterest(address creditAccount, address[] memory tokens)

@@ -3,14 +3,21 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {BitMask} from "./BitMask.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Helper} from "./IERC20Helper.sol";
 import {CollateralDebtData, CollateralTokenData} from "../interfaces/ICreditManagerV3.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 import {SECONDS_PER_YEAR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 import "../interfaces/IExceptions.sol";
+
+import {BitMask} from "./BitMask.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
+
+/// INTERFACES
+import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
+import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 
 uint256 constant INDEX_PRECISION = 10 ** 9;
 
@@ -364,5 +371,181 @@ library CreditLogic {
                 }
             }
         }
+    }
+
+    // COLLATERAL & DEBT COMPUTATION
+
+    /// @dev IMPLEMENTATION: calcCreditAccountAccruedInterest
+    // / @param creditAccount Address of the Credit Account
+    // / @param quotaInterest Total quota premiums accrued, computed elsewhere
+    // / @return debt The debt principal
+    // / @return accruedInterest Accrued interest
+    // / @return accruedFees Accrued interest and protocol fees
+    function calcCreditAccountAccruedInterest(
+        CollateralDebtData memory collateralDebtData,
+        uint256 debt,
+        uint256 cumulativeIndexLastUpdate,
+        uint256 cumulativeIndexNow,
+        uint16 feeInterest
+    ) internal pure {
+        collateralDebtData.debt = debt;
+
+        // Interest is never stored and is always computed dynamically
+        // as the difference between the current cumulative index of the pool
+        // and the cumulative index recorded in the Credit Account
+        collateralDebtData.accruedInterest = calcAccruedInterest(debt, cumulativeIndexLastUpdate, cumulativeIndexNow)
+            + collateralDebtData.cumulativeQuotaInterest; // F:[CM-49]
+
+        // Fees are computed as a percentage of interest
+        collateralDebtData.accruedFees = collateralDebtData.accruedInterest * feeInterest / PERCENTAGE_FACTOR; // F: [CM-49]
+    }
+
+    function calcQuotedCollateral(
+        CollateralDebtData memory collateralDebtData,
+        address creditAccount,
+        uint256 quotedTokenMask,
+        uint256 maxAllowedEnabledTokenLength,
+        address underlying,
+        address priceOracle,
+        address poolQuotaKeeper,
+        function (uint256) view returns (address, uint16) collateralTokensByMaskFn,
+        bool countCollateral
+    ) internal view {
+        uint256 j;
+        quotedTokenMask &= collateralDebtData.enabledTokensMask;
+        uint256 underlyingPriceRAY = countCollateral ? convertToUSD(priceOracle, RAY, underlying) : 0;
+
+        for (uint256 tokenMask = 2; tokenMask <= quotedTokenMask;) {
+            if (quotedTokenMask & tokenMask != 0) {
+                (address token, uint16 liquidationThreshold) = collateralTokensByMaskFn(tokenMask);
+                uint256 quoted = getQuotaAndUpdateOutstandingInterest({
+                    collateralDebtData: collateralDebtData,
+                    creditAccount: creditAccount,
+                    token: token,
+                    poolQuotaKeeper: poolQuotaKeeper
+                });
+
+                if (countCollateral) {
+                    calcOneNonQuotedTokenCollateral({
+                        collateralDebtData: collateralDebtData,
+                        creditAccount: creditAccount,
+                        token: token,
+                        liquidationThreshold: liquidationThreshold,
+                        quotaUSD: quoted * underlyingPriceRAY / RAY,
+                        priceOracle: priceOracle
+                    });
+                }
+
+                collateralDebtData.quotedTokens[j] = token;
+                unchecked {
+                    ++j;
+                }
+
+                if (j > maxAllowedEnabledTokenLength) {
+                    revert TooManyEnabledTokensException();
+                }
+            }
+
+            unchecked {
+                tokenMask <<= 1;
+            }
+        }
+    }
+
+    function getQuotaAndUpdateOutstandingInterest(
+        CollateralDebtData memory collateralDebtData,
+        address creditAccount,
+        address poolQuotaKeeper,
+        address token
+    ) internal view returns (uint256 quoted) {
+        uint256 outstandingInterest;
+        (quoted, outstandingInterest) = getQuotaAndOutstandingInterest(creditAccount, token, poolQuotaKeeper);
+        collateralDebtData.cumulativeQuotaInterest += outstandingInterest; // F:[CMQ-8]
+    }
+
+    function calcNotQuotedCollateral(
+        CollateralDebtData memory collateralDebtData,
+        address creditAccount,
+        uint256 enoughCollateralUSD,
+        uint256[] memory collateralHints,
+        uint256 quotedTokenMask,
+        address priceOracle,
+        function (uint256) view returns (address, uint16) collateralTokensByMaskFn
+    ) internal view {
+        uint256 len = collateralHints.length;
+
+        uint256 checkedTokenMask = collateralDebtData.enabledTokensMask.disable(quotedTokenMask);
+
+        if (enoughCollateralUSD != type(uint256).max) {
+            enoughCollateralUSD *= PERCENTAGE_FACTOR;
+        }
+
+        unchecked {
+            // TODO: add test that we check all values and it's always reachable
+            for (uint256 i; checkedTokenMask != 0; ++i) {
+                // TODO: add check for super long collateralnhints and for double masks
+                uint256 tokenMask = (i < len) ? collateralHints[i] : 1 << (i - len); // F: [CM-68]
+
+                // CASE enabledTokensMask & tokenMask == 0 F:[CM-38]
+                if (checkedTokenMask & tokenMask != 0) {
+                    (address token, uint16 liquidationThreshold) = collateralTokensByMaskFn(tokenMask);
+                    bool nonZeroBalance = calcOneNonQuotedTokenCollateral(
+                        collateralDebtData, creditAccount, token, liquidationThreshold, type(uint256).max, priceOracle
+                    );
+
+                    // Collateral calculations are only done if there is a non-zero balance
+                    if (nonZeroBalance) {
+                        // Full collateral check evaluates a Credit Account's health factor lazily;
+                        // Once the TWV computed thus far exceeds the debt, the check is considered
+                        // successful, and the function returns without evaluating any further collateral
+                        if (collateralDebtData.twvUSD >= enoughCollateralUSD) {
+                            break;
+                        }
+                        // Zero-balance tokens are disabled; this is done by flipping the
+                        // bit in enabledTokensMask, which is then written into storage at the
+                        // very end, to avoid redundant storage writes
+                    } else {
+                        collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.disable(tokenMask);
+                    }
+                }
+
+                checkedTokenMask &= (~tokenMask);
+            }
+        }
+    }
+
+    function calcOneNonQuotedTokenCollateral(
+        CollateralDebtData memory collateralDebtData,
+        address creditAccount,
+        address token,
+        uint16 liquidationThreshold,
+        uint256 quotaUSD,
+        address priceOracle
+    ) internal view returns (bool nonZeroBalance) {
+        uint256 balance = IERC20Helper.balanceOf(token, creditAccount);
+
+        // Collateral calculations are only done if there is a non-zero balance
+        if (balance > 1) {
+            uint256 balanceUSD = convertToUSD(priceOracle, balance, token);
+            collateralDebtData.totalValueUSD += balanceUSD;
+            collateralDebtData.twvUSD += Math.min(balanceUSD, quotaUSD) * liquidationThreshold / PERCENTAGE_FACTOR;
+            return true;
+        }
+    }
+
+    function getQuotaAndOutstandingInterest(address creditAccount, address token, address _poolQuotaKeeper)
+        internal
+        view
+        returns (uint256 quoted, uint256 outstandingInterest)
+    {
+        return IPoolQuotaKeeper(_poolQuotaKeeper).getQuotaAndInterest(creditAccount, token);
+    }
+
+    function convertToUSD(address priceOracle, uint256 amountInToken, address token)
+        internal
+        view
+        returns (uint256 amountInUSD)
+    {
+        amountInUSD = IPriceOracleV2(priceOracle).convertToUSD(amountInToken, token);
     }
 }

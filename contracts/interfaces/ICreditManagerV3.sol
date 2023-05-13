@@ -47,6 +47,7 @@ struct CollateralDebtData {
     uint256 twvUSD;
     uint16 hf;
     uint256 enabledTokensMask;
+    uint256 cumulativeQuotaInterest;
     address[] quotedTokens;
     bool isLiquidatable;
 }
