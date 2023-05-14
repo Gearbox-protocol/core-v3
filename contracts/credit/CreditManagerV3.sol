@@ -4,7 +4,6 @@
 pragma solidity ^0.8.17;
 
 // LIBRARIES
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -36,14 +35,7 @@ import {
     CollateralCalcTask,
     WITHDRAWAL_FLAG
 } from "../interfaces/ICreditManagerV3.sol";
-import {
-    IAddressProviderV3,
-    AP_PRICE_ORACLE,
-    AP_ACCOUNT_FACTORY,
-    AP_WETH_TOKEN,
-    AP_WETH_GATEWAY,
-    AP_WITHDRAWAL_MANAGER
-} from "../interfaces/IAddressProviderV3.sol";
+import "../interfaces/IAddressProviderV3.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
@@ -68,7 +60,6 @@ import "forge-std/console.sol";
 /// More info: https://dev.gearbox.fi/developers/credit/credit_manager
 contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
-    using Address for address payable;
     using BitMask for uint256;
     using CreditLogic for CollateralDebtData;
     using CreditLogic for CollateralTokenData;
@@ -217,7 +208,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         // The underlying is the first token added as collateral
         _addToken(underlying); // F:[CM-1]
 
-        wethAddress = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, 0); // F:[CM-1]
+        wethAddress = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // F:[CM-1]
         wethGateway = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_GATEWAY, 3_00); // F:[CM-1]
         priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_PRICE_ORACLE, 2); // F:[CM-1]
         accountFactory = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_ACCOUNT_FACTORY, 1); // F:[CM-1]

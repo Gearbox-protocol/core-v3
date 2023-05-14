@@ -5,6 +5,7 @@ pragma solidity ^0.8.10;
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
+uint256 constant NO_VERSION_CONTROL = 0;
 // Repositories & services
 bytes32 constant AP_CONTRACTS_REGISTER = "CONTRACTS_REGISTER";
 bytes32 constant AP_ACL = "ACL";

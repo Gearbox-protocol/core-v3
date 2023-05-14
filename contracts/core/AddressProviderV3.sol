@@ -20,7 +20,7 @@ contract AddressProviderV3 is IAddressProviderV3 {
     uint256 public constant override(IVersion) version = 3_00;
 
     modifier configuratorOnly() {
-        if (!IACL(getAddressOrRevert(AP_ACL, 0)).isConfigurator(msg.sender)) {
+        if (!IACL(getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL)).isConfigurator(msg.sender)) {
             revert CallerNotConfiguratorException();
         }
         _;
@@ -29,7 +29,7 @@ contract AddressProviderV3 is IAddressProviderV3 {
     constructor(address _acl) {
         // @dev Emits first event for contract discovery
         emit AddressSet("ADDRESS_PROVIDER", address(this), version);
-        _setAddress(AP_ACL, _acl, 0);
+        _setAddress(AP_ACL, _acl, NO_VERSION_CONTROL);
     }
 
     function getAddressOrRevert(bytes32 key, uint256 _version) public view override returns (address result) {
@@ -41,7 +41,7 @@ contract AddressProviderV3 is IAddressProviderV3 {
     /// @param key Key in string format
     /// @param value Address
     function setAddress(bytes32 key, address value, bool saveVersion) external override configuratorOnly {
-        _setAddress(key, value, saveVersion ? IVersion(value).version() : 0);
+        _setAddress(key, value, saveVersion ? IVersion(value).version() : NO_VERSION_CONTROL);
     }
 
     function _setAddress(bytes32 key, address value, uint256 _version) internal {
@@ -53,7 +53,7 @@ contract AddressProviderV3 is IAddressProviderV3 {
 
     /// @return Address of ACL contract
     function getACL() external view returns (address) {
-        return getAddressOrRevert(AP_ACL, 0); // F:[AP-3]
+        return getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL); // F:[AP-3]
     }
 
     /// @return Address of ContractsRegister

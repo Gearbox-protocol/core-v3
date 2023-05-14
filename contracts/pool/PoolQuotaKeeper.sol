@@ -86,8 +86,8 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
     /// @dev Constructor
     /// @param _pool Pool address
     constructor(address _pool)
-        ACLNonReentrantTrait(address(IPool4626(_pool).addressProvider()))
-        ContractsRegisterTrait(address(IPool4626(_pool).addressProvider()))
+        ACLNonReentrantTrait(IPool4626(_pool).addressProvider())
+        ContractsRegisterTrait(IPool4626(_pool).addressProvider())
     {
         pool = _pool; // F:[PQK-1]
         underlying = IPool4626(_pool).asset(); // F:[PQK-1]
@@ -101,9 +101,10 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         creditManagerOnly // F:[PQK-4]
         returns (uint256 caQuotaInterestChange, bool enableToken, bool disableToken)
     {
-        TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
-        AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
         int128 quotaRevenueChange;
+
+        AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
+        TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
 
         (caQuotaInterestChange, quotaRevenueChange, enableToken, disableToken) = QuotasLogic.changeQuota({
             tokenQuotaParams: tokenQuotaParams,
