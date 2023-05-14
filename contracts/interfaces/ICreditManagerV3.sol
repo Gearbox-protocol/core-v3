@@ -288,11 +288,14 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
             uint16 liquidationDiscountExpired
         );
 
+    /// @dev Address of address provider
+    function addressProvider() external view returns (address);
+
     /// @dev Address of the connected Credit Facade
     function creditFacade() external view returns (address);
 
     /// @dev Address of the connected Price Oracle
-    function priceOracle() external view returns (IPriceOracleV2);
+    function priceOracle() external view returns (address);
 
     function calcDebtAndCollateral(address creditAccount, CollateralCalcTask task)
         external
@@ -300,7 +303,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
         returns (CollateralDebtData memory collateralDebtData);
 
     /// @dev Withdrawal manager
-    function withdrawalManager() external view returns (IWithdrawalManager);
+    function withdrawalManager() external view returns (address);
 
     function scheduleWithdrawal(address creditAccount, address token, uint256 amount)
         external

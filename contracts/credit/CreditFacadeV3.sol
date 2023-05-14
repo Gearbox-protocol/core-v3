@@ -27,8 +27,8 @@ import {
 } from "../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
 import {ClaimAction} from "../interfaces/IWithdrawalManager.sol";
-
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
+import {IPriceFeedOnDemand} from "../interfaces/IPriceFeedOnDemand.sol";
 
 import {IPool4626} from "../interfaces/IPool4626.sol";
 import {IDegenNFT} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
@@ -565,6 +565,12 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                             abi.decode(mcall.callData[4:], (uint256[], uint16));
                     }
                     //
+                    //
+                    //
+                    else if (method == ICreditFacadeMulticall.onDemandPriceUpdate.selector) {
+                        _onDemandPriceUpdate(mcall.callData[4:]);
+                    }
+                    //
                     // ADD COLLATERAL
                     //
                     else if (method == ICreditFacadeMulticall.addCollateral.selector) {
@@ -747,6 +753,13 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         if (flags & permission == 0) {
             revert NoPermissionException(permission);
         }
+    }
+
+    function _onDemandPriceUpdate(bytes calldata callData) internal {
+        (address token, bytes memory data) = abi.decode(callData, (address, bytes));
+        address priceFeed = IPriceOracleV2(creditManager.priceOracle()).priceFeeds(token);
+        if (priceFeed == address(0)) revert PriceFeedNotExistsException();
+        IPriceFeedOnDemand(priceFeed).updatePrice(data);
     }
 
     function _updateQuota(address creditAccount, bytes calldata callData, uint256 enabledTokensMask)
