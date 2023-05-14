@@ -42,6 +42,7 @@ struct CollateralDebtData {
     uint256 debt;
     uint256 cumulativeIndexNow;
     uint256 cumulativeIndexLastUpdate;
+    uint256 cumulativeQuotaInterest;
     uint256 accruedInterest;
     uint256 accruedFees;
     uint256 totalValue;
@@ -49,9 +50,10 @@ struct CollateralDebtData {
     uint256 twvUSD;
     uint16 hf;
     uint256 enabledTokensMask;
-    uint256 cumulativeQuotaInterest;
     address[] quotedTokens;
     bool isLiquidatable;
+    ///
+    address _priceOracle;
 }
 
 struct CollateralTokenData {
