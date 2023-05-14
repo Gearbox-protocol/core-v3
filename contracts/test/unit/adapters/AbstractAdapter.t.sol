@@ -3,222 +3,156 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {
-    CallerNotCreditFacadeException,
-    ExternalCallCreditAccountNotSetException,
-    TokenNotAllowedException,
-    ZeroAddressException
-} from "../../../interfaces/IExceptions.sol";
-import {IPool4626} from "../../../interfaces/IPool4626.sol";
+import {ZeroAddressException} from "../../../interfaces/IExceptions.sol";
 
-import {CreditConfig} from "../../config/CreditConfig.sol";
-import {Tokens} from "../../config/Tokens.sol";
+import {TestHelper} from "../../lib/helper.sol";
+import {AddressProviderACLMock} from "../../mocks/core/AddressProviderACLMock.sol";
 
-import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
-import {CreditFacadeTestHelper} from "../../helpers/CreditFacadeTestHelper.sol";
+import {AbstractAdapterHarness} from "./AbstractAdapterHarness.sol";
+import {CreditManagerMock, CreditManagerMockEvents} from "./CreditManagerMock.sol";
 
-import {CONFIGURATOR, USER} from "../../lib/constants.sol";
+/// @title Abstract adapter unit test
+/// @notice U:[AA]: `AbstractAdapter` unit tests
+contract AbstractAdapterUnitTest is TestHelper, CreditManagerMockEvents {
+    AbstractAdapterHarness abstractAdapter;
+    AddressProviderACLMock addressProvider;
+    CreditManagerMock creditManager;
 
-import {AdapterMock} from "../../mocks/adapters/AdapterMock.sol";
-import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
-
-import {CreditFacadeTestSuite} from "../../suites/CreditFacadeTestSuite.sol";
-import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
-
-import {Test} from "forge-std/Test.sol";
-
-/// @title AbstractAdapterTest
-/// @notice Designed for unit test purposes only
-contract AbstractAdapterTest is Test, BalanceHelper, CreditFacadeTestHelper {
-    TargetContractMock targetMock;
-    AdapterMock adapterMock;
-
-    address usdc;
-    address dai;
+    address facade;
+    address target;
 
     function setUp() public {
-        tokenTestSuite = new TokensTestSuite();
+        facade = makeAddr("CREDIT_FACADE");
+        target = makeAddr("TARGET_CONTRACT");
 
-        CreditConfig creditConfig = new CreditConfig(
-            tokenTestSuite,
-            Tokens.DAI
-        );
-
-        cft = new CreditFacadeTestSuite(creditConfig, false, false, false, 1);
-
-        underlying = tokenTestSuite.addressOf(Tokens.DAI);
-        creditManager = cft.creditManager();
-        creditFacade = cft.creditFacade();
-        creditConfigurator = cft.creditConfigurator();
-
-        targetMock = new TargetContractMock();
-        adapterMock = new AdapterMock(
-            address(creditManager),
-            address(targetMock)
-        );
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.allowContract(address(targetMock), address(adapterMock));
-
-        vm.label(address(adapterMock), "AdapterMock");
-        vm.label(address(targetMock), "TargetContractMock");
-
-        usdc = tokenTestSuite.addressOf(Tokens.USDC);
-        dai = tokenTestSuite.addressOf(Tokens.DAI);
+        addressProvider = new AddressProviderACLMock();
+        creditManager = new CreditManagerMock(address(addressProvider));
+        abstractAdapter = new AbstractAdapterHarness(address(creditManager), target);
     }
 
-    /// ----- ///
-    /// TESTS ///
-    /// ----- ///
-
-    /// @notice [AA-1]: Constructor reverts when passed zero-address as credit manager or target contract
-    function test_AA_01_constructor_reverts_on_zero_address() public {
+    /// @notice U:[AA-1A]: constructor reverts on zero address
+    function test_U_AA_01A_constructor_reverts_on_zero_address() public {
         vm.expectRevert();
-        new AdapterMock(address(0), address(0));
+        new AbstractAdapterHarness(address(0), address(0));
 
         vm.expectRevert(ZeroAddressException.selector);
-        new AdapterMock(address(creditManager), address(0));
+        new AbstractAdapterHarness(address(creditManager), address(0));
     }
 
-    /// @notice [AA-2]: Constructor sets correct values
-    function test_AA_02_constructor_sets_correct_values() public {
-        assertEq(address(adapterMock.creditManager()), address(creditManager), "Incorrect credit manager");
-
-        assertEq(
-            address(adapterMock.addressProvider()),
-            address(IPool4626(creditManager.pool()).addressProvider()),
-            "Incorrect address provider"
-        );
-
-        assertEq(adapterMock.targetContract(), address(targetMock), "Incorrect target contract");
+    /// @notice U:[AA-1B]: constructor sets correct values
+    function test_U_AA_01B_constructor_sets_correct_values() public {
+        assertEq(address(abstractAdapter.creditManager()), address(creditManager), "Incorrect credit manager");
+        assertEq(address(abstractAdapter.addressProvider()), address(addressProvider), "Incorrect address provider");
+        assertEq(abstractAdapter.targetContract(), target, "Incorrect target contract");
     }
 
-    /// @notice [AA-3]: `creditFacadeOnly` functions revert if called not by the credit facade
-    function test_AA_03_creditFacadeOnly_function_reverts_if_called_not_by_credit_facade() public {
-        vm.expectRevert(CallerNotCreditFacadeException.selector);
-        vm.prank(USER);
-        adapterMock.dumbCall(0, 0);
+    /// @notice U:[AA-2]: `_creditAccount` works correctly
+    function test_U_AA_02_creditAccount_works_correctly(address creditAccount) public {
+        creditManager.setExternalCallCreditAccount(creditAccount);
+
+        vm.expectCall(address(creditManager), abi.encodeCall(creditManager.externalCallCreditAccountOrRevert, ()));
+        assertEq(abstractAdapter.creditAccount(), creditAccount, "Incorrect external call credit account");
     }
 
-    /// @notice [AA-4]: AbstractAdapter uses correct credit account
-    function test_AA_04_adapter_uses_correct_credit_account() public {
-        vm.expectRevert(ExternalCallCreditAccountNotSetException.selector);
-        vm.prank(address(creditFacade));
-        adapterMock.creditAccount();
+    /// @notice U:[AA-3]: `_getMaskOrRevert` works correctly
+    function test_U_AA_03_getMaskOrRevert_works_correctly(address token, uint8 index) public {
+        uint256 mask = 1 << index;
+        creditManager.setMask(token, mask);
 
-        address creditAccount = _openExternalCallCreditAccount();
-        assertEq(adapterMock.creditAccount(), creditAccount);
+        vm.expectCall(address(creditManager), abi.encodeCall(creditManager.getTokenMaskOrRevert, (token)));
+        assertEq(abstractAdapter.getMaskOrRevert(token), mask, "Incorrect token mask");
     }
 
-    /// @notice [AA-5]: `_getMaskOrRevert` works correctly
-    function test_AA_05_getMaskOrRevert_works_correctly() public {
-        vm.expectRevert(TokenNotAllowedException.selector);
-        adapterMock.getMaskOrRevert(address(0xdead));
-
-        assertEq(
-            adapterMock.getMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI)),
-            creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI))
-        );
+    /// @notice U:[AA-4]: `_approveToken` works correctly
+    function test_U_AA_04_approveToken_works_correctly(address token, uint256 amount) public {
+        vm.expectCall(address(creditManager), abi.encodeCall(creditManager.approveCreditAccount, (token, amount)));
+        abstractAdapter.approveToken(token, amount);
     }
 
-    /// @notice [AA-6]: `_approveToken` correctly passes parameters to the credit manager
-    function test_AA_06_approveToken_correctly_passes_to_credit_manager() public {
-        _openExternalCallCreditAccount();
+    /// @notice U:[AA-5]: `_execute` works correctly
+    function test_U_AA_05_execute_works_correctly(bytes memory data, bytes memory expectedResult) public {
+        creditManager.setExecuteOrderResult(expectedResult);
 
-        vm.expectCall(address(creditManager), abi.encodeCall(creditManager.approveCreditAccount, (usdc, 10)));
-        vm.prank(USER);
-        adapterMock.approveToken(usdc, 10);
+        vm.expectCall(address(creditManager), abi.encodeCall(creditManager.executeOrder, (data)));
+        assertEq(abstractAdapter.execute(data), expectedResult, "Incorrect result");
     }
 
-    /// @notice [AA-7]: `_execute` correctly passes parameters to the credit manager
-    function test_AA_07_execute_correctly_passes_to_credit_manager() public {
-        _openExternalCallCreditAccount();
+    /// @notice U:[AA-6]: `_executeSwapNoApprove` works correctly
+    function test_U_AA_06_executeSwapNoApprove_works_correctly(
+        address tokenIn,
+        address tokenOut,
+        uint8 tokenInIndex,
+        uint8 tokenOutIndex,
+        bytes memory data,
+        bytes memory expectedResult
+    ) public {
+        if (tokenIn == tokenOut) tokenOutIndex = tokenInIndex;
+        creditManager.setMask(tokenIn, 1 << tokenInIndex);
+        creditManager.setMask(tokenOut, 1 << tokenOutIndex);
+        creditManager.setExecuteOrderResult(expectedResult);
 
-        bytes memory callData = adapterMock.dumbCallData();
+        uint256 snapshot = vm.snapshot();
+        for (uint256 caseNumber; caseNumber < 2; ++caseNumber) {
+            bool disableTokenIn = caseNumber == 1;
+            string memory caseName = caseNumber == 1 ? "disableTokenIn = true" : "disableTokenIn = false";
 
-        vm.expectCall(address(creditManager), abi.encodeCall(creditManager.executeOrder, (callData)));
-        vm.prank(USER);
-        adapterMock.execute(callData);
-    }
+            vm.expectEmit(false, false, false, false);
+            emit Execute();
 
-    /// @notice [AA-8]: `_executeSwapNoApprove` works correctly
-    function test_AA_08_executeSwapNoApprove_works_correctly() public {
-        address creditAccount = _openExternalCallCreditAccount();
+            (uint256 tokensToEnable, uint256 tokensToDisable, bytes memory result) =
+                abstractAdapter.executeSwapNoApprove(tokenIn, tokenOut, data, disableTokenIn);
 
-        bytes memory callData = adapterMock.dumbCallData();
-        for (uint256 dt = 0; dt < 2; ++dt) {
-            bool disableTokenIn = dt == 1;
-
-            vm.expectCall(address(creditManager), abi.encodeCall(creditManager.executeOrder, (callData)));
-
-            vm.prank(USER);
-            (uint256 tokensToEnable, uint256 tokensToDisable,) =
-                adapterMock.executeSwapNoApprove(usdc, dai, callData, disableTokenIn);
-
-            expectAllowance(usdc, creditAccount, address(targetMock), 0);
-            assertEq(tokensToEnable, creditManager.getTokenMaskOrRevert(dai), "Incorrect tokensToEnable");
-            if (disableTokenIn) {
-                assertEq(tokensToDisable, creditManager.getTokenMaskOrRevert(usdc), "Incorrect tokensToDisable");
-            }
-        }
-    }
-
-    /// @notice [AA-9]: `_executeSwapSafeApprove` works correctly
-    function test_AA_09_executeSwapSafeApprove_works_correctly() public {
-        address creditAccount = _openExternalCallCreditAccount();
-
-        bytes memory callData = adapterMock.dumbCallData();
-        for (uint256 dt = 0; dt < 2; ++dt) {
-            bool disableTokenIn = dt == 1;
-
-            vm.expectCall(
-                address(creditManager), abi.encodeCall(creditManager.approveCreditAccount, (usdc, type(uint256).max))
+            assertEq(tokensToEnable, 1 << tokenOutIndex, _testCaseErr(caseName, "Incorrect tokensToEnable"));
+            assertEq(
+                tokensToDisable,
+                disableTokenIn ? 1 << tokenInIndex : 0,
+                _testCaseErr(caseName, "Incorrect tokensToDisable")
             );
-            vm.expectCall(address(creditManager), abi.encodeCall(creditManager.executeOrder, (callData)));
-            vm.expectCall(address(creditManager), abi.encodeCall(creditManager.approveCreditAccount, (usdc, 1)));
+            assertEq(result, expectedResult, _testCaseErr(caseName, "Incorrect result"));
 
-            vm.prank(USER);
-            (uint256 tokensToEnable, uint256 tokensToDisable,) =
-                adapterMock.executeSwapSafeApprove(usdc, dai, callData, disableTokenIn);
-
-            expectAllowance(usdc, creditAccount, address(targetMock), 1);
-            assertEq(tokensToEnable, creditManager.getTokenMaskOrRevert(dai), "Incorrect tokensToEnable");
-            if (disableTokenIn) {
-                assertEq(tokensToDisable, creditManager.getTokenMaskOrRevert(usdc), "Incorrect tokensToDisable");
-            }
+            vm.revertTo(snapshot);
         }
     }
 
-    /// @notice [AA-10]: `_executeSwap{No|Safe}Approve` reverts if `tokenIn` or `tokenOut` are not collateral tokens
-    function test_AA_10_executeSwap_reverts_if_tokenIn_or_tokenOut_are_not_collateral_tokens() public {
-        _openExternalCallCreditAccount();
+    /// @notice U:[AA-7]: `_executeSwapSafeApprove` works correctly
+    function test_U_AA_07_executeSwapSafeApprove_works_correctly(
+        address tokenIn,
+        address tokenOut,
+        uint8 tokenInIndex,
+        uint8 tokenOutIndex,
+        bytes memory data,
+        bytes memory expectedResult
+    ) public {
+        if (tokenIn == tokenOut) tokenOutIndex = tokenInIndex;
+        creditManager.setMask(tokenIn, 1 << tokenInIndex);
+        creditManager.setMask(tokenOut, 1 << tokenOutIndex);
+        creditManager.setExecuteOrderResult(expectedResult);
 
-        address token = address(0xdead);
-        bytes memory callData = adapterMock.dumbCallData();
-        for (uint256 ti; ti < 2; ++ti) {
-            (address tokenIn, address tokenOut) = (ti == 1 ? token : dai, ti == 1 ? dai : token);
-            for (uint256 dt; dt < 2; ++dt) {
-                bool disableTokenIn = dt == 1;
-                for (uint256 sa; sa < 2; ++sa) {
-                    vm.expectRevert(TokenNotAllowedException.selector);
-                    vm.prank(USER);
-                    if (sa == 1) {
-                        adapterMock.executeSwapSafeApprove(tokenIn, tokenOut, callData, disableTokenIn);
-                    } else {
-                        adapterMock.executeSwapNoApprove(tokenIn, tokenOut, callData, disableTokenIn);
-                    }
-                }
-            }
+        uint256 snapshot = vm.snapshot();
+        for (uint256 caseNumber; caseNumber < 2; ++caseNumber) {
+            bool disableTokenIn = caseNumber == 1;
+            string memory caseName = caseNumber == 1 ? "disableTokenIn = true" : "disableTokenIn = false";
+
+            // need to ensure that order is correct
+            vm.expectEmit(true, false, false, true);
+            emit Approve(tokenIn, type(uint256).max);
+            vm.expectEmit(false, false, false, false);
+            emit Execute();
+            vm.expectEmit(true, false, false, true);
+            emit Approve(tokenIn, 1);
+
+            (uint256 tokensToEnable, uint256 tokensToDisable, bytes memory result) =
+                abstractAdapter.executeSwapSafeApprove(tokenIn, tokenOut, data, disableTokenIn);
+
+            assertEq(tokensToEnable, 1 << tokenOutIndex, _testCaseErr(caseName, "Incorrect tokensToEnable"));
+            assertEq(
+                tokensToDisable,
+                disableTokenIn ? 1 << tokenInIndex : 0,
+                _testCaseErr(caseName, "Incorrect tokensToDisable")
+            );
+            assertEq(result, expectedResult, _testCaseErr(caseName, "Incorrect result"));
+
+            vm.revertTo(snapshot);
         }
-    }
-
-    /// ------- ///
-    /// HELPERS ///
-    /// ------- ///
-
-    function _openExternalCallCreditAccount() internal returns (address creditAccount) {
-        (creditAccount,) = _openTestCreditAccount();
-        vm.prank(address(creditFacade));
-        creditManager.setCreditAccountForExternalCall(creditAccount);
     }
 }

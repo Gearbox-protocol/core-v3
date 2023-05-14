@@ -81,4 +81,6 @@ interface ICreditFacadeMulticall {
     function scheduleWithdrawal(address token, uint256 amount) external;
 
     function revokeAdapterAllowances(RevocationPair[] calldata revocations) external;
+
+    function onDemandPriceUpdate(address token, bytes memory data) external;
 }

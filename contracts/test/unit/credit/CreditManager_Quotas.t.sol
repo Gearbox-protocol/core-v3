@@ -93,7 +93,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         creditManager = cms.creditManager();
 
-        priceOracle = creditManager.priceOracle();
+        priceOracle = IPriceOracleV2(creditManager.priceOracle());
         underlying = creditManager.underlying();
     }
 

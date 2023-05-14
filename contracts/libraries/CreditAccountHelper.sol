@@ -46,18 +46,16 @@ library CreditAccountHelper {
         return false;
     }
 
-    function _safeTransfer(ICreditAccount creditAccount, address token, address to, uint256 amount) internal {
+    function transfer(ICreditAccount creditAccount, address token, address to, uint256 amount) internal {
         ICreditAccount(creditAccount).safeTransfer(token, to, amount);
     }
 
-    function safeTransferDeliveredBalanceControl(
-        ICreditAccount creditAccount,
-        address token,
-        address to,
-        uint256 amount
-    ) internal returns (uint256 delivered) {
+    function transferDeliveredBalanceControl(ICreditAccount creditAccount, address token, address to, uint256 amount)
+        internal
+        returns (uint256 delivered)
+    {
         uint256 balanceBefore = IERC20Helper.balanceOf(token, to);
-        _safeTransfer(creditAccount, token, to, amount);
+        transfer(creditAccount, token, to, amount);
         delivered = IERC20Helper.balanceOf(token, to) - balanceBefore;
     }
 }

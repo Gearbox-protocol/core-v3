@@ -21,8 +21,7 @@ import {IERC20Helper} from "../libraries/IERC20Helper.sol";
 // INTERFACES
 import {IAccountFactory, TakeAccountAction} from "../interfaces/IAccountFactory.sol";
 import {ICreditAccount} from "../interfaces/ICreditAccount.sol";
-import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
-import {IPool4626} from "../interfaces/IPool4626.sol";
+import {IPoolBase, IPool4626} from "../interfaces/IPool4626.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
 import {ClaimAction, IWithdrawalManager} from "../interfaces/IWithdrawalManager.sol";
 import {
@@ -36,7 +35,14 @@ import {
     CollateralCalcTask,
     WITHDRAWAL_FLAG
 } from "../interfaces/ICreditManagerV3.sol";
-import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
+import {
+    IAddressProviderV3,
+    AP_PRICE_ORACLE,
+    AP_ACCOUNT_FACTORY,
+    AP_WETH_TOKEN,
+    AP_WETH_GATEWAY,
+    AP_WITHDRAWAL_MANAGER
+} from "../interfaces/IAddressProviderV3.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
@@ -74,7 +80,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     uint256 public constant override version = 3_00;
 
     /// @dev Factory contract for Credit Accounts
-    IAccountFactory public immutable accountFactory;
+    address public immutable addressProvider;
+
+    /// @dev Factory contract for Credit Accounts
+    address public immutable accountFactory;
 
     /// @dev Address of the underlying asset
     address public immutable override underlying;
@@ -123,7 +132,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     uint16 internal liquidationDiscountExpired;
 
     /// @dev Price oracle used to evaluate assets on Credit Accounts.
-    IPriceOracleV2 public override priceOracle;
+    address public override priceOracle;
 
     /// @dev Liquidation threshold for the underlying token.
     uint16 internal ltUnderlying;
@@ -132,7 +141,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     uint256 public override quotedTokenMask;
 
     /// @dev Withdrawal manager
-    IWithdrawalManager public immutable override withdrawalManager;
+    address public immutable override withdrawalManager;
 
     /// @dev Address of the connected Credit Configurator
     address public creditConfigurator;
@@ -194,33 +203,29 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
 
     /// @dev Constructor
     /// @param _pool Address of the pool to borrow funds from
-    constructor(address _pool, address _withdrawalManager) {
-        IAddressProvider addressProvider = IPoolService(_pool).addressProvider();
-
+    constructor(address _addressProvider, address _pool) {
+        addressProvider = _addressProvider;
         pool = _pool; // F:[CM-1]
 
-        address _underlying = IPoolService(pool).underlyingToken(); // F:[CM-1]
-        underlying = _underlying; // F:[CM-1]
+        underlying = IPoolBase(pool).underlyingToken(); // F:[CM-1]
 
-        try IPool4626(pool).supportsQuotas() returns (bool sq) {
+        try IPool4626(_pool).supportsQuotas() returns (bool sq) {
             supportsQuotas = sq;
         } catch {}
 
         // The underlying is the first token added as collateral
-        _addToken(_underlying); // F:[CM-1]
+        _addToken(underlying); // F:[CM-1]
 
-        wethAddress = addressProvider.getWethToken(); // F:[CM-1]
-        wethGateway = addressProvider.getWETHGateway(); // F:[CM-1]
+        wethAddress = IAddressProviderV3(addressProvider).getAddress(AP_WETH_TOKEN); // F:[CM-1]
+        wethGateway = IAddressProviderV3(addressProvider).getAddress(AP_WETH_GATEWAY); // F:[CM-1]
+        priceOracle = IAddressProviderV3(addressProvider).getAddress(AP_PRICE_ORACLE); // F:[CM-1]
+        accountFactory = IAddressProviderV3(addressProvider).getAddress(AP_ACCOUNT_FACTORY); // F:[CM-1]
+        withdrawalManager = IAddressProviderV3(addressProvider).getAddress(AP_WITHDRAWAL_MANAGER);
 
-        // Price oracle is stored in Slot1, as it is accessed frequently with fees
-        priceOracle = IPriceOracleV2(addressProvider.getPriceOracle()); // F:[CM-1]
-        accountFactory = IAccountFactory(addressProvider.getAccountFactory()); // F:[CM-1]
-
-        deployAccountAction =
-            accountFactory.version() == 3_00 ? TakeAccountAction.DEPLOY_NEW_ONE : TakeAccountAction.TAKE_USED_ONE;
+        deployAccountAction = IAccountFactory(accountFactory).version() == 3_00
+            ? TakeAccountAction.DEPLOY_NEW_ONE
+            : TakeAccountAction.TAKE_USED_ONE;
         creditConfigurator = msg.sender; // F:[CM-1]
-
-        withdrawalManager = IWithdrawalManager(_withdrawalManager);
 
         _externalCallCreditAccount = address(1);
     }
@@ -244,12 +249,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     {
         // Takes a Credit Account from the factory and sets initial parameters
         // The Credit Account will be connected to this Credit Manager until closing
-        creditAccount = accountFactory.takeCreditAccount(
+        creditAccount = IAccountFactory(accountFactory).takeCreditAccount(
             uint256(deployNew ? deployAccountAction : TakeAccountAction.TAKE_USED_ONE), 0
         ); // F:[CM-8]
 
         creditAccountInfo[creditAccount].debt = debt;
-        creditAccountInfo[creditAccount].cumulativeIndexLastUpdate = IPoolService(pool).calcLinearCumulative_RAY();
+        creditAccountInfo[creditAccount].cumulativeIndexLastUpdate = IPoolBase(pool).calcLinearCumulative_RAY();
         creditAccountInfo[creditAccount].flags = 0;
         creditAccountInfo[creditAccount].borrower = onBehalfOf;
 
@@ -260,7 +265,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         // enabledTokensMap[creditAccount] = 1; // F:[CM-8]
 
         // Requests the pool to transfer tokens the Credit Account
-        IPoolService(pool).lendCreditAccount(debt, creditAccount); // F:[CM-8]
+        IPoolBase(pool).lendCreditAccount(debt, creditAccount); // F:[CM-8]
         creditAccountsSet.add(creditAccount);
     }
 
@@ -363,12 +368,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         }
 
         // Transfers the due funds to the pool
-        ICreditAccount(creditAccount)._safeTransfer(underlying, pool, amountToPool); // F:[CM-10,11,12,13]
+        ICreditAccount(creditAccount).transfer(underlying, pool, amountToPool); // F:[CM-10,11,12,13]
 
         // Signals to the pool that debt has been repaid. The pool relies
         // on the Credit Manager to repay the debt correctly, and does not
         // check internally whether the underlying was actually transferred
-        IPoolService(pool).repayCreditAccount(collateralDebtData.debt, profit, loss); // F:[CM-10,11,12,13]
+        IPoolBase(pool).repayCreditAccount(collateralDebtData.debt, profit, loss); // F:[CM-10,11,12,13]
 
         // transfer remaining funds to the borrower [liquidations only]
         if (remainingFunds > 1) {
@@ -390,7 +395,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         _transferAssetsTo(creditAccount, to, convertWETH, enabledTokensMask); // F:[CM-14,17,19]
 
         // Returns Credit Account to the factory
-        accountFactory.returnCreditAccount(creditAccount); // F:[CM-9]
+        IAccountFactory(accountFactory).returnCreditAccount(creditAccount); // F:[CM-9]
         creditAccountsSet.remove(creditAccount);
     }
 
@@ -425,7 +430,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
                 CreditLogic.calcIncrease(debt, amount, cumulativeIndexNow, cumulativeIndexLastUpdate);
 
             // Requests the pool to lend additional funds to the Credit Account
-            IPoolService(pool).lendCreditAccount(amount, creditAccount); // F:[CM-20]
+            IPoolBase(pool).lendCreditAccount(amount, creditAccount); // F:[CM-20]
             tokensToEnable = UNDERLYING_TOKEN_MASK;
         } else {
             // Decrease
@@ -443,7 +448,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             }
 
             // Pays the amount back to the pool
-            ICreditAccount(creditAccount)._safeTransfer(underlying, pool, amount); // F:[CM-21]
+            ICreditAccount(creditAccount).transfer(underlying, address(pool), amount); // F:[CM-21]
             {
                 uint256 amountToRepay;
                 uint256 profit;
@@ -458,7 +463,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
                     cumulativeIndexLastUpdate: cumulativeIndexLastUpdate
                 });
 
-                IPoolService(pool).repayCreditAccount(amountToRepay, profit, 0); // F:[CM-21]
+                IPoolBase(pool).repayCreditAccount(amountToRepay, profit, 0); // F:[CM-21]
             }
             if (supportsQuotas) {
                 creditAccountInfo[creditAccount].cumulativeQuotaInterest = cumulativeQuotaInterest;
@@ -610,7 +615,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             (collateralDebtData.debt, collateralDebtData.accruedInterest, collateralDebtData.accruedFees) =
                 _calcCreditAccountAccruedInterest(creditAccount, quotaInterest);
         } else {
-            IPriceOracleV2 _priceOracle = priceOracle;
+            address _priceOracle = priceOracle;
             uint256[] memory collateralHints;
 
             collateralDebtData = _calcFullCollateral(
@@ -628,7 +633,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
                 );
             }
 
-            collateralDebtData.totalValue = _convertFromUSD(_priceOracle, collateralDebtData.totalValueUSD, underlying); // F:[FA-41]
+            collateralDebtData.totalValue =
+                IPriceOracleV2(_priceOracle).convertFromUSD(collateralDebtData.totalValueUSD, underlying); // F:[FA-41]
         }
 
         // FINALLY
@@ -644,7 +650,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         uint256 enabledTokensMask,
         uint16 minHealthFactor,
         uint256[] memory collateralHints,
-        IPriceOracleV2 _priceOracle,
+        address _priceOracle,
         bool lazy
     ) internal view returns (CollateralDebtData memory collateralDebtData) {
         uint256 totalUSD;
@@ -693,7 +699,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         collateralDebtData.isLiquidatable = twvUSD < debtPlusInterestRateAndFeesUSD;
     }
 
-    function _calcQuotedCollateral(address creditAccount, uint256 enabledTokensMask, IPriceOracleV2 _priceOracle)
+    function _calcQuotedCollateral(address creditAccount, uint256 enabledTokensMask, address _priceOracle)
         internal
         view
         returns (uint256 totalValueUSD, uint256 twvUSD, uint256 quotaInterest, address[] memory tokens)
@@ -715,7 +721,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         uint256 enabledTokensMask,
         uint256 enoughCollateralUSD,
         uint256[] memory collateralHints,
-        IPriceOracleV2 _priceOracle
+        address _priceOracle
     ) internal view returns (uint256 tokensToDisable, uint256 totalValueUSD, uint256 twvUSD) {
         uint256 tokenMask;
         uint256 len = collateralHints.length;
@@ -762,7 +768,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     }
 
     function _calcOneNonQuotedTokenCollateral(
-        IPriceOracleV2 _priceOracle,
+        address _priceOracle,
         uint256 tokenMask,
         address creditAccount,
         uint256 _totalValueUSD,
@@ -888,15 +894,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         internal
     {
         if (convertToETH && token == wethAddress) {
-            ICreditAccount(creditAccount)._safeTransfer(token, wethGateway, amount); // F:[CM-45]
+            ICreditAccount(creditAccount).transfer(token, wethGateway, amount); // F:[CM-45]
             IWETHGateway(wethGateway).depositFor(to, amount); // F:[CM-45]
         } else {
             try ICreditAccount(creditAccount).safeTransfer(token, to, amount) { // F:[CM-45]
             } catch {
-                uint256 delivered = ICreditAccount(creditAccount).safeTransferDeliveredBalanceControl(
+                uint256 delivered = ICreditAccount(creditAccount).transferDeliveredBalanceControl(
                     token, address(withdrawalManager), amount
                 );
-                withdrawalManager.addImmediateWithdrawal(to, token, delivered);
+                IWithdrawalManager(withdrawalManager).addImmediateWithdrawal(to, token, delivered);
             }
         }
     }
@@ -1005,7 +1011,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     {
         debt = creditAccountInfo[creditAccount].debt; // F:[CM-49,50]
         cumulativeIndexLastUpdate = creditAccountInfo[creditAccount].cumulativeIndexLastUpdate; // F:[CM-49,50]
-        cumulativeIndexNow = IPoolService(pool).calcLinearCumulative_RAY(); // F:[CM-49,50]
+        cumulativeIndexNow = IPoolBase(pool).calcLinearCumulative_RAY(); // F:[CM-49,50]
     }
 
     /// @dev Returns the liquidation threshold for the provided token
@@ -1057,11 +1063,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     /// @dev Address of the connected pool
     /// @notice [DEPRECATED]: use pool() instead.
     function poolService() external view returns (address) {
-        return pool;
+        return address(pool);
     }
 
     function poolQuotaKeeper() public view returns (IPoolQuotaKeeper) {
-        return IPoolQuotaKeeper(IPool4626(pool).poolQuotaKeeper());
+        return IPoolQuotaKeeper(IPool4626(address(pool)).poolQuotaKeeper());
     }
 
     //
@@ -1222,7 +1228,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         external
         creditConfiguratorOnly // F:[CM-4]
     {
-        priceOracle = IPriceOracleV2(_priceOracle);
+        priceOracle = _priceOracle;
     }
 
     /// @dev Sets a new Credit Configurator
@@ -1248,15 +1254,20 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     {
         uint256 tokenMask = getTokenMaskOrRevert(token);
 
-        uint256 delivered =
-            ICreditAccount(creditAccount).safeTransferDeliveredBalanceControl(token, address(withdrawalManager), amount);
+        if (IWithdrawalManager(withdrawalManager).delay() == 0) {
+            address borrower = creditAccountInfo[creditAccount].borrower;
+            _safeTokenTransfer(creditAccount, token, borrower, amount, false);
+        } else {
+            uint256 delivered =
+                ICreditAccount(creditAccount).transferDeliveredBalanceControl(token, withdrawalManager, amount);
 
-        withdrawalManager.addScheduledWithdrawal(creditAccount, token, delivered, tokenMask.calcIndex());
+            IWithdrawalManager(withdrawalManager).addScheduledWithdrawal(
+                creditAccount, token, delivered, tokenMask.calcIndex()
+            );
+            // enables withdrawal flag
+            creditAccountInfo[creditAccount].flags |= WITHDRAWAL_FLAG;
+        }
 
-        /// @dev enables withdrawal flag
-        creditAccountInfo[creditAccount].flags |= WITHDRAWAL_FLAG;
-
-        // We need to disable empty tokens in case they could be forbidden, to finally eliminate them
         if (IERC20Helper.balanceOf(token, creditAccount) <= 1) {
             tokensToDisable = tokenMask;
         }
@@ -1271,9 +1282,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     {
         if (_hasWithdrawals(creditAccount)) {
             bool hasScheduled;
-            (hasScheduled, tokensToEnable) = withdrawalManager.claimScheduledWithdrawals(creditAccount, to, action);
+            (hasScheduled, tokensToEnable) =
+                IWithdrawalManager(withdrawalManager).claimScheduledWithdrawals(creditAccount, to, action);
             if (!hasScheduled) {
-                /// @dev disables withdrawal flag
+                // disables withdrawal flag
                 creditAccountInfo[creditAccount].flags &= ~WITHDRAWAL_FLAG;
             }
         }
@@ -1283,16 +1295,16 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         return creditAccountInfo[creditAccount].flags & WITHDRAWAL_FLAG != 0;
     }
 
-    function _calcCancellableWithdrawalsValue(IPriceOracleV2 _priceOracle, address creditAccount, bool isForceCancel)
+    function _calcCancellableWithdrawalsValue(address _priceOracle, address creditAccount, bool isForceCancel)
         internal
         view
         returns (uint256 withdrawalsValueUSD)
     {
         (address token1, uint256 amount1, address token2, uint256 amount2) =
-            withdrawalManager.cancellableScheduledWithdrawals(creditAccount, isForceCancel);
+            IWithdrawalManager(withdrawalManager).cancellableScheduledWithdrawals(creditAccount, isForceCancel);
 
-        if (amount1 > 0) withdrawalsValueUSD += _convertToUSD(_priceOracle, amount1, token1);
-        if (amount2 > 0) withdrawalsValueUSD += _convertToUSD(_priceOracle, amount2, token2);
+        if (amount1 != 0) withdrawalsValueUSD += _convertToUSD(_priceOracle, amount1, token1);
+        if (amount2 != 0) withdrawalsValueUSD += _convertToUSD(_priceOracle, amount2, token2);
     }
 
     /// @notice Revokes allowances for specified spender/token pairs
@@ -1352,20 +1364,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         creditAccountInfo[creditAccount].enabledTokensMask = uint248(enabledTokensMask);
     }
 
-    function _convertFromUSD(IPriceOracleV2 _priceOracle, uint256 amountInUSD, address token)
-        internal
-        view
-        returns (uint256 amountInToken)
-    {
-        amountInToken = _priceOracle.convertFromUSD(amountInUSD, token);
-    }
-
-    function _convertToUSD(IPriceOracleV2 _priceOracle, uint256 amountInToken, address token)
+    function _convertToUSD(address _priceOracle, uint256 amountInToken, address token)
         internal
         view
         returns (uint256 amountInUSD)
     {
-        amountInUSD = _priceOracle.convertToUSD(amountInToken, token);
+        amountInUSD = IPriceOracleV2(_priceOracle).convertToUSD(amountInToken, token);
     }
 
     ///

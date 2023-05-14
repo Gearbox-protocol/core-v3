@@ -14,9 +14,9 @@ enum ScheduleTask {
     NON_SCHEDULED
 }
 
-/// @title Withdrawals logic test
-/// @notice [WL]: Unit tests for withdrawals library
-contract WithdrawalsLogicTest is TestHelper {
+/// @title Withdrawals logic unit test
+/// @notice U:[WL]: Unit tests for withdrawals logic library
+contract WithdrawalsLogicUnitTest is TestHelper {
     using WithdrawalsLogic for ClaimAction;
     using WithdrawalsLogic for ScheduledWithdrawal;
     using WithdrawalsLogic for ScheduledWithdrawal[2];
@@ -27,16 +27,16 @@ contract WithdrawalsLogicTest is TestHelper {
     uint8 constant TOKEN_INDEX = 1;
     uint256 constant AMOUNT = 1 ether;
 
-    /// @notice [WL-1]: `clear` works correctly
-    function test_WL_01_clear_works_correctly() public {
+    /// @notice U:[WL-1]: `clear` works correctly
+    function test_U_WL_01_clear_works_correctly() public {
         _setupWithdrawalSlot(0, ScheduleTask.MATURE);
         withdrawals[0].clear();
         assertEq(withdrawals[0].maturity, 1);
         assertEq(withdrawals[0].amount, 1);
     }
 
-    /// @notice [WL-2]: `tokenMaskAndAmount` works correctly
-    function test_WL_02_tokenMaskAndAmount_works_correctly() public {
+    /// @notice U:[WL-2]: `tokenMaskAndAmount` works correctly
+    function test_U_WL_02_tokenMaskAndAmount_works_correctly() public {
         // before scheduling
         (address token, uint256 mask, uint256 amount) = withdrawals[0].tokenMaskAndAmount();
         assertEq(token, address(0));
@@ -66,8 +66,8 @@ contract WithdrawalsLogicTest is TestHelper {
         uint8 expectedSlot;
     }
 
-    /// @notice [WL-3]: `findFreeSlot` works correctly
-    function test_WL_03_findFreeSlot_works_correctly() public {
+    /// @notice U:[WL-3]: `findFreeSlot` works correctly
+    function test_U_WL_03_findFreeSlot_works_correctly() public {
         FindFreeSlotCase[4] memory cases = [
             FindFreeSlotCase({
                 name: "both slots non-scheduled",
@@ -118,8 +118,8 @@ contract WithdrawalsLogicTest is TestHelper {
         bool expectedResult;
     }
 
-    /// @notice [WL-4]: `claimAllowed` works correctly
-    function test_WL_04_claimAllowed_works_correctly() public {
+    /// @notice U:[WL-4]: `claimAllowed` works correctly
+    function test_U_WL_04_claimAllowed_works_correctly() public {
         ClaimOrCancelAllowedCase[12] memory cases = [
             ClaimOrCancelAllowedCase({
                 name: "immature withdrawal, action == CLAIM",
@@ -205,8 +205,8 @@ contract WithdrawalsLogicTest is TestHelper {
         }
     }
 
-    /// @notice [WL-5]: `cancelAllowed` works correctly
-    function test_WL_05_cancelAllowed_works_correctly() public {
+    /// @notice U:[WL-5]: `cancelAllowed` works correctly
+    function test_U_WL_05_cancelAllowed_works_correctly() public {
         ClaimOrCancelAllowedCase[12] memory cases = [
             ClaimOrCancelAllowedCase({
                 name: "immature withdrawal, action == CLAIM",
