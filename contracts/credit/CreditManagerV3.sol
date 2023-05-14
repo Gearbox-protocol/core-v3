@@ -220,7 +220,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         wethAddress = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, 0); // F:[CM-1]
         wethGateway = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_GATEWAY, 3_00); // F:[CM-1]
         priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_PRICE_ORACLE, 2); // F:[CM-1]
-        accountFactory = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_ACCOUNT_FACTORY, 3_00); // F:[CM-1]
+        accountFactory = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_ACCOUNT_FACTORY, 1); // F:[CM-1]
         withdrawalManager = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00);
 
         deployAccountAction = IAccountFactory(accountFactory).version() == 3_00
@@ -384,7 +384,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         if (supportsQuotas && collateralDebtData.quotedTokens.length > 0) {
             /// In case of amy loss, PQK sets limits to zero for all quoted tokens
             bool setLimitsToZero = loss > 0;
-            poolQuotaKeeper().removeQuotas({
+            IPoolQuotaKeeper(collateralDebtData._poolQuotaKeeper).removeQuotas({
                 creditAccount: creditAccount,
                 tokens: collateralDebtData.quotedTokens,
                 setLimitsToZero: setLimitsToZero
@@ -443,7 +443,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             });
 
             if (supportsQuotas) {
-                poolQuotaKeeper().accrueQuotaInterest(creditAccount, collateralDebtData.quotedTokens); // F: [CMQ-4,5]
+                IPoolQuotaKeeper(collateralDebtData._poolQuotaKeeper).accrueQuotaInterest(
+                    creditAccount, collateralDebtData.quotedTokens
+                ); // F: [CMQ-4,5]
             }
 
             // Pays the amount back to the pool
@@ -593,7 +595,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             _calcDebtAndQuotedCollateral({
                 collateralDebtData: collateralDebtData,
                 creditAccount: creditAccount,
-                countQuotedCollateral: true
+                countQuotedCollateral: false
             });
         } else {
             address _priceOracle = priceOracle;
@@ -670,12 +672,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
 
         if (supportsQuotas) {
             collateralDebtData.cumulativeQuotaInterest = creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1;
+            collateralDebtData._poolQuotaKeeper = address(poolQuotaKeeper());
             collateralDebtData.calcQuotedCollateral({
                 creditAccount: creditAccount,
                 quotedTokenMask: quotedTokenMask,
                 maxAllowedEnabledTokenLength: maxAllowedEnabledTokenLength,
                 underlying: underlying,
-                poolQuotaKeeper: address(poolQuotaKeeper()),
                 collateralTokensByMaskFn: _collateralTokensByMask,
                 countCollateral: countQuotedCollateral
             });

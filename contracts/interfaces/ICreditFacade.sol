@@ -186,7 +186,7 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     function forbiddenTokenMask() external view returns (uint256);
 
     /// @dev Returns the CreditManagerV3 connected to this Credit Facade
-    function creditManager() external view returns (ICreditManagerV3);
+    function creditManager() external view returns (address);
 
     /// @dev Returns true if 'from' is allowed to transfer Credit Accounts to 'to'
     /// @param from Sender address to check allowance for

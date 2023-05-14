@@ -123,10 +123,18 @@ library QuotasLogic {
         AccountQuota storage accountQuota,
         uint256 lastQuotaRateUpdate
     ) internal initializedQuotasOnly(tokenQuotaParams) returns (uint256 caQuotaInterestChange) {
+        uint192 cumulativeIndexNow = cumulativeIndexSince(tokenQuotaParams, lastQuotaRateUpdate); // F:[CMQ-03]
+
         uint96 quoted = accountQuota.quota;
         if (quoted > 1) {
-            accountQuota.cumulativeIndexLU = cumulativeIndexSince(tokenQuotaParams, lastQuotaRateUpdate);
+            caQuotaInterestChange = CreditLogic.calcAccruedInterest({
+                amount: quoted,
+                cumulativeIndexLastUpdate: accountQuota.cumulativeIndexLU,
+                cumulativeIndexNow: cumulativeIndexNow
+            });
         }
+
+        accountQuota.cumulativeIndexLU = cumulativeIndexNow;
     }
 
     /// @dev Internal function to zero the quota for a single quoted token

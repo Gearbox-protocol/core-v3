@@ -13,6 +13,7 @@ import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFa
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
 import "../../interfaces/IAddressProviderV3.sol";
 import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
+import {BotList} from "../../support/BotList.sol";
 
 import {WETHGateway} from "../../support/WETHGateway.sol";
 import {PriceOracle, PriceFeedConfig} from "@gearbox-protocol/core-v2/contracts/oracles/PriceOracle.sol";
@@ -64,6 +65,9 @@ contract GenesisFactory is Ownable {
 
         WithdrawalManager wm = new WithdrawalManager(address(addressProvider), 1 days);
         addressProvider.setAddress(AP_WITHDRAWAL_MANAGER, address(wm), true);
+
+        BotList botList = new BotList(address(addressProvider));
+        addressProvider.setAddress(AP_BOT_LIST, address(botList), true);
 
         GearToken gearToken = new GearToken(address(this)); // T:[GD-1]
         addressProvider.setAddress(AP_GEAR_TOKEN, address(gearToken), false); // T:[GD-1]

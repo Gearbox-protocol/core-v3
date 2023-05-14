@@ -660,8 +660,8 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         } // F:[CC-12A,29]
 
         // Checks that the contract has a creditManager() function, which returns a correct value
-        try CreditFacadeV3(_contract).creditManager() returns (ICreditManagerV3 cm) {
-            if (cm != creditManager) revert IncompatibleContractException(); // F:[CC-12B,29]
+        try CreditFacadeV3(_contract).creditManager() returns (address cm) {
+            if (cm != address(creditManager)) revert IncompatibleContractException(); // F:[CC-12B,29]
         } catch {
             revert IncompatibleContractException(); // F:[CC-12B,29]
         }

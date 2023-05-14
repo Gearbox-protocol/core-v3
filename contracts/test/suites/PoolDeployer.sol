@@ -75,7 +75,7 @@ contract PoolDeployer is Test {
 
         priceOracle = IPriceOracleV2Ext(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 2));
 
-        acl = ACL(addressProvider.getAddressOrRevert(AP_ACL, 1));
+        acl = ACL(addressProvider.getAddressOrRevert(AP_ACL, 0));
 
         cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
 

@@ -218,7 +218,7 @@ contract PoolServiceMock is IPoolService {
 
     function setWithdrawFee(uint256 num) external {}
 
-    function connectPoolQuotaManager(address _poolQuotaKeeper) external {
+    function setPoolQuotaManager(address _poolQuotaKeeper) external {
         poolQuotaKeeper = _poolQuotaKeeper;
     }
 

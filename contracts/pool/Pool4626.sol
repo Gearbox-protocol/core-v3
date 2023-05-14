@@ -16,7 +16,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
-import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
+import {IAddressProviderV3, AP_TREASURY} from "../interfaces/IAddressProviderV3.sol";
 
 /// LIBS & TRAITS
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
@@ -48,7 +48,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
     using CreditLogic for uint256;
 
     /// @dev Address provider
-    AddressProvider public immutable override addressProvider;
+    address public immutable override addressProvider;
 
     /// @dev Address of the protocol treasury
     address public immutable treasury;
@@ -84,7 +84,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
     uint64 public override timestampLU;
 
     /// @dev Interest rate model
-    IInterestRateModel public interestRateModel;
+    address public interestRateModel;
 
     /// @dev Withdrawal fee in PERCENTAGE FORMAT
     uint16 public override withdrawFee;
@@ -152,15 +152,15 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
         nonZeroAddress(_underlyingToken) // F:[P4-02]
         nonZeroAddress(_interestRateModel) // F:[P4-02]
     {
-        addressProvider = AddressProvider(_addressProvider); // F:[P4-01]
+        addressProvider = _addressProvider; // F:[P4-01]
         underlyingToken = _underlyingToken; // F:[P4-01]
 
-        treasury = AddressProvider(_addressProvider).getTreasuryContract(); // F:[P4-01]
+        treasury = IAddressProviderV3(_addressProvider).getAddressOrRevert(AP_TREASURY, 0); // F:[P4-01]
 
         timestampLU = uint64(block.timestamp); // F:[P4-01]
         cumulativeIndexLU_RAY = uint128(RAY); // F:[P4-01]
 
-        interestRateModel = IInterestRateModel(_interestRateModel);
+        interestRateModel = _interestRateModel;
         emit SetInterestRateModel(_interestRateModel); // F:[P4-03]
 
         _setExpectedLiquidityLimit(_expectedLiquidityLimit); // F:[P4-01, 03]
@@ -550,7 +550,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
         // update borrow APY
         // TODO: add case to check with quotas
         _borrowRate = uint128(
-            interestRateModel.calcBorrowRate(
+            IInterestRateModel(interestRateModel).calcBorrowRate(
                 updatedExpectedLiquidityLU + (supportsQuotas ? _calcOutstandingQuotaRevenue() : 0),
                 availableLiquidityChanged == 0
                     ? availableLiquidity()
@@ -633,7 +633,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
         configuratorOnly // F:[P4-18]
         nonZeroAddress(_interestRateModel)
     {
-        interestRateModel = IInterestRateModel(_interestRateModel); // F:[P4-22]
+        interestRateModel = _interestRateModel; // F:[P4-22]
 
         _updateBaseParameters(0, 0, false); // F:[P4-22]
 
@@ -642,7 +642,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
 
     /// @dev Sets the new pool quota keeper
     /// @param _poolQuotaKeeper Address of the new poolQuotaKeeper copntract
-    function connectPoolQuotaManager(address _poolQuotaKeeper)
+    function setPoolQuotaManager(address _poolQuotaKeeper)
         external
         override
         configuratorOnly // F:[P4-18]
@@ -728,7 +728,8 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
                 _totalBorrowedLimit == type(uint128).max ? type(uint256).max : _totalBorrowedLimit - _totalBorrowed;
         } // F:[P4-27]
 
-        uint256 available = interestRateModel.availableToBorrow(expectedLiquidity(), availableLiquidity()); // F:[P4-27]
+        uint256 available =
+            IInterestRateModel(interestRateModel).availableToBorrow(expectedLiquidity(), availableLiquidity()); // F:[P4-27]
 
         canBorrow = Math.max(canBorrow, available); // F:[P4-27]
 

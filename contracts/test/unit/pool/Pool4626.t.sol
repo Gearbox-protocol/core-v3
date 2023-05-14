@@ -1439,7 +1439,7 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         pool.updateInterestRateModel(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        pool.connectPoolQuotaManager(DUMB_ADDRESS);
+        pool.setPoolQuotaManager(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotControllerException.selector);
         pool.setExpectedLiquidityLimit(0);
@@ -1543,9 +1543,9 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         );
     }
 
-    // [P4-23]: connectPoolQuotaManager updates quotaRevenue and emits event
+    // [P4-23]: setPoolQuotaManager updates quotaRevenue and emits event
 
-    function test_P4_23_connectPoolQuotaManager_updates_quotaRevenue_and_emits_event() public {
+    function test_P4_23_setPoolQuotaManager_updates_quotaRevenue_and_emits_event() public {
         pool = new Pool4626({
             _addressProvider: address(psts.addressProvider()),
             _underlyingToken: tokenTestSuite.addressOf(Tokens.DAI),
@@ -1562,7 +1562,7 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         emit SetPoolQuotaKeeper(POOL_QUOTA_KEEPER);
 
         vm.prank(CONFIGURATOR);
-        pool.connectPoolQuotaManager(POOL_QUOTA_KEEPER);
+        pool.setPoolQuotaManager(POOL_QUOTA_KEEPER);
 
         uint96 qu = uint96(WAD * 10);
 
@@ -1583,7 +1583,7 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         emit SetPoolQuotaKeeper(POOL_QUOTA_KEEPER2);
 
         vm.prank(CONFIGURATOR);
-        pool.connectPoolQuotaManager(POOL_QUOTA_KEEPER2);
+        pool.setPoolQuotaManager(POOL_QUOTA_KEEPER2);
 
         assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "Incorrect lastQuotaRevenuUpdate");
         assertEq(pool.quotaRevenue(), qu, "#1: Incorrect quotaRevenue");
@@ -1831,10 +1831,10 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
                 address POOL_QUOTA_KEEPER = address(pqk);
 
                 vm.prank(CONFIGURATOR);
-                pool.connectPoolQuotaManager(POOL_QUOTA_KEEPER);
+                pool.setPoolQuotaManager(POOL_QUOTA_KEEPER);
 
                 vm.prank(CONFIGURATOR);
-                pool.connectPoolQuotaManager(POOL_QUOTA_KEEPER);
+                pool.setPoolQuotaManager(POOL_QUOTA_KEEPER);
 
                 vm.prank(POOL_QUOTA_KEEPER);
                 pool.updateQuotaRevenue(testCase.quotaRevenue);

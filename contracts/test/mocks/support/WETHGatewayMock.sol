@@ -8,6 +8,7 @@ pragma abicoder v1;
 contract WETHGatewayMock {
     mapping(address => uint256) public balanceOf;
 
+    uint256 public constant version = 3_00;
     // CREDIT MANAGERS
 
     function depositFor(address to, uint256 amount) external {

@@ -120,8 +120,8 @@ interface IPool4626 is IPool4626Events, IPoolBase, IERC4626, IVersion {
     function totalBorrowedLimit() external view returns (uint256);
 
     /// @dev Address provider
-    function addressProvider() external view returns (AddressProvider);
+    function addressProvider() external view returns (address);
 
     // @dev Connects pool quota manager
-    function connectPoolQuotaManager(address) external;
+    function setPoolQuotaManager(address) external;
 }

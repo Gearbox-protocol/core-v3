@@ -13,8 +13,9 @@ import "forge-std/console.sol";
 
 /// @title Disposable credit accounts factory
 contract PriceOracleMock is Test, IPriceOracleV2 {
-    uint256 public version;
     mapping(address => uint256) public priceInUSD;
+
+    uint256 public constant override version = 2;
 
     constructor() {
         vm.label(address(this), "PRICE_ORACLE");

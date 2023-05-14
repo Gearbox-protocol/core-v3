@@ -54,6 +54,7 @@ struct CollateralDebtData {
     bool isLiquidatable;
     ///
     address _priceOracle;
+    address _poolQuotaKeeper;
 }
 
 struct CollateralTokenData {

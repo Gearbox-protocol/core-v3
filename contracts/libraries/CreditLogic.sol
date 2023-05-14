@@ -306,7 +306,6 @@ library CreditLogic {
         uint256 quotedTokenMask,
         uint256 maxAllowedEnabledTokenLength,
         address underlying,
-        address poolQuotaKeeper,
         function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn,
         bool countCollateral
     ) internal view {
@@ -322,8 +321,7 @@ library CreditLogic {
                 uint256 quoted = getQuotaAndUpdateOutstandingInterest({
                     collateralDebtData: collateralDebtData,
                     creditAccount: creditAccount,
-                    token: token,
-                    poolQuotaKeeper: poolQuotaKeeper
+                    token: token
                 });
 
                 if (countCollateral) {
@@ -355,11 +353,11 @@ library CreditLogic {
     function getQuotaAndUpdateOutstandingInterest(
         CollateralDebtData memory collateralDebtData,
         address creditAccount,
-        address poolQuotaKeeper,
         address token
     ) internal view returns (uint256 quoted) {
         uint256 outstandingInterest;
-        (quoted, outstandingInterest) = getQuotaAndOutstandingInterest(creditAccount, token, poolQuotaKeeper);
+        (quoted, outstandingInterest) =
+            getQuotaAndOutstandingInterest(creditAccount, token, collateralDebtData._poolQuotaKeeper);
         collateralDebtData.cumulativeQuotaInterest += outstandingInterest; // F:[CMQ-8]
     }
 
