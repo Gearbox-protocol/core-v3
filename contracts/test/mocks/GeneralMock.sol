@@ -9,4 +9,6 @@ contract GeneralMock {
     fallback() external {
         data = msg.data;
     }
+
+    receive() external payable {}
 }

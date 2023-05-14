@@ -19,7 +19,8 @@ import {
     ICreditManagerV3,
     ICreditManagerV3Events,
     ClosureAction,
-    ManageDebtAction
+    ManageDebtAction,
+    BOT_PERMISSIONS_SET_FLAG
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {ICreditFacadeEvents} from "../../../interfaces/ICreditFacade.sol";
@@ -50,6 +51,7 @@ import "../../../interfaces/IExceptions.sol";
 import {AdapterMock} from "../../mocks/adapters/AdapterMock.sol";
 import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
 import {ERC20BlacklistableMock} from "../../mocks/token/ERC20Blacklistable.sol";
+import {GeneralMock} from "../../mocks/GeneralMock.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
@@ -78,6 +80,8 @@ contract CreditFacadeIntegrationTest is
 
     TargetContractMock targetMock;
     AdapterMock adapterMock;
+
+    BotList botList;
 
     function setUp() public {
         _setUp(Tokens.DAI);
@@ -123,6 +127,11 @@ contract CreditFacadeIntegrationTest is
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.allowContract(address(targetMock), address(adapterMock));
+
+        botList = new BotList(address(cft.addressProvider()));
+
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setBotList(address(botList));
 
         vm.label(address(adapterMock), "AdapterMock");
         vm.label(address(targetMock), "TargetContractMock");
@@ -715,6 +724,8 @@ contract CreditFacadeIntegrationTest is
         vm.expectEmit(false, false, false, true);
         emit FinishMultiCall();
 
+        vm.expectCall(address(botList), abi.encodeCall(BotList.eraseAllBotPermissions, (creditAccount)));
+
         vm.expectCall(
             address(creditManager), abi.encodeCall(ICreditManagerV3.setCreditAccountForExternalCall, (address(1)))
         );
@@ -804,6 +815,8 @@ contract CreditFacadeIntegrationTest is
 
         vm.expectEmit(false, false, false, false);
         emit FinishMultiCall();
+
+        vm.expectCall(address(botList), abi.encodeCall(BotList.eraseAllBotPermissions, (creditAccount)));
 
         vm.expectCall(
             address(creditManager), abi.encodeCall(ICreditManagerV3.setCreditAccountForExternalCall, (address(1)))
@@ -2068,20 +2081,19 @@ contract CreditFacadeIntegrationTest is
     //     );
     // }
 
+    //
+    // BOT LIST INTEGRATION
+    //
+
     /// @dev [FA-58]: botMulticall works correctly
     function test_FA_58_botMulticall_works_correctly() public {
         (address creditAccount,) = _openTestCreditAccount();
 
-        BotList botList = new BotList(address(cft.addressProvider()));
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setBotList(address(botList));
-
         /// ????
-        address bot = address(new TargetContractMock());
+        address bot = address(new GeneralMock());
 
         vm.prank(USER);
-        botList.setBotPermissions(creditAccount, bot, type(uint192).max);
+        botList.setBotPermissions(creditAccount, bot, type(uint192).max, uint72(1 ether), uint72(1 ether / 10));
 
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
 
@@ -2134,6 +2146,43 @@ contract CreditFacadeIntegrationTest is
         vm.prank(bot);
         creditFacade.botMulticall(creditAccount, calls);
     }
+
+    /// @dev [FA-58A]: setBotPermissions works correctly in CF
+    function test_FA_58A_setBotPermissions_works_correctly() public {
+        (address creditAccount,) = _openTestCreditAccount();
+
+        address bot = address(new GeneralMock());
+
+        vm.expectRevert(CallerNotCreditAccountOwnerException.selector);
+        vm.prank(FRIEND);
+        creditFacade.setBotPermissions(creditAccount, bot, type(uint192).max, uint72(1 ether), uint72(1 ether / 10));
+
+        vm.expectCall(address(botList), abi.encodeCall(BotList.eraseAllBotPermissions, (creditAccount)));
+
+        vm.expectCall(
+            address(creditManager),
+            abi.encodeCall(CreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, true))
+        );
+
+        vm.prank(USER);
+        creditFacade.setBotPermissions(creditAccount, bot, type(uint192).max, uint72(1 ether), uint72(1 ether / 10));
+
+        assertTrue(creditManager.flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG > 0, "Flag was not set");
+
+        vm.expectCall(
+            address(creditManager),
+            abi.encodeCall(CreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, false))
+        );
+
+        vm.prank(USER);
+        creditFacade.setBotPermissions(creditAccount, bot, 0, 0, 0);
+
+        assertTrue(creditManager.flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG == 0, "Flag was not set");
+    }
+
+    //
+    // FULL CHECK PARAMS
+    //
 
     /// @dev [FA-59]: setFullCheckParams performs correct full check after multicall
     function test_FA_59_setFullCheckParams_correctly_passes_params_to_fullCollateralCheck() public {

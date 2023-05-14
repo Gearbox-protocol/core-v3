@@ -5,6 +5,8 @@ pragma solidity ^0.8.10;
 
 import {BotList} from "../../../support/BotList.sol";
 import {IBotListEvents, BotFunding} from "../../../interfaces/IBotList.sol";
+import {ICreditAccount} from "../../../interfaces/ICreditAccount.sol";
+import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 
 // TEST
 import "../../lib/constants.sol";
@@ -12,6 +14,7 @@ import "../../lib/constants.sol";
 // MOCKS
 import {AddressProviderACLMock} from "../../mocks/core/AddressProviderACLMock.sol";
 import {ERC20BlacklistableMock} from "../../mocks/token/ERC20Blacklistable.sol";
+import {GeneralMock} from "../../mocks/GeneralMock.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
@@ -32,6 +35,11 @@ contract BotListTest is Test, IBotListEvents {
 
     TokensTestSuite tokenTestSuite;
 
+    GeneralMock bot;
+    GeneralMock creditAccount;
+    GeneralMock creditManager;
+    GeneralMock creditFacade;
+
     function setUp() public {
         vm.prank(CONFIGURATOR);
         addressProvider = new AddressProviderACLMock();
@@ -39,6 +47,23 @@ contract BotListTest is Test, IBotListEvents {
         tokenTestSuite = new TokensTestSuite();
 
         botList = new BotList(address(addressProvider));
+
+        bot = new GeneralMock();
+        creditAccount = new GeneralMock();
+        creditManager = new GeneralMock();
+        creditFacade = new GeneralMock();
+
+        vm.mockCall(
+            address(creditAccount),
+            abi.encodeWithSelector(ICreditAccount.creditManager.selector),
+            abi.encode(address(creditManager))
+        );
+
+        vm.mockCall(
+            address(creditManager),
+            abi.encodeWithSelector(ICreditManagerV3.creditFacade.selector),
+            abi.encode(address(creditFacade))
+        );
     }
 
     ///
@@ -67,135 +92,336 @@ contract BotListTest is Test, IBotListEvents {
         assertEq(botList.daoFee(), 15, "DAO fee incorrect");
     }
 
-    /// @dev [BL-3]: increaseBotFunding works correctly
-    function test_BL_03_increaseBotFunding_works_correctly() public {
+    /// @dev [BL-3]: setBotPermissions works correctly
+    function test_BL_03_setBotPermissions_works_correctly() public {
+        vm.expectRevert(CallerNotCreditAccountFacadeException.selector);
+        vm.prank(USER);
+        botList.setBotPermissions({
+            creditAccount: address(creditAccount),
+            bot: address(bot),
+            permissions: type(uint192).max,
+            fundingAmount: uint72(1 ether),
+            weeklyFundingAllowance: uint72(1 ether / 10)
+        });
+
+        vm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, DUMB_ADDRESS));
+        vm.prank(address(creditFacade));
+        botList.setBotPermissions({
+            creditAccount: address(creditAccount),
+            bot: DUMB_ADDRESS,
+            permissions: type(uint192).max,
+            fundingAmount: uint72(1 ether),
+            weeklyFundingAllowance: uint72(1 ether / 10)
+        });
+
+        vm.prank(CONFIGURATOR);
+        botList.setBotForbiddenStatus(address(bot), true);
+
+        vm.expectRevert(InvalidBotException.selector);
+        vm.prank(address(creditFacade));
+        botList.setBotPermissions({
+            creditAccount: address(creditAccount),
+            bot: address(bot),
+            permissions: type(uint192).max,
+            fundingAmount: uint72(1 ether),
+            weeklyFundingAllowance: uint72(1 ether / 10)
+        });
+
+        vm.expectRevert(PositiveFundingForInactiveBotException.selector);
+        vm.prank(address(creditFacade));
+        botList.setBotPermissions({
+            creditAccount: address(creditAccount),
+            bot: address(bot),
+            permissions: 0,
+            fundingAmount: uint72(1 ether),
+            weeklyFundingAllowance: uint72(1 ether / 10)
+        });
+
+        vm.prank(address(creditFacade));
+        botList.setBotPermissions({
+            creditAccount: address(creditAccount),
+            bot: address(bot),
+            permissions: 0,
+            fundingAmount: 0,
+            weeklyFundingAllowance: 0
+        });
+
+        vm.prank(CONFIGURATOR);
+        botList.setBotForbiddenStatus(address(bot), false);
+
+        vm.expectEmit(true, true, false, true);
+        emit SetBotPermissions(address(creditAccount), address(bot), 1, uint72(1 ether), uint72(1 ether / 10));
+
+        vm.prank(address(creditFacade));
+        uint256 activeBotsRemaining = botList.setBotPermissions({
+            creditAccount: address(creditAccount),
+            bot: address(bot),
+            permissions: 1,
+            fundingAmount: uint72(1 ether),
+            weeklyFundingAllowance: uint72(1 ether / 10)
+        });
+
+        assertEq(activeBotsRemaining, 1, "Incorrect number of bots returned");
+
+        assertEq(botList.botPermissions(address(creditAccount), address(bot)), 1, "Bot permissions were not set");
+
+        (uint256 remainingFunds, uint256 maxWeeklyAllowance, uint256 remainingWeeklyAllowance, uint256 allowanceLU) =
+            botList.botFunding(address(creditAccount), address(bot));
+
+        address[] memory bots = botList.getActiveBots(address(creditAccount));
+
+        assertEq(bots.length, 1, "Incorrect active bots array length");
+
+        assertEq(bots[0], address(bot), "Incorrect address added to active bots list");
+
+        assertEq(remainingFunds, 1 ether, "Incorrect remaining funds value");
+
+        assertEq(maxWeeklyAllowance, 1 ether / 10, "Incorrect max weekly allowance");
+
+        assertEq(remainingWeeklyAllowance, 1 ether / 10, "Incorrect remaining weekly allowance");
+
+        assertEq(allowanceLU, block.timestamp, "Incorrect allowance update timestamp");
+
+        vm.prank(address(creditFacade));
+        activeBotsRemaining = botList.setBotPermissions({
+            creditAccount: address(creditAccount),
+            bot: address(bot),
+            permissions: 2,
+            fundingAmount: uint72(2 ether),
+            weeklyFundingAllowance: uint72(2 ether / 10)
+        });
+
+        (remainingFunds, maxWeeklyAllowance, remainingWeeklyAllowance, allowanceLU) =
+            botList.botFunding(address(creditAccount), address(bot));
+
+        assertEq(activeBotsRemaining, 1, "Incorrect number of bots returned");
+
+        assertEq(botList.botPermissions(address(creditAccount), address(bot)), 2, "Bot permissions were not set");
+
+        assertEq(remainingFunds, 2 ether, "Incorrect remaining funds value");
+
+        assertEq(maxWeeklyAllowance, 2 ether / 10, "Incorrect max weekly allowance");
+
+        assertEq(remainingWeeklyAllowance, 2 ether / 10, "Incorrect remaining weekly allowance");
+
+        assertEq(allowanceLU, block.timestamp, "Incorrect allowance update timestamp");
+
+        bots = botList.getActiveBots(address(creditAccount));
+
+        assertEq(bots.length, 1, "Incorrect active bots array length");
+
+        assertEq(bots[0], address(bot), "Incorrect address added to active bots list");
+
+        vm.prank(address(creditFacade));
+        activeBotsRemaining = botList.setBotPermissions({
+            creditAccount: address(creditAccount),
+            bot: address(bot),
+            permissions: 0,
+            fundingAmount: 0,
+            weeklyFundingAllowance: 0
+        });
+
+        (remainingFunds, maxWeeklyAllowance, remainingWeeklyAllowance, allowanceLU) =
+            botList.botFunding(address(creditAccount), address(bot));
+
+        assertEq(activeBotsRemaining, 0, "Incorrect number of bots returned");
+
+        assertEq(botList.botPermissions(address(creditAccount), address(bot)), 0, "Bot permissions were not set");
+
+        assertEq(remainingFunds, 0, "Incorrect remaining funds value");
+
+        assertEq(maxWeeklyAllowance, 0, "Incorrect max weekly allowance");
+
+        assertEq(remainingWeeklyAllowance, 0, "Incorrect remaining weekly allowance");
+
+        assertEq(allowanceLU, block.timestamp, "Incorrect allowance update timestamp");
+
+        bots = botList.getActiveBots(address(creditAccount));
+
+        assertEq(bots.length, 0, "Incorrect active bots array length");
+    }
+
+    /// @dev [BL-4]: addFunding and removeFunding work correctly
+    function test_BL_04_addFunding_removeFunding_work_correctly() public {
         vm.deal(USER, 10 ether);
 
         vm.expectRevert(AmountCantBeZeroException.selector);
-        botList.increaseBotFunding(FRIEND);
+        botList.addFunding();
 
-        vm.expectRevert(InvalidBotException.selector);
-        vm.prank(USER);
-        botList.increaseBotFunding{value: 1 ether}(FRIEND);
-
-        vm.prank(USER);
-        botList.setBotPermissions(DUMB_ADDRESS, address(addressProvider), type(uint192).max);
-
-        vm.prank(CONFIGURATOR);
-        botList.setBotForbiddenStatus(address(addressProvider), true);
-
-        vm.expectRevert(InvalidBotException.selector);
-        vm.prank(USER);
-        botList.increaseBotFunding{value: 1 ether}(address(addressProvider));
-
-        vm.prank(CONFIGURATOR);
-        botList.setBotForbiddenStatus(address(addressProvider), false);
+        vm.expectEmit(true, false, false, true);
+        emit ChangeFunding(USER, 1 ether);
 
         vm.prank(USER);
-        botList.increaseBotFunding{value: 1 ether}(address(addressProvider));
+        botList.addFunding{value: 1 ether}();
 
-        (uint72 remainingFunds,,,) = botList.botFunding(USER, address(addressProvider));
+        assertEq(botList.fundingBalances(USER), 1 ether, "User's bot funding wallet has incorrect balance");
 
-        assertEq(remainingFunds, 1 ether, "Remaining funds incorrect");
+        vm.expectEmit(true, false, false, true);
+        emit ChangeFunding(USER, 2 ether);
 
         vm.prank(USER);
-        botList.increaseBotFunding{value: 1 ether}(address(addressProvider));
+        botList.addFunding{value: 1 ether}();
 
-        (remainingFunds,,,) = botList.botFunding(USER, address(addressProvider));
+        assertEq(botList.fundingBalances(USER), 2 ether, "User's bot funding wallet has incorrect balance");
 
-        assertEq(remainingFunds, 2 ether, "Remaining funds incorrect");
+        vm.expectEmit(true, false, false, true);
+        emit ChangeFunding(USER, 3 ether / 2);
+
+        vm.prank(USER);
+        botList.removeFunding(1 ether / 2);
+
+        assertEq(botList.fundingBalances(USER), 3 ether / 2, "User's bot funding wallet has incorrect balance");
+
+        assertEq(USER.balance, 85 ether / 10, "User's balance is incorrect");
     }
 
-    /// @dev [BL-4]: decreaseBotFunding works correctly
-    function test_BL_04_decreaseBotFunding_works_correctly() public {
+    /// @dev [BL-5]: pullPayment works correctly
+    function test_BL_05_pullPayment_works_correctly() public {
+        vm.prank(CONFIGURATOR);
+        botList.setDAOFee(5000);
+
+        vm.mockCall(
+            address(creditManager),
+            abi.encodeWithSelector(ICreditManagerV3.getBorrowerOrRevert.selector, address(creditAccount)),
+            abi.encode(USER)
+        );
+
         vm.deal(USER, 10 ether);
 
         vm.prank(USER);
-        botList.setBotPermissions(DUMB_ADDRESS, address(addressProvider), type(uint192).max);
+        botList.addFunding{value: 2 ether}();
 
-        vm.prank(USER);
-        botList.increaseBotFunding{value: 2 ether}(address(addressProvider));
+        vm.prank(address(creditFacade));
+        botList.setBotPermissions({
+            creditAccount: address(creditAccount),
+            bot: address(bot),
+            permissions: 1,
+            fundingAmount: uint72(1 ether),
+            weeklyFundingAllowance: uint72(1 ether / 10)
+        });
 
-        vm.prank(USER);
-        botList.decreaseBotFunding(address(addressProvider), 1 ether);
+        vm.warp(block.timestamp + 1 days);
 
-        (uint72 remainingFunds,,,) = botList.botFunding(USER, address(addressProvider));
+        vm.expectEmit(true, true, true, true);
+        emit PullBotPayment(USER, address(creditAccount), address(bot), uint72(1 ether / 20), uint72(1 ether / 40));
 
-        assertEq(remainingFunds, 1 ether, "Remaining funds incorrect");
+        vm.prank(address(bot));
+        botList.pullPayment({creditAccount: address(creditAccount), paymentAmount: uint72(1 ether / 20)});
 
-        assertEq(USER.balance, 9 ether, "USER was sent an incorrect amount");
+        (uint256 remainingFunds, uint256 maxWeeklyAllowance, uint256 remainingWeeklyAllowance, uint256 allowanceLU) =
+            botList.botFunding(address(creditAccount), address(bot));
+
+        assertEq(remainingFunds, 1 ether - (1 ether / 20) - (1 ether / 40), "Bot funding remaining funds incorrect");
+
+        assertEq(
+            remainingWeeklyAllowance,
+            (1 ether / 10) - (1 ether / 20) - (1 ether / 40),
+            "Bot remaining weekly allowance incorrect"
+        );
+
+        assertEq(
+            botList.fundingBalances(USER),
+            2 ether - (1 ether / 20) - (1 ether / 40),
+            "User remaining funding balance incorrect"
+        );
+
+        assertEq(allowanceLU, block.timestamp - 1 days, "Allowance update timestamp incorrect");
+
+        assertEq(address(bot).balance, 1 ether / 20, "Bot was sent incorrect ETH amount");
+
+        assertEq(FRIEND2.balance, 1 ether / 40, "Treasury was sent incorrect amount");
+
+        vm.warp(block.timestamp + 7 days);
+
+        vm.prank(address(bot));
+        botList.pullPayment({creditAccount: address(creditAccount), paymentAmount: uint72(1 ether / 20)});
+
+        (remainingFunds, maxWeeklyAllowance, remainingWeeklyAllowance, allowanceLU) =
+            botList.botFunding(address(creditAccount), address(bot));
+
+        assertEq(remainingFunds, 1 ether - (2 ether / 20) - (2 ether / 40), "Bot funding remaining funds incorrect");
+
+        assertEq(
+            remainingWeeklyAllowance,
+            (1 ether / 10) - (1 ether / 20) - (1 ether / 40),
+            "Bot remaining weekly allowance incorrect"
+        );
+
+        assertEq(allowanceLU, block.timestamp, "Allowance update timestamp incorrect");
+
+        assertEq(
+            botList.fundingBalances(USER),
+            2 ether - (2 ether / 20) - (2 ether / 40),
+            "User remaining funding balance incorrect"
+        );
+
+        assertEq(address(bot).balance, 2 ether / 20, "Bot was sent incorrect ETH amount");
+
+        assertEq(FRIEND2.balance, 2 ether / 40, "Treasury was sent incorrect amount");
     }
 
-    /// @dev [BL-5]: setWeeklyAllowance works correctly
-    function test_BL_05_setWeeklyAllowance_works_correctly() public {
-        vm.deal(USER, 10 ether);
+    /// @dev [BL-6]: eraseAllBotPermissions works correctly
+    function test_BL_06_eraseAllBotPermissions_works_correctly() public {
+        vm.prank(address(creditFacade));
+        botList.setBotPermissions({
+            creditAccount: address(creditAccount),
+            bot: address(bot),
+            permissions: 1,
+            fundingAmount: uint72(1 ether),
+            weeklyFundingAllowance: uint72(1 ether / 10)
+        });
 
-        vm.prank(USER);
-        botList.setBotPermissions(DUMB_ADDRESS, address(addressProvider), type(uint192).max);
+        address bot2 = address(new GeneralMock());
 
-        vm.prank(USER);
-        botList.setWeeklyBotAllowance(address(addressProvider), 1 ether);
+        vm.prank(address(creditFacade));
+        uint256 activeBotsRemaining = botList.setBotPermissions({
+            creditAccount: address(creditAccount),
+            bot: address(bot2),
+            permissions: 2,
+            fundingAmount: uint72(2 ether),
+            weeklyFundingAllowance: uint72(2 ether / 10)
+        });
 
-        (, uint72 maxWeeklyAllowance,,) = botList.botFunding(USER, address(addressProvider));
+        assertEq(activeBotsRemaining, 2, "Incorrect number of active bots");
 
-        assertEq(maxWeeklyAllowance, 1 ether, "Incorrect new allowance");
+        vm.expectEmit(true, false, false, false);
+        emit EraseBots(address(creditAccount));
 
-        vm.prank(USER);
-        botList.increaseBotFunding{value: 1 ether}(address(addressProvider));
+        vm.prank(address(creditFacade));
+        botList.eraseAllBotPermissions(address(creditAccount));
 
-        vm.prank(address(addressProvider));
-        botList.pullPayment(USER, 1 ether / 10);
+        assertEq(
+            botList.botPermissions(address(creditAccount), address(bot)), 0, "Permissions were not erased for bot 1"
+        );
 
-        vm.prank(USER);
-        botList.setWeeklyBotAllowance(address(addressProvider), 1 ether / 2);
+        assertEq(
+            botList.botPermissions(address(creditAccount), address(bot2)), 0, "Permissions were not erased for bot 2"
+        );
 
-        uint72 remainingWeeklyAllowance;
+        (uint256 remainingFunds, uint256 maxWeeklyAllowance, uint256 remainingWeeklyAllowance, uint256 allowanceLU) =
+            botList.botFunding(address(creditAccount), address(bot));
 
-        (, maxWeeklyAllowance, remainingWeeklyAllowance,) = botList.botFunding(USER, address(addressProvider));
+        assertEq(remainingFunds, 0, "Remaining funds were not zeroed");
 
-        assertEq(maxWeeklyAllowance, 1 ether / 2, "Incorrect new allowance");
+        assertEq(maxWeeklyAllowance, 0, "Remaining funds were not zeroed");
 
-        assertEq(remainingWeeklyAllowance, 1 ether / 2, "Incorrect new remaining allowance");
-    }
+        assertEq(remainingWeeklyAllowance, 0, "Remaining funds were not zeroed");
 
-    /// @dev [BL-6]: pullPayment works correctly
-    function test_BL_06_pullPayment_works_correctly() public {
-        vm.deal(USER, 10 ether);
+        assertEq(allowanceLU, block.timestamp, "Allowance update timestamp incorrect");
 
-        vm.prank(USER);
-        botList.setBotPermissions(DUMB_ADDRESS, address(addressProvider), type(uint192).max);
+        (remainingFunds, maxWeeklyAllowance, remainingWeeklyAllowance, allowanceLU) =
+            botList.botFunding(address(creditAccount), address(bot2));
 
-        vm.prank(USER);
-        botList.setWeeklyBotAllowance(address(addressProvider), 1 ether);
+        assertEq(remainingFunds, 0, "Remaining funds were not zeroed");
 
-        vm.prank(USER);
-        botList.increaseBotFunding{value: 2 ether}(address(addressProvider));
+        assertEq(maxWeeklyAllowance, 0, "Remaining funds were not zeroed");
 
-        vm.prank(address(addressProvider));
-        botList.pullPayment(USER, 1 ether / 10);
+        assertEq(remainingWeeklyAllowance, 0, "Remaining funds were not zeroed");
 
-        (uint72 remainingFunds,, uint72 remainingWeeklyAllowance,) = botList.botFunding(USER, address(addressProvider));
+        assertEq(allowanceLU, block.timestamp, "Allowance update timestamp incorrect");
 
-        assertEq(remainingFunds, 2 ether - 1 ether / 10, "Incorrect new remaining funds");
+        address[] memory activeBots = botList.getActiveBots(address(creditAccount));
 
-        assertEq(remainingWeeklyAllowance, 1 ether - 1 ether / 10, "Incorrect new remaining allowance");
-
-        assertEq(address(addressProvider).balance, 1 ether / 10, "Incorrect amount sent to bot");
-
-        vm.prank(CONFIGURATOR);
-        botList.setDAOFee(10000);
-
-        vm.prank(address(addressProvider));
-        botList.pullPayment(USER, 1 ether / 10);
-
-        (remainingFunds,, remainingWeeklyAllowance,) = botList.botFunding(USER, address(addressProvider));
-
-        assertEq(remainingFunds, 2 ether - 3 ether / 10, "Incorrect new remaining funds");
-
-        assertEq(remainingWeeklyAllowance, 1 ether - 3 ether / 10, "Incorrect new remaining allowance");
-
-        assertEq(address(addressProvider).balance, 2 ether / 10, "Incorrect amount sent to bot");
-
-        assertEq(FRIEND2.balance, 1 ether / 10, "Incorrect amount sent to treasury");
+        assertEq(activeBots.length, 0, "Not all active bots were disabled");
     }
 }

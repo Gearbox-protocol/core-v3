@@ -236,3 +236,9 @@ error NoFreeWithdrawalSlotsException();
 error NoPermissionException(uint256 permission);
 
 error ExternalCallCreditAccountNotSetException();
+
+/// @dev Thrown when the caller is not a Credit Facade associated with required Credit Account
+error CallerNotCreditAccountFacadeException();
+
+/// @dev Thrown when attempting to set positive funding for a bot with 0 permissions
+error PositiveFundingForInactiveBotException();

@@ -462,8 +462,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         whenNotExpired
         nonReentrant
     {
-        address borrower = _getBorrowerOrRevert(creditAccount); // F:[FA-2]
-        uint256 botPermissions = IBotList(botList).botPermissions(borrower, msg.sender);
+        uint256 botPermissions = IBotList(botList).botPermissions(creditAccount, msg.sender);
         // Checks that the bot is approved by the borrower and is not forbidden
         if (botPermissions == 0 || IBotList(botList).forbiddenBot(msg.sender)) {
             revert NotApprovedBotException(); // F: [FA-58]
@@ -857,13 +856,19 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         _claimWithdrawals(creditAccount, to, ClaimAction.CLAIM);
     }
 
-    function setBotPermissions(address creditAccount, address bot, uint192 permissions)
-        external
-        override
-        whenNotPaused
-        creditAccountOwnerOnly(creditAccount)
-        nonReentrant
-    {
+    /// @dev Sets permissions and funding parameters for a bot
+    /// @param creditAccount CA to set permissions for
+    /// @param bot Bot to set permissions for
+    /// @param permissions A bit mask of permissions
+    /// @param fundingAmount Total amount of ETH available to the bot for payments
+    /// @param weeklyFundingAllowance Amount of ETH available to the bot weekly
+    function setBotPermissions(
+        address creditAccount,
+        address bot,
+        uint192 permissions,
+        uint72 fundingAmount,
+        uint72 weeklyFundingAllowance
+    ) external override whenNotPaused creditAccountOwnerOnly(creditAccount) nonReentrant {
         uint16 flags = creditManager.flagsOf(creditAccount);
 
         if (flags & BOT_PERMISSIONS_SET_FLAG == 0) {
@@ -874,7 +879,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             }
         }
 
-        uint256 remainingBots = IBotList(botList).setBotPermissions(creditAccount, bot, permissions);
+        uint256 remainingBots =
+            IBotList(botList).setBotPermissions(creditAccount, bot, permissions, fundingAmount, weeklyFundingAllowance);
         if (remainingBots == 0) {
             creditManager.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, false);
         }
