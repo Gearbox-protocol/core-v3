@@ -18,6 +18,13 @@ bytes32 constant AP_WETH_GATEWAY = "WETH_GATEWAY";
 bytes32 constant AP_WITHDRAWAL_MANAGER = "WITHDRAWAL_MANAGER";
 bytes32 constant AP_ROUTER = "ROUTER";
 
-interface IAddressProviderV3 is IVersion {
-    function getAddress(bytes32 key) external view returns (address);
+interface IAddressProviderEvents {
+    /// @dev Emits when an address is set for a contract role
+    event AddressSet(bytes32 indexed service, address indexed newAddress, uint256 indexed version);
+}
+
+interface IAddressProviderV3 is IAddressProviderEvents, IVersion {
+    function getAddressOrRevert(bytes32 key, uint256 _version) external view returns (address result);
+
+    function setAddress(bytes32 key, address value, bool saveVersion) external;
 }

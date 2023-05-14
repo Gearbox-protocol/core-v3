@@ -4,6 +4,7 @@
 pragma solidity ^0.8.10;
 pragma experimental ABIEncoderV2;
 
+import "../interfaces/IAddressProviderV3.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
@@ -39,7 +40,7 @@ import {ZeroAddressException} from "../interfaces/IExceptions.sol";
 /// Do not use for data from any onchain activities
 contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
     /// @dev Address of the AddressProvider
-    AddressProvider public immutable addressProvider;
+    IAddressProviderV3 public immutable addressProvider;
 
     /// @dev Address of the ContractsRegister
     ContractsRegister public immutable contractsRegister;
@@ -53,9 +54,9 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
     constructor(address _addressProvider) ContractsRegisterTrait(_addressProvider) {
         if (_addressProvider == address(0)) revert ZeroAddressException();
 
-        addressProvider = AddressProvider(_addressProvider);
-        contractsRegister = ContractsRegister(addressProvider.getContractsRegister());
-        WETHToken = addressProvider.getWethToken();
+        addressProvider = IAddressProviderV3(_addressProvider);
+        contractsRegister = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
+        WETHToken = addressProvider.getAddressOrRevert(AP_WETH_TOKEN, 0);
     }
 
     /// @dev Returns CreditAccountData for all opened accounts for particular borrower

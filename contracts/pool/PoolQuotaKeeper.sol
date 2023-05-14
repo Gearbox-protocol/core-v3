@@ -209,50 +209,69 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         }
     }
 
-    /// @dev Computes collateral value for quoted tokens on the account, as well as accrued quota interest
-    function computeQuotedCollateralUSD(
-        address creditAccount,
-        address _priceOracle,
-        address[] memory tokens,
-        uint256[] memory lts
-    ) external view override returns (uint256 totalValueUSD, uint256 twvUSD, uint256 totalQuotaInterest) {
-        uint256 len = tokens.length;
-        for (uint256 i; i < len;) {
-            address token = tokens[i];
-            if (token == address(0)) break;
+    // /// @dev Computes collateral value for quoted tokens on the account, as well as accrued quota interest
+    // function computeQuotedCollateralUSD(
+    //     address creditAccount,
+    //     address _priceOracle,
+    //     address[] memory tokens,
+    //     uint256[] memory lts
+    // ) external view override returns (uint256 totalValueUSD, uint256 twvUSD, uint256 totalQuotaInterest) {
+    //     uint256 len = tokens.length;
+    //     for (uint256 i; i < len;) {
+    //         address token = tokens[i];
+    //         if (token == address(0)) break;
 
-            (uint256 currentUSD, uint256 outstandingInterest) = _getCollateralValue(creditAccount, token, _priceOracle); // F:[CMQ-8]
+    //         (uint256 currentUSD, uint256 outstandingInterest) = _getCollateralValue(creditAccount, token, _priceOracle); // F:[CMQ-8]
 
-            totalValueUSD += currentUSD;
-            twvUSD += currentUSD * lts[i]; // F:[CMQ-8]
-            totalQuotaInterest += outstandingInterest; // F:[CMQ-8]
+    //         totalValueUSD += currentUSD;
+    //         twvUSD += currentUSD * lts[i]; // F:[CMQ-8]
+    //         totalQuotaInterest += outstandingInterest; // F:[CMQ-8]
 
-            unchecked {
-                ++i;
-            }
-        }
+    //         unchecked {
+    //             ++i;
+    //         }
+    //     }
 
-        twvUSD /= PERCENTAGE_FACTOR;
-    }
+    //     twvUSD /= PERCENTAGE_FACTOR;
+    // }
 
-    /// @dev Gets the effective value (i.e., value in underlying included into TWV) for a quoted token on an account
-    function _getCollateralValue(address creditAccount, address token, address _priceOracle)
-        internal
+    // /// @dev Gets the effective value (i.e., value in underlying included into TWV) for a quoted token on an account
+    // function _getCollateralValue(address creditAccount, address token, address _priceOracle)
+    //     internal
+    //     view
+    //     returns (uint256 value, uint256 interest)
+    // {
+    //     AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
+
+    //     uint96 quoted = accountQuota.quota;
+
+    //     if (quoted > 1) {
+    //         uint256 quotaValueUSD = IPriceOracleV2(_priceOracle).convertToUSD(quoted, underlying); // F:[CMQ-8]
+    //         uint256 balance = IERC20(token).balanceOf(creditAccount);
+    //         if (balance > 1) {
+    //             value = IPriceOracleV2(_priceOracle).convertToUSD(balance, token); // F:[CMQ-8]
+    //             if (value > quotaValueUSD) value = quotaValueUSD; // F:[CMQ-8]
+    //         }
+
+    //         interest = CreditLogic.calcAccruedInterest({
+    //             amount: quoted,
+    //             cumulativeIndexLastUpdate: accountQuota.cumulativeIndexLU,
+    //             cumulativeIndexNow: cumulativeIndex(token)
+    //         }); // F:[CMQ-8]
+    //     }
+    // }
+
+    function getQuotaAndInterest(address creditAccount, address token)
+        external
         view
-        returns (uint256 value, uint256 interest)
+        override
+        returns (uint256 quoted, uint256 interest)
     {
         AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
 
-        uint96 quoted = accountQuota.quota;
+        quoted = accountQuota.quota;
 
         if (quoted > 1) {
-            uint256 quotaValueUSD = IPriceOracleV2(_priceOracle).convertToUSD(quoted, underlying); // F:[CMQ-8]
-            uint256 balance = IERC20(token).balanceOf(creditAccount);
-            if (balance > 1) {
-                value = IPriceOracleV2(_priceOracle).convertToUSD(balance, token); // F:[CMQ-8]
-                if (value > quotaValueUSD) value = quotaValueUSD; // F:[CMQ-8]
-            }
-
             interest = CreditLogic.calcAccruedInterest({
                 amount: quoted,
                 cumulativeIndexLastUpdate: accountQuota.cumulativeIndexLU,
