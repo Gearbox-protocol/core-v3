@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
-import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
+import {IAddressProviderV3} from "../../../interfaces/IAddressProviderV3.sol";
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
@@ -56,7 +56,7 @@ import "forge-std/console.sol";
 contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper {
     CreditManagerTestSuite cms;
 
-    IAddressProvider addressProvider;
+    IAddressProviderV3 addressProvider;
     IWETH wethToken;
 
     AccountFactory af;

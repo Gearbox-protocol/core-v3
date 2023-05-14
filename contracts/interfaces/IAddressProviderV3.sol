@@ -3,6 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
+import {IAddressProviderEvents} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 // Repositories & services
@@ -18,6 +19,8 @@ bytes32 constant AP_WETH_GATEWAY = "WETH_GATEWAY";
 bytes32 constant AP_WITHDRAWAL_MANAGER = "WITHDRAWAL_MANAGER";
 bytes32 constant AP_ROUTER = "ROUTER";
 
-interface IAddressProviderV3 is IVersion {
-    function getAddress(bytes32 key) external view returns (address);
+interface IAddressProviderV3 is IAddressProviderEvents, IVersion {
+    function getAddressOrRevert(bytes32 key) external view returns (address result);
+
+    function setAddress(bytes32 key, address value) external;
 }

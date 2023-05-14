@@ -83,9 +83,8 @@ contract CreditFacadeTestSuite is PoolDeployer {
             cmOpts.degenNFT = address(degenNFT);
         }
 
-        cmOpts.withdrawalManager = address(withdrawalManager);
-
         CreditManagerFactory cmf = new CreditManagerFactory(
+            address(addressProvider),
             address(poolMock),
             cmOpts,
             0

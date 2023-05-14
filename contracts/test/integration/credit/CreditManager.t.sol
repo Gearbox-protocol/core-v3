@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
-import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
+import "../../../interfaces/IAddressProviderV3.sol";
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
@@ -70,7 +70,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
 
     CreditManagerTestSuite cms;
 
-    IAddressProvider addressProvider;
+    IAddressProviderV3 addressProvider;
     IWETH wethToken;
 
     AccountFactory af;
@@ -284,7 +284,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
 
     /// @dev [CM-8]: openCreditAccount sets correct values and transfers tokens from pool
     function test_CM_08_openCreditAccount_sets_correct_values_and_transfers_tokens_from_pool() public {
-        address expectedCreditAccount = AccountFactory(addressProvider.getAccountFactory()).head();
+        address expectedCreditAccount = AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY)).head();
 
         uint256 blockAtOpen = block.number;
         uint256 cumulativeAtOpen = 1012;
@@ -318,7 +318,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
 
         assertTrue(
-            creditAccount != AccountFactory(addressProvider.getAccountFactory()).tail(),
+            creditAccount != AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY)).tail(),
             "credit account is already in tail!"
         );
 
@@ -334,7 +334,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
 
         assertEq(
             creditAccount,
-            AccountFactory(addressProvider.getAccountFactory()).tail(),
+            AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY)).tail(),
             "credit account is not in accountFactory tail!"
         );
 

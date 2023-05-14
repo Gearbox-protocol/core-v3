@@ -255,7 +255,7 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
     //
 
     /// @dev Address provider (needed for upgrading the Price Oracle)
-    function addressProvider() external view returns (IAddressProvider);
+    function addressProvider() external view returns (address);
 
     /// @dev Returns the Credit Facade currently connected to the Credit Manager
     function creditFacade() external view returns (CreditFacadeV3);

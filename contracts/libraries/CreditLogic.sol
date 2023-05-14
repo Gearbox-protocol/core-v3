@@ -414,6 +414,7 @@ library CreditLogic {
         uint256 j;
         quotedTokenMask &= collateralDebtData.enabledTokensMask;
         uint256 underlyingPriceRAY = countCollateral ? convertToUSD(priceOracle, RAY, underlying) : 0;
+        collateralDebtData.quotedTokens = new address[](maxAllowedEnabledTokenLength);
 
         for (uint256 tokenMask = 2; tokenMask <= quotedTokenMask;) {
             if (quotedTokenMask & tokenMask != 0) {
@@ -441,7 +442,7 @@ library CreditLogic {
                     ++j;
                 }
 
-                if (j > maxAllowedEnabledTokenLength) {
+                if (j >= maxAllowedEnabledTokenLength) {
                     revert TooManyEnabledTokensException();
                 }
             }

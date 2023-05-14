@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
+import "../interfaces/IAddressProviderV3.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 
 import {
@@ -21,7 +21,7 @@ abstract contract ContractsRegisterTrait is SanityCheckTrait {
     ContractsRegister immutable _cr;
 
     constructor(address addressProvider) nonZeroAddress(addressProvider) {
-        _cr = ContractsRegister(AddressProvider(addressProvider).getContractsRegister());
+        _cr = ContractsRegister(IAddressProviderV3(addressProvider).getAddressOrRevert(AP_CONTRACTS_REGISTER));
     }
 
     function isRegisteredPool(address _pool) internal view returns (bool) {

@@ -3,6 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
+import "../interfaces/IAddressProviderV3.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
@@ -34,7 +35,6 @@ import {
 } from "../interfaces/ICreditConfiguratorV3.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
-import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
 
 // EXCEPTIONS
@@ -52,7 +52,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     using Address for address;
 
     /// @dev Address provider (needed for upgrading the Price Oracle)
-    IAddressProvider public override addressProvider;
+    address public immutable override addressProvider;
 
     /// @dev Address of the Credit Manager
     CreditManagerV3 public override creditManager;
@@ -85,7 +85,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         creditManager = _creditManager; // F:[CC-1]
         underlying = creditManager.underlying(); // F:[CC-1]
 
-        addressProvider = IPoolService(_creditManager.poolService()).addressProvider(); // F:[CC-1]
+        addressProvider = _creditManager.addressProvider(); // F:[CC-1]
 
         address currentConfigurator = creditManager.creditConfigurator(); // F: [CC-41]
 
@@ -573,7 +573,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         external
         configuratorOnly // F:[CC-2]
     {
-        address priceOracle = addressProvider.getPriceOracle();
+        address priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_PRICE_ORACLE);
         address currentPriceOracle = address(creditManager.priceOracle());
 
         // Checks that the price oracle is actually new to avoid emitting redundant events
