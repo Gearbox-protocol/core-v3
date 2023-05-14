@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
-import {IAddressProviderV3} from "../../../interfaces/IAddressProviderV3.sol";
+import "../../../interfaces/IAddressProviderV3.sol";
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
