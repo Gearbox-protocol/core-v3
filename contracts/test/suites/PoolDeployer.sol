@@ -69,15 +69,17 @@ contract PoolDeployer is Test {
         gp.acl().claimOwnership();
 
         addressProvider = gp.addressProvider();
-        af = AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY));
+        af = AccountFactory(
+            addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, accountFactoryVersion == 1 ? 1 : 3_00)
+        );
 
-        priceOracle = IPriceOracleV2Ext(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE));
+        priceOracle = IPriceOracleV2Ext(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 2));
 
-        acl = ACL(addressProvider.getAddressOrRevert(AP_ACL));
+        acl = ACL(addressProvider.getAddressOrRevert(AP_ACL, 1));
 
-        cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER));
+        cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
 
-        withdrawalManager = WithdrawalManager(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER));
+        withdrawalManager = WithdrawalManager(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00));
 
         underlying = _underlying;
 

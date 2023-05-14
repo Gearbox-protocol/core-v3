@@ -48,7 +48,7 @@ contract GearStakingTest is Test, IGearStakingEvents {
 
         gearToken = tokenTestSuite.addressOf(Tokens.WETH);
 
-        addressProvider.setAddress(AP_GEAR_TOKEN, gearToken);
+        addressProvider.setAddress(AP_GEAR_TOKEN, gearToken, false);
 
         gearStaking = new GearStaking(address(addressProvider), block.timestamp + 1);
 

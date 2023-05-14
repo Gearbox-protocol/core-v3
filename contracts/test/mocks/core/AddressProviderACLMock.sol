@@ -20,11 +20,10 @@ contract AddressProviderACLMock is Test, AddressProviderV3 {
     mapping(address => bool) public isCreditManager;
 
     constructor() AddressProviderV3(address(this)) {
-        _setAddress(AP_ACL, address(this));
-        _setAddress(AP_PRICE_ORACLE, address(new PriceOracleMock()));
-        _setAddress(AP_WETH_GATEWAY, address(new WETHGatewayMock()));
+        _setAddress(AP_PRICE_ORACLE, address(new PriceOracleMock()), true);
+        _setAddress(AP_WETH_GATEWAY, address(new WETHGatewayMock()), true);
 
-        _setAddress(AP_TREASURY, makeAddr("TREASURY"));
+        _setAddress(AP_TREASURY, makeAddr("TREASURY"), false);
 
         isConfigurator[msg.sender] = true;
         owner = msg.sender;

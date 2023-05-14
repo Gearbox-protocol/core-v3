@@ -26,22 +26,22 @@ contract GenesisFactory is Ownable {
     constructor(address wethToken, address treasury, uint8 accountFactoryVer) {
         acl = new ACL(); // T:[GD-1]
         addressProvider = new AddressProviderV3(address(acl)); // T:[GD-1]
-        addressProvider.setAddress(AP_WETH_TOKEN, wethToken); // T:[GD-1]
-        addressProvider.setAddress(AP_TREASURY, treasury); // T:[GD-1]
+        addressProvider.setAddress(AP_WETH_TOKEN, wethToken, false); // T:[GD-1]
+        addressProvider.setAddress(AP_TREASURY, treasury, false); // T:[GD-1]
 
         ContractsRegister contractsRegister = new ContractsRegister(
             address(addressProvider)
         ); // T:[GD-1]
-        addressProvider.setAddress(AP_CONTRACTS_REGISTER, address(contractsRegister)); // T:[GD-1]
+        addressProvider.setAddress(AP_CONTRACTS_REGISTER, address(contractsRegister), true); // T:[GD-1]
 
         DataCompressor dataCompressor = new DataCompressor(
             address(addressProvider)
         ); // T:[GD-1]
-        addressProvider.setAddress(AP_DATA_COMPRESSOR, address(dataCompressor)); // T:[GD-1]
+        addressProvider.setAddress(AP_DATA_COMPRESSOR, address(dataCompressor), true); // T:[GD-1]
 
         PriceFeedConfig[] memory config;
         priceOracle = new PriceOracle(address(addressProvider), config); // T:[GD-1]
-        addressProvider.setAddress(AP_PRICE_ORACLE, address(priceOracle)); // T:[GD-1]
+        addressProvider.setAddress(AP_PRICE_ORACLE, address(priceOracle), true); // T:[GD-1]
 
         address accountFactory;
 
@@ -57,16 +57,16 @@ contract GenesisFactory is Ownable {
             accountFactory = address(new  AccountFactoryV3( address(addressProvider))); // T:[GD-1]
         }
 
-        addressProvider.setAddress(AP_ACCOUNT_FACTORY, accountFactory); // T:[GD-1]
+        addressProvider.setAddress(AP_ACCOUNT_FACTORY, accountFactory, true); // T:[GD-1]
 
         WETHGateway wethGateway = new WETHGateway(address(addressProvider)); // T:[GD-1]
-        addressProvider.setAddress(AP_WETH_GATEWAY, address(wethGateway)); // T:[GD-1]
+        addressProvider.setAddress(AP_WETH_GATEWAY, address(wethGateway), true); // T:[GD-1]
 
         WithdrawalManager wm = new WithdrawalManager(address(addressProvider), 1 days);
-        addressProvider.setAddress(AP_WITHDRAWAL_MANAGER, address(wm));
+        addressProvider.setAddress(AP_WITHDRAWAL_MANAGER, address(wm), true);
 
         GearToken gearToken = new GearToken(address(this)); // T:[GD-1]
-        addressProvider.setAddress(AP_GEAR_TOKEN, address(gearToken)); // T:[GD-1]
+        addressProvider.setAddress(AP_GEAR_TOKEN, address(gearToken), false); // T:[GD-1]
         gearToken.transferOwnership(msg.sender); // T:[GD-1]
         acl.transferOwnership(msg.sender); // T:[GD-1]
     }

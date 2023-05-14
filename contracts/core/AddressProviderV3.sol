@@ -14,13 +14,15 @@ import "forge-std/console.sol";
 /// @notice Stores addresses of deployed contracts
 contract AddressProviderV3 is IAddressProviderV3 {
     // Mapping from contract keys to respective addresses
-    mapping(bytes32 => address) public addresses;
+    mapping(bytes32 => mapping(uint256 => address)) public addresses;
 
     // Contract version
     uint256 public constant override(IVersion) version = 3_00;
 
+    uint256 immutable aclVersion;
+
     modifier configuratorOnly() {
-        if (!IACL(getAddressOrRevert(AP_ACL)).isConfigurator(msg.sender)) {
+        if (!IACL(getAddressOrRevert(AP_ACL, aclVersion)).isConfigurator(msg.sender)) {
             revert CallerNotConfiguratorException();
         }
         _;
@@ -28,76 +30,79 @@ contract AddressProviderV3 is IAddressProviderV3 {
 
     constructor(address _acl) {
         // @dev Emits first event for contract discovery
-        emit AddressSet("ADDRESS_PROVIDER", address(this));
-        _setAddress(AP_ACL, _acl);
+        emit AddressSet("ADDRESS_PROVIDER", address(this), version);
+        aclVersion = IVersion(_acl).version();
+        _setAddress(AP_ACL, _acl, true);
     }
 
-    function getAddressOrRevert(bytes32 key) public view override returns (address result) {
-        result = addresses[key];
+    function getAddressOrRevert(bytes32 key, uint256 _version) public view override returns (address result) {
+        result = addresses[key][_version];
         if (result == address(0)) revert AddressNotFoundException();
     }
 
     /// @dev Sets address to map by its key
     /// @param key Key in string format
     /// @param value Address
-    function setAddress(bytes32 key, address value) external override configuratorOnly {
-        _setAddress(key, value);
+    function setAddress(bytes32 key, address value, bool saveVersion) external override configuratorOnly {
+        _setAddress(key, value, saveVersion);
     }
 
-    function _setAddress(bytes32 key, address value) internal {
-        addresses[key] = value;
-        emit AddressSet(key, value); // F:[AP-2]
+    function _setAddress(bytes32 key, address value, bool saveVersion) internal {
+        uint256 _version;
+        if (saveVersion) _version = IVersion(value).version();
+        addresses[key][_version] = value;
+        emit AddressSet(key, value, _version); // F:[AP-2]
     }
 
     /// KEPT FOR BACKWARD COMPATABILITY
 
     /// @return Address of ACL contract
     function getACL() external view returns (address) {
-        return getAddressOrRevert(AP_ACL); // F:[AP-3]
+        return getAddressOrRevert(AP_ACL, 1); // F:[AP-3]
     }
 
     /// @return Address of ContractsRegister
     function getContractsRegister() external view returns (address) {
-        return getAddressOrRevert(AP_CONTRACTS_REGISTER); // F:[AP-4]
+        return getAddressOrRevert(AP_CONTRACTS_REGISTER, 1); // F:[AP-4]
     }
 
     /// @return Address of PriceOracle
     function getPriceOracle() external view returns (address) {
-        return getAddressOrRevert(AP_PRICE_ORACLE); // F:[AP-5]
+        return getAddressOrRevert(AP_PRICE_ORACLE, 2); // F:[AP-5]
     }
 
     /// @return Address of AccountFactory
     function getAccountFactory() external view returns (address) {
-        return getAddressOrRevert(AP_ACCOUNT_FACTORY); // F:[AP-6]
+        return getAddressOrRevert(AP_ACCOUNT_FACTORY, 1); // F:[AP-6]
     }
 
     /// @return Address of DataCompressor
     function getDataCompressor() external view returns (address) {
-        return getAddressOrRevert(AP_DATA_COMPRESSOR); // F:[AP-7]
+        return getAddressOrRevert(AP_DATA_COMPRESSOR, 2); // F:[AP-7]
     }
 
     /// @return Address of Treasury contract
     function getTreasuryContract() external view returns (address) {
-        return getAddressOrRevert(AP_TREASURY); // F:[AP-8]
+        return getAddressOrRevert(AP_TREASURY, 0); // F:[AP-8]
     }
 
     /// @return Address of GEAR token
     function getGearToken() external view returns (address) {
-        return getAddressOrRevert(AP_GEAR_TOKEN); // F:[AP-9]
+        return getAddressOrRevert(AP_GEAR_TOKEN, 0); // F:[AP-9]
     }
 
     /// @return Address of WETH token
     function getWethToken() external view returns (address) {
-        return getAddressOrRevert(AP_WETH_TOKEN); // F:[AP-10]
+        return getAddressOrRevert(AP_WETH_TOKEN, 0); // F:[AP-10]
     }
 
     /// @return Address of WETH token
     function getWETHGateway() external view returns (address) {
-        return getAddressOrRevert(AP_WETH_GATEWAY); // F:[AP-11]
+        return getAddressOrRevert(AP_WETH_GATEWAY, 1); // F:[AP-11]
     }
 
     /// @return Address of PathFinder
     function getLeveragedActions() external view returns (address) {
-        return getAddressOrRevert(AP_ROUTER); // T:[AP-7]
+        return getAddressOrRevert(AP_ROUTER, 1); // T:[AP-7]
     }
 }

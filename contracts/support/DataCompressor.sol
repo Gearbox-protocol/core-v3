@@ -55,8 +55,8 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
         if (_addressProvider == address(0)) revert ZeroAddressException();
 
         addressProvider = IAddressProviderV3(_addressProvider);
-        contractsRegister = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER));
-        WETHToken = addressProvider.getAddressOrRevert(AP_WETH_TOKEN);
+        contractsRegister = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
+        WETHToken = addressProvider.getAddressOrRevert(AP_WETH_TOKEN, 0);
     }
 
     /// @dev Returns CreditAccountData for all opened accounts for particular borrower

@@ -119,17 +119,19 @@ contract CreditManagerV3UnitTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         assertEq(lt, 0, "Incorrect LT for underlying");
 
-        assertEq(creditManager.wethAddress(), addressProvider.getAddressOrRevert(AP_WETH_TOKEN), "Incorrect WETH token");
+        assertEq(
+            creditManager.wethAddress(), addressProvider.getAddressOrRevert(AP_WETH_TOKEN, 0), "Incorrect WETH token"
+        );
 
         assertEq(
             address(creditManager.wethGateway()),
-            addressProvider.getAddressOrRevert(AP_WETH_GATEWAY),
+            addressProvider.getAddressOrRevert(AP_WETH_GATEWAY, 3_00),
             "Incorrect WETH Gateway"
         );
 
         assertEq(
             address(creditManager.priceOracle()),
-            addressProvider.getAddressOrRevert(AP_PRICE_ORACLE),
+            addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 2),
             "Incorrect Price oracle"
         );
 

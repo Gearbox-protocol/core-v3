@@ -21,7 +21,7 @@ abstract contract ContractsRegisterTrait is SanityCheckTrait {
     ContractsRegister immutable _cr;
 
     constructor(address addressProvider) nonZeroAddress(addressProvider) {
-        _cr = ContractsRegister(IAddressProviderV3(addressProvider).getAddressOrRevert(AP_CONTRACTS_REGISTER));
+        _cr = ContractsRegister(IAddressProviderV3(addressProvider).getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
     }
 
     function isRegisteredPool(address _pool) internal view returns (bool) {

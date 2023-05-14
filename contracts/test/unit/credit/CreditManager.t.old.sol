@@ -253,17 +253,19 @@ contract OldCreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
 
         assertEq(lt, 0, "Incorrect LT for underlying");
 
-        assertEq(creditManager.wethAddress(), addressProvider.getAddressOrRevert(AP_WETH_TOKEN), "Incorrect WETH token");
+        assertEq(
+            creditManager.wethAddress(), addressProvider.getAddressOrRevert(AP_WETH_TOKEN, 0), "Incorrect WETH token"
+        );
 
         assertEq(
             address(creditManager.wethGateway()),
-            addressProvider.getAddressOrRevert(AP_WETH_GATEWAY),
+            addressProvider.getAddressOrRevert(AP_WETH_GATEWAY, 3_00),
             "Incorrect WETH Gateway"
         );
 
         assertEq(
             address(creditManager.priceOracle()),
-            addressProvider.getAddressOrRevert(AP_PRICE_ORACLE),
+            addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 2),
             "Incorrect Price oracle"
         );
 
@@ -472,7 +474,7 @@ contract OldCreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
 
     /// @dev [CM-8]: openCreditAccount sets correct values and transfers tokens from pool
     function test_CM_08_openCreditAccount_sets_correct_values_and_transfers_tokens_from_pool() public {
-        address expectedCreditAccount = AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY)).head();
+        address expectedCreditAccount = AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 1)).head();
 
         uint256 blockAtOpen = block.number;
         uint256 cumulativeAtOpen = 1012;
@@ -506,7 +508,7 @@ contract OldCreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
 
         assertTrue(
-            creditAccount != AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY)).tail(),
+            creditAccount != AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 1)).tail(),
             "credit account is already in tail!"
         );
 
@@ -522,7 +524,7 @@ contract OldCreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
 
         assertEq(
             creditAccount,
-            AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY)).tail(),
+            AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 1)).tail(),
             "credit account is not in accountFactory tail!"
         );
 

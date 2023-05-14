@@ -200,7 +200,7 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
 
     /// @dev Upgrades the price oracle in the Credit Manager, taking the address
     /// from the address provider
-    function setPriceOracle() external;
+    function setPriceOracle(uint256 version) external;
 
     /// @dev Upgrades the Credit Facade corresponding to the Credit Manager
     /// @param _creditFacade address of the new CreditFacadeV3

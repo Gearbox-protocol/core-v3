@@ -68,7 +68,7 @@ contract WETHGateway is IWETHGateway, ReentrancyGuard, ContractsRegisterTrait {
     /// @param addressProvider Address Repository for upgradable contract model
     constructor(address addressProvider) ContractsRegisterTrait(addressProvider) {
         if (addressProvider == address(0)) revert ZeroAddressException();
-        weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN);
+        weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, 0);
     }
 
     /// FOR POOLS V3

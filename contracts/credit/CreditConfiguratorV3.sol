@@ -569,11 +569,11 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
 
     /// @dev Upgrades the price oracle in the Credit Manager, taking the address
     /// from the address provider
-    function setPriceOracle()
+    function setPriceOracle(uint256 _version)
         external
         configuratorOnly // F:[CC-2]
     {
-        address priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_PRICE_ORACLE);
+        address priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_PRICE_ORACLE, _version);
         address currentPriceOracle = address(creditManager.priceOracle());
 
         // Checks that the price oracle is actually new to avoid emitting redundant events
