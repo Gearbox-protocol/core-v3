@@ -188,24 +188,15 @@ library CreditLogic {
     }
 
     function calcDescrease(
+        CollateralDebtData memory collateralDebtData,
         uint256 amount,
-        uint256 quotaInterestAccrued,
         uint16 feeInterest,
-        uint256 debt,
         uint256 cumulativeIndexNow,
         uint256 cumulativeIndexLastUpdate
-    )
-        internal
-        pure
-        returns (
-            uint256 newDebt,
-            uint256 newCumulativeIndex,
-            uint256 amountToRepay,
-            uint256 profit,
-            uint256 cumulativeQuotaInterest
-        )
-    {
+    ) internal pure returns (uint256 newDebt, uint256 newCumulativeIndex, uint256 amountToRepay, uint256 profit) {
         amountToRepay = amount;
+
+        uint256 quotaInterestAccrued = collateralDebtData.cumulativeQuotaInterest;
 
         if (quotaInterestAccrued > 1) {
             uint256 quotaProfit = (quotaInterestAccrued * feeInterest) / PERCENTAGE_FACTOR;
@@ -213,23 +204,24 @@ library CreditLogic {
             if (amountToRepay >= quotaInterestAccrued + quotaProfit) {
                 amountToRepay -= quotaInterestAccrued + quotaProfit; // F: [CMQ-5]
                 profit += quotaProfit; // F: [CMQ-5]
-                cumulativeQuotaInterest = 1; // F: [CMQ-5]
+                collateralDebtData.cumulativeQuotaInterest = 1; // F: [CMQ-5]
             } else {
                 uint256 amountToPool = (amountToRepay * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
 
                 profit += amountToRepay - amountToPool; // F: [CMQ-4]
                 amountToRepay = 0; // F: [CMQ-4]
 
-                cumulativeQuotaInterest = quotaInterestAccrued - amountToPool + 1; // F: [CMQ-4]
+                collateralDebtData.cumulativeQuotaInterest = quotaInterestAccrued - amountToPool + 1; // F: [CMQ-4]
 
-                newDebt = debt;
+                newDebt = collateralDebtData.debt;
                 newCumulativeIndex = cumulativeIndexLastUpdate;
             }
         }
 
         if (amountToRepay > 0) {
             // Computes the interest accrued thus far
-            uint256 interestAccrued = (debt * newCumulativeIndex) / cumulativeIndexLastUpdate - debt; // F:[CM-21]
+            uint256 interestAccrued =
+                (collateralDebtData.debt * newCumulativeIndex) / cumulativeIndexLastUpdate - collateralDebtData.debt; // F:[CM-21]
 
             // Computes profit, taken as a percentage of the interest rate
             uint256 profitFromInterest = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR; // F:[CM-21]
@@ -239,7 +231,7 @@ library CreditLogic {
                 // paid first, and the remainder is used to pay the principal
 
                 amountToRepay -= interestAccrued + profitFromInterest;
-                newDebt = debt - amountToRepay; //  + interestAccrued + profit - amount;
+                newDebt = collateralDebtData.debt - amountToRepay; //  + interestAccrued + profit - amount;
 
                 profit += profitFromInterest;
 
@@ -260,7 +252,7 @@ library CreditLogic {
 
                 // Since interest and fees are paid out first, the principal
                 // remains unchanged
-                newDebt = debt;
+                newDebt = collateralDebtData.debt;
 
                 // Since the interest was only repaid partially, we need to recompute the
                 // cumulativeIndexLastUpdate, so that "debt * (indexNow / indexAtOpenNew - 1)"
@@ -274,13 +266,13 @@ library CreditLogic {
                 newCumulativeIndex = (INDEX_PRECISION * cumulativeIndexNow * cumulativeIndexLastUpdate)
                     / (
                         INDEX_PRECISION * cumulativeIndexNow
-                            - (INDEX_PRECISION * amountToPool * cumulativeIndexLastUpdate) / debt
+                            - (INDEX_PRECISION * amountToPool * cumulativeIndexLastUpdate) / collateralDebtData.debt
                     );
             }
         }
 
         // TODO: delete after tests or write Invaraiant test
-        require(debt - newDebt == amountToRepay, "Ooops, something was wring");
+        require(collateralDebtData.debt - newDebt == amountToRepay, "Ooops, something was wring");
     }
 
     /// @param creditAccount Credit Account to compute balances for
@@ -408,7 +400,7 @@ library CreditLogic {
         address underlying,
         address priceOracle,
         address poolQuotaKeeper,
-        function (uint256) view returns (address, uint16) collateralTokensByMaskFn,
+        function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn,
         bool countCollateral
     ) internal view {
         uint256 j;
@@ -418,7 +410,7 @@ library CreditLogic {
 
         for (uint256 tokenMask = 2; tokenMask <= quotedTokenMask;) {
             if (quotedTokenMask & tokenMask != 0) {
-                (address token, uint16 liquidationThreshold) = collateralTokensByMaskFn(tokenMask);
+                (address token, uint16 liquidationThreshold) = collateralTokensByMaskFn(tokenMask, countCollateral);
                 uint256 quoted = getQuotaAndUpdateOutstandingInterest({
                     collateralDebtData: collateralDebtData,
                     creditAccount: creditAccount,

@@ -56,9 +56,7 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
     /// @dev Computes the accrued quota interest and updates interest indexes
     /// @param creditAccount Address of the Credit Account to accrue interest for
     /// @param tokens Array of all active quoted tokens on the account
-    function accrueQuotaInterest(address creditAccount, address[] memory tokens)
-        external
-        returns (uint256 caQuotaInterestChange);
+    function accrueQuotaInterest(address creditAccount, address[] memory tokens) external;
 
     /// @dev Gauge management
 
@@ -73,7 +71,7 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
     //
 
     /// @dev Returns the gauge address
-    function pool() external view returns (IPool4626);
+    function pool() external view returns (address);
 
     /// @dev Returns the gauge address
     function gauge() external view returns (address);
@@ -101,10 +99,4 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
         external
         view
         returns (uint256 quoted, uint256 outstandingInterest);
-
-    /// @dev Computes outstanding quota interest
-    function outstandingQuotaInterest(address creditAccount, address[] memory tokens)
-        external
-        view
-        returns (uint256 caQuotaInterestChange);
 }
