@@ -417,7 +417,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
 
         uint256 newCumulativeIndex;
         if (action == ManageDebtAction.INCREASE_DEBT) {
-            _getCreditAccountParameters({collateralDebtData: collateralDebtData, creditAccount: creditAccount});
+            _setDebtAndCumulativeIndex({collateralDebtData: collateralDebtData, creditAccount: creditAccount});
             (newDebt, newCumulativeIndex) = collateralDebtData.calcIncrease(amount);
 
             // Requests the pool to lend additional funds to the Credit Account
@@ -594,8 +594,25 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
 
             collateralDebtData._priceOracle = priceOracle;
 
-            _calcFullCollateral(collateralDebtData, creditAccount, PERCENTAGE_FACTOR, collateralHints, false);
-            _calcAndUpdateCancellableWithdrawalsValue(collateralDebtData, creditAccount, task);
+            _calcFullCollateral({
+                collateralDebtData: collateralDebtData,
+                creditAccount: creditAccount,
+                minHealthFactor: PERCENTAGE_FACTOR,
+                collateralHints: collateralHints,
+                lazy: false
+            });
+            collateralDebtData.calcHealthFactor();
+
+            if (
+                task == CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS
+                    || task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
+            ) {
+                _calcAndUpdateCancellableWithdrawalsValue({
+                    collateralDebtData: collateralDebtData,
+                    creditAccount: creditAccount,
+                    isForceCancel: task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
+                });
+            }
 
             collateralDebtData.totalValue =
                 IPriceOracleV2(_priceOracle).convertFromUSD(collateralDebtData.totalValueUSD, underlying); // F:[FA-41]
@@ -619,37 +636,18 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             countQuotedCollateral: true
         });
 
-        uint256 debtPlusInterestRateAndFeesUSD = CreditLogic.convertToUSD(
-            collateralDebtData._priceOracle,
-            collateralDebtData.calcTotalDebt() * minHealthFactor, // F: [CM-42]
-            underlying
-        ) / PERCENTAGE_FACTOR;
+        collateralDebtData.calcTotalDebtUSD(underlying);
 
-        // If quoted tokens fully cover the debt, we can stop here
-        // after performing some additional cleanup
-        if (collateralDebtData.twvUSD < debtPlusInterestRateAndFeesUSD || !lazy) {
-            uint256 limit = lazy ? (debtPlusInterestRateAndFeesUSD - collateralDebtData.twvUSD) : type(uint256).max;
+        collateralDebtData.calcNonQuotedTokensCollateral({
+            creditAccount: creditAccount,
+            stopIfReachLimit: lazy,
+            minHealthFactor: minHealthFactor,
+            collateralHints: collateralHints,
+            quotedTokenMask: supportsQuotas ? quotedTokenMask : 0,
+            collateralTokensByMaskFn: collateralTokensByMask
+        });
 
-            collateralDebtData.calcNotQuotedCollateral({
-                creditAccount: creditAccount,
-                enoughCollateralUSD: limit,
-                collateralHints: collateralHints,
-                quotedTokenMask: supportsQuotas ? quotedTokenMask : 0,
-                collateralTokensByMaskFn: collateralTokensByMask
-            });
-
-            // /// @notice tokensToDisable doesn't have any quoted tokens, no need to mask it
-            // enabledTokensMask = enabledTokensMask.disable(tokensToDisable);
-            // totalUSD += _totalUSD;
-            // twvUSD += _twvUSD;
-        }
-
-        // collateralDebtData.totalValueUSD = totalUSD;
-        // collateralDebtData.twvUSD = twvUSD;
-
-        // collateralDebtData.enabledTokensMask = enabledTokensMask;
-        collateralDebtData.hf = uint16(collateralDebtData.twvUSD * PERCENTAGE_FACTOR / debtPlusInterestRateAndFeesUSD);
-        collateralDebtData.isLiquidatable = collateralDebtData.twvUSD < debtPlusInterestRateAndFeesUSD;
+        collateralDebtData.isLiquidatable = collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD;
     }
 
     function _calcDebtAndQuotedCollateral(
@@ -659,12 +657,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     ) internal view {
         // The total weighted value of a Credit Account has to be compared
         // with the entire debt sum, including interest and fees
-        _getCreditAccountParameters({collateralDebtData: collateralDebtData, creditAccount: creditAccount});
+        _setDebtAndCumulativeIndex({collateralDebtData: collateralDebtData, creditAccount: creditAccount});
 
         if (supportsQuotas) {
             collateralDebtData.cumulativeQuotaInterest = creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1;
             collateralDebtData._poolQuotaKeeper = address(poolQuotaKeeper());
-            collateralDebtData.calcQuotedCollateral({
+
+            collateralDebtData.calcQuotedTokensCollateral({
                 creditAccount: creditAccount,
                 quotedTokenMask: quotedTokenMask,
                 maxAllowedEnabledTokenLength: maxAllowedEnabledTokenLength,
@@ -674,7 +673,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             });
         }
 
-        collateralDebtData.calcCreditAccountAccruedInterest({feeInterest: feeInterest});
+        collateralDebtData.calcAccruedInterestAndFees({feeInterest: feeInterest});
     }
     //
     // QUOTAS MANAGEMENT
@@ -833,7 +832,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
 
     /// @dev Returns the parameters of the Credit Account required to calculate debt
     /// @param creditAccount Address of the Credit Account
-    function _getCreditAccountParameters(CollateralDebtData memory collateralDebtData, address creditAccount)
+    function _setDebtAndCumulativeIndex(CollateralDebtData memory collateralDebtData, address creditAccount)
         internal
         view
     {
@@ -1127,15 +1126,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     function _calcAndUpdateCancellableWithdrawalsValue(
         CollateralDebtData memory collateralDebtData,
         address creditAccount,
-        CollateralCalcTask task
+        bool isForceCancel
     ) internal view {
-        if (
-            (
-                task == CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS
-                    || task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
-            ) && _hasWithdrawals(creditAccount)
-        ) {
-            bool isForceCancel = task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS;
+        if (_hasWithdrawals(creditAccount)) {
             (address token1, uint256 amount1, address token2, uint256 amount2) =
                 IWithdrawalManager(withdrawalManager).cancellableScheduledWithdrawals(creditAccount, isForceCancel);
 

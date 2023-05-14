@@ -250,14 +250,14 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         // uint256 expectedQuotaInterestRepaid = (amountRepaid * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
 
         // (, uint256 totalDebtBefore, uint256 totalDebtBeforeFee) =
-        //     creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        //     creditManager.calcAccruedInterestAndFees(creditAccount);
 
         // creditManager.manageDebt(
         //     creditAccount, amountRepaid, tokensToEnable | UNDERLYING_TOKEN_MASK, ManageDebtAction.DECREASE_DEBT
         // );
 
         // (, uint256 totalDebtAfter, uint256 totalDebtAfterFee) =
-        //     creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        //     creditManager.calcAccruedInterestAndFees(creditAccount);
 
         // assertEq(totalDebtAfter, totalDebtBefore - expectedQuotaInterestRepaid, "Debt updated incorrectly");
 
@@ -292,7 +292,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         // uint256 amountRepaid = 35 * WAD;
 
-        // (,, uint256 totalDebtBefore) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        // (,, uint256 totalDebtBefore) = creditManager.calcAccruedInterestAndFees(creditAccount);
 
         // creditManager.manageDebt(
         //     creditAccount, amountRepaid, tokensToEnable | UNDERLYING_TOKEN_MASK, ManageDebtAction.DECREASE_DEBT
@@ -302,7 +302,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         // assertEq(cumulativeQuotaInterest, 1, "Cumulative quota interest was not updated correctly");
 
-        // (,, uint256 totalDebtAfter) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        // (,, uint256 totalDebtAfter) = creditManager.calcAccruedInterestAndFees(creditAccount);
 
         // assertEq(totalDebtAfter, totalDebtBefore - amountRepaid, "Debt updated incorrectly");
     }
@@ -362,7 +362,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         // uint256 borrowedAmountWithInterest,
         // bool convertWETH
 
-        // (, uint256 borrowedAmountWithInterest,) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        // (, uint256 borrowedAmountWithInterest,) = creditManager.calcAccruedInterestAndFees(creditAccount);
 
         // creditManager.closeCreditAccount(
         //     creditAccount,
@@ -525,7 +525,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         //             * creditConfig.lt(Tokens.WETH)
         //     ) / WAD;
 
-        // (,, uint256 borrowedAmountWithInterestAndFees) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        // (,, uint256 borrowedAmountWithInterestAndFees) = creditManager.calcAccruedInterestAndFees(creditAccount);
 
         // uint256 debtUSD = (borrowedAmountWithInterestAndFees * minHealthFactor * tokenTestSuite.prices(Tokens.DAI))
         //     / PERCENTAGE_FACTOR / WAD;
@@ -588,8 +588,8 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         creditManager.fullCollateralCheck(creditAccount, enableTokenMask, collateralHints, 10000);
     }
 
-    /// @dev [CMQ-10]: calcCreditAccountAccruedInterest correctly counts quota interest
-    function test_CMQ_10_calcCreditAccountAccruedInterest_correctly_includes_quota_interest(
+    /// @dev [CMQ-10]: calcAccruedInterestAndFees correctly counts quota interest
+    function test_CMQ_10_calcAccruedInterestAndFees_correctly_includes_quota_interest(
         uint96 quotaLink,
         uint96 quotaUsdt
     ) public {
@@ -625,7 +625,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         // vm.warp(block.timestamp + 60 * 60 * 24 * 365);
 
-        // (,, uint256 totalDebt) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        // (,, uint256 totalDebt) = creditManager.calcAccruedInterestAndFees(creditAccount);
 
         // uint256 expectedTotalDebt = (borrowedAmount * cumulativeIndexAtClose) / cumulativeIndexLastUpdate;
         // expectedTotalDebt += (quotaLink * 1000 + quotaUsdt * 500) / PERCENTAGE_FACTOR;

@@ -225,7 +225,7 @@ contract CreditLogicTest is TestHelper {
         // (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow, address creditAccount) =
         //     cms.openCreditAccount((uint256(type(uint128).max) * 14) / 10);
 
-        // (,, uint256 totalDebt) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        // (,, uint256 totalDebt) = creditManager.calcAccruedInterestAndFees(creditAccount);
 
         // uint256 expectedInterestAndFees;
         // uint256 expectedBorrowAmount;
@@ -243,11 +243,11 @@ contract CreditLogicTest is TestHelper {
         // assertEq(newBorrowedAmount, expectedBorrowAmount, "Incorrect returned newBorrowedAmount");
 
         // if (amount >= totalDebt - borrowedAmount) {
-        //     (,, uint256 newTotalDebt) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        //     (,, uint256 newTotalDebt) = creditManager.calcAccruedInterestAndFees(creditAccount);
 
         //     assertEq(newTotalDebt, newBorrowedAmount, "Incorrect new interest");
         // } else {
-        //     (,, uint256 newTotalDebt) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        //     (,, uint256 newTotalDebt) = creditManager.calcAccruedInterestAndFees(creditAccount);
 
         //     assertLt(
         //         (RAY * (newTotalDebt - newBorrowedAmount)) / expectedInterestAndFees - RAY,

@@ -29,22 +29,22 @@ contract CreditManagerV3Harness is CreditManagerV3 {
     //         _calcFullCollateral(creditAccount, enabledTokensMask, minHealthFactor, collateralHints, _priceOracle, lazy);
     // }
 
-    // function calcQuotedCollateral(address creditAccount, uint256 enabledTokensMask, address _priceOracle)
+    // function calcQuotedTokensCollateral(address creditAccount, uint256 enabledTokensMask, address _priceOracle)
     //     external
     //     view
     //     returns (uint256 totalValueUSD, uint256 twvUSD, uint256 quotaInterest)
     // {
-    //     return _calcQuotedCollateral(creditAccount, enabledTokensMask, _priceOracle);
+    //     return _calcQuotedTokensCollateral(creditAccount, enabledTokensMask, _priceOracle);
     // }
 
-    // function calcNotQuotedCollateral(
+    // function calcNonQuotedTokensCollateral(
     //     address creditAccount,
     //     uint256 enabledTokensMask,
     //     uint256 enoughCollateralUSD,
     //     uint256[] memory collateralHints,
     //     address _priceOracle
     // ) external view returns (uint256 tokensToDisable, uint256 totalValueUSD, uint256 twvUSD) {
-    //     return _calcNotQuotedCollateral(
+    //     return _calcNonQuotedTokensCollateral(
     //         creditAccount, enabledTokensMask, enoughCollateralUSD, collateralHints, _priceOracle
     //     );
     // }
@@ -91,12 +91,12 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         return _collateralTokensByMask(tokenMask, calcLT);
     }
 
-    // function calcCreditAccountAccruedInterest(address creditAccount, uint256 quotaInterest)
+    // function calcAccruedInterestAndFees(address creditAccount, uint256 quotaInterest)
     //     external
     //     view
     //     returns (uint256 debt, uint256 accruedInterest, uint256 accruedFees)
     // {
-    //     return _calcCreditAccountAccruedInterest(creditAccount, quotaInterest);
+    //     return _calcAccruedInterestAndFees(creditAccount, quotaInterest);
     // }
 
     // function getCreditAccountParameters(address creditAccount)

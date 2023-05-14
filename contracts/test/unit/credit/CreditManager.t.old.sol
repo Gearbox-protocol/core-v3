@@ -1093,7 +1093,7 @@ contract OldCreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         // (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow, address creditAccount) =
         //     cms.openCreditAccount((uint256(type(uint128).max) * 14) / 10);
 
-        // (,, uint256 totalDebt) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        // (,, uint256 totalDebt) = creditManager.calcAccruedInterestAndFees(creditAccount);
 
         // uint256 expectedInterestAndFees;
         // uint256 expectedBorrowAmount;
@@ -1111,11 +1111,11 @@ contract OldCreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         // assertEq(newBorrowedAmount, expectedBorrowAmount, "Incorrect returned newBorrowedAmount");
 
         // if (amount >= totalDebt - borrowedAmount) {
-        //     (,, uint256 newTotalDebt) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        //     (,, uint256 newTotalDebt) = creditManager.calcAccruedInterestAndFees(creditAccount);
 
         //     assertEq(newTotalDebt, newBorrowedAmount, "Incorrect new interest");
         // } else {
-        //     (,, uint256 newTotalDebt) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        //     (,, uint256 newTotalDebt) = creditManager.calcAccruedInterestAndFees(creditAccount);
 
         //     assertLt(
         //         (RAY * (newTotalDebt - newBorrowedAmount)) / expectedInterestAndFees - RAY,
@@ -1502,7 +1502,7 @@ contract OldCreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         //             * creditConfig.lt(Tokens.WETH)
         //     ) / WAD;
 
-        // (,, uint256 borrowedAmountWithInterestAndFees) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        // (,, uint256 borrowedAmountWithInterestAndFees) = creditManager.calcAccruedInterestAndFees(creditAccount);
 
         // uint256 debtUSD = borrowedAmountWithInterestAndFees * tokenTestSuite.prices(Tokens.DAI) * minHealthFactor / WAD;
 
@@ -1703,8 +1703,8 @@ contract OldCreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
     // CALC CREDIT ACCOUNT ACCRUED INTEREST
     //
 
-    /// @dev [CM-49]: calcCreditAccountAccruedInterest computes correctly
-    function test_CM_49_calcCreditAccountAccruedInterest_computes_correctly(uint128 amount) public {
+    /// @dev [CM-49]: calcAccruedInterestAndFees computes correctly
+    function test_CM_49_calcAccruedInterestAndFees_computes_correctly(uint128 amount) public {
         // tokenTestSuite.mint(Tokens.DAI, address(poolMock), amount);
         // (,,, address creditAccount) = cms.openCreditAccount(amount);
 
@@ -1722,7 +1722,7 @@ contract OldCreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         //     ((expectedBorrowedAmountWithInterest - expectedBorrowedAmount) * feeInterest) / PERCENTAGE_FACTOR;
 
         // (uint256 borrowedAmount, uint256 borrowedAmountWithInterest, uint256 borrowedAmountWithInterestAndFees) =
-        //     creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        //     creditManager.calcAccruedInterestAndFees(creditAccount);
 
         // assertEq(borrowedAmount, expectedBorrowedAmount, "Incorrect borrowed amount");
         // assertEq(
