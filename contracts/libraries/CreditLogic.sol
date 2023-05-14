@@ -158,10 +158,7 @@ library CreditLogic {
     /// MANAGE DEBT
 
     /// @dev Calculates the new cumulative index when debt is updated
-    /// @param debt Current debt principal
     /// @param delta Absolute value of total debt amount change
-    /// @param cumulativeIndexNow Current cumulative index of the pool
-    /// @param cumulativeIndexOpen Last updated cumulative index recorded for the corresponding debt position
     /// @notice Handles two potential cases:
     ///         * Debt principal is increased by delta - in this case, the principal is changed
     ///           but the interest / fees have to stay the same
@@ -169,7 +166,7 @@ library CreditLogic {
     ///           but the interest changes. The delta is assumed to have fee repayment excluded.
     ///         The debt decrease case where delta > interest + fees is trivial and should be handled outside
     ///         this function.
-    function calcIncrease(uint256 debt, uint256 delta, uint256 cumulativeIndexNow, uint256 cumulativeIndexOpen)
+    function calcIncrease(CollateralDebtData memory collateralDebtData, uint256 delta)
         internal
         pure
         returns (uint256 newDebt, uint256 newCumulativeIndex)
@@ -179,21 +176,22 @@ library CreditLogic {
         // debt * (cumulativeIndexNow / cumulativeIndexOpen - 1) ==
         // == (debt + delta) * (cumulativeIndexNow / newCumulativeIndex - 1)
 
-        newDebt = debt + delta;
+        newDebt = collateralDebtData.debt + delta;
 
         newCumulativeIndex = (
-            (cumulativeIndexNow * newDebt * INDEX_PRECISION)
-                / ((INDEX_PRECISION * cumulativeIndexNow * debt) / cumulativeIndexOpen + INDEX_PRECISION * delta)
+            (collateralDebtData.cumulativeIndexNow * newDebt * INDEX_PRECISION)
+                / (
+                    (INDEX_PRECISION * collateralDebtData.cumulativeIndexNow * collateralDebtData.debt)
+                        / collateralDebtData.cumulativeIndexLastUpdate + INDEX_PRECISION * delta
+                )
         );
     }
 
-    function calcDescrease(
-        CollateralDebtData memory collateralDebtData,
-        uint256 amount,
-        uint16 feeInterest,
-        uint256 cumulativeIndexNow,
-        uint256 cumulativeIndexLastUpdate
-    ) internal pure returns (uint256 newDebt, uint256 newCumulativeIndex, uint256 amountToRepay, uint256 profit) {
+    function calcDescrease(CollateralDebtData memory collateralDebtData, uint256 amount, uint16 feeInterest)
+        internal
+        pure
+        returns (uint256 newDebt, uint256 newCumulativeIndex, uint256 amountToRepay, uint256 profit)
+    {
         amountToRepay = amount;
 
         uint256 quotaInterestAccrued = collateralDebtData.cumulativeQuotaInterest;
@@ -214,14 +212,14 @@ library CreditLogic {
                 collateralDebtData.cumulativeQuotaInterest = quotaInterestAccrued - amountToPool + 1; // F: [CMQ-4]
 
                 newDebt = collateralDebtData.debt;
-                newCumulativeIndex = cumulativeIndexLastUpdate;
+                newCumulativeIndex = collateralDebtData.cumulativeIndexLastUpdate;
             }
         }
 
         if (amountToRepay > 0) {
             // Computes the interest accrued thus far
-            uint256 interestAccrued =
-                (collateralDebtData.debt * newCumulativeIndex) / cumulativeIndexLastUpdate - collateralDebtData.debt; // F:[CM-21]
+            uint256 interestAccrued = (collateralDebtData.debt * newCumulativeIndex)
+                / collateralDebtData.cumulativeIndexLastUpdate - collateralDebtData.debt; // F:[CM-21]
 
             // Computes profit, taken as a percentage of the interest rate
             uint256 profitFromInterest = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR; // F:[CM-21]
@@ -238,7 +236,7 @@ library CreditLogic {
                 // Since interest is fully repaid, the Credit Account's cumulativeIndexLastUpdate
                 // is set to the current cumulative index - which means interest starts accruing
                 // on the new principal from zero
-                newCumulativeIndex = cumulativeIndexNow; // F:[CM-21]
+                newCumulativeIndex = collateralDebtData.cumulativeIndexNow; // F:[CM-21]
             } else {
                 // If the amount is not enough to cover interest and fees,
                 // then the sum is split between dao fees and pool profits pro-rata. Since the fee is the percentage
@@ -263,10 +261,14 @@ library CreditLogic {
                 // debt * (cumulativeIndexNow / cumulativeIndexOpen - 1) - delta ==
                 // == debt * (cumulativeIndexNow / newCumulativeIndex - 1)
 
-                newCumulativeIndex = (INDEX_PRECISION * cumulativeIndexNow * cumulativeIndexLastUpdate)
+                newCumulativeIndex = (
+                    INDEX_PRECISION * collateralDebtData.cumulativeIndexNow
+                        * collateralDebtData.cumulativeIndexLastUpdate
+                )
                     / (
-                        INDEX_PRECISION * cumulativeIndexNow
-                            - (INDEX_PRECISION * amountToPool * cumulativeIndexLastUpdate) / collateralDebtData.debt
+                        INDEX_PRECISION * collateralDebtData.cumulativeIndexNow
+                            - (INDEX_PRECISION * amountToPool * collateralDebtData.cumulativeIndexLastUpdate)
+                                / collateralDebtData.debt
                     );
             }
         }

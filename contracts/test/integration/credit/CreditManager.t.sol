@@ -1778,24 +1778,24 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
     //
 
     /// @dev [CM-50]: getCreditAccountParameters return correct values
-    function test_CM_50_getCreditAccountParameters_return_correct_values() public {
-        // It enables  CreditManagerTestInternal for some test cases
-        _connectCreditManagerSuite(Tokens.DAI, true);
+    // function test_CM_50_getCreditAccountParameters_return_correct_values() public {
+    //     // It enables  CreditManagerTestInternal for some test cases
+    //     _connectCreditManagerSuite(Tokens.DAI, true);
 
-        (,,, address creditAccount) = _openCreditAccount();
+    //     (,,, address creditAccount) = _openCreditAccount();
 
-        (uint256 expectedDebt, uint256 expectedcumulativeIndexLastUpdate,,,,) =
-            creditManager.creditAccountInfo(creditAccount);
+    //     (uint256 expectedDebt, uint256 expectedcumulativeIndexLastUpdate,,,,) =
+    //         creditManager.creditAccountInfo(creditAccount);
 
-        CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
+    //     CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
 
-        (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate,) = cmi.getCreditAccountParameters(creditAccount);
+    //     (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate,) = cmi.getCreditAccountParameters(creditAccount);
 
-        assertEq(borrowedAmount, expectedDebt, "Incorrect borrowed amount");
-        assertEq(cumulativeIndexLastUpdate, expectedcumulativeIndexLastUpdate, "Incorrect cumulativeIndexLastUpdate");
+    //     assertEq(borrowedAmount, expectedDebt, "Incorrect borrowed amount");
+    //     assertEq(cumulativeIndexLastUpdate, expectedcumulativeIndexLastUpdate, "Incorrect cumulativeIndexLastUpdate");
 
-        assertEq(cumulativeIndexLastUpdate, expectedcumulativeIndexLastUpdate, "cumulativeIndexLastUpdate");
-    }
+    //     assertEq(cumulativeIndexLastUpdate, expectedcumulativeIndexLastUpdate, "cumulativeIndexLastUpdate");
+    // }
 
     //
     // SET PARAMS

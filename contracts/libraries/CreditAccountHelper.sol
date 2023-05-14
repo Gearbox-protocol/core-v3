@@ -8,6 +8,10 @@ import {IERC20Helper} from "./IERC20Helper.sol";
 
 import {ICreditAccount} from "../interfaces/ICreditAccount.sol";
 import {AllowanceFailedException} from "../interfaces/IExceptions.sol";
+
+import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
+import {IWithdrawalManager} from "../interfaces/IWithdrawalManager.sol";
+
 /// @title CreditAccount Helper library
 
 library CreditAccountHelper {

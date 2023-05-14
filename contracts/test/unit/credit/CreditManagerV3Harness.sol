@@ -99,13 +99,13 @@ contract CreditManagerV3Harness is CreditManagerV3 {
     //     return _calcCreditAccountAccruedInterest(creditAccount, quotaInterest);
     // }
 
-    function getCreditAccountParameters(address creditAccount)
-        external
-        view
-        returns (uint256 debt, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow)
-    {
-        return _getCreditAccountParameters(creditAccount);
-    }
+    // function getCreditAccountParameters(address creditAccount)
+    //     external
+    //     view
+    //     returns (uint256 debt, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow)
+    // {
+    //     return _getCreditAccountParameters(creditAccount);
+    // }
 
     function hasWithdrawals(address creditAccount) external view returns (bool) {
         return _hasWithdrawals(creditAccount);

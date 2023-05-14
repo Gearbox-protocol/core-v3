@@ -66,13 +66,13 @@ contract CreditManagerTestInternal is CreditManagerV3 {
     //     _disableToken(creditAccount, token);
     // }
 
-    function getCreditAccountParameters(address creditAccount)
-        external
-        view
-        returns (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow)
-    {
-        return _getCreditAccountParameters(creditAccount);
-    }
+    // function getCreditAccountParameters(address creditAccount)
+    //     external
+    //     view
+    //     returns (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow)
+    // {
+    //     return _getCreditAccountParameters(creditAccount);
+    // }
 
     function collateralTokensInternal() external view returns (address[] memory collateralTokensAddr) {
         uint256 len = collateralTokensCount;
