@@ -49,7 +49,7 @@ uint256 constant fee = 6000;
 
 /// @title pool
 /// @notice Business logic for borrowing liquidity pools
-contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Events {
+contract Pool4626UnitTest is TestHelper, BalanceHelper, IPool4626Events, IERC4626Events {
     using Math for uint256;
 
     PoolServiceTestSuite psts;
@@ -124,7 +124,7 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
     }
 
     function _borrowToUtilisation(uint16 utilisation) internal {
-        cmMock.lendCreditAccount(pool.expectedLiquidity() / 2, DUMB_ADDRESS);
+        cmMock.lendCreditAccount(pool.expectedLiquidity() * utilisation / PERCENTAGE_FACTOR, DUMB_ADDRESS);
 
         assertEq(pool.borrowRate(), irm.calcBorrowRate(PERCENTAGE_FACTOR, utilisation, false));
     }
@@ -163,8 +163,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
     // TESTS
     //
 
-    // [P4-1]: getDieselRate_RAY=RAY, withdrawFee=0 and expectedLiquidityLimit as expected at start
-    function test_P4_01_start_parameters_correct() public {
+    // U:[P4-1]: getDieselRate_RAY=RAY, withdrawFee=0 and expectedLiquidityLimit as expected at start
+    function test_U_P4_01_start_parameters_correct() public {
         assertEq(pool.name(), "diesel DAI", "Symbol incorrectly set up");
         assertEq(pool.symbol(), "dDAI", "Symbol incorrectly set up");
         assertEq(address(pool.addressProvider()), address(psts.addressProvider()), "Incorrect address provider");
@@ -189,13 +189,16 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         assertEq(pool.totalBorrowedLimit(), type(uint256).max);
     }
 
-    // [P4-2]: constructor reverts for zero addresses
-    function test_P4_02_constructor_reverts_for_zero_addresses() public {
+    // U:[P4-2]: constructor reverts for zero addresses
+    function test_U_P4_02_constructor_reverts_for_zero_addresses() public {
+        address irmodel = address(psts.linearIRModel());
+        address ap = address(psts.addressProvider());
+
         vm.expectRevert(ZeroAddressException.selector);
         new Pool4626({
             _addressProvider: address(0),
             _underlyingToken: underlying,
-            _interestRateModel: address(psts.linearIRModel()),
+            _interestRateModel: irmodel,
             _expectedLiquidityLimit: type(uint128).max,
             _supportsQuotas: false
         });
@@ -205,7 +208,7 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
 
         vm.expectRevert(ZeroAddressException.selector);
         new Pool4626({
-              _addressProvider:address(psts.addressProvider()),
+              _addressProvider: ap,
             _underlyingToken: underlying,
             _interestRateModel: address(0),
             _expectedLiquidityLimit: type(uint128).max,
@@ -217,16 +220,16 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
 
         vm.expectRevert(ZeroAddressException.selector);
         new Pool4626({
-            _addressProvider: address(psts.addressProvider()),
+            _addressProvider: ap,
             _underlyingToken: address(0),
-            _interestRateModel: address(psts.linearIRModel()),
+            _interestRateModel: irmodel,
             _expectedLiquidityLimit: type(uint128).max,
             _supportsQuotas: false
         });
     }
 
-    // [P4-3]: constructor emits events
-    function test_P4_03_constructor_emits_events() public {
+    // U:[P4-3]: constructor emits events
+    function test_U_P4_03_constructor_emits_events() public {
         uint256 limit = 15890;
 
         vm.expectEmit(true, false, false, false);
@@ -247,8 +250,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         });
     }
 
-    // [P4-4]: addLiquidity, removeLiquidity, lendCreditAccount, repayCreditAccount reverts if contract is paused
-    function test_P4_04_cannot_be_used_while_paused() public {
+    // U:[P4-4]: addLiquidity, removeLiquidity, lendCreditAccount, repayCreditAccount reverts if contract is paused
+    function test_U_P4_04_cannot_be_used_while_paused() public {
         vm.startPrank(CONFIGURATOR);
         acl.addPausableAdmin(CONFIGURATOR);
         pool.pause();
@@ -297,8 +300,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         uint256 expectedLiquidityAfter;
     }
 
-    // [P4-5]: deposit adds liquidity correctly
-    function test_P4_05_deposit_adds_liquidity_correctly() public {
+    // U:[P4-5]: deposit adds liquidity correctly
+    function test_U_P4_05_deposit_adds_liquidity_correctly() public {
         // adds liqudity to mint initial diesel tokens to change 1:1 rate
 
         DepositTestCase[2] memory cases = [
@@ -420,8 +423,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         uint256 expectedLiquidityAfter;
     }
 
-    // [P4-6]: deposit adds liquidity correctly
-    function test_P4_06_mint_adds_liquidity_correctly() public {
+    // U:[P4-6]: deposit adds liquidity correctly
+    function test_U_P4_06_mint_adds_liquidity_correctly() public {
         MintTestCase[2] memory cases = [
             MintTestCase({
                 name: "Normal token",
@@ -519,8 +522,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         }
     }
 
-    // [P4-7]: deposit and mint if assets more than limit
-    function test_P4_07_deposit_and_mint_if_assets_more_than_limit() public {
+    // U:[P4-7]: deposit and mint if assets more than limit
+    function test_U_P4_07_deposit_and_mint_if_assets_more_than_limit() public {
         for (uint256 j; j < 2; ++j) {
             for (uint256 i; i < 2; ++i) {
                 bool feeToken = i == 1;
@@ -577,8 +580,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         uint256 expectedTreasury;
     }
 
-    // [P4-8]: deposit and mint if assets more than limit
-    function test_P4_08_withdraw_works_as_expected() public {
+    // U:[P4-8]: deposit and mint if assets more than limit
+    function test_U_P4_08_withdraw_works_as_expected() public {
         WithdrawTestCase[4] memory cases = [
             WithdrawTestCase({
                 name: "Normal token with 0 withdraw fee",
@@ -775,8 +778,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         uint256 expectedTreasury;
     }
 
-    // [P4-9]: deposit and mint if assets more than limit
-    function test_P4_09_redeem_works_as_expected() public {
+    // U:[P4-9]: deposit and mint if assets more than limit
+    function test_U_P4_09_redeem_works_as_expected() public {
         RedeemTestCase[4] memory cases = [
             RedeemTestCase({
                 name: "Normal token with 0 withdraw fee",
@@ -952,8 +955,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         }
     }
 
-    // [P4-10]: burn works as expected
-    function test_P4_10_burn_works_as_expected() public {
+    // U:[P4-10]: burn works as expected
+    function test_U_P4_10_burn_works_as_expected() public {
         _setUpTestCase(Tokens.DAI, 0, 50_00, addLiquidity, 2 * RAY, 0, false);
 
         vm.prank(USER);
@@ -983,8 +986,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
 
     ///
     /// LEND CREDIT ACCOUNT
-    // [P4-11]: lendCreditAccount works as expected
-    function test_P4_11_lendCreditAccount_works_as_expected() public {
+    // U:[P4-11]: lendCreditAccount works as expected
+    function test_U_P4_11_lendCreditAccount_works_as_expected() public {
         _setUpTestCase(Tokens.DAI, 0, 0, addLiquidity, 2 * RAY, 0, false);
 
         address creditAccount = DUMB_ADDRESS;
@@ -1019,8 +1022,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         assertEq(pool.creditManagerBorrowed(address(cmMock)), borrowAmount, "Incorrect CM limit");
     }
 
-    // [P4-12]: lendCreditAccount reverts if it breaches limits
-    function test_P4_12_lendCreditAccount_reverts_if_breach_limits() public {
+    // U:[P4-12]: lendCreditAccount reverts if it breaches limits
+    function test_U_P4_12_lendCreditAccount_reverts_if_breach_limits() public {
         address creditAccount = DUMB_ADDRESS;
 
         _setUpTestCase(Tokens.DAI, 0, 0, addLiquidity, 2 * RAY, 0, false);
@@ -1049,8 +1052,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
     // REPAY
     //
 
-    // [P4-13]: repayCreditAccount reverts for incorrect credit managers
-    function test_P4_13_repayCreditAccount_reverts_for_incorrect_credit_managers() public {
+    // U:[P4-13]: repayCreditAccount reverts for incorrect credit managers
+    function test_U_P4_13_repayCreditAccount_reverts_for_incorrect_credit_managers() public {
         _setUpTestCase(Tokens.DAI, 0, 0, addLiquidity, 2 * RAY, 0, false);
 
         /// Case for unknown CM
@@ -1086,8 +1089,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         uint256 uncoveredLoss;
     }
 
-    // [P4-14]: repayCreditAccount works as expected
-    function test_P4_14_repayCreditAccount_works_as_expected() public {
+    // U:[P4-14]: repayCreditAccount works as expected
+    function test_U_P4_14_repayCreditAccount_works_as_expected() public {
         address creditAccount = DUMB_ADDRESS;
         RepayTestCase[5] memory cases = [
             RepayTestCase({
@@ -1297,8 +1300,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
     ///  CALC LINEAR CUMULATIVE
     ///
 
-    // [P4-15]: calcLinearCumulative_RAY computes correctly
-    function test_P4_15_calcLinearCumulative_RAY_correct() public {
+    // U:[P4-15]: calcLinearCumulative_RAY computes correctly
+    function test_U_P4_15_calcLinearCumulative_RAY_correct() public {
         _setUpTestCase(Tokens.DAI, 0, 50_00, addLiquidity, 2 * RAY, 0, false);
 
         uint256 timeWarp = 180 days;
@@ -1312,8 +1315,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         assertEq(pool.calcLinearCumulative_RAY(), expectedLinearRate, "Index value was not updated correctly");
     }
 
-    // [P4-16]: updateBorrowRate correctly updates parameters
-    function test_P4_16_updateBorrowRate_correct() public {
+    // U:[P4-16]: updateBorrowRate correctly updates parameters
+    function test_U_P4_16_updateBorrowRate_correct() public {
         uint256 quotaInterestPerYear = addLiquidity / 4;
         for (uint256 i; i < 2; ++i) {
             bool supportQuotas = i == 1;
@@ -1386,8 +1389,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         }
     }
 
-    // [P4-17]: updateBorrowRate correctly updates parameters
-    function test_P4_17_changeQuotaRevenue_and_updateQuotaRevenue_updates_quotaRevenue_correctly() public {
+    // U:[P4-17]: updateBorrowRate correctly updates parameters
+    function test_U_P4_17_changeQuotaRevenue_and_updateQuotaRevenue_updates_quotaRevenue_correctly() public {
         _setUp(Tokens.DAI, true);
         address POOL_QUOTA_KEEPER = address(pqk);
 
@@ -1433,8 +1436,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         assertEq(pool.expectedLiquidityLU(), (qu1 + qu2) / PERCENTAGE_FACTOR, "#3: Incorrect expectedLiquidityLU");
     }
 
-    // [P4-18]: connectCreditManager, forbidCreditManagerToBorrow, newInterestRateModel, setExpecetedLiquidityLimit reverts if called with non-configurator
-    function test_P4_18_admin_functions_revert_on_non_admin() public {
+    // U:[P4-18]: connectCreditManager, forbidCreditManagerToBorrow, newInterestRateModel, setExpecetedLiquidityLimit reverts if called with non-configurator
+    function test_U_P4_18_admin_functions_revert_on_non_admin() public {
         vm.startPrank(USER);
 
         vm.expectRevert(CallerNotControllerException.selector);
@@ -1458,16 +1461,16 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         vm.stopPrank();
     }
 
-    // [P4-19]: setCreditManagerLimit reverts if not in register
-    function test_P4_19_connectCreditManager_reverts_if_not_in_register() public {
+    // U:[P4-19]: setCreditManagerLimit reverts if not in register
+    function test_U_P4_19_connectCreditManager_reverts_if_not_in_register() public {
         vm.expectRevert(RegisteredCreditManagerOnlyException.selector);
 
         vm.prank(CONFIGURATOR);
         pool.setCreditManagerLimit(DUMB_ADDRESS, 1);
     }
 
-    // [P4-20]: setCreditManagerLimit reverts if another pool is setup in CreditManagerV3
-    function test_P4_20_connectCreditManager_fails_on_incompatible_CM() public {
+    // U:[P4-20]: setCreditManagerLimit reverts if another pool is setup in CreditManagerV3
+    function test_U_P4_20_connectCreditManager_fails_on_incompatible_CM() public {
         cmMock.changePoolService(DUMB_ADDRESS);
 
         vm.expectRevert(IncompatibleCreditManagerException.selector);
@@ -1476,8 +1479,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         pool.setCreditManagerLimit(address(cmMock), 1);
     }
 
-    // [P4-21]: setCreditManagerLimit connects manager first time, then update limit only
-    function test_P4_21_setCreditManagerLimit_connects_manager_first_time_then_update_limit_only() public {
+    // U:[P4-21]: setCreditManagerLimit connects manager first time, then update limit only
+    function test_U_P4_21_setCreditManagerLimit_connects_manager_first_time_then_update_limit_only() public {
         address[] memory cms = pool.creditManagers();
         assertEq(cms.length, 0, "Credit manager is already connected!");
 
@@ -1513,8 +1516,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         assertEq(pool.creditManagerLimit(address(cmMock)), type(uint256).max, "#3: Incorrect CM limit");
     }
 
-    // [P4-22]: updateInterestRateModel changes interest rate model & emit event
-    function test_P4_22_updateInterestRateModel_works_correctly_and_emits_event() public {
+    // U:[P4-22]: updateInterestRateModel changes interest rate model & emit event
+    function test_U_P4_22_updateInterestRateModel_works_correctly_and_emits_event() public {
         _setUpTestCase(Tokens.DAI, 0, 50_00, addLiquidity, 2 * RAY, 0, false);
 
         uint256 expectedLiquidity = pool.expectedLiquidity();
@@ -1548,9 +1551,9 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         );
     }
 
-    // [P4-23]: setPoolQuotaManager updates quotaRevenue and emits event
+    // U:[P4-23]: setPoolQuotaManager updates quotaRevenue and emits event
 
-    function test_P4_23_setPoolQuotaManager_updates_quotaRevenue_and_emits_event() public {
+    function test_U_P4_23_setPoolQuotaManager_updates_quotaRevenue_and_emits_event() public {
         pool = new Pool4626({
             _addressProvider: address(psts.addressProvider()),
             _underlyingToken: tokenTestSuite.addressOf(Tokens.DAI),
@@ -1596,8 +1599,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         assertEq(pool.expectedLiquidityLU(), qu / PERCENTAGE_FACTOR, "Incorrect expectedLiquidityLU");
     }
 
-    // [P4-24]: setExpectedLiquidityLimit() sets limit & emits event
-    function test_P4_24_setExpectedLiquidityLimit_correct_and_emits_event() public {
+    // U:[P4-24]: setExpectedLiquidityLimit() sets limit & emits event
+    function test_U_P4_24_setExpectedLiquidityLimit_correct_and_emits_event() public {
         vm.expectEmit(false, false, false, true);
         emit SetExpectedLiquidityLimit(10005);
 
@@ -1607,8 +1610,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         assertEq(pool.expectedLiquidityLimit(), 10005, "expectedLiquidityLimit not set correctly");
     }
 
-    // [P4-25]: setTotalBorrowedLimit sets limit & emits event
-    function test_P4_25_setTotalBorrowedLimit_correct_and_emits_event() public {
+    // U:[P4-25]: setTotalBorrowedLimit sets limit & emits event
+    function test_U_P4_25_setTotalBorrowedLimit_correct_and_emits_event() public {
         vm.expectEmit(false, false, false, true);
         emit SetTotalBorrowedLimit(10005);
 
@@ -1618,8 +1621,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         assertEq(pool.totalBorrowedLimit(), 10005, "totalBorrowedLimit not set correctly");
     }
 
-    // [P4-26]: setWithdrawFee works correctly
-    function test_P4_26_setWithdrawFee_works_correctly() public {
+    // U:[P4-26]: setWithdrawFee works correctly
+    function test_U_P4_26_setWithdrawFee_works_correctly() public {
         vm.expectRevert(IncorrectParameterException.selector);
 
         vm.prank(CONFIGURATOR);
@@ -1648,8 +1651,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         uint256 expectedCanBorrow;
     }
 
-    // [P4-27]: creditManagerCanBorrow computes availabel borrow correctly
-    function test_P4_27_creditManagerCanBorrow_computes_available_borrow_amount_correctly() public {
+    // U:[P4-27]: creditManagerCanBorrow computes availabel borrow correctly
+    function test_U_P4_27_creditManagerCanBorrow_computes_available_borrow_amount_correctly() public {
         uint256 initialLiquidity = 10 * addLiquidity;
         CreditManagerBorrowTestCase[5] memory cases = [
             CreditManagerBorrowTestCase({
@@ -1771,8 +1774,8 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
         uint256 expectedSupplyRate;
     }
 
-    // [P4-28]: supplyRate computes rates correctly
-    function test_P4_28_supplyRate_computes_rates_correctly() public {
+    // U:[P4-28]: supplyRate computes rates correctly
+    function test_U_P4_28_supplyRate_computes_rates_correctly() public {
         SupplyRateTestCase[5] memory cases = [
             SupplyRateTestCase({
                 name: "normal pool with zero debt and zero supply",
@@ -1872,7 +1875,7 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
     }
 
     // 10000000000000000
-    // // [P4-23]: fromDiesel / toDiesel works correctly
+    // // U:[P4-23]: fromDiesel / toDiesel works correctly
     // function test_PX_23_diesel_conversion_is_correct() public {
     //     _connectAndSetLimit();
 
@@ -1898,7 +1901,7 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
     //     );
     // }
 
-    // // [P4-28]: expectedLiquidity() computes correctly
+    // // U:[P4-28]: expectedLiquidity() computes correctly
     // function test_PX_28_expectedLiquidity_correct() public {
     //     _connectAndSetLimit();
 
@@ -1920,7 +1923,7 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
     //     assertEq(pool.expectedLiquidity(), expectedLiquidity, "Index value was not updated correctly");
     // }
 
-    // // [P4-35]: updateInterestRateModel reverts on zero address
+    // // U:[P4-35]: updateInterestRateModel reverts on zero address
     // function test_PX_35_updateInterestRateModel_reverts_on_zero_address() public {
     //     vm.expectRevert(ZeroAddressException.selector);
     //     vm.prank(CONFIGURATOR);

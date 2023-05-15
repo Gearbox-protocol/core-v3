@@ -28,11 +28,12 @@ import {IPool4626} from "../interfaces/IPool4626.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
 
-import {RAY, MAX_WITHDRAW_FEE} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {RAY, MAX_WITHDRAW_FEE, SECONDS_PER_YEAR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
+import "forge-std/console.sol";
 
 struct CreditManagerDebt {
     uint128 totalBorrowed;
@@ -419,7 +420,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
     /// @dev Computes interest rate accrued from last update (LU)
     function _calcBaseInterestAccrued() internal view returns (uint256) {
         // TODO: add comment why we divide by RAY
-        return uint256(_totalBorrowed * _borrowRate).calcLinearGrowth(timestampLU) / RAY;
+        return (uint256(_totalBorrowed) * _borrowRate).calcLinearGrowth(timestampLU) / RAY;
     }
 
     function _calcOutstandingQuotaRevenue() internal view returns (uint128) {
@@ -732,7 +733,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
         uint256 available =
             IInterestRateModel(interestRateModel).availableToBorrow(expectedLiquidity(), availableLiquidity()); // F:[P4-27]
 
-        canBorrow = Math.max(canBorrow, available); // F:[P4-27]
+        canBorrow = Math.min(canBorrow, available); // F:[P4-27]
 
         CreditManagerDebt memory cmDebt = creditManagersDebt[_creditManager];
         if (cmDebt.totalBorrowed >= cmDebt.limit) {
@@ -741,7 +742,7 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
 
         unchecked {
             uint256 cmLimit = cmDebt.limit - cmDebt.totalBorrowed;
-            canBorrow = Math.max(canBorrow, cmLimit); // F:[P4-27]
+            canBorrow = Math.min(canBorrow, cmLimit); // F:[P4-27]
         }
     }
 
