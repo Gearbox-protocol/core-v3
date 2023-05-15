@@ -684,10 +684,12 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
             pool, abi.encodeWithSelector(IPool4626.creditManagerBorrowed.selector, creditManager), abi.encode(0)
         );
 
+        uint40 expirationDate = uint40(block.timestamp + 2 days);
+
         Policy memory policy = Policy({
             enabled: false,
             flags: 1,
-            exactValue: block.timestamp + 5,
+            exactValue: expirationDate,
             minValue: 0,
             maxValue: 0,
             referencePoint: 0,
@@ -702,15 +704,15 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         vm.prank(CONFIGURATOR);
         controllerTimelock.setPolicy(POLICY_CODE, policy);
 
-        uint40 expirationDate = uint40(block.timestamp + 1 days);
-
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
-            abi.encode(creditConfigurator, "setExpirationDate(uint40)", abi.encode(block.timestamp + 5), expirationDate)
+            abi.encode(
+                creditConfigurator, "setExpirationDate(uint40)", abi.encode(expirationDate), block.timestamp + 1 days
+            )
         );
 
         vm.prank(admin);
-        controllerTimelock.setExpirationDate(creditManager, uint40(block.timestamp + 5));
+        controllerTimelock.setExpirationDate(creditManager, expirationDate);
 
         vm.expectRevert(CallerNotAdminException.selector);
 
@@ -729,20 +731,17 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
 
         vm.warp(block.timestamp - 10 days);
 
-        // vm.mockCallRevert(
-        //     creditConfigurator,
-        //     abi.encodeWithSelector(
-        //         ICreditConfigurator.setExpirationDate.selector,
-        //         expirationDate
-        //     ),
-        //     abi.encode("error")
-        // );
+        vm.mockCallRevert(
+            creditConfigurator,
+            abi.encodeWithSelector(ICreditConfigurator.setExpirationDate.selector, expirationDate),
+            abi.encode("error")
+        );
 
-        // vm.expectRevert(TxExecutionRevertedException.selector);
-        // vm.prank(admin);
-        // controllerTimelock.executeTransaction(txHash);
+        vm.expectRevert(TxExecutionRevertedException.selector);
+        vm.prank(admin);
+        controllerTimelock.executeTransaction(txHash);
 
-        // vm.clearMockedCalls();
+        vm.clearMockedCalls();
 
         vm.expectEmit(true, false, false, false);
         emit ExecuteTransaction(txHash);

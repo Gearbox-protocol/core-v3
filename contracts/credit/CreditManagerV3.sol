@@ -448,7 +448,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
                 uint256 profit;
 
                 (newDebt, newCumulativeIndex, amountToRepay, profit) =
-                    collateralDebtData.calcDescrease({amount: amount, feeInterest: feeInterest});
+                    collateralDebtData.calcDecrease({amount: amount, feeInterest: feeInterest});
 
                 IPoolBase(pool).repayCreditAccount(amountToRepay, profit, 0); // F:[CM-21]
             }

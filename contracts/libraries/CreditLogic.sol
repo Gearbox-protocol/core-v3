@@ -188,7 +188,7 @@ library CreditLogic {
         );
     }
 
-    function calcDescrease(CollateralDebtData memory collateralDebtData, uint256 amount, uint16 feeInterest)
+    function calcDecrease(CollateralDebtData memory collateralDebtData, uint256 amount, uint16 feeInterest)
         internal
         pure
         returns (uint256 newDebt, uint256 newCumulativeIndex, uint256 amountToRepay, uint256 profit)
@@ -219,7 +219,7 @@ library CreditLogic {
 
         if (amountToRepay > 0) {
             // Computes the interest accrued thus far
-            uint256 interestAccrued = (collateralDebtData.debt * newCumulativeIndex)
+            uint256 interestAccrued = (collateralDebtData.debt * collateralDebtData.cumulativeIndexNow)
                 / collateralDebtData.cumulativeIndexLastUpdate - collateralDebtData.debt; // F:[CM-21]
 
             // Computes profit, taken as a percentage of the interest rate
@@ -272,10 +272,10 @@ library CreditLogic {
                                 / collateralDebtData.debt
                     );
             }
+        } else {
+            newDebt = collateralDebtData.debt;
+            newCumulativeIndex = collateralDebtData.cumulativeIndexLastUpdate;
         }
-
-        // TODO: delete after tests or write Invaraiant test
-        require(collateralDebtData.debt - newDebt == amountToRepay, "Ooops, something was wring");
     }
 
     // COLLATERAL & DEBT COMPUTATION
