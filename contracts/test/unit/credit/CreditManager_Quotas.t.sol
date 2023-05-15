@@ -360,7 +360,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         // uint256 enabledTokensMask,
         // uint256 skipTokensMask,
         // uint256 borrowedAmountWithInterest,
-        // bool convertWETH
+        // bool convertToETH
 
         // (, uint256 borrowedAmountWithInterest,) = creditManager.calcAccruedInterestAndFees(creditAccount);
 

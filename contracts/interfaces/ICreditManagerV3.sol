@@ -108,7 +108,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     ///    + if it is larger than amountToPool, then the pool is paid fully from funds on the Credit Account
     ///    + else tries to transfer the shortfall from the payer - either the borrower during closure, or liquidator during liquidation
     /// - Send assets to the "to" address, as long as they are not included into skipTokenMask
-    /// - If convertWETH is true, the function converts WETH into ETH before sending
+    /// - If convertToETH is true, the function converts WETH into ETH before sending
     /// - Returns the Credit Account back to factory
     ///
     /// @param creditAccount Credit account address
@@ -116,7 +116,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @param payer Address which would be charged if credit account has not enough funds to cover amountToPool
     /// @param to Address to which the leftover funds will be sent
     /// @param skipTokensMask Tokenmask contains 1 for tokens which needed to be skipped for sending
-    /// @param convertWETH If true converts WETH to ETH
+    /// @param convertToETH If true converts WETH to ETH
     function closeCreditAccount(
         address creditAccount,
         ClosureAction closureAction,
@@ -124,7 +124,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
         address payer,
         address to,
         uint256 skipTokensMask,
-        bool convertWETH
+        bool convertToETH
     ) external returns (uint256 remainingFunds, uint256 loss);
 
     /// @dev Manages debt size for borrower:
