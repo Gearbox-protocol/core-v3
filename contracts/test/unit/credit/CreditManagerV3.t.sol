@@ -19,6 +19,7 @@ import {
     ICreditManagerV3Events,
     ClosureAction,
     CollateralTokenData,
+    CollateralDebtData,
     ManageDebtAction
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
@@ -157,10 +158,18 @@ contract CreditManagerV3UnitTest is Test, ICreditManagerV3Events, BalanceHelper 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.openCreditAccount(200000, address(this), false);
 
+        CollateralDebtData memory collateralDebtData;
+
         vm.expectRevert(CallerNotCreditFacadeException.selector);
-        creditManager.closeCreditAccount(
-            DUMB_ADDRESS, ClosureAction.LIQUIDATE_ACCOUNT, 0, DUMB_ADDRESS, DUMB_ADDRESS, type(uint256).max, false
-        );
+        creditManager.closeCreditAccount({
+            creditAccount: DUMB_ADDRESS,
+            closureAction: ClosureAction.LIQUIDATE_ACCOUNT,
+            collateralDebtData: collateralDebtData,
+            payer: DUMB_ADDRESS,
+            to: DUMB_ADDRESS,
+            skipTokensMask: 0,
+            convertToETH: false
+        });
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.manageDebt(DUMB_ADDRESS, 100, 0, ManageDebtAction.INCREASE_DEBT);
