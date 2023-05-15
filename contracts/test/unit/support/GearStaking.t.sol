@@ -6,8 +6,8 @@ pragma solidity ^0.8.10;
 import {GearStaking} from "../../../support/GearStaking.sol";
 import {IGearStakingEvents, MultiVote, VotingContractStatus} from "../../../interfaces/IGearStaking.sol";
 import {IVotingContract} from "../../../interfaces/IVotingContract.sol";
-
 import {CallerNotConfiguratorException} from "../../../interfaces/IExceptions.sol";
+import "../../../interfaces/IAddressProviderV3.sol";
 
 // TEST
 import "../../lib/constants.sol";
@@ -48,7 +48,8 @@ contract GearStakingTest is Test, IGearStakingEvents {
 
         gearToken = tokenTestSuite.addressOf(Tokens.WETH);
 
-        addressProvider.setGearToken(gearToken);
+        vm.prank(CONFIGURATOR);
+        addressProvider.setAddress(AP_GEAR_TOKEN, gearToken, false);
 
         gearStaking = new GearStaking(address(addressProvider), block.timestamp + 1);
 

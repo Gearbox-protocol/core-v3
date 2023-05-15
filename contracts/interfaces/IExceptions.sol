@@ -15,12 +15,17 @@ error NotImplementedException();
 error IncorrectParameterException();
 
 error RegisteredCreditManagerOnlyException();
+
 error RegisteredPoolOnlyException();
 
 error WethPoolsOnlyException();
+
 error ReceiveIsNotAllowedException();
 
 error IncompatibleCreditManagerException();
+
+/// @dev Reverts if address isn't found in address provider
+error AddressNotFoundException();
 
 /// @dev Thrown on attempting to set an EOA as an important contract in the system
 error AddressIsNotContractException(address);

@@ -3,14 +3,22 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {BitMask} from "./BitMask.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Helper} from "./IERC20Helper.sol";
 import {CollateralDebtData, CollateralTokenData} from "../interfaces/ICreditManagerV3.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 import {SECONDS_PER_YEAR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 import "../interfaces/IExceptions.sol";
+
+import {BitMask} from "./BitMask.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
+
+/// INTERFACES
+import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
+import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
+import {IWithdrawalManager} from "../interfaces/IWithdrawalManager.sol";
 
 uint256 constant INDEX_PRECISION = 10 ** 9;
 
@@ -151,10 +159,7 @@ library CreditLogic {
     /// MANAGE DEBT
 
     /// @dev Calculates the new cumulative index when debt is updated
-    /// @param debt Current debt principal
     /// @param delta Absolute value of total debt amount change
-    /// @param cumulativeIndexNow Current cumulative index of the pool
-    /// @param cumulativeIndexOpen Last updated cumulative index recorded for the corresponding debt position
     /// @notice Handles two potential cases:
     ///         * Debt principal is increased by delta - in this case, the principal is changed
     ///           but the interest / fees have to stay the same
@@ -162,7 +167,7 @@ library CreditLogic {
     ///           but the interest changes. The delta is assumed to have fee repayment excluded.
     ///         The debt decrease case where delta > interest + fees is trivial and should be handled outside
     ///         this function.
-    function calcIncrease(uint256 debt, uint256 delta, uint256 cumulativeIndexNow, uint256 cumulativeIndexOpen)
+    function calcIncrease(CollateralDebtData memory collateralDebtData, uint256 delta)
         internal
         pure
         returns (uint256 newDebt, uint256 newCumulativeIndex)
@@ -172,33 +177,25 @@ library CreditLogic {
         // debt * (cumulativeIndexNow / cumulativeIndexOpen - 1) ==
         // == (debt + delta) * (cumulativeIndexNow / newCumulativeIndex - 1)
 
-        newDebt = debt + delta;
+        newDebt = collateralDebtData.debt + delta;
 
         newCumulativeIndex = (
-            (cumulativeIndexNow * newDebt * INDEX_PRECISION)
-                / ((INDEX_PRECISION * cumulativeIndexNow * debt) / cumulativeIndexOpen + INDEX_PRECISION * delta)
+            (collateralDebtData.cumulativeIndexNow * newDebt * INDEX_PRECISION)
+                / (
+                    (INDEX_PRECISION * collateralDebtData.cumulativeIndexNow * collateralDebtData.debt)
+                        / collateralDebtData.cumulativeIndexLastUpdate + INDEX_PRECISION * delta
+                )
         );
     }
 
-    function calcDescrease(
-        uint256 amount,
-        uint256 quotaInterestAccrued,
-        uint16 feeInterest,
-        uint256 debt,
-        uint256 cumulativeIndexNow,
-        uint256 cumulativeIndexLastUpdate
-    )
+    function calcDecrease(CollateralDebtData memory collateralDebtData, uint256 amount, uint16 feeInterest)
         internal
         pure
-        returns (
-            uint256 newDebt,
-            uint256 newCumulativeIndex,
-            uint256 amountToRepay,
-            uint256 profit,
-            uint256 cumulativeQuotaInterest
-        )
+        returns (uint256 newDebt, uint256 newCumulativeIndex, uint256 amountToRepay, uint256 profit)
     {
         amountToRepay = amount;
+
+        uint256 quotaInterestAccrued = collateralDebtData.cumulativeQuotaInterest;
 
         if (quotaInterestAccrued > 1) {
             uint256 quotaProfit = (quotaInterestAccrued * feeInterest) / PERCENTAGE_FACTOR;
@@ -206,23 +203,24 @@ library CreditLogic {
             if (amountToRepay >= quotaInterestAccrued + quotaProfit) {
                 amountToRepay -= quotaInterestAccrued + quotaProfit; // F: [CMQ-5]
                 profit += quotaProfit; // F: [CMQ-5]
-                cumulativeQuotaInterest = 1; // F: [CMQ-5]
+                collateralDebtData.cumulativeQuotaInterest = 1; // F: [CMQ-5]
             } else {
                 uint256 amountToPool = (amountToRepay * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
 
                 profit += amountToRepay - amountToPool; // F: [CMQ-4]
                 amountToRepay = 0; // F: [CMQ-4]
 
-                cumulativeQuotaInterest = quotaInterestAccrued - amountToPool + 1; // F: [CMQ-4]
+                collateralDebtData.cumulativeQuotaInterest = quotaInterestAccrued - amountToPool + 1; // F: [CMQ-4]
 
-                newDebt = debt;
-                newCumulativeIndex = cumulativeIndexLastUpdate;
+                newDebt = collateralDebtData.debt;
+                newCumulativeIndex = collateralDebtData.cumulativeIndexLastUpdate;
             }
         }
 
         if (amountToRepay > 0) {
             // Computes the interest accrued thus far
-            uint256 interestAccrued = (debt * newCumulativeIndex) / cumulativeIndexLastUpdate - debt; // F:[CM-21]
+            uint256 interestAccrued = (collateralDebtData.debt * collateralDebtData.cumulativeIndexNow)
+                / collateralDebtData.cumulativeIndexLastUpdate - collateralDebtData.debt; // F:[CM-21]
 
             // Computes profit, taken as a percentage of the interest rate
             uint256 profitFromInterest = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR; // F:[CM-21]
@@ -232,14 +230,14 @@ library CreditLogic {
                 // paid first, and the remainder is used to pay the principal
 
                 amountToRepay -= interestAccrued + profitFromInterest;
-                newDebt = debt - amountToRepay; //  + interestAccrued + profit - amount;
+                newDebt = collateralDebtData.debt - amountToRepay; //  + interestAccrued + profit - amount;
 
                 profit += profitFromInterest;
 
                 // Since interest is fully repaid, the Credit Account's cumulativeIndexLastUpdate
                 // is set to the current cumulative index - which means interest starts accruing
                 // on the new principal from zero
-                newCumulativeIndex = cumulativeIndexNow; // F:[CM-21]
+                newCumulativeIndex = collateralDebtData.cumulativeIndexNow; // F:[CM-21]
             } else {
                 // If the amount is not enough to cover interest and fees,
                 // then the sum is split between dao fees and pool profits pro-rata. Since the fee is the percentage
@@ -253,7 +251,7 @@ library CreditLogic {
 
                 // Since interest and fees are paid out first, the principal
                 // remains unchanged
-                newDebt = debt;
+                newDebt = collateralDebtData.debt;
 
                 // Since the interest was only repaid partially, we need to recompute the
                 // cumulativeIndexLastUpdate, so that "debt * (indexNow / indexAtOpenNew - 1)"
@@ -264,17 +262,228 @@ library CreditLogic {
                 // debt * (cumulativeIndexNow / cumulativeIndexOpen - 1) - delta ==
                 // == debt * (cumulativeIndexNow / newCumulativeIndex - 1)
 
-                newCumulativeIndex = (INDEX_PRECISION * cumulativeIndexNow * cumulativeIndexLastUpdate)
+                newCumulativeIndex = (
+                    INDEX_PRECISION * collateralDebtData.cumulativeIndexNow
+                        * collateralDebtData.cumulativeIndexLastUpdate
+                )
                     / (
-                        INDEX_PRECISION * cumulativeIndexNow
-                            - (INDEX_PRECISION * amountToPool * cumulativeIndexLastUpdate) / debt
+                        INDEX_PRECISION * collateralDebtData.cumulativeIndexNow
+                            - (INDEX_PRECISION * amountToPool * collateralDebtData.cumulativeIndexLastUpdate)
+                                / collateralDebtData.debt
                     );
             }
+        } else {
+            newDebt = collateralDebtData.debt;
+            newCumulativeIndex = collateralDebtData.cumulativeIndexLastUpdate;
         }
-
-        // TODO: delete after tests or write Invaraiant test
-        require(debt - newDebt == amountToRepay, "Ooops, something was wring");
     }
+
+    // COLLATERAL & DEBT COMPUTATION
+
+    /// @dev IMPLEMENTATION: calcAccruedInterestAndFees
+    // / @param creditAccount Address of the Credit Account
+    // / @param quotaInterest Total quota premiums accrued, computed elsewhere
+    // / @return debt The debt principal
+    // / @return accruedInterest Accrued interest
+    // / @return accruedFees Accrued interest and protocol fees
+    function calcAccruedInterestAndFees(CollateralDebtData memory collateralDebtData, uint16 feeInterest)
+        internal
+        pure
+    {
+        // Interest is never stored and is always computed dynamically
+        // as the difference between the current cumulative index of the pool
+        // and the cumulative index recorded in the Credit Account
+        collateralDebtData.accruedInterest = calcAccruedInterest(
+            collateralDebtData.debt, collateralDebtData.cumulativeIndexLastUpdate, collateralDebtData.cumulativeIndexNow
+        ) + collateralDebtData.cumulativeQuotaInterest; // F:[CM-49]
+
+        // Fees are computed as a percentage of interest
+        collateralDebtData.accruedFees = collateralDebtData.accruedInterest * feeInterest / PERCENTAGE_FACTOR; // F: [CM-49]
+    }
+
+    function calcTotalDebtUSD(CollateralDebtData memory collateralDebtData, address underlying) internal view {
+        collateralDebtData.totalDebtUSD = convertToUSD(
+            collateralDebtData._priceOracle,
+            calcTotalDebt(collateralDebtData), // F: [CM-42]
+            underlying
+        );
+    }
+
+    function calcHealthFactor(CollateralDebtData memory collateralDebtData) internal view {
+        collateralDebtData.hf = uint16(collateralDebtData.twvUSD * PERCENTAGE_FACTOR / collateralDebtData.totalDebtUSD);
+    }
+
+    function calcTotalValueInUnderlying(CollateralDebtData memory collateralDebtData, address underlying)
+        internal
+        view
+    {
+        collateralDebtData.totalValue =
+            IPriceOracleV2(collateralDebtData._priceOracle).convertFromUSD(collateralDebtData.totalValueUSD, underlying); // F:[FA-41]
+    }
+
+    function calcQuotedTokensCollateral(
+        CollateralDebtData memory collateralDebtData,
+        address creditAccount,
+        uint256 quotedTokenMask,
+        uint256 maxAllowedEnabledTokenLength,
+        address underlying,
+        function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn,
+        bool countCollateral
+    ) internal view {
+        uint256 j;
+        quotedTokenMask &= collateralDebtData.enabledTokensMask;
+
+        uint256 underlyingPriceRAY =
+            countCollateral ? convertToUSD(collateralDebtData._priceOracle, RAY, underlying) : 0;
+
+        collateralDebtData.quotedTokens = new address[](maxAllowedEnabledTokenLength);
+
+        unchecked {
+            for (uint256 tokenMask = 2; tokenMask <= quotedTokenMask; tokenMask <<= 1) {
+                if (quotedTokenMask & tokenMask != 0) {
+                    (address token, uint16 liquidationThreshold) = collateralTokensByMaskFn(tokenMask, countCollateral);
+
+                    uint256 quoted = getQuotaAndUpdateOutstandingInterest({
+                        collateralDebtData: collateralDebtData,
+                        creditAccount: creditAccount,
+                        token: token
+                    });
+
+                    if (countCollateral) {
+                        calcOneTokenCollateral({
+                            collateralDebtData: collateralDebtData,
+                            creditAccount: creditAccount,
+                            token: token,
+                            liquidationThreshold: liquidationThreshold,
+                            quotaUSD: quoted * underlyingPriceRAY / RAY
+                        });
+                    }
+
+                    collateralDebtData.quotedTokens[j] = token;
+
+                    ++j;
+
+                    if (j >= maxAllowedEnabledTokenLength) {
+                        revert TooManyEnabledTokensException();
+                    }
+                }
+            }
+        }
+    }
+
+    function getQuotaAndUpdateOutstandingInterest(
+        CollateralDebtData memory collateralDebtData,
+        address creditAccount,
+        address token
+    ) internal view returns (uint256 quoted) {
+        uint256 outstandingInterest;
+        (quoted, outstandingInterest) =
+            IPoolQuotaKeeper(collateralDebtData._poolQuotaKeeper).getQuotaAndInterest(creditAccount, token);
+        collateralDebtData.cumulativeQuotaInterest += outstandingInterest; // F:[CMQ-8]
+    }
+
+    function calcNonQuotedTokensCollateral(
+        CollateralDebtData memory collateralDebtData,
+        address creditAccount,
+        bool stopIfReachLimit,
+        uint16 minHealthFactor,
+        uint256[] memory collateralHints,
+        uint256 quotedTokenMask,
+        function (uint256) view returns (address, uint16) collateralTokensByMaskFn
+    ) internal view {
+        uint256 twvLimitUSD;
+        if (stopIfReachLimit) {
+            if (collateralDebtData.twvUSD * PERCENTAGE_FACTOR >= collateralDebtData.totalDebtUSD * minHealthFactor) {
+                return;
+            }
+            twvLimitUSD = collateralDebtData.totalDebtUSD * minHealthFactor / PERCENTAGE_FACTOR;
+        } else {
+            twvLimitUSD = type(uint256).max;
+        }
+        uint256 len = collateralHints.length;
+
+        uint256 checkedTokenMask = collateralDebtData.enabledTokensMask.disable(quotedTokenMask);
+
+        unchecked {
+            // TODO: add test that we check all values and it's always reachable
+            for (uint256 i; checkedTokenMask != 0; ++i) {
+                // TODO: add check for super long collateralnhints and for double masks
+                uint256 tokenMask = (i < len) ? collateralHints[i] : 1 << (i - len); // F: [CM-68]
+
+                // CASE enabledTokensMask & tokenMask == 0 F:[CM-38]
+                if (checkedTokenMask & tokenMask != 0) {
+                    bool nonZeroBalance;
+                    {
+                        (address token, uint16 liquidationThreshold) = collateralTokensByMaskFn(tokenMask);
+                        nonZeroBalance = calcOneTokenCollateral(
+                            collateralDebtData, creditAccount, token, liquidationThreshold, type(uint256).max
+                        );
+                    }
+                    // Collateral calculations are only done if there is a non-zero balance
+                    if (nonZeroBalance) {
+                        // Full collateral check evaluates a Credit Account's health factor lazily;
+                        // Once the TWV computed thus far exceeds the debt, the check is considered
+                        // successful, and the function returns without evaluating any further collateral
+                        if (collateralDebtData.twvUSD >= twvLimitUSD) {
+                            break;
+                        }
+                        // Zero-balance tokens are disabled; this is done by flipping the
+                        // bit in enabledTokensMask, which is then written into storage at the
+                        // very end, to avoid redundant storage writes
+                    } else {
+                        collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.disable(tokenMask);
+                    }
+                }
+
+                checkedTokenMask &= (~tokenMask);
+            }
+        }
+    }
+
+    function calcOneTokenCollateral(
+        CollateralDebtData memory collateralDebtData,
+        address creditAccount,
+        address token,
+        uint16 liquidationThreshold,
+        uint256 quotaUSD
+    ) internal view returns (bool nonZeroBalance) {
+        uint256 balance = IERC20Helper.balanceOf(token, creditAccount);
+
+        // Collateral calculations are only done if there is a non-zero balance
+        if (balance > 1) {
+            uint256 balanceUSD = convertToUSD(collateralDebtData._priceOracle, balance, token);
+            collateralDebtData.totalValueUSD += balanceUSD;
+            collateralDebtData.twvUSD += Math.min(balanceUSD, quotaUSD) * liquidationThreshold / PERCENTAGE_FACTOR;
+            return true;
+        }
+    }
+
+    function addCancellableWithdrawalsValue(
+        CollateralDebtData memory collateralDebtData,
+        address creditAccount,
+        bool isForceCancel,
+        address withdrawalManager
+    ) internal view {
+        (address token1, uint256 amount1, address token2, uint256 amount2) =
+            IWithdrawalManager(withdrawalManager).cancellableScheduledWithdrawals(creditAccount, isForceCancel);
+
+        if (amount1 != 0) {
+            collateralDebtData.totalValueUSD += convertToUSD(collateralDebtData._priceOracle, amount1, token1);
+        }
+        if (amount2 != 0) {
+            collateralDebtData.totalValueUSD += convertToUSD(collateralDebtData._priceOracle, amount2, token2);
+        }
+    }
+
+    function convertToUSD(address priceOracle, uint256 amountInToken, address token)
+        internal
+        view
+        returns (uint256 amountInUSD)
+    {
+        amountInUSD = IPriceOracleV2(priceOracle).convertToUSD(amountInToken, token);
+    }
+
+    /// BALANCES
 
     /// @param creditAccount Credit Account to compute balances for
     function storeBalances(address creditAccount, Balance[] memory desired)

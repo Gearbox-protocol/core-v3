@@ -3,6 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
+import "../../../interfaces/IAddressProviderV3.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
@@ -331,7 +332,7 @@ contract CreditConfiguratorTest is Test, ICreditManagerV3Events, ICreditConfigur
 
         // Upgrades
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.setPriceOracle();
+        creditConfigurator.setPriceOracle(0);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.setCreditFacade(DUMB_ADDRESS, false);
@@ -863,12 +864,12 @@ contract CreditConfiguratorTest is Test, ICreditManagerV3Events, ICreditConfigur
     /// @dev [CC-28]: setPriceOracle upgrades priceOracleCorrectly and doesnt change facade
     function test_CC_28_setPriceOracle_upgrades_priceOracleCorrectly_and_doesnt_change_facade() public {
         vm.startPrank(CONFIGURATOR);
-        cct.addressProvider().setPriceOracle(DUMB_ADDRESS);
+        cct.addressProvider().setAddress(AP_PRICE_ORACLE, DUMB_ADDRESS, false);
 
         vm.expectEmit(true, false, false, false);
         emit SetPriceOracle(DUMB_ADDRESS);
 
-        creditConfigurator.setPriceOracle();
+        creditConfigurator.setPriceOracle(0);
 
         assertEq(address(creditManager.priceOracle()), DUMB_ADDRESS);
         vm.stopPrank();
@@ -946,7 +947,9 @@ contract CreditConfiguratorTest is Test, ICreditManagerV3Events, ICreditConfigur
                 vm.prank(CONFIGURATOR);
                 creditConfigurator.setCreditFacade(address(cf), migrateSettings);
 
-                assertEq(address(creditManager.priceOracle()), cct.addressProvider().getPriceOracle());
+                assertEq(
+                    address(creditManager.priceOracle()), cct.addressProvider().getAddressOrRevert(AP_PRICE_ORACLE, 2)
+                );
 
                 assertEq(address(creditManager.creditFacade()), address(cf));
                 assertEq(address(creditConfigurator.creditFacade()), address(cf));

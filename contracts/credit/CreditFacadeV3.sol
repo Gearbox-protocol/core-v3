@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
+import "../interfaces/IAddressProviderV3.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 // LIBS & TRAITS
@@ -76,7 +77,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     using BitMask for uint256;
 
     /// @dev Credit Manager connected to this Credit Facade
-    ICreditManagerV3 public immutable creditManager;
+    address public immutable creditManager;
 
     /// @dev Whether the whitelisted mode is active
     bool public immutable whitelisted;
@@ -94,7 +95,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     address public immutable wethAddress;
 
     /// @dev Address of WETH Gateway
-    IWETHGateway public immutable wethGateway;
+    address public immutable wethGateway;
 
     /// @dev Address of the DegenNFT that gatekeeps account openings in whitelisted mode
     address public immutable override degenNFT;
@@ -138,7 +139,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
     /// @dev Restricts actions for users with opened credit accounts only
     modifier creditConfiguratorOnly() {
-        if (msg.sender != creditManager.creditConfigurator()) {
+        if (msg.sender != ICreditManagerV3(creditManager).creditConfigurator()) {
             revert CallerNotConfiguratorException();
         }
 
@@ -177,15 +178,17 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @param _degenNFT address of the DegenNFT or address(0) if whitelisted mode is not used
     /// @param _expirable Whether the CreditFacadeV3 can expire and implements expiration-related logic
     constructor(address _creditManager, address _degenNFT, bool _expirable)
-        ACLNonReentrantTrait(address(IPool4626(ICreditManagerV3(_creditManager).pool()).addressProvider()))
+        ACLNonReentrantTrait(ICreditManagerV3(_creditManager).addressProvider())
         nonZeroAddress(_creditManager)
     {
-        creditManager = ICreditManagerV3(_creditManager); // F:[FA-1A]
-        pool = creditManager.pool();
+        creditManager = _creditManager; // F:[FA-1A]
+        pool = ICreditManagerV3(_creditManager).pool();
         underlying = ICreditManagerV3(_creditManager).underlying(); // F:[FA-1A]
 
         wethAddress = ICreditManagerV3(_creditManager).wethAddress(); // F:[FA-1A]
-        wethGateway = IWETHGateway(ICreditManagerV3(_creditManager).wethGateway());
+        wethGateway = ICreditManagerV3(_creditManager).wethGateway();
+        botList =
+            IAddressProviderV3(ICreditManagerV3(_creditManager).addressProvider()).getAddressOrRevert(AP_BOT_LIST, 3_00);
 
         degenNFT = _degenNFT; // F:[FA-1A]
         whitelisted = _degenNFT != address(0); // F:[FA-1A]
@@ -252,7 +255,11 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         _wrapETH(); // F:[FA-3B]
 
         // Requests the Credit Manager to open a Credit Account
-        creditAccount = creditManager.openCreditAccount({debt: debt, onBehalfOf: onBehalfOf, deployNew: deployNew}); // F:[FA-8]
+        creditAccount = ICreditManagerV3(creditManager).openCreditAccount({
+            debt: debt,
+            onBehalfOf: onBehalfOf,
+            deployNew: deployNew
+        }); // F:[FA-8]
 
         // emits a new event
         emit OpenCreditAccount(creditAccount, onBehalfOf, msg.sender, debt, referralCode); // F:[FA-8]
@@ -477,7 +484,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     {
         uint256 _forbiddenTokenMask = forbiddenTokenMask;
 
-        uint256 enabledTokensMaskBefore = creditManager.enabledTokensMaskOf(creditAccount);
+        uint256 enabledTokensMaskBefore = ICreditManagerV3(creditManager).enabledTokensMaskOf(creditAccount);
 
         uint256[] memory forbiddenBalances = CreditLogic.storeForbiddenBalances({
             creditAccount: creditAccount,
@@ -516,7 +523,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         internal
         returns (FullCheckParams memory fullCheckParams)
     {
-        uint256 quotedTokenMaskInverted = ~creditManager.quotedTokenMask();
+        uint256 quotedTokenMaskInverted = ~ICreditManagerV3(creditManager).quotedTokenMask();
         // Emits event for multicall start - used in analytics to track actions within multicalls
         emit StartMultiCall(creditAccount); // F:[FA-26]
 
@@ -676,7 +683,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     // functionCall to it is strictly forbidden, even if
                     // the Configurator adds it as an adapter
 
-                    if (creditManager.adapterToContract(mcall.target) == address(0)) {
+                    if (ICreditManagerV3(creditManager).adapterToContract(mcall.target) == address(0)) {
                         revert TargetContractNotAllowedException();
                     } // F:[FA-24]
 
@@ -745,7 +752,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     }
 
     function _setExternalCallCreditAccount(address creditAccount) internal {
-        creditManager.setCreditAccountForExternalCall(creditAccount); // F:[FA-26]
+        ICreditManagerV3(creditManager).setCreditAccountForExternalCall(creditAccount); // F:[FA-26]
     }
 
     function _revertIfNoPermission(uint256 flags, uint256 permission) internal pure {
@@ -756,7 +763,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
     function _onDemandPriceUpdate(bytes calldata callData) internal {
         (address token, bytes memory data) = abi.decode(callData, (address, bytes));
-        address priceFeed = IPriceOracleV2(creditManager.priceOracle()).priceFeeds(token);
+        address priceFeed = IPriceOracleV2(ICreditManagerV3(creditManager).priceOracle()).priceFeeds(token);
         if (priceFeed == address(0)) revert PriceFeedNotExistsException();
         IPriceFeedOnDemand(priceFeed).updatePrice(data);
     }
@@ -766,12 +773,12 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
         (address token, int96 quotaChange) = abi.decode(callData, (address, int96));
-        return creditManager.updateQuota(creditAccount, token, quotaChange);
+        return ICreditManagerV3(creditManager).updateQuota(creditAccount, token, quotaChange);
     }
 
     function _revokeAdapterAllowances(address creditAccount, bytes calldata callData) internal {
         (RevocationPair[] memory revocations) = abi.decode(callData, (RevocationPair[]));
-        creditManager.revokeAdapterAllowances(creditAccount, revocations);
+        ICreditManagerV3(creditManager).revokeAdapterAllowances(creditAccount, revocations);
     }
 
     /// @dev Adds expected deltas to current balances on a Credit account and returns the result
@@ -795,7 +802,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         uint256 newDebt;
         // Requests the Credit Manager to borrow additional funds from the pool
         (newDebt, tokensToEnable, tokensToDisable) =
-            creditManager.manageDebt(creditAccount, amount, enabledTokensMask, action); // F:[FA-17]
+            ICreditManagerV3(creditManager).manageDebt(creditAccount, amount, enabledTokensMask, action); // F:[FA-17]
 
         // Checks that the new total borrowed amount is within bounds
         _revertIfOutOfDebtLimits(newDebt); // F:[FA-18B]
@@ -811,7 +818,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     function _addCollateral(address creditAccount, bytes calldata callData) internal returns (uint256 tokenMaskAfter) {
         (address token, uint256 amount) = abi.decode(callData, (address, uint256)); // F:[FA-26, 27]
         // Requests Credit Manager to transfer collateral to the Credit Account
-        tokenMaskAfter = creditManager.addCollateral(msg.sender, creditAccount, token, amount); // F:[FA-21]
+        tokenMaskAfter = ICreditManagerV3(creditManager).addCollateral(msg.sender, creditAccount, token, amount); // F:[FA-21]
 
         // Emits event
         emit AddCollateral(creditAccount, token, amount); // F:[FA-21]
@@ -822,7 +829,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         returns (uint256 tokensToDisable)
     {
         (address token, uint256 amount) = abi.decode(callData, (address, uint256));
-        tokensToDisable = creditManager.scheduleWithdrawal(creditAccount, token, amount);
+        tokensToDisable = ICreditManagerV3(creditManager).scheduleWithdrawal(creditAccount, token, amount);
     }
 
     /// @dev Transfers credit account to another user
@@ -852,7 +859,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         _eraseAllBotPermissions(creditAccount, true);
 
         // Requests the Credit Manager to transfer the account
-        creditManager.transferAccountOwnership(creditAccount, to); // F:[FA-35]
+        ICreditManagerV3(creditManager).transferAccountOwnership(creditAccount, to); // F:[FA-35]
 
         // Emits event
         emit TransferAccount(creditAccount, msg.sender, to); // F:[FA-35]
@@ -882,7 +889,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         uint72 fundingAmount,
         uint72 weeklyFundingAllowance
     ) external override whenNotPaused creditAccountOwnerOnly(creditAccount) nonReentrant {
-        uint16 flags = creditManager.flagsOf(creditAccount);
+        uint16 flags = ICreditManagerV3(creditManager).flagsOf(creditAccount);
 
         if (flags & BOT_PERMISSIONS_SET_FLAG == 0) {
             _eraseAllBotPermissions(creditAccount, false);
@@ -908,7 +915,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     }
 
     function _setFlagFor(address creditAccount, uint16 flag, bool value) internal {
-        creditManager.setFlagFor(creditAccount, flag, value);
+        ICreditManagerV3(creditManager).setFlagFor(creditAccount, flag, value);
     }
 
     /// @dev Checks that transfer is allowed
@@ -975,11 +982,11 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @dev Internal wrapper for `creditManager.getBorrowerOrRevert()`
     /// @notice The external call is wrapped to optimize contract size
     function _getBorrowerOrRevert(address borrower) internal view returns (address) {
-        return creditManager.getBorrowerOrRevert(borrower);
+        return ICreditManagerV3(creditManager).getBorrowerOrRevert(borrower);
     }
 
     function _getTokenMaskOrRevert(address token) internal view returns (uint256 mask) {
-        mask = creditManager.getTokenMaskOrRevert(token);
+        mask = ICreditManagerV3(creditManager).getTokenMaskOrRevert(token);
     }
 
     function _closeCreditAccount(
@@ -991,7 +998,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         uint256 skipTokensMask,
         bool convertWETH
     ) internal returns (uint256 remainingFunds, uint256 reportedLoss) {
-        (remainingFunds, reportedLoss) = creditManager.closeCreditAccount({
+        (remainingFunds, reportedLoss) = ICreditManagerV3(creditManager).closeCreditAccount({
             creditAccount: creditAccount,
             closureAction: closureAction,
             collateralDebtData: collateralDebtData,
@@ -1011,7 +1018,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         uint256[] memory forbiddenBalances,
         uint256 _forbiddenTokenMask
     ) internal {
-        creditManager.fullCollateralCheck(
+        ICreditManagerV3(creditManager).fullCollateralCheck(
             creditAccount,
             fullCheckParams.enabledTokensMaskAfter,
             fullCheckParams.collateralHints,
@@ -1073,22 +1080,22 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         view
         returns (CollateralDebtData memory)
     {
-        return creditManager.calcDebtAndCollateral(creditAccount, task);
+        return ICreditManagerV3(creditManager).calcDebtAndCollateral(creditAccount, task);
     }
 
     function _getTokenByMask(uint256 mask) internal view returns (address) {
-        return creditManager.getTokenByMask(mask);
+        return ICreditManagerV3(creditManager).getTokenByMask(mask);
     }
 
     function _claimWithdrawals(address creditAccount, address to, ClaimAction action)
         internal
         returns (uint256 tokensToEnable)
     {
-        tokensToEnable = creditManager.claimWithdrawals(creditAccount, to, action);
+        tokensToEnable = ICreditManagerV3(creditManager).claimWithdrawals(creditAccount, to, action);
     }
 
     function _wethWithdrawTo(address to) internal {
-        wethGateway.withdrawTo(to);
+        IWETHGateway(wethGateway).withdrawTo(to);
     }
 
     //

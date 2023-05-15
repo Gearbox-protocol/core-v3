@@ -94,7 +94,7 @@ contract CreditFacadeTestHelper is TestHelper {
         // switch to new block to be able to close account
         vm.roll(block.number + 1);
 
-        // (,, uint256 underlyingToClose) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        // (,, uint256 underlyingToClose) = creditManager.calcAccruedInterestAndFees(creditAccount);
         // uint256 underlyingBalance = cft.tokenTestSuite().balanceOf(underlying, creditAccount);
 
         // if (underlyingToClose > underlyingBalance) {

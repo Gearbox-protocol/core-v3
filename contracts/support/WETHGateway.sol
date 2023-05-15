@@ -4,13 +4,13 @@
 pragma solidity ^0.8.10;
 pragma abicoder v1;
 
+import "../interfaces/IAddressProviderV3.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
@@ -68,7 +68,7 @@ contract WETHGateway is IWETHGateway, ReentrancyGuard, ContractsRegisterTrait {
     /// @param addressProvider Address Repository for upgradable contract model
     constructor(address addressProvider) ContractsRegisterTrait(addressProvider) {
         if (addressProvider == address(0)) revert ZeroAddressException();
-        weth = AddressProvider(addressProvider).getWethToken();
+        weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, 0);
     }
 
     /// FOR POOLS V3
