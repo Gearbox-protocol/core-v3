@@ -42,6 +42,7 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 import "../../lib/constants.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 import {CreditFacadeTestHelper} from "../../helpers/CreditFacadeTestHelper.sol";
+import {GeneralMock} from "../../mocks/GeneralMock.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
@@ -2071,10 +2072,10 @@ contract CreditFacadeTest is BalanceHelper, CreditFacadeTestHelper, ICreditManag
         creditConfigurator.setBotList(address(botList));
 
         /// ????
-        address bot = address(new TargetContractMock());
+        address bot = address(new GeneralMock());
 
         vm.prank(USER);
-        botList.setBotPermissions(creditAccount, bot, type(uint192).max);
+        creditFacade.setBotPermissions(creditAccount, bot, type(uint192).max, uint72(1 ether), uint72(1 ether / 10));
 
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
 

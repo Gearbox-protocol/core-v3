@@ -176,7 +176,19 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
 
     function claimWithdrawals(address creditAccount, address to) external;
 
-    function setBotPermissions(address creditAccount, address bot, uint192 permissions) external;
+    /// @dev Sets permissions and funding parameters for a bot
+    /// @param creditAccount CA to set permissions for
+    /// @param bot Bot to set permissions for
+    /// @param permissions A bit mask of permissions
+    /// @param fundingAmount Total amount of ETH available to the bot for payments
+    /// @param weeklyFundingAllowance Amount of ETH available to the bot weekly
+    function setBotPermissions(
+        address creditAccount,
+        address bot,
+        uint192 permissions,
+        uint72 fundingAmount,
+        uint72 weeklyFundingAllowance
+    ) external;
 
     //
     // GETTERS

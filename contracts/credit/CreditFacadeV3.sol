@@ -473,10 +473,9 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         whenNotExpired
         nonReentrant
     {
-        address borrower = _getBorrowerOrRevert(creditAccount); // F:[FA-2]
-        uint256 botPermissions = IBotList(botList).botPermissions(borrower, msg.sender);
+        (uint256 botPermissions, bool forbidden) = IBotList(botList).getBotStatus(creditAccount, msg.sender);
         // Checks that the bot is approved by the borrower and is not forbidden
-        if (botPermissions == 0 || IBotList(botList).forbiddenBot(msg.sender)) {
+        if (botPermissions == 0 || forbidden) {
             revert NotApprovedBotException(); // F: [FA-58]
         }
 
@@ -888,26 +887,33 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         _claimWithdrawals(creditAccount, to, ClaimAction.CLAIM);
     }
 
-    function setBotPermissions(address creditAccount, address bot, uint192 permissions)
-        external
-        override
-        whenNotPaused
-        creditAccountOwnerOnly(creditAccount)
-        nonReentrant
-    {
+    /// @dev Sets permissions and funding parameters for a bot
+    /// @param creditAccount CA to set permissions for
+    /// @param bot Bot to set permissions for
+    /// @param permissions A bit mask of permissions
+    /// @param fundingAmount Total amount of ETH available to the bot for payments
+    /// @param weeklyFundingAllowance Amount of ETH available to the bot weekly
+    function setBotPermissions(
+        address creditAccount,
+        address bot,
+        uint192 permissions,
+        uint72 fundingAmount,
+        uint72 weeklyFundingAllowance
+    ) external override whenNotPaused creditAccountOwnerOnly(creditAccount) nonReentrant {
         uint16 flags = ICreditManagerV3(creditManager).flagsOf(creditAccount);
 
         if (flags & BOT_PERMISSIONS_SET_FLAG == 0) {
             _eraseAllBotPermissions({creditAccount: creditAccount, setFlag: false});
 
             if (permissions != 0) {
-                _setFlag(creditAccount, BOT_PERMISSIONS_SET_FLAG, true);
+                _setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, true);
             }
         }
 
-        uint256 remainingBots = IBotList(botList).setBotPermissions(creditAccount, bot, permissions);
+        uint256 remainingBots =
+            IBotList(botList).setBotPermissions(creditAccount, bot, permissions, fundingAmount, weeklyFundingAllowance);
         if (remainingBots == 0) {
-            _setFlag(creditAccount, BOT_PERMISSIONS_SET_FLAG, false);
+            _setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, false);
         }
     }
 
@@ -915,8 +921,12 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         IBotList(botList).eraseAllBotPermissions(creditAccount);
 
         if (setFlag) {
-            _setFlag(creditAccount, BOT_PERMISSIONS_SET_FLAG, false);
+            _setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, false);
         }
+    }
+
+    function _setFlagFor(address creditAccount, uint16 flag, bool value) internal {
+        ICreditManagerV3(creditManager).setFlagFor(creditAccount, flag, value);
     }
 
     /// @dev Checks that transfer is allowed
@@ -1034,10 +1044,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             forbiddenTokenMask: _forbiddenTokenMask,
             getTokenByMaskFn: _getTokenByMask
         });
-    }
-
-    function _setFlag(address creditAccount, uint16 flag, bool value) internal {
-        ICreditManagerV3(creditManager).setFlagFor(creditAccount, flag, value);
     }
 
     /// @dev Returns whether the Credit Facade is expired
