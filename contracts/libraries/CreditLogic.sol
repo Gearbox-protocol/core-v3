@@ -462,28 +462,17 @@ library CreditLogic {
         CollateralDebtData memory collateralDebtData,
         address creditAccount,
         bool isForceCancel,
-        address withdrawalManager,
-        function (address) view returns (uint256) getTokenMaskFn
+        address withdrawalManager
     ) internal view {
         (address token1, uint256 amount1, address token2, uint256 amount2) =
             IWithdrawalManager(withdrawalManager).cancellableScheduledWithdrawals(creditAccount, isForceCancel);
 
         if (amount1 != 0) {
-            addTotalValueAndEnableToken(collateralDebtData, token1, amount1, getTokenMaskFn);
+            collateralDebtData.totalValueUSD += convertToUSD(collateralDebtData._priceOracle, amount1, token1);
         }
         if (amount2 != 0) {
-            addTotalValueAndEnableToken(collateralDebtData, token2, amount2, getTokenMaskFn);
+            collateralDebtData.totalValueUSD += convertToUSD(collateralDebtData._priceOracle, amount2, token2);
         }
-    }
-
-    function addTotalValueAndEnableToken(
-        CollateralDebtData memory collateralDebtData,
-        address token,
-        uint256 amount,
-        function (address) view returns (uint256) getTokenMaskFn
-    ) internal view {
-        collateralDebtData.totalValueUSD += convertToUSD(collateralDebtData._priceOracle, amount, token);
-        collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(getTokenMaskFn(token));
     }
 
     function convertToUSD(address priceOracle, uint256 amountInToken, address token)

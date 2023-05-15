@@ -613,8 +613,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
                 collateralDebtData.addCancellableWithdrawalsValue({
                     creditAccount: creditAccount,
                     isForceCancel: task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS,
-                    withdrawalManager: withdrawalManager,
-                    getTokenMaskFn: getTokenMaskOrRevert
+                    withdrawalManager: withdrawalManager
                 });
             }
 
