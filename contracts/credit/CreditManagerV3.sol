@@ -175,21 +175,21 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     /// @dev Restricts calls to Credit Facade only
     modifier creditFacadeOnly() {
-        _revertIfCallerNotCreditFacade();
+        _checkCreditFacade();
         _;
     }
 
-    function _revertIfCallerNotCreditFacade() private {
+    function _checkCreditFacade() private {
         if (msg.sender != creditFacade) revert CallerNotCreditFacadeException();
     }
 
     /// @dev Restricts calls to Credit Configurator only
     modifier creditConfiguratorOnly() {
-        _revertIfCallerNotCreditConfigurator();
+        _checkCreditConfigurator();
         _;
     }
 
-    function _revertIfCallerNotCreditConfigurator() private {
+    function _checkCreditConfigurator() private {
         if (msg.sender != creditConfigurator) {
             revert CallerNotConfiguratorException();
         }

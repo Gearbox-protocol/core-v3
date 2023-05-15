@@ -139,35 +139,24 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
     /// @dev Restricts actions for users with opened credit accounts only
     modifier creditConfiguratorOnly() {
-        _revertIfCallerNotCreditConfigurator();
+        _checkCreditConfigurator();
         _;
     }
 
-    function _revertIfCallerNotCreditConfigurator() private {
+    function _checkCreditConfigurator() private {
         if (msg.sender != ICreditManagerV3(creditManager).creditConfigurator()) {
             revert CallerNotConfiguratorException();
         }
     }
 
     modifier creditAccountOwnerOnly(address creditAccount) {
-        _revertIfCallerNotCreditAccountOwner(creditAccount);
+        _checkCreditAccountOwner(creditAccount);
         _;
     }
 
-    function _revertIfCallerNotCreditAccountOwner(address creditAccount) private {
+    function _checkCreditAccountOwner(address creditAccount) private {
         if (msg.sender != _getBorrowerOrRevert(creditAccount)) {
             revert CallerNotCreditAccountOwnerException();
-        }
-    }
-
-    modifier nonZeroCallsOnly(MultiCall[] calldata calls) {
-        _revertIfZeroCallsLength(calls);
-        _;
-    }
-
-    function _revertIfZeroCallsLength(MultiCall[] calldata calls) private {
-        if (calls.length == 0) {
-            revert ZeroCallsException();
         }
     }
 
@@ -244,7 +233,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         whenNotExpired
         nonReentrant
         nonZeroAddress(onBehalfOf)
-        nonZeroCallsOnly(calls)
         returns (address creditAccount)
     {
         // Checks that the borrowed amount is within the borrowing debtLimits
@@ -499,7 +487,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
     function _multicallFullCollateralCheck(address creditAccount, MultiCall[] calldata calls, uint256 permissions)
         internal
-        nonZeroCallsOnly(calls)
     {
         uint256 _forbiddenTokenMask = forbiddenTokenMask;
 

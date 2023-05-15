@@ -20,6 +20,18 @@ abstract contract ContractsRegisterTrait is SanityCheckTrait {
     // ACL contract to check rights
     ContractsRegister immutable _cr;
 
+    /// @dev Checks that credit manager is registered
+    modifier registeredCreditManagerOnly(address addr) {
+        _checkRegisteredCreditManagerOnly(addr);
+        _;
+    }
+
+    /// @dev Checks that credit manager is registered
+    modifier registeredPoolOnly(address addr) {
+        _checkRegisteredPoolOnly(addr);
+        _;
+    }
+
     constructor(address addressProvider) nonZeroAddress(addressProvider) {
         _cr = ContractsRegister(IAddressProviderV3(addressProvider).getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
     }
@@ -32,17 +44,11 @@ abstract contract ContractsRegisterTrait is SanityCheckTrait {
         return _cr.isCreditManager(_creditManager);
     }
 
-    /// @dev Checks that credit manager is registered
-    modifier registeredCreditManagerOnly(address addr) {
-        if (!isRegisteredCreditManager(addr)) revert RegisteredCreditManagerOnlyException(); // T:[WG-3]
-
-        _;
+    function _checkRegisteredCreditManagerOnly(address addr) internal view {
+        if (!isRegisteredCreditManager(addr)) revert RegisteredCreditManagerOnlyException();
     }
 
-    /// @dev Checks that credit manager is registered
-    modifier registeredPoolOnly(address addr) {
+    function _checkRegisteredPoolOnly(address addr) internal view {
         if (!isRegisteredPool(addr)) revert RegisteredPoolOnlyException();
-
-        _;
     }
 }
