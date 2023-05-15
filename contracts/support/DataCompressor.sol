@@ -312,7 +312,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
             result.degenNFT = creditFacade.degenNFT();
             result.isIncreaseDebtForbidden = creditFacade.maxDebtPerBlockMultiplier() == 0; // V2 only: true if increasing debt is forbidden
             result.forbiddenTokenMask = creditFacade.forbiddenTokenMask(); // V2 only: mask which forbids some particular tokens
-            result.maxEnabledTokensLength = creditManagerV2.maxAllowedEnabledTokenLength(); // V2 only: a limit on enabled tokens imposed for security
+            result.maxEnabledTokensLength = creditManagerV2.maxEnabledTokens(); // V2 only: a limit on enabled tokens imposed for security
             {
                 (
                     result.feeInterest,

@@ -13,7 +13,7 @@ contract CreditManagerMock is CreditManagerMockEvents {
     address public creditFacade;
     address public addressProvider;
 
-    address public externalCallCreditAccountOrRevert;
+    address public getExternalCallCreditAccountOrRevert;
     mapping(address => uint256) public getTokenMaskOrRevert;
 
     bytes _result;
@@ -34,7 +34,7 @@ contract CreditManagerMock is CreditManagerMockEvents {
     }
 
     function setExternalCallCreditAccount(address creditAccount) external {
-        externalCallCreditAccountOrRevert = creditAccount;
+        getExternalCallCreditAccountOrRevert = creditAccount;
     }
 
     function setMask(address token, uint256 mask) external {

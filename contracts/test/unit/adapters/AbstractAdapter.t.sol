@@ -50,7 +50,7 @@ contract AbstractAdapterUnitTest is TestHelper, CreditManagerMockEvents {
     function test_U_AA_02_creditAccount_works_correctly(address creditAccount) public {
         creditManager.setExternalCallCreditAccount(creditAccount);
 
-        vm.expectCall(address(creditManager), abi.encodeCall(creditManager.externalCallCreditAccountOrRevert, ()));
+        vm.expectCall(address(creditManager), abi.encodeCall(creditManager.getExternalCallCreditAccountOrRevert, ()));
         assertEq(abstractAdapter.creditAccount(), creditAccount, "Incorrect external call credit account");
     }
 

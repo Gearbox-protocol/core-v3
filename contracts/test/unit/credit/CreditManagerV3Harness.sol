@@ -67,10 +67,10 @@ contract CreditManagerV3Harness is CreditManagerV3 {
     //     return _getQuotedTokens(enabledTokensMask, withLTs);
     // }
 
-    function transferAssetsTo(address creditAccount, address to, bool convertWETH, uint256 enabledTokensMask)
+    function transferAssetsTo(address creditAccount, address to, bool convertToETH, uint256 enabledTokensMask)
         external
     {
-        _transferAssetsTo(creditAccount, to, convertWETH, enabledTokensMask);
+        _transferAssetsTo(creditAccount, to, convertToETH, enabledTokensMask);
     }
 
     function safeTokenTransfer(address creditAccount, address token, address to, uint256 amount, bool convertToETH)

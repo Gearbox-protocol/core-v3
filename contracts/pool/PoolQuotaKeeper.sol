@@ -101,7 +101,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         creditManagerOnly // F:[PQK-4]
         returns (uint256 caQuotaInterestChange, bool enableToken, bool disableToken)
     {
-        int128 quotaRevenueChange;
+        int128 quotaRevenueChange; // TODO: better naming(?)
 
         AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
         TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
@@ -149,7 +149,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
             }
         }
 
-        if (quotaRevenueChange > 0) {
+        if (quotaRevenueChange != 0) {
             IPool4626(pool).changeQuotaRevenue(quotaRevenueChange);
         }
     }
