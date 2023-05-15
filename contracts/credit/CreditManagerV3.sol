@@ -453,8 +453,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
                 uint256 amountToRepay;
                 uint256 profit;
 
-                (newDebt, newCumulativeIndex, amountToRepay, profit, cumulativeQuotaInterest) = CreditLogic
-                    .calcDescrease({
+                (newDebt, newCumulativeIndex, amountToRepay, profit, cumulativeQuotaInterest) = CreditLogic.calcDecrease({
                     amount: amount,
                     quotaInterestAccrued: cumulativeQuotaInterest,
                     feeInterest: feeInterest,

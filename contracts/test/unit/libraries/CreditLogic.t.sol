@@ -7,13 +7,145 @@ import {IncorrectParameterException} from "../../../interfaces/IExceptions.sol";
 import {CreditLogic} from "../../../libraries/CreditLogic.sol";
 import {ClosureAction} from "../../../interfaces/ICreditManagerV3.sol";
 import {TestHelper} from "../../lib/helper.sol";
+
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {RAY, WAD} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+
 import "forge-std/console.sol";
 
 /// @title BitMask logic test
 /// @notice [BM]: Unit tests for bit mask library
 contract CreditLogicTest is TestHelper {
+    function _calcDiff(uint256 a, uint256 b) internal pure returns (uint256 diff) {
+        diff = a > b ? a - b : b - a;
+    }
+
     /// @notice U:[CL-1]: `calcIndex` reverts for zero value
     function test_CL_01_calcIndex_reverts_for_zero_value() public {}
+
+    /// @notice U:[CL-2]: `calcIncrease` outputs new interest that is old interest with at most a small error
+    function test_CL_02_calcIncrease_preserves_interest(
+        uint256 debt,
+        uint256 indexNow,
+        uint256 indexAtOpen,
+        uint256 delta
+    ) public {
+        vm.assume(debt > 100);
+        vm.assume(debt < 2 ** 128 - 1);
+        vm.assume(delta < 2 ** 128 - 1);
+        vm.assume(debt + delta <= 2 ** 128 - 1);
+
+        indexNow = indexNow < RAY ? indexNow + RAY : indexNow;
+        indexAtOpen = indexAtOpen < RAY ? indexAtOpen + RAY : indexAtOpen;
+
+        vm.assume(indexNow <= 100 * RAY);
+        vm.assume(indexNow >= indexAtOpen);
+        vm.assume(indexNow - indexAtOpen < 10 * RAY);
+
+        uint256 interest = uint256((debt * indexNow) / indexAtOpen - debt);
+
+        vm.assume(interest > 1);
+
+        (uint256 newDebt, uint256 newIndex) = CreditLogic.calcIncrease(debt, delta, indexNow, indexAtOpen);
+
+        assertEq(newDebt, debt + delta, "Debt principal not updated correctly");
+
+        uint256 newInterestError = (newDebt * indexNow) / newIndex - newDebt - ((debt * indexNow) / indexAtOpen - debt);
+
+        uint256 newTotalDebt = (newDebt * indexNow) / newIndex;
+
+        assertLe((RAY * newInterestError) / newTotalDebt, 10000, "Interest error is larger than 10 ** -23");
+    }
+
+    /// @notice U:[CL-3A]: `calcDecrease` outputs newTotalDebt that is different by delta with at most a small error
+    function test_CL_03A_calcDecrease_outputs_correct_new_total_debt(
+        uint256 debt,
+        uint256 indexNow,
+        uint256 indexAtOpen,
+        uint256 delta,
+        uint256 quotaInterest,
+        uint16 feeInterest
+    ) public {
+        vm.assume(debt > WAD);
+        vm.assume(debt < 2 ** 128 - 1);
+        vm.assume(delta < 2 ** 128 - 1);
+        vm.assume(quotaInterest < 2 ** 128 - 1);
+        vm.assume(debt + delta <= 2 ** 128 - 1);
+        vm.assume(feeInterest <= PERCENTAGE_FACTOR);
+
+        indexNow = indexNow < RAY ? indexNow + RAY : indexNow;
+        indexAtOpen = indexAtOpen < RAY ? indexAtOpen + RAY : indexAtOpen;
+
+        vm.assume(indexNow <= 100 * RAY);
+        vm.assume(indexNow >= indexAtOpen);
+        vm.assume(indexNow - indexAtOpen < 10 * RAY);
+
+        uint256 interest = uint256((debt * indexNow) / indexAtOpen - debt);
+
+        vm.assume(interest > 1);
+
+        if (delta > debt + interest + quotaInterest) delta %= debt + interest + quotaInterest;
+
+        (uint256 newDebt, uint256 newCumulativeIndex,,, uint256 cumulativeQuotaInterest) =
+            CreditLogic.calcDecrease(delta, quotaInterest, feeInterest, debt, indexNow, indexAtOpen);
+
+        uint256 oldTotalDebt = debt + (interest + quotaInterest) * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR;
+
+        uint256 newTotalDebt = newDebt
+            + (newDebt * indexNow / newCumulativeIndex + cumulativeQuotaInterest - newDebt)
+                * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR;
+
+        uint256 debtError = _calcDiff(oldTotalDebt, newTotalDebt + delta);
+        uint256 rel = oldTotalDebt > newTotalDebt ? oldTotalDebt : newTotalDebt;
+
+        debtError = debtError > 10 ? debtError : 0;
+
+        assertLe((RAY * debtError) / rel, 10 ** 5, "Error is larger than 10 ** -22");
+    }
+
+    /// @notice U:[CL-3B]: `calcDecrease` correctly outputs amountToRepay and profit
+    function test_CL_03B_calcDecrease_outputs_correct_amountToRepay_profit(
+        uint256 debt,
+        uint256 indexNow,
+        uint256 indexAtOpen,
+        uint256 delta,
+        uint256 quotaInterest,
+        uint16 feeInterest
+    ) public {
+        vm.assume(debt > WAD);
+        vm.assume(debt < 2 ** 128 - 1);
+        vm.assume(delta < 2 ** 128 - 1);
+        vm.assume(quotaInterest < 2 ** 128 - 1);
+        vm.assume(debt + delta <= 2 ** 128 - 1);
+        vm.assume(feeInterest <= PERCENTAGE_FACTOR);
+
+        indexNow = indexNow < RAY ? indexNow + RAY : indexNow;
+        indexAtOpen = indexAtOpen < RAY ? indexAtOpen + RAY : indexAtOpen;
+
+        vm.assume(indexNow <= 100 * RAY);
+        vm.assume(indexNow >= indexAtOpen);
+        vm.assume(indexNow - indexAtOpen < 10 * RAY);
+
+        uint256 interest = uint256((debt * indexNow) / indexAtOpen - debt);
+
+        vm.assume(interest > 1);
+
+        if (delta > debt + interest + quotaInterest) delta %= debt + interest + quotaInterest;
+
+        (uint256 newDebt,, uint256 amountToRepay, uint256 profit,) =
+            CreditLogic.calcDecrease(delta, quotaInterest, feeInterest, debt, indexNow, indexAtOpen);
+
+        assertEq(amountToRepay, debt - newDebt, "Amount to repay incorrect");
+
+        uint256 expectedProfit = delta
+            > (interest + quotaInterest) * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR
+            ? (interest + quotaInterest) * feeInterest / PERCENTAGE_FACTOR
+            : delta * feeInterest / (PERCENTAGE_FACTOR + feeInterest);
+
+        uint256 profitError = _calcDiff(expectedProfit, profit);
+
+        assertLe(profitError, 100, "Profit error too large");
+    }
 
     //
     // CALC CLOSE PAYMENT PURE

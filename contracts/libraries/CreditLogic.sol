@@ -12,6 +12,8 @@ import {SECONDS_PER_YEAR} from "@gearbox-protocol/core-v2/contracts/libraries/Co
 import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 import "../interfaces/IExceptions.sol";
 
+import "forge-std/console.sol";
+
 uint256 constant INDEX_PRECISION = 10 ** 9;
 
 /// @title Credit Logic Library
@@ -180,7 +182,7 @@ library CreditLogic {
         );
     }
 
-    function calcDescrease(
+    function calcDecrease(
         uint256 amount,
         uint256 quotaInterestAccrued,
         uint16 feeInterest,
@@ -189,7 +191,7 @@ library CreditLogic {
         uint256 cumulativeIndexLastUpdate
     )
         internal
-        pure
+        view
         returns (
             uint256 newDebt,
             uint256 newCumulativeIndex,
@@ -218,11 +220,13 @@ library CreditLogic {
                 newDebt = debt;
                 newCumulativeIndex = cumulativeIndexLastUpdate;
             }
+        } else {
+            cumulativeQuotaInterest = quotaInterestAccrued;
         }
 
         if (amountToRepay > 0) {
             // Computes the interest accrued thus far
-            uint256 interestAccrued = (debt * newCumulativeIndex) / cumulativeIndexLastUpdate - debt; // F:[CM-21]
+            uint256 interestAccrued = (debt * cumulativeIndexNow) / cumulativeIndexLastUpdate - debt; // F:[CM-21]
 
             // Computes profit, taken as a percentage of the interest rate
             uint256 profitFromInterest = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR; // F:[CM-21]
@@ -270,10 +274,10 @@ library CreditLogic {
                             - (INDEX_PRECISION * amountToPool * cumulativeIndexLastUpdate) / debt
                     );
             }
+        } else {
+            newDebt = debt;
+            newCumulativeIndex = cumulativeIndexLastUpdate;
         }
-
-        // TODO: delete after tests or write Invaraiant test
-        require(debt - newDebt == amountToRepay, "Ooops, something was wring");
     }
 
     /// @param creditAccount Credit Account to compute balances for
