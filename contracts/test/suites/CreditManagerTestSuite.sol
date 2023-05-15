@@ -57,8 +57,8 @@ contract CreditManagerTestSuite is PoolDeployer {
         tokenTestSuite = creditConfig.tokenTestSuite();
 
         creditManager = internalSuite
-            ? new CreditManagerTestInternal(address(poolMock), address(withdrawalManager))
-            : new CreditManagerV3(address(poolMock), address(withdrawalManager));
+            ? new CreditManagerTestInternal(address(addressProvider), address(poolMock))
+            : new CreditManagerV3(address(addressProvider), address(poolMock));
 
         creditFacade = msg.sender;
 

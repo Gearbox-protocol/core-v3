@@ -16,7 +16,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
-import {IAddressProviderV3, AP_TREASURY} from "../interfaces/IAddressProviderV3.sol";
+import {IAddressProviderV3, AP_TREASURY, NO_VERSION_CONTROL} from "../interfaces/IAddressProviderV3.sol";
 
 /// LIBS & TRAITS
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
@@ -155,7 +155,8 @@ contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegister
         addressProvider = _addressProvider; // F:[P4-01]
         underlyingToken = _underlyingToken; // F:[P4-01]
 
-        treasury = IAddressProviderV3(_addressProvider).getAddressOrRevert(AP_TREASURY, 0); // F:[P4-01]
+        treasury =
+            IAddressProviderV3(_addressProvider).getAddressOrRevert({key: AP_TREASURY, _version: NO_VERSION_CONTROL}); // F:[P4-01]
 
         timestampLU = uint64(block.timestamp); // F:[P4-01]
         cumulativeIndexLU_RAY = uint128(RAY); // F:[P4-01]

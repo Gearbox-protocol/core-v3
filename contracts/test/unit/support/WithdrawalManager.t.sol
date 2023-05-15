@@ -17,7 +17,7 @@ import {
 
 import {USER} from "../../lib/constants.sol";
 import {TestHelper} from "../../lib/helper.sol";
-import {AddressProviderACLMock} from "../../mocks/core/AddressProviderACLMock.sol";
+import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 import {ERC20BlacklistableMock} from "../../mocks/token/ERC20Blacklistable.sol";
 
 import {WithdrawalManagerHarness} from "./WithdrawalManagerHarness.sol";
@@ -32,7 +32,7 @@ enum ScheduleTask {
 /// @notice U:[WM]: Unit tests for withdrawal manager
 contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerEvents {
     WithdrawalManagerHarness manager;
-    AddressProviderACLMock acl;
+    AddressProviderV3ACLMock acl;
     ERC20BlacklistableMock token0;
     ERC20Mock token1;
 
@@ -54,7 +54,7 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerEvents {
         creditManager = makeAddr("CREDIT_MANAGER");
 
         vm.startPrank(configurator);
-        acl = new AddressProviderACLMock();
+        acl = new AddressProviderV3ACLMock();
         acl.addCreditManager(creditManager);
         manager = new WithdrawalManagerHarness(address(acl), DELAY);
         vm.stopPrank();

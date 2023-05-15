@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
-import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
+import "../../core/AddressProviderV3.sol";
+import {AddressProviderV3ACLMock} from "../mocks/core/AddressProviderV3ACLMock.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {DieselToken} from "@gearbox-protocol/core-v2/contracts/tokens/DieselToken.sol";
@@ -40,7 +41,7 @@ contract PoolServiceTestSuite is Test {
     ACL public acl;
     WETHMock public weth;
 
-    AddressProvider public addressProvider;
+    IAddressProviderV3 public addressProvider;
     ContractsRegister public cr;
     TestPoolService public poolService;
     Pool4626 public pool4626;
@@ -66,15 +67,20 @@ contract PoolServiceTestSuite is Test {
 
         vm.startPrank(CONFIGURATOR);
 
-        acl = new ACL();
-        weth = WETHMock(payable(_tokenTestSuite.wethToken()));
-        addressProvider = new AddressProvider();
-        addressProvider.setACL(address(acl));
-        addressProvider.setTreasuryContract(DUMB_ADDRESS2);
-        cr = new ContractsRegister(address(addressProvider));
-        addressProvider.setContractsRegister(address(cr));
-        treasury = DUMB_ADDRESS2;
-        addressProvider.setWethToken(address(weth));
+        // acl = new ACL();
+        // weth = WETHMock(payable(_tokenTestSuite.wethToken()));
+        // addressProvider = new AddressProvider();
+        // addressProvider.setACL(address(acl));
+        // addressProvider.setTreasuryContract(DUMB_ADDRESS2);
+        // cr = new ContractsRegister(address(addressProvider));
+        // addressProvider.setContractsRegister(address(cr));
+        // treasury = DUMB_ADDRESS2;
+        // addressProvider.setWethToken(address(weth));
+
+        addressProvider = new AddressProviderV3ACLMock();
+        acl = ACL(addressProvider.getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL));
+        cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
+        treasury = addressProvider.getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL);
 
         underlying = IERC20(_underlying);
 
@@ -92,19 +98,19 @@ contract PoolServiceTestSuite is Test {
         if (is4626) {
             pool4626 = isFeeToken
                 ? new Pool4626_USDT({
-                            _addressProvider: address(addressProvider),
-                            _underlyingToken: _underlying,
-                            _interestRateModel: address(linearIRModel),
-                            _expectedLiquidityLimit: type(uint256).max,
-                            _supportsQuotas: supportQuotas
-                        })
+                                                                _addressProvider: address(addressProvider),
+                                                                _underlyingToken: _underlying,
+                                                                _interestRateModel: address(linearIRModel),
+                                                                _expectedLiquidityLimit: type(uint256).max,
+                                                                _supportsQuotas: supportQuotas
+                                                            })
                 : new Pool4626({
-                            _addressProvider: address(addressProvider),
-                            _underlyingToken: _underlying,
-                            _interestRateModel: address(linearIRModel),
-                            _expectedLiquidityLimit: type(uint256).max,
-                            _supportsQuotas: supportQuotas
-                        });
+                                                                _addressProvider: address(addressProvider),
+                                                                _underlyingToken: _underlying,
+                                                                _interestRateModel: address(linearIRModel),
+                                                                _expectedLiquidityLimit: type(uint256).max,
+                                                                _supportsQuotas: supportQuotas
+                                                            });
             newPool = address(pool4626);
 
             if (supportQuotas) {

@@ -13,7 +13,7 @@ import "../../../interfaces/IAddressProviderV3.sol";
 import "../../lib/constants.sol";
 
 // MOCKS
-import {AddressProviderACLMock} from "../../mocks/core/AddressProviderACLMock.sol";
+import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
 import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
 
@@ -32,7 +32,7 @@ uint256 constant EPOCH_LENGTH = 7 days;
 contract GearStakingTest is Test, IGearStakingEvents {
     address gearToken;
 
-    AddressProviderACLMock public addressProvider;
+    AddressProviderV3ACLMock public addressProvider;
 
     GearStaking gearStaking;
 
@@ -42,7 +42,7 @@ contract GearStakingTest is Test, IGearStakingEvents {
 
     function setUp() public {
         vm.prank(CONFIGURATOR);
-        addressProvider = new AddressProviderACLMock();
+        addressProvider = new AddressProviderV3ACLMock();
 
         tokenTestSuite = new TokensTestSuite();
 

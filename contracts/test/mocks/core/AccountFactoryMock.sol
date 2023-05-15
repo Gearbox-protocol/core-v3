@@ -15,22 +15,20 @@ import "forge-std/console.sol";
 /// @title Disposable credit accounts factory
 contract AccountFactoryMock is Test, IAccountFactory {
     /// @dev Contract version
-    uint256 public version = 3_00;
+    uint256 public version;
 
     address public usedAccount;
     address public newCreditAccount;
 
     address public returnedAccount;
 
-    constructor() {
+    constructor(uint256 _version) {
         usedAccount = address(new CreditAccountMock());
         newCreditAccount = makeAddr("NEW_CREDIT_ACCOUNT");
 
-        vm.label(usedAccount, "CREDIT_ACCOUNT");
-    }
-
-    function setVersion(uint256 _version) external {
         version = _version;
+
+        vm.label(usedAccount, "CREDIT_ACCOUNT");
     }
 
     /// @dev Provides a new credit account to a Credit Manager

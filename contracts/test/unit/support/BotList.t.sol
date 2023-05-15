@@ -12,7 +12,7 @@ import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import "../../lib/constants.sol";
 
 // MOCKS
-import {AddressProviderACLMock} from "../../mocks/core/AddressProviderACLMock.sol";
+import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 import {ERC20BlacklistableMock} from "../../mocks/token/ERC20Blacklistable.sol";
 import {GeneralMock} from "../../mocks/GeneralMock.sol";
 
@@ -29,7 +29,7 @@ import "forge-std/console.sol";
 /// @title LPPriceFeedTest
 /// @notice Designed for unit test purposes only
 contract BotListTest is Test, IBotListEvents {
-    AddressProviderACLMock public addressProvider;
+    AddressProviderV3ACLMock public addressProvider;
 
     BotList botList;
 
@@ -42,7 +42,7 @@ contract BotListTest is Test, IBotListEvents {
 
     function setUp() public {
         vm.prank(CONFIGURATOR);
-        addressProvider = new AddressProviderACLMock();
+        addressProvider = new AddressProviderV3ACLMock();
 
         tokenTestSuite = new TokensTestSuite();
 

@@ -11,6 +11,7 @@ import {LinearInterestRateModel} from "../../../pool/LinearInterestRateModel.sol
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import "../../../core/AddressProviderV3.sol";
 import {Pool4626} from "../../../pool/Pool4626.sol";
 import {IPool4626Events} from "../../../interfaces/IPool4626.sol";
 import {IERC4626Events} from "../../interfaces/IERC4626.sol";
@@ -173,7 +174,11 @@ contract Pool4626Test is TestHelper, BalanceHelper, IPool4626Events, IERC4626Eve
 
         assertEq(pool.decimals(), IERC20Metadata(address(psts.underlying())).decimals(), "Incorrect decimals");
 
-        assertEq(pool.treasury(), psts.addressProvider().getTreasuryContract(), "Incorrect treasury");
+        assertEq(
+            pool.treasury(),
+            psts.addressProvider().getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL),
+            "Incorrect treasury"
+        );
 
         assertEq(pool.convertToAssets(RAY), RAY, "Incorrect diesel rate!");
 

@@ -21,13 +21,13 @@ import "../../lib/constants.sol";
 import {Test} from "forge-std/Test.sol";
 
 // MOCKS
-import {AddressProviderACLMock} from "../../mocks/core/AddressProviderACLMock.sol";
+import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
 contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerTimelockErrors {
-    AddressProviderACLMock public addressProvider;
+    AddressProviderV3ACLMock public addressProvider;
 
     ControllerTimelock public controllerTimelock;
 
@@ -39,7 +39,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         vetoAdmin = makeAddr("VETO_ADMIN");
 
         vm.prank(CONFIGURATOR);
-        addressProvider = new AddressProviderACLMock();
+        addressProvider = new AddressProviderV3ACLMock();
         controllerTimelock = new ControllerTimelock(address(addressProvider), admin, vetoAdmin);
     }
 

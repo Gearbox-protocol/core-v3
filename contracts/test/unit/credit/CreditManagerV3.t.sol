@@ -4,7 +4,7 @@
 pragma solidity ^0.8.10;
 
 /// MOCKS
-import {AddressProviderACLMock} from "../../mocks/core/AddressProviderACLMock.sol";
+import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 import {AccountFactoryMock} from "../../mocks/core/AccountFactoryMock.sol";
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 
@@ -82,11 +82,16 @@ contract CreditManagerV3UnitTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         tokenTestSuite.topUpWETH{value: 100 * WAD}();
 
-        underlying = makeAddr("UNDERLYING_TOKEN");
+        underlying = tokenTestSuite.addressOf(Tokens.DAI);
 
-        addressProvider = new AddressProviderACLMock();
+        addressProvider = new AddressProviderV3ACLMock();
+
+        addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
+
         poolMock = new PoolMock(address(addressProvider), underlying);
         creditManager = new CreditManagerV3Harness(address(addressProvider), address(poolMock));
+
+        creditManager.setCreditFacade(address(this));
     }
 
     ///
@@ -97,9 +102,9 @@ contract CreditManagerV3UnitTest is Test, ICreditManagerV3Events, BalanceHelper 
     ///  TESTS
     ///
     ///
-    /// @dev [CM-1]: credit manager reverts if were called non-creditFacade
-    function test_CM_01_constructor_sets_correct_values() public {
-        creditManager = new CreditManagerV3Harness(address(poolMock), address(withdrawalManager));
+    /// @dev U:[CM-1]: credit manager reverts if were called non-creditFacade
+    function test_U_CM_01_constructor_sets_correct_values() public {
+        // creditManager = new CreditManagerV3Harness(address(poolMock),);
 
         assertEq(address(creditManager.poolService()), address(poolMock), "Incorrect poolSerivice");
 
@@ -136,7 +141,7 @@ contract CreditManagerV3UnitTest is Test, ICreditManagerV3Events, BalanceHelper 
         assertEq(address(creditManager.creditConfigurator()), address(this), "Incorrect creditConfigurator");
     }
 
-    /// @dev [CM-2]:credit account management functions revert if were called non-creditFacade
+    /// @dev U:[CM-2]:credit account management functions revert if were called non-creditFacade
     /// Functions list:
     /// - openCreditAccount
     /// - closeCreditAccount
@@ -144,7 +149,7 @@ contract CreditManagerV3UnitTest is Test, ICreditManagerV3Events, BalanceHelper 
     /// - addCollateral
     /// - transferOwnership
     /// All these functions have creditFacadeOnly modifier
-    function test_CM_02_credit_account_management_functions_revert_if_not_called_by_creditFacadeCall() public {
+    function test_U_CM_02_credit_account_management_functions_revert_if_not_called_by_creditFacadeCall() public {
         assertEq(creditManager.creditFacade(), address(this));
 
         vm.startPrank(USER);
@@ -152,10 +157,10 @@ contract CreditManagerV3UnitTest is Test, ICreditManagerV3Events, BalanceHelper 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.openCreditAccount(200000, address(this), false);
 
-        // vm.expectRevert(CallerNotCreditFacadeException.selector);
-        // creditManager.closeCreditAccount(
-        //     DUMB_ADDRESS, ClosureAction.LIQUIDATE_ACCOUNT, 0, DUMB_ADDRESS, DUMB_ADDRESS, type(uint256).max, false
-        // );
+        vm.expectRevert(CallerNotCreditFacadeException.selector);
+        creditManager.closeCreditAccount(
+            DUMB_ADDRESS, ClosureAction.LIQUIDATE_ACCOUNT, 0, DUMB_ADDRESS, DUMB_ADDRESS, type(uint256).max, false
+        );
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.manageDebt(DUMB_ADDRESS, 100, 0, ManageDebtAction.INCREASE_DEBT);
@@ -169,7 +174,7 @@ contract CreditManagerV3UnitTest is Test, ICreditManagerV3Events, BalanceHelper 
         vm.stopPrank();
     }
 
-    /// @dev [CM-3]:credit account execution functions revert if were called non-creditFacade & non-adapters
+    /// @dev U:[CM-3]:credit account execution functions revert if were called non-creditFacade & non-adapters
     /// Functions list:
     /// - approveCreditAccount
     /// - executeOrder
@@ -177,7 +182,9 @@ contract CreditManagerV3UnitTest is Test, ICreditManagerV3Events, BalanceHelper 
     /// - fullCollateralCheck
     /// - disableToken
     /// - changeEnabledTokens
-    function test_CM_03_credit_account_execution_functions_revert_if_not_called_by_creditFacade_or_adapters() public {
+    function test_U_CM_03_credit_account_execution_functions_revert_if_not_called_by_creditFacade_or_adapters()
+        public
+    {
         assertEq(creditManager.creditFacade(), address(this));
 
         vm.startPrank(USER);
@@ -194,7 +201,7 @@ contract CreditManagerV3UnitTest is Test, ICreditManagerV3Events, BalanceHelper 
         vm.stopPrank();
     }
 
-    /// @dev [CM-4]:credit account configuration functions revert if were called non-configurator
+    /// @dev U:[CM-4]:credit account configuration functions revert if were called non-configurator
     /// Functions list:
     /// - addToken
     /// - setParams
@@ -205,7 +212,7 @@ contract CreditManagerV3UnitTest is Test, ICreditManagerV3Events, BalanceHelper 
     /// - setCreditConfigurator
     /// - addEmergencyLiquidator
     /// - removeEmergenceLiquidator
-    function test_CM_04_credit_account_configurator_functions_revert_if_not_called_by_creditConfigurator() public {
+    function test_U_CM_04_credit_account_configurator_functions_revert_if_not_called_by_creditConfigurator() public {
         assertEq(creditManager.creditFacade(), address(this));
 
         vm.startPrank(USER);

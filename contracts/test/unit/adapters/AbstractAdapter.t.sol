@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 import {ZeroAddressException} from "../../../interfaces/IExceptions.sol";
 
 import {TestHelper} from "../../lib/helper.sol";
-import {AddressProviderACLMock} from "../../mocks/core/AddressProviderACLMock.sol";
+import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
 import {AbstractAdapterHarness} from "./AbstractAdapterHarness.sol";
 import {CreditManagerMock, CreditManagerMockEvents} from "./CreditManagerMock.sol";
@@ -15,7 +15,7 @@ import {CreditManagerMock, CreditManagerMockEvents} from "./CreditManagerMock.so
 /// @notice U:[AA]: `AbstractAdapter` unit tests
 contract AbstractAdapterUnitTest is TestHelper, CreditManagerMockEvents {
     AbstractAdapterHarness abstractAdapter;
-    AddressProviderACLMock addressProvider;
+    AddressProviderV3ACLMock addressProvider;
     CreditManagerMock creditManager;
 
     address facade;
@@ -25,7 +25,7 @@ contract AbstractAdapterUnitTest is TestHelper, CreditManagerMockEvents {
         facade = makeAddr("CREDIT_FACADE");
         target = makeAddr("TARGET_CONTRACT");
 
-        addressProvider = new AddressProviderACLMock();
+        addressProvider = new AddressProviderV3ACLMock();
         creditManager = new CreditManagerMock(address(addressProvider));
         abstractAdapter = new AbstractAdapterHarness(address(creditManager), target);
     }
