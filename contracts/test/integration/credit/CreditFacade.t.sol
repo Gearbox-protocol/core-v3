@@ -190,7 +190,7 @@ contract CreditFacadeIntegrationTest is
         assertEq(address(creditFacade.creditManager()), address(creditManager), "Incorrect creditManager");
         assertEq(creditFacade.underlying(), underlying, "Incorrect underlying token");
 
-        assertEq(creditFacade.wethAddress(), creditManager.wethAddress(), "Incorrect wethAddress token");
+        assertEq(creditFacade.weth(), creditManager.weth(), "Incorrect weth token");
 
         assertEq(creditFacade.degenNFT(), address(0), "Incorrect degenNFT");
 

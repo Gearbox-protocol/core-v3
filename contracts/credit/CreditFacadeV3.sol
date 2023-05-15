@@ -92,7 +92,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     address public immutable underlying;
 
     /// @dev Address of WETH
-    address public immutable wethAddress;
+    address public immutable weth;
 
     /// @dev Address of WETH Gateway
     address public immutable wethGateway;
@@ -185,7 +185,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         pool = ICreditManagerV3(_creditManager).pool();
         underlying = ICreditManagerV3(_creditManager).underlying(); // F:[FA-1A]
 
-        wethAddress = ICreditManagerV3(_creditManager).wethAddress(); // F:[FA-1A]
+        weth = ICreditManagerV3(_creditManager).weth(); // F:[FA-1A]
         wethGateway = ICreditManagerV3(_creditManager).wethGateway();
         botList =
             IAddressProviderV3(ICreditManagerV3(_creditManager).addressProvider()).getAddressOrRevert(AP_BOT_LIST, 3_00);
@@ -1038,8 +1038,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// TODO: Check L2 networks for supporting native currencies
     function _wrapETH() internal {
         if (msg.value > 0) {
-            IWETH(wethAddress).deposit{value: msg.value}(); // F:[FA-3]
-            IWETH(wethAddress).transfer(msg.sender, msg.value); // F:[FA-3]
+            IWETH(weth).deposit{value: msg.value}(); // F:[FA-3]
+            IWETH(weth).transfer(msg.sender, msg.value); // F:[FA-3]
         }
     }
 

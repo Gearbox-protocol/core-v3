@@ -262,7 +262,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     function creditConfigurator() external view returns (address);
 
     /// @dev Address of WETH
-    function wethAddress() external view returns (address);
+    function weth() external view returns (address);
 
     /// @dev Address of WETHGateway
     function wethGateway() external view returns (address);
