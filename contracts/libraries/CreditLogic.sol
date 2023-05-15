@@ -325,7 +325,7 @@ library CreditLogic {
         CollateralDebtData memory collateralDebtData,
         address creditAccount,
         uint256 quotedTokenMask,
-        uint256 maxAllowedEnabledTokenLength,
+        uint256 maxEnabledTokens,
         address underlying,
         function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn,
         bool countCollateral
@@ -336,7 +336,7 @@ library CreditLogic {
         uint256 underlyingPriceRAY =
             countCollateral ? convertToUSD(collateralDebtData._priceOracle, RAY, underlying) : 0;
 
-        collateralDebtData.quotedTokens = new address[](maxAllowedEnabledTokenLength);
+        collateralDebtData.quotedTokens = new address[](maxEnabledTokens);
 
         unchecked {
             for (uint256 tokenMask = 2; tokenMask <= quotedTokenMask; tokenMask <<= 1) {
@@ -363,7 +363,7 @@ library CreditLogic {
 
                     ++j;
 
-                    if (j >= maxAllowedEnabledTokenLength) {
+                    if (j >= maxEnabledTokens) {
                         revert TooManyEnabledTokensException();
                     }
                 }

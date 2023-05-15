@@ -644,7 +644,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
     // function test_CMQ_11_updateQuotas_reverts_on_too_many_tokens_enabled() public {
     //     (,,, address creditAccount) = cms.openCreditAccount();
 
-    //     uint256 maxTokens = creditManager.maxAllowedEnabledTokenLength();
+    //     uint256 maxTokens = creditManager.maxEnabledTokens();
 
     //     QuotaUpdate[] memory quotaUpdates = _addManyLimitedTokens(maxTokens + 1, 100);
 
@@ -675,7 +675,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         });
         enabledTokensMap |= tokensToEnable;
 
-        address[] memory quotedTokens = new address[](creditManager.maxAllowedEnabledTokenLength() + 1);
+        address[] memory quotedTokens = new address[](creditManager.maxEnabledTokens() + 1);
 
         quotedTokens[0] = tokenTestSuite.addressOf(Tokens.LINK);
         quotedTokens[1] = tokenTestSuite.addressOf(Tokens.USDT);

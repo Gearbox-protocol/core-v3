@@ -272,7 +272,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     function liquidationThresholds(address token) external view returns (uint16);
 
     /// @dev The maximal number of enabled tokens on a single Credit Account
-    function maxAllowedEnabledTokenLength() external view returns (uint8);
+    function maxEnabledTokens() external view returns (uint8);
 
     /// @dev Returns the fee parameters of the Credit Manager
     /// @return feeInterest Percentage of interest taken by the protocol as profit
@@ -326,7 +326,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
 
     function setCreditAccountForExternalCall(address creditAccount) external;
 
-    function externalCallCreditAccountOrRevert() external view returns (address creditAccount);
+    function getExternalCallCreditAccountOrRevert() external view returns (address creditAccount);
 
     function getTokenByMask(uint256 tokenMask) external view returns (address token);
 

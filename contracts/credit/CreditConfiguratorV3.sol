@@ -375,11 +375,11 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         // If there is an existing adapter for the target contract, it has to be removed
         address currentAdapter = creditManager.contractToAdapter(targetContract);
         if (currentAdapter != address(0)) {
-            creditManager.setContractAllowance(currentAdapter, address(0)); // F: [CC-15A]
+            creditManager.setContractAllowance({adapter: currentAdapter, targetContract: address(0)}); // F: [CC-15A]
         }
 
         // Sets a link between adapter and targetContract in creditFacade and creditManager
-        creditManager.setContractAllowance(adapter, targetContract); // F:[CC-15]
+        creditManager.setContractAllowance({adapter: adapter, targetContract: targetContract}); // F:[CC-15]
 
         // adds contract to the list of allowed contracts
         allowedContractsSet.add(targetContract); // F:[CC-15]
@@ -406,8 +406,8 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         // Sets both contractToAdapter[targetContract] and adapterToContract[adapter]
         // To address(0), which would make Credit Manager revert on attempts to
         // call the respective targetContract using the adapter
-        creditManager.setContractAllowance(adapter, address(0)); // F:[CC-17]
-        creditManager.setContractAllowance(address(0), targetContract); // F:[CC-17]
+        creditManager.setContractAllowance({adapter: adapter, targetContract: address(0)}); // F:[CC-17]
+        creditManager.setContractAllowance({adapter: address(0), targetContract: targetContract}); // F:[CC-17]
 
         // removes contract from the list of allowed contracts
         allowedContractsSet.remove(targetContract); // F:[CC-17]
@@ -432,7 +432,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         }
 
         /// Removes the adapter => target contract link only
-        creditManager.setContractAllowance(adapter, address(0)); // F: [CC-40]
+        creditManager.setContractAllowance({adapter: adapter, targetContract: address(0)}); // F: [CC-40]
 
         emit ForbidAdapter(adapter); // F: [CC-40]
     }
@@ -751,7 +751,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         external
         controllerOnly // F:[CC-2B]
     {
-        uint256 maxEnabledTokensCurrent = creditManager.maxAllowedEnabledTokenLength();
+        uint256 maxEnabledTokensCurrent = creditManager.maxEnabledTokens();
 
         // Checks that value is actually changed, to avoid redundant checks
         if (maxEnabledTokens != maxEnabledTokensCurrent) {

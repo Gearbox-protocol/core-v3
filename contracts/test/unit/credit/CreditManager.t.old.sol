@@ -212,8 +212,8 @@ contract OldCreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
     }
 
     function enableTokensMoreThanLimit(address creditAccount) internal {
-        uint256 maxAllowedEnabledTokenLength = creditManager.maxAllowedEnabledTokenLength();
-        _addAndEnableTokens(creditAccount, maxAllowedEnabledTokenLength, 2);
+        uint256 maxEnabledTokens = creditManager.maxEnabledTokens();
+        _addAndEnableTokens(creditAccount, maxEnabledTokens, 2);
     }
 
     function _openAccountAndTransferToCF() internal returns (address creditAccount) {
@@ -1958,7 +1958,7 @@ contract OldCreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         vm.prank(CONFIGURATOR);
         creditManager.setMaxEnabledTokens(255);
 
-        assertEq(creditManager.maxAllowedEnabledTokenLength(), 255, "Incorrect max enabled tokens");
+        assertEq(creditManager.maxEnabledTokens(), 255, "Incorrect max enabled tokens");
     }
 
     // /// @dev [CM-67]: checkEmergencyPausable returns pause state and enable emergencyLiquidation if needed
