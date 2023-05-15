@@ -18,7 +18,7 @@ import {
     DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER,
     WAD
 } from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-
+import {UNDERLYING_TOKEN_MASK} from "../libraries/BitMask.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // CONTRACTS
@@ -197,7 +197,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         // Checks that the token is not underlying, since its LT is determined by Credit Manager params
         if (token == underlying) revert SetLTForUnderlyingException(); // F:[CC-5]
 
-        (, uint16 ltUnderlying) = creditManager.collateralTokens(0);
+        (, uint16 ltUnderlying) = creditManager.collateralTokensByMask(UNDERLYING_TOKEN_MASK);
         // Sanity check for the liquidation threshold. The LT should be less than underlying
         if (liquidationThreshold > ltUnderlying) {
             revert IncorrectLiquidationThresholdException();
@@ -226,7 +226,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         // Checks that the token is not underlying, since its LT is determined by Credit Manager params
         if (token == underlying) revert SetLTForUnderlyingException();
 
-        (, uint16 ltUnderlying) = creditManager.collateralTokens(0);
+        (, uint16 ltUnderlying) = creditManager.collateralTokensByMask(UNDERLYING_TOKEN_MASK);
         // Sanity check for the liquidation threshold. The LT should be less than underlying
         if (liquidationThresholdFinal > ltUnderlying) {
             revert IncorrectLiquidationThresholdException();
@@ -508,7 +508,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         // Computes the underlying LT and updates it if required
 
         uint16 newLTUnderlying = uint16(_liquidationDiscount - _feeLiquidation); // FT:[CC-25]
-        (, uint16 ltUnderlying) = creditManager.collateralTokens(0);
+        (, uint16 ltUnderlying) = creditManager.collateralTokensByMask(UNDERLYING_TOKEN_MASK);
 
         if (newLTUnderlying != ltUnderlying) {
             _updateLiquidationThreshold(newLTUnderlying); // F:[CC-25]
@@ -559,7 +559,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         uint256 len = creditManager.collateralTokensCount();
         unchecked {
             for (uint256 i = 1; i < len; ++i) {
-                (address token, uint16 lt) = creditManager.collateralTokens(i);
+                (address token, uint16 lt) = creditManager.collateralTokensByMask(1 << i);
                 if (lt > ltUnderlying) {
                     _setLiquidationThreshold(token, ltUnderlying); // F:[CC-25]
                 }

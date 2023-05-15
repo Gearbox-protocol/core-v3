@@ -85,9 +85,6 @@ error CallerNotVoterException();
 ///      the connected Credit Facade, or an allowed adapter
 error CallerNotAdapterException();
 
-/// @dev Thrown if an access-restricted function is called by an address that is not withdrawal manager
-error CallerNotWithdrawalManagerException();
-
 /// interface ICreditConfiguratorExceptions {
 
 /// @dev Thrown if the underlying's LT is set directly

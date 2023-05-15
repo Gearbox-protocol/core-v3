@@ -14,7 +14,7 @@ import {UNDERLYING_TOKEN_MASK, BitMask} from "../libraries/BitMask.sol";
 import {CreditLogic} from "../libraries/CreditLogic.sol";
 import {CreditAccountHelper} from "../libraries/CreditAccountHelper.sol";
 
-import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 import {IERC20Helper} from "../libraries/IERC20Helper.sol";
 
@@ -58,7 +58,7 @@ import "forge-std/console.sol";
 /// @notice Encapsulates the business logic for managing Credit Accounts
 ///
 /// More info: https://dev.gearbox.fi/developers/credit/credit_manager
-contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard {
+contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using BitMask for uint256;
     using CreditLogic for CollateralDebtData;
@@ -94,16 +94,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
 
     TakeAccountAction private immutable deployAccountAction;
 
-    /// @dev The maximal number of enabled tokens on a single Credit Account
-    uint8 public override maxEnabledTokens = 12;
-
     /// @dev Address of the connected Credit Facade
     address public override creditFacade;
 
-    /// @dev Points to creditAccount during multicall, otherwise keeps address(1) for gas savings
-    /// CreditFacade is trusted source, so primarly it sends creditAccount as parameter
-    /// _externalCallCreditAccount is used for adapters interation when adapter calls approve / execute methods
-    address internal _externalCallCreditAccount;
+    /// @dev The maximal number of enabled tokens on a single Credit Account
+    uint8 public override maxEnabledTokens = 12;
+
+    /// @dev Liquidation threshold for the underlying token.
+    uint16 internal ltUnderlying;
 
     /// @dev Interest fee charged by the protocol: fee = interest accrued * feeInterest
     uint16 internal feeInterest;
@@ -126,8 +124,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     /// @dev Price oracle used to evaluate assets on Credit Accounts.
     address public override priceOracle;
 
-    /// @dev Liquidation threshold for the underlying token.
-    uint16 internal ltUnderlying;
+    /// @dev Points to creditAccount during multicall, otherwise keeps address(1) for gas savings
+    /// CreditFacade is trusted source, so primarly it sends creditAccount as parameter
+    /// _externalCallCreditAccount is used for adapters interation when adapter calls approve / execute methods
+    address internal _externalCallCreditAccount;
+
+    /// @dev Total number of known collateral tokens.
+    uint8 public collateralTokensCount;
 
     /// @dev Mask of tokens to apply quotas for
     uint256 public override quotedTokenMask;
@@ -149,9 +152,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     ///         Masks are used to efficiently check set inclusion, since it only involves
     ///         a single AND and comparison to zero
     mapping(address => uint256) internal tokenMasksMapInternal;
-
-    /// @dev Total number of known collateral tokens.
-    uint8 public collateralTokensCount;
 
     /// CONTRACTS & ADAPTERS
 
@@ -175,49 +175,51 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
 
     /// @dev Restricts calls to Credit Facade only
     modifier creditFacadeOnly() {
-        if (msg.sender != creditFacade) revert CallerNotCreditFacadeException();
+        _revertIfCallerNotCreditFacade();
         _;
     }
 
-    /// @dev Restricts calls to Withdrawal Manager only
-    modifier withdrawalManagerOnly() {
-        if (msg.sender != address(withdrawalManager)) revert CallerNotWithdrawalManagerException();
-        _;
+    function _revertIfCallerNotCreditFacade() private {
+        if (msg.sender != creditFacade) revert CallerNotCreditFacadeException();
     }
 
     /// @dev Restricts calls to Credit Configurator only
     modifier creditConfiguratorOnly() {
+        _revertIfCallerNotCreditConfigurator();
+        _;
+    }
+
+    function _revertIfCallerNotCreditConfigurator() private {
         if (msg.sender != creditConfigurator) {
             revert CallerNotConfiguratorException();
         }
-        _;
     }
 
     /// @dev Constructor
     /// @param _pool Address of the pool to borrow funds from
     constructor(address _addressProvider, address _pool) {
         addressProvider = _addressProvider;
-        pool = _pool; // F:[CM-1]
+        pool = _pool; // U:[CM-1]
 
-        underlying = IPoolBase(pool).underlyingToken(); // F:[CM-1]
+        underlying = IPoolBase(pool).underlyingToken(); // U:[CM-1]
 
         try IPool4626(_pool).supportsQuotas() returns (bool sq) {
             supportsQuotas = sq;
         } catch {}
 
         // The underlying is the first token added as collateral
-        _addToken(underlying); // F:[CM-1]
+        _addToken(underlying); // U:[CM-1]
 
-        weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // F:[CM-1]
-        wethGateway = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_GATEWAY, 3_00); // F:[CM-1]
-        priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_PRICE_ORACLE, 2); // F:[CM-1]
-        accountFactory = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_ACCOUNT_FACTORY, 1); // F:[CM-1]
+        weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // U:[CM-1]
+        wethGateway = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_GATEWAY, 3_00); // U:[CM-1]
+        priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_PRICE_ORACLE, 2); // U:[CM-1]
+        accountFactory = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_ACCOUNT_FACTORY, 1);
         withdrawalManager = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00);
 
         deployAccountAction = IAccountFactory(accountFactory).version() == 3_00
             ? TakeAccountAction.DEPLOY_NEW_ONE
             : TakeAccountAction.TAKE_USED_ONE;
-        creditConfigurator = msg.sender; // F:[CM-1]
+        creditConfigurator = msg.sender; // U:[CM-1]
 
         _externalCallCreditAccount = address(1);
     }
@@ -235,8 +237,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     function openCreditAccount(uint256 debt, address onBehalfOf, bool deployNew)
         external
         override
-        nonReentrant
-        creditFacadeOnly // F:[CM-2]
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // // U:[CM-2]
         returns (address creditAccount)
     {
         // Takes a Credit Account from the factory and sets initial parameters
@@ -298,8 +300,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     )
         external
         override
-        nonReentrant
-        creditFacadeOnly // F:[CM-2]
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // U:[CM-2]
         returns (uint256 remainingFunds, uint256 loss)
     {
         // Checks that the Credit Account exists for the borrower
@@ -309,7 +311,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         creditAccountInfo[creditAccount].borrower = address(0); // F:[CM-9]
 
         // Makes all computations needed to close credit account
-
         uint256 amountToPool;
         uint256 profit;
 
@@ -380,7 +381,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
             }); // F: [CMQ-6]
         }
 
-        _transferAssetsTo({
+        _batchTokensTransfer({
             creditAccount: creditAccount,
             to: to,
             convertToETH: convertToETH,
@@ -410,8 +411,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     /// @return newDebt The new debt principal
     function manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)
         external
-        nonReentrant
-        creditFacadeOnly // F:[CM-2]
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // U:[CM-2]
         returns (uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable)
     {
         CollateralDebtData memory collateralDebtData;
@@ -477,7 +478,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     function addCollateral(address payer, address creditAccount, address token, uint256 amount)
         external
         nonReentrant
-        creditFacadeOnly // F:[CM-2]
+        creditFacadeOnly // U:[CM-2]
         returns (uint256 tokenMask)
     {
         tokenMask = getTokenMaskOrRevert(token);
@@ -490,8 +491,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     function transferAccountOwnership(address creditAccount, address to)
         external
         override
-        nonReentrant
-        creditFacadeOnly // F:[CM-2]
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // U:[CM-2]
     {
         getBorrowerOrRevert(creditAccount);
         creditAccountInfo[creditAccount].borrower = to; // F:[CM-7]
@@ -500,8 +501,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     /// @dev Requests the Credit Account to approve a collateral token to another contract.
     /// @param token Collateral token to approve
     /// @param amount New allowance amount
-    function approveCreditAccount(address token, uint256 amount) external override nonReentrant {
-        address targetContract = _getTargetContractOrRevert();
+    function approveCreditAccount(address token, uint256 amount)
+        external
+        override
+        nonReentrant // U:[CM-5]
+    {
+        address targetContract = _getTargetContractOrRevert(); // U:[CM-3]
         _approveSpender({
             creditAccount: getExternalCallCreditAccountOrRevert(),
             token: token,
@@ -522,8 +527,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     /// @dev Requests a Credit Account to make a low-level call with provided data
     /// This is the intended pathway for state-changing interactions with 3rd-party protocols
     /// @param data Data to pass with the call
-    function executeOrder(bytes memory data) external override nonReentrant returns (bytes memory) {
-        address targetContract = _getTargetContractOrRevert();
+    function executeOrder(bytes memory data)
+        external
+        override
+        nonReentrant // U:[CM-5]
+        returns (bytes memory)
+    {
+        address targetContract = _getTargetContractOrRevert(); // U:[CM-3]
         // Emits an event
         emit ExecuteOrder(targetContract); // F:[CM-29]
 
@@ -558,7 +568,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         uint256 enabledTokensMask,
         uint256[] memory collateralHints,
         uint16 minHealthFactor
-    ) external creditFacadeOnly nonReentrant {
+    )
+        external
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // U:[CM-2]
+    {
         if (minHealthFactor < PERCENTAGE_FACTOR) {
             revert CustomHealthFactorTooLowException();
         }
@@ -703,7 +717,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     function updateQuota(address creditAccount, address token, int96 quotaChange)
         external
         override
-        creditFacadeOnly // F: [CMQ-3]
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // U:[CM-2]
         returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
         (uint256 caInterestChange, bool enable, bool disable) =
@@ -729,7 +744,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     /// @param tokensToTransferMask A bit mask encoding tokens to be transfered. All of the tokens included
     ///        in the mask will be transferred. If any tokens need to be skipped, they must be
     ///        excluded from the mask beforehand.
-    function _transferAssetsTo(address creditAccount, address to, bool convertToETH, uint256 tokensToTransferMask)
+    function _batchTokensTransfer(address creditAccount, address to, bool convertToETH, uint256 tokensToTransferMask)
         internal
     {
         // Since tokensToTransferMask encodes all enabled tokens as 1, tokenMask > enabledTokensMask is equivalent
@@ -799,15 +814,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     //
     // GETTERS
     //
-
-    /// @dev Returns the collateral token at requested index and its liquidation threshold
-    /// @param id The index of token to return
-    function collateralTokens(uint256 id) public view returns (address token, uint16 liquidationThreshold) {
-        // Collateral tokens are stored under their masks rather than
-        // indicies, so this is simply a convenience function that wraps
-        // the getter by mask
-        return collateralTokensByMask(1 << id);
-    }
 
     /// @dev Returns the collateral token with requested mask and its liquidationThreshold
     /// @param tokenMask Token mask corresponding to the token
@@ -932,7 +938,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     /// @param token Address of the token to add
     function addToken(address token)
         external
-        creditConfiguratorOnly // F:[CM-4]
+        creditConfiguratorOnly // U:[CM-4]
     {
         _addToken(token); // F:[CM-52]
     }
@@ -979,7 +985,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         uint16 _liquidationDiscountExpired
     )
         external
-        creditConfiguratorOnly // F:[CM-4]
+        creditConfiguratorOnly // U:[CM-4]
     {
         feeInterest = _feeInterest; // F:[CM-51]
         feeLiquidation = _feeLiquidation; // F:[CM-51]
@@ -1001,7 +1007,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         uint16 finalLT,
         uint40 timestampRampStart,
         uint24 rampDuration
-    ) external creditConfiguratorOnly {
+    )
+        external
+        creditConfiguratorOnly // U:[CM-4]
+    {
         if (token == underlying) {
             ltUnderlying = initialLT; // F:[CM-47]
         } else {
@@ -1022,7 +1031,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     ///         Tokens in the mask also incur additional interest based on their quotas
     function setQuotedMask(uint256 _quotedTokenMask)
         external
-        creditConfiguratorOnly // F: [CMQ-2]
+        creditConfiguratorOnly // U:[CM-4]
     {
         quotedTokenMask = _quotedTokenMask; // F: [CMQ-2]
     }
@@ -1031,7 +1040,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     /// @param _maxEnabledTokens The new enabled token quantity limit.
     function setMaxEnabledTokens(uint8 _maxEnabledTokens)
         external
-        creditConfiguratorOnly // F: [CM-4]
+        creditConfiguratorOnly // U: [CM-4]
     {
         maxEnabledTokens = _maxEnabledTokens; // F: [CC-37]
     }
@@ -1042,7 +1051,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     /// @notice The function can be called with (adapter, address(0)) and (address(0), targetContract)
     ///         to disallow a particular target or adapter, since this would set values in respective
     ///         mappings to address(0).
-    function setContractAllowance(address adapter, address targetContract) external creditConfiguratorOnly {
+    function setContractAllowance(address adapter, address targetContract)
+        external
+        creditConfiguratorOnly // U: [CM-4]
+    {
         if (targetContract == address(this) || adapter == address(this)) {
             revert TargetContractNotAllowedException();
         } // F:[CC-13]
@@ -1059,7 +1071,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     /// @param _creditFacade Address of the new Credit Facade
     function setCreditFacade(address _creditFacade)
         external
-        creditConfiguratorOnly // F:[CM-4]
+        creditConfiguratorOnly // U: [CM-4]
     {
         creditFacade = _creditFacade;
     }
@@ -1068,7 +1080,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     /// @param _priceOracle Address of the new Price Oracle
     function setPriceOracle(address _priceOracle)
         external
-        creditConfiguratorOnly // F:[CM-4]
+        creditConfiguratorOnly // U: [CM-4]
     {
         priceOracle = _priceOracle;
     }
@@ -1077,7 +1089,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     /// @param _creditConfigurator Address of the new Credit Configurator
     function setCreditConfigurator(address _creditConfigurator)
         external
-        creditConfiguratorOnly // F:[CM-4]
+        creditConfiguratorOnly // U: [CM-4]
     {
         creditConfigurator = _creditConfigurator; // F:[CM-58]
         emit SetCreditConfigurator(_creditConfigurator); // F:[CM-58]
@@ -1091,7 +1103,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     function scheduleWithdrawal(address creditAccount, address token, uint256 amount)
         external
         override
-        creditFacadeOnly
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // U:[CM-2]
         returns (uint256 tokensToDisable)
     {
         uint256 tokenMask = getTokenMaskOrRevert({token: token});
@@ -1125,7 +1138,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     function claimWithdrawals(address creditAccount, address to, ClaimAction action)
         external
         override
-        creditFacadeOnly
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // U:[CM-2]
         returns (uint256 tokensToEnable)
     {
         if (_hasWithdrawals(creditAccount)) {
@@ -1149,7 +1163,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations)
         external
         override
-        creditFacadeOnly
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // U:[CM-2]
     {
         uint256 numRevocations = revocations.length;
         unchecked {
@@ -1170,7 +1185,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     }
 
     ///
-    function setCreditAccountForExternalCall(address creditAccount) external override creditFacadeOnly {
+    function setCreditAccountForExternalCall(address creditAccount)
+        external
+        override
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // U:[CM-2]
+    {
         _externalCallCreditAccount = creditAccount;
     }
 
@@ -1187,11 +1207,16 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         return creditAccountInfo[creditAccount].flags;
     }
 
-    function setFlagFor(address creditAccount, uint16 flag, bool value) external override creditFacadeOnly {
+    function setFlagFor(address creditAccount, uint16 flag, bool value)
+        external
+        override
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // U:[CM-2]
+    {
         if (value) {
             _enableFlag(creditAccount, flag);
         } else {
-            creditAccountInfo[creditAccount].flags &= ~flag;
+            _disableFlag(creditAccount, flag);
         }
     }
 

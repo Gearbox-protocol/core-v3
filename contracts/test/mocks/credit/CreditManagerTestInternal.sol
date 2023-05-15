@@ -50,10 +50,10 @@ contract CreditManagerTestInternal is CreditManagerV3 {
     //     return calcClosePayments(totalValue, closureActionType, borrowedAmount, borrowedAmountWithInterest);
     // }
 
-    function transferAssetsTo(address creditAccount, address to, bool convertToETH, uint256 enabledTokensMask)
+    function batchTokensTransfer(address creditAccount, address to, bool convertToETH, uint256 enabledTokensMask)
         external
     {
-        _transferAssetsTo(creditAccount, to, convertToETH, enabledTokensMask);
+        _batchTokensTransfer(creditAccount, to, convertToETH, enabledTokensMask);
     }
 
     function safeTokenTransfer(address creditAccount, address token, address to, uint256 amount, bool convertToETH)
@@ -78,7 +78,7 @@ contract CreditManagerTestInternal is CreditManagerV3 {
         uint256 len = collateralTokensCount;
         collateralTokensAddr = new address[](len);
         for (uint256 i = 0; i < len; i++) {
-            (collateralTokensAddr[i],) = collateralTokens(i);
+            (collateralTokensAddr[i],) = collateralTokensByMask(1 << i);
         }
     }
 

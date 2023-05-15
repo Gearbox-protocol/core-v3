@@ -1574,7 +1574,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
             uint256 enabledTokensMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI))
                 | creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.WETH));
 
-            cmi.transferAssetsTo(creditAccount, friend, convertToETH, enabledTokensMask);
+            cmi.batchTokensTransfer(creditAccount, friend, convertToETH, enabledTokensMask);
 
             expectBalance(Tokens.DAI, creditAccount, borrowedAmount, "Underlying assets were transffered!");
 

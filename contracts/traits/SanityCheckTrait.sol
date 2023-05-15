@@ -9,7 +9,11 @@ import {ZeroAddressException} from "../interfaces/IExceptions.sol";
 /// @notice Utility class for ACL consumers
 abstract contract SanityCheckTrait {
     modifier nonZeroAddress(address addr) {
-        if (addr == address(0)) revert ZeroAddressException(); // F:[P4-2]
+        _nonZeroCheck(addr);
         _;
+    }
+
+    function _nonZeroCheck(address addr) private view {
+        if (addr == address(0)) revert ZeroAddressException(); // F:[P4-2]
     }
 }

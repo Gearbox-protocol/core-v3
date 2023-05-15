@@ -100,28 +100,28 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @dev Address of the DegenNFT that gatekeeps account openings in whitelisted mode
     address public immutable override degenNFT;
 
-    /// @dev Keeps borrowing debtLimits together for storage access optimization
-    DebtLimits public debtLimits;
+    /// @dev
+    uint40 public expirationDate;
 
     /// @dev Maximal amount of new debt that can be taken per block
     uint8 public override maxDebtPerBlockMultiplier;
 
+    uint64 internal lastBlockBorrowed;
+
     /// @dev Stores in a compressed state the last block where borrowing happened and the total amount borrowed in that block
     uint128 internal totalBorrowedInBlock;
 
-    uint64 internal lastBlockBorrowed;
+    /// @dev Contract containing permissions from borrowers to bots
+    address public botList;
+
+    /// @dev Keeps borrowing debtLimits together for storage access optimization
+    DebtLimits public debtLimits;
 
     /// @dev Bit mask encoding a set of forbidden tokens
     uint256 public forbiddenTokenMask;
 
     /// @dev Keeps parameters that are used to pause the system after too much bad debt over a short period
     CumulativeLossParams public override lossParams;
-
-    /// @dev Contract containing permissions from borrowers to bots
-    address public botList;
-
-    /// @dev
-    uint40 public expirationDate;
 
     /// @dev A map that stores whether a user allows a transfer of an account from another user to themselves
     mapping(address => mapping(address => bool)) public override transfersAllowed;
@@ -139,25 +139,36 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
     /// @dev Restricts actions for users with opened credit accounts only
     modifier creditConfiguratorOnly() {
+        _revertIfCallerNotCreditConfigurator();
+        _;
+    }
+
+    function _revertIfCallerNotCreditConfigurator() private {
         if (msg.sender != ICreditManagerV3(creditManager).creditConfigurator()) {
             revert CallerNotConfiguratorException();
         }
-
-        _;
     }
 
     modifier creditAccountOwnerOnly(address creditAccount) {
-        if (msg.sender != _getBorrowerOrRevert(creditAccount)) {
-            revert CallerNotCreditAccountOwnerException();
-        }
+        _revertIfCallerNotCreditAccountOwner(creditAccount);
         _;
     }
 
+    function _revertIfCallerNotCreditAccountOwner(address creditAccount) private {
+        if (msg.sender != _getBorrowerOrRevert(creditAccount)) {
+            revert CallerNotCreditAccountOwnerException();
+        }
+    }
+
     modifier nonZeroCallsOnly(MultiCall[] calldata calls) {
+        _revertIfZeroCallsLength(calls);
+        _;
+    }
+
+    function _revertIfZeroCallsLength(MultiCall[] calldata calls) private {
         if (calls.length == 0) {
             revert ZeroCallsException();
         }
-        _;
     }
 
     modifier whenNotPausedOrEmergency() {
@@ -167,10 +178,14 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
     // Reverts if CreditFacadeV3 is expired
     modifier whenNotExpired() {
+        _revertIfExpired();
+        _;
+    }
+
+    function _revertIfExpired() private {
         if (_isExpired()) {
             revert NotAllowedAfterExpirationException(); // F: [FA-46]
         }
-        _;
     }
 
     /// @dev Initializes creditFacade and connects it with CreditManagerV3

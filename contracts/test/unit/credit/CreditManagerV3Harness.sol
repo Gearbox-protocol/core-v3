@@ -5,6 +5,10 @@ import {CollateralDebtData} from "../../../interfaces/ICreditManagerV3.sol";
 contract CreditManagerV3Harness is CreditManagerV3 {
     constructor(address _addressProvider, address _pool) CreditManagerV3(_addressProvider, _pool) {}
 
+    function setReentrancy(uint8 _status) external {
+        _reentrancyStatus = _status;
+    }
+
     function setDebt(address creditAccount, CreditAccountInfo memory _creditAccountInfo) external {
         creditAccountInfo[creditAccount] = _creditAccountInfo;
     }
@@ -67,10 +71,10 @@ contract CreditManagerV3Harness is CreditManagerV3 {
     //     return _getQuotedTokens(enabledTokensMask, withLTs);
     // }
 
-    function transferAssetsTo(address creditAccount, address to, bool convertToETH, uint256 enabledTokensMask)
+    function batchTokensTransfer(address creditAccount, address to, bool convertToETH, uint256 enabledTokensMask)
         external
     {
-        _transferAssetsTo(creditAccount, to, convertToETH, enabledTokensMask);
+        _batchTokensTransfer(creditAccount, to, convertToETH, enabledTokensMask);
     }
 
     function safeTokenTransfer(address creditAccount, address token, address to, uint256 amount, bool convertToETH)

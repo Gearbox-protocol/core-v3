@@ -183,7 +183,7 @@ contract CreditFacadeTestHelper is TestHelper {
     function expectSafeAllowance(address creditAccount, address target) internal {
         uint256 len = creditManager.collateralTokensCount();
         for (uint256 i = 0; i < len; i++) {
-            (address token,) = creditManager.collateralTokens(i);
+            (address token,) = creditManager.collateralTokensByMask(1 << i);
             assertLe(IERC20(token).allowance(creditAccount, target), 1, "allowance is too high");
         }
     }

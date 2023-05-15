@@ -212,10 +212,6 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     ///         the bit at the position equal to token's index to 1
     function enabledTokensMaskOf(address creditAccount) external view returns (uint256);
 
-    /// @dev Returns the collateral token at requested index and its liquidation threshold
-    /// @param id The index of token to return
-    function collateralTokens(uint256 id) external view returns (address token, uint16 liquidationThreshold);
-
     /// @dev Returns the collateral token with requested mask and its liquidationThreshold
     /// @param tokenMask Token mask corresponding to the token
     function collateralTokensByMask(uint256 tokenMask)

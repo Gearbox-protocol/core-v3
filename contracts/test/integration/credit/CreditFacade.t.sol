@@ -579,7 +579,7 @@ contract CreditFacadeIntegrationTest is
         vm.prank(CONFIGURATOR);
         creditConfigurator.setLimits(1, type(uint96).max);
 
-        (address collateral,) = creditManager.collateralTokens(token1);
+        (address collateral,) = creditManager.collateralTokensByMask(1 << token1);
 
         tokenTestSuite.mint(collateral, USER, type(uint96).max);
 
