@@ -531,9 +531,13 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
                 || (_liquidationDiscountExpired != _liquidationDiscountExpiredCurrent)
         ) {
             // updates params in creditManager
-            creditManager.setParams(
-                _feeInterest, _feeLiquidation, _liquidationDiscount, _feeLiquidationExpired, _liquidationDiscountExpired
-            );
+            creditManager.setParams({
+                _feeInterest: _feeInterest,
+                _feeLiquidation: _feeLiquidation,
+                _liquidationDiscount: _liquidationDiscount,
+                _feeLiquidationExpired: _feeLiquidationExpired,
+                _liquidationDiscountExpired: _liquidationDiscountExpired
+            });
 
             emit FeesUpdated(
                 _feeInterest,
