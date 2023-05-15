@@ -74,7 +74,7 @@ contract BotListTest is Test, IBotListEvents {
 
     /// @dev [BL-1]: constructor sets correct values
     function test_BL_01_constructor_sets_correct_values() public {
-        assertEq(botList.treasury(), FRIEND2, "Treasury contract incorrect");
+        assertEq(botList.treasury(), addressProvider.getTreasuryContract(), "Treasury contract incorrect");
         assertEq(botList.daoFee(), 0, "Initial DAO fee incorrect");
     }
 
@@ -329,7 +329,7 @@ contract BotListTest is Test, IBotListEvents {
 
         assertEq(address(bot).balance, 1 ether / 20, "Bot was sent incorrect ETH amount");
 
-        assertEq(FRIEND2.balance, 1 ether / 40, "Treasury was sent incorrect amount");
+        assertEq(addressProvider.getTreasuryContract().balance, 1 ether / 40, "Treasury was sent incorrect amount");
 
         vm.warp(block.timestamp + 7 days);
 
@@ -357,7 +357,7 @@ contract BotListTest is Test, IBotListEvents {
 
         assertEq(address(bot).balance, 2 ether / 20, "Bot was sent incorrect ETH amount");
 
-        assertEq(FRIEND2.balance, 2 ether / 40, "Treasury was sent incorrect amount");
+        assertEq(addressProvider.getTreasuryContract().balance, 2 ether / 40, "Treasury was sent incorrect amount");
     }
 
     /// @dev [BL-6]: eraseAllBotPermissions works correctly

@@ -62,15 +62,6 @@ interface IBotList is IBotListEvents, IVersion {
     /// @param creditAccount Credit Account to erase permissions for
     function eraseAllBotPermissions(address creditAccount) external;
 
-    /// @dev Returns all active bots currently on the account
-    function getActiveBots(address creditAccount) external view returns (address[] memory);
-
-    /// @dev Returns whether the bot is approved by the borrower
-    function botPermissions(address borrower, address bot) external view returns (uint192);
-
-    /// @dev Returns whether the bot is forbidden by the borrower
-    function forbiddenBot(address bot) external view returns (bool);
-
     /// @dev Adds funds to the borrower's bot payment wallet
     function addFunding() external payable;
 
@@ -81,4 +72,19 @@ interface IBotList is IBotListEvents, IVersion {
     /// @param payer Address of the paying user
     /// @param paymentAmount Amount to pull
     function pullPayment(address payer, uint72 paymentAmount) external;
+
+    /// @dev Returns all active bots currently on the account
+    function getActiveBots(address creditAccount) external view returns (address[] memory);
+
+    /// @dev Returns whether the bot is approved by the borrower
+    function botPermissions(address borrower, address bot) external view returns (uint192);
+
+    /// @dev Returns whether the bot is forbidden by the borrower
+    function forbiddenBot(address bot) external view returns (bool);
+
+    /// @dev Returns information about bot permissions
+    function getBotStatus(address bot, address creditAccount)
+        external
+        view
+        returns (uint192 permissions, bool forbidden);
 }
