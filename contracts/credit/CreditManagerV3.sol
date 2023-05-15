@@ -601,21 +601,24 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
                 collateralHints: collateralHints,
                 lazy: false
             });
+
             collateralDebtData.calcHealthFactor();
 
             if (
-                task == CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS
-                    || task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
+                (
+                    task == CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS
+                        || task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
+                ) && (_hasWithdrawals(creditAccount))
             ) {
-                _calcAndUpdateCancellableWithdrawalsValue({
-                    collateralDebtData: collateralDebtData,
+                collateralDebtData.addCancellableWithdrawalsValue({
                     creditAccount: creditAccount,
-                    isForceCancel: task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
+                    isForceCancel: task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS,
+                    withdrawalManager: withdrawalManager,
+                    getTokenMaskFn: getTokenMaskOrRevert
                 });
             }
 
-            collateralDebtData.totalValue =
-                IPriceOracleV2(_priceOracle).convertFromUSD(collateralDebtData.totalValueUSD, underlying); // F:[FA-41]
+            collateralDebtData.calcTotalValueInUnderlying(underlying); // F:[FA-41]
         }
     }
 
@@ -917,29 +920,24 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     /// @param token Address of the token to add
     function _addToken(address token) internal {
         // Checks that the token is not already known (has an associated token mask)
-        if (tokenMasksMapInternal[token] > 0) {
+        if (tokenMasksMapInternal[token] != 0) {
             revert TokenAlreadyAddedException();
         } // F:[CM-52]
 
         // Checks that there aren't too many tokens
-        // Since token masks are 248 bit numbers with each bit corresponding to 1 token,
-        // only at most 248 are supported
-        if (collateralTokensCount >= 248) revert TooManyTokensException(); // F:[CM-52]
+        // Since token masks are 255 bit numbers with each bit corresponding to 1 token,
+        // only at most 255 are supported
+        if (collateralTokensCount >= 255) revert TooManyTokensException(); // F:[CM-52]
 
         // The tokenMask of a token is a bit mask with 1 at position corresponding to its index
         // (i.e. 2 ** index or 1 << index)
         uint256 tokenMask = 1 << collateralTokensCount;
         tokenMasksMapInternal[token] = tokenMask; // F:[CM-53]
 
-        collateralTokensData[tokenMask] = CollateralTokenData({
-            token: token,
-            ltInitial: 0,
-            ltFinal: 0,
-            timestampRampStart: type(uint40).max,
-            rampDuration: 0
-        }); // F:[CM-47]
+        collateralTokensData[tokenMask].token = token;
+        collateralTokensData[tokenMask].timestampRampStart = type(uint40).max; // F:[CM-47]
 
-        collateralTokensCount++; // F:[CM-47]
+        ++collateralTokensCount; // F:[CM-47]
     }
 
     /// @dev Sets fees and premiums
@@ -1082,7 +1080,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
         uint256 tokenMask = getTokenMaskOrRevert(token);
 
         if (IWithdrawalManager(withdrawalManager).delay() == 0) {
-            address borrower = creditAccountInfo[creditAccount].borrower;
+            address borrower = getBorrowerOrRevert(creditAccount);
             _safeTokenTransfer(creditAccount, token, borrower, amount, false);
         } else {
             uint256 delivered =
@@ -1121,33 +1119,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
 
     function _hasWithdrawals(address creditAccount) internal view returns (bool) {
         return creditAccountInfo[creditAccount].flags & WITHDRAWAL_FLAG != 0;
-    }
-
-    function _calcAndUpdateCancellableWithdrawalsValue(
-        CollateralDebtData memory collateralDebtData,
-        address creditAccount,
-        bool isForceCancel
-    ) internal view {
-        if (_hasWithdrawals(creditAccount)) {
-            (address token1, uint256 amount1, address token2, uint256 amount2) =
-                IWithdrawalManager(withdrawalManager).cancellableScheduledWithdrawals(creditAccount, isForceCancel);
-
-            if (amount1 != 0) {
-                _addTotalValueInUSDUAndEnableInPlace(collateralDebtData, token1, amount1);
-            }
-            if (amount2 != 0) {
-                _addTotalValueInUSDUAndEnableInPlace(collateralDebtData, token2, amount2);
-            }
-        }
-    }
-
-    function _addTotalValueInUSDUAndEnableInPlace(
-        CollateralDebtData memory collateralDebtData,
-        address token,
-        uint256 amount
-    ) internal view {
-        collateralDebtData.totalValueUSD += CreditLogic.convertToUSD(collateralDebtData._priceOracle, amount, token);
-        collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(getTokenMaskOrRevert(token));
     }
 
     /// @notice Revokes allowances for specified spender/token pairs
@@ -1200,11 +1171,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     }
 
     function _saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) internal {
-        if (enabledTokensMask > type(uint248).max) {
-            revert IncorrectParameterException();
-        }
         _checkEnabledTokenLength(enabledTokensMask);
-        creditAccountInfo[creditAccount].enabledTokensMask = uint248(enabledTokensMask);
+        creditAccountInfo[creditAccount].enabledTokensMask = enabledTokensMask;
     }
 
     ///

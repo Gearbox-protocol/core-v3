@@ -1839,7 +1839,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         vm.expectRevert(TokenAlreadyAddedException.selector);
         creditManager.addToken(underlying);
 
-        for (uint256 i = creditManager.collateralTokensCount(); i < 248; i++) {
+        for (uint256 i = creditManager.collateralTokensCount(); i < 255; i++) {
             creditManager.addToken(address(uint160(uint256(keccak256(abi.encodePacked(i))))));
         }
 

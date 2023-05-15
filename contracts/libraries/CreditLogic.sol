@@ -18,6 +18,7 @@ import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.so
 /// INTERFACES
 import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
+import {IWithdrawalManager} from "../interfaces/IWithdrawalManager.sol";
 
 uint256 constant INDEX_PRECISION = 10 ** 9;
 
@@ -312,6 +313,14 @@ library CreditLogic {
         collateralDebtData.hf = uint16(collateralDebtData.twvUSD * PERCENTAGE_FACTOR / collateralDebtData.totalDebtUSD);
     }
 
+    function calcTotalValueInUnderlying(CollateralDebtData memory collateralDebtData, address underlying)
+        internal
+        view
+    {
+        collateralDebtData.totalValue =
+            IPriceOracleV2(collateralDebtData._priceOracle).convertFromUSD(collateralDebtData.totalValueUSD, underlying); // F:[FA-41]
+    }
+
     function calcQuotedTokensCollateral(
         CollateralDebtData memory collateralDebtData,
         address creditAccount,
@@ -341,7 +350,7 @@ library CreditLogic {
                     });
 
                     if (countCollateral) {
-                        calcOneNonQuotedTokenCollateral({
+                        calcOneTokenCollateral({
                             collateralDebtData: collateralDebtData,
                             creditAccount: creditAccount,
                             token: token,
@@ -406,7 +415,7 @@ library CreditLogic {
                     bool nonZeroBalance;
                     {
                         (address token, uint16 liquidationThreshold) = collateralTokensByMaskFn(tokenMask);
-                        nonZeroBalance = calcOneNonQuotedTokenCollateral(
+                        nonZeroBalance = calcOneTokenCollateral(
                             collateralDebtData, creditAccount, token, liquidationThreshold, type(uint256).max
                         );
                     }
@@ -431,7 +440,7 @@ library CreditLogic {
         }
     }
 
-    function calcOneNonQuotedTokenCollateral(
+    function calcOneTokenCollateral(
         CollateralDebtData memory collateralDebtData,
         address creditAccount,
         address token,
@@ -447,6 +456,34 @@ library CreditLogic {
             collateralDebtData.twvUSD += Math.min(balanceUSD, quotaUSD) * liquidationThreshold / PERCENTAGE_FACTOR;
             return true;
         }
+    }
+
+    function addCancellableWithdrawalsValue(
+        CollateralDebtData memory collateralDebtData,
+        address creditAccount,
+        bool isForceCancel,
+        address withdrawalManager,
+        function (address) view returns (uint256) getTokenMaskFn
+    ) internal view {
+        (address token1, uint256 amount1, address token2, uint256 amount2) =
+            IWithdrawalManager(withdrawalManager).cancellableScheduledWithdrawals(creditAccount, isForceCancel);
+
+        if (amount1 != 0) {
+            addTotalValueAndEnableToken(collateralDebtData, token1, amount1, getTokenMaskFn);
+        }
+        if (amount2 != 0) {
+            addTotalValueAndEnableToken(collateralDebtData, token2, amount2, getTokenMaskFn);
+        }
+    }
+
+    function addTotalValueAndEnableToken(
+        CollateralDebtData memory collateralDebtData,
+        address token,
+        uint256 amount,
+        function (address) view returns (uint256) getTokenMaskFn
+    ) internal view {
+        collateralDebtData.totalValueUSD += convertToUSD(collateralDebtData._priceOracle, amount, token);
+        collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(getTokenMaskFn(token));
     }
 
     function convertToUSD(address priceOracle, uint256 amountInToken, address token)
