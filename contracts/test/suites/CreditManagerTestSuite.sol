@@ -67,7 +67,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         vm.startPrank(CONFIGURATOR);
         creditManager.setCreditFacade(creditFacade);
 
-        creditManager.setParams(
+        creditManager.setFees(
             DEFAULT_FEE_INTEREST,
             DEFAULT_FEE_LIQUIDATION,
             PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM,

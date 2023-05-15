@@ -106,7 +106,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
             /// DEPLOYED FOR NEW CREDIT MANAGER
 
             /// Sets limits and fees for the Credit Manager
-            _setParams(
+            _setFees(
                 DEFAULT_FEE_INTEREST,
                 DEFAULT_FEE_LIQUIDATION,
                 PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM,
@@ -115,7 +115,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
             ); // F:[CC-1]
 
             /// Adds collateral tokens and sets their liquidation thresholds
-            /// The underlying must not be in this list, since its LT is set separately in _setParams
+            /// The underlying must not be in this list, since its LT is set separately in _setFees
             uint256 len = opts.collateralTokens.length;
             for (uint256 i = 0; i < len;) {
                 address token = opts.collateralTokens[i].token;
@@ -488,7 +488,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
                 || (_liquidationPremiumExpired + _feeLiquidationExpired) >= PERCENTAGE_FACTOR
         ) revert IncorrectParameterException(); // FT:[CC-23]
 
-        _setParams(
+        _setFees(
             _feeInterest,
             _feeLiquidation,
             PERCENTAGE_FACTOR - _liquidationPremium,
@@ -498,7 +498,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     }
 
     /// @dev Does sanity checks on fee params and sets them in CreditManagerV3
-    function _setParams(
+    function _setFees(
         uint16 _feeInterest,
         uint16 _feeLiquidation,
         uint16 _liquidationDiscount,
@@ -531,7 +531,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
                 || (_liquidationDiscountExpired != _liquidationDiscountExpiredCurrent)
         ) {
             // updates params in creditManager
-            creditManager.setParams({
+            creditManager.setFees({
                 _feeInterest: _feeInterest,
                 _feeLiquidation: _feeLiquidation,
                 _liquidationDiscount: _liquidationDiscount,

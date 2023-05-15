@@ -971,7 +971,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuard 
     ///         during expired account liquidations
     /// @param _liquidationDiscountExpired Multiplier that reduces the effective totalValue during expired account liquidations,
     ///         allowing the liquidator to take the unaccounted for remainder as premium. Equal to (1 - liquidationPremiumExpired)
-    function setParams(
+    function setFees(
         uint16 _feeInterest,
         uint16 _feeLiquidation,
         uint16 _liquidationDiscount,

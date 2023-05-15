@@ -195,7 +195,7 @@ contract CreditLogicTest is TestHelper {
     function test_CM_43_calcClosePayments_test() public {
         // vm.prank(CONFIGURATOR);
 
-        // creditManager.setParams(
+        // creditManager.setFees(
         //     1000, // feeInterest: 10% , it doesn't matter this test
         //     200, // feeLiquidation: 2%, it doesn't matter this test
         //     9500, // liquidationPremium: 5%, it doesn't matter this test

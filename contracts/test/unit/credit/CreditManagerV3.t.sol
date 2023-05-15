@@ -213,7 +213,7 @@ contract CreditManagerV3UnitTest is Test, ICreditManagerV3Events, BalanceHelper 
     /// @dev U:[CM-4]:credit account configuration functions revert if were called non-configurator
     /// Functions list:
     /// - addToken
-    /// - setParams
+    /// - setFees
     /// - setLiquidationThreshold
     /// - setForbidMask
     /// - setContractAllowance
@@ -230,7 +230,7 @@ contract CreditManagerV3UnitTest is Test, ICreditManagerV3Events, BalanceHelper 
         creditManager.addToken(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditManager.setParams(0, 0, 0, 0, 0);
+        creditManager.setFees(0, 0, 0, 0, 0);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setCollateralTokenData(DUMB_ADDRESS, 0, 0, 0, 0);

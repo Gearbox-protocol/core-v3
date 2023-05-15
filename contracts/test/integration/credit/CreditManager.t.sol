@@ -1414,7 +1414,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
     function test_CM_43_calcClosePayments_test() public {
         // vm.prank(CONFIGURATOR);
 
-        // creditManager.setParams(
+        // creditManager.setFees(
         //     1000, // feeInterest: 10% , it doesn't matter this test
         //     200, // feeLiquidation: 2%, it doesn't matter this test
         //     9500, // liquidationPremium: 5%, it doesn't matter this test
@@ -1801,8 +1801,8 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
     // SET PARAMS
     //
 
-    /// @dev [CM-51]: setParams sets configuration properly
-    function test_CM_51_setParams_sets_configuration_properly() public {
+    /// @dev [CM-51]: setFees sets configuration properly
+    function test_CM_51_setFees_sets_configuration_properly() public {
         uint16 s_feeInterest = 8733;
         uint16 s_feeLiquidation = 1233;
         uint16 s_liquidationPremium = 1220;
@@ -1810,7 +1810,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         uint16 s_liquidationPremiumExpired = 7777;
 
         vm.prank(CONFIGURATOR);
-        creditManager.setParams(
+        creditManager.setFees(
             s_feeInterest, s_feeLiquidation, s_liquidationPremium, s_feeLiquidationExpired, s_liquidationPremiumExpired
         );
         (
