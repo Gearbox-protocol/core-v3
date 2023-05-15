@@ -10,7 +10,6 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
-import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 
 /// LIBS & TRAITS
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
@@ -43,7 +42,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
     address public immutable underlying;
 
     /// @dev Address of the protocol treasury
-    IPool4626 public immutable override pool;
+    address public immutable override pool;
 
     /// @dev The list of all Credit Managers
     EnumerableSet.AddressSet internal creditManagerSet;
@@ -87,10 +86,10 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
     /// @dev Constructor
     /// @param _pool Pool address
     constructor(address _pool)
-        ACLNonReentrantTrait(address(IPool4626(_pool).addressProvider()))
-        ContractsRegisterTrait(address(IPool4626(_pool).addressProvider()))
+        ACLNonReentrantTrait(IPool4626(_pool).addressProvider())
+        ContractsRegisterTrait(IPool4626(_pool).addressProvider())
     {
-        pool = IPool4626(_pool); // F:[PQK-1]
+        pool = _pool; // F:[PQK-1]
         underlying = IPool4626(_pool).asset(); // F:[PQK-1]
     }
 
@@ -102,9 +101,10 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         creditManagerOnly // F:[PQK-4]
         returns (uint256 caQuotaInterestChange, bool enableToken, bool disableToken)
     {
-        TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
-        AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
         int128 quotaRevenueChange;
+
+        AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
+        TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
 
         (caQuotaInterestChange, quotaRevenueChange, enableToken, disableToken) = QuotasLogic.changeQuota({
             tokenQuotaParams: tokenQuotaParams,
@@ -114,7 +114,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         });
 
         if (quotaRevenueChange != 0) {
-            pool.changeQuotaRevenue(quotaRevenueChange);
+            IPool4626(pool).changeQuotaRevenue(quotaRevenueChange);
         }
     }
 
@@ -150,7 +150,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         }
 
         if (quotaRevenueChange > 0) {
-            pool.changeQuotaRevenue(quotaRevenueChange);
+            IPool4626(pool).changeQuotaRevenue(quotaRevenueChange);
         }
     }
 
@@ -161,22 +161,19 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         external
         override
         creditManagerOnly // F:[PQK-4]
-        returns (uint256 caQuotaInterestChange)
     {
         uint256 len = tokens.length;
+        uint40 _lastQuotaRateUpdate = lastQuotaRateUpdate;
+        unchecked {
+            for (uint256 i; i < len; ++i) {
+                address token = tokens[i];
+                if (token == address(0)) break;
 
-        for (uint256 i; i < len;) {
-            address token = tokens[i];
-            if (token == address(0)) break;
-
-            caQuotaInterestChange += QuotasLogic.accrueAccountQuotaInterest({
-                tokenQuotaParams: totalQuotaParams[token],
-                accountQuota: accountQuotas[creditAccount][token],
-                lastQuotaRateUpdate: lastQuotaRateUpdate
-            });
-
-            unchecked {
-                ++i;
+                QuotasLogic.accrueAccountQuotaInterest({
+                    tokenQuotaParams: totalQuotaParams[token],
+                    accountQuota: accountQuotas[creditAccount][token],
+                    lastQuotaRateUpdate: _lastQuotaRateUpdate
+                });
             }
         }
     }
@@ -184,75 +181,17 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
     //
     // GETTERS
     //
-
-    /// @dev Computes outstanding quota interest
-    function outstandingQuotaInterest(address creditAccount, address[] memory tokens)
+    function getQuotaAndInterest(address creditAccount, address token)
         external
         view
         override
-        returns (uint256 caQuotaInterestChange)
-    {
-        uint256 len = tokens.length;
-        for (uint256 i; i < len;) {
-            address token = tokens[i];
-            if (token == address(0)) break;
-
-            caQuotaInterestChange += QuotasLogic.calcOutstandingQuotaInterest({
-                tokenQuotaParams: totalQuotaParams[token],
-                accountQuota: accountQuotas[creditAccount][token],
-                lastQuotaRateUpdate: lastQuotaRateUpdate
-            });
-
-            unchecked {
-                ++i;
-            }
-        }
-    }
-
-    /// @dev Computes collateral value for quoted tokens on the account, as well as accrued quota interest
-    function computeQuotedCollateralUSD(
-        address creditAccount,
-        address _priceOracle,
-        address[] memory tokens,
-        uint256[] memory lts
-    ) external view override returns (uint256 totalValueUSD, uint256 twvUSD, uint256 totalQuotaInterest) {
-        uint256 len = tokens.length;
-        for (uint256 i; i < len;) {
-            address token = tokens[i];
-            if (token == address(0)) break;
-
-            (uint256 currentUSD, uint256 outstandingInterest) = _getCollateralValue(creditAccount, token, _priceOracle); // F:[CMQ-8]
-
-            totalValueUSD += currentUSD;
-            twvUSD += currentUSD * lts[i]; // F:[CMQ-8]
-            totalQuotaInterest += outstandingInterest; // F:[CMQ-8]
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        twvUSD /= PERCENTAGE_FACTOR;
-    }
-
-    /// @dev Gets the effective value (i.e., value in underlying included into TWV) for a quoted token on an account
-    function _getCollateralValue(address creditAccount, address token, address _priceOracle)
-        internal
-        view
-        returns (uint256 value, uint256 interest)
+        returns (uint256 quoted, uint256 interest)
     {
         AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
 
-        uint96 quoted = accountQuota.quota;
+        quoted = accountQuota.quota;
 
         if (quoted > 1) {
-            uint256 quotaValueUSD = IPriceOracleV2(_priceOracle).convertToUSD(quoted, underlying); // F:[CMQ-8]
-            uint256 balance = IERC20(token).balanceOf(creditAccount);
-            if (balance > 1) {
-                value = IPriceOracleV2(_priceOracle).convertToUSD(balance, token); // F:[CMQ-8]
-                if (value > quotaValueUSD) value = quotaValueUSD; // F:[CMQ-8]
-            }
-
             interest = CreditLogic.calcAccruedInterest({
                 amount: quoted,
                 cumulativeIndexLastUpdate: accountQuota.cumulativeIndexLU,
@@ -344,7 +283,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
             }
         }
 
-        pool.updateQuotaRevenue(quotaRevenue); // F:[PQK-7]
+        IPool4626(pool).updateQuotaRevenue(quotaRevenue); // F:[PQK-7]
         lastQuotaRateUpdate = uint40(block.timestamp); // F:[PQK-7]
     }
 

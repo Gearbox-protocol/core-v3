@@ -5,6 +5,7 @@ pragma solidity ^0.8.10;
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
+uint256 constant NO_VERSION_CONTROL = 0;
 // Repositories & services
 bytes32 constant AP_CONTRACTS_REGISTER = "CONTRACTS_REGISTER";
 bytes32 constant AP_ACL = "ACL";
@@ -17,7 +18,15 @@ bytes32 constant AP_WETH_TOKEN = "WETH_TOKEN";
 bytes32 constant AP_WETH_GATEWAY = "WETH_GATEWAY";
 bytes32 constant AP_WITHDRAWAL_MANAGER = "WITHDRAWAL_MANAGER";
 bytes32 constant AP_ROUTER = "ROUTER";
+bytes32 constant AP_BOT_LIST = "BOT_LIST";
 
-interface IAddressProviderV3 is IVersion {
-    function getAddress(bytes32 key) external view returns (address);
+interface IAddressProviderEvents {
+    /// @dev Emits when an address is set for a contract role
+    event AddressSet(bytes32 indexed service, address indexed newAddress, uint256 indexed version);
+}
+
+interface IAddressProviderV3 is IAddressProviderEvents, IVersion {
+    function getAddressOrRevert(bytes32 key, uint256 _version) external view returns (address result);
+
+    function setAddress(bytes32 key, address value, bool saveVersion) external;
 }

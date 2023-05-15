@@ -1876,7 +1876,7 @@ contract CreditFacadeIntegrationTest is
         vm.roll(block.number + 1);
 
         // (uint256 borrowedAmount, uint256 borrowedAmountWithInterest,) =
-        //     creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        //     creditManager.calcAccruedInterestAndFees(creditAccount);
 
         // (, uint256 remainingFunds,,) = creditManager.calcClosePayments(
         //     balance, ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT, borrowedAmount, borrowedAmountWithInterest

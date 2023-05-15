@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {IncorrectParameterException} from "../../../interfaces/IExceptions.sol";
 import {CreditLogic} from "../../../libraries/CreditLogic.sol";
-import {ClosureAction} from "../../../interfaces/ICreditManagerV3.sol";
+import {ClosureAction, CollateralDebtData} from "../../../interfaces/ICreditManagerV3.sol";
 import {TestHelper} from "../../lib/helper.sol";
 
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
@@ -18,6 +18,17 @@ import "forge-std/console.sol";
 contract CreditLogicTest is TestHelper {
     function _calcDiff(uint256 a, uint256 b) internal pure returns (uint256 diff) {
         diff = a > b ? a - b : b - a;
+    }
+
+    function _calcTotalDebt(
+        uint256 debt,
+        uint256 indexNow,
+        uint256 indexOpen,
+        uint256 quotaInterest,
+        uint16 feeInterest
+    ) internal view returns (uint256) {
+        return debt
+            + (debt * indexNow / indexOpen + quotaInterest - debt) * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR;
     }
 
     /// @notice U:[CL-1]: `calcIndex` reverts for zero value
@@ -46,7 +57,13 @@ contract CreditLogicTest is TestHelper {
 
         vm.assume(interest > 1);
 
-        (uint256 newDebt, uint256 newIndex) = CreditLogic.calcIncrease(debt, delta, indexNow, indexAtOpen);
+        CollateralDebtData memory cdd;
+
+        cdd.debt = debt;
+        cdd.cumulativeIndexNow = indexNow;
+        cdd.cumulativeIndexLastUpdate = indexAtOpen;
+
+        (uint256 newDebt, uint256 newIndex) = CreditLogic.calcIncrease(cdd, delta);
 
         assertEq(newDebt, debt + delta, "Debt principal not updated correctly");
 
@@ -86,14 +103,20 @@ contract CreditLogicTest is TestHelper {
 
         if (delta > debt + interest + quotaInterest) delta %= debt + interest + quotaInterest;
 
-        (uint256 newDebt, uint256 newCumulativeIndex,,, uint256 cumulativeQuotaInterest) =
-            CreditLogic.calcDecrease(delta, quotaInterest, feeInterest, debt, indexNow, indexAtOpen);
+        CollateralDebtData memory cdd;
 
-        uint256 oldTotalDebt = debt + (interest + quotaInterest) * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR;
+        cdd.debt = debt;
+        cdd.cumulativeIndexNow = indexNow;
+        cdd.cumulativeIndexLastUpdate = indexAtOpen;
+        cdd.cumulativeQuotaInterest = quotaInterest;
 
-        uint256 newTotalDebt = newDebt
-            + (newDebt * indexNow / newCumulativeIndex + cumulativeQuotaInterest - newDebt)
-                * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR;
+        (uint256 newDebt, uint256 newCumulativeIndex,,) = CreditLogic.calcDecrease(cdd, delta, feeInterest);
+
+        uint256 cumulativeQuotaInterest = cdd.cumulativeQuotaInterest;
+
+        uint256 oldTotalDebt = _calcTotalDebt(debt, indexNow, indexAtOpen, quotaInterest, feeInterest);
+        uint256 newTotalDebt =
+            _calcTotalDebt(newDebt, indexNow, newCumulativeIndex, cumulativeQuotaInterest, feeInterest);
 
         uint256 debtError = _calcDiff(oldTotalDebt, newTotalDebt + delta);
         uint256 rel = oldTotalDebt > newTotalDebt ? oldTotalDebt : newTotalDebt;
@@ -132,8 +155,14 @@ contract CreditLogicTest is TestHelper {
 
         if (delta > debt + interest + quotaInterest) delta %= debt + interest + quotaInterest;
 
-        (uint256 newDebt,, uint256 amountToRepay, uint256 profit,) =
-            CreditLogic.calcDecrease(delta, quotaInterest, feeInterest, debt, indexNow, indexAtOpen);
+        CollateralDebtData memory cdd;
+
+        cdd.debt = debt;
+        cdd.cumulativeIndexNow = indexNow;
+        cdd.cumulativeIndexLastUpdate = indexAtOpen;
+        cdd.cumulativeQuotaInterest = quotaInterest;
+
+        (uint256 newDebt,, uint256 amountToRepay, uint256 profit) = CreditLogic.calcDecrease(cdd, delta, feeInterest);
 
         assertEq(amountToRepay, debt - newDebt, "Amount to repay incorrect");
 
@@ -357,7 +386,7 @@ contract CreditLogicTest is TestHelper {
         // (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow, address creditAccount) =
         //     cms.openCreditAccount((uint256(type(uint128).max) * 14) / 10);
 
-        // (,, uint256 totalDebt) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        // (,, uint256 totalDebt) = creditManager.calcAccruedInterestAndFees(creditAccount);
 
         // uint256 expectedInterestAndFees;
         // uint256 expectedBorrowAmount;
@@ -375,11 +404,11 @@ contract CreditLogicTest is TestHelper {
         // assertEq(newBorrowedAmount, expectedBorrowAmount, "Incorrect returned newBorrowedAmount");
 
         // if (amount >= totalDebt - borrowedAmount) {
-        //     (,, uint256 newTotalDebt) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        //     (,, uint256 newTotalDebt) = creditManager.calcAccruedInterestAndFees(creditAccount);
 
         //     assertEq(newTotalDebt, newBorrowedAmount, "Incorrect new interest");
         // } else {
-        //     (,, uint256 newTotalDebt) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        //     (,, uint256 newTotalDebt) = creditManager.calcAccruedInterestAndFees(creditAccount);
 
         //     assertLt(
         //         (RAY * (newTotalDebt - newBorrowedAmount)) / expectedInterestAndFees - RAY,

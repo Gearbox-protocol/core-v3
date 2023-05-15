@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.10;
 
-import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
+import "../../../interfaces/IAddressProviderV3.sol";
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
@@ -70,7 +70,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
 
     CreditManagerTestSuite cms;
 
-    IAddressProvider addressProvider;
+    IAddressProviderV3 addressProvider;
     IWETH wethToken;
 
     AccountFactory af;
@@ -284,7 +284,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
 
     /// @dev [CM-8]: openCreditAccount sets correct values and transfers tokens from pool
     function test_CM_08_openCreditAccount_sets_correct_values_and_transfers_tokens_from_pool() public {
-        address expectedCreditAccount = AccountFactory(addressProvider.getAccountFactory()).head();
+        address expectedCreditAccount = AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 1)).head();
 
         uint256 blockAtOpen = block.number;
         uint256 cumulativeAtOpen = 1012;
@@ -318,7 +318,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
 
         assertTrue(
-            creditAccount != AccountFactory(addressProvider.getAccountFactory()).tail(),
+            creditAccount != AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 1)).tail(),
             "credit account is already in tail!"
         );
 
@@ -334,7 +334,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
 
         assertEq(
             creditAccount,
-            AccountFactory(addressProvider.getAccountFactory()).tail(),
+            AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 1)).tail(),
             "credit account is not in accountFactory tail!"
         );
 
@@ -903,7 +903,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         // (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow, address creditAccount) =
         //     cms.openCreditAccount((uint256(type(uint128).max) * 14) / 10);
 
-        // (,, uint256 totalDebt) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        // (,, uint256 totalDebt) = creditManager.calcAccruedInterestAndFees(creditAccount);
 
         // uint256 expectedInterestAndFees;
         // uint256 expectedBorrowAmount;
@@ -921,11 +921,11 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         // assertEq(newBorrowedAmount, expectedBorrowAmount, "Incorrect returned newBorrowedAmount");
 
         // if (amount >= totalDebt - borrowedAmount) {
-        //     (,, uint256 newTotalDebt) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        //     (,, uint256 newTotalDebt) = creditManager.calcAccruedInterestAndFees(creditAccount);
 
         //     assertEq(newTotalDebt, newBorrowedAmount, "Incorrect new interest");
         // } else {
-        //     (,, uint256 newTotalDebt) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        //     (,, uint256 newTotalDebt) = creditManager.calcAccruedInterestAndFees(creditAccount);
 
         //     assertLt(
         //         (RAY * (newTotalDebt - newBorrowedAmount)) / expectedInterestAndFees - RAY,
@@ -1368,7 +1368,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         //             * creditConfig.lt(Tokens.WETH)
         //     ) / WAD;
 
-        // (,, uint256 borrowedAmountWithInterestAndFees) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        // (,, uint256 borrowedAmountWithInterestAndFees) = creditManager.calcAccruedInterestAndFees(creditAccount);
 
         // uint256 debtUSD = borrowedAmountWithInterestAndFees * tokenTestSuite.prices(Tokens.DAI) * minHealthFactor / WAD;
 
@@ -1741,8 +1741,8 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
     // CALC CREDIT ACCOUNT ACCRUED INTEREST
     //
 
-    /// @dev [CM-49]: calcCreditAccountAccruedInterest computes correctly
-    function test_CM_49_calcCreditAccountAccruedInterest_computes_correctly(uint128 amount) public {
+    /// @dev [CM-49]: calcAccruedInterestAndFees computes correctly
+    function test_CM_49_calcAccruedInterestAndFees_computes_correctly(uint128 amount) public {
         // tokenTestSuite.mint(Tokens.DAI, address(poolMock), amount);
         // (,,, address creditAccount) = cms.openCreditAccount(amount);
 
@@ -1760,7 +1760,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         //     ((expectedBorrowedAmountWithInterest - expectedBorrowedAmount) * feeInterest) / PERCENTAGE_FACTOR;
 
         // (uint256 borrowedAmount, uint256 borrowedAmountWithInterest, uint256 borrowedAmountWithInterestAndFees) =
-        //     creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        //     creditManager.calcAccruedInterestAndFees(creditAccount);
 
         // assertEq(borrowedAmount, expectedBorrowedAmount, "Incorrect borrowed amount");
         // assertEq(
@@ -1778,24 +1778,24 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
     //
 
     /// @dev [CM-50]: getCreditAccountParameters return correct values
-    function test_CM_50_getCreditAccountParameters_return_correct_values() public {
-        // It enables  CreditManagerTestInternal for some test cases
-        _connectCreditManagerSuite(Tokens.DAI, true);
+    // function test_CM_50_getCreditAccountParameters_return_correct_values() public {
+    //     // It enables  CreditManagerTestInternal for some test cases
+    //     _connectCreditManagerSuite(Tokens.DAI, true);
 
-        (,,, address creditAccount) = _openCreditAccount();
+    //     (,,, address creditAccount) = _openCreditAccount();
 
-        (uint256 expectedDebt, uint256 expectedcumulativeIndexLastUpdate,,,,) =
-            creditManager.creditAccountInfo(creditAccount);
+    //     (uint256 expectedDebt, uint256 expectedcumulativeIndexLastUpdate,,,,) =
+    //         creditManager.creditAccountInfo(creditAccount);
 
-        CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
+    //     CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
 
-        (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate,) = cmi.getCreditAccountParameters(creditAccount);
+    //     (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate,) = cmi.getCreditAccountParameters(creditAccount);
 
-        assertEq(borrowedAmount, expectedDebt, "Incorrect borrowed amount");
-        assertEq(cumulativeIndexLastUpdate, expectedcumulativeIndexLastUpdate, "Incorrect cumulativeIndexLastUpdate");
+    //     assertEq(borrowedAmount, expectedDebt, "Incorrect borrowed amount");
+    //     assertEq(cumulativeIndexLastUpdate, expectedcumulativeIndexLastUpdate, "Incorrect cumulativeIndexLastUpdate");
 
-        assertEq(cumulativeIndexLastUpdate, expectedcumulativeIndexLastUpdate, "cumulativeIndexLastUpdate");
-    }
+    //     assertEq(cumulativeIndexLastUpdate, expectedcumulativeIndexLastUpdate, "cumulativeIndexLastUpdate");
+    // }
 
     //
     // SET PARAMS
@@ -1839,7 +1839,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         vm.expectRevert(TokenAlreadyAddedException.selector);
         creditManager.addToken(underlying);
 
-        for (uint256 i = creditManager.collateralTokensCount(); i < 248; i++) {
+        for (uint256 i = creditManager.collateralTokensCount(); i < 255; i++) {
             creditManager.addToken(address(uint160(uint256(keccak256(abi.encodePacked(i))))));
         }
 

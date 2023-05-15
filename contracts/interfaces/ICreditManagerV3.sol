@@ -40,15 +40,22 @@ enum CollateralCalcTask {
 
 struct CollateralDebtData {
     uint256 debt;
+    uint256 cumulativeIndexNow;
+    uint256 cumulativeIndexLastUpdate;
+    uint256 cumulativeQuotaInterest;
     uint256 accruedInterest;
     uint256 accruedFees;
     uint256 totalValue;
     uint256 totalValueUSD;
     uint256 twvUSD;
+    uint256 totalDebtUSD;
     uint16 hf;
     uint256 enabledTokensMask;
     address[] quotedTokens;
     bool isLiquidatable;
+    ///
+    address _priceOracle;
+    address _poolQuotaKeeper;
 }
 
 struct CollateralTokenData {
@@ -216,8 +223,8 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
         view
         returns (address token, uint16 liquidationThreshold);
 
-    /// @dev Returns the array of quoted tokens that are enabled on the account
-    function getQuotedTokens(address creditAccount) external view returns (address[] memory tokens);
+    // /// @dev Returns the array of quoted tokens that are enabled on the account
+    // function getQuotedTokens(address creditAccount) external view returns (address[] memory tokens);
 
     /// @dev Total number of known collateral tokens.
     function collateralTokensCount() external view returns (uint8);

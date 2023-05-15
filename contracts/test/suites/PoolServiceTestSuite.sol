@@ -92,19 +92,19 @@ contract PoolServiceTestSuite is Test {
         if (is4626) {
             pool4626 = isFeeToken
                 ? new Pool4626_USDT({
-                                                                                            _addressProvider: address(addressProvider),
-                                                                                            _underlyingToken: _underlying,
-                                                                                            _interestRateModel: address(linearIRModel),
-                                                                                            _expectedLiquidityLimit: type(uint256).max,
-                                                                                            _supportsQuotas: supportQuotas
-                                                                                        })
+                        _addressProvider: address(addressProvider),
+                        _underlyingToken: _underlying,
+                        _interestRateModel: address(linearIRModel),
+                        _expectedLiquidityLimit: type(uint256).max,
+                        _supportsQuotas: supportQuotas
+                    })
                 : new Pool4626({
-                                                                                            _addressProvider: address(addressProvider),
-                                                                                            _underlyingToken: _underlying,
-                                                                                            _interestRateModel: address(linearIRModel),
-                                                                                            _expectedLiquidityLimit: type(uint256).max,
-                                                                                            _supportsQuotas: supportQuotas
-                                                                                        });
+                        _addressProvider: address(addressProvider),
+                        _underlyingToken: _underlying,
+                        _interestRateModel: address(linearIRModel),
+                        _expectedLiquidityLimit: type(uint256).max,
+                        _supportsQuotas: supportQuotas
+                    });
             newPool = address(pool4626);
 
             if (supportQuotas) {
@@ -148,7 +148,7 @@ contract PoolServiceTestSuite is Test {
         poolQuotaKeeper = new PoolQuotaKeeper(address(pool4626));
 
         // vm.prank(CONFIGURATOR);
-        pool4626.connectPoolQuotaManager(address(poolQuotaKeeper));
+        pool4626.setPoolQuotaManager(address(poolQuotaKeeper));
 
         gaugeMock = new GaugeMock(address(pool4626));
 

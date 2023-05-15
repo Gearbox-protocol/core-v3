@@ -74,7 +74,7 @@ contract PoolQuotaKeeperTestSuite is Test {
         poolQuotaKeeper = new PoolQuotaKeeper(address(pool4626));
 
         // vm.prank(CONFIGURATOR);
-        pool4626.connectPoolQuotaManager(address(poolQuotaKeeper));
+        pool4626.setPoolQuotaManager(address(poolQuotaKeeper));
 
         gaugeMock = new GaugeMock(address(pool4626));
 
