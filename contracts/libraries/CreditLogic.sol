@@ -367,193 +367,222 @@ library CreditLogic {
     function calcAccruedInterestAndFees(CollateralDebtData memory collateralDebtData, uint16 feeInterest)
         internal
         pure
+        returns (uint256 accruedInterest, uint256 accruedFees)
     {
         // Interest is never stored and is always computed dynamically
         // as the difference between the current cumulative index of the pool
         // and the cumulative index recorded in the Credit Account
-        collateralDebtData.accruedInterest = calcAccruedInterest(
+        accruedInterest = calcAccruedInterest(
             collateralDebtData.debt, collateralDebtData.cumulativeIndexLastUpdate, collateralDebtData.cumulativeIndexNow
         ) + collateralDebtData.cumulativeQuotaInterest; // F:[CM-49]
 
         // Fees are computed as a percentage of interest
-        collateralDebtData.accruedFees = collateralDebtData.accruedInterest * feeInterest / PERCENTAGE_FACTOR; // F: [CM-49]
+        accruedFees = collateralDebtData.accruedInterest * feeInterest / PERCENTAGE_FACTOR; // F: [CM-49]
     }
 
-    function calcTotalDebtUSD(CollateralDebtData memory collateralDebtData, address underlying) internal view {
-        collateralDebtData.totalDebtUSD = convertToUSD(
+    function calcTotalDebtUSD(
+        CollateralDebtData memory collateralDebtData,
+        address underlying,
+        function (address, uint256, address) view returns(uint256) convertToUSDFn
+    ) internal view returns (uint256 totalDebtUSD) {
+        totalDebtUSD = convertToUSDFn(
             collateralDebtData._priceOracle,
             calcTotalDebt(collateralDebtData), // F: [CM-42]
             underlying
         );
     }
 
-    function calcHealthFactor(CollateralDebtData memory collateralDebtData) internal pure {
-        collateralDebtData.hf = uint16(collateralDebtData.twvUSD * PERCENTAGE_FACTOR / collateralDebtData.totalDebtUSD);
+    function calcHealthFactor(CollateralDebtData memory collateralDebtData) internal pure returns (uint16 hf) {
+        hf = uint16(collateralDebtData.twvUSD * PERCENTAGE_FACTOR / collateralDebtData.totalDebtUSD);
     }
 
-    function calcTotalValueInUnderlying(CollateralDebtData memory collateralDebtData, address underlying)
-        internal
-        view
-    {
-        collateralDebtData.totalValue =
-            IPriceOracleV2(collateralDebtData._priceOracle).convertFromUSD(collateralDebtData.totalValueUSD, underlying); // F:[FA-41]
+    function calcTotalValueInUnderlying(
+        CollateralDebtData memory collateralDebtData,
+        address underlying,
+        function (address, uint256, address) view returns(uint256) convertFromUSDFn
+    ) internal view returns (uint256 totalValue) {
+        totalValue = convertFromUSDFn(collateralDebtData._priceOracle, collateralDebtData.totalValueUSD, underlying); // F:[FA-41]
+    }
+
+    function calcCollateral(
+        CollateralDebtData memory collateralDebtData,
+        address creditAccount,
+        address underlying,
+        bool lazy,
+        uint16 minHealthFactor,
+        uint256[] memory collateralHints,
+        function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn,
+        function (address, uint256, address) view returns(uint256) convertToUSDFn
+    ) internal view returns (uint256 totalValueUSD, uint256 twvUSD, uint256 tokensToDisable) {
+        uint256 limit = lazy ? collateralDebtData.totalDebtUSD * minHealthFactor / PERCENTAGE_FACTOR : type(uint256).max;
+
+        if (collateralDebtData.quotedTokens.length != 0) {
+            uint256 underlyingPriceRAY = convertToUSDFn(collateralDebtData._priceOracle, RAY, underlying);
+
+            (totalValueUSD, twvUSD) = calcQuotedTokensCollateral({
+                collateralDebtData: collateralDebtData,
+                creditAccount: creditAccount,
+                underlyingPriceRAY: underlyingPriceRAY,
+                limit: limit,
+                convertToUSDFn: convertToUSDFn
+            });
+
+            if (twvUSD > limit) {
+                return (totalValueUSD, twvUSD, 0);
+            } else {
+                unchecked {
+                    limit -= twvUSD;
+                }
+            }
+        }
+        {
+            uint256 tokensToCheckMask = collateralDebtData.enabledTokensMask.disable(collateralDebtData.quotedTokenMask);
+            address priceOracle = collateralDebtData._priceOracle;
+            uint256 tvDelta;
+            uint256 twvDelta;
+
+            (tvDelta, twvDelta, tokensToDisable) = calcNonQuotedTokensCollateral({
+                tokensToCheckMask: tokensToCheckMask,
+                priceOracle: priceOracle,
+                creditAccount: creditAccount,
+                limit: limit,
+                collateralHints: collateralHints,
+                collateralTokensByMaskFn: collateralTokensByMaskFn,
+                convertToUSDFn: convertToUSDFn
+            });
+        }
     }
 
     function calcQuotedTokensCollateral(
         CollateralDebtData memory collateralDebtData,
         address creditAccount,
-        uint256 maxEnabledTokens,
-        address underlying,
-        function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn,
-        bool countCollateral
-    ) internal view {
-        uint256 j;
-        uint256 quotedTokenMask = collateralDebtData.quotedTokenMask & collateralDebtData.enabledTokensMask;
+        uint256 underlyingPriceRAY,
+        uint256 limit,
+        function (address, uint256, address) view returns(uint256) convertToUSDFn
+    ) internal view returns (uint256 totalValueUSD, uint256 twvUSD) {
+        uint256 len = collateralDebtData.quotedTokens.length;
+        address priceOracle = collateralDebtData._priceOracle;
 
-        uint256 underlyingPriceRAY =
-            countCollateral ? convertToUSD(collateralDebtData._priceOracle, RAY, underlying) : 0;
+        for (uint256 i; i < len;) {
+            address token = collateralDebtData.quotedTokens[i];
+            if (token == address(0)) break;
+            {
+                uint16 lt = collateralDebtData.quotedLts[i];
+                uint256 quotaUSD = collateralDebtData.quotas[i] * underlyingPriceRAY / RAY;
+                (uint256 valueUSD, uint256 weightedValueUSD,) = calcOneTokenCollateral({
+                    priceOracle: priceOracle,
+                    creditAccount: creditAccount,
+                    token: token,
+                    liquidationThreshold: lt,
+                    quotaUSD: quotaUSD,
+                    convertToUSDFn: convertToUSDFn
+                });
 
-        collateralDebtData.quotedTokens = new address[](maxEnabledTokens);
+                totalValueUSD += valueUSD;
+                twvUSD += weightedValueUSD;
+            }
+            if (twvUSD >= limit) {
+                return (totalValueUSD, twvUSD);
+            }
 
-        unchecked {
-            for (uint256 tokenMask = 2; tokenMask <= quotedTokenMask; tokenMask <<= 1) {
-                if (quotedTokenMask & tokenMask != 0) {
-                    (address token, uint16 liquidationThreshold) = collateralTokensByMaskFn(tokenMask, countCollateral);
-
-                    uint256 quoted = getQuotaAndUpdateOutstandingInterest({
-                        collateralDebtData: collateralDebtData,
-                        creditAccount: creditAccount,
-                        token: token
-                    });
-
-                    if (countCollateral) {
-                        calcOneTokenCollateral({
-                            collateralDebtData: collateralDebtData,
-                            creditAccount: creditAccount,
-                            token: token,
-                            liquidationThreshold: liquidationThreshold,
-                            quotaUSD: quoted * underlyingPriceRAY / RAY
-                        });
-                    }
-
-                    collateralDebtData.quotedTokens[j] = token;
-
-                    ++j;
-
-                    if (j >= maxEnabledTokens) {
-                        revert TooManyEnabledTokensException();
-                    }
-                }
+            unchecked {
+                ++i;
             }
         }
-    }
-
-    function getQuotaAndUpdateOutstandingInterest(
-        CollateralDebtData memory collateralDebtData,
-        address creditAccount,
-        address token
-    ) internal view returns (uint256 quoted, uint256 outstandingInterest) {
-        return IPoolQuotaKeeper(collateralDebtData._poolQuotaKeeper).getQuotaAndInterest(creditAccount, token);
     }
 
     function calcNonQuotedTokensCollateral(
-        CollateralDebtData memory collateralDebtData,
         address creditAccount,
-        bool stopIfReachLimit,
-        uint16 minHealthFactor,
+        uint256 limit,
         uint256[] memory collateralHints,
-        function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn
-    ) internal view {
-        uint256 twvLimitUSD;
-        if (stopIfReachLimit) {
-            if (collateralDebtData.twvUSD * PERCENTAGE_FACTOR >= collateralDebtData.totalDebtUSD * minHealthFactor) {
-                return;
-            }
-            twvLimitUSD = collateralDebtData.totalDebtUSD * minHealthFactor / PERCENTAGE_FACTOR;
-        } else {
-            twvLimitUSD = type(uint256).max;
-        }
+        function (address, uint256, address) view returns(uint256) convertToUSDFn,
+        function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn,
+        uint256 tokensToCheckMask,
+        address priceOracle
+    ) internal view returns (uint256 totalValueUSD, uint256 twvUSD, uint256 tokensToDisable) {
         uint256 len = collateralHints.length;
 
-        uint256 checkedTokenMask = collateralDebtData.enabledTokensMask.disable(collateralDebtData.quotedTokenMask);
-
-        unchecked {
-            // TODO: add test that we check all values and it's always reachable
-            for (uint256 i; checkedTokenMask != 0; ++i) {
+        address ca = creditAccount;
+        // TODO: add test that we check all values and it's always reachable
+        for (uint256 i; tokensToCheckMask != 0;) {
+            uint256 tokenMask;
+            unchecked {
                 // TODO: add check for super long collateralnhints and for double masks
-                uint256 tokenMask = (i < len) ? collateralHints[i] : 1 << (i - len); // F: [CM-68]
-
-                // CASE enabledTokensMask & tokenMask == 0 F:[CM-38]
-                if (checkedTokenMask & tokenMask != 0) {
-                    bool nonZeroBalance;
-                    {
-                        (address token, uint16 liquidationThreshold) = collateralTokensByMaskFn(tokenMask, true);
-                        nonZeroBalance = calcOneTokenCollateral(
-                            collateralDebtData, creditAccount, token, liquidationThreshold, type(uint256).max
-                        );
-                    }
-                    // Collateral calculations are only done if there is a non-zero balance
-                    if (nonZeroBalance) {
-                        // Full collateral check evaluates a Credit Account's health factor lazily;
-                        // Once the TWV computed thus far exceeds the debt, the check is considered
-                        // successful, and the function returns without evaluating any further collateral
-                        if (collateralDebtData.twvUSD >= twvLimitUSD) {
-                            break;
-                        }
-                        // Zero-balance tokens are disabled; this is done by flipping the
-                        // bit in enabledTokensMask, which is then written into storage at the
-                        // very end, to avoid redundant storage writes
-                    } else {
-                        collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.disable(tokenMask);
-                    }
+                tokenMask = (i < len) ? collateralHints[i] : 1 << (i - len); // F: [CM-68]
+            }
+            // CASE enabledTokensMask & tokenMask == 0 F:[CM-38]
+            if (tokensToCheckMask & tokenMask != 0) {
+                bool nonZero;
+                {
+                    uint256 valueUSD;
+                    uint256 weightedValueUSD;
+                    (valueUSD, weightedValueUSD, nonZero) = calcOneNonQuotedCollateral({
+                        priceOracle: priceOracle,
+                        creditAccount: ca,
+                        tokenMask: tokenMask,
+                        convertToUSDFn: convertToUSDFn,
+                        collateralTokensByMaskFn: collateralTokensByMaskFn
+                    });
+                    totalValueUSD += valueUSD;
+                    twvUSD += weightedValueUSD;
                 }
+                if (nonZero) {
+                    // Full collateral check evaluates a Credit Account's health factor lazily;
+                    // Once the TWV computed thus far exceeds the debt, the check is considered
+                    // successful, and the function returns without evaluating any further collateral
+                    if (twvUSD >= limit) {
+                        break;
+                    }
+                    // Zero-balance tokens are disabled; this is done by flipping the
+                    // bit in enabledTokensMask, which is then written into storage at the
+                    // very end, to avoid redundant storage writes
+                } else {
+                    tokensToDisable |= tokenMask;
+                }
+            }
+            tokensToCheckMask = tokensToCheckMask.disable(tokenMask);
 
-                checkedTokenMask &= (~tokenMask);
+            unchecked {
+                ++i;
             }
         }
     }
 
-    function calcOneTokenCollateral(
-        CollateralDebtData memory collateralDebtData,
+    function calcOneNonQuotedCollateral(
         address creditAccount,
+        function (address, uint256, address) view returns(uint256) convertToUSDFn,
+        function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn,
+        uint256 tokenMask,
+        address priceOracle
+    ) internal view returns (uint256 valueUSD, uint256 weightedValueUSD, bool nonZeroBalance) {
+        (address token, uint16 liquidationThreshold) = collateralTokensByMaskFn(tokenMask, true);
+
+        (valueUSD, weightedValueUSD, nonZeroBalance) = calcOneTokenCollateral({
+            priceOracle: priceOracle,
+            creditAccount: creditAccount,
+            token: token,
+            liquidationThreshold: liquidationThreshold,
+            quotaUSD: type(uint256).max,
+            convertToUSDFn: convertToUSDFn
+        });
+    }
+
+    function calcOneTokenCollateral(
+        address creditAccount,
+        function (address, uint256, address) view returns(uint256) convertToUSDFn,
+        address priceOracle,
         address token,
         uint16 liquidationThreshold,
         uint256 quotaUSD
-    ) internal view returns (bool nonZeroBalance) {
+    ) internal view returns (uint256 valueUSD, uint256 weightedValueUSD, bool nonZeroBalance) {
         uint256 balance = IERC20Helper.balanceOf(token, creditAccount);
 
         // Collateral calculations are only done if there is a non-zero balance
         if (balance > 1) {
-            uint256 balanceUSD = convertToUSD(collateralDebtData._priceOracle, balance, token);
-            collateralDebtData.totalValueUSD += balanceUSD;
-            collateralDebtData.twvUSD += Math.min(balanceUSD, quotaUSD) * liquidationThreshold / PERCENTAGE_FACTOR;
-            return true;
+            valueUSD = convertToUSDFn(priceOracle, balance, token);
+            weightedValueUSD = Math.min(valueUSD, quotaUSD) * liquidationThreshold / PERCENTAGE_FACTOR;
+            nonZeroBalance = true;
         }
-    }
-
-    function addCancellableWithdrawalsValue(
-        CollateralDebtData memory collateralDebtData,
-        address creditAccount,
-        bool isForceCancel,
-        address withdrawalManager
-    ) internal view {
-        (address token1, uint256 amount1, address token2, uint256 amount2) =
-            IWithdrawalManager(withdrawalManager).cancellableScheduledWithdrawals(creditAccount, isForceCancel);
-
-        if (amount1 != 0) {
-            collateralDebtData.totalValueUSD += convertToUSD(collateralDebtData._priceOracle, amount1, token1);
-        }
-        if (amount2 != 0) {
-            collateralDebtData.totalValueUSD += convertToUSD(collateralDebtData._priceOracle, amount2, token2);
-        }
-    }
-
-    function convertToUSD(address priceOracle, uint256 amountInToken, address token)
-        internal
-        view
-        returns (uint256 amountInUSD)
-    {
-        amountInUSD = IPriceOracleV2(priceOracle).convertToUSD(amountInToken, token);
     }
 
     /// BALANCES

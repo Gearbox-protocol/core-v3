@@ -53,6 +53,8 @@ struct CollateralDebtData {
     uint256 enabledTokensMask;
     uint256 quotedTokenMask;
     address[] quotedTokens;
+    uint16[] quotedLts;
+    uint256[] quotas;
     bool isLiquidatable;
     ///
     address _priceOracle;
