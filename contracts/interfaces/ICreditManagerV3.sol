@@ -48,19 +48,16 @@ struct CollateralDebtData {
     uint256 cumulativeQuotaInterest;
     uint256 accruedInterest;
     uint256 accruedFees;
+    uint256 totalDebtUSD;
     uint256 totalValue;
     uint256 totalValueUSD;
     uint256 twvUSD;
-    uint256 totalDebtUSD;
-    uint16 hf;
     uint256 enabledTokensMask;
     uint256 quotedTokenMask;
     address[] quotedTokens;
     uint16[] quotedLts;
     uint256[] quotas;
-    bool isLiquidatable;
     ///
-    address _priceOracle;
     address _poolQuotaKeeper;
 }
 
@@ -255,7 +252,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     function poolService() external view returns (address);
 
     /// @dev Returns the current pool quota keeper connected to the pool
-    function poolQuotaKeeper() external view returns (IPoolQuotaKeeper);
+    function poolQuotaKeeper() external view returns (address);
 
     /// @dev Whether the Credit Manager supports quotas
     function supportsQuotas() external view returns (bool);

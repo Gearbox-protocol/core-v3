@@ -295,14 +295,15 @@ contract CreditManagerV3UnitTest is Test, ICreditManagerV3Events, BalanceHelper 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditManager.setFlagFor(DUMB_ADDRESS, 1, true);
 
-        // vm.startPrank(USER);
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        creditManager.approveCreditAccount(DUMB_ADDRESS, 100);
 
-        // vm.expectRevert(CallerNotAdapterException.selector);
-        // creditManager.approveCreditAccount(DUMB_ADDRESS, 100);
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        creditManager.executeOrder(bytes("0"));
+    }
 
-        // vm.expectRevert(CallerNotAdapterException.selector);
-        // creditManager.executeOrder(bytes("0"));
-
-        // vm.stopPrank();
+    /// @dev U:[CM-6]: credit manager works as expected
+    function test_U_CM_06_non_reentrant_functions_revert_if_called_in_reentrancy() public {
+        creditManager.openCreditAccount(200000, address(this), false);
     }
 }

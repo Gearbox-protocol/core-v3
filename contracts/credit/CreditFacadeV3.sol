@@ -143,7 +143,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         _;
     }
 
-    function _checkCreditConfigurator() private {
+    function _checkCreditConfigurator() private view {
         if (msg.sender != ICreditManagerV3(creditManager).creditConfigurator()) {
             revert CallerNotConfiguratorException();
         }
@@ -391,10 +391,11 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         CollateralDebtData memory collateralDebtData;
         {
             ClaimAction claimAction;
-            (claimAction, closeAction, collateralDebtData) =
+            bool isLiquidatable;
+            (claimAction, closeAction, collateralDebtData, isLiquidatable) =
                 _isAccountLiquidatable({creditAccount: creditAccount, isEmergency: paused()}); // F:[FA-14]
 
-            if (!collateralDebtData.isLiquidatable) revert CreditAccountNotLiquidatableException();
+            if (!isLiquidatable) revert CreditAccountNotLiquidatableException();
 
             collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(
                 _claimWithdrawals({action: claimAction, creditAccount: creditAccount, to: borrower})
@@ -863,9 +864,9 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
         /// Checks that the account hf > 1, as it is forbidden to transfer
         /// accounts that are liquidatable
-        (,, CollateralDebtData memory collateralDebtData) = _isAccountLiquidatable(creditAccount, false); // F:[FA-34]
+        (,,, bool isLiquidatable) = _isAccountLiquidatable(creditAccount, false); // F:[FA-34]
 
-        if (collateralDebtData.isLiquidatable) revert CantTransferLiquidatableAccountException(); // F:[FA-34]
+        if (isLiquidatable) revert CantTransferLiquidatableAccountException(); // F:[FA-34]
 
         /// Bot permissions are specific to (owner, creditAccount),
         /// so they need to be erased on account transfer
@@ -1071,7 +1072,12 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     function _isAccountLiquidatable(address creditAccount, bool isEmergency)
         internal
         view
-        returns (ClaimAction claimAction, ClosureAction closeAction, CollateralDebtData memory collateralDebtData)
+        returns (
+            ClaimAction claimAction,
+            ClosureAction closeAction,
+            CollateralDebtData memory collateralDebtData,
+            bool isLiquidatable
+        )
     {
         claimAction = isEmergency ? ClaimAction.FORCE_CANCEL : ClaimAction.CANCEL;
         collateralDebtData = _calcDebtAndCollateral(
@@ -1082,8 +1088,10 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         );
         closeAction = ClosureAction.LIQUIDATE_ACCOUNT;
 
-        if (!collateralDebtData.isLiquidatable && _isExpired()) {
-            collateralDebtData.isLiquidatable = true;
+        isLiquidatable = collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD;
+
+        if (!isLiquidatable && _isExpired()) {
+            isLiquidatable = true;
             closeAction = ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT;
         }
     }

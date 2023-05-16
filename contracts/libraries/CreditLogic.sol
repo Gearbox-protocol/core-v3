@@ -312,19 +312,21 @@ library CreditLogic {
         uint16 minHealthFactor,
         uint256[] memory collateralHints,
         function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn,
-        function (address, uint256, address) view returns(uint256) convertToUSDFn
+        function (address, uint256, address) view returns(uint256) convertToUSDFn,
+        address priceOracle
     ) internal view returns (uint256 totalValueUSD, uint256 twvUSD, uint256 tokensToDisable) {
         uint256 limit = lazy ? collateralDebtData.totalDebtUSD * minHealthFactor / PERCENTAGE_FACTOR : type(uint256).max;
 
         if (collateralDebtData.quotedTokens.length != 0) {
-            uint256 underlyingPriceRAY = convertToUSDFn(collateralDebtData._priceOracle, RAY, underlying);
+            uint256 underlyingPriceRAY = convertToUSDFn(priceOracle, RAY, underlying);
 
             (totalValueUSD, twvUSD) = calcQuotedTokensCollateral({
                 collateralDebtData: collateralDebtData,
                 creditAccount: creditAccount,
                 underlyingPriceRAY: underlyingPriceRAY,
                 limit: limit,
-                convertToUSDFn: convertToUSDFn
+                convertToUSDFn: convertToUSDFn,
+                priceOracle: priceOracle
             });
 
             if (twvUSD > limit) {
@@ -337,7 +339,7 @@ library CreditLogic {
         }
         {
             uint256 tokensToCheckMask = collateralDebtData.enabledTokensMask.disable(collateralDebtData.quotedTokenMask);
-            address priceOracle = collateralDebtData._priceOracle;
+
             uint256 tvDelta;
             uint256 twvDelta;
 
@@ -361,10 +363,11 @@ library CreditLogic {
         address creditAccount,
         uint256 underlyingPriceRAY,
         uint256 limit,
-        function (address, uint256, address) view returns(uint256) convertToUSDFn
+        function (address, uint256, address) view returns(uint256) convertToUSDFn,
+        address priceOracle
     ) internal view returns (uint256 totalValueUSD, uint256 twvUSD) {
         uint256 len = collateralDebtData.quotedTokens.length;
-        address priceOracle = collateralDebtData._priceOracle;
+        // address priceOracle = collateralDebtData._priceOracle;
 
         for (uint256 i; i < len;) {
             address token = collateralDebtData.quotedTokens[i];

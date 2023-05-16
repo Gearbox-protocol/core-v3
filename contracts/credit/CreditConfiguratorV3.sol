@@ -296,9 +296,9 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     /// @notice This action is irreversible!
     function makeTokenQuoted(address token) external configuratorOnly {
         // Verifies whether the quota keeper has a token registered as quotable
-        IPoolQuotaKeeper quotaKeeper = creditManager.poolQuotaKeeper();
+        address quotaKeeper = creditManager.poolQuotaKeeper();
 
-        if (!quotaKeeper.isQuotedToken(token)) {
+        if (!IPoolQuotaKeeper(quotaKeeper).isQuotedToken(token)) {
             revert TokenIsNotQuotedException();
         }
 
