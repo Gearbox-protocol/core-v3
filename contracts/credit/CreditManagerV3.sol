@@ -633,74 +633,74 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         collateralDebtData.cumulativeIndexLastUpdate = creditAccountInfo[creditAccount].cumulativeIndexLastUpdate;
         collateralDebtData.cumulativeIndexNow = _poolCumulativeIndexNow();
 
-        if (task != CollateralCalcTask.GENERIC_PARAMS) {
-            /// COMPUTE DEBT PARAMS
-            collateralDebtData.enabledTokensMask = enabledTokensMask;
+        if (task == CollateralCalcTask.GENERIC_PARAMS) return collateralDebtData;
+        ///
+        /// COMPUTE DEBT PARAMS
+        collateralDebtData.enabledTokensMask = enabledTokensMask;
 
-            if (supportsQuotas) {
-                collateralDebtData.cumulativeQuotaInterest =
-                    creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1;
-                collateralDebtData.quotedTokenMask = quotedTokenMask & collateralDebtData.enabledTokensMask;
-                collateralDebtData._poolQuotaKeeper = address(poolQuotaKeeper());
+        if (supportsQuotas) {
+            collateralDebtData.cumulativeQuotaInterest = creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1;
+            collateralDebtData.quotedTokenMask = quotedTokenMask & collateralDebtData.enabledTokensMask;
+            collateralDebtData._poolQuotaKeeper = address(poolQuotaKeeper());
 
-                (
-                    collateralDebtData.quotedTokens,
-                    collateralDebtData.cumulativeQuotaInterest,
-                    collateralDebtData.quotas,
-                    collateralDebtData.quotedLts
-                ) = _getQuotaTokenData({
-                    creditAccount: creditAccount,
-                    enabledTokensMask: enabledTokensMask,
-                    _poolQuotaKeeper: collateralDebtData._poolQuotaKeeper
-                });
-            }
+            (
+                collateralDebtData.quotedTokens,
+                collateralDebtData.cumulativeQuotaInterest,
+                collateralDebtData.quotas,
+                collateralDebtData.quotedLts
+            ) = _getQuotaTokenData({
+                creditAccount: creditAccount,
+                enabledTokensMask: enabledTokensMask,
+                _poolQuotaKeeper: collateralDebtData._poolQuotaKeeper
+            });
+        }
 
-            (collateralDebtData.accruedInterest, collateralDebtData.accruedFees) =
-                collateralDebtData.calcAccruedInterestAndFees({feeInterest: feeInterest});
+        (collateralDebtData.accruedInterest, collateralDebtData.accruedFees) =
+            collateralDebtData.calcAccruedInterestAndFees({feeInterest: feeInterest});
 
-            if (task != CollateralCalcTask.DEBT_ONLY) {
-                /// Computes collateral. If task == FULL_COLLATERAL_CHECK_LAZY, until it finds enough collateral
-                collateralDebtData._priceOracle = priceOracle;
-                collateralDebtData.totalDebtUSD = _convertToUSD(
-                    collateralDebtData._priceOracle,
-                    collateralDebtData.calcTotalDebt(), // F: [CM-42]
-                    underlying
-                );
+        if (task == CollateralCalcTask.DEBT_ONLY) return collateralDebtData;
+        ///
+        /// COMPUTES COLLATERAL
+        /// If task == FULL_COLLATERAL_CHECK_LAZY, until it finds enough collateral
+        collateralDebtData._priceOracle = priceOracle;
+        collateralDebtData.totalDebtUSD = _convertToUSD(
+            collateralDebtData._priceOracle,
+            collateralDebtData.calcTotalDebt(), // F: [CM-42]
+            underlying
+        );
 
-                uint256 tokensToDisable;
-                (collateralDebtData.totalValueUSD, collateralDebtData.twvUSD, tokensToDisable) = collateralDebtData
-                    .calcCollateral({
-                    creditAccount: creditAccount,
-                    underlying: underlying,
-                    lazy: task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY,
-                    minHealthFactor: minHealthFactor,
-                    collateralHints: collateralHints,
-                    collateralTokensByMaskFn: _collateralTokensByMask,
-                    convertToUSDFn: _convertToUSD
-                });
+        uint256 tokensToDisable;
+        (collateralDebtData.totalValueUSD, collateralDebtData.twvUSD, tokensToDisable) = collateralDebtData
+            .calcCollateral({
+            creditAccount: creditAccount,
+            underlying: underlying,
+            lazy: task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY,
+            minHealthFactor: minHealthFactor,
+            collateralHints: collateralHints,
+            collateralTokensByMaskFn: _collateralTokensByMask,
+            convertToUSDFn: _convertToUSD
+        });
 
-                collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.disable(tokensToDisable);
-                collateralDebtData.isLiquidatable = collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD;
+        collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.disable(tokensToDisable);
+        collateralDebtData.isLiquidatable = collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD;
 
-                if (task != CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) {
-                    // If there is not fullCoolaralCheck calc, than it adds some useful pararms
-                    collateralDebtData.hf =
-                        uint16(collateralDebtData.twvUSD * PERCENTAGE_FACTOR / collateralDebtData.totalDebtUSD);
-                    collateralDebtData.totalValue =
-                        _convertFromUSD(collateralDebtData._priceOracle, collateralDebtData.totalValueUSD, underlying); // F:[FA-41]
+        if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) return collateralDebtData;
+        //
+        // EXTRA PARAMS
+        // If there is not fullCoolaralCheck calc, than it adds some useful pararms
+        collateralDebtData.hf = uint16(collateralDebtData.twvUSD * PERCENTAGE_FACTOR / collateralDebtData.totalDebtUSD);
+        collateralDebtData.totalValue =
+            _convertFromUSD(collateralDebtData._priceOracle, collateralDebtData.totalValueUSD, underlying); // F:[FA-41]
 
-                    if (
-                        (task != CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS)
-                            && _hasWithdrawals(creditAccount)
-                    ) {
-                        collateralDebtData.totalValueUSD += addCancellableWithdrawalsValue({
-                            collateralDebtData: collateralDebtData,
-                            creditAccount: creditAccount,
-                            isForceCancel: task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
-                        });
-                    }
-                }
-            }
+        if (task == CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS) return collateralDebtData;
+        ///
+        /// ADDS WITHDRAWAL VALUE
+        if (_hasWithdrawals(creditAccount)) {
+            collateralDebtData.totalValueUSD += addCancellableWithdrawalsValue({
+                collateralDebtData: collateralDebtData,
+                creditAccount: creditAccount,
+                isForceCancel: task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
+            });
         }
     }
 
