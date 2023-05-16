@@ -154,7 +154,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         _;
     }
 
-    function _checkCreditAccountOwner(address creditAccount) private {
+    function _checkCreditAccountOwner(address creditAccount) private view {
         if (msg.sender != _getBorrowerOrRevert(creditAccount)) {
             revert CallerNotCreditAccountOwnerException();
         }
@@ -167,11 +167,11 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
     // Reverts if CreditFacadeV3 is expired
     modifier whenNotExpired() {
-        _revertIfExpired();
+        _checkExpired();
         _;
     }
 
-    function _revertIfExpired() private {
+    function _checkExpired() private view {
         if (_isExpired()) {
             revert NotAllowedAfterExpirationException(); // F: [FA-46]
         }

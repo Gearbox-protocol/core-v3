@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Helper} from "./IERC20Helper.sol";
-import {CollateralDebtData, CollateralTokenData} from "../interfaces/ICreditManagerV3.sol";
+import {CollateralDebtData, CollateralTokenData, CreditAccountInfo} from "../interfaces/ICreditManagerV3.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 import {SECONDS_PER_YEAR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import "../interfaces/IExceptions.sol";
@@ -278,7 +278,55 @@ library CreditLogic {
         }
     }
 
+    //
     // COLLATERAL & DEBT COMPUTATION
+    //
+    function setDebtAndCumulativeIndex(
+        CollateralDebtData memory collateralDebtData,
+        CreditAccountInfo storage creditAccountInfo,
+        uint256 cumulativeIndexNow
+    ) internal view {
+        // The total weighted value of a Credit Account has to be compared
+        // with the entire debt sum, including interest and fees
+        collateralDebtData.debt = creditAccountInfo.debt; // F:[CM-49,50]
+        collateralDebtData.cumulativeIndexLastUpdate = creditAccountInfo.cumulativeIndexLastUpdate; // F:[CM-49,50]
+        collateralDebtData.cumulativeIndexNow = cumulativeIndexNow; // F:[CM-49,50]
+    }
+
+    function calcTotalDebtAndQuotedTokensCollateral(
+        CollateralDebtData memory collateralDebtData,
+        CreditAccountInfo storage creditAccountInfo,
+        uint256 cumulativeIndexNow,
+        address creditAccount,
+        bool supportsQuotas,
+        bool computeQuotedTokensCollateral,
+        uint256 maxEnabledTokens,
+        address underlying,
+        uint16 feeInterest,
+        function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn
+    ) internal view {
+        setDebtAndCumulativeIndex({
+            collateralDebtData: collateralDebtData,
+            creditAccountInfo: creditAccountInfo,
+            cumulativeIndexNow: cumulativeIndexNow
+        });
+
+        if (supportsQuotas) {
+            collateralDebtData.cumulativeQuotaInterest = creditAccountInfo.cumulativeQuotaInterest - 1;
+            // collateralDebtData._poolQuotaKeeper = address(poolQuotaKeeper());
+        }
+
+        calcQuotedTokensCollateral({
+            collateralDebtData: collateralDebtData,
+            creditAccount: creditAccount,
+            maxEnabledTokens: maxEnabledTokens,
+            underlying: underlying,
+            collateralTokensByMaskFn: collateralTokensByMaskFn,
+            countCollateral: computeQuotedTokensCollateral
+        });
+
+        calcAccruedInterestAndFees({collateralDebtData: collateralDebtData, feeInterest: feeInterest});
+    }
 
     /// @dev IMPLEMENTATION: calcAccruedInterestAndFees
     // / @param creditAccount Address of the Credit Account
@@ -309,7 +357,7 @@ library CreditLogic {
         );
     }
 
-    function calcHealthFactor(CollateralDebtData memory collateralDebtData) internal view {
+    function calcHealthFactor(CollateralDebtData memory collateralDebtData) internal pure {
         collateralDebtData.hf = uint16(collateralDebtData.twvUSD * PERCENTAGE_FACTOR / collateralDebtData.totalDebtUSD);
     }
 
@@ -324,14 +372,13 @@ library CreditLogic {
     function calcQuotedTokensCollateral(
         CollateralDebtData memory collateralDebtData,
         address creditAccount,
-        uint256 quotedTokenMask,
         uint256 maxEnabledTokens,
         address underlying,
         function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn,
         bool countCollateral
     ) internal view {
         uint256 j;
-        quotedTokenMask &= collateralDebtData.enabledTokensMask;
+        uint256 quotedTokenMask = collateralDebtData.quotedTokenMask & collateralDebtData.enabledTokensMask;
 
         uint256 underlyingPriceRAY =
             countCollateral ? convertToUSD(collateralDebtData._priceOracle, RAY, underlying) : 0;
@@ -388,8 +435,7 @@ library CreditLogic {
         bool stopIfReachLimit,
         uint16 minHealthFactor,
         uint256[] memory collateralHints,
-        uint256 quotedTokenMask,
-        function (uint256) view returns (address, uint16) collateralTokensByMaskFn
+        function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn
     ) internal view {
         uint256 twvLimitUSD;
         if (stopIfReachLimit) {
@@ -402,7 +448,7 @@ library CreditLogic {
         }
         uint256 len = collateralHints.length;
 
-        uint256 checkedTokenMask = collateralDebtData.enabledTokensMask.disable(quotedTokenMask);
+        uint256 checkedTokenMask = collateralDebtData.enabledTokensMask.disable(collateralDebtData.quotedTokenMask);
 
         unchecked {
             // TODO: add test that we check all values and it's always reachable
@@ -414,7 +460,7 @@ library CreditLogic {
                 if (checkedTokenMask & tokenMask != 0) {
                     bool nonZeroBalance;
                     {
-                        (address token, uint16 liquidationThreshold) = collateralTokensByMaskFn(tokenMask);
+                        (address token, uint16 liquidationThreshold) = collateralTokensByMaskFn(tokenMask, true);
                         nonZeroBalance = calcOneTokenCollateral(
                             collateralDebtData, creditAccount, token, liquidationThreshold, type(uint256).max
                         );
