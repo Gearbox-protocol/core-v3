@@ -616,17 +616,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         if (task == CollateralCalcTask.DEBT_ONLY) {
             _calcTotalDebtInplace(collateralDebtData, creditAccount);
-            // collateralDebtData.calcTotalDebtAndQuotedTokensCollateral({
-            //     creditAccountInfo: creditAccountInfo[creditAccount],
-            //     cumulativeIndexNow: _poolCumulativeIndexNow(),
-            //     creditAccount: creditAccount,
-            //     supportsQuotas: supportsQuotas,
-            //     computeQuotedTokensCollateral: false,
-            //     maxEnabledTokens: maxEnabledTokens,
-            //     underlying: underlying,
-            //     feeInterest: feeInterest,
-            //     collateralTokensByMaskFn: _collateralTokensByMask
-            // });
         } else {
             uint256[] memory collateralHints;
 
@@ -877,17 +866,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         borrower = creditAccountInfo[creditAccount].borrower; // F:[CM-48]
         if (borrower == address(0)) revert CreditAccountNotExistsException(); // F:[CM-48]
     }
-
-    // /// @dev Returns the parameters of the Credit Account required to calculate debt
-    // /// @param creditAccount Address of the Credit Account
-    // function _setDebtAndCumulativeIndex(CollateralDebtData memory collateralDebtData, address creditAccount)
-    //     internal
-    //     view
-    // {
-    //     collateralDebtData.debt = creditAccountInfo[creditAccount].debt; // F:[CM-49,50]
-    //     collateralDebtData.cumulativeIndexLastUpdate = creditAccountInfo[creditAccount].cumulativeIndexLastUpdate; // F:[CM-49,50]
-    //     collateralDebtData.cumulativeIndexNow = _poolCumulativeIndexNow(); // F:[CM-49,50]
-    // }
 
     /// @dev Returns the liquidation threshold for the provided token
     /// @param token Token to retrieve the LT for
