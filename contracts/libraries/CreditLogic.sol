@@ -282,82 +282,6 @@ library CreditLogic {
     // COLLATERAL & DEBT COMPUTATION
     //
 
-    // initCollateralDebtData({
-    // ...
-    // quotedTokenMask: supportsQuotas ? quotedTokenMask: 0,
-    // ... });
-    function initCollateralDebtData(
-        CreditAccountInfo storage creditAccountInfo,
-        uint256 cumulativeIndexNow,
-        bool supportsQuotas,
-        uint256 enabledTokensMask
-    ) internal view returns (CollateralDebtData memory collateralDebtData) {
-        // The total weighted value of a Credit Account has to be compared
-        // with the entire debt sum, including interest and fees
-        collateralDebtData.debt = creditAccountInfo.debt;
-        collateralDebtData.cumulativeIndexLastUpdate = creditAccountInfo.cumulativeIndexLastUpdate;
-        collateralDebtData.cumulativeIndexNow = cumulativeIndexNow;
-        collateralDebtData.enabledTokensMask = enabledTokensMask;
-
-        if (supportsQuotas) {
-            collateralDebtData.cumulativeQuotaInterest = creditAccountInfo.cumulativeQuotaInterest - 1;
-            // collateralDebtData._poolQuotaKeeper = address(poolQuotaKeeper());
-        }
-    }
-
-    function getQuotaTokenData(
-        CollateralDebtData memory collateralDebtData,
-        address creditAccount,
-        uint256 maxEnabledTokens,
-        uint256 quotedTokenMask,
-        function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn,
-        function (address, address,address) view returns (uint256, uint256) getQuotaAndOutstandingInterestFn
-    )
-        internal
-        view
-        returns (
-            address[] memory quotaTokens,
-            uint256[] memory quotas,
-            uint16[] memory lts,
-            uint256 outstandingQuotaInterest
-        )
-    {
-        uint256 j;
-        quotedTokenMask = quotedTokenMask & collateralDebtData.enabledTokensMask;
-        collateralDebtData.quotedTokenMask = quotedTokenMask;
-
-        // uint256 underlyingPriceRAY =
-        //     countCollateral ? convertToUSD(collateralDebtData._priceOracle, RAY, underlying) : 0;
-
-        quotaTokens = new address[](maxEnabledTokens);
-        quotas = new uint256[](maxEnabledTokens);
-        lts = new uint16[](maxEnabledTokens);
-
-        unchecked {
-            for (uint256 tokenMask = 2; tokenMask <= quotedTokenMask; tokenMask <<= 1) {
-                if (quotedTokenMask & tokenMask != 0) {
-                    address token;
-                    (token, lts[j]) = collateralTokensByMaskFn(tokenMask, true);
-
-                    quotaTokens[j] = token;
-
-                    uint256 outstandingInterestDelta;
-                    (quotas[j], outstandingInterestDelta) =
-                        getQuotaAndOutstandingInterestFn(collateralDebtData._poolQuotaKeeper, creditAccount, token);
-
-                    // Safe because quotaInterest =  (quota is uint96) * APY * time, so even with 1000% APY, it will take 10**10 years for overflow
-                    outstandingQuotaInterest += outstandingInterestDelta;
-
-                    ++j;
-
-                    if (j >= maxEnabledTokens) {
-                        revert TooManyEnabledTokensException();
-                    }
-                }
-            }
-        }
-    }
-
     /// @dev IMPLEMENTATION: calcAccruedInterestAndFees
     // / @param creditAccount Address of the Credit Account
     // / @param quotaInterest Total quota premiums accrued, computed elsewhere
@@ -378,30 +302,6 @@ library CreditLogic {
 
         // Fees are computed as a percentage of interest
         accruedFees = collateralDebtData.accruedInterest * feeInterest / PERCENTAGE_FACTOR; // F: [CM-49]
-    }
-
-    function calcTotalDebtUSD(
-        CollateralDebtData memory collateralDebtData,
-        address underlying,
-        function (address, uint256, address) view returns(uint256) convertToUSDFn
-    ) internal view returns (uint256 totalDebtUSD) {
-        totalDebtUSD = convertToUSDFn(
-            collateralDebtData._priceOracle,
-            calcTotalDebt(collateralDebtData), // F: [CM-42]
-            underlying
-        );
-    }
-
-    function calcHealthFactor(CollateralDebtData memory collateralDebtData) internal pure returns (uint16 hf) {
-        hf = uint16(collateralDebtData.twvUSD * PERCENTAGE_FACTOR / collateralDebtData.totalDebtUSD);
-    }
-
-    function calcTotalValueInUnderlying(
-        CollateralDebtData memory collateralDebtData,
-        address underlying,
-        function (address, uint256, address) view returns(uint256) convertFromUSDFn
-    ) internal view returns (uint256 totalValue) {
-        totalValue = convertFromUSDFn(collateralDebtData._priceOracle, collateralDebtData.totalValueUSD, underlying); // F:[FA-41]
     }
 
     function calcCollateral(
