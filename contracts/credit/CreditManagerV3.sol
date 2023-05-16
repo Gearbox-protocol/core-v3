@@ -333,7 +333,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     : liquidationDiscountExpired,
                 feeLiquidation: closureAction == ClosureAction.LIQUIDATE_ACCOUNT ? feeLiquidation : feeLiquidationExpired,
                 amountWithFeeFn: _amountWithFee,
-                amountMinusFeeFn: _amountWithFee
+                amountMinusFeeFn: _amountMinusFee
             });
         }
         {

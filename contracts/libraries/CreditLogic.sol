@@ -350,6 +350,9 @@ library CreditLogic {
                 collateralTokensByMaskFn: collateralTokensByMaskFn,
                 convertToUSDFn: convertToUSDFn
             });
+
+            totalValueUSD += tvDelta;
+            twvUSD += twvDelta;
         }
     }
 
@@ -367,13 +370,13 @@ library CreditLogic {
             address token = collateralDebtData.quotedTokens[i];
             if (token == address(0)) break;
             {
-                uint16 lt = collateralDebtData.quotedLts[i];
+                uint16 liquidationThreshold = collateralDebtData.quotedLts[i];
                 uint256 quotaUSD = collateralDebtData.quotas[i] * underlyingPriceRAY / RAY;
                 (uint256 valueUSD, uint256 weightedValueUSD,) = calcOneTokenCollateral({
                     priceOracle: priceOracle,
                     creditAccount: creditAccount,
                     token: token,
-                    liquidationThreshold: lt,
+                    liquidationThreshold: liquidationThreshold,
                     quotaUSD: quotaUSD,
                     convertToUSDFn: convertToUSDFn
                 });
