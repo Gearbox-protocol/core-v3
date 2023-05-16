@@ -281,51 +281,81 @@ library CreditLogic {
     //
     // COLLATERAL & DEBT COMPUTATION
     //
-    function setDebtAndCumulativeIndex(
-        CollateralDebtData memory collateralDebtData,
-        CreditAccountInfo storage creditAccountInfo,
-        uint256 cumulativeIndexNow
-    ) internal view {
-        // The total weighted value of a Credit Account has to be compared
-        // with the entire debt sum, including interest and fees
-        collateralDebtData.debt = creditAccountInfo.debt; // F:[CM-49,50]
-        collateralDebtData.cumulativeIndexLastUpdate = creditAccountInfo.cumulativeIndexLastUpdate; // F:[CM-49,50]
-        collateralDebtData.cumulativeIndexNow = cumulativeIndexNow; // F:[CM-49,50]
-    }
 
-    function calcTotalDebtAndQuotedTokensCollateral(
-        CollateralDebtData memory collateralDebtData,
+    // initCollateralDebtData({
+    // ...
+    // quotedTokenMask: supportsQuotas ? quotedTokenMask: 0,
+    // ... });
+    function initCollateralDebtData(
         CreditAccountInfo storage creditAccountInfo,
         uint256 cumulativeIndexNow,
-        address creditAccount,
         bool supportsQuotas,
-        bool computeQuotedTokensCollateral,
-        uint256 maxEnabledTokens,
-        address underlying,
-        uint16 feeInterest,
-        function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn
-    ) internal view {
-        setDebtAndCumulativeIndex({
-            collateralDebtData: collateralDebtData,
-            creditAccountInfo: creditAccountInfo,
-            cumulativeIndexNow: cumulativeIndexNow
-        });
+        uint256 enabledTokensMask
+    ) internal view returns (CollateralDebtData memory collateralDebtData) {
+        // The total weighted value of a Credit Account has to be compared
+        // with the entire debt sum, including interest and fees
+        collateralDebtData.debt = creditAccountInfo.debt;
+        collateralDebtData.cumulativeIndexLastUpdate = creditAccountInfo.cumulativeIndexLastUpdate;
+        collateralDebtData.cumulativeIndexNow = cumulativeIndexNow;
+        collateralDebtData.enabledTokensMask = enabledTokensMask;
 
         if (supportsQuotas) {
             collateralDebtData.cumulativeQuotaInterest = creditAccountInfo.cumulativeQuotaInterest - 1;
             // collateralDebtData._poolQuotaKeeper = address(poolQuotaKeeper());
         }
+    }
 
-        calcQuotedTokensCollateral({
-            collateralDebtData: collateralDebtData,
-            creditAccount: creditAccount,
-            maxEnabledTokens: maxEnabledTokens,
-            underlying: underlying,
-            collateralTokensByMaskFn: collateralTokensByMaskFn,
-            countCollateral: computeQuotedTokensCollateral
-        });
+    function getQuotaTokenData(
+        CollateralDebtData memory collateralDebtData,
+        address creditAccount,
+        uint256 maxEnabledTokens,
+        uint256 quotedTokenMask,
+        function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn,
+        function (address, address,address) view returns (uint256, uint256) getQuotaAndOutstandingInterestFn
+    )
+        internal
+        view
+        returns (
+            address[] memory quotaTokens,
+            uint256[] memory quotas,
+            uint16[] memory lts,
+            uint256 outstandingQuotaInterest
+        )
+    {
+        uint256 j;
+        quotedTokenMask = quotedTokenMask & collateralDebtData.enabledTokensMask;
+        collateralDebtData.quotedTokenMask = quotedTokenMask;
 
-        calcAccruedInterestAndFees({collateralDebtData: collateralDebtData, feeInterest: feeInterest});
+        // uint256 underlyingPriceRAY =
+        //     countCollateral ? convertToUSD(collateralDebtData._priceOracle, RAY, underlying) : 0;
+
+        quotaTokens = new address[](maxEnabledTokens);
+        quotas = new uint256[](maxEnabledTokens);
+        lts = new uint16[](maxEnabledTokens);
+
+        unchecked {
+            for (uint256 tokenMask = 2; tokenMask <= quotedTokenMask; tokenMask <<= 1) {
+                if (quotedTokenMask & tokenMask != 0) {
+                    address token;
+                    (token, lts[j]) = collateralTokensByMaskFn(tokenMask, true);
+
+                    quotaTokens[j] = token;
+
+                    uint256 outstandingInterestDelta;
+                    (quotas[j], outstandingInterestDelta) =
+                        getQuotaAndOutstandingInterestFn(collateralDebtData._poolQuotaKeeper, creditAccount, token);
+
+                    // Safe because quotaInterest =  (quota is uint96) * APY * time, so even with 1000% APY, it will take 10**10 years for overflow
+                    outstandingQuotaInterest += outstandingInterestDelta;
+
+                    ++j;
+
+                    if (j >= maxEnabledTokens) {
+                        revert TooManyEnabledTokensException();
+                    }
+                }
+            }
+        }
     }
 
     /// @dev IMPLEMENTATION: calcAccruedInterestAndFees
@@ -422,11 +452,8 @@ library CreditLogic {
         CollateralDebtData memory collateralDebtData,
         address creditAccount,
         address token
-    ) internal view returns (uint256 quoted) {
-        uint256 outstandingInterest;
-        (quoted, outstandingInterest) =
-            IPoolQuotaKeeper(collateralDebtData._poolQuotaKeeper).getQuotaAndInterest(creditAccount, token);
-        collateralDebtData.cumulativeQuotaInterest += outstandingInterest; // F:[CMQ-8]
+    ) internal view returns (uint256 quoted, uint256 outstandingInterest) {
+        return IPoolQuotaKeeper(collateralDebtData._poolQuotaKeeper).getQuotaAndInterest(creditAccount, token);
     }
 
     function calcNonQuotedTokensCollateral(
