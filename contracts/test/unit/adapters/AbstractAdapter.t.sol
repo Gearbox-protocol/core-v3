@@ -26,7 +26,7 @@ contract AbstractAdapterUnitTest is TestHelper, CreditManagerMockEvents {
         target = makeAddr("TARGET_CONTRACT");
 
         addressProvider = new AddressProviderV3ACLMock();
-        creditManager = new CreditManagerMock(address(addressProvider));
+        creditManager = new CreditManagerMock(address(addressProvider), facade);
         abstractAdapter = new AbstractAdapterHarness(address(creditManager), target);
     }
 
