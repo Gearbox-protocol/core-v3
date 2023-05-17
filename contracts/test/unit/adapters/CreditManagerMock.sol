@@ -9,7 +9,6 @@ interface CreditManagerMockEvents {
 }
 
 contract CreditManagerMock is CreditManagerMockEvents {
-    address public pool;
     address public creditFacade;
     address public addressProvider;
 
@@ -19,7 +18,6 @@ contract CreditManagerMock is CreditManagerMockEvents {
     bytes _result;
 
     constructor(address _addressProvider) {
-        pool = address(this);
         creditFacade = address(this);
         addressProvider = _addressProvider;
     }

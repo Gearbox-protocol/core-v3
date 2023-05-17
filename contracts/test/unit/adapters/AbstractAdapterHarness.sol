@@ -12,6 +12,10 @@ contract AbstractAdapterHarness is AbstractAdapter {
 
     constructor(address _creditManager, address _targetContract) AbstractAdapter(_creditManager, _targetContract) {}
 
+    function revertIfCallerNotCreditFacade() external view {
+        _revertIfCallerNotCreditFacade();
+    }
+
     function creditAccount() external view returns (address) {
         return _creditAccount();
     }
