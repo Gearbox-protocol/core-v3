@@ -31,7 +31,7 @@ library CreditLogic {
         // timeDifference = blockTime - previous timeStamp
 
         //                             timeDifference
-        //  grownVluaed = value  *  -------------------
+        //  valueGrowth = value  *  -------------------
         //                           SECONDS_PER_YEAR
         //
         return value * (block.timestamp - timestampLastUpdate) / SECONDS_PER_YEAR;
@@ -100,6 +100,7 @@ library CreditLogic {
             if (totalFunds > amountToPoolWithFee) {
                 remainingFunds = totalFunds - amountToPoolWithFee - 1; // F:[CM-43]
             } else {
+                amountToPoolWithFee = totalFunds;
                 amountToPool = amountMinusFeeFn(totalFunds); // F:[CM-43]
             }
 
@@ -110,15 +111,7 @@ library CreditLogic {
             }
         }
 
-        amountToPool = amountWithFeeFn(amountToPool);
-    }
-
-    function _calcAmountToPool(uint256 debt, uint256 debtWithInterest, uint16 feeInterest)
-        internal
-        pure
-        returns (uint256 amountToPool)
-    {
-        amountToPool = debtWithInterest + ((debtWithInterest - debt) * feeInterest) / PERCENTAGE_FACTOR;
+        amountToPool = amountToPoolWithFee;
     }
 
     function getTokenOrRevert(CollateralTokenData storage tokenData) internal view returns (address token) {
@@ -367,7 +360,6 @@ library CreditLogic {
         address priceOracle
     ) internal view returns (uint256 totalValueUSD, uint256 twvUSD) {
         uint256 len = collateralDebtData.quotedTokens.length;
-        // address priceOracle = collateralDebtData._priceOracle;
 
         for (uint256 i; i < len;) {
             address token = collateralDebtData.quotedTokens[i];
