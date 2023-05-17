@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -53,7 +53,6 @@ contract CreditFacadeTestHelper is TestHelper {
                     callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, amount))
                 })
             ),
-            false,
             referralCode
         );
     }

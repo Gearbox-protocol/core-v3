@@ -10,7 +10,7 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {CreditAccountV3} from "../credit/CreditAccountV3.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
 
-import {IAccountFactory, TakeAccountAction} from "../interfaces/IAccountFactory.sol";
+import {IAccountFactory} from "../interfaces/IAccountFactory.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
@@ -41,7 +41,7 @@ contract AccountFactoryV3 is IAccountFactory, ACLTrait, ContractsRegisterTrait {
 
     /// @dev Provides a new credit account to a Credit Manager
     /// @return creditAccount Address of credit account
-    function takeCreditAccount(uint256 deployAction, uint256) external override returns (address creditAccount) {
+    function takeCreditAccount(uint256, uint256) external override returns (address creditAccount) {
         CreditManagerFactory storage cmf = masterCreditAccounts[msg.sender];
         address masterCreditAccount = cmf.masterCreditAccount;
 
@@ -49,7 +49,7 @@ contract AccountFactoryV3 is IAccountFactory, ACLTrait, ContractsRegisterTrait {
             revert CallerNotCreditManagerException();
         }
         uint256 totalUsed = cmf.tail - cmf.head;
-        if (totalUsed < cmf.minUsedInQueue || deployAction == uint256(TakeAccountAction.DEPLOY_NEW_ONE)) {
+        if (totalUsed < cmf.minUsedInQueue) {
             // Create a new credit account if there are none in stock
             creditAccount = Clones.clone(masterCreditAccount); // T:[AF-2]
             emit DeployCreditAccount(creditAccount);

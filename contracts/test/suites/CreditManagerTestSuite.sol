@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
@@ -153,7 +153,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         vm.prank(creditFacade);
 
         // Existing address case
-        creditAccount = creditManager.openCreditAccount(borrowedAmount, USER, false);
+        creditAccount = creditManager.openCreditAccount(borrowedAmount, USER);
 
         // Increase block number cause it's forbidden to close credit account in the same block
         vm.roll(block.number + 1);

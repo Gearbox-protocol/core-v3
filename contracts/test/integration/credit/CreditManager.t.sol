@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import "../../../interfaces/IAddressProviderV3.sol";
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
@@ -291,7 +291,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         poolMock.setCumulative_RAY(cumulativeAtOpen);
 
         // Existing address case
-        address creditAccount = creditManager.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, false);
+        address creditAccount = creditManager.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER);
         assertEq(creditAccount, expectedCreditAccount, "Incorrecct credit account address");
 
         (uint256 debt, uint256 cumulativeIndexLastUpdate,,,,) = creditManager.creditAccountInfo(creditAccount);
@@ -1207,7 +1207,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
 
         vm.stopPrank();
 
-        address creditAccount = cm.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, false);
+        address creditAccount = cm.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER);
         cm.transferAccountOwnership(creditAccount, address(this));
 
         address revertToken = DUMB_ADDRESS;
@@ -1258,7 +1258,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         creditManager.setCollateralTokenData(poolMock.underlyingToken(), 9300, 9300, type(uint40).max, 0);
         vm.stopPrank();
 
-        address creditAccount = creditManager.openCreditAccount(DAI_ACCOUNT_AMOUNT, address(this), false);
+        address creditAccount = creditManager.openCreditAccount(DAI_ACCOUNT_AMOUNT, address(this));
         tokenTestSuite.mint(Tokens.DAI, creditAccount, 2 * DAI_ACCOUNT_AMOUNT);
 
         enableTokensMoreThanLimit(creditAccount);
