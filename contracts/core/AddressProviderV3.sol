@@ -68,7 +68,7 @@ contract AddressProviderV3 is IAddressProviderV3 {
 
     /// @return Address of AccountFactory
     function getAccountFactory() external view returns (address) {
-        return getAddressOrRevert(AP_ACCOUNT_FACTORY, 1); // F:[AP-6]
+        return getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL); // F:[AP-6]
     }
 
     /// @return Address of DataCompressor
@@ -78,17 +78,17 @@ contract AddressProviderV3 is IAddressProviderV3 {
 
     /// @return Address of Treasury contract
     function getTreasuryContract() external view returns (address) {
-        return getAddressOrRevert(AP_TREASURY, 0); // F:[AP-8]
+        return getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL); // F:[AP-8]
     }
 
     /// @return Address of GEAR token
     function getGearToken() external view returns (address) {
-        return getAddressOrRevert(AP_GEAR_TOKEN, 0); // F:[AP-9]
+        return getAddressOrRevert(AP_GEAR_TOKEN, NO_VERSION_CONTROL); // F:[AP-9]
     }
 
     /// @return Address of WETH token
     function getWethToken() external view returns (address) {
-        return getAddressOrRevert(AP_WETH_TOKEN, 0); // F:[AP-10]
+        return getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // F:[AP-10]
     }
 
     /// @return Address of WETH token

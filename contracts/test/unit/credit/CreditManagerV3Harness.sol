@@ -1,8 +1,11 @@
 import {CreditManagerV3, CreditAccountInfo} from "../../../credit/CreditManagerV3.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {CollateralDebtData} from "../../../interfaces/ICreditManagerV3.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 contract CreditManagerV3Harness is CreditManagerV3 {
+    using EnumerableSet for EnumerableSet.AddressSet;
+
     constructor(address _addressProvider, address _pool) CreditManagerV3(_addressProvider, _pool) {}
 
     function setReentrancy(uint8 _status) external {
@@ -19,6 +22,31 @@ contract CreditManagerV3Harness is CreditManagerV3 {
 
     function getTargetContractOrRevert() external view returns (address targetContract) {
         return _getTargetContractOrRevert();
+    }
+
+    function setBorrower(address creditAccount, address borrower) external {
+        creditAccountInfo[creditAccount].borrower = borrower;
+    }
+
+    function addToCAList(address creditAccount) external {
+        creditAccountsSet.add(creditAccount);
+    }
+
+    function setCreditAccountInfoMap(
+        address creditAccount,
+        uint256 debt,
+        uint256 cumulativeIndexLastUpdate,
+        uint256 cumulativeQuotaInterest,
+        uint256 enabledTokensMask,
+        uint16 flags,
+        address borrower
+    ) external {
+        creditAccountInfo[creditAccount].debt = debt;
+        creditAccountInfo[creditAccount].cumulativeIndexLastUpdate = cumulativeIndexLastUpdate;
+        creditAccountInfo[creditAccount].cumulativeQuotaInterest = cumulativeQuotaInterest;
+        creditAccountInfo[creditAccount].enabledTokensMask = enabledTokensMask;
+        creditAccountInfo[creditAccount].flags = flags;
+        creditAccountInfo[creditAccount].borrower = borrower;
     }
 
     // function calcFullCollateral(

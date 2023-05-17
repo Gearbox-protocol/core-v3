@@ -31,7 +31,7 @@ contract AccountFactoryMock is Test, IAccountFactory {
 
     /// @dev Provides a new credit account to a Credit Manager
     /// @return creditAccount Address of credit account
-    function takeCreditAccount(uint256, uint256) external override returns (address creditAccount) {
+    function takeCreditAccount(uint256, uint256) external view override returns (address creditAccount) {
         return usedAccount;
     }
 

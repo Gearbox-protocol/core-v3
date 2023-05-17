@@ -11,7 +11,7 @@ import {IPoolBase} from "../interfaces/IPool4626.sol";
 contract CreditManagerV3_USDT is CreditManagerV3, USDT_Transfer {
     constructor(address _addressProvider, address _pool)
         CreditManagerV3(_addressProvider, _pool)
-        USDT_Transfer(IPoolBase(pool).underlyingToken())
+        USDT_Transfer(IPoolBase(_pool).underlyingToken())
     {}
 
     function _amountWithFee(uint256 amount) internal view override returns (uint256) {

@@ -58,7 +58,7 @@ contract GenesisFactory is Ownable {
             accountFactory = address(new  AccountFactoryV3( address(addressProvider))); // T:[GD-1]
         }
 
-        addressProvider.setAddress(AP_ACCOUNT_FACTORY, accountFactory, true); // T:[GD-1]
+        addressProvider.setAddress(AP_ACCOUNT_FACTORY, accountFactory, false); // T:[GD-1]
 
         WETHGateway wethGateway = new WETHGateway(address(addressProvider)); // T:[GD-1]
         addressProvider.setAddress(AP_WETH_GATEWAY, address(wethGateway), true); // T:[GD-1]

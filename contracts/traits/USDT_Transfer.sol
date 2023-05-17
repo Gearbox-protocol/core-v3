@@ -3,11 +3,18 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {IUSDT} from "../interfaces/external/IUSDT.sol";
+import {USDTFees} from "../libraries/USDTFees.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
+interface IUSDT {
+    function basisPointsRate() external view returns (uint256);
+
+    function maximumFee() external view returns (uint256);
+}
+
 contract USDT_Transfer {
+    using USDTFees for uint256;
+
     address private immutable usdt;
 
     constructor(address _usdt) {
@@ -16,19 +23,15 @@ contract USDT_Transfer {
 
     /// @dev Computes how much usdt you should send to get exact amount on destination account
     function _amountUSDTWithFee(uint256 amount) internal view virtual returns (uint256) {
-        uint256 amountWithBP = (amount * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR - IUSDT(usdt).basisPointsRate()); // U:[UTT_01]
+        uint256 basisPointsRate = IUSDT(usdt).basisPointsRate(); // U:[UTT_01]
         uint256 maximumFee = IUSDT(usdt).maximumFee(); // U:[UTT_01]
-        unchecked {
-            uint256 amountWithMaxFee = maximumFee > type(uint256).max - amount ? maximumFee : amount + maximumFee;
-            return Math.min(amountWithMaxFee, amountWithBP); // U:[UTT_01]
-        }
+        return amount.amountUSDTWithFee({basisPointsRate: basisPointsRate, maximumFee: maximumFee}); // U:[UTT_01]
     }
 
     /// @dev Computes how much usdt you should send to get exact amount on destination account
     function _amountUSDTMinusFee(uint256 amount) internal view virtual returns (uint256) {
-        uint256 fee = amount * IUSDT(usdt).basisPointsRate() / PERCENTAGE_FACTOR;
-        uint256 maximumFee = IUSDT(usdt).maximumFee();
-        fee = Math.min(maximumFee, fee);
-        return amount - fee;
+        uint256 basisPointsRate = IUSDT(usdt).basisPointsRate(); // U:[UTT_01]
+        uint256 maximumFee = IUSDT(usdt).maximumFee(); // U:[UTT_01]
+        return amount.amountUSDTMinusFee({basisPointsRate: basisPointsRate, maximumFee: maximumFee}); // U:[UTT_01]
     }
 }

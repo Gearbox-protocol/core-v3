@@ -34,11 +34,8 @@ contract AddressProviderV3ACLMock is Test, AddressProviderV3 {
         WithdrawalManagerMock withdrawalManagerMock = new WithdrawalManagerMock();
         _setAddress(AP_WITHDRAWAL_MANAGER, address(withdrawalManagerMock), withdrawalManagerMock.version());
 
-        AccountFactoryMock accountFactoryMockV1 = new AccountFactoryMock(1);
-        _setAddress(AP_ACCOUNT_FACTORY, address(accountFactoryMockV1), accountFactoryMockV1.version());
-
-        AccountFactoryMock accountFactoryMockV3 = new AccountFactoryMock(3_00);
-        _setAddress(AP_ACCOUNT_FACTORY, address(accountFactoryMockV3), accountFactoryMockV3.version());
+        AccountFactoryMock accountFactoryMock = new AccountFactoryMock(3_00);
+        _setAddress(AP_ACCOUNT_FACTORY, address(accountFactoryMock), NO_VERSION_CONTROL);
 
         _setAddress(AP_CONTRACTS_REGISTER, address(this), 1);
 

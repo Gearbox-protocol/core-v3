@@ -92,16 +92,16 @@ contract TokensTestSuite is Test, TokensData, TokensTestSuiteHelper {
         return balanceOf(addressOf[t], holder);
     }
 
-    function approve(Tokens t, address holder, address targetContract) public {
-        approve(addressOf[t], holder, targetContract);
+    function approve(Tokens t, address from, address spender) public {
+        approve(addressOf[t], from, spender);
     }
 
-    function approve(Tokens t, address holder, address targetContract, uint256 amount) public {
-        approve(addressOf[t], holder, targetContract, amount);
+    function approve(Tokens t, address from, address spender, uint256 amount) public {
+        approve(addressOf[t], from, spender, amount);
     }
 
-    function allowance(Tokens t, address holder, address targetContract) external view returns (uint256) {
-        return IERC20(addressOf[t]).allowance(holder, targetContract);
+    function allowance(Tokens t, address from, address spender) external view returns (uint256) {
+        return IERC20(addressOf[t]).allowance(from, spender);
     }
 
     function burn(Tokens t, address from, uint256 amount) external {

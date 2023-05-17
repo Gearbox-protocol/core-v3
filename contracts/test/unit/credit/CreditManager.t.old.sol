@@ -31,8 +31,8 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 
 // LIBS & TRAITS
 import {BitMask} from "../../../libraries/BitMask.sol";
-// TESTS
 
+// TESTS
 import "../../lib/constants.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 
@@ -151,7 +151,7 @@ contract OldCreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
     function _addAndEnableTokens(address creditAccount, uint256 numTokens, uint256 balance) internal {
         for (uint256 i = 0; i < numTokens; i++) {
             ERC20Mock t = new ERC20Mock("new token", "nt", 18);
-            PriceFeedMock pf = new PriceFeedMock(10**8, 8);
+            PriceFeedMock pf = new PriceFeedMock(10 ** 8, 8);
 
             vm.startPrank(CONFIGURATOR);
             creditManager.addToken(address(t));

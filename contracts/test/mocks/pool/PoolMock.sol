@@ -65,7 +65,7 @@ contract PoolMock is IPoolService {
     uint256 public override _cumulativeIndex_RAY;
 
     // Contract version
-    uint256 public constant override version = 1;
+    uint256 public constant override version = 3_00;
 
     uint128 public quotaRevenue;
 
