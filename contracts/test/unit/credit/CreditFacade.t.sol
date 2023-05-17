@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
@@ -271,7 +271,6 @@ contract CreditFacadeTest is BalanceHelper, CreditFacadeTestHelper, ICreditManag
                     callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
                 })
             ),
-            false,
             0
         );
         _checkForWETHTest();
@@ -346,7 +345,7 @@ contract CreditFacadeTest is BalanceHelper, CreditFacadeTestHelper, ICreditManag
             })
         );
         vm.expectRevert(AccountTransferNotAllowedException.selector);
-        creditFacade.openCreditAccount(minBorrowedAmount, FRIEND, calls, false, 0);
+        creditFacade.openCreditAccount(minBorrowedAmount, FRIEND, calls, 0);
 
         vm.stopPrank();
     }
@@ -375,7 +374,6 @@ contract CreditFacadeTest is BalanceHelper, CreditFacadeTestHelper, ICreditManag
                     callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
                 })
             ),
-            false,
             0
         );
     }
@@ -415,7 +413,6 @@ contract CreditFacadeTest is BalanceHelper, CreditFacadeTestHelper, ICreditManag
                     callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT))
                 })
             ),
-            false,
             0
         );
 
@@ -477,7 +474,7 @@ contract CreditFacadeTest is BalanceHelper, CreditFacadeTestHelper, ICreditManag
 
         vm.expectRevert(BorrowedBlockLimitException.selector);
         vm.prank(USER);
-        creditFacade.openCreditAccount(minBorrowedAmount, USER, calls, false, 0);
+        creditFacade.openCreditAccount(minBorrowedAmount, USER, calls, 0);
     }
 
     /// @dev [FA-8]: openCreditAccount runs operations in correct order
@@ -508,8 +505,7 @@ contract CreditFacadeTest is BalanceHelper, CreditFacadeTestHelper, ICreditManag
         // EXPECTED STACK TRACE & EVENTS
 
         vm.expectCall(
-            address(creditManager),
-            abi.encodeCall(ICreditManagerV3.openCreditAccount, (DAI_ACCOUNT_AMOUNT, FRIEND, false))
+            address(creditManager), abi.encodeCall(ICreditManagerV3.openCreditAccount, (DAI_ACCOUNT_AMOUNT, FRIEND))
         );
 
         vm.expectEmit(true, true, false, true);
@@ -545,7 +541,7 @@ contract CreditFacadeTest is BalanceHelper, CreditFacadeTestHelper, ICreditManag
         );
 
         vm.prank(USER);
-        creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, FRIEND, calls, false, REFERRAL_CODE);
+        creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, FRIEND, calls, REFERRAL_CODE);
     }
 
     /// @dev [FA-9]: openCreditAccount cant open credit account with hf <1;
@@ -596,7 +592,6 @@ contract CreditFacadeTest is BalanceHelper, CreditFacadeTestHelper, ICreditManag
                     callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (collateral, amount))
                 })
             ),
-            false,
             REFERRAL_CODE
         );
     }
@@ -616,7 +611,6 @@ contract CreditFacadeTest is BalanceHelper, CreditFacadeTestHelper, ICreditManag
                     callData: abi.encodeCall(ICreditFacadeMulticall.decreaseDebt, 812)
                 })
             ),
-            false,
             REFERRAL_CODE
         );
     }
@@ -646,12 +640,12 @@ contract CreditFacadeTest is BalanceHelper, CreditFacadeTestHelper, ICreditManag
         );
 
         vm.prank(FRIEND);
-        creditFacade.openCreditAccount(_maxDebt - _minDebt, FRIEND, calls, false, 0);
+        creditFacade.openCreditAccount(_maxDebt - _minDebt, FRIEND, calls, 0);
 
         vm.expectRevert(BorrowedBlockLimitException.selector);
 
         vm.prank(USER);
-        creditFacade.openCreditAccount(_minDebt + 1, USER, calls, false, 0);
+        creditFacade.openCreditAccount(_minDebt + 1, USER, calls, 0);
     }
 
     /// @dev [FA-11B]: openCreditAccount reverts if amount < minAmount or amount > maxAmount
@@ -669,11 +663,11 @@ contract CreditFacadeTest is BalanceHelper, CreditFacadeTestHelper, ICreditManag
 
         vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
         vm.prank(USER);
-        creditFacade.openCreditAccount(minBorrowedAmount - 1, USER, calls, false, 0);
+        creditFacade.openCreditAccount(minBorrowedAmount - 1, USER, calls, 0);
 
         vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
         vm.prank(USER);
-        creditFacade.openCreditAccount(maxBorrowedAmount + 1, USER, calls, false, 0);
+        creditFacade.openCreditAccount(maxBorrowedAmount + 1, USER, calls, 0);
     }
 
     //
@@ -1816,7 +1810,6 @@ contract CreditFacadeTest is BalanceHelper, CreditFacadeTestHelper, ICreditManag
                     callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
                 })
             ),
-            false,
             0
         );
     }

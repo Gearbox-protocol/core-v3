@@ -219,13 +219,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @param calls The array of MultiCall structs encoding the required operations. Generally must have
     /// at least a call to addCollateral, as otherwise the health check at the end will fail.
     /// @param referralCode Referral code which is used for potential rewards. 0 if no referral code provided
-    function openCreditAccount(
-        uint256 debt,
-        address onBehalfOf,
-        MultiCall[] calldata calls,
-        bool deployNew,
-        uint16 referralCode
-    )
+    function openCreditAccount(uint256 debt, address onBehalfOf, MultiCall[] calldata calls, uint16 referralCode)
         external
         payable
         override
@@ -256,11 +250,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         _wrapETH(); // F:[FA-3B]
 
         // Requests the Credit Manager to open a Credit Account
-        creditAccount = ICreditManagerV3(creditManager).openCreditAccount({
-            debt: debt,
-            onBehalfOf: onBehalfOf,
-            deployNew: deployNew
-        }); // F:[FA-8]
+        creditAccount = ICreditManagerV3(creditManager).openCreditAccount({debt: debt, onBehalfOf: onBehalfOf}); // F:[FA-8]
 
         // emits a new event
         emit OpenCreditAccount(creditAccount, onBehalfOf, msg.sender, debt, referralCode); // F:[FA-8]

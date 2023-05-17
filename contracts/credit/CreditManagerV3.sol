@@ -236,26 +236,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     ///
     /// @param debt Amount to be borrowed by the Credit Account
     /// @param onBehalfOf The owner of the newly opened Credit Account
-    function openCreditAccount(uint256 debt, address onBehalfOf, bool deployNew)
+    function openCreditAccount(uint256 debt, address onBehalfOf)
         external
         override
         nonReentrant // U:[CM-5]
         creditFacadeOnly // // U:[CM-2]
         returns (address creditAccount)
     {
-        if (_afVer == 1) {
-            // Takes a Credit Account from the factory and sets initial parameters
-            // The Credit Account will be connected to this Credit Manager until closing
-            creditAccount = IAccountFactory(accountFactory).takeCreditAccount(
-                0,
-                0 // uint256(deployNew ? deployAccountAction : TakeAccountAction.TAKE_USED_ONE), 0
-            ); // F:[CM-8]
-        } else {
-            creditAccount = IAccountFactory(accountFactory).takeCreditAccount(
-                0,
-                0 // uint256(deployNew ? deployAccountAction : TakeAccountAction.TAKE_USED_ONE), 0
-            ); // F:[CM-8]
-        }
+        creditAccount = IAccountFactory(accountFactory).takeCreditAccount(0, 0);
 
         creditAccountInfo[creditAccount].debt = debt;
         creditAccountInfo[creditAccount].cumulativeIndexLastUpdate = _poolCumulativeIndexNow();

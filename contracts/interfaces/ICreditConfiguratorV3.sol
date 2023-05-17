@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {CreditManagerV3} from "../credit/CreditManagerV3.sol";

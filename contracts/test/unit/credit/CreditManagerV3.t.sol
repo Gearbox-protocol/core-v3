@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 /// MOCKS
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
@@ -151,7 +151,7 @@ contract CreditManagerV3UnitTest is Test, ICreditManagerV3Events, BalanceHelper 
         vm.startPrank(USER);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
-        creditManager.openCreditAccount(200000, address(this), false);
+        creditManager.openCreditAccount(200000, address(this));
 
         CollateralDebtData memory collateralDebtData;
 
@@ -250,7 +250,7 @@ contract CreditManagerV3UnitTest is Test, ICreditManagerV3Events, BalanceHelper 
         creditManager.setReentrancy(ENTERED);
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditManager.openCreditAccount(200000, address(this), false);
+        creditManager.openCreditAccount(200000, address(this));
 
         CollateralDebtData memory collateralDebtData;
 
@@ -302,8 +302,8 @@ contract CreditManagerV3UnitTest is Test, ICreditManagerV3Events, BalanceHelper 
         creditManager.executeOrder(bytes("0"));
     }
 
-    /// @dev U:[CM-6]: credit manager works as expected
+    /// @dev U:[CM-6]: open credit account works as expected
     function test_U_CM_06_non_reentrant_functions_revert_if_called_in_reentrancy() public {
-        creditManager.openCreditAccount(200000, address(this), false);
+        creditManager.openCreditAccount(200000, address(this));
     }
 }
