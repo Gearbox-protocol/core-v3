@@ -17,7 +17,10 @@ contract USDT_TransferUnitTest is USDT_Transfer, TestHelper {
 
     constructor() USDT_Transfer(address(this)) {}
 
-    function test_U_UTT_01_fuzzing_transfer_amounts(uint256 amount, uint8 fee, uint256 maxFee) public {
+    /// @dev U:[UTT_01]: amountUSDTWithFee computes value correctly [fuzzing]
+    function test_U_UTT_01_fuzzing_amountUSDTWithFee_computes_value_correctly(uint256 amount, uint8 fee, uint256 maxFee)
+        public
+    {
         uint256 decimals = 6;
         uint256 tenBillionsUSDT = 10 ** 10 * (10 ** decimals);
         uint256 oneCent = (10 ** decimals) / 100;

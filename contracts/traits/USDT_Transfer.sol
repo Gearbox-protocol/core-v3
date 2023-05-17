@@ -16,11 +16,11 @@ contract USDT_Transfer {
 
     /// @dev Computes how much usdt you should send to get exact amount on destination account
     function _amountUSDTWithFee(uint256 amount) internal view virtual returns (uint256) {
-        uint256 amountWithBP = (amount * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR - IUSDT(usdt).basisPointsRate());
-        uint256 maximumFee = IUSDT(usdt).maximumFee();
+        uint256 amountWithBP = (amount * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR - IUSDT(usdt).basisPointsRate()); // U:[UTT_01]
+        uint256 maximumFee = IUSDT(usdt).maximumFee(); // U:[UTT_01]
         unchecked {
             uint256 amountWithMaxFee = maximumFee > type(uint256).max - amount ? maximumFee : amount + maximumFee;
-            return Math.min(amountWithMaxFee, amountWithBP);
+            return Math.min(amountWithMaxFee, amountWithBP); // U:[UTT_01]
         }
     }
 

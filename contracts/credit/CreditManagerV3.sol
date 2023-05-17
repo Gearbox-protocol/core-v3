@@ -19,7 +19,7 @@ import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 import {IERC20Helper} from "../libraries/IERC20Helper.sol";
 
 // INTERFACES
-import {IAccountFactory, TakeAccountAction} from "../interfaces/IAccountFactory.sol";
+import {IAccountFactory} from "../interfaces/IAccountFactory.sol";
 import {ICreditAccount} from "../interfaces/ICreditAccount.sol";
 import {IPoolBase, IPool4626} from "../interfaces/IPool4626.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";

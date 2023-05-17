@@ -5,11 +5,6 @@ pragma solidity ^0.8.17;
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
-enum TakeAccountAction {
-    TAKE_USED_ONE,
-    DEPLOY_NEW_ONE
-}
-
 interface IAccountFactoryEvents {
     /// @dev Emits when a new Credit Account is created
     event DeployCreditAccount(address indexed creditAccount);
