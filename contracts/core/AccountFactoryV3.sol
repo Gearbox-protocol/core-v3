@@ -1,97 +1,128 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Holdings, 2022
+// (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 pragma abicoder v1;
 
-import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 
+import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+
 import {CreditAccountV3} from "../credit/CreditAccountV3.sol";
+import {CreditManagerV3} from "../credit/CreditManagerV3.sol";
+import {IAccountFactoryV3} from "../interfaces/IAccountFactoryV3.sol";
+import {
+    CallerNotCreditManagerException,
+    CreditAccountIsInUseException,
+    MasterCreditAccountAlreadyDeployedException
+} from "../interfaces/IExceptions.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
+import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
-import {IAccountFactory, TakeAccountAction} from "../interfaces/IAccountFactory.sol";
-
-// EXCEPTIONS
-import "../interfaces/IExceptions.sol";
-
-import "forge-std/console.sol";
-
-struct CreditManagerFactory {
+struct FactoryParams {
     address masterCreditAccount;
-    uint32 head;
-    uint32 tail;
-    uint16 minUsedInQueue;
+    uint40 head;
+    uint40 tail;
 }
 
-/// @title Disposable credit accounts factory
-contract AccountFactoryV3 is IAccountFactory, ACLTrait, ContractsRegisterTrait {
-    /// @dev Address of master credit account for cloning
-    mapping(address => CreditManagerFactory) public masterCreditAccounts;
+struct QueuedAccount {
+    address creditAccount;
+    uint40 reusableAfter;
+}
 
-    mapping(address => address[]) public usedCreditAccounts;
+/// @title Account factory V3
+/// @notice Reusable credit accounts factory.
+///         - Account deployment is cheap thanks to the clones proxy pattern
+///         - Accounts are reusable: new accounts are only deployed when the queue of reusable accounts is empty
+///           (a separate queue is maintained for each credit manager)
+///         - When account is returned to the factory, it is only added to the queue after a certain delay, which
+///           allows DAO to rescue funds that might have been accidentally left upon account closure
+contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait {
+    /// @inheritdoc IVersion
+    uint256 public constant override version = 3_00;
 
-    /// @dev Contract version
-    uint256 public constant version = 3_00;
+    /// @inheritdoc IAccountFactoryV3
+    uint40 public constant override delay = 3 days;
 
-    error MasterCreditAccountAlreadyDeployed();
+    /// @dev Mapping credit manager => factory params
+    mapping(address => FactoryParams) internal _factoryParams;
 
-    /// @param addressProvider Address of address repository
+    /// @dev Mapping credit manager => queued accounts
+    mapping(address => QueuedAccount[]) internal _queuedAccounts;
+
+    /// @notice Constructor
+    /// @param addressProvider Address provider contract address
     constructor(address addressProvider) ACLTrait(addressProvider) ContractsRegisterTrait(addressProvider) {}
 
-    /// @dev Provides a new credit account to a Credit Manager
-    /// @return creditAccount Address of credit account
-    function takeCreditAccount(uint256 deployAction, uint256) external override returns (address creditAccount) {
-        CreditManagerFactory storage cmf = masterCreditAccounts[msg.sender];
-        address masterCreditAccount = cmf.masterCreditAccount;
+    /// @inheritdoc IAccountFactoryV3
+    function takeCreditAccount(uint256, uint256) external override returns (address creditAccount) {
+        FactoryParams storage fp = _factoryParams[msg.sender];
 
+        address masterCreditAccount = fp.masterCreditAccount;
         if (masterCreditAccount == address(0)) {
             revert CallerNotCreditManagerException();
         }
-        uint256 totalUsed = cmf.tail - cmf.head;
-        if (totalUsed < cmf.minUsedInQueue || deployAction == uint256(TakeAccountAction.DEPLOY_NEW_ONE)) {
-            // Create a new credit account if there are none in stock
-            creditAccount = Clones.clone(masterCreditAccount); // T:[AF-2]
-            emit DeployCreditAccount(creditAccount);
+
+        uint256 head = fp.head;
+        if (head < fp.tail && block.timestamp >= _queuedAccounts[msg.sender][head].reusableAfter) {
+            creditAccount = _queuedAccounts[msg.sender][head].creditAccount;
+            delete _queuedAccounts[msg.sender][head];
+            unchecked {
+                ++fp.head;
+            }
         } else {
-            creditAccount = usedCreditAccounts[msg.sender][cmf.head];
-            ++cmf.head;
-            emit ReuseCreditAccount(creditAccount);
+            creditAccount = Clones.clone(masterCreditAccount);
+            emit DeployCreditAccount({creditAccount: creditAccount, creditManager: msg.sender});
         }
 
-        // emit InitializeCreditAccount(result, msg.sender); // T:[AF-5]
+        emit TakeCreditAccount({creditAccount: creditAccount, creditManager: msg.sender});
     }
 
-    function returnCreditAccount(address usedAccount) external override {
-        CreditManagerFactory storage cmf = masterCreditAccounts[msg.sender];
+    /// @inheritdoc IAccountFactoryV3
+    function returnCreditAccount(address creditAccount) external override {
+        FactoryParams storage fp = _factoryParams[msg.sender];
 
-        if (cmf.masterCreditAccount == address(0)) {
+        if (fp.masterCreditAccount == address(0)) {
             revert CallerNotCreditManagerException();
         }
 
-        usedCreditAccounts[msg.sender][cmf.tail] = usedAccount;
-        ++cmf.tail;
-        emit ReturnCreditAccount(usedAccount);
+        _queuedAccounts[msg.sender][fp.tail] =
+            QueuedAccount({creditAccount: creditAccount, reusableAfter: uint40(block.timestamp) + delay});
+        unchecked {
+            ++fp.tail;
+        }
+        emit ReturnCreditAccount({creditAccount: creditAccount, creditManager: msg.sender});
     }
 
-    // CONFIGURATION
+    /// ------------- ///
+    /// CONFIGURATION ///
+    /// ------------- ///
 
-    function addCreditManager(address creditManager, uint16 minUsedInQueue)
+    /// @inheritdoc IAccountFactoryV3
+    function addCreditManager(address creditManager)
         external
+        override
         configuratorOnly
         registeredCreditManagerOnly(creditManager)
     {
-        if (masterCreditAccounts[creditManager].masterCreditAccount != address(0)) {
-            revert MasterCreditAccountAlreadyDeployed();
+        if (_factoryParams[creditManager].masterCreditAccount != address(0)) {
+            revert MasterCreditAccountAlreadyDeployedException();
+        }
+        address masterCreditAccount = address(new CreditAccountV3(creditManager));
+        _factoryParams[creditManager].masterCreditAccount = masterCreditAccount;
+        emit AddCreditManager(creditManager, masterCreditAccount);
+    }
+
+    /// @inheritdoc IAccountFactoryV3
+    function rescue(address creditAccount, address target, bytes calldata data) external configuratorOnly {
+        address creditManager = CreditAccountV3(creditAccount).creditManager();
+        _checkRegisteredCreditManagerOnly(creditManager);
+
+        (,,,,, address borrower) = CreditManagerV3(creditManager).creditAccountInfo(creditAccount);
+        if (borrower != address(0)) {
+            revert CreditAccountIsInUseException();
         }
 
-        masterCreditAccounts[creditManager] = CreditManagerFactory({
-            masterCreditAccount: address(new CreditAccountV3(creditManager)),
-            head: 0,
-            tail: 0,
-            minUsedInQueue: minUsedInQueue
-        });
-
-        emit AddCreditManager(creditManager);
+        CreditAccountV3(creditAccount).rescue(target, data);
     }
 }
