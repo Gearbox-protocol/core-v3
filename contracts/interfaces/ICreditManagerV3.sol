@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IPoolQuotaKeeper} from "./IPoolQuotaKeeper.sol";
@@ -32,10 +32,13 @@ struct CreditAccountInfo {
 }
 
 enum CollateralCalcTask {
+    GENERIC_PARAMS,
     DEBT_ONLY,
     DEBT_COLLATERAL_WITHOUT_WITHDRAWALS,
     DEBT_COLLATERAL_CANCEL_WITHDRAWALS,
-    DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
+    DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS,
+    ///
+    FULL_COLLATERAL_CHECK_LAZY
 }
 
 struct CollateralDebtData {
@@ -45,17 +48,16 @@ struct CollateralDebtData {
     uint256 cumulativeQuotaInterest;
     uint256 accruedInterest;
     uint256 accruedFees;
+    uint256 totalDebtUSD;
     uint256 totalValue;
     uint256 totalValueUSD;
     uint256 twvUSD;
-    uint256 totalDebtUSD;
-    uint16 hf;
     uint256 enabledTokensMask;
     uint256 quotedTokenMask;
     address[] quotedTokens;
-    bool isLiquidatable;
+    uint16[] quotedLts;
+    uint256[] quotas;
     ///
-    address _priceOracle;
     address _poolQuotaKeeper;
 }
 
@@ -91,7 +93,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     ///  @dev Opens credit account and borrows funds from the pool.
     /// @param debt Amount to be borrowed by the Credit Account
     /// @param onBehalfOf The owner of the newly opened Credit Account
-    function openCreditAccount(uint256 debt, address onBehalfOf, bool deployNew) external returns (address);
+    function openCreditAccount(uint256 debt, address onBehalfOf) external returns (address);
 
     ///  @dev Closes a Credit Account - covers both normal closure and liquidation
     /// - Checks whether the contract is paused, and, if so, if the payer is an emergency liquidator.
@@ -250,7 +252,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     function poolService() external view returns (address);
 
     /// @dev Returns the current pool quota keeper connected to the pool
-    function poolQuotaKeeper() external view returns (IPoolQuotaKeeper);
+    function poolQuotaKeeper() external view returns (address);
 
     /// @dev Whether the Credit Manager supports quotas
     function supportsQuotas() external view returns (bool);
