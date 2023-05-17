@@ -2082,11 +2082,10 @@ contract CreditFacadeIntegrationTest is
     function test_FA_58_botMulticall_works_correctly() public {
         (address creditAccount,) = _openTestCreditAccount();
 
-        /// ????
         address bot = address(new GeneralMock());
 
         vm.prank(USER);
-        botList.setBotPermissions(creditAccount, bot, type(uint192).max, uint72(1 ether), uint72(1 ether / 10));
+        creditFacade.setBotPermissions(creditAccount, bot, type(uint192).max, uint72(1 ether), uint72(1 ether / 10));
 
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
 

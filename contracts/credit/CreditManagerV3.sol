@@ -442,7 +442,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     creditAccount: creditAccount,
                     tokens: collateralDebtData.quotedTokens
                 }); // F: [CMQ-4,5]
-                creditAccountInfo[creditAccount].cumulativeQuotaInterest = collateralDebtData.cumulativeQuotaInterest;
+                creditAccountInfo[creditAccount].cumulativeQuotaInterest =
+                    collateralDebtData.cumulativeQuotaInterest + 1;
             }
 
             // Pays the amount back to the pool

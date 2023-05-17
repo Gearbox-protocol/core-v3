@@ -518,7 +518,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(admin);
         controllerTimelock.rampLiquidationThreshold(
-            creditManager, token, 6000, uint40(block.timestamp + 6 days), 7 days
+            creditManager, token, 6000, uint40(block.timestamp + 1 days / 2), 7 days
         );
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
