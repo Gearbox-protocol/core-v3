@@ -46,22 +46,33 @@ contract CreditAccountV3 is ICreditAccountV3 {
     /// @notice Constructor
     /// @param _creditManager Credit manager to connect this account to
     constructor(address _creditManager) {
-        creditManager = _creditManager;
-        factory = msg.sender;
+        creditManager = _creditManager; // U:[CA-1]
+        factory = msg.sender; // U:[CA-1]
     }
 
     /// @inheritdoc ICreditAccountV3
-    function safeTransfer(address token, address to, uint256 amount) external creditManagerOnly {
-        IERC20(token).safeTransfer(to, amount);
+    function safeTransfer(address token, address to, uint256 amount)
+        external
+        creditManagerOnly // U:[CA-2]
+    {
+        IERC20(token).safeTransfer(to, amount); // U:[CA-3]
     }
 
     /// @inheritdoc ICreditAccountV3
-    function execute(address target, bytes memory data) external creditManagerOnly returns (bytes memory result) {
-        result = target.functionCall(data);
+    function execute(address target, bytes memory data)
+        external
+        creditManagerOnly // U:[CA-2]
+        returns (bytes memory result)
+    {
+        result = target.functionCall(data); // U:[CA-4]
     }
 
     /// @inheritdoc ICreditAccountV3
-    function rescue(address target, bytes memory data) external override factoryOnly {
-        target.functionCall(data);
+    function rescue(address target, bytes memory data)
+        external
+        override
+        factoryOnly // U:[CA-2]
+    {
+        target.functionCall(data); // U:[CA-5]
     }
 }
