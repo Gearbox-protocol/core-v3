@@ -202,7 +202,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         return isFeeToken ? amount.amountUSDTMinusFee(tokenFee, maxTokenFee) : amount;
     }
 
-    function _decimals(address token) internal returns (uint8) {
+    function _decimals(address token) internal view returns (uint8) {
         return IERC20Metadata(token).decimals();
     }
 
