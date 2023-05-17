@@ -61,12 +61,12 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait, ContractsRegisterTra
     /// --------------------- ///
 
     /// @inheritdoc IWithdrawalManager
-    function addImmediateWithdrawal(address account, address token, uint256 amount)
+    function addImmediateWithdrawal(address token, address to, uint256 amount)
         external
         override
         registeredCreditManagerOnly(msg.sender) // U:[WM-2]
     {
-        _addImmediateWithdrawal(account, token, amount);
+        _addImmediateWithdrawal({account: to, token: token, amount: amount});
     }
 
     /// @inheritdoc IWithdrawalManager
