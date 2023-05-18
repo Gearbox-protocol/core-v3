@@ -33,6 +33,7 @@ interface IAccountFactoryV3 is IAccountFactoryV3Events, IVersion {
 
     /// @notice Returns a used credit account to the queue
     /// @param creditAccount Address of the returned credit account
+    /// @custom:expects Credit account is connected to the calling credit manager
     /// @custom:expects Credit manager sets account's borrower to zero-address before calling this function
     function returnCreditAccount(address creditAccount) external;
 

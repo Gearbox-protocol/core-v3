@@ -60,22 +60,22 @@ contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait
 
         address masterCreditAccount = fp.masterCreditAccount;
         if (masterCreditAccount == address(0)) {
-            revert CallerNotCreditManagerException();
+            revert CallerNotCreditManagerException(); // U:[AF-1]
         }
 
         uint256 head = fp.head;
-        if (head < fp.tail && block.timestamp >= _queuedAccounts[msg.sender][head].reusableAfter) {
-            creditAccount = _queuedAccounts[msg.sender][head].creditAccount;
-            delete _queuedAccounts[msg.sender][head];
-            unchecked {
-                ++fp.head;
-            }
+        if (head == fp.tail || block.timestamp < _queuedAccounts[msg.sender][head].reusableAfter) {
+            creditAccount = Clones.clone(masterCreditAccount); // U:[AF-2A]
+            emit DeployCreditAccount({creditAccount: creditAccount, creditManager: msg.sender}); // U:[AF-2A]
         } else {
-            creditAccount = Clones.clone(masterCreditAccount);
-            emit DeployCreditAccount({creditAccount: creditAccount, creditManager: msg.sender});
+            creditAccount = _queuedAccounts[msg.sender][head].creditAccount; // U:[AF-2B]
+            delete _queuedAccounts[msg.sender][head]; // U:[AF-2B]
+            unchecked {
+                ++fp.head; // U:[AF-2B]
+            }
         }
 
-        emit TakeCreditAccount({creditAccount: creditAccount, creditManager: msg.sender});
+        emit TakeCreditAccount({creditAccount: creditAccount, creditManager: msg.sender}); // U:[AF-2A,2B]
     }
 
     /// @inheritdoc IAccountFactoryV3
@@ -83,15 +83,16 @@ contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait
         FactoryParams storage fp = _factoryParams[msg.sender];
 
         if (fp.masterCreditAccount == address(0)) {
-            revert CallerNotCreditManagerException();
+            revert CallerNotCreditManagerException(); // U:[AF-1]
         }
 
-        _queuedAccounts[msg.sender][fp.tail] =
-            QueuedAccount({creditAccount: creditAccount, reusableAfter: uint40(block.timestamp) + delay});
+        _queuedAccounts[msg.sender].push(
+            QueuedAccount({creditAccount: creditAccount, reusableAfter: uint40(block.timestamp) + delay})
+        ); // U:[AF-3]
         unchecked {
-            ++fp.tail;
+            ++fp.tail; // U:[AF-3]
         }
-        emit ReturnCreditAccount({creditAccount: creditAccount, creditManager: msg.sender});
+        emit ReturnCreditAccount({creditAccount: creditAccount, creditManager: msg.sender}); // U:[AF-3]
     }
 
     /// ------------- ///
@@ -102,27 +103,30 @@ contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait
     function addCreditManager(address creditManager)
         external
         override
-        configuratorOnly
-        registeredCreditManagerOnly(creditManager)
+        configuratorOnly // U:[AF-1]
+        registeredCreditManagerOnly(creditManager) // U:[AF-4A]
     {
         if (_factoryParams[creditManager].masterCreditAccount != address(0)) {
-            revert MasterCreditAccountAlreadyDeployedException();
+            revert MasterCreditAccountAlreadyDeployedException(); // U:[AF-4B]
         }
-        address masterCreditAccount = address(new CreditAccountV3(creditManager));
-        _factoryParams[creditManager].masterCreditAccount = masterCreditAccount;
-        emit AddCreditManager(creditManager, masterCreditAccount);
+        address masterCreditAccount = address(new CreditAccountV3(creditManager)); // U:[AF-4C]
+        _factoryParams[creditManager].masterCreditAccount = masterCreditAccount; // U:[AF-4C]
+        emit AddCreditManager(creditManager, masterCreditAccount); // U:[AF-4C]
     }
 
     /// @inheritdoc IAccountFactoryV3
-    function rescue(address creditAccount, address target, bytes calldata data) external configuratorOnly {
+    function rescue(address creditAccount, address target, bytes calldata data)
+        external
+        configuratorOnly // U:[AF-1]
+    {
         address creditManager = CreditAccountV3(creditAccount).creditManager();
-        _checkRegisteredCreditManagerOnly(creditManager);
+        _checkRegisteredCreditManagerOnly(creditManager); // U:[AF-5A]
 
         (,,,,, address borrower) = CreditManagerV3(creditManager).creditAccountInfo(creditAccount);
         if (borrower != address(0)) {
-            revert CreditAccountIsInUseException();
+            revert CreditAccountIsInUseException(); // U:[AF-5B]
         }
 
-        CreditAccountV3(creditAccount).rescue(target, data);
+        CreditAccountV3(creditAccount).rescue(target, data); // U:[AF-5C]
     }
 }
