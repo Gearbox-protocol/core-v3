@@ -17,6 +17,7 @@ import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {UNDERLYING_TOKEN_MASK, BitMask} from "../../../libraries/BitMask.sol";
 import {CreditLogic} from "../../../libraries/CreditLogic.sol";
 import {USDTFees} from "../../../libraries/USDTFees.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 
 /// INTERFACE
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -45,7 +46,7 @@ import {IWETHGateway} from "../../../interfaces/IWETHGateway.sol";
 import {ClaimAction, IWithdrawalManager} from "../../../interfaces/IWithdrawalManager.sol";
 
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
-import {ERC20FeeMock} from "../../mocks/token/ERC20FeeMock.sol";
+
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // EXCEPTIONS
@@ -55,7 +56,9 @@ import "../../../interfaces/IExceptions.sol";
 import {PriceOracleMock} from "../../mocks/oracles/PriceOracleMock.sol";
 import {PoolMock} from "../../mocks/pool/PoolMock.sol";
 import {PoolQuotaKeeperMock} from "../../mocks/pool/PoolQuotaKeeperMock.sol";
-
+import {ERC20FeeMock} from "../../mocks/token/ERC20FeeMock.sol";
+import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
+import {WETHGatewayMock} from "../../mocks/support/WETHGatewayMock.sol";
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";
@@ -77,15 +80,14 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     using USDTFees for uint256;
 
     IAddressProviderV3 addressProvider;
-    IWETH wethToken;
 
     AccountFactoryMock accountFactory;
     CreditManagerV3Harness creditManager;
     PoolMock poolMock;
     PoolQuotaKeeperMock poolQuotaKeeperMock;
 
-    IPriceOracleV2 priceOracle;
-    IWETHGateway wethGateway;
+    PriceOracleMock priceOracle;
+    WETHGatewayMock wethGateway;
     IWithdrawalManager withdrawalManager;
 
     address underlying;
@@ -143,6 +145,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         addressProvider = new AddressProviderV3ACLMock();
 
         accountFactory = AccountFactoryMock(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL));
+        wethGateway = WETHGatewayMock(addressProvider.getAddressOrRevert(AP_WETH_GATEWAY, 3_00));
 
         addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
     }
@@ -204,6 +207,18 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
     function _decimals(address token) internal view returns (uint8) {
         return IERC20Metadata(token).decimals();
+    }
+
+    function _addTokens(address creditAccount, uint8 numberOfTokens, uint256 balance) internal {
+        for (uint8 i = 0; i < numberOfTokens; ++i) {
+            ERC20Mock t =
+            new ERC20Mock(string.concat("new token ", Strings.toString(i+1)),string.concat("NT-", Strings.toString(i+1)), 18);
+
+            creditManager.addToken(address(t));
+            creditManager.setCollateralTokenData(address(t), 8000, 8000, type(uint40).max, 0);
+
+            t.mint(creditAccount, balance * ((i + 2) % 5));
+        }
     }
 
     ///
@@ -757,11 +772,13 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 convertToETH: false
             });
 
+            assertEq(poolMock.repayAmount(), collateralDebtData.debt, _testCaseErr(caseName, "Incorrect repay amount"));
+            assertEq(poolMock.repayProfit(), profit, _testCaseErr(caseName, "Incorrect profit"));
+            assertEq(poolMock.repayLoss(), loss, _testCaseErr(caseName, "Incorrect loss"));
+
             assertEq(remainingFunds, expectedRemainingFunds, _testCaseErr(caseName, "incorrect remainingFunds"));
 
             assertEq(loss, expectedLoss, _testCaseErr(caseName, "incorrect loss"));
-
-            console.log("LOSS", loss);
 
             checkTokenTransfers({debug: false});
 
@@ -774,11 +791,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                     - loss,
                 reason: "Pool balance invariant"
             });
-            // assertEq(
-            //     _case.expectedTransferFromPayer,
-            //     payerBalanceBefore - tokenTestSuite.balanceOf({token: underlying, holder: LIQUIDATOR}),
-            //     _testCaseErr(caseName, "incorrect expectedTransferFromPayer")
-            // );
 
             (,,,,, address borrower) = creditManager.creditAccountInfo(creditAccount);
             assertEq(borrower, address(0), "Borrowers wasn't cleared");
@@ -802,4 +814,88 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             vm.revertTo(snapshot);
         }
     }
+
+    /// @dev U:[CM-9]: close credit account works as expected
+    function test_U_CM_09_close_credit_transfers_tokens_correctly(uint256 skipTokenMask)
+        public
+        withFeeTokenCase
+        withoutSupportQuotas
+    {
+        bool convertToEth = (skipTokenMask % 2) != 0;
+        uint8 numberOfTokens = uint8(skipTokenMask % 253);
+
+        CollateralDebtData memory collateralDebtData;
+        collateralDebtData.debt = DAI_ACCOUNT_AMOUNT;
+
+        /// @notice `+2` for underlying and WETH token
+        collateralDebtData.enabledTokensMask =
+            uint256(keccak256(abi.encode(skipTokenMask))) & ((1 << (numberOfTokens + 2)) - 1);
+
+        address creditAccount = accountFactory.usedAccount();
+
+        creditManager.setBorrower(creditAccount, USER);
+        tokenTestSuite.mint({token: underlying, to: creditAccount, amount: _amountWithFee(collateralDebtData.debt * 2)});
+
+        address weth = tokenTestSuite.addressOf(Tokens.WETH);
+        creditManager.addToken(weth);
+        creditManager.setCollateralTokenData(weth, 8000, 8000, type(uint40).max, 0);
+
+        {
+            uint256 randomAmount = skipTokenMask % DAI_ACCOUNT_AMOUNT;
+            tokenTestSuite.mint({token: weth, to: creditAccount, amount: randomAmount});
+            _addTokens({creditAccount: creditAccount, numberOfTokens: numberOfTokens, balance: randomAmount});
+        }
+
+        string memory caseName = string.concat("token transfer with ", Strings.toString(numberOfTokens), " on account");
+        caseName = isFeeToken ? string.concat("Fee token: ", caseName) : caseName;
+
+        startTokenTrackingSession(caseName);
+
+        uint8 len = creditManager.collateralTokensCount();
+
+        /// @notice it starts from 1, because underlying token has index 0
+        for (uint8 i = 0; i < len; ++i) {
+            uint256 tokenMask = 1 << i;
+            address token = creditManager.getTokenByMask(tokenMask);
+            uint256 balance = IERC20(token).balanceOf(creditAccount);
+
+            if (
+                (collateralDebtData.enabledTokensMask & tokenMask != 0) && (tokenMask & skipTokenMask == 0)
+                    && (balance > 1)
+            ) {
+                if (i == 0) {
+                    expectTokenTransfer({
+                        reason: "transfer underlying token ",
+                        token: underlying,
+                        from: creditAccount,
+                        to: FRIEND,
+                        amount: collateralDebtData.debt - 1
+                    });
+                } else {
+                    expectTokenTransfer({
+                        reason: string.concat("transfer token ", IERC20Metadata(token).symbol()),
+                        token: token,
+                        from: creditAccount,
+                        to: (convertToEth && token == weth) ? address(wethGateway) : FRIEND,
+                        amount: balance - 1
+                    });
+                }
+            }
+        }
+
+        creditManager.closeCreditAccount({
+            creditAccount: creditAccount,
+            closureAction: ClosureAction.CLOSE_ACCOUNT,
+            collateralDebtData: collateralDebtData,
+            payer: USER,
+            to: FRIEND,
+            skipTokensMask: skipTokenMask,
+            convertToETH: convertToEth
+        });
+
+        checkTokenTransfers({debug: true});
+    }
+
+    /// @dev U:[CM-10]: manageDebt increases debt correctly
+    function test_U_CM_10_manageDebt_increases_debt_correctly() public withFeeTokenCase withoutSupportQuotas {}
 }

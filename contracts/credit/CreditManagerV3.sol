@@ -329,7 +329,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 feeLiquidation: closureAction == ClosureAction.LIQUIDATE_ACCOUNT ? feeLiquidation : feeLiquidationExpired,
                 amountWithFeeFn: _amountWithFee,
                 amountMinusFeeFn: _amountMinusFee
-            });
+            }); // U:[CM-8]
         }
         {
             uint256 underlyingBalance = IERC20Helper.balanceOf({token: underlying, holder: creditAccount}); // U:[CM-8]
@@ -352,7 +352,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         // Signals to the pool that debt has been repaid. The pool relies
         // on the Credit Manager to repay the debt correctly, and does not
         // check internally whether the underlying was actually transferred
-        _poolRepayCreditAccount(collateralDebtData.debt, profit, loss);
+        _poolRepayCreditAccount(collateralDebtData.debt, profit, loss); // U:[CM-8]
 
         // transfer remaining funds to the borrower [liquidations only]
         if (remainingFunds > 1) {
@@ -362,7 +362,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 to: borrower,
                 amount: remainingFunds,
                 convertToETH: false
-            });
+            }); // U:[CM-8]
         }
 
         if (supportsQuotas && collateralDebtData.quotedTokens.length != 0) {
@@ -381,7 +381,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             to: to,
             convertToETH: convertToETH,
             tokensToTransferMask: collateralDebtData.enabledTokensMask.disable(skipTokensMask)
-        });
+        }); // U:[CM-8, 9]
 
         // Returns Credit Account to the factory
         IAccountFactory(accountFactory).returnCreditAccount({usedAccount: creditAccount}); // U:[CM-8]
@@ -453,7 +453,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 uint256 profit;
 
                 (newDebt, newCumulativeIndex, amountToRepay, profit) =
-                    collateralDebtData.calcDecrease({amount: amount, feeInterest: feeInterest});
+                    collateralDebtData.calcDecrease({amount: _amountMinusFee(amount), feeInterest: feeInterest});
 
                 _poolRepayCreditAccount(amountToRepay, profit, 0); // F:[CM-21]
             }

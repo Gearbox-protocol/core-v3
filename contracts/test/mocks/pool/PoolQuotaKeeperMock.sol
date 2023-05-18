@@ -50,6 +50,7 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeper {
 
     function updateQuota(address creditAccount, address token, int96 quotaChange)
         external
+        view
         returns (uint256 caQuotaInterestChange, bool enableToken, bool disableToken)
     {
         caQuotaInterestChange = return_caQuotaInterestChange;
@@ -64,7 +65,6 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeper {
         call_creditAccount = creditAccount;
         call_tokens = tokens;
         call_setLimitsToZero = setLimitsToZero;
-        console.log("SZ:", setLimitsToZero);
     }
 
     /// @dev Computes the accrued quota interest and updates interest indexes
