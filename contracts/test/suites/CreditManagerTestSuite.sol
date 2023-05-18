@@ -100,7 +100,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         }
 
         if (accountFactoryVer == 2) {
-            AccountFactoryV3(address(af)).addCreditManager(address(creditManager), 1);
+            AccountFactoryV3(address(af)).addCreditManager(address(creditManager));
         }
 
         vm.stopPrank();

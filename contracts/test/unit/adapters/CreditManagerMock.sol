@@ -9,19 +9,17 @@ interface CreditManagerMockEvents {
 }
 
 contract CreditManagerMock is CreditManagerMockEvents {
-    address public pool;
-    address public creditFacade;
     address public addressProvider;
+    address public creditFacade;
 
     address public getExternalCallCreditAccountOrRevert;
     mapping(address => uint256) public getTokenMaskOrRevert;
 
     bytes _result;
 
-    constructor(address _addressProvider) {
-        pool = address(this);
-        creditFacade = address(this);
+    constructor(address _addressProvider, address _creditFacade) {
         addressProvider = _addressProvider;
+        creditFacade = _creditFacade;
     }
 
     function approveCreditAccount(address token, uint256 amount) external {

@@ -800,12 +800,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     to: withdrawalManager,
                     amount: amount
                 });
-                /// what `account` is ?
-                IWithdrawalManager(withdrawalManager).addImmediateWithdrawal({
-                    account: to,
-                    token: token,
-                    amount: delivered
-                });
+                IWithdrawalManager(withdrawalManager).addImmediateWithdrawal({token: token, to: to, amount: delivered});
             }
         }
     }

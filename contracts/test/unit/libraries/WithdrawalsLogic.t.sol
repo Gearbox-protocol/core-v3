@@ -14,7 +14,7 @@ enum ScheduleTask {
     NON_SCHEDULED
 }
 
-/// @title Withdrawals logic unit test
+/// @title Withdrawals logic library unit test
 /// @notice U:[WL]: Unit tests for withdrawals logic library
 contract WithdrawalsLogicUnitTest is TestHelper {
     using WithdrawalsLogic for ClaimAction;
