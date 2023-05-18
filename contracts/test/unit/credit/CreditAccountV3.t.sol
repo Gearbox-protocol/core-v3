@@ -38,36 +38,21 @@ contract CreditAccountV3UnitTest is TestHelper {
     }
 
     /// @notice U:[CA-2]: External functions have correct access
-    function test_U_CA_02_external_functions_have_correct_access(
-        address caller,
-        address factory_,
-        address creditManager_
-    ) public {
-        vm.assume(factory_ != creditManager_);
-
-        vm.prank(factory_);
-        CreditAccountV3 creditAccount_ = new CreditAccountV3(creditManager_);
-
-        vm.mockCall(address(0), bytes(""), bytes(""));
-        vm.mockCall(address(0), abi.encodeCall(IERC20.transfer, (address(0), 0)), bytes(""));
-
-        if (caller != creditManager_) {
+    function test_U_CA_02_external_functions_have_correct_access(address caller) public {
+        vm.startPrank(caller);
+        if (caller != creditManager) {
             vm.expectRevert(CallerNotCreditManagerException.selector);
+            creditAccount.safeTransfer({token: address(0), to: address(0), amount: 0});
         }
-        vm.prank(caller);
-        creditAccount_.safeTransfer({token: address(0), to: address(0), amount: 0});
-
-        if (caller != creditManager_) {
+        if (caller != creditManager) {
             vm.expectRevert(CallerNotCreditManagerException.selector);
+            creditAccount.execute({target: address(0), data: bytes("")});
         }
-        vm.prank(caller);
-        creditAccount_.execute({target: address(0), data: bytes("")});
-
-        if (caller != factory_) {
+        if (caller != factory) {
             vm.expectRevert(CallerNotAccountFactoryException.selector);
+            creditAccount.rescue({target: address(0), data: bytes("")});
         }
-        vm.prank(caller);
-        creditAccount_.rescue({target: address(0), data: bytes("")});
+        vm.stopPrank();
     }
 
     /// @notice U:[CA-3]: `safeTransfer` works correctly

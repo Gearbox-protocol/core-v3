@@ -19,13 +19,13 @@ contract CreditAccountV3 is ICreditAccountV3 {
     using Address for address;
 
     /// @inheritdoc IVersion
-    uint256 public constant version = 3_00;
+    uint256 public constant override version = 3_00;
 
     /// @inheritdoc ICreditAccountV3
-    address public immutable factory;
+    address public immutable override factory;
 
     /// @inheritdoc ICreditAccountV3
-    address public immutable creditManager;
+    address public immutable override creditManager;
 
     /// @dev Ensures that function caller is account factory
     modifier factoryOnly() {
@@ -53,6 +53,7 @@ contract CreditAccountV3 is ICreditAccountV3 {
     /// @inheritdoc ICreditAccountV3
     function safeTransfer(address token, address to, uint256 amount)
         external
+        override
         creditManagerOnly // U:[CA-2]
     {
         IERC20(token).safeTransfer(to, amount); // U:[CA-3]
@@ -61,6 +62,7 @@ contract CreditAccountV3 is ICreditAccountV3 {
     /// @inheritdoc ICreditAccountV3
     function execute(address target, bytes memory data)
         external
+        override
         creditManagerOnly // U:[CA-2]
         returns (bytes memory result)
     {
