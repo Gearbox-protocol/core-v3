@@ -1215,4 +1215,40 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             );
         }
     }
+
+    //
+    //  ADD COLLATERAL
+    //
+    /// @dev U:[CM-13]: addCollateral works as expected
+    function test_U_CM_13_addCollateral_works_as_expected() public withoutSupportQuotas {
+        address creditAccount = DUMB_ADDRESS;
+        address linkToken = tokenTestSuite.addressOf(Tokens.LINK);
+
+        uint256 amount = DAI_ACCOUNT_AMOUNT;
+
+        tokenTestSuite.mint({token: underlying, to: USER, amount: amount});
+
+        vm.prank(USER);
+        IERC20(underlying).approve({spender: address(creditManager), amount: type(uint256).max});
+
+        vm.expectRevert(TokenNotAllowedException.selector);
+        creditManager.addCollateral({payer: USER, creditAccount: creditAccount, token: linkToken, amount: amount});
+
+        startTokenTrackingSession("add collateral");
+
+        expectTokenTransfer({
+            reason: "transfer from user to pool",
+            token: underlying,
+            from: USER,
+            to: creditAccount,
+            amount: amount
+        });
+
+        uint256 tokenToEnable =
+            creditManager.addCollateral({payer: USER, creditAccount: creditAccount, token: underlying, amount: amount});
+
+        checkTokenTransfers({debug: false});
+
+        assertEq(tokenToEnable, UNDERLYING_TOKEN_MASK, "Incorrect tokenToEnable");
+    }
 }

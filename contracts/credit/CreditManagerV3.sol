@@ -489,12 +489,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param amount Amount to add
     function addCollateral(address payer, address creditAccount, address token, uint256 amount)
         external
-        nonReentrant
+        nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
         returns (uint256 tokenMask)
     {
-        tokenMask = getTokenMaskOrRevert({token: token});
-        IERC20(token).safeTransferFrom({from: payer, to: creditAccount, value: amount}); // F:[CM-22]
+        tokenMask = getTokenMaskOrRevert({token: token}); // U:[CM-13]
+        IERC20(token).safeTransferFrom({from: payer, to: creditAccount, value: amount}); // U:[CM-13]
     }
 
     /// @dev Transfers Credit Account ownership to another address
@@ -507,7 +507,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacadeOnly // U:[CM-2]
     {
         getBorrowerOrRevert({creditAccount: creditAccount});
-        creditAccountInfo[creditAccount].borrower = to; // F:[CM-7]
+        creditAccountInfo[creditAccount].borrower = to;
     }
 
     /// @dev Requests the Credit Account to approve a collateral token to another contract.
