@@ -243,7 +243,7 @@ error NoFreeWithdrawalSlotsException();
 
 error NoPermissionException(uint256 permission);
 
-error ExternalCallCreditAccountNotSetException();
+error ActiveCreditAccountNotSetException();
 
 /// @dev Thrown when the caller is not a Credit Facade associated with required Credit Account
 error CallerNotCreditAccountFacadeException();

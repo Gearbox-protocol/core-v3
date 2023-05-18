@@ -691,7 +691,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
                     if (flags & EXTERNAL_CONTRACT_WAS_CALLED == 0) {
                         flags = flags.enable(EXTERNAL_CONTRACT_WAS_CALLED);
-                        _setCaForExterallCall(creditAccount);
+                        _setActiveCreditAccount(creditAccount);
                     }
 
                     // Makes a call
@@ -733,7 +733,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         }
 
         if (flags & EXTERNAL_CONTRACT_WAS_CALLED != 0) {
-            _returnCaForExterallCall();
+            _unsetActiveCreditAccount();
         }
 
         // Emits event for multicall end - used in analytics to track actions within multicalls
@@ -743,18 +743,13 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         fullCheckParams.enabledTokensMaskAfter = enabledTokensMask;
     }
 
-    function _setCaForExterallCall(address creditAccount) internal {
-        // Takes ownership of the Credit Account
-        _setCreditAccountForExternalCall(creditAccount); // F:[FA-26]
+    function _setActiveCreditAccount(address creditAccount) internal {
+        ICreditManagerV3(creditManager).setActiveCreditAccount(creditAccount); // F:[FA-26]
     }
 
-    function _returnCaForExterallCall() internal {
-        // Takes ownership of the Credit Account
-        _setCreditAccountForExternalCall(address(1)); // F:[FA-26]
-    }
-
-    function _setCreditAccountForExternalCall(address creditAccount) internal {
-        ICreditManagerV3(creditManager).setCreditAccountForExternalCall(creditAccount); // F:[FA-26]
+    /// @dev returns activeCreditAccount to address(1) which means that multicall is not active
+    function _unsetActiveCreditAccount() internal {
+        _setActiveCreditAccount(address(1)); // F:[FA-26]
     }
 
     function _revertIfNoPermission(uint256 flags, uint256 permission) internal pure {

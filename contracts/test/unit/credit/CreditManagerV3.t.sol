@@ -349,7 +349,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.revokeAdapterAllowances(DUMB_ADDRESS, new RevocationPair[](0));
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
-        creditManager.setCreditAccountForExternalCall(DUMB_ADDRESS);
+        creditManager.setActiveCreditAccount(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.setFlagFor(DUMB_ADDRESS, 1, true);
@@ -454,7 +454,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.revokeAdapterAllowances(DUMB_ADDRESS, new RevocationPair[](0));
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditManager.setCreditAccountForExternalCall(DUMB_ADDRESS);
+        creditManager.setActiveCreditAccount(DUMB_ADDRESS);
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditManager.setFlagFor(DUMB_ADDRESS, 1, true);
@@ -1285,7 +1285,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         address creditAccount = address(new CreditAccountMock());
         address linkToken = tokenTestSuite.addressOf(Tokens.LINK);
 
-        creditManager.setCreditAccountForExternalCall(address(creditAccount));
+        creditManager.setActiveCreditAccount(address(creditAccount));
         creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
 
         /// @notice check that it reverts on unknown token
@@ -1316,7 +1316,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     function test_U_CM_16_executeOrder_works_as_expected() public withoutSupportQuotas {
         address creditAccount = address(new CreditAccountMock());
 
-        creditManager.setCreditAccountForExternalCall(address(creditAccount));
+        creditManager.setActiveCreditAccount(address(creditAccount));
         creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
 
         bytes memory dumbCallData = bytes("Hello, world");

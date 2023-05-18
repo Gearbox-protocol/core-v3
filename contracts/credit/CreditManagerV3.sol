@@ -124,8 +124,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     /// @dev Points to creditAccount during multicall, otherwise keeps address(1) for gas savings
     /// CreditFacade is trusted source, so primarly it sends creditAccount as parameter
-    /// _externalCallCreditAccount is used for adapters interation when adapter calls approve / execute methods
-    address internal _externalCallCreditAccount;
+    /// _activeCreditAccount is used for adapters interation when adapter calls approve / execute methods
+    address internal _activeCreditAccount;
 
     /// @dev Total number of known collateral tokens.
     uint8 public collateralTokensCount;
@@ -221,7 +221,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         creditConfigurator = msg.sender; // U:[CM-1]
 
-        _externalCallCreditAccount = address(1);
+        _activeCreditAccount = address(1);
     }
 
     //
@@ -520,7 +520,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         address targetContract = _getTargetContractOrRevert(); // U:[CM-3]
         _approveSpender({
-            creditAccount: getExternalCallCreditAccountOrRevert(),
+            creditAccount: getActiveCreditAccountOrRevert(),
             token: token,
             spender: targetContract,
             amount: amount
@@ -552,7 +552,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         // Returned data is provided as-is to the caller;
         // It is expected that is is parsed and returned as a correct type
         // by the adapter itself.
-        address creditAccount = getExternalCallCreditAccountOrRevert(); // U:[CM-16]
+        address creditAccount = getActiveCreditAccountOrRevert(); // U:[CM-16]
         return ICreditAccount(creditAccount).execute(targetContract, data); // U:[CM-16]
     }
 
@@ -1204,18 +1204,18 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     ///
-    function setCreditAccountForExternalCall(address creditAccount)
+    function setActiveCreditAccount(address creditAccount)
         external
         override
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
     {
-        _externalCallCreditAccount = creditAccount;
+        _activeCreditAccount = creditAccount;
     }
 
-    function getExternalCallCreditAccountOrRevert() public view override returns (address creditAccount) {
-        creditAccount = _externalCallCreditAccount;
-        if (creditAccount == address(1)) revert ExternalCallCreditAccountNotSetException();
+    function getActiveCreditAccountOrRevert() public view override returns (address creditAccount) {
+        creditAccount = _activeCreditAccount;
+        if (creditAccount == address(1)) revert ActiveCreditAccountNotSetException();
     }
 
     function enabledTokensMaskOf(address creditAccount) public view override returns (uint256) {

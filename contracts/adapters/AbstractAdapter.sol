@@ -48,7 +48,7 @@ abstract contract AbstractAdapter is IAdapter, ACLTrait {
 
     /// @dev Ensures that external call credit account is set and returns its address
     function _creditAccount() internal view returns (address) {
-        return ICreditManagerV3(creditManager).getExternalCallCreditAccountOrRevert(); // U:[AA-3]
+        return ICreditManagerV3(creditManager).getActiveCreditAccountOrRevert(); // U:[AA-3]
     }
 
     /// @dev Ensures that token is registered as collateral in the credit manager and returns its mask
