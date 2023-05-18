@@ -87,7 +87,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     PoolMock poolMock;
     PoolQuotaKeeperMock poolQuotaKeeperMock;
 
-    PriceOracleMock priceOracle;
+    PriceOracleMock priceOracleMock;
     WETHGatewayMock wethGateway;
     IWithdrawalManager withdrawalManager;
 
@@ -148,6 +148,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         accountFactory = AccountFactoryMock(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL));
         wethGateway = WETHGatewayMock(addressProvider.getAddressOrRevert(AP_WETH_GATEWAY, 3_00));
 
+        priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 2));
         addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
     }
     ///
@@ -220,6 +221,10 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             creditManager.setCollateralTokenData(address(t), 8000, 8000, type(uint40).max, 0);
 
             t.mint(creditAccount, balance * ((i + 2) % 5));
+
+            /// sets price between $0.01 and $60K
+            uint256 randomPrice = (uint256(keccak256(abi.encode(numberOfTokens, i, balance))) % 600_0000) * 10 ** 6;
+            priceOracleMock.setPrice(address(t), randomPrice);
         }
     }
 
@@ -1331,5 +1336,114 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         bytes memory returnValue = creditManager.executeOrder(dumbCallData);
 
         assertEq(returnValue, expectedReturnValue, "Incorrect return value");
+    }
+
+    //
+    //
+    // FULL COLLATERAL CHECK
+    //
+    //
+
+    /// @dev U:[CM-17]: fullCollateralCheck reverts if hf < 10K
+    function test_U_CM_17_fullCollateralCheck_reverts_if_hf_less_10K() public withoutSupportQuotas {
+        vm.expectRevert(CustomHealthFactorTooLowException.selector);
+        creditManager.fullCollateralCheck({
+            creditAccount: DUMB_ADDRESS,
+            enabledTokensMask: 0,
+            collateralHints: new uint256[](0),
+            minHealthFactor: PERCENTAGE_FACTOR - 1
+        });
+    }
+
+    /// @dev U:[CM-18]: fullCollateralCheck reverts if not enough collateral otherwise saves enabledTokensMask
+    function test_U_CM_18_fullCollateralCheck_reverts_if_not_enough_collateral_otherwise_saves_enabledTokensMask(
+        uint256 amount
+    ) public withFeeTokenCase withoutSupportQuotas {
+        /// @notice This test doesn't check collateral calculation, it proves that function
+        /// reverts if it's not enough collateral otherwise it stores enabledTokensMask to storage
+
+        vm.assume(amount > 0 && amount < 1e20 * WAD);
+
+        // uint256 amount = DAI_ACCOUNT_AMOUNT;
+        address creditAccount = DUMB_ADDRESS;
+        uint8 numberOfTokens = uint8(amount % 253);
+
+        /// @notice `+1` for underlying token
+        uint256 enabledTokensMask = uint256(keccak256(abi.encode(amount))) & ((1 << (numberOfTokens + 1)) - 1);
+
+        creditManager.setMaxEnabledTokens(numberOfTokens + 1);
+
+        tokenTestSuite.mint({token: underlying, to: creditAccount, amount: amount});
+
+        /// @notice sets price 1 USD for underlying
+        priceOracleMock.setPrice(underlying, 10 ** 8);
+
+        _addTokens({creditAccount: creditAccount, numberOfTokens: numberOfTokens, balance: amount});
+
+        creditManager.setCreditAccountInfoMap({
+            creditAccount: creditAccount,
+            debt: 100330010,
+            cumulativeIndexLastUpdate: RAY,
+            cumulativeQuotaInterest: 0,
+            enabledTokensMask: enabledTokensMask,
+            flags: 0,
+            borrower: USER
+        });
+
+        CollateralDebtData memory collateralDebtData =
+            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS);
+
+        console.log("etm", enabledTokensMask);
+
+        /// @notice fuzzler could find a combination which enabled tokens with zero balances,
+        /// which cause to twvUSD == 0 and arithmetic errr later
+        vm.assume(collateralDebtData.twvUSD > 0);
+
+        creditManager.setDebt(creditAccount, collateralDebtData.twvUSD + 1);
+
+        collateralDebtData =
+            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY);
+
+        assertEq(
+            collateralDebtData.twvUSD + 1, collateralDebtData.totalDebtUSD, "SETUP: incorrect params for liquidation"
+        );
+
+        vm.expectRevert(NotEnoughCollateralException.selector);
+        creditManager.fullCollateralCheck({
+            creditAccount: creditAccount,
+            enabledTokensMask: enabledTokensMask,
+            collateralHints: new uint256[](0),
+            minHealthFactor: PERCENTAGE_FACTOR
+        });
+
+        /// @notice we run calcDebtAndCollateral to get enabledTokensMask as it should be after check
+        creditManager.setDebt(creditAccount, collateralDebtData.twvUSD - 1);
+
+        collateralDebtData =
+            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY);
+
+        uint256 enabledTokenMaskWithDisableTokens = collateralDebtData.enabledTokensMask;
+
+        /// @notice it makes account non liquidatable and clears mask - to check that it's set
+        creditManager.setCreditAccountInfoMap({
+            creditAccount: creditAccount,
+            debt: collateralDebtData.twvUSD - 1,
+            cumulativeIndexLastUpdate: RAY,
+            cumulativeQuotaInterest: 0,
+            enabledTokensMask: 0,
+            flags: 0,
+            borrower: USER
+        });
+
+        creditManager.fullCollateralCheck({
+            creditAccount: creditAccount,
+            enabledTokensMask: enabledTokensMask,
+            collateralHints: new uint256[](0),
+            minHealthFactor: PERCENTAGE_FACTOR
+        });
+
+        (,,, uint256 enabledTokensMaskAfter,,) = creditManager.creditAccountInfo(creditAccount);
+
+        assertEq(enabledTokensMaskAfter, enabledTokenMaskWithDisableTokens, "enabledTokensMask wasn't set correctly");
     }
 }

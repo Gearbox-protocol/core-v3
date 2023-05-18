@@ -26,12 +26,16 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         return _getTargetContractOrRevert();
     }
 
+    function addToCAList(address creditAccount) external {
+        creditAccountsSet.add(creditAccount);
+    }
+
     function setBorrower(address creditAccount, address borrower) external {
         creditAccountInfo[creditAccount].borrower = borrower;
     }
 
-    function addToCAList(address creditAccount) external {
-        creditAccountsSet.add(creditAccount);
+    function setDebt(address creditAccount, uint256 debt) external {
+        creditAccountInfo[creditAccount].debt = debt;
     }
 
     function setCreditAccountInfoMap(

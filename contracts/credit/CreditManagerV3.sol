@@ -557,12 +557,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     function _getTargetContractOrRevert() internal view returns (address targetContract) {
-        targetContract = adapterToContract[msg.sender];
+        targetContract = adapterToContract[msg.sender]; // U:[CM-15, 16]
 
         // Checks that msg.sender is the adapter associated with the passed target contract.
         if (targetContract == address(0)) {
-            revert CallerNotAdapterException();
-            // F:[CM-28]
+            revert CallerNotAdapterException(); // U:[CM-3]
         }
     }
 
@@ -586,7 +585,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacadeOnly // U:[CM-2]
     {
         if (minHealthFactor < PERCENTAGE_FACTOR) {
-            revert CustomHealthFactorTooLowException();
+            revert CustomHealthFactorTooLowException(); // U:[CM-17]
         }
 
         CollateralDebtData memory collateralDebtData = _calcDebtAndCollateral({
@@ -595,13 +594,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             collateralHints: collateralHints,
             enabledTokensMask: enabledTokensMask,
             task: CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY
-        });
+        }); // U:[CM-18]
 
         if (collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD) {
-            revert NotEnoughCollateralException();
+            revert NotEnoughCollateralException(); // U:[CM-18]
         }
 
-        _saveEnabledTokensMask(creditAccount, collateralDebtData.enabledTokensMask);
+        _saveEnabledTokensMask(creditAccount, collateralDebtData.enabledTokensMask); // U:[CM-18]
     }
 
     /// @dev Calculates total value for provided Credit Account in underlying
@@ -617,6 +616,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (CollateralDebtData memory collateralDebtData)
     {
         uint256[] memory collateralHints;
+
+        /// todo: forbid CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY!
 
         collateralDebtData = _calcDebtAndCollateral({
             creditAccount: creditAccount,
