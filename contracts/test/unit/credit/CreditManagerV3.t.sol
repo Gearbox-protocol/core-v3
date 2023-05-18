@@ -59,6 +59,7 @@ import {PoolQuotaKeeperMock} from "../../mocks/pool/PoolQuotaKeeperMock.sol";
 import {ERC20FeeMock} from "../../mocks/token/ERC20FeeMock.sol";
 import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
 import {WETHGatewayMock} from "../../mocks/support/WETHGatewayMock.sol";
+import {CreditAccountMock, CreditAccountMockEvents} from "../../mocks/credit/CreditAccountMock.sol";
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";
@@ -73,7 +74,7 @@ import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 import {TestHelper} from "../../lib/helper.sol";
 import "forge-std/console.sol";
 
-contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceHelper {
+contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceHelper, CreditAccountMockEvents {
     using BitMask for uint256;
     using CreditLogic for CollateralDebtData;
     using CreditLogic for CollateralTokenData;
@@ -1250,5 +1251,85 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         checkTokenTransfers({debug: false});
 
         assertEq(tokenToEnable, UNDERLYING_TOKEN_MASK, "Incorrect tokenToEnable");
+    }
+
+    //
+    //  TRANSFER ACCOUNT OWNERSHIP
+    //
+
+    /// @dev U:[CM-14]: transferAccountOwnership works as expected
+    function test_U_CM_14_transferAccountOwnership_works_as_expected() public withoutSupportQuotas {
+        address creditAccount = DUMB_ADDRESS;
+        vm.expectRevert(CreditAccountNotExistsException.selector);
+        creditManager.transferAccountOwnership(creditAccount, FRIEND);
+
+        creditManager.setBorrower({creditAccount: creditAccount, borrower: USER});
+        creditManager.transferAccountOwnership(creditAccount, FRIEND);
+
+        (,,,,, address borrower) = creditManager.creditAccountInfo(creditAccount);
+
+        assertEq(borrower, FRIEND, "Incorrect borrower");
+    }
+
+    //
+    //  APPROVE CREDIT ACCOUNT
+    //
+
+    /// @dev U:[CM-15]: approveCreditAccount works as expected
+    function test_U_CM_15_approveCreditAccount_works_as_expected() public withoutSupportQuotas {
+        address creditAccount = address(new CreditAccountMock());
+        address linkToken = tokenTestSuite.addressOf(Tokens.LINK);
+
+        creditManager.setCreditAccountForExternalCall(address(creditAccount));
+        creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
+
+        /// @notice check that it reverts on unknown token
+        vm.prank(ADAPTER);
+        vm.expectRevert(TokenNotAllowedException.selector);
+        creditManager.approveCreditAccount({token: linkToken, amount: 20000});
+
+        /// @notice logic which works with different token approvals are incapsulated
+        /// in CreditAccountHelper librarby and tested also there
+
+        vm.expectCall(
+            creditAccount,
+            abi.encodeCall(ICreditAccount.execute, (underlying, abi.encodeCall(IERC20.approve, (DUMB_ADDRESS, 20000))))
+        );
+
+        vm.expectEmit(true, true, true, true);
+        emit ExecuteCall(underlying, abi.encodeCall(IERC20.approve, (DUMB_ADDRESS, 20000)));
+
+        vm.prank(ADAPTER);
+        creditManager.approveCreditAccount({token: underlying, amount: 20000});
+    }
+
+    //
+    //  EXECUTE
+    //
+
+    /// @dev U:[CM-16]: executeOrder works as expected
+    function test_U_CM_16_executeOrder_works_as_expected() public withoutSupportQuotas {
+        address creditAccount = address(new CreditAccountMock());
+
+        creditManager.setCreditAccountForExternalCall(address(creditAccount));
+        creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
+
+        bytes memory dumbCallData = bytes("Hello, world");
+        bytes memory expectedReturnValue = bytes("Yes,sir!");
+
+        CreditAccountMock(creditAccount).setReturnExecuteResult(expectedReturnValue);
+
+        vm.expectEmit(true, false, false, false);
+        emit ExecuteOrder(DUMB_ADDRESS);
+
+        vm.expectCall(creditAccount, abi.encodeCall(ICreditAccount.execute, (DUMB_ADDRESS, dumbCallData)));
+
+        vm.expectEmit(true, true, true, true);
+        emit ExecuteCall(DUMB_ADDRESS, dumbCallData);
+
+        vm.prank(ADAPTER);
+        bytes memory returnValue = creditManager.executeOrder(dumbCallData);
+
+        assertEq(returnValue, expectedReturnValue, "Incorrect return value");
     }
 }

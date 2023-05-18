@@ -506,8 +506,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
     {
-        getBorrowerOrRevert({creditAccount: creditAccount});
-        creditAccountInfo[creditAccount].borrower = to;
+        getBorrowerOrRevert({creditAccount: creditAccount}); //  U:[CM-14]
+        creditAccountInfo[creditAccount].borrower = to; //  U:[CM-14]
     }
 
     /// @dev Requests the Credit Account to approve a collateral token to another contract.
@@ -524,22 +524,22 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             token: token,
             spender: targetContract,
             amount: amount
-        });
+        }); // U:[CM-15]
     }
 
     function _approveSpender(address creditAccount, address token, address spender, uint256 amount) internal {
         // Checks that the token is a collateral token
         // Forbidden tokens can be approved, since users need that to
         // sell them off
-        getTokenMaskOrRevert({token: token});
+        getTokenMaskOrRevert({token: token}); // U:[CM-15]
 
-        ICreditAccount(creditAccount).safeApprove({token: token, spender: spender, amount: amount});
+        ICreditAccount(creditAccount).safeApprove({token: token, spender: spender, amount: amount}); // U:[CM-15]
     }
 
     /// @dev Requests a Credit Account to make a low-level call with provided data
     /// This is the intended pathway for state-changing interactions with 3rd-party protocols
     /// @param data Data to pass with the call
-    function executeOrder(bytes memory data)
+    function executeOrder(bytes calldata data)
         external
         override
         nonReentrant // U:[CM-5]
@@ -547,13 +547,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         address targetContract = _getTargetContractOrRevert(); // U:[CM-3]
         // Emits an event
-        emit ExecuteOrder(targetContract); // F:[CM-29]
+        emit ExecuteOrder(targetContract); // U:[CM-16]
 
         // Returned data is provided as-is to the caller;
         // It is expected that is is parsed and returned as a correct type
         // by the adapter itself.
-        address creditAccount = getExternalCallCreditAccountOrRevert();
-        return ICreditAccount(creditAccount).execute(targetContract, data); // F:[CM-29]
+        address creditAccount = getExternalCallCreditAccountOrRevert(); // U:[CM-16]
+        return ICreditAccount(creditAccount).execute(targetContract, data); // U:[CM-16]
     }
 
     function _getTargetContractOrRevert() internal view returns (address targetContract) {
