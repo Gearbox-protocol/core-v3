@@ -421,12 +421,19 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 collateralHints: collateralHints,
                 minHealthFactor: PERCENTAGE_FACTOR,
                 task: CollateralCalcTask.GENERIC_PARAMS
-            });
-            (newDebt, newCumulativeIndex) = collateralDebtData.calcIncrease(amount);
+            }); // U:[CM-10]
+
+            (newDebt, newCumulativeIndex) = CreditLogic.calcIncrease({
+                amount: amount,
+                debt: collateralDebtData.debt,
+                cumulativeIndexNow: collateralDebtData.cumulativeIndexNow,
+                cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate
+            }); // U:[CM-10]
 
             // Requests the pool to lend additional funds to the Credit Account
-            _poolLendCreditAccount(amount, creditAccount); // F:[CM-20]
-            tokensToEnable = UNDERLYING_TOKEN_MASK;
+            _poolLendCreditAccount(amount, creditAccount); // U:[CM-10]
+
+            tokensToEnable = UNDERLYING_TOKEN_MASK; // U:[CM-10]
         } else {
             // Decrease
             collateralDebtData = _calcDebtAndCollateral({
@@ -435,37 +442,44 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 collateralHints: collateralHints,
                 minHealthFactor: PERCENTAGE_FACTOR,
                 task: CollateralCalcTask.DEBT_ONLY
-            });
+            }); // U:[CM-11]
+
+            uint256 newCumulativeQuotaInterest;
+            // Pays the amount back to the pool
+            ICreditAccount(creditAccount).transfer({token: underlying, to: pool, amount: amount}); // U:[CM-11]
+            {
+                uint256 amountToRepay;
+                uint256 profit;
+
+                (newDebt, newCumulativeIndex, amountToRepay, profit, newCumulativeQuotaInterest) = CreditLogic
+                    .calcDecrease({
+                    amount: _amountMinusFee(amount),
+                    debt: collateralDebtData.debt,
+                    cumulativeIndexNow: collateralDebtData.cumulativeIndexNow,
+                    cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
+                    cumulativeQuotaInterest: collateralDebtData.cumulativeQuotaInterest,
+                    feeInterest: feeInterest
+                }); // U:[CM-11]
+
+                /// @notice fee is accounted in amountToRepay because we reduce amount as parameter
+                _poolRepayCreditAccount(amountToRepay, profit, 0); // U:[CM-11]
+            }
 
             if (supportsQuotas) {
                 IPoolQuotaKeeper(collateralDebtData._poolQuotaKeeper).accrueQuotaInterest({
                     creditAccount: creditAccount,
                     tokens: collateralDebtData.quotedTokens
-                }); // F: [CMQ-4,5]
-                creditAccountInfo[creditAccount].cumulativeQuotaInterest =
-                    collateralDebtData.cumulativeQuotaInterest + 1;
-            }
-
-            // Pays the amount back to the pool
-            ICreditAccount(creditAccount).transfer({token: underlying, to: pool, amount: amount}); // F:[CM-21]
-            {
-                uint256 amountToRepay;
-                uint256 profit;
-
-                (newDebt, newCumulativeIndex, amountToRepay, profit) =
-                    collateralDebtData.calcDecrease({amount: _amountMinusFee(amount), feeInterest: feeInterest});
-
-                _poolRepayCreditAccount(amountToRepay, profit, 0); // F:[CM-21]
+                });
+                creditAccountInfo[creditAccount].cumulativeQuotaInterest = newCumulativeQuotaInterest; // U:[CM-11]
             }
 
             if (IERC20Helper.balanceOf({token: underlying, holder: creditAccount}) <= 1) {
-                tokensToDisable = UNDERLYING_TOKEN_MASK;
+                tokensToDisable = UNDERLYING_TOKEN_MASK; // U:[CM-11]
             }
         }
-        //
-        creditAccountInfo[creditAccount].debt = newDebt;
-        // F:[CM-20. 21]
-        creditAccountInfo[creditAccount].cumulativeIndexLastUpdate = newCumulativeIndex; // F:[CM-20. 21]
+
+        creditAccountInfo[creditAccount].debt = newDebt; // U:[CM-10, 11]
+        creditAccountInfo[creditAccount].cumulativeIndexLastUpdate = newCumulativeIndex; // U:[CM-10, 11]
     }
 
     /// @dev Adds collateral to borrower's credit account
@@ -631,7 +645,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         collateralDebtData.enabledTokensMask = enabledTokensMask;
 
         if (supportsQuotas) {
-            collateralDebtData.cumulativeQuotaInterest = creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1;
             collateralDebtData.quotedTokenMask = quotedTokenMask & collateralDebtData.enabledTokensMask;
             collateralDebtData._poolQuotaKeeper = poolQuotaKeeper();
 
@@ -646,6 +659,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 enabledTokensMask: enabledTokensMask,
                 _poolQuotaKeeper: collateralDebtData._poolQuotaKeeper
             });
+
+            collateralDebtData.cumulativeQuotaInterest += creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1;
         }
 
         (collateralDebtData.accruedInterest, collateralDebtData.accruedFees) =

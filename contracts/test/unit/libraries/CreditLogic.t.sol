@@ -224,9 +224,8 @@ contract CreditLogicTest is TestHelper {
         cdd.cumulativeIndexLastUpdate = indexAtOpen;
         cdd.cumulativeQuotaInterest = quotaInterest;
 
-        (uint256 newDebt, uint256 newCumulativeIndex,,) = CreditLogic.calcDecrease(cdd, delta, feeInterest);
-
-        uint256 cumulativeQuotaInterest = cdd.cumulativeQuotaInterest;
+        (uint256 newDebt, uint256 newCumulativeIndex,,, uint256 cumulativeQuotaInterest) =
+            CreditLogic.calcDecrease(cdd, delta, feeInterest);
 
         uint256 oldTotalDebt = _calcTotalDebt(debt, indexNow, indexAtOpen, quotaInterest, feeInterest);
         uint256 newTotalDebt =
@@ -276,7 +275,7 @@ contract CreditLogicTest is TestHelper {
         cdd.cumulativeIndexLastUpdate = indexAtOpen;
         cdd.cumulativeQuotaInterest = quotaInterest;
 
-        (uint256 newDebt,, uint256 amountToRepay, uint256 profit) = CreditLogic.calcDecrease(cdd, delta, feeInterest);
+        (uint256 newDebt,, uint256 amountToRepay, uint256 profit,) = CreditLogic.calcDecrease(cdd, delta, feeInterest);
 
         assertEq(amountToRepay, debt - newDebt, "Amount to repay incorrect");
 

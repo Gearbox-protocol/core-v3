@@ -181,10 +181,35 @@ library CreditLogic {
         );
     }
 
+    /// NEW VERSION which doesnt depend on structrure
+    function calcIncrease(uint256 amount, uint256 debt, uint256 cumulativeIndexNow, uint256 cumulativeIndexLastUpdate)
+        internal
+        pure
+        returns (uint256 newDebt, uint256 newCumulativeIndex)
+    {
+        // In case of debt increase, the principal increases by exactly delta, but interest has to be kept unchanged
+        // newCumulativeIndex is proven to be the solution to
+        // debt * (cumulativeIndexNow / cumulativeIndexOpen - 1) ==
+        // == (debt + delta) * (cumulativeIndexNow / newCumulativeIndex - 1)
+
+        newDebt = debt + amount;
+
+        newCumulativeIndex = (
+            (cumulativeIndexNow * newDebt * INDEX_PRECISION)
+                / ((INDEX_PRECISION * cumulativeIndexNow * debt) / cumulativeIndexLastUpdate + INDEX_PRECISION * amount)
+        );
+    }
+
     function calcDecrease(CollateralDebtData memory collateralDebtData, uint256 amount, uint16 feeInterest)
         internal
         pure
-        returns (uint256 newDebt, uint256 newCumulativeIndex, uint256 amountToRepay, uint256 profit)
+        returns (
+            uint256 newDebt,
+            uint256 newCumulativeIndex,
+            uint256 amountToRepay,
+            uint256 profit,
+            uint256 newCumulativeQuotaInterest
+        )
     {
         amountToRepay = amount;
 
@@ -196,14 +221,14 @@ library CreditLogic {
             if (amountToRepay >= quotaInterestAccrued + quotaProfit) {
                 amountToRepay -= quotaInterestAccrued + quotaProfit; // F: [CMQ-5]
                 profit += quotaProfit; // F: [CMQ-5]
-                collateralDebtData.cumulativeQuotaInterest = 1; // F: [CMQ-5]
+                newCumulativeQuotaInterest = 1; // F: [CMQ-5]
             } else {
                 uint256 amountToPool = (amountToRepay * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
 
                 profit += amountToRepay - amountToPool; // F: [CMQ-4]
                 amountToRepay = 0; // F: [CMQ-4]
 
-                collateralDebtData.cumulativeQuotaInterest = quotaInterestAccrued - amountToPool + 1; // F: [CMQ-4]
+                newCumulativeQuotaInterest = quotaInterestAccrued - amountToPool + 1; // F: [CMQ-4]
 
                 newDebt = collateralDebtData.debt;
                 newCumulativeIndex = collateralDebtData.cumulativeIndexLastUpdate;
@@ -268,6 +293,105 @@ library CreditLogic {
         } else {
             newDebt = collateralDebtData.debt;
             newCumulativeIndex = collateralDebtData.cumulativeIndexLastUpdate;
+        }
+    }
+
+    ///
+    /// New version which doesn't depend on structure
+
+    function calcDecrease(
+        uint256 amount,
+        uint256 debt,
+        uint256 cumulativeIndexNow,
+        uint256 cumulativeIndexLastUpdate,
+        uint256 cumulativeQuotaInterest,
+        uint16 feeInterest
+    )
+        internal
+        pure
+        returns (
+            uint256 newDebt,
+            uint256 newCumulativeIndex,
+            uint256 amountToRepay,
+            uint256 profit,
+            uint256 newCumulativeQuotaInterest
+        )
+    {
+        amountToRepay = amount;
+
+        if (cumulativeQuotaInterest > 1) {
+            uint256 quotaProfit = (cumulativeQuotaInterest * feeInterest) / PERCENTAGE_FACTOR;
+
+            if (amountToRepay >= cumulativeQuotaInterest + quotaProfit) {
+                amountToRepay -= cumulativeQuotaInterest + quotaProfit; // F: [CMQ-5]
+                profit += quotaProfit; // F: [CMQ-5]
+                newCumulativeQuotaInterest = 1; // F: [CMQ-5]
+            } else {
+                uint256 amountToPool = (amountToRepay * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
+
+                profit += amountToRepay - amountToPool; // F: [CMQ-4]
+                amountToRepay = 0; // F: [CMQ-4]
+
+                newCumulativeQuotaInterest = cumulativeQuotaInterest - amountToPool + 1; // F: [CMQ-4]
+
+                newDebt = debt;
+                newCumulativeIndex = cumulativeIndexLastUpdate;
+            }
+        }
+
+        if (amountToRepay > 0) {
+            // Computes the interest accrued thus far
+            uint256 interestAccrued = (debt * cumulativeIndexNow) / cumulativeIndexLastUpdate - debt; // F:[CM-21]
+
+            // Computes profit, taken as a percentage of the interest rate
+            uint256 profitFromInterest = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR; // F:[CM-21]
+
+            if (amountToRepay >= interestAccrued + profitFromInterest) {
+                // If the amount covers all of the interest and fees, they are
+                // paid first, and the remainder is used to pay the principal
+
+                amountToRepay -= interestAccrued + profitFromInterest;
+                newDebt = debt - amountToRepay; //  + interestAccrued + profit - amount;
+
+                profit += profitFromInterest;
+
+                // Since interest is fully repaid, the Credit Account's cumulativeIndexLastUpdate
+                // is set to the current cumulative index - which means interest starts accruing
+                // on the new principal from zero
+                newCumulativeIndex = cumulativeIndexNow; // F:[CM-21]
+            } else {
+                // If the amount is not enough to cover interest and fees,
+                // then the sum is split between dao fees and pool profits pro-rata. Since the fee is the percentage
+                // of interest, this ensures that the new fee is consistent with the
+                // new pending interest
+
+                uint256 amountToPool = (amountToRepay * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
+
+                profit += amountToRepay - amountToPool;
+                amountToRepay = 0;
+
+                // Since interest and fees are paid out first, the principal
+                // remains unchanged
+                newDebt = debt;
+
+                // Since the interest was only repaid partially, we need to recompute the
+                // cumulativeIndexLastUpdate, so that "debt * (indexNow / indexAtOpenNew - 1)"
+                // is equal to interestAccrued - amountToInterest
+
+                // In case of debt decrease, the principal is the same, but the interest is reduced exactly by delta
+                // newCumulativeIndex is proven to be the solution to
+                // debt * (cumulativeIndexNow / cumulativeIndexOpen - 1) - delta ==
+                // == debt * (cumulativeIndexNow / newCumulativeIndex - 1)
+
+                newCumulativeIndex = (INDEX_PRECISION * cumulativeIndexNow * cumulativeIndexLastUpdate)
+                    / (
+                        INDEX_PRECISION * cumulativeIndexNow
+                            - (INDEX_PRECISION * amountToPool * cumulativeIndexLastUpdate) / debt
+                    );
+            }
+        } else {
+            newDebt = debt;
+            newCumulativeIndex = cumulativeIndexLastUpdate;
         }
     }
 
