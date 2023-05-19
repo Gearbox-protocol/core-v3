@@ -8,12 +8,10 @@ import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMoc
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 
-import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
+import {CreditFacadeV3Harness} from "./CreditFacadeV3Harness.sol";
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 import {DegenNFTMock} from "../../mocks/token/DegenNFTMock.sol";
-
-import {BotList} from "../../../support/BotList.sol";
 
 import "../../../interfaces/ICreditFacade.sol";
 import {ICreditManagerV3, ClosureAction, ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
@@ -54,7 +52,7 @@ contract CreditFacadeUnitTest is BalanceHelper, ICreditFacadeEvents {
 
     IAddressProviderV3 addressProvider;
 
-    CreditFacadeV3 creditFacade;
+    CreditFacadeV3Harness creditFacade;
     CreditManagerMock creditManagerMock;
 
     DegenNFTMock degenNFTMock;
@@ -94,11 +92,10 @@ contract CreditFacadeUnitTest is BalanceHelper, ICreditFacadeEvents {
 
     modifier allDegenNftCases() {
         uint256 snapshot = vm.snapshot();
-
         _withoutDegenNFT();
         _;
-        vm.revertTo(snapshot);
 
+        vm.revertTo(snapshot);
         _withDegenNFT();
         _;
     }
@@ -124,12 +121,12 @@ contract CreditFacadeUnitTest is BalanceHelper, ICreditFacadeEvents {
 
     function _notExpirable() internal {
         expirable = false;
-        creditFacade = new CreditFacadeV3(address(creditManagerMock), address(degenNFTMock), expirable);
+        creditFacade = new CreditFacadeV3Harness(address(creditManagerMock), address(degenNFTMock), expirable);
     }
 
     function _expirable() internal {
         expirable = true;
-        creditFacade = new CreditFacadeV3(address(creditManagerMock), address(degenNFTMock), expirable);
+        creditFacade = new CreditFacadeV3Harness(address(creditManagerMock), address(degenNFTMock), expirable);
     }
 
     /// @dev U:[FA-1]: constructor sets correct values
