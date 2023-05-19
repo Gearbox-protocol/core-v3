@@ -603,12 +603,22 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         _saveEnabledTokensMask(creditAccount, collateralDebtData.enabledTokensMask); // U:[CM-18]
     }
 
-    /// @dev Calculates total value for provided Credit Account in underlying
-    /// More: https://dev.gearbox.fi/developers/credit/economy#totalUSD-value
-    ///
-    /// @param creditAccount Credit Account address
-    // @return total Total value in underlying
-    // @return twv Total weighted (discounted by liquidation thresholds) value in underlying
+    /// Q: move to CF?
+    function isLiquidatable(address creditAccount, uint16 minHealthFactor) external view override returns (bool) {
+        uint256[] memory collateralHints;
+
+        CollateralDebtData memory collateralDebtData = _calcDebtAndCollateral({
+            creditAccount: creditAccount,
+            enabledTokensMask: enabledTokensMaskOf(creditAccount),
+            collateralHints: collateralHints,
+            minHealthFactor: minHealthFactor,
+            task: CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY
+        }); // U:[CM-18]
+
+        return collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD; // U:[CM-18]
+    }
+
+    /// @dev Calculates collateral and debt parameters
     function calcDebtAndCollateral(address creditAccount, CollateralCalcTask task)
         external
         view
@@ -617,7 +627,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         uint256[] memory collateralHints;
 
-        /// todo: forbid CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY!
+        /// @notice FULL_COLLATERAL_CHECK_LAZY is used for internal calculations only
+        if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) {
+            revert IncorrectParameterException(); // U:[CM-19]
+        }
 
         collateralDebtData = _calcDebtAndCollateral({
             creditAccount: creditAccount,
@@ -625,7 +638,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             collateralHints: collateralHints,
             minHealthFactor: PERCENTAGE_FACTOR,
             task: task
-        });
+        }); // U:[CM-20]
     }
 
     function _calcDebtAndCollateral(
@@ -636,11 +649,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         CollateralCalcTask task
     ) internal view returns (CollateralDebtData memory collateralDebtData) {
         /// GET GENERIC PARAMS
-        collateralDebtData.debt = creditAccountInfo[creditAccount].debt;
-        collateralDebtData.cumulativeIndexLastUpdate = creditAccountInfo[creditAccount].cumulativeIndexLastUpdate;
-        collateralDebtData.cumulativeIndexNow = _poolCumulativeIndexNow();
+        collateralDebtData.debt = creditAccountInfo[creditAccount].debt; // U:[CM-20]
+        collateralDebtData.cumulativeIndexLastUpdate = creditAccountInfo[creditAccount].cumulativeIndexLastUpdate; // U:[CM-20]
+        collateralDebtData.cumulativeIndexNow = _poolCumulativeIndexNow(); // U:[CM-20]
 
-        if (task == CollateralCalcTask.GENERIC_PARAMS) return collateralDebtData;
+        if (task == CollateralCalcTask.GENERIC_PARAMS) return collateralDebtData; // U:[CM-20]
         ///
         /// COMPUTE DEBT PARAMS
         collateralDebtData.enabledTokensMask = enabledTokensMask;

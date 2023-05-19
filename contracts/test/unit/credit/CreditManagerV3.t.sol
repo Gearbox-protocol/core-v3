@@ -477,7 +477,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         string memory caseName = supportsQuotas ? "supportsQuotas = true" : "supportsQuotas = false";
 
         uint256 cumulativeIndexNow = RAY * 5;
-        poolMock.setCumulative_RAY(cumulativeIndexNow);
+        poolMock.setCumulativeIndexNow(cumulativeIndexNow);
 
         tokenTestSuite.mint(Tokens.DAI, address(poolMock), DAI_ACCOUNT_AMOUNT);
 
@@ -945,7 +945,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         collateralDebtData.cumulativeIndexNow = RAY * 12 / 10;
         collateralDebtData.cumulativeIndexLastUpdate = RAY;
 
-        poolMock.setCumulative_RAY(collateralDebtData.cumulativeIndexNow);
+        poolMock.setCumulativeIndexNow(collateralDebtData.cumulativeIndexNow);
 
         creditManager.setCreditAccountInfoMap({
             creditAccount: creditAccount,
@@ -1032,7 +1032,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             collateralDebtData.cumulativeQuotaInterest = amount / (amount % 5 + 1);
         }
 
-        poolMock.setCumulative_RAY(collateralDebtData.cumulativeIndexNow);
+        poolMock.setCumulativeIndexNow(collateralDebtData.cumulativeIndexNow);
 
         /// @notice enabledTokensMask is read directly from function parameters, not from this function
         creditManager.setCreditAccountInfoMap({
@@ -1165,7 +1165,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             collateralDebtData.cumulativeQuotaInterest = debt / (debt % 5 + 1);
         }
 
-        poolMock.setCumulative_RAY(collateralDebtData.cumulativeIndexNow);
+        poolMock.setCumulativeIndexNow(collateralDebtData.cumulativeIndexNow);
 
         tokenTestSuite.mint(underlying, creditAccount, debt);
 
@@ -1393,16 +1393,13 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         CollateralDebtData memory collateralDebtData =
             creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS);
 
-        console.log("etm", enabledTokensMask);
-
         /// @notice fuzzler could find a combination which enabled tokens with zero balances,
         /// which cause to twvUSD == 0 and arithmetic errr later
         vm.assume(collateralDebtData.twvUSD > 0);
 
         creditManager.setDebt(creditAccount, collateralDebtData.twvUSD + 1);
 
-        collateralDebtData =
-            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY);
+        collateralDebtData = creditManager.calcDebtAndCollateralFC(creditAccount);
 
         assertEq(
             collateralDebtData.twvUSD + 1, collateralDebtData.totalDebtUSD, "SETUP: incorrect params for liquidation"
@@ -1416,13 +1413,22 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             minHealthFactor: PERCENTAGE_FACTOR
         });
 
+        assertTrue(
+            creditManager.isLiquidatable(creditAccount, PERCENTAGE_FACTOR),
+            "isLiquidatable returns false for liqudatable acc"
+        );
+
         /// @notice we run calcDebtAndCollateral to get enabledTokensMask as it should be after check
         creditManager.setDebt(creditAccount, collateralDebtData.twvUSD - 1);
 
-        collateralDebtData =
-            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY);
+        collateralDebtData = creditManager.calcDebtAndCollateralFC(creditAccount);
 
         uint256 enabledTokenMaskWithDisableTokens = collateralDebtData.enabledTokensMask;
+
+        assertTrue(
+            !creditManager.isLiquidatable(creditAccount, PERCENTAGE_FACTOR),
+            "isLiquidatable returns true for non-liqudatable acc"
+        );
 
         /// @notice it makes account non liquidatable and clears mask - to check that it's set
         creditManager.setCreditAccountInfoMap({
@@ -1446,4 +1452,54 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         assertEq(enabledTokensMaskAfter, enabledTokenMaskWithDisableTokens, "enabledTokensMask wasn't set correctly");
     }
+
+    //
+    //
+    // CALC DEBT AND COLLATERAL
+    //
+    //
+
+    /// @dev U:[CM-19]: calcDebtAndCollateral reverts for FULL_COLLATERAL_CHECK_LAZY
+    function test_U_CM_19_calcDebtAndCollateral_reverts_for_FULL_COLLATERAL_CHECK_LAZY() public withoutSupportQuotas {
+        vm.expectRevert(IncorrectParameterException.selector);
+        creditManager.calcDebtAndCollateral({
+            creditAccount: DUMB_ADDRESS,
+            task: CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY
+        });
+    }
+
+    /// @dev U:[CM-20]: calcDebtAndCollateral works correctly for GENERIC_PARAMS task
+    function test_U_CM_20_calcDebtAndCollateral_works_correctly_for_GENERIC_PARAMS_task() public withoutSupportQuotas {
+        uint256 debt = DAI_ACCOUNT_AMOUNT;
+        uint256 cumulativeIndexNow = RAY * 12 / 10;
+        uint256 cumulativeIndexLastUpdate = RAY * 11 / 10;
+
+        address creditAccount = DUMB_ADDRESS;
+
+        creditManager.setCreditAccountInfoMap({
+            creditAccount: creditAccount,
+            debt: debt,
+            cumulativeIndexLastUpdate: cumulativeIndexLastUpdate,
+            cumulativeQuotaInterest: 0,
+            enabledTokensMask: UNDERLYING_TOKEN_MASK,
+            flags: 0,
+            borrower: USER
+        });
+
+        poolMock.setCumulativeIndexNow(cumulativeIndexNow);
+
+        CollateralDebtData memory collateralDebtData =
+            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.GENERIC_PARAMS);
+
+        assertEq(collateralDebtData.debt, debt, "Incorrect debt");
+        assertEq(
+            collateralDebtData.cumulativeIndexLastUpdate,
+            cumulativeIndexLastUpdate,
+            "Incorrect cumulativeIndexLastUpdate"
+        );
+        assertEq(collateralDebtData.cumulativeIndexNow, cumulativeIndexNow, "Incorrect cumulativeIndexLastUpdate");
+    }
+
+    /// @dev U:[CM-21]: calcDebtAndCollateral works correctly for DEBT_ONLY task
+    function test_U_CM_21_calcDebtAndCollateral_works_correctly_for_DEBT_ONLY_task() public withoutSupportQuotas {}
 }

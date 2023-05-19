@@ -233,7 +233,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         _revertIfOutOfDebtLimits(debt); // F:[FA-11B]
 
         // Checks whether the new borrowed amount does not violate the block limit
-        _checkIncreaseDebtAllowedAndUpdateBlockLimit(debt); // F:[FA-11]
+        _revertIfOutOfBorrowingLimit(debt); // F:[FA-11]
 
         // Checks that the msg.sender can open an account for onBehalfOf
         // msg.sender must either be the account owner themselves, or be approved for transfers
@@ -795,7 +795,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
         if (action == ManageDebtAction.INCREASE_DEBT) {
             // Checks that the borrowed amount does not violate the per block limit
-            _checkIncreaseDebtAllowedAndUpdateBlockLimit(amount); // F:[FA-18A]
+            _revertIfOutOfBorrowingLimit(amount); // F:[FA-18A]
         }
 
         uint256 newDebt;
@@ -926,7 +926,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
     /// @dev Checks that the per-block borrow limit was not violated and updates the
     /// amount borrowed in current block
-    function _checkIncreaseDebtAllowedAndUpdateBlockLimit(uint256 amount) internal {
+    function _revertIfOutOfBorrowingLimit(uint256 amount) internal {
         uint8 _maxDebtPerBlockMultiplier = maxDebtPerBlockMultiplier; // F:[FA-18]\
 
         if (_maxDebtPerBlockMultiplier == 0) {

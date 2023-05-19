@@ -288,7 +288,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
 
         uint256 blockAtOpen = block.number;
         uint256 cumulativeAtOpen = 1012;
-        poolMock.setCumulative_RAY(cumulativeAtOpen);
+        poolMock.setCumulativeIndexNow(cumulativeAtOpen);
 
         // Existing address case
         address creditAccount = creditManager.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER);
@@ -870,7 +870,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
 
         tokenTestSuite.mint(Tokens.DAI, address(poolMock), amount);
 
-        poolMock.setCumulative_RAY(cumulativeIndexLastUpdate * 2);
+        poolMock.setCumulativeIndexNow(cumulativeIndexLastUpdate * 2);
 
         uint256 expectedNewCulumativeIndex =
             (2 * cumulativeIndexLastUpdate * (borrowedAmount + amount)) / (2 * borrowedAmount + amount);

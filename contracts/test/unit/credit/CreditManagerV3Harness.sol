@@ -2,8 +2,9 @@ pragma solidity ^0.8.17;
 
 import {CreditManagerV3, CreditAccountInfo} from "../../../credit/CreditManagerV3.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {CollateralDebtData} from "../../../interfaces/ICreditManagerV3.sol";
+import {CollateralDebtData, CollateralCalcTask} from "../../../interfaces/ICreditManagerV3.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 contract CreditManagerV3Harness is CreditManagerV3 {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -55,56 +56,6 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         creditAccountInfo[creditAccount].borrower = borrower;
     }
 
-    // function calcFullCollateral(
-    //     address creditAccount,
-    //     uint256 enabledTokensMask,
-    //     uint16 minHealthFactor,
-    //     uint256[] memory collateralHints,
-    //     address _priceOracle,
-    //     bool lazy
-    // ) external view returns (CollateralDebtData memory collateralDebtData) {
-    //     return
-    //         _calcFullCollateral(creditAccount, enabledTokensMask, minHealthFactor, collateralHints, _priceOracle, lazy);
-    // }
-
-    // function calcQuotedTokensCollateral(address creditAccount, uint256 enabledTokensMask, address _priceOracle)
-    //     external
-    //     view
-    //     returns (uint256 totalValueUSD, uint256 twvUSD, uint256 quotaInterest)
-    // {
-    //     return _calcQuotedTokensCollateral(creditAccount, enabledTokensMask, _priceOracle);
-    // }
-
-    // function calcNonQuotedTokensCollateral(
-    //     address creditAccount,
-    //     uint256 enabledTokensMask,
-    //     uint256 enoughCollateralUSD,
-    //     uint256[] memory collateralHints,
-    //     address _priceOracle
-    // ) external view returns (uint256 tokensToDisable, uint256 totalValueUSD, uint256 twvUSD) {
-    //     return _calcNonQuotedTokensCollateral(
-    //         creditAccount, enabledTokensMask, enoughCollateralUSD, collateralHints, _priceOracle
-    //     );
-    // }
-
-    // function calcOneNonQuotedTokenCollateral(
-    //     address _priceOracle,
-    //     uint256 tokenMask,
-    //     address creditAccount,
-    //     uint256 _totalValueUSD,
-    //     uint256 _twvUSDx10K
-    // ) external view returns (uint256 totalValueUSD, uint256 twvUSDx10K, bool nonZeroBalance) {
-    //     return _calcOneNonQuotedTokenCollateral(_priceOracle, tokenMask, creditAccount, _totalValueUSD, _twvUSDx10K);
-    // }
-
-    // function _getQuotedTokensLT(uint256 enabledTokensMask, bool withLTs)
-    //     external
-    //     view
-    //     returns (address[] memory tokens, uint256[] memory lts)
-    // {
-    //     return _getQuotedTokens(enabledTokensMask, withLTs);
-    // }
-
     function batchTokensTransfer(address creditAccount, address to, bool convertToETH, uint256 enabledTokensMask)
         external
     {
@@ -129,21 +80,22 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         return _collateralTokensByMask(tokenMask, calcLT);
     }
 
-    // function calcAccruedInterestAndFees(address creditAccount, uint256 quotaInterest)
-    //     external
-    //     view
-    //     returns (uint256 debt, uint256 accruedInterest, uint256 accruedFees)
-    // {
-    //     return _calcAccruedInterestAndFees(creditAccount, quotaInterest);
-    // }
+    /// @dev Calculates collateral and debt parameters
+    function calcDebtAndCollateralFC(address creditAccount)
+        external
+        view
+        returns (CollateralDebtData memory collateralDebtData)
+    {
+        uint256[] memory collateralHints;
 
-    // function getCreditAccountParameters(address creditAccount)
-    //     external
-    //     view
-    //     returns (uint256 debt, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow)
-    // {
-    //     return _getCreditAccountParameters(creditAccount);
-    // }
+        collateralDebtData = _calcDebtAndCollateral({
+            creditAccount: creditAccount,
+            enabledTokensMask: enabledTokensMaskOf(creditAccount),
+            collateralHints: collateralHints,
+            minHealthFactor: PERCENTAGE_FACTOR,
+            task: CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY
+        });
+    }
 
     function hasWithdrawals(address creditAccount) external view returns (bool) {
         return _hasWithdrawals(creditAccount);
