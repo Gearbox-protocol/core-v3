@@ -1140,29 +1140,6 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         );
     }
 
-    /// @dev U:[CC-40]: forbidAdapter works correctly and emits event
-    function test_U_CC_40_forbidAdapter_works_correctly() public {
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.forbidAdapter(DUMB_ADDRESS);
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.allowContract(TARGET_CONTRACT, address(adapter1));
-
-        vm.expectEmit(true, false, false, false);
-        emit ForbidAdapter(address(adapter1));
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.forbidAdapter(address(adapter1));
-
-        assertEq(
-            creditManager.adapterToContract(address(adapter1)), address(0), "Adapter to contract link was not removed"
-        );
-
-        assertEq(
-            creditManager.contractToAdapter(TARGET_CONTRACT), address(adapter1), "Contract to adapter link was removed"
-        );
-    }
-
     /// @dev U:[CC-41]: allowedContracts migrate correctly
     function test_U_CC_41_allowedContracts_are_migrated_correctly_for_new_CC() public {
         vm.prank(CONFIGURATOR);

@@ -174,11 +174,6 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
     /// @param targetContract Address of a contract to be forbidden
     function forbidContract(address targetContract) external;
 
-    /// @dev Forbids adapter (and only the adapter - the target contract is not affected)
-    /// @param adapter Address of adapter to disable
-    /// @notice Used to clean up orphaned adapters
-    function forbidAdapter(address adapter) external;
-
     /// @dev Sets borrowed amount limits in Credit Facade
     /// @param _minBorrowedAmount Minimum borrowed amount
     /// @param _maxBorrowedAmount Maximum borrowed amount

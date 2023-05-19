@@ -415,28 +415,6 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         emit ForbidContract(targetContract); // F:[CC-17]
     }
 
-    /// @dev Removes the link between passed adapter and its contract
-    ///      Useful to remove "orphaned" adapters, i.e. adapters that were replaced but still point
-    ///      to the contract for some reason. This allows users to still execute actions through the old adapter,
-    ///      even though that is not intended.
-    function forbidAdapter(address adapter)
-        external
-        override
-        configuratorOnly
-        nonZeroAddress(adapter) // F: [CC-40]
-    {
-        /// If the adapter already has no linked target contract, then there is nothing to change
-        address targetContract = creditManager.adapterToContract(adapter);
-        if (targetContract == address(0)) {
-            revert ContractIsNotAnAllowedAdapterException(); // F: [CC-40]
-        }
-
-        /// Removes the adapter => target contract link only
-        creditManager.setContractAllowance({adapter: adapter, targetContract: address(0)}); // F: [CC-40]
-
-        emit ForbidAdapter(adapter); // F: [CC-40]
-    }
-
     //
     // CREDIT MANAGER MGMT
     //
