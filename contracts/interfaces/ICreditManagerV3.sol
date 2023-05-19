@@ -308,6 +308,8 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
         view
         returns (CollateralDebtData memory collateralDebtData);
 
+    function isLiquidatable(address creditAccount, uint16 minHealthFactor) external view returns (bool);
+
     /// @dev Withdrawal manager
     function withdrawalManager() external view returns (address);
 

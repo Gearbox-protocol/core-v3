@@ -96,7 +96,7 @@ contract PoolMock is IPoolService {
         supportsQuotas = val;
     }
 
-    function setCumulative_RAY(uint256 cumulativeIndex_RAY) external {
+    function setCumulativeIndexNow(uint256 cumulativeIndex_RAY) external {
         _cumulativeIndex_RAY = cumulativeIndex_RAY;
     }
 

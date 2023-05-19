@@ -148,7 +148,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         borrowedAmount = _borrowedAmount;
 
         cumulativeIndexLastUpdate = RAY;
-        poolMock.setCumulative_RAY(cumulativeIndexLastUpdate);
+        poolMock.setCumulativeIndexNow(cumulativeIndexLastUpdate);
 
         vm.prank(creditFacade);
 
@@ -159,7 +159,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         vm.roll(block.number + 1);
 
         cumulativeIndexAtClose = (cumulativeIndexLastUpdate * 12) / 10;
-        poolMock.setCumulative_RAY(cumulativeIndexAtClose);
+        poolMock.setCumulativeIndexNow(cumulativeIndexAtClose);
     }
 
     function makeTokenQuoted(address token, uint16 rate, uint96 limit) external {

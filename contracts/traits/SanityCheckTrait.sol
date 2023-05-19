@@ -13,7 +13,7 @@ abstract contract SanityCheckTrait {
         _;
     }
 
-    function _nonZeroCheck(address addr) private view {
+    function _nonZeroCheck(address addr) private pure {
         if (addr == address(0)) revert ZeroAddressException(); // F:[P4-2]
     }
 }
