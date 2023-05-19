@@ -122,7 +122,7 @@ contract CreditLogicTest is TestHelper {
     }
 
     /// @notice U:[CL-1]: `calcIndex` reverts for zero value
-    function test_CL_01_calcAccruedInterest_computes_interest_with_small_error(
+    function test_U_CL_01_calcAccruedInterest_computes_interest_with_small_error(
         uint256 debt,
         uint256 cumulativeIndexAtOpen,
         uint256 borrowRate,
@@ -149,7 +149,7 @@ contract CreditLogicTest is TestHelper {
     }
 
     /// @notice U:[CL-2]: `calcIncrease` outputs new interest that is old interest with at most a small error
-    function test_CL_02_calcIncrease_preserves_interest(
+    function test_U_CL_02_calcIncrease_preserves_interest(
         uint256 debt,
         uint256 indexNow,
         uint256 indexAtOpen,
@@ -189,7 +189,7 @@ contract CreditLogicTest is TestHelper {
     }
 
     /// @notice U:[CL-3A]: `calcDecrease` outputs newTotalDebt that is different by delta with at most a small error
-    function test_CL_03A_calcDecrease_outputs_correct_new_total_debt(
+    function test_U_CL_03A_calcDecrease_outputs_correct_new_total_debt(
         uint256 debt,
         uint256 indexNow,
         uint256 indexAtOpen,
@@ -241,7 +241,7 @@ contract CreditLogicTest is TestHelper {
     }
 
     /// @notice U:[CL-3B]: `calcDecrease` correctly outputs amountToRepay and profit
-    function test_CL_03B_calcDecrease_outputs_correct_amountToRepay_profit(
+    function test_U_CL_03B_calcDecrease_outputs_correct_amountToRepay_profit(
         uint256 debt,
         uint256 indexNow,
         uint256 indexAtOpen,
@@ -306,7 +306,7 @@ contract CreditLogicTest is TestHelper {
     }
 
     /// @notice U:[CL-4]: `calcLiquidationPayments` gives expected outputs
-    function test_CL_04_calcLiquidationPayments_case_test() public {
+    function test_U_CL_04_calcLiquidationPayments_case_test() public {
         /// FEE INTEREST: 50%
         /// NORMAL LIQUIDATION PREMIUM: 4%
         /// NORMAL LIQUIDATION FEE: 1.5%
@@ -479,7 +479,7 @@ contract CreditLogicTest is TestHelper {
     }
 
     /// @notice U:[CL-5]: `calcLiquidationThreshold` gives expected outputs
-    function test_CL_05_getLiquidationThreshold_case_test() public {
+    function test_U_CL_05_getLiquidationThreshold_case_test() public {
         LiquidationThresholdTestCase[6] memory cases = [
             LiquidationThresholdTestCase({
                 name: "LIQUIDATION THRESHOLD RAMP IN THE FUTURE",
@@ -567,7 +567,7 @@ contract CreditLogicTest is TestHelper {
     }
 
     /// @notice U:[CL-6]: `calcQuotedTokensCollateral` fuzzing test
-    function test_CL_06_calcQuotedTokensCollateral_fuzz_test(
+    function test_U_CL_06_calcQuotedTokensCollateral_fuzz_test(
         uint256[8] memory tokenBalances,
         uint256[8] memory tokenPrices,
         uint256[8] memory tokenQuotas,
@@ -641,7 +641,7 @@ contract CreditLogicTest is TestHelper {
     }
 
     /// @notice U:[CL-7]: `calcNonQuotedTokensCollateral` fuzzing test
-    function test_CL_07_calcNonQuotedTokensCollateral_fuzz_test(
+    function test_U_CL_07_calcNonQuotedTokensCollateral_fuzz_test(
         uint256 collateralHintsRand,
         uint256 tokensToCheck,
         uint256[8] memory tokenBalances,

@@ -366,7 +366,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
 
         if (supportsQuotas && collateralDebtData.quotedTokens.length != 0) {
-            /// In case of amy loss, PQK sets limits to zero for all quoted tokens
+            /// In case of any loss, PQK sets limits to zero for all quoted tokens
             bool setLimitsToZero = loss > 0; // U:[CM-8]
 
             IPoolQuotaKeeper(collateralDebtData._poolQuotaKeeper).removeQuotas({

@@ -44,8 +44,8 @@ import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 /// @title CreditConfigurator
 /// @notice This contract is used to configure CreditManagers and is the only one with the priviledge
 /// to call access-restricted functions
-/// @dev All functions can only by called by he Configurator as per ACL.
-/// CreditManagerV3 blindly executes all requests from CreditConfigurator, so all sanity checks
+/// @dev All functions can only by called by the Configurator as per ACL.
+/// CreditManagerV3 blindly executes all requests (in nearly all cases) from CreditConfigurator, so most sanity checks
 /// are performed here.
 contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -60,14 +60,20 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     /// @dev Address of the Credit Manager's underlying asset
     address public override underlying;
 
-    /// @dev Array of the allowed contracts
+    /// @dev Set of allowed contracts
     EnumerableSet.AddressSet private allowedContractsSet;
+
+    /// @dev Set of emergency liquidators
+    EnumerableSet.AddressSet private emergencyLiquidatorsSet;
+
+    /// @dev Set of forbidden tokens
+    EnumerableSet.AddressSet private forbiddenTokensSet;
 
     /// @dev Contract version
     uint256 public constant version = 3_00;
 
-    /// @dev Constructor has a special role in credit management deployment
-    /// This is where the initial configuration is performed.
+    /// @dev Constructor has a special role in Credit Manager deployment
+    /// For newly deployed CMs, this is where the initial configuration is performed.
     /// The correct deployment flow is as follows:
     ///
     /// 1. Configures CreditManagerV3 fee parameters and sets underlying LT
@@ -75,13 +81,14 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     /// 3. Connects creditFacade and priceOracle to the Credit Manager
     /// 4. Sets itself as creditConfigurator in Credit Manager
     ///
+    /// For existing Credit Manager the CC will only migrate some parameters from the previous Credit Configurator,
+    /// and will otherwise keep the existing CM configuration intact.
     /// @param _creditManager CreditManagerV3 contract instance
     /// @param _creditFacade CreditFacadeV3 contract instance
     /// @param opts Configuration parameters for CreditManagerV3
     constructor(CreditManagerV3 _creditManager, CreditFacadeV3 _creditFacade, CreditManagerOpts memory opts)
         ACLNonReentrantTrait(address(IPoolService(_creditManager.poolService()).addressProvider()))
     {
-        /// Sets contract addressees
         creditManager = _creditManager; // F:[CC-1]
         underlying = creditManager.underlying(); // F:[CC-1]
 
@@ -91,21 +98,54 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
 
         if (currentConfigurator != address(this)) {
             /// DEPLOYED FOR EXISTING CREDIT MANAGER
+            /// In the case where the CC is deployed for the existing Credit Manager,
+            /// we only need to copy several array parameters from the last CC,
+            /// but the existing configs must be kept intact otherwise
+            /// 1. Allowed contracts set stores all the connected third-party contracts - currently only used
+            ///    to retrieve externally
+            /// 2. Emergency liquidator set stores all emergency liquidators - used for parameter migration when changing the Credit Facade
+            /// 3. Forbidden token set stores all forbidden tokens - used for parameter migration when changing the Credit Facade
+            {
+                address[] memory allowedContractsPrev = CreditConfigurator(currentConfigurator).allowedContracts(); // F: [CC-41]
 
-            address[] memory allowedContractsPrev = CreditConfigurator(currentConfigurator).allowedContracts(); // F: [CC-41]
+                uint256 allowedContractsLen = allowedContractsPrev.length;
+                for (uint256 i = 0; i < allowedContractsLen;) {
+                    allowedContractsSet.add(allowedContractsPrev[i]); // F: [CC-41]
 
-            uint256 allowedContractsLen = allowedContractsPrev.length;
-            for (uint256 i = 0; i < allowedContractsLen;) {
-                allowedContractsSet.add(allowedContractsPrev[i]); // F: [CC-41]
+                    unchecked {
+                        ++i;
+                    }
+                }
+            }
+            {
+                address[] memory emergencyLiquidatorsPrev =
+                    CreditConfigurator(currentConfigurator).emergencyLiquidators();
 
-                unchecked {
-                    ++i;
+                uint256 emergencyLiquidatorsLen = emergencyLiquidatorsPrev.length;
+                for (uint256 i = 0; i < emergencyLiquidatorsLen;) {
+                    emergencyLiquidatorsSet.add(emergencyLiquidatorsPrev[i]);
+
+                    unchecked {
+                        ++i;
+                    }
+                }
+            }
+            {
+                address[] memory forbiddenTokensPrev = CreditConfigurator(currentConfigurator).forbiddenTokens();
+
+                uint256 forbiddenTokensLen = forbiddenTokensPrev.length;
+                for (uint256 i = 0; i < forbiddenTokensLen;) {
+                    forbiddenTokensSet.add(forbiddenTokensPrev[i]);
+
+                    unchecked {
+                        ++i;
+                    }
                 }
             }
         } else {
             /// DEPLOYED FOR NEW CREDIT MANAGER
 
-            /// Sets limits and fees for the Credit Manager
+            /// Sets liquidation discounts and fees for the Credit Manager
             _setFees(
                 DEFAULT_FEE_INTEREST,
                 DEFAULT_FEE_LIQUIDATION,
@@ -120,7 +160,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
             for (uint256 i = 0; i < len;) {
                 address token = opts.collateralTokens[i].token;
 
-                addCollateralToken(token); // F:[CC-1]
+                _addCollateralToken(token); // F:[CC-1]
 
                 _setLiquidationThreshold(token, opts.collateralTokens[i].liquidationThreshold); // F:[CC-1]
 
@@ -129,14 +169,18 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
                 }
             }
 
-            // Connects creditFacade and priceOracle
+            /// Connects creditFacade and priceOracle
             creditManager.setCreditFacade(address(_creditFacade)); // F:[CC-1]
 
             emit SetCreditFacade(address(_creditFacade)); // F: [CC-1A]
             emit SetPriceOracle(address(creditManager.priceOracle())); // F: [CC-1A]
 
+            /// Sets the max debt per block multiplier
+            /// This parameter determines the maximal new debt per block as a factor of
+            /// maximal Credit Account debt - essentially a cap on the number of new Credit Accounts per block
             _setMaxDebtPerBlockMultiplier(uint8(DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER)); // F:[CC-1]
 
+            /// Sets the borrowing limits per Credit Account
             _setLimits(opts.minBorrowedAmount, opts.maxBorrowedAmount); // F:[CC-1]
         }
     }
@@ -153,15 +197,14 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         override
         configuratorOnly // F:[CC-2]
     {
-        addCollateralToken(token); // F:[CC-3,4]
+        _addCollateralToken(token); // F:[CC-3,4]
         _setLiquidationThreshold(token, liquidationThreshold); // F:[CC-4]
     }
 
     /// @dev Makes all sanity checks and adds the token to the collateral token list
     /// @param token Address of token to be added
-    function addCollateralToken(address token) internal nonZeroAddress(token) {
-        // Checks that token != address(0)
-
+    function _addCollateralToken(address token) internal nonZeroAddress(token) {
+        /// Checks that the token is a contract
         if (!token.isContract()) revert AddressIsNotContractException(token); // F:[CC-3]
 
         // Checks that the contract has balanceOf method
@@ -176,7 +219,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
             revert IncorrectPriceFeedException(); // F:[CC-3]
         }
 
-        // creditManager has an additional check that the token is not added yet
+        /// creditManager has an additional check that the token is not added yet
         creditManager.addToken(token); // F:[CC-4]
 
         emit AllowToken(token); // F:[CC-4]
@@ -206,8 +249,10 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         uint16 currentLT = creditManager.liquidationThresholds(token);
 
         if (currentLT != liquidationThreshold) {
-            // Sets the LT in Credit Manager, where token existence is checked
-            //  _setLTRampParams(tokenData, tokenMask, , 0);
+            /// When the LT of a token is set directly, we set the parameters
+            /// as if it was a ramp from `liquidationThreshold` to `liquidationThreshold`
+            /// starting in far future. This ensures that the LT function in Credit Manager
+            /// will always return `liquidationThreshold` until the parameters are changed
             creditManager.setCollateralTokenData(token, liquidationThreshold, liquidationThreshold, type(uint40).max, 0); // F:[CC-6]
             emit SetTokenLiquidationThreshold(token, liquidationThreshold); // F:[CC-6]
         }
@@ -232,12 +277,21 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
             revert IncorrectLiquidationThresholdException();
         }
 
+        // In case that (for some reason) the function is executed later than
+        // the start of the ramp, we start the ramp from the current moment
+        // to prevent discontinueous jumps in token's LT
         rampStart = block.timestamp > rampStart ? uint40(block.timestamp) : rampStart;
 
         uint16 currentLT = creditManager.liquidationThresholds(token);
 
         if (currentLT != liquidationThresholdFinal) {
-            // Sets the LT in Credit Manager, where token existence is checked
+            // CollateralTokenData in CreditManager stores 4 values:
+            // 1. ltInitial
+            // 2. ltFinal
+            // 3. rampStart
+            // 4. rampDuration
+            // The actual LT changes linearly between ltInitial and ltFinal over rampDuration;
+            // E.g., it is ltInitial in rampStart and ltFinal in rampStart + rampDuration
             creditManager.setCollateralTokenData(token, currentLT, liquidationThresholdFinal, rampStart, rampDuration);
             emit ScheduleTokenLiquidationThresholdRamp(
                 token, currentLT, liquidationThresholdFinal, rampStart, uint40(block.timestamp) + rampDuration
@@ -262,6 +316,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         // Skipping case: F:[CC-8]
         if (forbiddenTokenMask & tokenMask != 0) {
             creditFacade().setTokenAllowance(token, AllowanceAction.ALLOW); // TODO: CHECK
+            forbiddenTokensSet.remove(token);
             emit AllowToken(token); // F:[CC-9]
         }
     }
@@ -275,6 +330,11 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         external
         pausableAdminsOnly // F:[CC-2B]
     {
+        _forbidToken(token);
+    }
+
+    /// @dev IMPLEMENTATION: forbidToken
+    function _forbidToken(address token) internal {
         // Gets token masks. Reverts if the token was not added as collateral or is the underlying
         uint256 tokenMask = _getAndCheckTokenMaskForSettingLT(token); // F:[CC-7]
 
@@ -285,8 +345,8 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         // otherwise no actions done.
         // Skipping case: F:[CC-10]
         if (forbiddenTokenMask & tokenMask == 0) {
-            forbiddenTokenMask |= tokenMask; // F:[CC-11]
             creditFacade().setTokenAllowance(token, AllowanceAction.FORBID); // TODO: CHECK
+            forbiddenTokensSet.add(token);
             emit ForbidToken(token); // F:[CC-11]
         }
     }
@@ -455,7 +515,6 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     function _setLimits(uint128 _minBorrowedAmount, uint128 _maxBorrowedAmount) internal {
         // Performs sanity checks on limits:
         // maxBorrowedAmount must not be less than minBorrowedAmount
-        // maxBorrowedAmount must not be larger than maximal borrowed amount per block
         uint8 maxDebtPerBlockMultiplier = creditFacade().maxDebtPerBlockMultiplier();
         if (_minBorrowedAmount > _maxBorrowedAmount) {
             revert IncorrectLimitsException();
@@ -497,7 +556,8 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         ); // FT:[CC-24,25,26]
     }
 
-    /// @dev Does sanity checks on fee params and sets them in CreditManagerV3
+    /// @dev IMPLEMENTATION: setFees
+    ///      Does sanity checks on fee params and sets them in CreditManagerV3
     function _setFees(
         uint16 _feeInterest,
         uint16 _feeLiquidation,
@@ -506,7 +566,6 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         uint16 _liquidationDiscountExpired
     ) internal {
         // Computes the underlying LT and updates it if required
-
         uint16 newLTUnderlying = uint16(_liquidationDiscount - _feeLiquidation); // FT:[CC-25]
         (, uint16 ltUnderlying) = creditManager.collateralTokensByMask(UNDERLYING_TOKEN_MASK);
 
@@ -556,6 +615,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
 
         // An LT of an ordinary collateral token cannot be larger than the LT of underlying
         // As such, all LTs need to be checked and reduced if needed
+        // NB: This action will interrupt all ongoing LT ramps
         uint256 len = creditManager.collateralTokensCount();
         unchecked {
             for (uint256 i = 1; i < len; ++i) {
@@ -616,6 +676,8 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
 
         address botList = creditFacade().botList();
 
+        (, uint128 maxCumulativeLoss) = creditFacade().lossParams();
+
         // Sets Credit Facade to the new address
         creditManager.setCreditFacade(_creditFacade); // F:[CC-30]
 
@@ -623,14 +685,44 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
             // Copies all limits and restrictions on borrowing
             _setMaxDebtPerBlockMultiplier(_maxDebtPerBlockMultiplier); // F:[CC-30]
             _setLimits(minBorrowedAmount, maxBorrowedAmount); // F:[CC-30]
+            _setMaxCumulativeLoss(maxCumulativeLoss);
+
+            // Migrates array-based parameters
+            _migrateEmergencyLiquidators();
+            _migrateForbiddenTokens();
 
             // Copies the expiration date if the contract is expirable
             if (expirable) _setExpirationDate(expirationDate); // F: [CC-30]
 
+            // Copies the bot list if bot functionality is supported
             if (botList != address(0)) _setBotList(botList);
         }
 
         emit SetCreditFacade(_creditFacade); // F:[CC-30]
+    }
+
+    /// @dev Internal function to migrate emergency liquidators when
+    ///      updating the Credit Facade
+    function _migrateEmergencyLiquidators() internal {
+        uint256 len = emergencyLiquidatorsSet.length();
+        for (uint256 i; i < len;) {
+            _addEmergencyLiquidator(emergencyLiquidatorsSet.at(i));
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /// @dev Internal function to migrate forbidden tokens when
+    ///      updating the Credit Facade
+    function _migrateForbiddenTokens() internal {
+        uint256 len = forbiddenTokensSet.length();
+        for (uint256 i; i < len;) {
+            _forbidToken(forbiddenTokensSet.at(i));
+            unchecked {
+                ++i;
+            }
+        }
     }
 
     /// @dev Upgrades the Credit Configurator for a connected Credit Manager
@@ -673,6 +765,8 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
 
     /// @dev Disables borrowing in Credit Facade (and, consequently, the Credit Manager)
     function forbidBorrowing() external pausableAdminsOnly {
+        /// This is done by setting the max debt per block multiplier to 0,
+        /// which prevents all new borrowing
         _setMaxDebtPerBlockMultiplier(0);
     }
 
@@ -681,6 +775,11 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         external
         configuratorOnly // F: [CC-02]
     {
+        _setMaxCumulativeLoss(_maxCumulativeLoss);
+    }
+
+    /// @dev IMPLEMENTATION: setMaxCumulativeLoss
+    function _setMaxCumulativeLoss(uint128 _maxCumulativeLoss) internal {
         (, uint128 maxCumulativeLossCurrent) = creditFacade().lossParams();
 
         if (_maxCumulativeLoss != maxCumulativeLossCurrent) {
@@ -766,10 +865,13 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
 
     /// @dev Sets the bot list contract
     /// @param botList The address of the new bot list
+    /// @notice The bot list determines the permissions for actions
+    ///         that bots can perform on Credit Accounts
     function setBotList(address botList) external configuratorOnly {
         _setBotList(botList);
     }
 
+    /// @dev IMPLEMENTATION: setBotList
     function _setBotList(address botList) internal nonZeroAddress(botList) {
         address currentBotList = creditFacade().botList();
 
@@ -801,6 +903,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         // to avoid redundant events
         if (!statusCurrent) {
             creditFacade().setEmergencyLiquidator(liquidator, AllowanceAction.ALLOW); // F: [CC-38]
+            emergencyLiquidatorsSet.add(liquidator);
             emit AddEmergencyLiquidator(liquidator); // F: [CC-38]
         }
     }
@@ -822,6 +925,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         // to avoid redundant events
         if (statusCurrent) {
             creditFacade().setEmergencyLiquidator(liquidator, AllowanceAction.FORBID); // F: [CC-38]
+            emergencyLiquidatorsSet.remove(liquidator);
             emit RemoveEmergencyLiquidator(liquidator); // F: [CC-38]
         }
     }
@@ -836,6 +940,30 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         result = new address[](len);
         for (uint256 i; i < len;) {
             result[i] = allowedContractsSet.at(i);
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /// @dev Returns all emergency liquidators
+    function emergencyLiquidators() external view override returns (address[] memory result) {
+        uint256 len = emergencyLiquidatorsSet.length();
+        result = new address[](len);
+        for (uint256 i; i < len;) {
+            result[i] = emergencyLiquidatorsSet.at(i);
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /// @dev Returns all forbidden tokens
+    function forbiddenTokens() external view override returns (address[] memory result) {
+        uint256 len = forbiddenTokensSet.length();
+        result = new address[](len);
+        for (uint256 i; i < len;) {
+            result[i] = forbiddenTokensSet.at(i);
             unchecked {
                 ++i;
             }

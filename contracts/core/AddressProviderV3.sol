@@ -8,12 +8,11 @@ import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.
 import {IACL} from "@gearbox-protocol/core-v2/contracts/interfaces/IACL.sol";
 
 import {AddressNotFoundException, CallerNotConfiguratorException} from "../interfaces/IExceptions.sol";
-import "forge-std/console.sol";
 
 /// @title AddressRepository
 /// @notice Stores addresses of deployed contracts
 contract AddressProviderV3 is IAddressProviderV3 {
-    // Mapping from contract keys to respective addresses
+    // Mapping from (contract key, version) to the respective contract address
     mapping(bytes32 => mapping(uint256 => address)) public addresses;
 
     // Contract version
@@ -27,23 +26,26 @@ contract AddressProviderV3 is IAddressProviderV3 {
     }
 
     constructor(address _acl) {
-        // @dev Emits first event for contract discovery
+        /// The first event is emitted for the AP itself, to aid in contract discovery
         emit AddressSet("ADDRESS_PROVIDER", address(this), version);
         _setAddress(AP_ACL, _acl, NO_VERSION_CONTROL);
     }
 
+    /// @dev Returns the address associated with the passed key/version
     function getAddressOrRevert(bytes32 key, uint256 _version) public view override returns (address result) {
         result = addresses[key][_version];
         if (result == address(0)) revert AddressNotFoundException();
     }
 
-    /// @dev Sets address to map by its key
+    /// @dev Sets the address for the passed key, and optionally records the contract version
     /// @param key Key in string format
-    /// @param value Address
+    /// @param value Address to save
+    /// @param saveVersion Whether to save
     function setAddress(bytes32 key, address value, bool saveVersion) external override configuratorOnly {
         _setAddress(key, value, saveVersion ? IVersion(value).version() : NO_VERSION_CONTROL);
     }
 
+    /// @dev Internal function to set the address mapping value
     function _setAddress(bytes32 key, address value, uint256 _version) internal {
         addresses[key][_version] = value;
         emit AddressSet(key, value, _version); // F:[AP-2]

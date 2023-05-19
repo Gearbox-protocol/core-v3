@@ -247,3 +247,5 @@ error CallerNotCreditAccountFacadeException();
 
 /// @dev Thrown when attempting to set positive funding for a bot with 0 permissions
 error PositiveFundingForInactiveBotException();
+
+error MasterCreditAccountAlreadyDeployed();

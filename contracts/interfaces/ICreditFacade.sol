@@ -10,6 +10,20 @@ import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.
 import {ClosureAction} from "../interfaces/ICreditManagerV3.sol";
 import "./ICreditFacadeMulticall.sol";
 
+struct DebtLimits {
+    /// @dev Minimal borrowed amount per credit account
+    uint128 minDebt;
+    /// @dev Maximum aborrowed amount per credit account
+    uint128 maxDebt;
+}
+
+struct CumulativeLossParams {
+    /// @dev Current cumulative loss from all bad debt liquidations
+    uint128 currentCumulativeLoss;
+    /// @dev Max cumulative loss accrued before the system is paused
+    uint128 maxCumulativeLoss;
+}
+
 struct FullCheckParams {
     uint256[] collateralHints;
     uint16 minHealthFactor;

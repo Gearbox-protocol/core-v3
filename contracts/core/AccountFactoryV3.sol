@@ -15,26 +15,30 @@ import {IAccountFactory} from "../interfaces/IAccountFactory.sol";
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
-import "forge-std/console.sol";
-
+/// @dev Struct storing per-CreditManager data on account usage queue
 struct CreditManagerFactory {
+    /// @dev Address of the contract being cloned to create new Credit Accounts
     address masterCreditAccount;
+    /// @dev Id of the next reused Credit Account in the used account queue, i.e.
+    ///      the front of the reused CA queue
     uint32 head;
+    /// @dev Id of the last returned Credit Account in the used account queue, i.e.
+    ///      the back of the reused CA queue
     uint32 tail;
+    /// @dev Min used account queue size in order to start reusing accounts
     uint16 minUsedInQueue;
 }
 
 /// @title Disposable credit accounts factory
 contract AccountFactoryV3 is IAccountFactory, ACLTrait, ContractsRegisterTrait {
-    /// @dev Address of master credit account for cloning
+    /// @dev Mapping from Credit Manager to their Credit Account queue data
     mapping(address => CreditManagerFactory) public masterCreditAccounts;
 
+    /// @dev Mapping from Credit Manager to their used account queue
     mapping(address => address[]) public usedCreditAccounts;
 
     /// @dev Contract version
     uint256 public constant version = 3_00;
-
-    error MasterCreditAccountAlreadyDeployed();
 
     /// @param addressProvider Address of address repository
     constructor(address addressProvider) ACLTrait(addressProvider) ContractsRegisterTrait(addressProvider) {}
@@ -48,20 +52,27 @@ contract AccountFactoryV3 is IAccountFactory, ACLTrait, ContractsRegisterTrait {
         if (masterCreditAccount == address(0)) {
             revert CallerNotCreditManagerException();
         }
+
+        ///  A used Credit Account is only given to a user if there is a sufficiently
+        ///  large number of other accounts opened before it. The minimal number of
+        ///  accounts to cycle through before a particular account is reusable is determined
+        ///  by minUsedInQueue for each Credit Manager.
+        ///  This is done to make it hard for a user to intentionally reopen an account
+        ///  that they closed shortly prior, as this can potentially be used as an element
+        ///  in an attack.
         uint256 totalUsed = cmf.tail - cmf.head;
         if (totalUsed < cmf.minUsedInQueue) {
-            // Create a new credit account if there are none in stock
-            creditAccount = Clones.clone(masterCreditAccount); // T:[AF-2]
+            creditAccount = Clones.clone(masterCreditAccount);
             emit DeployCreditAccount(creditAccount);
         } else {
             creditAccount = usedCreditAccounts[msg.sender][cmf.head];
             ++cmf.head;
             emit ReuseCreditAccount(creditAccount);
         }
-
-        // emit InitializeCreditAccount(result, msg.sender); // T:[AF-5]
     }
 
+    /// @dev Returns a Credit Account from the Credit Manager into the used account queue
+    /// @param usedAccount Credit Account to return
     function returnCreditAccount(address usedAccount) external override {
         CreditManagerFactory storage cmf = masterCreditAccounts[msg.sender];
 
@@ -76,6 +87,9 @@ contract AccountFactoryV3 is IAccountFactory, ACLTrait, ContractsRegisterTrait {
 
     // CONFIGURATION
 
+    /// @dev Adds a new Credit Manager to the account factory and initializes its master Credit Account
+    /// @param creditManager Address of the CA to add
+    /// @param minUsedInQueue Minimal number of opened accounts before a CA is reusable
     function addCreditManager(address creditManager, uint16 minUsedInQueue)
         external
         configuratorOnly
@@ -85,6 +99,8 @@ contract AccountFactoryV3 is IAccountFactory, ACLTrait, ContractsRegisterTrait {
             revert MasterCreditAccountAlreadyDeployed();
         }
 
+        /// As `creditManager` is an immutable field in a Credit Account,
+        /// it will be copied as part of the code when the master Credit Account is cloned
         masterCreditAccounts[creditManager] = CreditManagerFactory({
             masterCreditAccount: address(new CreditAccountV3(creditManager)),
             head: 0,

@@ -16,8 +16,9 @@ import "../interfaces/IExceptions.sol";
 contract CreditAccountV3 is ICreditAccount {
     using SafeERC20 for IERC20;
     using Address for address;
-    /// @dev Address of the currently connected Credit Manager
 
+    /// @dev Address of the Credit Manager this account is used for
+    /// @notice Note that V3 Credit Accounts are specific to their respective Credit Managers
     address public immutable creditManager;
 
     // Contract version
