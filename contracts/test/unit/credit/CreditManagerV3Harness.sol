@@ -68,10 +68,6 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         _safeTokenTransfer(creditAccount, token, to, amount, convertToETH);
     }
 
-    function checkEnabledTokenLength(uint256 enabledTokensMask) external view {
-        _checkEnabledTokenLength(enabledTokensMask);
-    }
-
     function collateralTokensByMaskCalcLT(uint256 tokenMask, bool calcLT)
         external
         view
