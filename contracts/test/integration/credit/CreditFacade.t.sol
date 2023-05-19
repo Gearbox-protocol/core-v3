@@ -128,11 +128,6 @@ contract CreditFacadeIntegrationTest is
         vm.prank(CONFIGURATOR);
         creditConfigurator.allowContract(address(targetMock), address(adapterMock));
 
-        botList = new BotList(address(cft.addressProvider()));
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setBotList(address(botList));
-
         vm.label(address(adapterMock), "AdapterMock");
         vm.label(address(targetMock), "TargetContractMock");
     }

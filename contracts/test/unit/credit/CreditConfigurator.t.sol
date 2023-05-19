@@ -341,7 +341,7 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         creditConfigurator.upgradeCreditConfigurator(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.setBotList(FRIEND);
+        creditConfigurator.setBotList(0);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.setMaxCumulativeLoss(0);
@@ -980,10 +980,7 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
 
             setUp();
 
-            address botList = address(new BotList(address(cct.addressProvider())));
-
-            vm.prank(CONFIGURATOR);
-            creditConfigurator.setBotList(botList);
+            address botList = creditFacade.botList();
 
             CreditFacadeV3 cf = new CreditFacadeV3(
                 address(creditManager),

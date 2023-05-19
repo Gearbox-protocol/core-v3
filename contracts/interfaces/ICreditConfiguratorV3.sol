@@ -247,8 +247,9 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
     function resetCumulativeLoss() external;
 
     /// @dev Sets the bot list contract
-    /// @param botList The address of the new bot list
-    function setBotList(address botList) external;
+    /// @param version The version of the new bot list contract
+    ///                The contract address is retrieved from addressProvider
+    function setBotList(uint256 version) external;
 
     //
     // GETTERS
