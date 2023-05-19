@@ -171,13 +171,7 @@ contract CreditLogicTest is TestHelper {
 
         vm.assume(interest > 1);
 
-        CollateralDebtData memory cdd;
-
-        cdd.debt = debt;
-        cdd.cumulativeIndexNow = indexNow;
-        cdd.cumulativeIndexLastUpdate = indexAtOpen;
-
-        (uint256 newDebt, uint256 newIndex) = CreditLogic.calcIncrease(cdd, delta);
+        (uint256 newDebt, uint256 newIndex) = CreditLogic.calcIncrease(delta, debt, indexNow, indexAtOpen);
 
         assertEq(newDebt, debt + delta, "Debt principal not updated correctly");
 
@@ -217,15 +211,8 @@ contract CreditLogicTest is TestHelper {
 
         if (delta > debt + interest + quotaInterest) delta %= debt + interest + quotaInterest;
 
-        CollateralDebtData memory cdd;
-
-        cdd.debt = debt;
-        cdd.cumulativeIndexNow = indexNow;
-        cdd.cumulativeIndexLastUpdate = indexAtOpen;
-        cdd.cumulativeQuotaInterest = quotaInterest;
-
         (uint256 newDebt, uint256 newCumulativeIndex,,, uint256 cumulativeQuotaInterest) =
-            CreditLogic.calcDecrease(cdd, delta, feeInterest);
+            CreditLogic.calcDecrease(delta, debt, indexNow, indexAtOpen, quotaInterest, feeInterest);
 
         uint256 oldTotalDebt = _calcTotalDebt(debt, indexNow, indexAtOpen, quotaInterest, feeInterest);
         uint256 newTotalDebt =
@@ -268,14 +255,8 @@ contract CreditLogicTest is TestHelper {
 
         if (delta > debt + interest + quotaInterest) delta %= debt + interest + quotaInterest;
 
-        CollateralDebtData memory cdd;
-
-        cdd.debt = debt;
-        cdd.cumulativeIndexNow = indexNow;
-        cdd.cumulativeIndexLastUpdate = indexAtOpen;
-        cdd.cumulativeQuotaInterest = quotaInterest;
-
-        (uint256 newDebt,, uint256 amountToRepay, uint256 profit,) = CreditLogic.calcDecrease(cdd, delta, feeInterest);
+        (uint256 newDebt,, uint256 amountToRepay, uint256 profit,) =
+            CreditLogic.calcDecrease(delta, debt, indexNow, indexAtOpen, quotaInterest, feeInterest);
 
         assertEq(amountToRepay, debt - newDebt, "Amount to repay incorrect");
 
