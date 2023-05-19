@@ -415,28 +415,6 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         emit ForbidContract(targetContract); // F:[CC-17]
     }
 
-    /// @dev Removes the link between passed adapter and its contract
-    ///      Useful to remove "orphaned" adapters, i.e. adapters that were replaced but still point
-    ///      to the contract for some reason. This allows users to still execute actions through the old adapter,
-    ///      even though that is not intended.
-    function forbidAdapter(address adapter)
-        external
-        override
-        configuratorOnly
-        nonZeroAddress(adapter) // F: [CC-40]
-    {
-        /// If the adapter already has no linked target contract, then there is nothing to change
-        address targetContract = creditManager.adapterToContract(adapter);
-        if (targetContract == address(0)) {
-            revert ContractIsNotAnAllowedAdapterException(); // F: [CC-40]
-        }
-
-        /// Removes the adapter => target contract link only
-        creditManager.setContractAllowance({adapter: adapter, targetContract: address(0)}); // F: [CC-40]
-
-        emit ForbidAdapter(adapter); // F: [CC-40]
-    }
-
     //
     // CREDIT MANAGER MGMT
     //
@@ -614,7 +592,11 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
 
         bool expirable = creditFacade().expirable();
 
-        address botList = creditFacade().botList();
+        uint256 botListVersion;
+        {
+            address botList = creditFacade().botList();
+            botListVersion = botList == address(0) ? 0 : IVersion(botList).version();
+        }
 
         // Sets Credit Facade to the new address
         creditManager.setCreditFacade(_creditFacade); // F:[CC-30]
@@ -627,7 +609,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
             // Copies the expiration date if the contract is expirable
             if (expirable) _setExpirationDate(expirationDate); // F: [CC-30]
 
-            if (botList != address(0)) _setBotList(botList);
+            if (botListVersion != 0) _setBotList(botListVersion);
         }
 
         emit SetCreditFacade(_creditFacade); // F:[CC-30]
@@ -765,12 +747,14 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     }
 
     /// @dev Sets the bot list contract
-    /// @param botList The address of the new bot list
-    function setBotList(address botList) external configuratorOnly {
-        _setBotList(botList);
+    /// @param version The version of the new bot list contract
+    ///                The contract address is retrieved from addressProvider
+    function setBotList(uint256 version) external configuratorOnly {
+        _setBotList(version);
     }
 
-    function _setBotList(address botList) internal nonZeroAddress(botList) {
+    function _setBotList(uint256 version) internal {
+        address botList = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_BOT_LIST, version);
         address currentBotList = creditFacade().botList();
 
         if (botList != currentBotList) {

@@ -85,12 +85,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @dev Whether the Credit Facade implements expirable logic
     bool public immutable expirable;
 
-    /// @dev Address of the pool
-    address public immutable pool;
-
-    /// @dev Address of the underlying token
-    address public immutable underlying;
-
     /// @dev Address of WETH
     address public immutable weth;
 
@@ -183,21 +177,18 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @param _expirable Whether the CreditFacadeV3 can expire and implements expiration-related logic
     constructor(address _creditManager, address _degenNFT, bool _expirable)
         ACLNonReentrantTrait(ICreditManagerV3(_creditManager).addressProvider())
-        nonZeroAddress(_creditManager)
     {
-        creditManager = _creditManager; // F:[FA-1A]
-        pool = ICreditManagerV3(_creditManager).pool();
-        underlying = ICreditManagerV3(_creditManager).underlying(); // F:[FA-1A]
+        creditManager = _creditManager; // U:[FA-1] // F:[FA-1A]
 
-        weth = ICreditManagerV3(_creditManager).weth(); // F:[FA-1A]
-        wethGateway = ICreditManagerV3(_creditManager).wethGateway();
+        weth = ICreditManagerV3(_creditManager).weth(); // U:[FA-1] // F:[FA-1A]
+        wethGateway = ICreditManagerV3(_creditManager).wethGateway(); // U:[FA-1]
         botList =
             IAddressProviderV3(ICreditManagerV3(_creditManager).addressProvider()).getAddressOrRevert(AP_BOT_LIST, 3_00);
 
-        degenNFT = _degenNFT; // F:[FA-1A]
-        whitelisted = _degenNFT != address(0); // F:[FA-1A]
+        degenNFT = _degenNFT; // U:[FA-1]  // F:[FA-1A]
+        whitelisted = _degenNFT != address(0); // U:[FA-1] // F:[FA-1A]
 
-        expirable = _expirable;
+        expirable = _expirable; // U:[FA-1] // F:[FA-1A]
     }
 
     // Notice: ETH interactions

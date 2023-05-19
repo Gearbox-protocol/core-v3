@@ -341,7 +341,7 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         creditConfigurator.upgradeCreditConfigurator(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.setBotList(FRIEND);
+        creditConfigurator.setBotList(0);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.setMaxCumulativeLoss(0);
@@ -980,10 +980,7 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
 
             setUp();
 
-            address botList = address(new BotList(address(cct.addressProvider())));
-
-            vm.prank(CONFIGURATOR);
-            creditConfigurator.setBotList(botList);
+            address botList = creditFacade.botList();
 
             CreditFacadeV3 cf = new CreditFacadeV3(
                 address(creditManager),
@@ -1140,29 +1137,6 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
 
         assertTrue(
             !creditFacade.canLiquidateWhilePaused(DUMB_ADDRESS), "Credit manager emergency liquidator status incorrect"
-        );
-    }
-
-    /// @dev U:[CC-40]: forbidAdapter works correctly and emits event
-    function test_U_CC_40_forbidAdapter_works_correctly() public {
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.forbidAdapter(DUMB_ADDRESS);
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.allowContract(TARGET_CONTRACT, address(adapter1));
-
-        vm.expectEmit(true, false, false, false);
-        emit ForbidAdapter(address(adapter1));
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.forbidAdapter(address(adapter1));
-
-        assertEq(
-            creditManager.adapterToContract(address(adapter1)), address(0), "Adapter to contract link was not removed"
-        );
-
-        assertEq(
-            creditManager.contractToAdapter(TARGET_CONTRACT), address(adapter1), "Contract to adapter link was removed"
         );
     }
 
