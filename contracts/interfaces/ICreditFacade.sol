@@ -214,9 +214,6 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     /// @dev Address of the DegenNFT that gatekeeps account openings in whitelisted mode
     function degenNFT() external view returns (address);
 
-    /// @dev Address of the underlying asset
-    function underlying() external view returns (address);
-
     /// @dev Maps addresses to their status as emergency liquidator.
     /// @notice Emergency liquidators are trusted addresses
     /// that are able to liquidate positions while the contracts are paused,

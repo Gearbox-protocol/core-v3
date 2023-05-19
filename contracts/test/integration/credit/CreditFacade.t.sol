@@ -192,7 +192,7 @@ contract CreditFacadeIntegrationTest is
     /// @dev [FA-1A]: constructor sets correct values
     function test_FA_01A_constructor_sets_correct_values() public {
         assertEq(address(creditFacade.creditManager()), address(creditManager), "Incorrect creditManager");
-        assertEq(creditFacade.underlying(), underlying, "Incorrect underlying token");
+        // assertEq(creditFacade.underlying(), underlying, "Incorrect underlying token");
 
         assertEq(creditFacade.weth(), creditManager.weth(), "Incorrect weth token");
 

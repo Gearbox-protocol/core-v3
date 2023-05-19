@@ -138,8 +138,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
     function setUp() public {
         tokenTestSuite = new TokensTestSuite();
-
         tokenTestSuite.topUpWETH{value: 100 * WAD}();
+
+        addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
 
         underlying = tokenTestSuite.addressOf(Tokens.DAI);
 
@@ -149,7 +150,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         wethGateway = WETHGatewayMock(addressProvider.getAddressOrRevert(AP_WETH_GATEWAY, 3_00));
 
         priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 2));
-        addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
     }
     ///
     /// HELPERS
