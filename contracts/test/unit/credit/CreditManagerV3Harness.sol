@@ -101,15 +101,21 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         return _hasWithdrawals(creditAccount);
     }
 
-    // function calcCancellableWithdrawalsValue(address creditAccount, bool isForceCancel) external {
-    //     _calcCancellableWithdrawalsValue(creditAccount, isForceCancel);
-    // }
-
     function saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) external {
         _saveEnabledTokensMask(creditAccount, enabledTokensMask);
     }
 
-    // function convertToUSD(uint256 amountInToken, address token) external returns (uint256 amountInUSD) {
-    //     return _convertToUSD(amountInToken, token);
-    // }
+    function getQuotedTokensData(address creditAccount, uint256 enabledTokensMask, address _poolQuotaKeeper)
+        external
+        view
+        returns (
+            address[] memory quotaTokens,
+            uint256 outstandingQuotaInterest,
+            uint256[] memory quotas,
+            uint16[] memory lts,
+            uint256 quotedMask
+        )
+    {
+        return _getQuotedTokensData(creditAccount, enabledTokensMask, _poolQuotaKeeper);
+    }
 }
