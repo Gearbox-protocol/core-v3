@@ -22,6 +22,8 @@ import {IWithdrawalManager} from "../interfaces/IWithdrawalManager.sol";
 
 uint256 constant INDEX_PRECISION = 10 ** 9;
 
+import "forge-std/console.sol";
+
 /// @title Credit Logic Library
 library CreditLogic {
     using BitMask for uint256;
@@ -294,7 +296,7 @@ library CreditLogic {
                 priceOracle: priceOracle
             });
 
-            if (twvUSD > limit) {
+            if (lazy && twvUSD > limit) {
                 return (totalValueUSD, twvUSD, 0);
             } else {
                 unchecked {
@@ -302,6 +304,9 @@ library CreditLogic {
                 }
             }
         }
+
+        // @notice Computes non-quotes collateral
+
         {
             uint256 tokensToCheckMask =
                 collateralDebtData.enabledTokensMask.disable(collateralDebtData.enabledQuotedTokenMask);

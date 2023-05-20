@@ -4,7 +4,30 @@ pragma solidity ^0.8.17;
 import "./constants.sol";
 import {Test} from "forge-std/Test.sol";
 
+struct VarU256 {
+    mapping(bytes32 => uint256) values;
+    mapping(bytes32 => bool) isSet;
+}
+
+library Vars {
+    function set(VarU256 storage v, string memory key, uint256 value) internal {
+        bytes32 b32key = keccak256(bytes(key));
+        v.values[b32key] = value;
+        v.isSet[b32key] = true;
+    }
+
+    function get(VarU256 storage v, string memory key) internal view returns (uint256) {
+        bytes32 b32key = keccak256(bytes(key));
+        require(v.isSet[b32key], string.concat("Value ", key, " is undefined"));
+        return v.values[b32key];
+    }
+}
+
 contract TestHelper is Test {
+    VarU256 internal vars;
+
+    string caseName;
+
     constructor() {
         vm.label(USER, "USER");
         vm.label(FRIEND, "FRIEND");
@@ -14,8 +37,12 @@ contract TestHelper is Test {
         vm.label(ADAPTER, "ADAPTER");
     }
 
-    function _testCaseErr(string memory caseName, string memory err) internal pure returns (string memory) {
-        return string.concat("\nCase: ", caseName, "\nError: ", err);
+    function _testCaseErr(string memory err) internal view returns (string memory) {
+        return _testCaseErr(caseName, err);
+    }
+
+    function _testCaseErr(string memory _caseName, string memory err) internal pure returns (string memory) {
+        return string.concat("\nCase: ", _caseName, "\nError: ", err);
     }
 
     function arrayOf(uint256 v1) internal pure returns (uint256[] memory array) {

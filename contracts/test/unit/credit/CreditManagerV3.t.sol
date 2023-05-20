@@ -71,14 +71,17 @@ import "../../../interfaces/IExceptions.sol";
 // TESTS
 import "../../lib/constants.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
-import {TestHelper} from "../../lib/helper.sol";
+import {TestHelper, Vars, VarU256} from "../../lib/helper.sol";
 import "forge-std/console.sol";
+
+uint16 constant LT_UNDERLYING = uint16(PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM - DEFAULT_FEE_LIQUIDATION);
 
 contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceHelper, CreditAccountMockEvents {
     using BitMask for uint256;
     using CreditLogic for CollateralDebtData;
     using CreditLogic for CollateralTokenData;
     using USDTFees for uint256;
+    using Vars for VarU256;
 
     IAddressProviderV3 addressProvider;
 
@@ -140,11 +143,10 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         tokenTestSuite = new TokensTestSuite();
         tokenTestSuite.topUpWETH{value: 100 * WAD}();
 
-        addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
-
         underlying = tokenTestSuite.addressOf(Tokens.DAI);
 
         addressProvider = new AddressProviderV3ACLMock();
+        addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
 
         accountFactory = AccountFactoryMock(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL));
         wethGateway = WETHGatewayMock(addressProvider.getAddressOrRevert(AP_WETH_GATEWAY, 3_00));
@@ -163,6 +165,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         if (_supportsQuotas) {
             poolQuotaKeeperMock = new PoolQuotaKeeperMock(address(poolMock), underlying);
             poolMock.setPoolQuotaKeeper(address(poolQuotaKeeperMock));
+            caseName = string.concat(caseName, " [ supportsQuotas = true ] ");
+        } else {
+            caseName = string.concat(caseName, " [ supportsQuotas = false ] ");
         }
 
         creditManager = (isFeeToken)
@@ -177,6 +182,14 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             DEFAULT_FEE_LIQUIDATION_EXPIRED,
             PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM_EXPIRED
         );
+
+        creditManager.setCollateralTokenData({
+            token: underlying,
+            initialLT: LT_UNDERLYING,
+            finalLT: LT_UNDERLYING,
+            timestampRampStart: type(uint40).max,
+            rampDuration: 0
+        });
     }
 
     function _setUnderlying(bool underlyingIsFeeToken) internal {
@@ -189,6 +202,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         uint256 _maxTokenFee = underlyingIsFeeToken ? 1000000000000 * oneUSDT : 0;
 
         _setFee(_tokenFee, _maxTokenFee);
+
+        caseName = string.concat(caseName, " [fee token = ", underlyingIsFeeToken ? " true ]" : " false ]");
     }
 
     function _setFee(uint256 _tokenFee, uint256 _maxTokenFee) internal {
@@ -264,6 +279,25 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         return creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(token));
     }
 
+    function _taskName(CollateralCalcTask task) internal pure returns (string memory) {
+        if (task == CollateralCalcTask.GENERIC_PARAMS) return "GENERIC_PARAMS";
+
+        if (task == CollateralCalcTask.DEBT_ONLY) return "DEBT_ONLY";
+
+        if (task == CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS) {
+            return "DEBT_COLLATERAL_WITHOUT_WITHDRAWALS";
+        }
+        if (task == CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS) return "DEBT_COLLATERAL_CANCEL_WITHDRAWALS";
+
+        if (task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS) {
+            return "DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS";
+        }
+
+        if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) return "FULL_COLLATERAL_CHECK_LAZY";
+
+        revert("UNKNOWN TASK");
+    }
+
     ///
     ///
     ///  TESTS
@@ -272,62 +306,50 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
     /// @dev U:[CM-1]: credit manager reverts if were called non-creditFacade
     function test_U_CM_01_constructor_sets_correct_values() public allQuotaCases {
-        string memory caseName = supportsQuotas ? "supportsQuotas = true" : "supportsQuotas = false";
+        assertEq(address(creditManager.poolService()), address(poolMock), _testCaseErr("Incorrect poolService"));
 
-        assertEq(
-            address(creditManager.poolService()), address(poolMock), _testCaseErr(caseName, "Incorrect poolService")
-        );
+        assertEq(address(creditManager.pool()), address(poolMock), _testCaseErr("Incorrect pool"));
 
-        assertEq(address(creditManager.pool()), address(poolMock), _testCaseErr(caseName, "Incorrect pool"));
-
-        assertEq(
-            creditManager.underlying(),
-            tokenTestSuite.addressOf(Tokens.DAI),
-            _testCaseErr(caseName, "Incorrect underlying")
-        );
+        assertEq(creditManager.underlying(), tokenTestSuite.addressOf(Tokens.DAI), _testCaseErr("Incorrect underlying"));
 
         (address token, uint16 lt) = creditManager.collateralTokensByMask(UNDERLYING_TOKEN_MASK);
 
-        assertEq(token, tokenTestSuite.addressOf(Tokens.DAI), _testCaseErr(caseName, "Incorrect underlying"));
+        assertEq(token, tokenTestSuite.addressOf(Tokens.DAI), _testCaseErr("Incorrect underlying"));
 
         assertEq(
             creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI)),
             1,
-            _testCaseErr(caseName, "Incorrect token mask for underlying token")
+            _testCaseErr("Incorrect token mask for underlying token")
         );
 
-        assertEq(lt, 0, _testCaseErr(caseName, "Incorrect LT for underlying"));
+        // assertEq(lt, 0, _testCaseErr("Incorrect LT for underlying"));
 
-        assertEq(creditManager.supportsQuotas(), supportsQuotas, _testCaseErr(caseName, "Incorrect supportsQuotas"));
+        assertEq(creditManager.supportsQuotas(), supportsQuotas, _testCaseErr("Incorrect supportsQuotas"));
 
         assertEq(
             creditManager.weth(),
             addressProvider.getAddressOrRevert(AP_WETH_TOKEN, 0),
-            _testCaseErr(caseName, "Incorrect WETH token")
+            _testCaseErr("Incorrect WETH token")
         );
 
         assertEq(
             address(creditManager.wethGateway()),
             addressProvider.getAddressOrRevert(AP_WETH_GATEWAY, 3_00),
-            _testCaseErr(caseName, "Incorrect WETH Gateway")
+            _testCaseErr("Incorrect WETH Gateway")
         );
 
         assertEq(
             address(creditManager.priceOracle()),
             addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 2),
-            _testCaseErr(caseName, "Incorrect Price oracle")
+            _testCaseErr("Incorrect Price oracle")
         );
 
         assertEq(
-            address(creditManager.accountFactory()),
-            address(accountFactory),
-            _testCaseErr(caseName, "Incorrect account factory")
+            address(creditManager.accountFactory()), address(accountFactory), _testCaseErr("Incorrect account factory")
         );
 
         assertEq(
-            address(creditManager.creditConfigurator()),
-            address(this),
-            _testCaseErr(caseName, "Incorrect creditConfigurator")
+            address(creditManager.creditConfigurator()), address(this), _testCaseErr("Incorrect creditConfigurator")
         );
     }
 
@@ -510,16 +532,12 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
     /// @dev U:[CM-6]: open credit account works as expected
     function test_U_CM_06_open_credit_account_works_as_expected() public allQuotaCases {
-        string memory caseName = supportsQuotas ? "supportsQuotas = true" : "supportsQuotas = false";
-
         uint256 cumulativeIndexNow = RAY * 5;
         poolMock.setCumulativeIndexNow(cumulativeIndexNow);
 
         tokenTestSuite.mint(Tokens.DAI, address(poolMock), DAI_ACCOUNT_AMOUNT);
 
-        assertEq(
-            creditManager.creditAccounts().length, 0, _testCaseErr(caseName, "SETUP: incorrect creditAccounts() length")
-        );
+        assertEq(creditManager.creditAccounts().length, 0, _testCaseErr("SETUP: incorrect creditAccounts() length"));
 
         uint256 cumulativeQuotaInterestBefore = 123412321;
         uint256 enabledTokensMaskBefore = 231423;
@@ -538,9 +556,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         //  vm.expectCall(address(accountFactory), abi.encodeCall(IAccountFactory.takeCreditAccount, (0, 0)));
         address creditAccount = creditManager.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER);
         assertEq(
-            address(creditAccount),
-            accountFactory.usedAccount(),
-            _testCaseErr(caseName, "Incorrect credit account returned")
+            address(creditAccount), accountFactory.usedAccount(), _testCaseErr("Incorrect credit account returned")
         );
 
         (
@@ -552,32 +568,24 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             address borrower
         ) = creditManager.creditAccountInfo(creditAccount);
 
-        assertEq(debt, DAI_ACCOUNT_AMOUNT, _testCaseErr(caseName, "Incorrect debt"));
-        assertEq(
-            cumulativeIndexLastUpdate, cumulativeIndexNow, _testCaseErr(caseName, "Incorrect cumulativeIndexLastUpdate")
-        );
+        assertEq(debt, DAI_ACCOUNT_AMOUNT, _testCaseErr("Incorrect debt"));
+        assertEq(cumulativeIndexLastUpdate, cumulativeIndexNow, _testCaseErr("Incorrect cumulativeIndexLastUpdate"));
         assertEq(
             cumulativeQuotaInterest,
             supportsQuotas ? 1 : cumulativeQuotaInterestBefore,
-            _testCaseErr(caseName, "Incorrect cumulativeQuotaInterest")
+            _testCaseErr("Incorrect cumulativeQuotaInterest")
         );
-        assertEq(enabledTokensMask, enabledTokensMaskBefore, _testCaseErr(caseName, "Incorrect enabledTokensMask"));
-        assertEq(flags, 0, _testCaseErr(caseName, "Incorrect flags"));
-        assertEq(borrower, USER, _testCaseErr(caseName, "Incorrect borrower"));
+        assertEq(enabledTokensMask, enabledTokensMaskBefore, _testCaseErr("Incorrect enabledTokensMask"));
+        assertEq(flags, 0, _testCaseErr("Incorrect flags"));
+        assertEq(borrower, USER, _testCaseErr("Incorrect borrower"));
 
-        assertEq(poolMock.lendAmount(), DAI_ACCOUNT_AMOUNT, _testCaseErr(caseName, "Incorrect amount was borrowed"));
-        assertEq(poolMock.lendAccount(), creditAccount, _testCaseErr(caseName, "Incorrect amount was borrowed"));
+        assertEq(poolMock.lendAmount(), DAI_ACCOUNT_AMOUNT, _testCaseErr("Incorrect amount was borrowed"));
+        assertEq(poolMock.lendAccount(), creditAccount, _testCaseErr("Incorrect amount was borrowed"));
 
-        assertEq(creditManager.creditAccounts().length, 1, _testCaseErr(caseName, "incorrect creditAccounts() length"));
-        assertEq(
-            creditManager.creditAccounts()[0],
-            creditAccount,
-            _testCaseErr(caseName, "incorrect creditAccounts()[0] value")
-        );
+        assertEq(creditManager.creditAccounts().length, 1, _testCaseErr("incorrect creditAccounts() length"));
+        assertEq(creditManager.creditAccounts()[0], creditAccount, _testCaseErr("incorrect creditAccounts()[0] value"));
 
-        expectBalance(
-            Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT, _testCaseErr(caseName, "incorrect balance on creditAccount")
-        );
+        expectBalance(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT, _testCaseErr("incorrect balance on creditAccount"));
     }
 
     //
@@ -742,7 +750,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
             CloseCreditAccountTestCase memory _case = cases[i];
 
-            string memory caseName = isFeeToken ? string.concat("Fee token: ", _case.name) : _case.name;
+            caseName = string.concat(caseName, _case.name);
 
             CollateralDebtData memory collateralDebtData;
             collateralDebtData._poolQuotaKeeper = address(poolQuotaKeeperMock);
@@ -835,13 +843,13 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 convertToETH: false
             });
 
-            assertEq(poolMock.repayAmount(), collateralDebtData.debt, _testCaseErr(caseName, "Incorrect repay amount"));
-            assertEq(poolMock.repayProfit(), profit, _testCaseErr(caseName, "Incorrect profit"));
-            assertEq(poolMock.repayLoss(), loss, _testCaseErr(caseName, "Incorrect loss"));
+            assertEq(poolMock.repayAmount(), collateralDebtData.debt, _testCaseErr("Incorrect repay amount"));
+            assertEq(poolMock.repayProfit(), profit, _testCaseErr("Incorrect profit"));
+            assertEq(poolMock.repayLoss(), loss, _testCaseErr("Incorrect loss"));
 
-            assertEq(remainingFunds, expectedRemainingFunds, _testCaseErr(caseName, "incorrect remainingFunds"));
+            assertEq(remainingFunds, expectedRemainingFunds, _testCaseErr("incorrect remainingFunds"));
 
-            assertEq(loss, expectedLoss, _testCaseErr(caseName, "incorrect loss"));
+            assertEq(loss, expectedLoss, _testCaseErr("incorrect loss"));
 
             checkTokenTransfers({debug: false});
 
@@ -870,9 +878,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
             assertEq(accountFactory.returnedAccount(), creditAccount, "returnAccount wasn't called");
 
-            assertEq(
-                creditManager.creditAccounts().length, 0, _testCaseErr(caseName, "incorrect creditAccounts() length")
-            );
+            assertEq(creditManager.creditAccounts().length, 0, _testCaseErr("incorrect creditAccounts() length"));
 
             vm.revertTo(snapshot);
         }
@@ -909,8 +915,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             _addTokensBatch({creditAccount: creditAccount, numberOfTokens: numberOfTokens, balance: randomAmount});
         }
 
-        string memory caseName = string.concat("token transfer with ", Strings.toString(numberOfTokens), " on account");
-        caseName = isFeeToken ? string.concat("Fee token: ", caseName) : caseName;
+        caseName = string.concat(caseName, "token transfer with ", Strings.toString(numberOfTokens), " on account");
 
         startTokenTrackingSession(caseName);
 
@@ -1003,7 +1008,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate
         });
 
-        string memory caseName = "increase debt";
+        caseName = string.concat(caseName, "increase debt");
         caseName = isFeeToken ? string.concat("Fee token: ", caseName) : caseName;
 
         startTokenTrackingSession(caseName);
@@ -1026,24 +1031,24 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         checkTokenTransfers({debug: false});
 
-        assertEq(newDebt, expectedNewDebt, _testCaseErr(caseName, "Incorrect new debt"));
+        assertEq(newDebt, expectedNewDebt, _testCaseErr("Incorrect new debt"));
 
-        assertEq(poolMock.lendAmount(), amount, _testCaseErr(caseName, "Incorrect lend amount"));
-        assertEq(poolMock.lendAccount(), creditAccount, _testCaseErr(caseName, "Incorrect credit account"));
+        assertEq(poolMock.lendAmount(), amount, _testCaseErr("Incorrect lend amount"));
+        assertEq(poolMock.lendAccount(), creditAccount, _testCaseErr("Incorrect credit account"));
 
         /// @notice checking creditAccountInf update
 
         (uint256 debt, uint256 cumulativeIndexLastUpdate,,,,) = creditManager.creditAccountInfo(creditAccount);
 
-        assertEq(debt, expectedNewDebt, _testCaseErr(caseName, "Incorrect debt update in creditAccountInfo"));
+        assertEq(debt, expectedNewDebt, _testCaseErr("Incorrect debt update in creditAccountInfo"));
         assertEq(
             cumulativeIndexLastUpdate,
             expectedCumulativeIndex,
-            _testCaseErr(caseName, "Incorrect cumulativeIndexLastUpdate update in creditAccountInfo")
+            _testCaseErr("Incorrect cumulativeIndexLastUpdate update in creditAccountInfo")
         );
 
-        assertEq(tokensToEnable, UNDERLYING_TOKEN_MASK, _testCaseErr(caseName, "Incorrect tokensToEnable"));
-        assertEq(tokensToDisable, 0, _testCaseErr(caseName, "Incorrect tokensToDisable"));
+        assertEq(tokensToEnable, UNDERLYING_TOKEN_MASK, _testCaseErr("Incorrect tokensToEnable"));
+        assertEq(tokensToDisable, 0, _testCaseErr("Incorrect tokensToDisable"));
     }
 
     /// @dev U:[CM-11]: manageDebt decreases debt correctly
@@ -1104,11 +1109,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             feeInterest: DEFAULT_FEE_INTEREST
         });
 
-        string memory caseName = "decrease debt &";
-        caseName = isFeeToken ? string.concat("Fee token: ", caseName) : caseName;
-        caseName = supportsQuotas
-            ? string.concat(caseName, ", supportsQuotas = true")
-            : string.concat(caseName, ", supportsQuotas = false");
+        caseName = string.concat(caseName, "decrease debt: ");
 
         /// @notice there are 3 cases to test
         /// #0: use whole balance of undelrying asset of CA and keeps 0
@@ -1151,38 +1152,36 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         checkTokenTransfers({debug: false});
 
-        assertEq(newDebt, expectedNewDebt, _testCaseErr(caseName, "Incorrect new debt"));
+        assertEq(newDebt, expectedNewDebt, _testCaseErr("Incorrect new debt"));
 
-        assertEq(poolMock.repayAmount(), expectedAmountToRepay, _testCaseErr(caseName, "Incorrect repay amount"));
-        assertEq(poolMock.repayProfit(), expectedProfit, _testCaseErr(caseName, "Incorrect repay profit"));
-        assertEq(poolMock.repayLoss(), 0, _testCaseErr(caseName, "Incorrect repay loss"));
+        assertEq(poolMock.repayAmount(), expectedAmountToRepay, _testCaseErr("Incorrect repay amount"));
+        assertEq(poolMock.repayProfit(), expectedProfit, _testCaseErr("Incorrect repay profit"));
+        assertEq(poolMock.repayLoss(), 0, _testCaseErr("Incorrect repay loss"));
 
         /// @notice checking creditAccountInf update
         {
             (uint256 debt, uint256 cumulativeIndexLastUpdate, uint256 cumulativeQuotaInterest,,,) =
                 creditManager.creditAccountInfo(creditAccount);
 
-            assertEq(debt, expectedNewDebt, _testCaseErr(caseName, "Incorrect debt update in creditAccountInfo"));
+            assertEq(debt, expectedNewDebt, _testCaseErr("Incorrect debt update in creditAccountInfo"));
             assertEq(
                 cumulativeIndexLastUpdate,
                 expectedCumulativeIndex,
-                _testCaseErr(caseName, "Incorrect cumulativeIndexLastUpdate update in creditAccountInfo")
+                _testCaseErr("Incorrect cumulativeIndexLastUpdate update in creditAccountInfo")
             );
 
             assertEq(
                 cumulativeQuotaInterest,
                 expectedCumulativeQuotaInterest,
-                _testCaseErr(caseName, "Incorrect cumulativeQuotaInterest update in creditAccountInfo")
+                _testCaseErr("Incorrect cumulativeQuotaInterest update in creditAccountInfo")
             );
         }
 
-        assertEq(tokensToEnable, 0, _testCaseErr(caseName, "Incorrect tokensToEnable"));
+        assertEq(tokensToEnable, 0, _testCaseErr("Incorrect tokensToEnable"));
 
         /// @notice it should disable token mask with 0 or 1 balance after
         assertEq(
-            tokensToDisable,
-            (testCase != 2) ? UNDERLYING_TOKEN_MASK : 0,
-            _testCaseErr(caseName, "Incorrect tokensToDisable")
+            tokensToDisable, (testCase != 2) ? UNDERLYING_TOKEN_MASK : 0, _testCaseErr("Incorrect tokensToDisable")
         );
     }
 
@@ -1217,11 +1216,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
 
         for (uint256 testCase = 0; testCase < 2; testCase++) {
-            string memory caseName = "decrease debt &";
-            caseName = isFeeToken ? string.concat("Fee token: ", caseName) : caseName;
-            caseName = supportsQuotas
-                ? string.concat(caseName, ", supportsQuotas = true")
-                : string.concat(caseName, ", supportsQuotas = false");
+            caseName = string.concat(caseName, "decrease debt &");
 
             caseName =
                 testCase == 0 ? string.concat(caseName, ", INCREASE_DEBT") : string.concat(caseName, ", DECREASE_DEBT");
@@ -1234,26 +1229,24 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             });
 
             assertEq(
-                tokensToEnable,
-                testCase == 0 ? UNDERLYING_TOKEN_MASK : 0,
-                _testCaseErr(caseName, "Incorrect tokensToEnable")
+                tokensToEnable, testCase == 0 ? UNDERLYING_TOKEN_MASK : 0, _testCaseErr("Incorrect tokensToEnable")
             );
-            assertEq(tokensToDisable, 0, _testCaseErr(caseName, "Incorrect tokensToDisable"));
+            assertEq(tokensToDisable, 0, _testCaseErr("Incorrect tokensToDisable"));
 
             (uint256 caiDebt, uint256 caiCumulativeIndexLastUpdate, uint256 caiCumulativeQuotaInterest,,,) =
                 creditManager.creditAccountInfo(creditAccount);
 
-            assertEq(caiDebt, debt, _testCaseErr(caseName, "Incorrect debt update in creditAccountInfo"));
+            assertEq(caiDebt, debt, _testCaseErr("Incorrect debt update in creditAccountInfo"));
             assertEq(
                 caiCumulativeIndexLastUpdate,
                 collateralDebtData.cumulativeIndexLastUpdate,
-                _testCaseErr(caseName, "Incorrect cumulativeIndexLastUpdate update in creditAccountInfo")
+                _testCaseErr("Incorrect cumulativeIndexLastUpdate update in creditAccountInfo")
             );
 
             assertEq(
                 caiCumulativeQuotaInterest,
                 collateralDebtData.cumulativeQuotaInterest + 1,
-                _testCaseErr(caseName, "Incorrect cumulativeQuotaInterest update in creditAccountInfo")
+                _testCaseErr("Incorrect cumulativeQuotaInterest update in creditAccountInfo")
             );
         }
     }
@@ -1427,7 +1420,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
 
         CollateralDebtData memory collateralDebtData =
-            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS);
+            creditManager.calcDebtAndCollateralFC(creditAccount, CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS);
 
         /// @notice fuzzler could find a combination which enabled tokens with zero balances,
         /// which cause to twvUSD == 0 and arithmetic errr later
@@ -1435,7 +1428,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         creditManager.setDebt(creditAccount, collateralDebtData.twvUSD + 1);
 
-        collateralDebtData = creditManager.calcDebtAndCollateralFC(creditAccount);
+        collateralDebtData =
+            creditManager.calcDebtAndCollateralFC(creditAccount, CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY);
 
         assertEq(
             collateralDebtData.twvUSD + 1, collateralDebtData.totalDebtUSD, "SETUP: incorrect params for liquidation"
@@ -1457,7 +1451,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         /// @notice we run calcDebtAndCollateral to get enabledTokensMask as it should be after check
         creditManager.setDebt(creditAccount, collateralDebtData.twvUSD - 1);
 
-        collateralDebtData = creditManager.calcDebtAndCollateralFC(creditAccount);
+        collateralDebtData =
+            creditManager.calcDebtAndCollateralFC(creditAccount, CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY);
 
         uint256 enabledTokenMaskWithDisableTokens = collateralDebtData.enabledTokensMask;
 
@@ -1525,7 +1520,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         poolMock.setCumulativeIndexNow(cumulativeIndexNow);
 
         CollateralDebtData memory collateralDebtData =
-            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.GENERIC_PARAMS);
+            creditManager.calcDebtAndCollateral({creditAccount: creditAccount, task: CollateralCalcTask.GENERIC_PARAMS});
 
         assertEq(collateralDebtData.debt, debt, "Incorrect debt");
         assertEq(
@@ -1559,10 +1554,10 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         uint256 LINK_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.LINK});
         uint256 STETH_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.STETH});
 
-        uint256 cumulativeIndexNow = RAY * 22 / 10;
-        uint256 cumulativeIndexLastUpdate = RAY * 21 / 10;
+        vars.set("cumulativeIndexNow", RAY * 22 / 10);
+        vars.set("cumulativeIndexLastUpdate", RAY * 21 / 10);
 
-        poolMock.setCumulativeIndexNow(cumulativeIndexNow);
+        poolMock.setCumulativeIndexNow(vars.get("cumulativeIndexNow"));
 
         if (supportsQuotas) {
             creditManager.setQuotedMask(LINK_TOKEN_MASK | STETH_TOKEN_MASK);
@@ -1571,14 +1566,14 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.setCreditAccountInfoMap({
             creditAccount: creditAccount,
             debt: debt,
-            cumulativeIndexLastUpdate: cumulativeIndexLastUpdate,
+            cumulativeIndexLastUpdate: vars.get("cumulativeIndexLastUpdate"),
             cumulativeQuotaInterest: INITIAL_INTEREST,
             enabledTokensMask: UNDERLYING_TOKEN_MASK | LINK_TOKEN_MASK | STETH_TOKEN_MASK,
             flags: 0,
             borrower: USER
         });
 
-        poolMock.setCumulativeIndexNow(cumulativeIndexNow);
+        poolMock.setCumulativeIndexNow(vars.get("cumulativeIndexNow"));
         creditManager.setMaxEnabledTokens(3);
 
         CollateralDebtData memory collateralDebtData =
@@ -1630,8 +1625,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             collateralDebtData.accruedInterest,
             CreditLogic.calcAccruedInterest({
                 amount: debt,
-                cumulativeIndexLastUpdate: cumulativeIndexLastUpdate,
-                cumulativeIndexNow: cumulativeIndexNow
+                cumulativeIndexLastUpdate: vars.get("cumulativeIndexLastUpdate"),
+                cumulativeIndexNow: vars.get("cumulativeIndexNow")
             }) + (supportsQuotas ? LINK_INTEREST + STETH_INTEREST + (INITIAL_INTEREST - 1) : 0),
             "Incorrect accruedInterest"
         );
@@ -1641,6 +1636,202 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             collateralDebtData.accruedInterest * DEFAULT_FEE_INTEREST / PERCENTAGE_FACTOR,
             "Incorrect accruedFees"
         );
+    }
+
+    struct CollateralCalcTestCase {
+        string name;
+        uint256 enabledTokensMask;
+        uint256 underlyingBalance;
+        uint256 linkBalance;
+        uint256 stEthBalance;
+        uint256 usdcBalance;
+        uint256 expectedTotalValueUSD;
+        uint256 expectedTwvUSD;
+        uint256 expectedEnabledTokensMask;
+    }
+
+    function _collateralTestSetup(uint256 debt) internal {
+        vars.set("LINK_QUOTA", 10_000);
+        vars.set("LINK_INTEREST", debt / 8);
+
+        vars.set("INITIAL_INTEREST", 500);
+
+        vars.set("LINK_LT", 80_00);
+        if (supportsQuotas) {
+            _addQuotedToken({
+                token: Tokens.LINK,
+                lt: uint16(vars.get("LINK_LT")),
+                quoted: uint96(vars.get("LINK_QUOTA")),
+                outstandingInterest: vars.get("LINK_INTEREST")
+            });
+        } else {
+            _addToken({token: Tokens.LINK, lt: uint16(vars.get("LINK_LT"))});
+        }
+
+        vars.set("STETH_LT", 30_00);
+        _addToken({token: Tokens.STETH, lt: uint16(vars.get("STETH_LT"))});
+        _addToken({token: Tokens.USDC, lt: 60_00});
+
+        vars.set("cumulativeIndexNow", RAY * 22 / 10);
+        vars.set("cumulativeIndexLastUpdate", RAY * 21 / 10);
+
+        poolMock.setCumulativeIndexNow(vars.get("cumulativeIndexNow"));
+
+        ///
+        vars.set("UNDERLYING_PRICE", 2);
+        priceOracleMock.setPrice({token: underlying, price: vars.get("UNDERLYING_PRICE") * (10 ** 8)});
+
+        vars.set("LINK_PRICE", 4);
+        priceOracleMock.setPrice({
+            token: tokenTestSuite.addressOf(Tokens.LINK),
+            price: vars.get("LINK_PRICE") * (10 ** 8)
+        });
+
+        vars.set("STETH_PRICE", 3);
+        priceOracleMock.setPrice({
+            token: tokenTestSuite.addressOf(Tokens.STETH),
+            price: vars.get("STETH_PRICE") * (10 ** 8)
+        });
+
+        vars.set("USDC_PRICE", 5);
+        priceOracleMock.setPrice({
+            token: tokenTestSuite.addressOf(Tokens.USDC),
+            price: vars.get("USDC_PRICE") * (10 ** 8)
+        });
+
+        /// @notice Quotas are nominated in underlying token, so we use underlying price instead link one
+        vars.set("LINK_QUOTA_IN_USD", vars.get("LINK_QUOTA") * vars.get("UNDERLYING_PRICE"));
+    }
+
+    /// @dev U:[CM-22]: calcDebtAndCollateral works correctly for DEBT_COLLATERAL* task
+
+    function test_U_CM_22_calcDebtAndCollateral_works_correctly_for_DEBT_COLLATERAL_task() public allQuotaCases {
+        uint256 debt = DAI_ACCOUNT_AMOUNT;
+
+        _collateralTestSetup(debt);
+
+        uint256 LINK_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.LINK});
+        uint256 STETH_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.STETH});
+        uint256 USDC_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.USDC});
+
+        if (supportsQuotas) {
+            creditManager.setQuotedMask(LINK_TOKEN_MASK);
+        }
+
+        CollateralCalcTestCase[4] memory cases = [
+            CollateralCalcTestCase({
+                name: "Underlying token on acccount only",
+                enabledTokensMask: UNDERLYING_TOKEN_MASK | STETH_TOKEN_MASK | USDC_TOKEN_MASK,
+                underlyingBalance: debt,
+                linkBalance: 0,
+                stEthBalance: 0,
+                usdcBalance: 0,
+                expectedTotalValueUSD: vars.get("UNDERLYING_PRICE") * debt,
+                expectedTwvUSD: vars.get("UNDERLYING_PRICE") * debt * LT_UNDERLYING / PERCENTAGE_FACTOR,
+                expectedEnabledTokensMask: UNDERLYING_TOKEN_MASK
+            }),
+            CollateralCalcTestCase({
+                name: "One quoted token with balance < quota",
+                enabledTokensMask: LINK_TOKEN_MASK,
+                underlyingBalance: 0,
+                linkBalance: vars.get("LINK_QUOTA") / 2 / vars.get("LINK_PRICE"),
+                stEthBalance: 0,
+                usdcBalance: 0,
+                expectedTotalValueUSD: vars.get("LINK_QUOTA") / 2,
+                expectedTwvUSD: vars.get("LINK_QUOTA") / 2 * vars.get("LINK_LT") / PERCENTAGE_FACTOR,
+                expectedEnabledTokensMask: LINK_TOKEN_MASK
+            }),
+            CollateralCalcTestCase({
+                name: "One quoted token with balance > quota",
+                enabledTokensMask: LINK_TOKEN_MASK,
+                underlyingBalance: 0,
+                linkBalance: 2 * vars.get("LINK_QUOTA") * vars.get("UNDERLYING_PRICE") / vars.get("LINK_PRICE"),
+                stEthBalance: 0,
+                usdcBalance: 0,
+                expectedTotalValueUSD: 2 * vars.get("LINK_QUOTA_IN_USD"),
+                expectedTwvUSD: (supportsQuotas ? vars.get("LINK_QUOTA_IN_USD") : 2 * vars.get("LINK_QUOTA_IN_USD"))
+                    * vars.get("LINK_LT") / PERCENTAGE_FACTOR,
+                expectedEnabledTokensMask: LINK_TOKEN_MASK
+            }),
+            CollateralCalcTestCase({
+                name: "It disables non-quoted zero balance tokens",
+                enabledTokensMask: UNDERLYING_TOKEN_MASK | LINK_TOKEN_MASK | STETH_TOKEN_MASK | USDC_TOKEN_MASK,
+                underlyingBalance: 20_000,
+                linkBalance: 0,
+                stEthBalance: 20_000,
+                usdcBalance: 0,
+                expectedTotalValueUSD: 20_000 * vars.get("UNDERLYING_PRICE") + 20_000 * vars.get("STETH_PRICE"),
+                expectedTwvUSD: 20_000 * vars.get("UNDERLYING_PRICE") * LT_UNDERLYING / PERCENTAGE_FACTOR
+                    + 20_000 * vars.get("STETH_PRICE") * vars.get("STETH_LT") / PERCENTAGE_FACTOR,
+                expectedEnabledTokensMask: UNDERLYING_TOKEN_MASK | STETH_TOKEN_MASK | (supportsQuotas ? LINK_TOKEN_MASK : 0)
+            })
+        ];
+
+        address creditAccount = DUMB_ADDRESS;
+
+        CollateralCalcTask[3] memory tasks = [
+            CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS,
+            CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS,
+            CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
+        ];
+
+        for (uint256 taskIndex = 0; taskIndex < tasks.length; ++taskIndex) {
+            caseName = string.concat(caseName, _taskName(tasks[taskIndex]));
+            for (uint256 i; i < cases.length; ++i) {
+                uint256 snapshot = vm.snapshot();
+
+                CollateralCalcTestCase memory _case = cases[i];
+                caseName = string.concat(caseName, _case.name);
+
+                creditManager.setCreditAccountInfoMap({
+                    creditAccount: creditAccount,
+                    debt: debt,
+                    cumulativeIndexLastUpdate: vars.get("cumulativeIndexLastUpdate"),
+                    cumulativeQuotaInterest: vars.get("INITIAL_INTEREST") + 1,
+                    enabledTokensMask: _case.enabledTokensMask,
+                    flags: 0,
+                    borrower: USER
+                });
+
+                tokenTestSuite.mint({token: underlying, to: creditAccount, amount: _case.underlyingBalance});
+                tokenTestSuite.mint({t: Tokens.LINK, to: creditAccount, amount: _case.linkBalance});
+                tokenTestSuite.mint({t: Tokens.STETH, to: creditAccount, amount: _case.stEthBalance});
+                tokenTestSuite.mint({t: Tokens.USDC, to: creditAccount, amount: _case.usdcBalance});
+
+                CollateralDebtData memory collateralDebtData =
+                    creditManager.calcDebtAndCollateralFC({creditAccount: creditAccount, task: tasks[taskIndex]});
+
+                /// @notice It checks that USD value is computed correctly
+                assertEq(
+                    collateralDebtData.totalDebtUSD,
+                    vars.get("UNDERLYING_PRICE")
+                        * (debt + collateralDebtData.accruedInterest + collateralDebtData.accruedFees),
+                    _testCaseErr("Incorrect totalDebtUSD")
+                );
+
+                assertEq(
+                    collateralDebtData.totalValueUSD,
+                    _case.expectedTotalValueUSD,
+                    _testCaseErr("Incorrect totalValueUSD")
+                );
+
+                assertEq(collateralDebtData.twvUSD, _case.expectedTwvUSD, _testCaseErr("Incorrect twvUSD"));
+
+                assertEq(
+                    collateralDebtData.enabledTokensMask,
+                    _case.expectedEnabledTokensMask,
+                    _testCaseErr("Incorrect enabledTokensMask")
+                );
+
+                assertEq(
+                    collateralDebtData.totalValue,
+                    _case.expectedTotalValueUSD / vars.get("UNDERLYING_PRICE"),
+                    _testCaseErr("Incorrect totalValueUSD")
+                );
+
+                vm.revertTo(snapshot);
+            }
+        }
     }
 
     ///
@@ -1751,7 +1942,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
             GetQuotedTokenDataTestCase memory _case = cases[i];
 
-            string memory caseName = _case.name;
+            caseName = string.concat(caseName, _case.name);
 
             /// @notice DUMB_ADDRESS is used because poolQuotaMock has predefined returns
             ///  depended on token only
@@ -1773,15 +1964,15 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             });
 
             if (!_case.expectRevert) {
-                assertEq(quotaTokens, _case.expectedQuotaTokens, _testCaseErr(caseName, "Incorrect quotedTokens"));
+                assertEq(quotaTokens, _case.expectedQuotaTokens, _testCaseErr("Incorrect quotedTokens"));
                 assertEq(
                     outstandingQuotaInterest,
                     _case.expertedOutstandingQuotaInterest,
-                    _testCaseErr(caseName, "Incorrect expertedOutstandingQuotaInterest")
+                    _testCaseErr("Incorrect expertedOutstandingQuotaInterest")
                 );
-                assertEq(quotas, _case.expectedQuotas, _testCaseErr(caseName, "Incorrect expectedQuotas"));
-                assertEq(lts, _case.expectedLts, _testCaseErr(caseName, "Incorrect expectedLts"));
-                assertEq(quotedMask, _case.expectedQuotedMask, _testCaseErr(caseName, "Incorrect expectedQuotedMask"));
+                assertEq(quotas, _case.expectedQuotas, _testCaseErr("Incorrect expectedQuotas"));
+                assertEq(lts, _case.expectedLts, _testCaseErr("Incorrect expectedLts"));
+                assertEq(quotedMask, _case.expectedQuotedMask, _testCaseErr("Incorrect expectedQuotedMask"));
             }
 
             vm.revertTo(snapshot);

@@ -81,7 +81,7 @@ contract CreditManagerV3Harness is CreditManagerV3 {
     }
 
     /// @dev Calculates collateral and debt parameters
-    function calcDebtAndCollateralFC(address creditAccount)
+    function calcDebtAndCollateralFC(address creditAccount, CollateralCalcTask task)
         external
         view
         returns (CollateralDebtData memory collateralDebtData)
@@ -93,7 +93,7 @@ contract CreditManagerV3Harness is CreditManagerV3 {
             enabledTokensMask: enabledTokensMaskOf(creditAccount),
             collateralHints: collateralHints,
             minHealthFactor: PERCENTAGE_FACTOR,
-            task: CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY
+            task: task
         });
     }
 
