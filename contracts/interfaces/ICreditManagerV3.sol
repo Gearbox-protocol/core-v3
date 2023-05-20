@@ -53,7 +53,7 @@ struct CollateralDebtData {
     uint256 totalValueUSD;
     uint256 twvUSD;
     uint256 enabledTokensMask;
-    uint256 quotedTokenMask;
+    uint256 enabledQuotedTokenMask;
     address[] quotedTokens;
     uint16[] quotedLts;
     uint256[] quotas;

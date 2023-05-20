@@ -269,29 +269,6 @@ library CreditLogic {
     //
     // COLLATERAL & DEBT COMPUTATION
     //
-
-    /// @dev IMPLEMENTATION: calcAccruedInterestAndFees
-    // / @param creditAccount Address of the Credit Account
-    // / @param quotaInterest Total quota premiums accrued, computed elsewhere
-    // / @return debt The debt principal
-    // / @return accruedInterest Accrued interest
-    // / @return accruedFees Accrued interest and protocol fees
-    function calcAccruedInterestAndFees(CollateralDebtData memory collateralDebtData, uint16 feeInterest)
-        internal
-        pure
-        returns (uint256 accruedInterest, uint256 accruedFees)
-    {
-        // Interest is never stored and is always computed dynamically
-        // as the difference between the current cumulative index of the pool
-        // and the cumulative index recorded in the Credit Account
-        accruedInterest = calcAccruedInterest(
-            collateralDebtData.debt, collateralDebtData.cumulativeIndexLastUpdate, collateralDebtData.cumulativeIndexNow
-        ) + collateralDebtData.cumulativeQuotaInterest; // F:[CM-49]
-
-        // Fees are computed as a percentage of interest
-        accruedFees = collateralDebtData.accruedInterest * feeInterest / PERCENTAGE_FACTOR; // F: [CM-49]
-    }
-
     function calcCollateral(
         CollateralDebtData memory collateralDebtData,
         address creditAccount,
@@ -326,7 +303,8 @@ library CreditLogic {
             }
         }
         {
-            uint256 tokensToCheckMask = collateralDebtData.enabledTokensMask.disable(collateralDebtData.quotedTokenMask);
+            uint256 tokensToCheckMask =
+                collateralDebtData.enabledTokensMask.disable(collateralDebtData.enabledQuotedTokenMask);
 
             uint256 tvDelta;
             uint256 twvDelta;

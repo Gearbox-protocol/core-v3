@@ -138,8 +138,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
     function setUp() public {
         tokenTestSuite = new TokensTestSuite();
-
         tokenTestSuite.topUpWETH{value: 100 * WAD}();
+
+        addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
 
         underlying = tokenTestSuite.addressOf(Tokens.DAI);
 
@@ -149,7 +150,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         wethGateway = WETHGatewayMock(addressProvider.getAddressOrRevert(AP_WETH_GATEWAY, 3_00));
 
         priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 2));
-        addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
     }
     ///
     /// HELPERS
@@ -212,13 +212,45 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         return IERC20Metadata(token).decimals();
     }
 
-    function _addTokens(address creditAccount, uint8 numberOfTokens, uint256 balance) internal {
+    function _addToken(Tokens token, uint16 lt) internal {
+        _addToken(tokenTestSuite.addressOf(token), lt);
+    }
+
+    function _addToken(address token, uint16 lt) internal {
+        creditManager.addToken({token: token});
+        creditManager.setCollateralTokenData({
+            token: address(token),
+            initialLT: lt,
+            finalLT: lt,
+            timestampRampStart: type(uint40).max,
+            rampDuration: 0
+        });
+    }
+
+    function _addQuotedToken(address token, uint16 lt, uint96 quoted, uint256 outstandingInterest) internal {
+        _addToken({token: token, lt: lt});
+        poolQuotaKeeperMock.setQuotaAndOutstandingInterest({
+            token: token,
+            quoted: quoted,
+            outstandingInterest: outstandingInterest
+        });
+    }
+
+    function _addQuotedToken(Tokens token, uint16 lt, uint96 quoted, uint256 outstandingInterest) internal {
+        _addQuotedToken({
+            token: tokenTestSuite.addressOf(token),
+            lt: lt,
+            quoted: quoted,
+            outstandingInterest: outstandingInterest
+        });
+    }
+
+    function _addTokensBatch(address creditAccount, uint8 numberOfTokens, uint256 balance) internal {
         for (uint8 i = 0; i < numberOfTokens; ++i) {
             ERC20Mock t =
             new ERC20Mock(string.concat("new token ", Strings.toString(i+1)),string.concat("NT-", Strings.toString(i+1)), 18);
 
-            creditManager.addToken(address(t));
-            creditManager.setCollateralTokenData(address(t), 8000, 8000, type(uint40).max, 0);
+            _addToken({token: address(t), lt: 80_00});
 
             t.mint(creditAccount, balance * ((i + 2) % 5));
 
@@ -226,6 +258,10 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             uint256 randomPrice = (uint256(keccak256(abi.encode(numberOfTokens, i, balance))) % 600_0000) * 10 ** 6;
             priceOracleMock.setPrice(address(t), randomPrice);
         }
+    }
+
+    function _getTokenMaskOrRevert(Tokens token) internal view returns (uint256) {
+        return creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(token));
     }
 
     ///
@@ -870,7 +906,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         {
             uint256 randomAmount = skipTokenMask % DAI_ACCOUNT_AMOUNT;
             tokenTestSuite.mint({token: weth, to: creditAccount, amount: randomAmount});
-            _addTokens({creditAccount: creditAccount, numberOfTokens: numberOfTokens, balance: randomAmount});
+            _addTokensBatch({creditAccount: creditAccount, numberOfTokens: numberOfTokens, balance: randomAmount});
         }
 
         string memory caseName = string.concat("token transfer with ", Strings.toString(numberOfTokens), " on account");
@@ -1378,7 +1414,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         /// @notice sets price 1 USD for underlying
         priceOracleMock.setPrice(underlying, 10 ** 8);
 
-        _addTokens({creditAccount: creditAccount, numberOfTokens: numberOfTokens, balance: amount});
+        _addTokensBatch({creditAccount: creditAccount, numberOfTokens: numberOfTokens, balance: amount});
 
         creditManager.setCreditAccountInfoMap({
             creditAccount: creditAccount,
@@ -1501,5 +1537,254 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     }
 
     /// @dev U:[CM-21]: calcDebtAndCollateral works correctly for DEBT_ONLY task
-    function test_U_CM_21_calcDebtAndCollateral_works_correctly_for_DEBT_ONLY_task() public withoutSupportQuotas {}
+    function test_U_CM_21_calcDebtAndCollateral_works_correctly_for_DEBT_ONLY_task() public allQuotaCases {
+        uint256 debt = DAI_ACCOUNT_AMOUNT;
+
+        address creditAccount = DUMB_ADDRESS;
+
+        uint96 LINK_QUOTA = uint96(debt / 2);
+        uint96 STETH_QUOTA = uint96(debt / 8);
+
+        uint256 LINK_INTEREST = debt / 8;
+        uint256 STETH_INTEREST = debt / 100;
+        uint256 INITIAL_INTEREST = 500;
+
+        if (supportsQuotas) {
+            _addQuotedToken({token: Tokens.LINK, lt: 80_00, quoted: LINK_QUOTA, outstandingInterest: LINK_INTEREST});
+            _addQuotedToken({token: Tokens.STETH, lt: 30_00, quoted: STETH_QUOTA, outstandingInterest: STETH_INTEREST});
+        } else {
+            _addToken({token: Tokens.LINK, lt: 80_00});
+            _addToken({token: Tokens.STETH, lt: 30_00});
+        }
+        uint256 LINK_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.LINK});
+        uint256 STETH_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.STETH});
+
+        uint256 cumulativeIndexNow = RAY * 22 / 10;
+        uint256 cumulativeIndexLastUpdate = RAY * 21 / 10;
+
+        poolMock.setCumulativeIndexNow(cumulativeIndexNow);
+
+        if (supportsQuotas) {
+            creditManager.setQuotedMask(LINK_TOKEN_MASK | STETH_TOKEN_MASK);
+        }
+
+        creditManager.setCreditAccountInfoMap({
+            creditAccount: creditAccount,
+            debt: debt,
+            cumulativeIndexLastUpdate: cumulativeIndexLastUpdate,
+            cumulativeQuotaInterest: INITIAL_INTEREST,
+            enabledTokensMask: UNDERLYING_TOKEN_MASK | LINK_TOKEN_MASK | STETH_TOKEN_MASK,
+            flags: 0,
+            borrower: USER
+        });
+
+        poolMock.setCumulativeIndexNow(cumulativeIndexNow);
+        creditManager.setMaxEnabledTokens(3);
+
+        CollateralDebtData memory collateralDebtData =
+            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_ONLY);
+
+        assertEq(
+            collateralDebtData.enabledTokensMask,
+            UNDERLYING_TOKEN_MASK | LINK_TOKEN_MASK | STETH_TOKEN_MASK,
+            "Incorrect enabledTokensMask"
+        );
+
+        assertEq(
+            collateralDebtData._poolQuotaKeeper,
+            supportsQuotas ? address(poolQuotaKeeperMock) : address(0),
+            "Incorrect _poolQuotaKeeper"
+        );
+
+        assertEq(
+            collateralDebtData.quotedTokens,
+            supportsQuotas ? tokenTestSuite.listOf(Tokens.LINK, Tokens.STETH, Tokens.NO_TOKEN) : new address[](0),
+            "Incorrect quotedTokens"
+        );
+
+        assertEq(
+            collateralDebtData.cumulativeQuotaInterest,
+            supportsQuotas ? LINK_INTEREST + STETH_INTEREST + (INITIAL_INTEREST - 1) : 0,
+            "Incorrect cumulativeQuotaInterest"
+        );
+
+        assertEq(
+            collateralDebtData.quotas,
+            supportsQuotas ? arrayOf(LINK_QUOTA, STETH_QUOTA, 0) : new uint256[](0),
+            "Incorrect quotas"
+        );
+
+        assertEq(
+            collateralDebtData.quotedLts,
+            supportsQuotas ? arrayOfU16(80_00, 30_00, 0) : new uint16[](0),
+            "Incorrect quotedLts"
+        );
+
+        assertEq(
+            collateralDebtData.enabledQuotedTokenMask,
+            supportsQuotas ? LINK_TOKEN_MASK | STETH_TOKEN_MASK : 0,
+            "Incorrect quotedLts"
+        );
+
+        assertEq(
+            collateralDebtData.accruedInterest,
+            CreditLogic.calcAccruedInterest({
+                amount: debt,
+                cumulativeIndexLastUpdate: cumulativeIndexLastUpdate,
+                cumulativeIndexNow: cumulativeIndexNow
+            }) + (supportsQuotas ? LINK_INTEREST + STETH_INTEREST + (INITIAL_INTEREST - 1) : 0),
+            "Incorrect accruedInterest"
+        );
+
+        assertEq(
+            collateralDebtData.accruedFees,
+            collateralDebtData.accruedInterest * DEFAULT_FEE_INTEREST / PERCENTAGE_FACTOR,
+            "Incorrect accruedFees"
+        );
+    }
+
+    ///
+    /// GET QUOTED TOKENS DATA
+    ///
+
+    struct GetQuotedTokenDataTestCase {
+        string name;
+        //
+        uint256 enabledTokensMask;
+        address[] expectedQuotaTokens;
+        uint256 expertedOutstandingQuotaInterest;
+        uint256[] expectedQuotas;
+        uint16[] expectedLts;
+        uint256 expectedQuotedMask;
+        bool expectRevert;
+    }
+
+    /// @dev U:[CM-31]: _getQuotedTokensData works correctly
+    function test_U_CM_31_getQuotedTokensData_works_correctly() public withSupportQuotas {
+        assertEq(creditManager.collateralTokensCount(), 1, "SETUP: incorrect tokens count");
+
+        //// LINK: [QUOTED]
+        _addQuotedToken({token: Tokens.LINK, lt: 80_00, quoted: 10_000, outstandingInterest: 40_000});
+        uint256 LINK_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.LINK});
+
+        //// WETH: [NOT_QUOTED]
+        _addToken({token: Tokens.WETH, lt: 50_00});
+        uint256 WETH_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.WETH});
+
+        //// USDT: [QUOTED]
+        _addQuotedToken({token: Tokens.USDT, lt: 40_00, quoted: 0, outstandingInterest: 90_000});
+        uint256 USDT_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.USDT});
+
+        //// STETH: [QUOTED]
+        _addQuotedToken({token: Tokens.STETH, lt: 30_00, quoted: 20_000, outstandingInterest: 10_000});
+        uint256 STETH_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.STETH});
+
+        //// USDC: [NOT_QUOTED]
+        _addToken({token: Tokens.USDC, lt: 80_00});
+        uint256 USDC_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.USDC});
+
+        //// CVX: [QUOTED]
+        _addQuotedToken({token: Tokens.CVX, lt: 20_00, quoted: 100_000, outstandingInterest: 30_000});
+        uint256 CVX_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.CVX});
+
+        creditManager.setQuotedMask(LINK_TOKEN_MASK | USDT_TOKEN_MASK | STETH_TOKEN_MASK | CVX_TOKEN_MASK);
+        creditManager.setMaxEnabledTokens(3);
+
+        //
+        // CASES
+        //
+        GetQuotedTokenDataTestCase[5] memory cases = [
+            GetQuotedTokenDataTestCase({
+                name: "No quoted tokens",
+                enabledTokensMask: UNDERLYING_TOKEN_MASK | WETH_TOKEN_MASK | USDC_TOKEN_MASK,
+                expectedQuotaTokens: new address[](0),
+                expertedOutstandingQuotaInterest: 0,
+                expectedQuotas: new uint256[](0),
+                expectedLts: new uint16[](0),
+                expectedQuotedMask: 0,
+                expectRevert: false
+            }),
+            GetQuotedTokenDataTestCase({
+                name: "Revert if quoted tokens > maxEnabledTokens",
+                enabledTokensMask: LINK_TOKEN_MASK | USDT_TOKEN_MASK | STETH_TOKEN_MASK | CVX_TOKEN_MASK,
+                expectedQuotaTokens: new address[](0),
+                expertedOutstandingQuotaInterest: 0,
+                expectedQuotas: new uint256[](0),
+                expectedLts: new uint16[](0),
+                expectedQuotedMask: 0,
+                expectRevert: true
+            }),
+            GetQuotedTokenDataTestCase({
+                name: "1 quotes token",
+                enabledTokensMask: STETH_TOKEN_MASK | WETH_TOKEN_MASK | USDC_TOKEN_MASK,
+                expectedQuotaTokens: tokenTestSuite.listOf(Tokens.STETH, Tokens.NO_TOKEN, Tokens.NO_TOKEN),
+                expertedOutstandingQuotaInterest: 10_000,
+                expectedQuotas: arrayOf(20_000, 0, 0),
+                expectedLts: arrayOfU16(30_00, 0, 0),
+                expectedQuotedMask: STETH_TOKEN_MASK,
+                expectRevert: false
+            }),
+            GetQuotedTokenDataTestCase({
+                name: "2 quotes token",
+                enabledTokensMask: STETH_TOKEN_MASK | LINK_TOKEN_MASK | WETH_TOKEN_MASK | USDC_TOKEN_MASK,
+                expectedQuotaTokens: tokenTestSuite.listOf(Tokens.LINK, Tokens.STETH, Tokens.NO_TOKEN),
+                expertedOutstandingQuotaInterest: 40_000 + 10_000,
+                expectedQuotas: arrayOf(10_000, 20_000, 0),
+                expectedLts: arrayOfU16(80_00, 30_00, 0),
+                expectedQuotedMask: LINK_TOKEN_MASK | STETH_TOKEN_MASK,
+                expectRevert: false
+            }),
+            GetQuotedTokenDataTestCase({
+                name: "3 quotes token",
+                enabledTokensMask: STETH_TOKEN_MASK | LINK_TOKEN_MASK | CVX_TOKEN_MASK | WETH_TOKEN_MASK | USDC_TOKEN_MASK,
+                expectedQuotaTokens: tokenTestSuite.listOf(Tokens.LINK, Tokens.STETH, Tokens.CVX),
+                expertedOutstandingQuotaInterest: 40_000 + 10_000 + 30_000,
+                expectedQuotas: arrayOf(10_000, 20_000, 100_000),
+                expectedLts: arrayOfU16(80_00, 30_00, 20_00),
+                expectedQuotedMask: LINK_TOKEN_MASK | STETH_TOKEN_MASK | CVX_TOKEN_MASK,
+                expectRevert: false
+            })
+        ];
+
+        for (uint256 i; i < cases.length; ++i) {
+            uint256 snapshot = vm.snapshot();
+
+            GetQuotedTokenDataTestCase memory _case = cases[i];
+
+            string memory caseName = _case.name;
+
+            /// @notice DUMB_ADDRESS is used because poolQuotaMock has predefined returns
+            ///  depended on token only
+
+            if (_case.expectRevert) {
+                vm.expectRevert(TooManyEnabledTokensException.selector);
+            }
+
+            (
+                address[] memory quotaTokens,
+                uint256 outstandingQuotaInterest,
+                uint256[] memory quotas,
+                uint16[] memory lts,
+                uint256 quotedMask
+            ) = creditManager.getQuotedTokensData({
+                creditAccount: DUMB_ADDRESS,
+                enabledTokensMask: _case.enabledTokensMask,
+                _poolQuotaKeeper: address(poolQuotaKeeperMock)
+            });
+
+            if (!_case.expectRevert) {
+                assertEq(quotaTokens, _case.expectedQuotaTokens, _testCaseErr(caseName, "Incorrect quotedTokens"));
+                assertEq(
+                    outstandingQuotaInterest,
+                    _case.expertedOutstandingQuotaInterest,
+                    _testCaseErr(caseName, "Incorrect expertedOutstandingQuotaInterest")
+                );
+                assertEq(quotas, _case.expectedQuotas, _testCaseErr(caseName, "Incorrect expectedQuotas"));
+                assertEq(lts, _case.expectedLts, _testCaseErr(caseName, "Incorrect expectedLts"));
+                assertEq(quotedMask, _case.expectedQuotedMask, _testCaseErr(caseName, "Incorrect expectedQuotedMask"));
+            }
+
+            vm.revertTo(snapshot);
+        }
+    }
 }

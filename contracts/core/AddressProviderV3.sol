@@ -8,7 +8,6 @@ import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.
 import {IACL} from "@gearbox-protocol/core-v2/contracts/interfaces/IACL.sol";
 
 import {AddressNotFoundException, CallerNotConfiguratorException} from "../interfaces/IExceptions.sol";
-import "forge-std/console.sol";
 
 /// @title AddressRepository
 /// @notice Stores addresses of deployed contracts
@@ -32,7 +31,7 @@ contract AddressProviderV3 is IAddressProviderV3 {
         _setAddress(AP_ACL, _acl, NO_VERSION_CONTROL);
     }
 
-    function getAddressOrRevert(bytes32 key, uint256 _version) public view override returns (address result) {
+    function getAddressOrRevert(bytes32 key, uint256 _version) public view virtual override returns (address result) {
         result = addresses[key][_version];
         if (result == address(0)) revert AddressNotFoundException();
     }
@@ -44,7 +43,7 @@ contract AddressProviderV3 is IAddressProviderV3 {
         _setAddress(key, value, saveVersion ? IVersion(value).version() : NO_VERSION_CONTROL);
     }
 
-    function _setAddress(bytes32 key, address value, uint256 _version) internal {
+    function _setAddress(bytes32 key, address value, uint256 _version) internal virtual {
         addresses[key][_version] = value;
         emit AddressSet(key, value, _version); // F:[AP-2]
     }
