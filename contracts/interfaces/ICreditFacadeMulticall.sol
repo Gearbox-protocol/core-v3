@@ -14,6 +14,7 @@ uint256 constant DISABLE_TOKEN_PERMISSION = 2 ** 4;
 uint256 constant WITHDRAW_PERMISSION = 2 ** 5;
 uint256 constant UPDATE_QUOTA_PERMISSION = 2 ** 6;
 uint256 constant REVOKE_ALLOWANCES_PERMISSION = 2 ** 7;
+uint256 constant PAY_BOT_PERMISSION = 2 ** 8;
 uint256 constant EXTERNAL_CALLS_PERMISSION = 2 ** 16;
 
 uint256 constant ALL_CREDIT_FACADE_CALLS_PERMISSION = ADD_COLLATERAL_PERMISSION | INCREASE_DEBT_PERMISSION
@@ -83,4 +84,6 @@ interface ICreditFacadeMulticall {
     function revokeAdapterAllowances(RevocationPair[] calldata revocations) external;
 
     function onDemandPriceUpdate(address token, bytes memory data) external;
+
+    function payBot(uint72 paymentAmount) external;
 }
