@@ -31,8 +31,8 @@ interface IBotListEvents {
     /// @dev Emits when the allowed weekly amount of bot's spending is changed by the user
     event ChangeBotWeeklyAllowance(address indexed payer, address indexed bot, uint72 newWeeklyAllowance);
 
-    /// @dev Emits when the bot pull payment for performed services
-    event PullBotPayment(
+    /// @dev Emits when the bot is paid for performed services
+    event PayBot(
         address indexed payer,
         address indexed creditAccount,
         address indexed bot,
@@ -45,6 +45,12 @@ interface IBotListEvents {
 
     /// @dev Emits when all bot permissions for a Credit Account are erased
     event EraseBots(address creditAccount);
+
+    /// @dev Emits when a new Credit Manager is approved in BotList
+    event CreditManagerAdded(address indexed creditManager);
+
+    /// @dev Emits when a Credit Manager is removed from BotList
+    event CreditManagerRemoved(address indexed creditManager);
 }
 
 /// @title IBotList
@@ -68,10 +74,12 @@ interface IBotList is IBotListEvents, IVersion {
     /// @dev Removes funds from the borrower's bot payment wallet
     function removeFunding(uint256 amount) external;
 
-    /// @dev Takes payment from the user to the bot for performed services
-    /// @param payer Address of the paying user
-    /// @param paymentAmount Amount to pull
-    function pullPayment(address payer, uint72 paymentAmount) external;
+    /// @dev Takes payment for performed services from the user's balance and sends to the bot
+    /// @param payer Address to charge
+    /// @param creditAccount Address of the credit account paid for
+    /// @param bot Address of the bot to pay
+    /// @param paymentAmount Amount to pay
+    function payBot(address payer, address creditAccount, address bot, uint72 paymentAmount) external;
 
     /// @dev Returns all active bots currently on the account
     function getActiveBots(address creditAccount) external view returns (address[] memory);

@@ -464,7 +464,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             revert NotApprovedBotException(); // F: [FA-58]
         }
 
-        _multicallFullCollateralCheck(creditAccount, calls, botPermissions);
+        _multicallFullCollateralCheck(creditAccount, calls, botPermissions | PAY_BOT_PERMISSION);
     }
 
     function _multicallFullCollateralCheck(address creditAccount, MultiCall[] calldata calls, uint256 permissions)
@@ -661,6 +661,14 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                         _revokeAdapterAllowances(creditAccount, mcall.callData[4:]);
                     }
                     //
+                    // PAY BOT
+                    //
+                    else if (method == ICreditFacadeMulticall.payBot.selector) {
+                        _revertIfNoPermission(flags, PAY_BOT_PERMISSION);
+                        flags = flags.disable(PAY_BOT_PERMISSION);
+                        _payBot(creditAccount, mcall.callData[4:]);
+                    }
+                    //
                     // UNKNOWN METHOD
                     //
                     else {
@@ -769,6 +777,18 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     function _revokeAdapterAllowances(address creditAccount, bytes calldata callData) internal {
         (RevocationPair[] memory revocations) = abi.decode(callData, (RevocationPair[]));
         ICreditManagerV3(creditManager).revokeAdapterAllowances(creditAccount, revocations);
+    }
+
+    /// @dev Requests the bot list to pay the bot for performed services
+    /// @param creditAccount Credit account the service was performed for
+    /// @param callData Bytes calldata for parsing
+    function _payBot(address creditAccount, bytes calldata callData) internal {
+        uint72 paymentAmount = abi.decode(callData, (uint72));
+
+        /// The current owner of the account always pays for bot services
+        address payer = _getBorrowerOrRevert(creditAccount);
+
+        IBotList(botList).payBot(payer, creditAccount, msg.sender, paymentAmount);
     }
 
     /// @dev Adds expected deltas to current balances on a Credit account and returns the result

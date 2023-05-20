@@ -7,6 +7,7 @@ import {BotList} from "../../../support/BotList.sol";
 import {IBotListEvents, BotFunding} from "../../../interfaces/IBotList.sol";
 import {ICreditAccount} from "../../../interfaces/ICreditAccount.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
+import {ICreditFacade} from "../../../interfaces/ICreditFacade.sol";
 
 // TEST
 import "../../lib/constants.sol";
@@ -26,6 +27,14 @@ import "../../../interfaces/IExceptions.sol";
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
+contract InvalidCFMock {
+    address public creditManager;
+
+    constructor(address _creditManager) {
+        creditManager = _creditManager;
+    }
+}
+
 /// @title LPPriceFeedTest
 /// @notice Designed for unit test purposes only
 contract BotListTest is Test, IBotListEvents {
@@ -36,9 +45,11 @@ contract BotListTest is Test, IBotListEvents {
     TokensTestSuite tokenTestSuite;
 
     GeneralMock bot;
-    GeneralMock creditAccount;
     GeneralMock creditManager;
     GeneralMock creditFacade;
+    GeneralMock creditAccount;
+
+    address invalidCF;
 
     function setUp() public {
         vm.prank(CONFIGURATOR);
@@ -49,9 +60,23 @@ contract BotListTest is Test, IBotListEvents {
         botList = new BotList(address(addressProvider));
 
         bot = new GeneralMock();
-        creditAccount = new GeneralMock();
         creditManager = new GeneralMock();
         creditFacade = new GeneralMock();
+        creditAccount = new GeneralMock();
+
+        invalidCF = address(new InvalidCFMock(address(creditManager)));
+
+        vm.mockCall(
+            address(creditManager),
+            abi.encodeWithSelector(ICreditManagerV3.creditFacade.selector),
+            abi.encode(address(creditFacade))
+        );
+
+        vm.mockCall(
+            address(creditFacade),
+            abi.encodeWithSelector(ICreditFacade.creditManager.selector),
+            abi.encode(address(creditManager))
+        );
 
         vm.mockCall(
             address(creditAccount),
@@ -59,11 +84,8 @@ contract BotListTest is Test, IBotListEvents {
             abi.encode(address(creditManager))
         );
 
-        vm.mockCall(
-            address(creditManager),
-            abi.encodeWithSelector(ICreditManagerV3.creditFacade.selector),
-            abi.encode(address(creditFacade))
-        );
+        vm.prank(CONFIGURATOR);
+        botList.setApprovedCreditManagerStatus(address(creditManager), true);
     }
 
     ///
@@ -94,8 +116,8 @@ contract BotListTest is Test, IBotListEvents {
 
     /// @dev [BL-3]: setBotPermissions works correctly
     function test_BL_03_setBotPermissions_works_correctly() public {
-        vm.expectRevert(CallerNotCreditAccountFacadeException.selector);
-        vm.prank(USER);
+        vm.expectRevert(CallerNotCreditFacadeException.selector);
+        vm.prank(invalidCF);
         botList.setBotPermissions({
             creditAccount: address(creditAccount),
             bot: address(bot),
@@ -275,8 +297,8 @@ contract BotListTest is Test, IBotListEvents {
         assertEq(USER.balance, 85 ether / 10, "User's balance is incorrect");
     }
 
-    /// @dev [BL-5]: pullPayment works correctly
-    function test_BL_05_pullPayment_works_correctly() public {
+    /// @dev [BL-5]: payBot works correctly
+    function test_BL_05_payBot_works_correctly() public {
         vm.prank(CONFIGURATOR);
         botList.setDAOFee(5000);
 
@@ -302,11 +324,25 @@ contract BotListTest is Test, IBotListEvents {
 
         vm.warp(block.timestamp + 1 days);
 
-        vm.expectEmit(true, true, true, true);
-        emit PullBotPayment(USER, address(creditAccount), address(bot), uint72(1 ether / 20), uint72(1 ether / 40));
+        vm.expectRevert(CallerNotCreditFacadeException.selector);
+        vm.prank(invalidCF);
+        botList.payBot({
+            payer: USER,
+            creditAccount: address(creditAccount),
+            bot: address(bot),
+            paymentAmount: uint72(1 ether / 20)
+        });
 
-        vm.prank(address(bot));
-        botList.pullPayment({creditAccount: address(creditAccount), paymentAmount: uint72(1 ether / 20)});
+        vm.expectEmit(true, true, true, true);
+        emit PayBot(USER, address(creditAccount), address(bot), uint72(1 ether / 20), uint72(1 ether / 40));
+
+        vm.prank(address(creditFacade));
+        botList.payBot({
+            payer: USER,
+            creditAccount: address(creditAccount),
+            bot: address(bot),
+            paymentAmount: uint72(1 ether / 20)
+        });
 
         (uint256 remainingFunds, uint256 maxWeeklyAllowance, uint256 remainingWeeklyAllowance, uint256 allowanceLU) =
             botList.botFunding(address(creditAccount), address(bot));
@@ -333,8 +369,13 @@ contract BotListTest is Test, IBotListEvents {
 
         vm.warp(block.timestamp + 7 days);
 
-        vm.prank(address(bot));
-        botList.pullPayment({creditAccount: address(creditAccount), paymentAmount: uint72(1 ether / 20)});
+        vm.prank(address(creditFacade));
+        botList.payBot({
+            payer: USER,
+            creditAccount: address(creditAccount),
+            bot: address(bot),
+            paymentAmount: uint72(1 ether / 20)
+        });
 
         (remainingFunds, maxWeeklyAllowance, remainingWeeklyAllowance, allowanceLU) =
             botList.botFunding(address(creditAccount), address(bot));
@@ -383,6 +424,10 @@ contract BotListTest is Test, IBotListEvents {
         });
 
         assertEq(activeBotsRemaining, 2, "Incorrect number of active bots");
+
+        vm.expectRevert(CallerNotCreditFacadeException.selector);
+        vm.prank(invalidCF);
+        botList.eraseAllBotPermissions(address(creditAccount));
 
         vm.expectEmit(true, false, false, false);
         emit EraseBots(address(creditAccount));
