@@ -12,6 +12,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 // LIBS & TRAITS
 import {UNDERLYING_TOKEN_MASK, BitMask} from "../libraries/BitMask.sol";
 import {CreditLogic} from "../libraries/CreditLogic.sol";
+import {CollateralLogic} from "../libraries/CollateralLogic.sol";
 import {CreditAccountHelper} from "../libraries/CreditAccountHelper.sol";
 
 import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
@@ -61,8 +62,9 @@ import "forge-std/console.sol";
 contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using BitMask for uint256;
-    using CreditLogic for CollateralDebtData;
     using CreditLogic for CollateralTokenData;
+    using CreditLogic for CollateralDebtData;
+    using CollateralLogic for CollateralDebtData;
     using SafeERC20 for IERC20;
     using IERC20Helper for IERC20;
     using CreditAccountHelper for ICreditAccount;

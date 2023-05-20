@@ -16,6 +16,7 @@ import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 // LIBS & TRAITS
 import {UNDERLYING_TOKEN_MASK, BitMask} from "../../../libraries/BitMask.sol";
 import {CreditLogic} from "../../../libraries/CreditLogic.sol";
+import {CollateralLogic} from "../../../libraries/CollateralLogic.sol";
 import {USDTFees} from "../../../libraries/USDTFees.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
@@ -78,8 +79,9 @@ uint16 constant LT_UNDERLYING = uint16(PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_P
 
 contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceHelper, CreditAccountMockEvents {
     using BitMask for uint256;
-    using CreditLogic for CollateralDebtData;
     using CreditLogic for CollateralTokenData;
+    using CreditLogic for CollateralDebtData;
+    using CollateralLogic for CollateralDebtData;
     using USDTFees for uint256;
     using Vars for VarU256;
 

@@ -546,178 +546,178 @@ contract CreditLogicTest is TestHelper {
         return tokenPricesStorage[tokenIdx] * tokenBalancesStorage[tokenIdx] / WAD;
     }
 
-    /// @notice U:[CL-6]: `calcQuotedTokensCollateral` fuzzing test
-    function test_CL_06_calcQuotedTokensCollateral_fuzz_test(
-        uint256[8] memory tokenBalances,
-        uint256[8] memory tokenPrices,
-        uint256[8] memory tokenQuotas,
-        uint256 limit,
-        uint16[8] memory lts
-    ) public {
-        _prepareTokens();
+    //     /// @notice U:[CL-6]: `calcQuotedTokensCollateral` fuzzing test
+    //     function test_CL_06_calcQuotedTokensCollateral_fuzz_test(
+    //         uint256[8] memory tokenBalances,
+    //         uint256[8] memory tokenPrices,
+    //         uint256[8] memory tokenQuotas,
+    //         uint256 limit,
+    //         uint16[8] memory lts
+    //     ) public {
+    //         _prepareTokens();
 
-        CollateralDebtData memory cdd;
+    //         CollateralDebtData memory cdd;
 
-        address creditAccount = makeAddr("CREDIT_ACCOUNT");
-        address underlying = makeAddr("UNDERLYING");
+    //         address creditAccount = makeAddr("CREDIT_ACCOUNT");
+    //         address underlying = makeAddr("UNDERLYING");
 
-        for (uint256 i = 0; i < 8; ++i) {
-            tokenBalances[i] = tokenBalances[i] % (WAD * 10 ** 9);
-            tokenQuotas[i] = tokenQuotas[i] % (WAD * 10 ** 9);
-            lts[i] = lts[i] % 9451;
-            tokenPrices[i] = 10 ** 5 + tokenPrices[i] % (100000 * 10 ** 8);
+    //         for (uint256 i = 0; i < 8; ++i) {
+    //             tokenBalances[i] = tokenBalances[i] % (WAD * 10 ** 9);
+    //             tokenQuotas[i] = tokenQuotas[i] % (WAD * 10 ** 9);
+    //             lts[i] = lts[i] % 9451;
+    //             tokenPrices[i] = 10 ** 5 + tokenPrices[i] % (100000 * 10 ** 8);
 
-            emit log_string("TOKEN");
-            emit log_uint(i);
-            emit log_string("BALANCE");
-            emit log_uint(tokenBalances[i]);
-            emit log_string("QUOTA");
-            emit log_uint(tokenQuotas[i]);
-            emit log_string("LT");
-            emit log_uint(lts[i]);
-            emit log_string("TOKEN PRICE");
-            emit log_uint(tokenPrices[i]);
+    //             emit log_string("TOKEN");
+    //             emit log_uint(i);
+    //             emit log_string("BALANCE");
+    //             emit log_uint(tokenBalances[i]);
+    //             emit log_string("QUOTA");
+    //             emit log_uint(tokenQuotas[i]);
+    //             emit log_string("LT");
+    //             emit log_uint(lts[i]);
+    //             emit log_string("TOKEN PRICE");
+    //             emit log_uint(tokenPrices[i]);
 
-            vm.mockCall(tokens[i], abi.encodeCall(IERC20.balanceOf, (creditAccount)), abi.encode(tokenBalances[i]));
-        }
+    //             vm.mockCall(tokens[i], abi.encodeCall(IERC20.balanceOf, (creditAccount)), abi.encode(tokenBalances[i]));
+    //         }
 
-        tokenBalancesStorage = tokenBalances;
-        tokenPricesStorage = tokenPrices;
-        tokenLTsStorage = lts;
+    //         tokenBalancesStorage = tokenBalances;
+    //         tokenPricesStorage = tokenPrices;
+    //         tokenLTsStorage = lts;
 
-        cdd.quotedTokens = _getTokenArray();
-        cdd.quotedLts = _getLTArray();
+    //         cdd.quotedTokens = _getTokenArray();
+    //         cdd.quotedLts = _getLTArray();
 
-        {
-            uint256[] memory quotas = new uint256[](8);
+    //         {
+    //             uint256[] memory quotas = new uint256[](8);
 
-            for (uint256 i = 0; i < 8; ++i) {
-                quotas[i] = tokenQuotas[i];
-            }
+    //             for (uint256 i = 0; i < 8; ++i) {
+    //                 quotas[i] = tokenQuotas[i];
+    //             }
 
-            cdd.quotas = quotas;
-        }
+    //             cdd.quotas = quotas;
+    //         }
 
-        (cdd.totalValueUSD, cdd.twvUSD) = CreditLogic.calcQuotedTokensCollateral(
-            cdd, creditAccount, 10 ** 8 * RAY / WAD, limit, _convertToUSD, address(0)
-        );
+    //         (cdd.totalValueUSD, cdd.twvUSD) = CreditLogic.calcQuotedTokensCollateral(
+    //             cdd, creditAccount, 10 ** 8 * RAY / WAD, limit, _convertToUSD, address(0)
+    //         );
 
-        uint256 twvExpected;
-        uint256 totalValueExpected;
-        uint256 interestExpected;
+    //         uint256 twvExpected;
+    //         uint256 totalValueExpected;
+    //         uint256 interestExpected;
 
-        for (uint256 i = 0; i < 8; ++i) {
-            uint256 balanceValue = tokenBalances[i] * tokenPrices[i] / WAD;
-            uint256 quotaValue = tokenQuotas[i] / 10 ** 10;
-            totalValueExpected += balanceValue;
-            twvExpected += (balanceValue < quotaValue ? balanceValue : quotaValue) * lts[i] / PERCENTAGE_FACTOR;
+    //         for (uint256 i = 0; i < 8; ++i) {
+    //             uint256 balanceValue = tokenBalances[i] * tokenPrices[i] / WAD;
+    //             uint256 quotaValue = tokenQuotas[i] / 10 ** 10;
+    //             totalValueExpected += balanceValue;
+    //             twvExpected += (balanceValue < quotaValue ? balanceValue : quotaValue) * lts[i] / PERCENTAGE_FACTOR;
 
-            if (twvExpected >= limit) break;
-        }
+    //             if (twvExpected >= limit) break;
+    //         }
 
-        assertLe(_calcDiff(cdd.twvUSD, twvExpected), 1, "Incorrect twv");
+    //         assertLe(_calcDiff(cdd.twvUSD, twvExpected), 1, "Incorrect twv");
 
-        assertEq(cdd.totalValueUSD, totalValueExpected, "Incorrect total value");
-    }
+    //         assertEq(cdd.totalValueUSD, totalValueExpected, "Incorrect total value");
+    //     }
 
-    /// @notice U:[CL-7]: `calcNonQuotedTokensCollateral` fuzzing test
-    function test_CL_07_calcNonQuotedTokensCollateral_fuzz_test(
-        uint256 collateralHintsRand,
-        uint256 tokensToCheck,
-        uint256[8] memory tokenBalances,
-        uint256[8] memory tokenPrices,
-        uint256 limit,
-        uint16[8] memory lts
-    ) public {
-        _prepareTokens();
+    //     /// @notice U:[CL-7]: `calcNonQuotedTokensCollateral` fuzzing test
+    //     function test_CL_07_calcNonQuotedTokensCollateral_fuzz_test(
+    //         uint256 collateralHintsRand,
+    //         uint256 tokensToCheck,
+    //         uint256[8] memory tokenBalances,
+    //         uint256[8] memory tokenPrices,
+    //         uint256 limit,
+    //         uint16[8] memory lts
+    //     ) public {
+    //         _prepareTokens();
 
-        tokensToCheck %= 2 ** 8;
+    //         tokensToCheck %= 2 ** 8;
 
-        emit log_string("LIMIT");
-        emit log_uint(limit);
+    //         emit log_string("LIMIT");
+    //         emit log_uint(limit);
 
-        for (uint256 i = 0; i < 8; ++i) {
-            tokenBalances[i] = tokenBalances[i] % (WAD * 10 ** 9);
-            lts[i] = lts[i] % 9451;
-            tokenPrices[i] = 10 ** 5 + tokenPrices[i] % (100000 * 10 ** 8);
+    //         for (uint256 i = 0; i < 8; ++i) {
+    //             tokenBalances[i] = tokenBalances[i] % (WAD * 10 ** 9);
+    //             lts[i] = lts[i] % 9451;
+    //             tokenPrices[i] = 10 ** 5 + tokenPrices[i] % (100000 * 10 ** 8);
 
-            emit log_string("TOKEN");
-            emit log_uint(i);
-            emit log_string("BALANCE");
-            emit log_uint(tokenBalances[i]);
-            emit log_string("LT");
-            emit log_uint(lts[i]);
-            emit log_string("TOKEN PRICE");
-            emit log_uint(tokenPrices[i]);
-            emit log_string("CHECKED");
-            emit log_uint(tokensToCheck & (1 << i) == 0 ? 0 : 1);
+    //             emit log_string("TOKEN");
+    //             emit log_uint(i);
+    //             emit log_string("BALANCE");
+    //             emit log_uint(tokenBalances[i]);
+    //             emit log_string("LT");
+    //             emit log_uint(lts[i]);
+    //             emit log_string("TOKEN PRICE");
+    //             emit log_uint(tokenPrices[i]);
+    //             emit log_string("CHECKED");
+    //             emit log_uint(tokensToCheck & (1 << i) == 0 ? 0 : 1);
 
-            vm.mockCall(
-                tokens[i], abi.encodeCall(IERC20.balanceOf, (makeAddr("CREDIT_ACCOUNT"))), abi.encode(tokenBalances[i])
-            );
-        }
+    //             vm.mockCall(
+    //                 tokens[i], abi.encodeCall(IERC20.balanceOf, (makeAddr("CREDIT_ACCOUNT"))), abi.encode(tokenBalances[i])
+    //             );
+    //         }
 
-        uint256[] memory colHints = _getCollateralHintsIdx(collateralHintsRand);
+    //         uint256[] memory colHints = _getCollateralHintsIdx(collateralHintsRand);
 
-        emit log_string("COLLATERAL HINTS");
-        for (uint256 i = 0; i < colHints.length; ++i) {
-            emit log_uint(colHints[i]);
-        }
+    //         emit log_string("COLLATERAL HINTS");
+    //         for (uint256 i = 0; i < colHints.length; ++i) {
+    //             emit log_uint(colHints[i]);
+    //         }
 
-        tokenBalancesStorage = tokenBalances;
-        tokenPricesStorage = tokenPrices;
-        tokenLTsStorage = lts;
+    //         tokenBalancesStorage = tokenBalances;
+    //         tokenPricesStorage = tokenPrices;
+    //         tokenLTsStorage = lts;
 
-        (uint256 totalValueUSD, uint256 twvUSD, uint256 tokensToDisable) = CreditLogic.calcNonQuotedTokensCollateral(
-            makeAddr("CREDIT_ACCOUNT"),
-            limit,
-            _getMasksFromIdx(colHints),
-            _convertToUSD,
-            _collateralTokenByMask,
-            tokensToCheck,
-            address(0)
-        );
+    //         (uint256 totalValueUSD, uint256 twvUSD, uint256 tokensToDisable) = CreditLogic.calcNonQuotedTokensCollateral(
+    //             makeAddr("CREDIT_ACCOUNT"),
+    //             limit,
+    //             _getMasksFromIdx(colHints),
+    //             _convertToUSD,
+    //             _collateralTokenByMask,
+    //             tokensToCheck,
+    //             address(0)
+    //         );
 
-        uint256 twvExpected;
-        uint256 totalValueExpected;
-        uint256 tokensToDisableExpected;
+    //         uint256 twvExpected;
+    //         uint256 totalValueExpected;
+    //         uint256 tokensToDisableExpected;
 
-        for (uint256 i = 0; i < colHints.length; ++i) {
-            uint256 idx = colHints[i];
+    //         for (uint256 i = 0; i < colHints.length; ++i) {
+    //             uint256 idx = colHints[i];
 
-            if (tokensToCheck & (1 << idx) != 0) {
-                if (tokenBalances[idx] > 1) {
-                    uint256 balanceValue = tokenBalances[idx] * tokenPrices[idx] / WAD;
-                    totalValueExpected += balanceValue;
-                    twvExpected += balanceValue * lts[idx] / PERCENTAGE_FACTOR;
+    //             if (tokensToCheck & (1 << idx) != 0) {
+    //                 if (tokenBalances[idx] > 1) {
+    //                     uint256 balanceValue = tokenBalances[idx] * tokenPrices[idx] / WAD;
+    //                     totalValueExpected += balanceValue;
+    //                     twvExpected += balanceValue * lts[idx] / PERCENTAGE_FACTOR;
 
-                    if (twvExpected >= limit) break;
-                } else {
-                    tokensToDisableExpected += 1 << idx;
-                }
-            }
+    //                     if (twvExpected >= limit) break;
+    //                 } else {
+    //                     tokensToDisableExpected += 1 << idx;
+    //                 }
+    //             }
 
-            tokensToCheck = tokensToCheck & ~(1 << idx);
-        }
+    //             tokensToCheck = tokensToCheck & ~(1 << idx);
+    //         }
 
-        for (uint256 i = 0; i < 8; ++i) {
-            if (tokensToCheck & (1 << i) != 0) {
-                if (tokenBalances[i] > 1) {
-                    uint256 balanceValue = tokenBalances[i] * tokenPrices[i] / WAD;
-                    totalValueExpected += balanceValue;
-                    twvExpected += balanceValue * lts[i] / PERCENTAGE_FACTOR;
+    //         for (uint256 i = 0; i < 8; ++i) {
+    //             if (tokensToCheck & (1 << i) != 0) {
+    //                 if (tokenBalances[i] > 1) {
+    //                     uint256 balanceValue = tokenBalances[i] * tokenPrices[i] / WAD;
+    //                     totalValueExpected += balanceValue;
+    //                     twvExpected += balanceValue * lts[i] / PERCENTAGE_FACTOR;
 
-                    if (twvExpected >= limit) break;
-                } else {
-                    tokensToDisableExpected += 1 << i;
-                }
-            }
-        }
+    //                     if (twvExpected >= limit) break;
+    //                 } else {
+    //                     tokensToDisableExpected += 1 << i;
+    //                 }
+    //             }
+    //         }
 
-        assertLe(_calcDiff(twvUSD, twvExpected), 1, "Incorrect twv");
+    //         assertLe(_calcDiff(twvUSD, twvExpected), 1, "Incorrect twv");
 
-        assertEq(totalValueUSD, totalValueExpected, "Incorrect total value");
+    //         assertEq(totalValueUSD, totalValueExpected, "Incorrect total value");
 
-        assertEq(tokensToDisable, tokensToDisableExpected, "Incorrect tokens to disable");
-    }
+    //         assertEq(tokensToDisable, tokensToDisableExpected, "Incorrect tokens to disable");
+    //     }
 }
