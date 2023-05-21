@@ -14,6 +14,8 @@ contract WithdrawalManagerMock {
     uint256 public constant version = 3_00;
     // // CREDIT MANAGERS
 
+    uint40 public delay;
+
     mapping(bool => CancellableWithdrawals[2]) amoucancellableWithdrawals;
 
     function cancellableScheduledWithdrawals(address, bool isForceCancel)
@@ -35,5 +37,9 @@ contract WithdrawalManagerMock {
     ) external {
         amoucancellableWithdrawals[isForceCancel][0] = CancellableWithdrawals({token: token1, amount: amount1});
         amoucancellableWithdrawals[isForceCancel][1] = CancellableWithdrawals({token: token2, amount: amount2});
+    }
+
+    function setDelay(uint40 _delay) external {
+        delay = _delay;
     }
 }

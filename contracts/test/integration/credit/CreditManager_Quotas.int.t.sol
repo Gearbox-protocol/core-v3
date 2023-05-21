@@ -131,13 +131,13 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
     ///
     ///
 
-    /// @dev [CMQ-1]: constructor correctly sets supportsQuotas based on pool
-    function test_CMQ_01_constructor_correctly_sets_quota_related_params() public {
+    /// @dev I:[CMQ-1]: constructor correctly sets supportsQuotas based on pool
+    function test_I_CMQ_01_constructor_correctly_sets_quota_related_params() public {
         assertTrue(creditManager.supportsQuotas(), "Credit Manager does not support quotas");
     }
 
-    /// @dev [CMQ-2]: setQuotedMask works correctly
-    function test_CMQ_02_setQuotedMask_works_correctly() public {
+    /// @dev I:[CMQ-2]: setQuotedMask works correctly
+    function test_I_CMQ_02_setQuotedMask_works_correctly() public {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
 
         uint256 usdcMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.USDC));
@@ -154,8 +154,8 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         assertEq(creditManager.quotedTokensMask(), usdcMask | linkMask, "New limited mask is incorrect");
     }
 
-    /// @dev [CMQ-3]: updateQuotas works correctly
-    function test_CMQ_03_updateQuotas_works_correctly() public {
+    /// @dev I:[CMQ-3]: updateQuotas works correctly
+    function test_I_CMQ_03_updateQuotas_works_correctly() public {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
@@ -215,8 +215,8 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         }
     }
 
-    /// @dev [CMQ-4]: Quotas are handled correctly on debt decrease: amount < quota interest case
-    function test_CMQ_04_quotas_are_handled_correctly_at_repayment_partial_case() public {
+    /// @dev I:[CMQ-4]: Quotas are handled correctly on debt decrease: amount < quota interest case
+    function test_I_CMQ_04_quotas_are_handled_correctly_at_repayment_partial_case() public {
         // _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         // _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
@@ -264,8 +264,8 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         // assertEq(totalDebtAfterFee, totalDebtBeforeFee - amountRepaid, "Debt updated incorrectly");
     }
 
-    /// @dev [CMQ-5]: Quotas are handled correctly on debt decrease: amount >= quota interest case
-    function test_CMQ_05_quotas_are_handled_correctly_at_repayment_full_case() public {
+    /// @dev I:[CMQ-5]: Quotas are handled correctly on debt decrease: amount >= quota interest case
+    function test_I_CMQ_05_quotas_are_handled_correctly_at_repayment_full_case() public {
         // _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 1000, uint96(1_000_000 * WAD));
         // _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
@@ -307,8 +307,8 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         // assertEq(totalDebtAfter, totalDebtBefore - amountRepaid, "Debt updated incorrectly");
     }
 
-    /// @dev [CMQ-6]: Quotas are disabled on closing an account
-    function test_CMQ_06_quotas_are_disabled_on_close_account_and_all_quota_fees_are_repaid() public {
+    /// @dev I:[CMQ-6]: Quotas are disabled on closing an account
+    function test_I_CMQ_06_quotas_are_disabled_on_close_account_and_all_quota_fees_are_repaid() public {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 5_00, uint96(1_000_000 * WAD));
 
@@ -378,8 +378,8 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         assertEq(uint256(quota), 1, "Quota was not set to 0");
     }
 
-    // /// @dev [CMQ-7] enableToken, disableToken and changeEnabledTokens do nothing for limited tokens
-    // function test_CMQ_07_enable_disable_changeEnabled_do_nothing_for_limited_tokens() public {
+    // /// @dev I:[CMQ-7] enableToken, disableToken and changeEnabledTokens do nothing for limited tokens
+    // function test_I_CMQ_07_enable_disable_changeEnabled_do_nothing_for_limited_tokens() public {
     //     _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
     //     (,,, address creditAccount) = cms.openCreditAccount();
     //     creditManager.transferAccountOwnership(USER, address(this));
@@ -403,8 +403,8 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
     //     expectTokenIsEnabled(creditAccount, Tokens.LINK, true);
     // }
 
-    /// @dev [CMQ-8]: fullCollateralCheck fuzzing test with quotas
-    function test_CMQ_08_fullCollateralCheck_fuzzing_test_quotas(
+    /// @dev I:[CMQ-8]: fullCollateralCheck fuzzing test with quotas
+    function test_I_CMQ_08_fullCollateralCheck_fuzzing_test_quotas(
         uint128 borrowedAmount,
         uint128 daiBalance,
         uint128 usdcBalance,
@@ -525,8 +525,8 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         // creditManager.fullCollateralCheck(creditAccount, enabledTokensMap, new uint256[](0), minHealthFactor);
     }
 
-    /// @dev [CMQ-9]: fullCollateralCheck does not check non-limited tokens if limited are enough to cover debt
-    function test_CMQ_09_fullCollateralCheck_skips_normal_tokens_if_limited_tokens_cover_debt() public {
+    /// @dev I:[CMQ-9]: fullCollateralCheck does not check non-limited tokens if limited are enough to cover debt
+    function test_I_CMQ_09_fullCollateralCheck_skips_normal_tokens_if_limited_tokens_cover_debt() public {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDC), 500, uint96(1_000_000 * WAD));
 
@@ -572,8 +572,8 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         creditManager.fullCollateralCheck(creditAccount, enableTokenMask, collateralHints, 10000);
     }
 
-    /// @dev [CMQ-10]: calcAccruedInterestAndFees correctly counts quota interest
-    function test_CMQ_10_calcAccruedInterestAndFees_correctly_includes_quota_interest(
+    /// @dev I:[CMQ-10]: calcAccruedInterestAndFees correctly counts quota interest
+    function test_I_CMQ_10_calcAccruedInterestAndFees_correctly_includes_quota_interest(
         uint96 quotaLink,
         uint96 quotaUsdt
     ) public {
@@ -624,8 +624,8 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
     }
 
     // [DEPRECIATED]: We test that after full collateral
-    // /// @dev [CMQ-11]: updateQuotas reverts on too many enabled tokens
-    // function test_CMQ_11_updateQuotas_reverts_on_too_many_tokens_enabled() public {
+    // /// @dev I:[CMQ-11]: updateQuotas reverts on too many enabled tokens
+    // function test_I_CMQ_11_updateQuotas_reverts_on_too_many_tokens_enabled() public {
     //     (,,, address creditAccount) = cms.openCreditAccount();
 
     //     uint256 maxTokens = creditManager.maxEnabledTokens();
@@ -636,8 +636,8 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
     //     creditManager.updateQuotas(creditAccount, quotaUpdates);
     // }
 
-    /// @dev [CMQ-12]: Credit Manager zeroes limits on quoted tokens upon incurring a loss
-    function test_CMQ_12_creditManager_triggers_limit_zeroing_on_loss() public {
+    /// @dev I:[CMQ-12]: Credit Manager zeroes limits on quoted tokens upon incurring a loss
+    function test_I_CMQ_12_creditManager_triggers_limit_zeroing_on_loss() public {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 

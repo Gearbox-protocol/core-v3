@@ -201,6 +201,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             timestampRampStart: type(uint40).max,
             rampDuration: 0
         });
+
+        creditManager.setCreditConfigurator(CONFIGURATOR);
     }
 
     function _setUnderlying(bool underlyingIsFeeToken) internal {
@@ -243,7 +245,10 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     }
 
     function _addToken(address token, uint16 lt) internal {
+        vm.prank(CONFIGURATOR);
         creditManager.addToken({token: token});
+
+        vm.prank(CONFIGURATOR);
         creditManager.setCollateralTokenData({
             token: address(token),
             initialLT: lt,
@@ -360,7 +365,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         );
 
         assertEq(
-            address(creditManager.creditConfigurator()), address(this), _testCaseErr("Incorrect creditConfigurator")
+            address(creditManager.creditConfigurator()),
+            address(CONFIGURATOR),
+            _testCaseErr("Incorrect creditConfigurator")
         );
     }
 
@@ -446,8 +453,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         public
         withoutSupportQuotas
     {
-        vm.startPrank(USER);
-
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.addToken(DUMB_ADDRESS);
 
@@ -474,8 +479,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditManager.setCreditConfigurator(DUMB_ADDRESS);
-
-        vm.stopPrank();
     }
 
     /// @dev U:[CM-5]: non-reentrant functions revert if called in reentrancy
@@ -917,8 +920,12 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         tokenTestSuite.mint({token: underlying, to: creditAccount, amount: _amountWithFee(collateralDebtData.debt * 2)});
 
         address weth = tokenTestSuite.addressOf(Tokens.WETH);
+
+        vm.startPrank(CONFIGURATOR);
         creditManager.addToken(weth);
         creditManager.setCollateralTokenData(weth, 8000, 8000, type(uint40).max, 0);
+
+        vm.stopPrank();
 
         {
             uint256 randomAmount = skipTokenMask % DAI_ACCOUNT_AMOUNT;
@@ -1269,10 +1276,10 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         }
     }
 
-    // //
-    // //  ADD COLLATERAL
-    // //
-    // /// @dev U:[CM-13]: addCollateral works as expected
+    //
+    //  ADD COLLATERAL
+    //
+    /// @dev U:[CM-13]: addCollateral works as expected
     function test_U_CM_13_addCollateral_works_as_expected() public withoutSupportQuotas {
         address creditAccount = DUMB_ADDRESS;
         address linkToken = tokenTestSuite.addressOf(Tokens.LINK);
@@ -1305,9 +1312,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         assertEq(tokenToEnable, UNDERLYING_TOKEN_MASK, "Incorrect tokenToEnable");
     }
 
-    // //
-    // //  APPROVE CREDIT ACCOUNT
-    // //
+    //
+    //  APPROVE CREDIT ACCOUNT
+    //
 
     /// @dev U:[CM-15]: approveCreditAccount works as expected
     function test_U_CM_15_approveCreditAccount_works_as_expected() public withoutSupportQuotas {
@@ -1315,6 +1322,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         address linkToken = tokenTestSuite.addressOf(Tokens.LINK);
 
         creditManager.setActiveCreditAccount(address(creditAccount));
+
+        vm.prank(CONFIGURATOR);
         creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
 
         /// @notice check that it reverts on unknown token
@@ -1337,15 +1346,17 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.approveCreditAccount({token: underlying, amount: 20000});
     }
 
-    // //
-    // //  EXECUTE
-    // //
+    //
+    //  EXECUTE
+    //
 
     /// @dev U:[CM-16]: executeOrder works as expected
     function test_U_CM_16_executeOrder_works_as_expected() public withoutSupportQuotas {
         address creditAccount = address(new CreditAccountMock());
 
         creditManager.setActiveCreditAccount(address(creditAccount));
+
+        vm.prank(CONFIGURATOR);
         creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
 
         bytes memory dumbCallData = bytes("Hello, world");
@@ -1367,11 +1378,11 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         assertEq(returnValue, expectedReturnValue, "Incorrect return value");
     }
 
-    // //
-    // //
-    // // FULL COLLATERAL CHECK
-    // //
-    // //
+    //
+    //
+    // FULL COLLATERAL CHECK
+    //
+    //
 
     /// @dev U:[CM-17]: fullCollateralCheck reverts if hf < 10K
     function test_U_CM_17_fullCollateralCheck_reverts_if_hf_less_10K() public withoutSupportQuotas {
@@ -1400,6 +1411,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         /// @notice `+1` for underlying token
         uint256 enabledTokensMask = uint256(keccak256(abi.encode(amount))) & ((1 << (numberOfTokens + 1)) - 1);
 
+        vm.prank(CONFIGURATOR);
         creditManager.setMaxEnabledTokens(numberOfTokens + 1);
 
         tokenTestSuite.mint({token: underlying, to: creditAccount, amount: amount});
@@ -1484,11 +1496,11 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         assertEq(enabledTokensMaskAfter, enabledTokenMaskWithDisableTokens, "enabledTokensMask wasn't set correctly");
     }
 
-    // //
-    // //
-    // // CALC DEBT AND COLLATERAL
-    // //
-    // //
+    //
+    //
+    // CALC DEBT AND COLLATERAL
+    //
+    //
 
     /// @dev U:[CM-19]: calcDebtAndCollateral reverts for FULL_COLLATERAL_CHECK_LAZY
     function test_U_CM_19_calcDebtAndCollateral_reverts_for_FULL_COLLATERAL_CHECK_LAZY() public withoutSupportQuotas {
@@ -1560,6 +1572,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         poolMock.setCumulativeIndexNow(vars.get("cumulativeIndexNow"));
 
         if (supportsQuotas) {
+            vm.prank(CONFIGURATOR);
             creditManager.setQuotedMask(LINK_TOKEN_MASK | STETH_TOKEN_MASK);
         }
 
@@ -1574,6 +1587,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
 
         poolMock.setCumulativeIndexNow(vars.get("cumulativeIndexNow"));
+
+        vm.prank(CONFIGURATOR);
         creditManager.setMaxEnabledTokens(3);
 
         CollateralDebtData memory collateralDebtData =
@@ -1714,6 +1729,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         uint256 USDC_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.USDC});
 
         if (supportsQuotas) {
+            vm.prank(CONFIGURATOR);
             creditManager.setQuotedMask(LINK_TOKEN_MASK);
         }
 
@@ -1841,67 +1857,75 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         _collateralTestSetup(debt);
 
         address creditAccount = DUMB_ADDRESS;
-
-        caseName = string.concat(caseName, "withdrawal computation");
-
-        creditManager.setCreditAccountInfoMap({
-            creditAccount: creditAccount,
-            debt: debt,
-            cumulativeIndexLastUpdate: vars.get("cumulativeIndexLastUpdate"),
-            cumulativeQuotaInterest: vars.get("INITIAL_INTEREST") + 1,
-            enabledTokensMask: UNDERLYING_TOKEN_MASK,
-            flags: WITHDRAWAL_FLAG,
-            borrower: USER
-        });
-
         tokenTestSuite.mint({token: underlying, to: creditAccount, amount: 10_000});
 
-        withdrawalManager.setCancellableWithdrawals(
-            false, tokenTestSuite.addressOf(Tokens.LINK), amount1, tokenTestSuite.addressOf(Tokens.STETH), amount2
-        );
+        for (uint256 i = 0; i < 2; ++i) {
+            bool setFlag = i == 1;
+            caseName =
+                string.concat(caseName, "withdrawal computation. WITHDRAWAL FLAG is ", setFlag ? "true" : "flase");
 
-        withdrawalManager.setCancellableWithdrawals(
-            true, tokenTestSuite.addressOf(Tokens.USDC), amount1, tokenTestSuite.addressOf(Tokens.DAI), amount2
-        );
+            creditManager.setCreditAccountInfoMap({
+                creditAccount: creditAccount,
+                debt: debt,
+                cumulativeIndexLastUpdate: vars.get("cumulativeIndexLastUpdate"),
+                cumulativeQuotaInterest: vars.get("INITIAL_INTEREST") + 1,
+                enabledTokensMask: UNDERLYING_TOKEN_MASK,
+                flags: setFlag ? WITHDRAWAL_FLAG : 0,
+                borrower: USER
+            });
 
-        CollateralDebtData memory collateralDebtData = creditManager.calcDebtAndCollateral({
-            creditAccount: creditAccount,
-            task: CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS
-        });
+            withdrawalManager.setCancellableWithdrawals(
+                false, tokenTestSuite.addressOf(Tokens.LINK), amount1, tokenTestSuite.addressOf(Tokens.STETH), amount2
+            );
 
-        CollateralDebtData memory collateralDebtDataNormal = creditManager.calcDebtAndCollateral({
-            creditAccount: creditAccount,
-            task: CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS
-        });
+            withdrawalManager.setCancellableWithdrawals(
+                true, tokenTestSuite.addressOf(Tokens.USDC), amount1, tokenTestSuite.addressOf(Tokens.DAI), amount2
+            );
 
-        CollateralDebtData memory collateralDebtDataForced = creditManager.calcDebtAndCollateral({
-            creditAccount: creditAccount,
-            task: CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
-        });
+            CollateralDebtData memory collateralDebtData = creditManager.calcDebtAndCollateral({
+                creditAccount: creditAccount,
+                task: CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS
+            });
 
-        assertEq(
-            collateralDebtDataNormal.totalValueUSD - collateralDebtData.totalValueUSD,
-            amount1 * vars.get("LINK_PRICE") + amount2 * vars.get("STETH_PRICE"),
-            _testCaseErr("Incorrect totalValueUSD normal case")
-        );
+            CollateralDebtData memory collateralDebtDataNormal = creditManager.calcDebtAndCollateral({
+                creditAccount: creditAccount,
+                task: CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS
+            });
 
-        assertEq(
-            collateralDebtDataForced.totalValueUSD - collateralDebtData.totalValueUSD,
-            amount1 * vars.get("USDC_PRICE") + amount2 * vars.get("UNDERLYING_PRICE"),
-            _testCaseErr("Incorrect totalValueUSD force case")
-        );
+            CollateralDebtData memory collateralDebtDataForced = creditManager.calcDebtAndCollateral({
+                creditAccount: creditAccount,
+                task: CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
+            });
 
-        assertEq(
-            collateralDebtDataNormal.totalValue - collateralDebtData.totalValue,
-            (amount1 * vars.get("LINK_PRICE") + amount2 * vars.get("STETH_PRICE")) / vars.get("UNDERLYING_PRICE"),
-            _testCaseErr("Incorrect totalValue normal case")
-        );
+            assertEq(
+                collateralDebtDataNormal.totalValueUSD - collateralDebtData.totalValueUSD,
+                setFlag ? amount1 * vars.get("LINK_PRICE") + amount2 * vars.get("STETH_PRICE") : 0,
+                _testCaseErr("Incorrect totalValueUSD normal case")
+            );
 
-        assertEq(
-            collateralDebtDataForced.totalValue - collateralDebtData.totalValue,
-            (amount1 * vars.get("USDC_PRICE") + amount2 * vars.get("UNDERLYING_PRICE")) / vars.get("UNDERLYING_PRICE"),
-            _testCaseErr("Incorrect totalValue force case")
-        );
+            assertEq(
+                collateralDebtDataForced.totalValueUSD - collateralDebtData.totalValueUSD,
+                setFlag ? amount1 * vars.get("USDC_PRICE") + amount2 * vars.get("UNDERLYING_PRICE") : 0,
+                _testCaseErr("Incorrect totalValueUSD force case")
+            );
+
+            assertEq(
+                collateralDebtDataNormal.totalValue - collateralDebtData.totalValue,
+                setFlag
+                    ? (amount1 * vars.get("LINK_PRICE") + amount2 * vars.get("STETH_PRICE")) / vars.get("UNDERLYING_PRICE")
+                    : 0,
+                _testCaseErr("Incorrect totalValue normal case")
+            );
+
+            assertEq(
+                collateralDebtDataForced.totalValue - collateralDebtData.totalValue,
+                setFlag
+                    ? (amount1 * vars.get("USDC_PRICE") + amount2 * vars.get("UNDERLYING_PRICE"))
+                        / vars.get("UNDERLYING_PRICE")
+                    : 0,
+                _testCaseErr("Incorrect totalValue force case")
+            );
+        }
     }
 
     ///
@@ -1948,8 +1972,11 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         uint256 CVX_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.CVX});
 
         uint256 quotedTokensMask = LINK_TOKEN_MASK | USDT_TOKEN_MASK | STETH_TOKEN_MASK | CVX_TOKEN_MASK;
+
+        vm.startPrank(CONFIGURATOR);
         creditManager.setQuotedMask(quotedTokensMask);
         creditManager.setMaxEnabledTokens(3);
+        vm.stopPrank();
 
         //
         // CASES
@@ -2047,4 +2074,334 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     ///
     /// UPDATE QUOTAS
     ///
+
+    /// @dev U:[CM-25]: updateQuota works correctly
+    function test_U_CM_25_updateQuota_works_correctly() public withSupportQuotas {
+        _addToken(Tokens.LINK, 80_00);
+        uint256 LINK_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.LINK});
+
+        uint256 INITIAL_INTEREST = 123123;
+        uint256 caInterestChange = 10323212323;
+        address creditAccount = DUMB_ADDRESS;
+
+        creditManager.setCreditAccountInfoMap({
+            creditAccount: creditAccount,
+            debt: 0,
+            cumulativeIndexLastUpdate: 0,
+            cumulativeQuotaInterest: INITIAL_INTEREST,
+            enabledTokensMask: 0,
+            flags: 0,
+            borrower: USER
+        });
+
+        for (uint256 i = 0; i < 3; ++i) {
+            uint256 snapshot = vm.snapshot();
+            bool enable = i == 1;
+            bool disable = i == 2;
+            uint256 expectedTokensToEnable;
+            uint256 expectedTokensToDisable;
+
+            if (enable) {
+                caseName = string.concat(caseName, "enable case");
+                expectedTokensToEnable = LINK_TOKEN_MASK;
+            }
+            if (disable) {
+                caseName = string.concat(caseName, "disable case");
+                expectedTokensToDisable = LINK_TOKEN_MASK;
+            }
+            poolQuotaKeeperMock.setUpdateQuotaReturns(caInterestChange, enable, disable);
+
+            /// @notice mock returns predefined values which do not depend on params
+            (uint256 tokensToEnable, uint256 tokensToDisable) = creditManager.updateQuota({
+                creditAccount: creditAccount,
+                token: tokenTestSuite.addressOf(Tokens.LINK),
+                quotaChange: 122
+            });
+
+            (,, uint256 cumulativeQuotaInterest,,,) = creditManager.creditAccountInfo(creditAccount);
+
+            assertEq(tokensToEnable, expectedTokensToEnable, _testCaseErr("Incorrect tokensToEnable"));
+            assertEq(tokensToDisable, expectedTokensToDisable, _testCaseErr("Incorrect tokensToDisable"));
+            assertEq(
+                cumulativeQuotaInterest,
+                INITIAL_INTEREST + caInterestChange,
+                _testCaseErr("Incorrect cumulativeQuotaInterest")
+            );
+
+            vm.revertTo(snapshot);
+        }
+    }
+
+    //
+    //
+    // WITHDRAWALS
+    //
+    //
+
+    /// @dev U:[CM-26]: scheduleWithdrawal reverts for unknown token
+    function test_U_CM_26_scheduleWithdrawal_reverts_for_unknown_token() public withoutSupportQuotas {
+        address creditAccount = DUMB_ADDRESS;
+        address linkToken = tokenTestSuite.addressOf(Tokens.LINK);
+        /// @notice check that it reverts on unknown token
+        vm.expectRevert(TokenNotAllowedException.selector);
+        creditManager.scheduleWithdrawal({creditAccount: creditAccount, token: linkToken, amount: 20000});
+    }
+
+    /// @dev U:[CM-27]: scheduleWithdrawal transfers token if delay == 0
+    function test_U_CM_27_scheduleWithdrawal_transfers_token_if_delay_is_zero()
+        public
+        withFeeTokenCase
+        withoutSupportQuotas
+    {
+        address creditAccount = DUMB_ADDRESS;
+
+        withdrawalManager.setDelay(0);
+
+        tokenTestSuite.mint(underlying, creditAccount, DAI_ACCOUNT_AMOUNT);
+
+        vm.expectRevert(CreditAccountNotExistsException.selector);
+        (uint256 tokensToDisable) =
+            creditManager.scheduleWithdrawal({creditAccount: creditAccount, token: underlying, amount: 20_000});
+
+        // creditManager.setBorrower({creditAccount: creditAccount, borrower: USER});
+
+        // (tokensToDisable) =
+        //     creditManager.scheduleWithdrawal({creditAccount: creditAccount, token: underlying, amount: 20_000});
+
+        // assertEq(tokensToDisable, 0, _testCaseErr("Incorrect token to disable"));
+    }
+    //
+    //
+    //
+    //
+    ///
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    ///
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    ///
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    ///
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    ///
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+
+    /// FROM OLD TESTS
+
+    /// @dev U:[CM-51]: setFees sets configuration properly
+    function test_U_CM_51_setFees_sets_configuration_properly() public withoutSupportQuotas {
+        uint16 s_feeInterest = 8733;
+        uint16 s_feeLiquidation = 1233;
+        uint16 s_liquidationPremium = 1220;
+        uint16 s_feeLiquidationExpired = 1221;
+        uint16 s_liquidationPremiumExpired = 7777;
+
+        vm.prank(CONFIGURATOR);
+        creditManager.setFees(
+            s_feeInterest, s_feeLiquidation, s_liquidationPremium, s_feeLiquidationExpired, s_liquidationPremiumExpired
+        );
+        (
+            uint16 feeInterest,
+            uint16 feeLiquidation,
+            uint16 liquidationDiscount,
+            uint16 feeLiquidationExpired,
+            uint16 liquidationPremiumExpired
+        ) = creditManager.fees();
+
+        assertEq(feeInterest, s_feeInterest, "Incorrect feeInterest");
+        assertEq(feeLiquidation, s_feeLiquidation, "Incorrect feeLiquidation");
+        assertEq(liquidationDiscount, s_liquidationPremium, "Incorrect liquidationDiscount");
+        assertEq(feeLiquidationExpired, s_feeLiquidationExpired, "Incorrect feeLiquidationExpired");
+        assertEq(liquidationPremiumExpired, s_liquidationPremiumExpired, "Incorrect liquidationPremiumExpired");
+    }
+
+    //
+    // ADD TOKEN
+    //
+
+    /// @dev I:[CM-52]: addToken reverts if token exists and if collateralTokens > 256
+    function test_I_CM_52_addToken_reverts_if_token_exists_and_if_collateralTokens_more_256()
+        public
+        withoutSupportQuotas
+    {
+        vm.startPrank(CONFIGURATOR);
+
+        vm.expectRevert(TokenAlreadyAddedException.selector);
+        creditManager.addToken(underlying);
+
+        for (uint256 i = creditManager.collateralTokensCount(); i < 255; i++) {
+            creditManager.addToken(address(uint160(uint256(keccak256(abi.encodePacked(i))))));
+        }
+
+        vm.expectRevert(TooManyTokensException.selector);
+        creditManager.addToken(DUMB_ADDRESS);
+
+        vm.stopPrank();
+    }
+
+    /// @dev I:[CM-53]: addToken adds token and set tokenMaskMap correctly
+    function test_I_CM_53_addToken_adds_token_and_set_tokenMaskMap_correctly() public withoutSupportQuotas {
+        uint256 count = creditManager.collateralTokensCount();
+
+        vm.prank(CONFIGURATOR);
+        creditManager.addToken(DUMB_ADDRESS);
+
+        assertEq(creditManager.collateralTokensCount(), count + 1, "collateralTokensCount want incremented");
+
+        assertEq(creditManager.getTokenMaskOrRevert(DUMB_ADDRESS), 1 << count, "tokenMaskMap was set incorrectly");
+    }
+
+    //
+    // SET LIQUIDATION THRESHOLD
+    //
+
+    /// @dev I:[CM-54]: setLiquidationThreshold reverts for unknown token
+    function test_I_CM_54_setLiquidationThreshold_reverts_for_unknown_token() public withoutSupportQuotas {
+        vm.prank(CONFIGURATOR);
+        vm.expectRevert(TokenNotAllowedException.selector);
+        creditManager.setCollateralTokenData(DUMB_ADDRESS, 8000, 8000, type(uint40).max, 0);
+    }
+
+    //
+    // CHANGE CONTRACT AllowanceAction
+    //
+
+    /// @dev I:[CM-56]: setContractAllowance updates adapterToContract
+    function test_I_CM_56_setContractAllowance_updates_adapterToContract() public withoutSupportQuotas {
+        assertTrue(
+            creditManager.adapterToContract(ADAPTER) != DUMB_ADDRESS, "adapterToContract(ADAPTER) is already the same"
+        );
+
+        vm.prank(CONFIGURATOR);
+        creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
+
+        assertEq(creditManager.adapterToContract(ADAPTER), DUMB_ADDRESS, "adapterToContract is not set correctly");
+
+        assertEq(creditManager.contractToAdapter(DUMB_ADDRESS), ADAPTER, "adapterToContract is not set correctly");
+
+        vm.prank(CONFIGURATOR);
+        creditManager.setContractAllowance(ADAPTER, address(0));
+
+        assertEq(creditManager.adapterToContract(ADAPTER), address(0), "adapterToContract is not set correctly");
+
+        assertEq(creditManager.contractToAdapter(address(0)), address(0), "adapterToContract is not set correctly");
+
+        vm.prank(CONFIGURATOR);
+        creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
+
+        vm.prank(CONFIGURATOR);
+        creditManager.setContractAllowance(address(0), DUMB_ADDRESS);
+
+        assertEq(creditManager.adapterToContract(address(0)), address(0), "adapterToContract is not set correctly");
+
+        assertEq(creditManager.contractToAdapter(DUMB_ADDRESS), address(0), "adapterToContract is not set correctly");
+
+        // vm.prank(CONFIGURATOR);
+        // creditManager.setContractAllowance(ADAPTER, UNIVERSAL_CONTRACT);
+
+        // assertEq(creditManager.universalAdapter(), ADAPTER, "Universal adapter is not correctly set");
+
+        // vm.prank(CONFIGURATOR);
+        // creditManager.setContractAllowance(address(0), UNIVERSAL_CONTRACT);
+
+        // assertEq(creditManager.universalAdapter(), address(0), "Universal adapter is not correctly set");
+    }
+
+    //
+    // UPGRADE CONTRACTS
+    //
+
+    /// @dev I:[CM-57A]: setCreditFacade updates Credit Facade correctly
+    function test_I_CM_57A_setCreditFacade_updates_contract_correctly() public withoutSupportQuotas {
+        assertTrue(creditManager.creditFacade() != DUMB_ADDRESS, "creditFacade( is already the same");
+
+        vm.prank(CONFIGURATOR);
+        creditManager.setCreditFacade(DUMB_ADDRESS);
+
+        assertEq(creditManager.creditFacade(), DUMB_ADDRESS, "creditFacade is not set correctly");
+    }
+
+    /// @dev I:[CM-57B]: setPriceOracle updates contract correctly
+    function test_I_CM_57_setPriceOracle_updates_contract_correctly() public withoutSupportQuotas {
+        assertTrue(address(creditManager.priceOracle()) != DUMB_ADDRESS2, "priceOracle is already the same");
+
+        vm.prank(CONFIGURATOR);
+        creditManager.setPriceOracle(DUMB_ADDRESS2);
+
+        assertEq(address(creditManager.priceOracle()), DUMB_ADDRESS2, "priceOracle is not set correctly");
+    }
+
+    //
+    // SET CONFIGURATOR
+    //
+
+    /// @dev I:[CM-58]: setCreditConfigurator sets creditConfigurator correctly and emits event
+    function test_I_CM_58_setCreditConfigurator_sets_creditConfigurator_correctly_and_emits_event()
+        public
+        withoutSupportQuotas
+    {
+        assertTrue(creditManager.creditConfigurator() != DUMB_ADDRESS, "creditConfigurator is already the same");
+
+        vm.prank(CONFIGURATOR);
+
+        vm.expectEmit(true, false, false, false);
+        emit SetCreditConfigurator(DUMB_ADDRESS);
+
+        creditManager.setCreditConfigurator(DUMB_ADDRESS);
+
+        assertEq(creditManager.creditConfigurator(), DUMB_ADDRESS, "creditConfigurator is not set correctly");
+    }
+
+    /// @dev I:[CM-61]: setMaxEnabledToken correctly sets value
+    function test_I_CM_61_setMaxEnabledTokens_works_correctly() public withoutSupportQuotas {
+        vm.prank(CONFIGURATOR);
+        creditManager.setMaxEnabledTokens(255);
+
+        assertEq(creditManager.maxEnabledTokens(), 255, "Incorrect max enabled tokens");
+    }
 }

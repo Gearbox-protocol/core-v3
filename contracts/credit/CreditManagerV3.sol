@@ -834,14 +834,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             return collateralDebtData;
         }
 
-        /// The underlying-denominated total value is also added for liquidation payments calculations, unless the data is computed
-        /// for fullCollateralCheck, which doesn't need this
-        collateralDebtData.totalValue = _convertFromUSD(_priceOracle, collateralDebtData.totalValueUSD, underlying); // F:[FA-41]
-
-        if (task == CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS) {
-            return collateralDebtData;
-        }
-
         /// WITHDRAWALS
         /// Withdrawals are added to the total value of the account primarily for liquidation purposes,
         /// since we want to return withdrawals to the Credit Account but also need to ensure that
@@ -854,6 +846,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             }); // U:[CM-23]
         }
 
+        /// The underlying-denominated total value is also added for liquidation payments calculations, unless the data is computed
+        /// for fullCollateralCheck, which doesn't need this
         collateralDebtData.totalValue = _convertFromUSD(_priceOracle, collateralDebtData.totalValueUSD, underlying); // U:[CM-22,23]
     }
 
@@ -939,15 +933,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             creditAccount: creditAccount,
             token: token,
             quotaChange: quotaChange
-        }); // F: [CMQ-3]
+        }); // U:[CM-25] // I: [CMQ-3]
 
         if (enable) {
-            tokensToEnable = getTokenMaskOrRevert(token);
+            tokensToEnable = getTokenMaskOrRevert(token); // U:[CM-25]
         } else if (disable) {
-            tokensToDisable = getTokenMaskOrRevert(token);
+            tokensToDisable = getTokenMaskOrRevert(token); // U:[CM-25]
         }
 
-        creditAccountInfo[creditAccount].cumulativeQuotaInterest += caInterestChange; // F: [CMQ-3]
+        creditAccountInfo[creditAccount].cumulativeQuotaInterest += caInterestChange; // U:[CM-25] // I: [CMQ-3]
     }
 
     ///
@@ -968,7 +962,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacadeOnly // U:[CM-2]
         returns (uint256 tokensToDisable)
     {
-        uint256 tokenMask = getTokenMaskOrRevert({token: token});
+        uint256 tokenMask = getTokenMaskOrRevert({token: token}); // U:[CM-26]
 
         // If the configured delay is zero, then sending funds to the WithdrawalManager can be skipped
         // and they can be sent directly to the user
@@ -982,12 +976,18 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 convertToETH: false
             });
         } else {
-            uint256 delivered =
-                ICreditAccount(creditAccount).transferDeliveredBalanceControl(token, withdrawalManager, amount);
+            uint256 delivered = ICreditAccount(creditAccount).transferDeliveredBalanceControl({
+                token: token,
+                to: withdrawalManager,
+                amount: amount
+            });
 
-            IWithdrawalManager(withdrawalManager).addScheduledWithdrawal(
-                creditAccount, token, delivered, tokenMask.calcIndex()
-            );
+            IWithdrawalManager(withdrawalManager).addScheduledWithdrawal({
+                creditAccount: creditAccount,
+                token: token,
+                amount: delivered,
+                tokenIndex: tokenMask.calcIndex()
+            });
 
             // WITHDRAWAL_FLAG is enabled on the account to efficiently determine
             // whether the account has pending withdrawals in the future
@@ -1446,7 +1446,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         external
         creditConfiguratorOnly // U:[CM-4]
     {
-        quotedTokensMask = _quotedTokensMask; // F: [CMQ-2]
+        quotedTokensMask = _quotedTokensMask; // I: [CMQ-2]
     }
 
     /// @notice Sets the maximal number of enabled tokens on a single Credit Account.

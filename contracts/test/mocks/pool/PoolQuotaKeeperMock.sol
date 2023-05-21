@@ -61,6 +61,12 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeper {
         disableToken = return_disableToken;
     }
 
+    function setUpdateQuotaReturns(uint256 caQuotaInterestChange, bool enableToken, bool disableToken) external {
+        return_caQuotaInterestChange = caQuotaInterestChange;
+        return_enableToken = enableToken;
+        return_disableToken = disableToken;
+    }
+
     /// @dev Updates all quotas to zero when closing a credit account, and computes the final quota interest change
     /// @param creditAccount Address of the Credit Account being closed
     /// @param tokens Array of all active quoted tokens on the account
