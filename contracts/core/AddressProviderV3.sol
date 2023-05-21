@@ -12,10 +12,10 @@ import {AddressNotFoundException, CallerNotConfiguratorException} from "../inter
 /// @title AddressRepository
 /// @notice Stores addresses of deployed contracts
 contract AddressProviderV3 is IAddressProviderV3 {
-    // Mapping from contract keys to respective addresses
+    /// @notice Mapping from (contract key, version) to the respective contract address
     mapping(bytes32 => mapping(uint256 => address)) public addresses;
 
-    // Contract version
+    /// @inheritdoc IVersion
     uint256 public constant override(IVersion) version = 3_00;
 
     modifier configuratorOnly() {
@@ -26,23 +26,26 @@ contract AddressProviderV3 is IAddressProviderV3 {
     }
 
     constructor(address _acl) {
-        // @dev Emits first event for contract discovery
+        /// The first event is emitted for the AP itself, to aid in contract discovery
         emit AddressSet("ADDRESS_PROVIDER", address(this), version);
         _setAddress(AP_ACL, _acl, NO_VERSION_CONTROL);
     }
 
+    /// @notice Returns the address associated with the passed key/version
     function getAddressOrRevert(bytes32 key, uint256 _version) public view virtual override returns (address result) {
         result = addresses[key][_version];
         if (result == address(0)) revert AddressNotFoundException();
     }
 
-    /// @dev Sets address to map by its key
+    /// @notice Sets the address for the passed key, and optionally records the contract version
     /// @param key Key in string format
-    /// @param value Address
+    /// @param value Address to save
+    /// @param saveVersion Whether to save
     function setAddress(bytes32 key, address value, bool saveVersion) external override configuratorOnly {
         _setAddress(key, value, saveVersion ? IVersion(value).version() : NO_VERSION_CONTROL);
     }
 
+    /// @notice Internal function to set the address mapping value
     function _setAddress(bytes32 key, address value, uint256 _version) internal virtual {
         addresses[key][_version] = value;
         emit AddressSet(key, value, _version); // F:[AP-2]
@@ -95,7 +98,7 @@ contract AddressProviderV3 is IAddressProviderV3 {
         return getAddressOrRevert(AP_WETH_GATEWAY, 1); // F:[AP-11]
     }
 
-    /// @return Address of PathFinder
+    /// @return Address of Router
     function getLeveragedActions() external view returns (address) {
         return getAddressOrRevert(AP_ROUTER, 1); // T:[AP-7]
     }

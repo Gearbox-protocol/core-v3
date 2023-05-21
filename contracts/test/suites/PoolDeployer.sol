@@ -12,6 +12,7 @@ import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFa
 import {GenesisFactory} from "./GenesisFactory.sol";
 import {PoolFactory, PoolOpts} from "@gearbox-protocol/core-v2/contracts/factories/PoolFactory.sol";
 import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
+import {BotList} from "../../support/BotList.sol";
 
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 import {PoolServiceMock} from "../mocks/pool/PoolServiceMock.sol";
@@ -39,6 +40,7 @@ contract PoolDeployer is Test {
     GaugeMock public gaugeMock;
     ContractsRegister public cr;
     WithdrawalManager public withdrawalManager;
+    BotList public botList;
     ACL public acl;
 
     IPriceOracleV2Ext public priceOracle;
@@ -78,6 +80,8 @@ contract PoolDeployer is Test {
         cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
 
         withdrawalManager = WithdrawalManager(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00));
+
+        botList = BotList(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00));
 
         underlying = _underlying;
 
