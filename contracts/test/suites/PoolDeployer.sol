@@ -15,7 +15,7 @@ import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
 import {BotList} from "../../support/BotList.sol";
 
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
-import {PoolServiceMock} from "../mocks//pool/PoolServiceMock.sol";
+import {PoolMock} from "../mocks//pool/PoolMock.sol";
 import {GaugeMock} from "../mocks//pool/GaugeMock.sol";
 import {PoolQuotaKeeper} from "../../pool/PoolQuotaKeeper.sol";
 
@@ -35,7 +35,7 @@ contract PoolDeployer is Test {
     IAddressProviderV3 public addressProvider;
     GenesisFactory public gp;
     AccountFactory public af;
-    PoolServiceMock public poolMock;
+    PoolMock public poolMock;
     PoolQuotaKeeper public poolQuotaKeeper;
     GaugeMock public gaugeMock;
     ContractsRegister public cr;
@@ -85,7 +85,7 @@ contract PoolDeployer is Test {
 
         underlying = _underlying;
 
-        poolMock = new PoolServiceMock(
+        poolMock = new PoolMock(
             address(gp.addressProvider()),
             underlying
         );

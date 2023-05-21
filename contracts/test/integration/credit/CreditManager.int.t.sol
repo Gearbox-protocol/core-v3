@@ -41,7 +41,7 @@ import {TokenAlreadyAddedException} from "../../../interfaces/IExceptions.sol";
 
 // MOCKS
 import {PriceFeedMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/oracles/PriceFeedMock.sol";
-import {PoolServiceMock} from "../../mocks//pool/PoolServiceMock.sol";
+import {PoolMock} from "../../mocks//pool/PoolMock.sol";
 import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
 import {
     ERC20ApproveRestrictedRevert,
@@ -73,7 +73,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
 
     AccountFactory af;
     CreditManagerV3 creditManager;
-    PoolServiceMock poolMock;
+    PoolMock poolMock;
     IPriceOracleV2 priceOracle;
     IWETHGateway wethGateway;
     IWithdrawalManager withdrawalManager;

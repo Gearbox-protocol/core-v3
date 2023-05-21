@@ -15,7 +15,7 @@ import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {PoolServiceMock} from "../../mocks/pool/PoolServiceMock.sol";
+import {PoolMock} from "../../mocks/pool/PoolMock.sol";
 
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
@@ -46,7 +46,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
     PoolQuotaKeeper pqk;
     GaugeMock gaugeMock;
 
-    PoolServiceMock pool;
+    PoolMock pool;
     address underlying;
 
     CreditManagerMock cmMock;
@@ -65,7 +65,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
         AddressProviderV3ACLMock addressProvider = new AddressProviderV3ACLMock();
         addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
 
-        pool = new PoolServiceMock(address(addressProvider), underlying);
+        pool = new PoolMock(address(addressProvider), underlying);
 
         pqk = new PoolQuotaKeeper(address(pool));
 
