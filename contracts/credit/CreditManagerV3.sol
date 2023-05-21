@@ -52,10 +52,8 @@ import {
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
-import "forge-std/console.sol";
-
 /// @title Credit Manager
-/// @notice Encapsulates the business logic for managing Credit Accounts
+/// @dev Encapsulates the business logic for managing Credit Accounts
 ///
 /// More info: https://dev.gearbox.fi/developers/credit/credit_manager
 contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardTrait {
@@ -68,132 +66,141 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     using CreditAccountHelper for ICreditAccount;
 
     // IMMUTABLE PARAMS
-    /// @dev contract version
+
+    /// @inheritdoc IVersion
     uint256 public constant override version = 3_00;
 
-    /// @dev Factory contract for Credit Accounts
+    /// @notice Address provider
+    /// @dev While not used in this contract outside the constructor,
+    ///      it is routinely used by other connected contracts
     address public immutable override addressProvider;
 
-    /// @dev Factory contract for Credit Accounts
+    /// @notice Factory contract for Credit Accounts
     address public immutable accountFactory;
 
-    /// @dev Address of the underlying asset
+    /// @notice Address of the underlying asset
     address public immutable override underlying;
 
-    /// @dev Address of the connected pool
+    /// @notice Address of the connected pool
     address public immutable override pool;
 
-    /// @dev Address of WETH
+    /// @notice Address of WETH
     address public immutable override weth;
 
-    /// @dev Address of WETH Gateway
+    /// @notice Address of WETH Gateway
     address public immutable wethGateway;
 
-    /// @dev Whether the CM supports quota-related logic
+    /// @notice Whether the CM supports quota-related logic
     bool public immutable override supportsQuotas;
 
-    /// @dev Address of the connected Credit Facade
+    /// @notice Address of the connected Credit Facade
     address public override creditFacade;
 
-    /// @dev The maximal number of enabled tokens on a single Credit Account
+    /// @notice The maximal number of enabled tokens on a single Credit Account
     uint8 public override maxEnabledTokens = 12;
 
-    /// @dev Liquidation threshold for the underlying token.
+    /// @notice Liquidation threshold for the underlying token.
     uint16 internal ltUnderlying;
 
-    /// @dev Interest fee charged by the protocol: fee = interest accrued * feeInterest
+    /// @notice Interest fee charged by the protocol: fee = interest accrued * feeInterest (this includes quota interest)
     uint16 internal feeInterest;
 
-    /// @dev Liquidation fee charged by the protocol: fee = totalValue * feeLiquidation
+    /// @notice Liquidation fee charged by the protocol: fee = totalValue * feeLiquidation
     uint16 internal feeLiquidation;
 
-    /// @dev Multiplier used to compute the total value of funds during liquidation.
+    /// @notice Multiplier used to compute the total value of funds during liquidation.
     /// At liquidation, the borrower's funds are discounted, and the pool is paid out of discounted value
     /// The liquidator takes the difference between the discounted and actual values as premium.
     uint16 internal liquidationDiscount;
 
-    /// @dev Liquidation fee charged by the protocol during liquidation by expiry. Typically lower than feeLiquidation.
+    /// @notice Liquidation fee charged by the protocol during liquidation by expiry. Typically lower than feeLiquidation.
     uint16 internal feeLiquidationExpired;
 
-    /// @dev Multiplier used to compute the total value of funds during liquidation by expiry. Typically higher than
+    /// @notice Multiplier used to compute the total value of funds during liquidation by expiry. Typically higher than
     /// liquidationDiscount (meaning lower premium).
     uint16 internal liquidationDiscountExpired;
 
-    /// @dev Price oracle used to evaluate assets on Credit Accounts.
+    /// @notice Price oracle used to evaluate assets on Credit Accounts.
     address public override priceOracle;
 
-    /// @dev Points to creditAccount during multicall, otherwise keeps address(1) for gas savings
-    /// CreditFacade is trusted source, so primarly it sends creditAccount as parameter
-    /// _activeCreditAccount is used for adapters interation when adapter calls approve / execute methods
+    /// @notice Points to the currently processed Credit Account during multicall, otherwise keeps address(1) for gas savings
+    /// CreditFacade is a trusted source, so it generally sends the CA as an input for account management functions
+    /// _activeCreditAccount is used to avoid adapters having to manually pass the Credit Account
     address internal _activeCreditAccount;
 
-    /// @dev Total number of known collateral tokens.
+    /// @notice Total number of known collateral tokens.
     uint8 public collateralTokensCount;
 
-    /// @dev Mask of tokens to apply quotas for
+    /// @notice Mask of tokens to apply quota logic for
     uint256 public override quotedTokenMask;
 
-    /// @dev Withdrawal manager
+    /// @notice Contract that handles withdrawals
     address public immutable override withdrawalManager;
 
-    /// @dev Address of the connected Credit Configurator
+    /// @notice Address of the connected Credit Configurator
     address public creditConfigurator;
 
     /// COLLATERAL TOKENS DATA
 
-    /// @dev Map of token's bit mask to its address and LT parameters in a single-slot struct
+    /// @notice Map of token's bit mask to its address and LT parameters in a single-slot struct
     mapping(uint256 => CollateralTokenData) internal collateralTokensData;
 
-    /// @dev Internal map of token addresses to their indidivual masks.
-    /// @notice A mask is a uint256 that has only 1 non-zero bit in the position correspondingto
+    /// @notice Internal map of token addresses to their indidivual masks.
+    /// @dev A mask is a uint256 that has only 1 non-zero bit in the position corresponding to
     ///         the token's index (i.e., tokenMask = 2 ** index)
-    ///         Masks are used to efficiently check set inclusion, since it only involves
+    ///         Masks are used to efficiently track set inclusion, since it only involves
     ///         a single AND and comparison to zero
     mapping(address => uint256) internal tokenMasksMapInternal;
 
     /// CONTRACTS & ADAPTERS
 
-    /// @dev Maps allowed adapters to their respective target contracts.
+    /// @notice Maps allowed adapters to their respective target contracts.
     mapping(address => address) public override adapterToContract;
 
-    /// @dev Maps 3rd party contracts to their respective adapters
+    /// @notice Maps 3rd party contracts to their respective adapters
     mapping(address => address) public override contractToAdapter;
 
     /// CREDIT ACCOUNT DATA
 
-    /// @dev Contains infomation related to CA
+    /// @notice Contains infomation related to CA, such as accumulated interest,
+    ///         enabled tokens, the current borrower and miscellaneous flags
     mapping(address => CreditAccountInfo) public creditAccountInfo;
 
-    /// @dev Array of the allowed contracts
+    /// @notice Set of all currently active contracts
     EnumerableSet.AddressSet internal creditAccountsSet;
 
     //
     // MODIFIERS
     //
 
-    /// @dev Restricts calls to Credit Facade only
+    /// @notice Restricts calls to Credit Facade only
     modifier creditFacadeOnly() {
         _checkCreditFacade();
         _;
     }
 
+    /// @notice Internal function wrapping `creditFacadeOnly` modifier logic
+    ///         Used to optimize contract size
     function _checkCreditFacade() private view {
         if (msg.sender != creditFacade) revert CallerNotCreditFacadeException();
     }
 
-    /// @dev Restricts calls to Credit Configurator only
+    /// @notice Restricts calls to Credit Configurator only
     modifier creditConfiguratorOnly() {
         _checkCreditConfigurator();
         _;
     }
 
+    /// @notice Internal function wrapping `creditFacadeOnly` modifier logic
+    ///         Used to optimize contract size
     function _checkCreditConfigurator() private view {
         if (msg.sender != creditConfigurator) {
             revert CallerNotConfiguratorException();
         }
     }
 
-    /// @dev Constructor
+    /// @notice Constructor
+    /// @param _addressProvider Address of the repository to get system-level contracts from
     /// @param _pool Address of the pool to borrow funds from
     constructor(address _addressProvider, address _pool) {
         addressProvider = _addressProvider;
@@ -228,8 +235,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     // CREDIT ACCOUNT MANAGEMENT
     //
 
-    ///  @dev Opens credit account and borrows funds from the pool.
+    ///  @notice Opens credit account and borrows funds from the pool.
     /// - Takes Credit Account from the factory;
+    /// - Initializes `creditAccountInfo` fields
     /// - Requests the pool to lend underlying to the Credit Account
     ///
     /// @param debt Amount to be borrowed by the Credit Account
@@ -252,31 +260,30 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             creditAccountInfo[creditAccount].cumulativeQuotaInterest = 1;
         } // U:[CM-6]
 
-        // OUTDATED: enabledTokensMap is set in FullCollateralCheck
-        // enabledTokensMap[creditAccount] = 1;
-
         // Requests the pool to transfer tokens the Credit Account
         _poolLendCreditAccount(debt, creditAccount); // U:[CM-6]
         creditAccountsSet.add(creditAccount); // U:[CM-6]
     }
 
-    ///  @dev Closes a Credit Account - covers both normal czlosure and liquidation
-    /// - Checks whether the contract is paused, and, if so, if the payer is an emergency liquidator.
-    ///   Only emergency liquidators are able to liquidate account while the CM is paused.
-    ///   Emergency liquidations do not pay a liquidator premium or liquidation fees.
-    /// - Calculates payments to various recipients on closure:
-    ///    + Computes amountToPool, which is the amount to be sent back to the pool.
+    ///  @notice Closes a Credit Account - covers both normal closure and liquidation
+    /// - Calculates payments to various recipients on closure.
+    ///    + amountToPool is the amount to be sent back to the pool.
     ///      This includes the principal, interest and fees, but can't be more than
     ///      total position value
     ///    + Computes remainingFunds during liquidations - these are leftover funds
     ///      after paying the pool and the liquidator, and are sent to the borrower
     ///    + Computes protocol profit, which includes interest and liquidation fees
     ///    + Computes loss if the totalValue is less than borrow amount + interest
+    ///   remainingFunds and loss are only computed during liquidation, since they are
+    ///   meaningless during normal account closure.
     /// - Checks the underlying token balance:
     ///    + if it is larger than amountToPool, then the pool is paid fully from funds on the Credit Account
     ///    + else tries to transfer the shortfall from the payer - either the borrower during closure, or liquidator during liquidation
+    /// - Signals the pool that the debt is repaid
+    /// - If liquidation: transfers `remainingFunds` to the borrower
+    /// - If the account has active quotas, requests the PoolQuotaKeeper to reduce them to 0,
+    ///   which is required for correctness of interest calculations
     /// - Send assets to the "to" address, as long as they are not included into skipTokenMask
-    /// - If convertToETH is true, the function converts WETH into ETH before sending
     /// - Returns the Credit Account back to factory
     ///
     /// @param creditAccount Credit account address
@@ -307,10 +314,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         // Sets borrower's Credit Account to zero address
         delete creditAccountInfo[creditAccount].borrower; // U:[CM-8]
 
-        // Makes all computations needed to close credit account
         uint256 amountToPool;
         uint256 profit;
 
+        // Computations for various closure amounts are isolated into the `CreditLogic` library
+        // See `CreditLogic.calcClosePayments` and `CreditLogic.calcLiquidationPayments`
         if (closureAction == ClosureAction.CLOSE_ACCOUNT) {
             (amountToPool, profit) = collateralDebtData.calcClosePayments({amountWithFeeFn: _amountWithFee}); // U:[CM-8]
         } else {
@@ -367,6 +375,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             }); // U:[CM-8]
         }
 
+        // If the creditAccount has non-zero quotas, they need to be reduced to 0;
+        // This is required to both free quota limits for other users and correctly
+        // compute quota interest
         if (supportsQuotas && collateralDebtData.quotedTokens.length != 0) {
             /// In case of any loss, PQK sets limits to zero for all quoted tokens
             bool setLimitsToZero = loss > 0; // U:[CM-8]
@@ -378,6 +389,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             }); // U:[CM-8]
         }
 
+        // All remaining assets on the account are transferred to the `to` address
+        // If some asset cannot be transferred directly (e.g., `to` is blacklisted by USDC),
+        // then an immediate withdrawal is added to withdrawal manager
         _batchTokensTransfer({
             creditAccount: creditAccount,
             to: to,
@@ -390,22 +404,30 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditAccountsSet.remove(creditAccount); // U:[CM-8]
     }
 
-    /// @dev Manages debt size for borrower:
+    /// @notice Manages debt size for borrower:
     ///
     /// - Increase debt:
     ///   + Increases debt by transferring funds from the pool to the credit account
     ///   + Updates the cumulative index to keep interest the same. Since interest
     ///     is always computed dynamically as debt * (cumulativeIndexNew / cumulativeIndexOpen - 1),
-    ///     cumulativeIndexOpen needs to be updated, as the borrow amount has changed
+    ///     cumulativeIndexOpen needs to be updated, as the debt amount has changed
     ///
     /// - Decrease debt:
-    ///   + Repays debt partially + all interest and fees accrued thus far
-    ///   + Updates cunulativeIndex to cumulativeIndex now
+    ///   + Repays the debt in the following order: quota interest + fees, normal interest + fees, debt;
+    ///     In case of interest, if the (remaining) amount is not enough to cover it fully,
+    ///     it is split pro-rata between interest and fees to preserve correct fee computations
+    ///   + If there were non-zer quota interest, updates to quota interest after repayment
+    ///   + If base interest was repaid, updates `cumulativeIndexLastUpdate`
+    ///   + If debt was repaid, updates `debt`
+    /// @dev For details on cumulativeIndex computations, see `CreditLogic.calcIncrease` and `CreditLogic.calcDecrease`
     ///
     /// @param creditAccount Address of the Credit Account to change debt for
-    /// @param amount Amount to increase / decrease the principal by
-    /// @param action Increase/decrease bed debt
+    /// @param amount Amount to increase / decrease the total debt by
+    /// @param enabledTokensMask The current enabledTokensMask (required for quota interest computation)
+    /// @param action Whether to increase or decrease debt
     /// @return newDebt The new debt principal
+    /// @return tokensToEnable The mask of tokens enabled after the operation
+    /// @return tokensToDisable The mask of tokens disabled after the operation
     function manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)
         external
         nonReentrant // U:[CM-5]
@@ -417,6 +439,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         uint256 newCumulativeIndex;
         if (action == ManageDebtAction.INCREASE_DEBT) {
+            /// INCREASE DEBT
+
             collateralDebtData = _calcDebtAndCollateral({
                 creditAccount: creditAccount,
                 enabledTokensMask: enabledTokensMask,
@@ -432,12 +456,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate
             }); // U:[CM-10]
 
-            // Requests the pool to lend additional funds to the Credit Account
             _poolLendCreditAccount(amount, creditAccount); // U:[CM-10]
 
             tokensToEnable = UNDERLYING_TOKEN_MASK; // U:[CM-10]
         } else {
-            // Decrease
+            // DECREASE DEBT
+
             collateralDebtData = _calcDebtAndCollateral({
                 creditAccount: creditAccount,
                 enabledTokensMask: enabledTokensMask,
@@ -447,7 +471,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             }); // U:[CM-11]
 
             uint256 newCumulativeQuotaInterest;
-            // Pays the amount back to the pool
+            // Pays the entire amount back to the pool
             ICreditAccount(creditAccount).transfer({token: underlying, to: pool, amount: amount}); // U:[CM-11]
             {
                 uint256 amountToRepay;
@@ -463,18 +487,22 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     feeInterest: feeInterest
                 }); // U:[CM-11]
 
-                /// @notice fee is accounted in amountToRepay because we reduce amount as parameter
+                /// @dev amountToRepay is whatever is left after repaying quota and base interest + fees
                 _poolRepayCreditAccount(amountToRepay, profit, 0); // U:[CM-11]
             }
 
+            /// If quota logic is supported, we need to accrue quota interest in order to keep
+            /// quota interest indexes in PQK and cumulativeQuotaInterest in Credit Manager consistent
+            /// with each other, since this action caches all quota interest in Credit Manager
             if (supportsQuotas) {
                 IPoolQuotaKeeper(collateralDebtData._poolQuotaKeeper).accrueQuotaInterest({
                     creditAccount: creditAccount,
                     tokens: collateralDebtData.quotedTokens
                 });
-                creditAccountInfo[creditAccount].cumulativeQuotaInterest = newCumulativeQuotaInterest; // U:[CM-11]
+                creditAccountInfo[creditAccount].cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // U:[CM-11]
             }
 
+            /// If the entire underlying balance was spent on repayment, it is disabled
             if (IERC20Helper.balanceOf({token: underlying, holder: creditAccount}) <= 1) {
                 tokensToDisable = UNDERLYING_TOKEN_MASK; // U:[CM-11]
             }
@@ -484,7 +512,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditAccountInfo[creditAccount].cumulativeIndexLastUpdate = newCumulativeIndex; // U:[CM-10, 11]
     }
 
-    /// @dev Adds collateral to borrower's credit account
+    /// @notice Transfer collateral from the payer to the credit account
     /// @param payer Address of the account which will be charged to provide additional collateral
     /// @param creditAccount Address of the Credit Account
     /// @param token Collateral token to add
@@ -499,7 +527,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         IERC20(token).safeTransferFrom({from: payer, to: creditAccount, value: amount}); // U:[CM-13]
     }
 
-    /// @dev Transfers Credit Account ownership to another address
+    /// @notice Transfers Credit Account ownership to another address
     /// @param creditAccount Address of creditAccount to be transferred
     /// @param to Address of new owner
     function transferAccountOwnership(address creditAccount, address to)
@@ -516,7 +544,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// ADAPTER FUNCTIONS
     ///
 
-    /// @dev Requests the Credit Account to approve a collateral token to another contract.
+    /// @notice Requests the Credit Account to approve a collateral token to another contract.
     /// @param token Collateral token to approve
     /// @param amount New allowance amount
     function approveCreditAccount(address token, uint256 amount)
@@ -533,16 +561,24 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }); // U:[CM-15]
     }
 
+    /// @notice Internal wrapper for approving tokens, used to optimize contract size, since approvals
+    ///         are used in several functions
+    /// @param creditAccount Address of the Credit Account
+    /// @param token Token to give an approval for
+    /// @param spender The address of the spender
+    /// @param amount The new allowance amount
     function _approveSpender(address creditAccount, address token, address spender, uint256 amount) internal {
         // Checks that the token is a collateral token
         // Forbidden tokens can be approved, since users need that to
         // sell them off
         getTokenMaskOrRevert({token: token}); // U:[CM-15]
 
+        // The approval logic is isolated into `CreditAccountHelper.safeApprove`. See the corresponding
+        // library for details
         ICreditAccount(creditAccount).safeApprove({token: token, spender: spender, amount: amount}); // U:[CM-15]
     }
 
-    /// @dev Requests a Credit Account to make a low-level call with provided data
+    /// @notice Requests a Credit Account to make a low-level call with provided data
     /// This is the intended pathway for state-changing interactions with 3rd-party protocols
     /// @param data Data to pass with the call
     function executeOrder(bytes calldata data)
@@ -562,16 +598,17 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         return ICreditAccount(creditAccount).execute(targetContract, data); // U:[CM-16]
     }
 
+    /// @notice Returns the target contract associated with the calling address (which is assumed to be an adapter),
+    ///      and reverts if there is none. Used to ensure that an adapter can only make calls to its own target
     function _getTargetContractOrRevert() internal view returns (address targetContract) {
         targetContract = adapterToContract[msg.sender]; // U:[CM-15, 16]
-
-        // Checks that msg.sender is the adapter associated with the passed target contract.
         if (targetContract == address(0)) {
             revert CallerNotAdapterException(); // U:[CM-3]
         }
     }
 
-    ///
+    /// @notice Sets the active credit account (credit account returned to adapters to work on) to the provided address
+    /// @dev CreditFacade must always ensure that `_activeCreditAccount` is address(1) between calls
     function setActiveCreditAccount(address creditAccount)
         external
         override
@@ -581,6 +618,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         _activeCreditAccount = creditAccount;
     }
 
+    /// @notice Returns the current active credit account
     function getActiveCreditAccountOrRevert() public view override returns (address creditAccount) {
         creditAccount = _activeCreditAccount;
         if (creditAccount == address(1)) revert ActiveCreditAccountNotSetException();
@@ -590,9 +628,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     // COLLATERAL VALIDITY AND ACCOUNT HEALTH CHECKS
     //
 
-    /// @dev Performs a full health check on an account with a custom order of evaluated tokens and
+    /// @notice Performs a full health check on an account with a custom order of evaluated tokens and
     ///      a custom minimal health factor
     /// @param creditAccount Address of the Credit Account to check
+    /// @param enabledTokensMask Current enabled token mask
     /// @param collateralHints Array of token masks in the desired order of evaluation
     /// @param minHealthFactor Minimal health factor of the account, in PERCENTAGE format
     function fullCollateralCheck(
@@ -609,6 +648,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             revert CustomHealthFactorTooLowException(); // U:[CM-17]
         }
 
+        /// Performs a generalized debt and collteral computation with the
+        /// task FULL_COLLATERAL_CHECK_LAZY. This ensures that collateral computations
+        /// stop as soon as it is determined that there is enough collateral to cover the debt,
+        /// which is done in order to save gas
         CollateralDebtData memory collateralDebtData = _calcDebtAndCollateral({
             creditAccount: creditAccount,
             minHealthFactor: minHealthFactor,
@@ -617,14 +660,23 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             task: CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY
         }); // U:[CM-18]
 
+        /// If the TWV value outputted by the collateral computation is less than
+        /// total debt, the full collateral check has failed
         if (collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD) {
             revert NotEnoughCollateralException(); // U:[CM-18]
         }
 
+        /// During the debt and collateral computation, any encountered zero balance
+        /// tokens are deleted from the in-memory enabledTokensMask, so the final value
+        /// must be saved
         _saveEnabledTokensMask(creditAccount, collateralDebtData.enabledTokensMask); // U:[CM-18]
     }
 
-    /// Q: move to CF?
+    /// TODO: Q: move to CF?
+    /// @notice Returns whether the passed credit account is unhealthy given the provided minHealthFactor
+    /// @param creditAccount Address of the credit account to check
+    /// @param minHealthFactor The health factor below which the function would
+    ///                        consider the account unhealthy
     function isLiquidatable(address creditAccount, uint16 minHealthFactor) external view override returns (bool) {
         uint256[] memory collateralHints;
 
@@ -639,7 +691,29 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         return collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD; // U:[CM-18]
     }
 
-    /// @dev Calculates collateral and debt parameters
+    /// @notice Calculates parameters related to account's debt and collateral,
+    ///         with level of detail dependent on `task`
+    /// @dev Unlike previous versions, Gearbox V3 uses a generalized Credit Manager function to compute debt and collateral
+    ///      that is then reused in other contracts (including third-party contracts, such as bots). This allows to ensure that account health
+    ///      computation logic is uniform across the codebase. The returned collateralDebtData object is intended to be a complete set of
+    ///      data required to track account health, but can be filled partially to avoid unnecessary computation where needed.
+    /// @param creditAccount Credit Account to compute parameters for
+    /// @param task Determines the parameters to compute:
+    ///             * GENERIC_PARAMS - computes debt and raw base interest indexes
+    ///             * DEBT_ONLY - computes all debt parameters, including totalDebt, accrued base/quota interest and associated fees;
+    ///               if quota logic is enabled, also returns all data relevant to quota interest and collateral computations in the struct
+    ///             * DEBT_COLLATERAL_WITHOUT_WITHDRAWALS - computes all debt parameters and the total value of collateral
+    ///               (both weighted and unweighted, in USD and underlying).
+    ///             * DEBT_COLLATERAL_CANCEL_WITHDRAWALS - same as above, but includes immature withdrawals into the total value of the Credit Account;
+    ///               NB: The value of withdrawals is not included into the total weighted value, so they have no bearing on whether an account can be
+    ///               liquidated. However, during liquidations it is prudent to return immature withdrawals to the Credit Account, to defend against attacks
+    ///               that involve withdrawals combined with oracle manipulations. Hence, this collateral computation method is used for liquidations.
+    ///             * DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS - same as above, but also includes mature withdrawals into the total value of the Credit Account;
+    ///               NB: This method of calculation is used for emergency liquidations. Emergency liquidations are performed when the system is paused due to a
+    ///               perceived security risk. Returning mature withdrawals is a contingency for the case where a malicious withdrawal is scheduled, the system
+    ///               is paused, and the withdrawal matures while the DAO coordinates a response.
+    /// @return collateralDebtData A struct containing debt and collateral parameters. It is filled based on the passed task.
+    ///                            For more information on struct fields, see its definition along the `ICreditManagerV3` interface
     function calcDebtAndCollateral(address creditAccount, CollateralCalcTask task)
         external
         view
@@ -648,7 +722,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         uint256[] memory collateralHints;
 
-        /// @notice FULL_COLLATERAL_CHECK_LAZY is used for internal calculations only
+        /// @dev FULL_COLLATERAL_CHECK_LAZY is a special calculation type
+        ///      that can only be used safely internally, since it can stop early
+        ///      and possibly return incorrect TWV/TV values. Therefore, it is
+        ///      prevented from being called internally
         if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) {
             revert IncorrectParameterException(); // U:[CM-19]
         }
@@ -662,6 +739,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }); // U:[CM-20]
     }
 
+    /// @notice Implementation for `calcDebtAndCollateral`.
+    /// @param creditAccount Credit Account to compute collateral for
+    /// @param enabledTokensMask Current enabled tokens mask
+    /// @param collateralHints Array of token masks in the desired order of evaluation.
+    ///        Used to optimize the length of lazy evaluation by putting the most valuable
+    ///        tokens on the account first.
+    /// @param minHealthFactor The health factor to stop the lazy evaluation at
+    /// @param task The type of calculation to perform (see `calcDebtAndCollateral` for details)
     function _calcDebtAndCollateral(
         address creditAccount,
         uint256 enabledTokensMask,
@@ -669,7 +754,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         uint16 minHealthFactor,
         CollateralCalcTask task
     ) internal view returns (CollateralDebtData memory collateralDebtData) {
-        /// GET GENERIC PARAMS
+        /// GENERIC PARAMS
+        /// The generic parameters include the debt principal and base interest current and LU indexes
+        /// This is the minimal amount of debt data required to perform computations after increasing debt.
         collateralDebtData.debt = creditAccountInfo[creditAccount].debt; // U:[CM-20]
         collateralDebtData.cumulativeIndexLastUpdate = creditAccountInfo[creditAccount].cumulativeIndexLastUpdate; // U:[CM-20]
         collateralDebtData.cumulativeIndexNow = _poolCumulativeIndexNow(); // U:[CM-20]
@@ -677,8 +764,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         if (task == CollateralCalcTask.GENERIC_PARAMS) {
             return collateralDebtData;
         } // U:[CM-20]
-        ///
-        /// COMPUTE DEBT PARAMS
+
+        /// DEBT
+        /// Debt parameters include accrued interest (with quota interest included, if applicable) and fees
+        /// Parameters related to quoted tokens are cached inside the struct, since they are read from storage
+        /// during quota interest computation and can be later reused to compute quota token collateral
         collateralDebtData.enabledTokensMask = enabledTokensMask; // U:[CM-21]
 
         if (supportsQuotas) {
@@ -708,9 +798,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         collateralDebtData.accruedFees = (collateralDebtData.accruedInterest * feeInterest) / PERCENTAGE_FACTOR; // U:[CM-21]
 
         if (task == CollateralCalcTask.DEBT_ONLY) return collateralDebtData; // U:[CM-21]
-        ///
-        /// COMPUTES COLLATERAL
-        /// If task == FULL_COLLATERAL_CHECK_LAZY, collateral is computed until it less enough
+
+        /// COLLATERAL
+        /// Collateral values such as total value / total weighted value are computed and saved into the struct
+        /// And zero-balance tokens encountered are removed from enabledTokensMask inside the struct as well
+        /// If the task is FULL_COLLATERAL_CHECK_LAZY, then collateral value are only computed until twvUSD > totalDebtUSD,
+        /// and any extra collateral on top of that is not included into the account's value
         address _priceOracle = priceOracle;
 
         collateralDebtData.totalDebtUSD = _convertToUSD({
@@ -719,6 +812,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             token: underlying
         }); // U:[CM-22]
 
+        /// The logic for computing collateral is isolated into the `CreditLogic` library. See `CreditLogic.calcCollateral` for details.
         uint256 tokensToDisable;
         (collateralDebtData.totalValueUSD, collateralDebtData.twvUSD, tokensToDisable) = collateralDebtData
             .calcCollateral({
@@ -737,19 +831,21 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) {
             return collateralDebtData;
         }
-        //
-        // EXTRA PARAMS
-        // If there is not fullCoolaralCheck calc, than it adds some useful pararms
 
+        /// The underlying-denominated total value is also added for liquidation payments calculations, unless the data is computed
+        /// for fullCollateralCheck, which doesn't need this
         collateralDebtData.totalValue = _convertFromUSD(_priceOracle, collateralDebtData.totalValueUSD, underlying); // F:[FA-41]
 
         if (task == CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS) {
             return collateralDebtData;
         }
-        ///
-        /// ADDS WITHDRAWAL VALUE
+
+        /// WITHDRAWALS
+        /// Withdrawals are added to the total value of the account primarily for liquidation purposes,
+        /// since we want to return withdrawals to the Credit Account but also need to ensure that
+        /// they are included into remainingFunds.
         if (_hasWithdrawals(creditAccount)) {
-            collateralDebtData.totalValueUSD += addCancellableWithdrawalsValue({
+            collateralDebtData.totalValueUSD += _addCancellableWithdrawalsValue({
                 _priceOracle: _priceOracle,
                 creditAccount: creditAccount,
                 isForceCancel: task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
@@ -757,6 +853,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
     }
 
+    /// @notice Gathers all data on the Credit Account's quoted tokens and quota interest
+    /// @param creditAccount Credit Account to return quoted token data for
+    /// @param enabledTokensMask Current mask of enabled tokens
+    /// @param _poolQuotaKeeper The PoolQuotaKeeper contract storing the quota and quota interest data
+    /// @return quotaTokens An array of address of quoted tokens on the Credit Account
+    /// @return outstandingQuotaInterest Quota interest that has not been saved in the Credit Manager
+    /// @return quotas Current quotas on quoted tokens, in the same order as quoted tokens
+    /// @return lts Current lts of quoted tokens, in the same order as quoted tokens
+    /// @return quotedMask The mask of enabled quoted tokens on the account
     function _getQuotedTokensData(address creditAccount, uint256 enabledTokensMask, address _poolQuotaKeeper)
         internal
         view
@@ -772,6 +877,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         quotedMask = enabledTokensMask & quotedTokenMask;
 
+        // If there are not quoted tokens on the account, then zero-length arrays are returned
+        // This is desirable, as it makes it simple to check whether there are any quoted tokens
         if (quotedMask != 0) {
             quotaTokens = new address[](_maxEnabledTokens);
             quotas = new uint256[](_maxEnabledTokens);
@@ -794,7 +901,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                         (quotas[j], outstandingInterestDelta) =
                             IPoolQuotaKeeper(_poolQuotaKeeper).getQuotaAndOutstandingInterest(creditAccount, token);
 
-                        // Safe because quotaInterest =  (quota is uint96) * APY * time, so even with 1000% APY, it will take 10**10 years for overflow
+                        /// Quota interest is equal to quota * APY * time. Since quota is a uint96, this is unlikely to overflow in any realistic scenario.
                         outstandingQuotaInterest += outstandingInterestDelta;
 
                         ++j;
@@ -808,7 +915,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     // QUOTAS MANAGEMENT
     //
 
-    /// @dev Updates credit account's quotas for multiple tokens
+    /// @notice Updates credit account's quotas for multiple tokens
     /// @param creditAccount Address of credit account
     /// @param token Address of quoted token
     /// @param quotaChange Change in quota in SIGNED format
@@ -819,6 +926,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacadeOnly // U:[CM-2]
         returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
+        /// The PoolQuotaKeeper returns the interest to be cached (quota interest is computed dynamically,
+        /// so the cumulative index inside PQK needs to be updated before setting the new quota value).
+        /// PQK also reports whether the quota was changed from zero to non-zero and vice versa, in order to
+        /// safely enable and disable quoted tokens
         (uint256 caInterestChange, bool enable, bool disable) = IPoolQuotaKeeper(poolQuotaKeeper()).updateQuota({
             creditAccount: creditAccount,
             token: token,
@@ -838,7 +949,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// WITHDRAWALS
     ///
 
-    /// @inheritdoc ICreditManagerV3
+    /// @notice Schedules a delayed withdrawal of an asset from the account.
+    /// @dev Withdrawals in Gearbox V3 are generally delayed for safety, and an intermediate WithdrawalManager contract
+    ///      is used to store funds pending a withdrawal. When the withdrawal matures, a corresponding `claimWithdrawals` function
+    ///      can be used to receive them outside the Gearbox system.
+    /// @param creditAccount Credit Account to schedule a withdrawal for
+    /// @param token Token to withdraw
+    /// @param amount Amount to withdraw
     function scheduleWithdrawal(address creditAccount, address token, uint256 amount)
         external
         override
@@ -848,6 +965,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         uint256 tokenMask = getTokenMaskOrRevert({token: token});
 
+        // If the configured delay is zero, then sending funds to the WithdrawalManager can be skipped
+        // and they can be sent directly to the user
         if (IWithdrawalManager(withdrawalManager).delay() == 0) {
             address borrower = getBorrowerOrRevert({creditAccount: creditAccount});
             _safeTokenTransfer({
@@ -864,7 +983,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             IWithdrawalManager(withdrawalManager).addScheduledWithdrawal(
                 creditAccount, token, delivered, tokenMask.calcIndex()
             );
-            // enables withdrawal flag
+
+            // WITHDRAWAL_FLAG is enabled on the account to efficiently determine
+            // whether the account has pending withdrawals in the future
             _enableFlag({creditAccount: creditAccount, flag: WITHDRAWAL_FLAG});
         }
 
@@ -873,7 +994,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
     }
 
-    /// @inheritdoc ICreditManagerV3
+    /// @notice Resolves pending withdrawals, with logic dependent on the passed action.
+    /// @param creditAccount Credit Account to claim withdrawals for
+    /// @param to Address to claim withdrawals to
+    /// @param action Action to perform:
+    ///               * CLAIM - claims mature withdrawals to `to`, leaving immature withdrawals as-is
+    ///               * CANCEL - claims mature withdrawals and returns immature withdrawals to the credit account
+    ///               * FORCE_CLAIM - claims all pending withdrawals, regardless of maturity
+    ///               * FORCE_CANCEL - returns all pending withdrawals to the Credit Account regardless of maturity
     function claimWithdrawals(address creditAccount, address to, ClaimAction action)
         external
         override
@@ -887,13 +1015,17 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             (hasScheduled, tokensToEnable) =
                 IWithdrawalManager(withdrawalManager).claimScheduledWithdrawals(creditAccount, to, action);
             if (!hasScheduled) {
-                // disables withdrawal flag
+                // WITHDRAWAL_FLAG is disabled when there are no more pending withdrawals
                 _disableFlag(creditAccount, WITHDRAWAL_FLAG);
             }
         }
     }
 
-    function addCancellableWithdrawalsValue(address _priceOracle, address creditAccount, bool isForceCancel)
+    /// @notice Computes the value of cancellable withdrawals to add to Credit Account value
+    /// @param _priceOracle Price Oracle to compute the value of withdrawn assets
+    /// @param creditAccount Credit Account to compute value for
+    /// @param isForceCancel Whether to cancel all withdrawals or only immature ones
+    function _addCancellableWithdrawalsValue(address _priceOracle, address creditAccount, bool isForceCancel)
         internal
         view
         returns (uint256 totalValueUSD)
@@ -910,6 +1042,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     /// @notice Revokes allowances for specified spender/token pairs
+    /// @dev When used with an older account factory, the Credit Manager may receive
+    ///      an account with existing allowances. If the user is not comfortable with
+    ///      these allowances, they can revoke them.
+    /// @param creditAccount Credit Account to revoke allowances for
     /// @param revocations Spender/token pairs to revoke allowances for
     function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations)
         external
@@ -939,7 +1075,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     // TRANSFER HELPERS
     //
 
-    /// @dev Transfers all enabled assets from a Credit Account to the "to" address
+    /// @notice Transfers all enabled assets from a Credit Account to the "to" address
     /// @param creditAccount Credit Account to transfer assets from
     /// @param to Recipient address
     /// @param convertToETH Whether WETH must be converted to ETH before sending
@@ -973,8 +1109,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
     }
 
-    /// @dev Requests the Credit Account to transfer a token to another address
-    ///      Able to unwrap WETH before sending, if requested
+    /// @notice Requests the Credit Account to transfer a token to another address. If a token transfer
+    ///         fails, the token will be transferred to WithdrawalManager, where the `to` address can
+    ///         withdraw it from to any address.
     /// @param creditAccount Address of the sender Credit Account
     /// @param token Address of the token
     /// @param to Recipient address
@@ -986,6 +1123,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             ICreditAccount(creditAccount).transfer({token: token, to: wethGateway, amount: amount}); // F:[CM-45]
             IWETHGateway(wethGateway).depositFor({to: to, amount: amount}); // F:[CM-45]
         } else {
+            // In case a token transfer fails (e.g., borrower getting blacklisted by USDC), the token will be sent
+            // to WithdrawalManager
             try ICreditAccount(creditAccount).safeTransfer({token: token, to: to, amount: amount}) {
                 // F:[CM-45]
             } catch {
@@ -1003,10 +1142,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     // GETTERS
     //
 
-    /// @dev Returns the collateral token with requested mask and its liquidationThreshold
-    /// @param tokenMask Token mask corresponding to the token
-
     // TODO: naming!
+    /// @notice Returns the collateral token with requested mask and its liquidationThreshold
+    /// @param tokenMask Token mask corresponding to the token
     function collateralTokensByMask(uint256 tokenMask)
         public
         view
@@ -1016,25 +1154,27 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         return _collateralTokensByMask({tokenMask: tokenMask, calcLT: true});
     }
 
-    /// @dev Returns the mask for the provided token
+    /// @notice Returns the mask for the provided token
     /// @param token Token to returns the mask for
     function getTokenMaskOrRevert(address token) public view override returns (uint256 tokenMask) {
         tokenMask = (token == underlying) ? 1 : tokenMasksMapInternal[token];
         if (tokenMask == 0) revert TokenNotAllowedException();
     }
 
+    /// @notice Returns the collateral token with requested mask
+    /// @param tokenMask Token mask corresponding to the token
     function getTokenByMask(uint256 tokenMask) public view override returns (address token) {
         (token,) = _collateralTokensByMask({tokenMask: tokenMask, calcLT: false});
     }
 
-    /// @dev Returns the liquidation threshold for the provided token
+    /// @notice Returns the liquidation threshold for the provided token
     /// @param token Token to retrieve the LT for
     function liquidationThresholds(address token) public view override returns (uint16 lt) {
         uint256 tokenMask = getTokenMaskOrRevert(token);
         (, lt) = _collateralTokensByMask({tokenMask: tokenMask, calcLT: true}); // F:[CM-47]
     }
 
-    /// @dev Returns the collateral token with requested mask and its liquidationThreshold
+    /// @notice Returns the collateral token with requested mask and its liquidationThreshold
     /// @param tokenMask Token mask corresponding to the token
     function _collateralTokensByMask(uint256 tokenMask, bool calcLT)
         internal
@@ -1050,12 +1190,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             token = tokenData.getTokenOrRevert();
 
             if (calcLT) {
+                // The logic to calculate a ramping LT is isolated to the `CreditLogic` library.
+                // See `CreditLogic.getLiquidationThreshold()` for details.
                 liquidationThreshold = tokenData.getLiquidationThreshold();
             }
         }
     }
 
-    /// @dev Returns the fee parameters of the Credit Manager
+    /// @notice Returns the fee parameters of the Credit Manager
     /// @return _feeInterest Percentage of interest taken by the protocol as profit
     /// @return _feeLiquidation Percentage of account value taken by the protocol as profit
     ///         during unhealthy account liquidations
@@ -1084,12 +1226,17 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         _liquidationDiscountExpired = liquidationDiscountExpired; // F:[CM-51]
     }
 
-    /// @dev Address of the connected pool
-    /// @notice [DEPRECATED]: use pool() instead.
+    /// @notice Address of the connected pool
+    /// @dev [DEPRECATED]: use pool() instead.
     function poolService() external view returns (address) {
         return pool;
     }
 
+    /// @notice Adress of the connected PoolQuotaKeeper
+    /// @dev PoolQuotaKeeper is a contract that manages token quota parameters
+    ///      and computes quota interest. Since quota interest is paid directly to the pool,
+    ///      this contract is responsible for aligning quota interest values between the
+    ///      pool, gauge and the Credit Manager
     function poolQuotaKeeper() public view returns (address) {
         return IPool4626(pool).poolQuotaKeeper();
     }
@@ -1098,21 +1245,32 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// CREDIT ACCOUNT INFO
     ///
 
-    /// @dev Returns the address of a borrower's Credit Account, or reverts if there is none.
-    /// @param borrower Borrower's address
+    /// @notice Returns the owner of the provided CA, or reverts if there is none
+    /// @param creditAccount Credit Account to get the borrower for
     function getBorrowerOrRevert(address creditAccount) public view override returns (address borrower) {
         borrower = creditAccountInfo[creditAccount].borrower; // F:[CM-48]
         if (borrower == address(0)) revert CreditAccountNotExistsException(); // F:[CM-48]
     }
 
+    /// @notice Returns the mask containing the account's enabled tokens
+    /// @param creditAccount Credit Account to get the mask for
     function enabledTokensMaskOf(address creditAccount) public view override returns (uint256) {
         return creditAccountInfo[creditAccount].enabledTokensMask;
     }
 
+    /// @notice Returns the mask containing miscellaneous account flags
+    /// @dev Currently, the following flags are supported:
+    ///      * 1 - WITHDRAWALS_FLAG - whether the account has pending withdrawals
+    ///      * 2 - BOT_PERMISSIONS_FLAG - whether the account has non-zero permissions for at least one bot
+    /// @param creditAccount Account to get the mask for
     function flagsOf(address creditAccount) external view override returns (uint16) {
         return creditAccountInfo[creditAccount].flags;
     }
 
+    /// @notice Sets a flag for a Credit Account
+    /// @param creditAccount Account to set a flag for
+    /// @param flag Flag to set
+    /// @param value The new flag value
     function setFlagFor(address creditAccount, uint16 flag, bool value)
         external
         override
@@ -1126,19 +1284,22 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
     }
 
+    /// @notice Sets the flag in the CA's flag mask to 1
     function _enableFlag(address creditAccount, uint16 flag) internal {
         creditAccountInfo[creditAccount].flags |= flag;
     }
 
+    /// @notice Sets the flag in the CA's flag mask to 0
     function _disableFlag(address creditAccount, uint16 flag) internal {
         creditAccountInfo[creditAccount].flags &= ~flag;
     }
 
+    /// @notice Efficiently checks whether the CA has pending withdrawals using the flag
     function _hasWithdrawals(address creditAccount) internal view returns (bool) {
         return creditAccountInfo[creditAccount].flags & WITHDRAWAL_FLAG != 0;
     }
 
-    /// @dev Checks quantity of enabled tokens and saves it to creditAccountInfo
+    /// @notice Checks quantity of enabled tokens and saves the mask to creditAccountInfo
     function _saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) internal {
         if (enabledTokensMask.calcEnabledTokens() > maxEnabledTokens) {
             revert TooManyEnabledTokensException();
@@ -1150,15 +1311,23 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// FEE TOKEN SUPPORT
     ///
 
+    /// @notice Returns the amount that needs to be transferred to get exactly `amount` delivered
+    /// @dev Can be overriden in inheritor contracts to support tokens with fees (such as USDT)
     function _amountWithFee(uint256 amount) internal view virtual returns (uint256) {
         return amount;
     }
 
+    /// @notice Returns the amount that will be delivered after `amount` is tranferred
+    /// @dev Can be overriden in inheritor contracts to support tokens with fees (such as USDT)
     function _amountMinusFee(uint256 amount) internal view virtual returns (uint256) {
         return amount;
     }
 
-    // CREDIT ACCOUNTS
+    ///
+    /// CREDIT ACCOUNTS
+    ///
+
+    /// @notice Returns the full set of currently active Credit Accounts
     function creditAccounts() external view returns (address[] memory) {
         return creditAccountsSet.values();
     }
@@ -1166,11 +1335,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     //
     // CONFIGURATION
     //
-    // The following function change vital Credit Manager parameters
+    // The following functions change vital Credit Manager parameters
     // and can only be called by the Credit Configurator
     //
 
-    /// @dev Adds a token to the list of collateral tokens
+    /// @notice Adds a token to the list of collateral tokens
     /// @param token Address of the token to add
     function addToken(address token)
         external
@@ -1179,7 +1348,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         _addToken(token); // F:[CM-52]
     }
 
-    /// @dev IMPLEMENTATION: addToken
+    /// @notice IMPLEMENTATION: addToken
     /// @param token Address of the token to add
     function _addToken(address token) internal {
         // Checks that the token is not already known (has an associated token mask)
@@ -1205,7 +1374,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
     }
 
-    /// @dev Sets fees and premiums
+    /// @notice Sets fees and premiums
     /// @param _feeInterest Percentage of interest taken by the protocol as profit
     /// @param _feeLiquidation Percentage of account value taken by the protocol as profit
     ///         during unhealthy account liquidations
@@ -1232,9 +1401,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         liquidationDiscountExpired = _liquidationDiscountExpired; // F:[CM-51]
     }
 
-    /// @dev Sets ramping parameters for a token's liquidation threshold
-    /// @notice Ramping parameters allow to decrease the LT gradually over a period of time
+    /// @notice Sets ramping parameters for a token's liquidation threshold
+    /// @dev Ramping parameters allow to decrease the LT gradually over a period of time
     ///         which gives users/bots time to react and adjust their position for the new LT
+    /// @dev A static LT can be forced by setting ltInitial to desired LT and setting timestampRampStart to unit40.max
     /// @param token The collateral token to set the LT for
     /// @param finalLT The final LT after ramping
     /// @param timestampRampStart Timestamp when the LT starts ramping
@@ -1262,10 +1432,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
     }
 
-    /// @dev Sets the limited token mask
+    /// @notice Sets the quoted token mask
     /// @param _quotedTokenMask The new mask
-    /// @notice Limited tokens are counted as collateral not based on their balances,
-    ///         but instead based on their quotas set in the poolQuotaKeeper contract
+    /// @dev Quoted tokens are counted as collateral not only based on their balances,
+    ///         but also on their quotas set in thePpoolQuotaKeeper contract
     ///         Tokens in the mask also incur additional interest based on their quotas
     function setQuotedMask(uint256 _quotedTokenMask)
         external
@@ -1274,7 +1444,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         quotedTokenMask = _quotedTokenMask; // F: [CMQ-2]
     }
 
-    /// @dev Sets the maximal number of enabled tokens on a single Credit Account.
+    /// @notice Sets the maximal number of enabled tokens on a single Credit Account.
     /// @param _maxEnabledTokens The new enabled token quantity limit.
     function setMaxEnabledTokens(uint8 _maxEnabledTokens)
         external
@@ -1283,10 +1453,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         maxEnabledTokens = _maxEnabledTokens; // F: [CC-37]
     }
 
-    /// @dev Sets the link between an adapter and its corresponding targetContract
+    /// @notice Sets the link between an adapter and its corresponding targetContract
     /// @param adapter Address of the adapter to be used to access the target contract
     /// @param targetContract A 3rd-party contract for which the adapter is set
-    /// @notice The function can be called with (adapter, address(0)) and (address(0), targetContract)
+    /// @dev The function can be called with (adapter, address(0)) and (address(0), targetContract)
     ///         to disallow a particular target or adapter, since this would set values in respective
     ///         mappings to address(0).
     function setContractAllowance(address adapter, address targetContract)
@@ -1305,7 +1475,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
     }
 
-    /// @dev Sets the Credit Facade
+    /// @notice Sets the Credit Facade
     /// @param _creditFacade Address of the new Credit Facade
     function setCreditFacade(address _creditFacade)
         external
@@ -1314,7 +1484,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacade = _creditFacade;
     }
 
-    /// @dev Sets the Price Oracle
+    /// @notice Sets the Price Oracle
     /// @param _priceOracle Address of the new Price Oracle
     function setPriceOracle(address _priceOracle)
         external
@@ -1323,7 +1493,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         priceOracle = _priceOracle;
     }
 
-    /// @dev Sets a new Credit Configurator
+    /// @notice Sets a new Credit Configurator
     /// @param _creditConfigurator Address of the new Credit Configurator
     function setCreditConfigurator(address _creditConfigurator)
         external
@@ -1340,14 +1510,23 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     //
     // POOL HELPERS
     //
+
+    /// @notice Returns the current pool cumulative index
     function _poolCumulativeIndexNow() internal view returns (uint256) {
         return IPoolBase(pool).calcLinearCumulative_RAY();
     }
 
+    /// @notice Notifies the pool that there was a debt repayment
+    /// @param debt Amount of debt principal repaid
+    /// @param profit Amount of treasury earned (if any)
+    /// @param loss Amount of loss incurred (if any)
     function _poolRepayCreditAccount(uint256 debt, uint256 profit, uint256 loss) internal {
         IPoolBase(pool).repayCreditAccount(debt, profit, loss);
     }
 
+    /// @notice Requests the pool to lend funds to a Credit Account
+    /// @param amount Amount of funds to lend
+    /// @param creditAccount Address of the Credit Account to lend to
     function _poolLendCreditAccount(uint256 amount, address creditAccount) internal {
         IPoolBase(pool).lendCreditAccount(amount, creditAccount); // F:[CM-20]
     }
@@ -1355,6 +1534,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     //
     // PRICE ORACLE
     //
+
+    /// @notice Returns the value of a token amount in USD
+    /// @param _priceOracle Price oracle to query for token value
+    /// @param amountInToken Amount of token to convert
+    /// @param token Token to convert
     function _convertToUSD(address _priceOracle, uint256 amountInToken, address token)
         internal
         view
@@ -1363,6 +1547,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         amountInUSD = IPriceOracleV2(_priceOracle).convertToUSD(amountInToken, token);
     }
 
+    /// @notice Returns amount of token after converting from a provided USD amount
+    /// @param _priceOracle Price oracle to query for token value
+    /// @param amountInUSD USD amount to convert
+    /// @param token Token to convert to
     function _convertFromUSD(address _priceOracle, uint256 amountInUSD, address token)
         internal
         view

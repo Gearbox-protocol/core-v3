@@ -198,14 +198,14 @@ library CreditLogic {
             if (amountToRepay >= cumulativeQuotaInterest + quotaProfit) {
                 amountToRepay -= cumulativeQuotaInterest + quotaProfit; // F: [CMQ-5]
                 profit += quotaProfit; // F: [CMQ-5]
-                newCumulativeQuotaInterest = 1; // F: [CMQ-5]
+                newCumulativeQuotaInterest = 0; // F: [CMQ-5]
             } else {
                 uint256 amountToPool = (amountToRepay * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
 
                 profit += amountToRepay - amountToPool; // F: [CMQ-4]
                 amountToRepay = 0; // F: [CMQ-4]
 
-                newCumulativeQuotaInterest = cumulativeQuotaInterest - amountToPool + 1; // F: [CMQ-4]
+                newCumulativeQuotaInterest = cumulativeQuotaInterest - amountToPool; // F: [CMQ-4]
 
                 newDebt = debt;
                 newCumulativeIndex = cumulativeIndexLastUpdate;

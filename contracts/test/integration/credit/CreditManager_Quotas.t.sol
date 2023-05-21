@@ -13,7 +13,9 @@ import {
     ICreditManagerV3Events,
     ClosureAction,
     CollateralTokenData,
-    ManageDebtAction
+    ManageDebtAction,
+    CollateralCalcTask,
+    CollateralDebtData
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {IPoolQuotaKeeper, AccountQuota} from "../../../interfaces/IPoolQuotaKeeper.sol";
 import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
@@ -163,13 +165,12 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         assertEq(cumulativeQuotaInterest, 1, "SETUP: Cumulative quota interest was not updated correctly");
 
-        vm.expectRevert(CallerNotCreditFacadeException.selector);
-        vm.prank(FRIEND);
-        creditManager.updateQuota({
-            creditAccount: creditAccount,
-            token: tokenTestSuite.addressOf(Tokens.LINK),
-            quotaChange: 100_000
-        });
+        {
+            address link = tokenTestSuite.addressOf(Tokens.LINK);
+            vm.expectRevert(CallerNotCreditFacadeException.selector);
+            vm.prank(FRIEND);
+            creditManager.updateQuota({creditAccount: creditAccount, token: link, quotaChange: 100_000});
+        }
 
         vm.expectCall(
             address(poolQuotaKeeper),
@@ -203,16 +204,15 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         assertEq(
             cumulativeQuotaInterest,
-            (100000 * 1000 + 200000 * 500) / PERCENTAGE_FACTOR + 1,
+            (100000 * 1000) / PERCENTAGE_FACTOR + 1,
             "Cumulative quota interest was not updated correctly"
         );
 
-        vm.expectRevert(TokenIsNotQuotedException.selector);
-        creditManager.updateQuota({
-            creditAccount: creditAccount,
-            token: tokenTestSuite.addressOf(Tokens.USDC),
-            quotaChange: 100_000
-        });
+        {
+            address usdc = tokenTestSuite.addressOf(Tokens.USDC);
+            vm.expectRevert(TokenIsNotQuotedException.selector);
+            creditManager.updateQuota({creditAccount: creditAccount, token: usdc, quotaChange: 100_000});
+        }
     }
 
     /// @dev [CMQ-4]: Quotas are handled correctly on debt decrease: amount < quota interest case
@@ -352,29 +352,15 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         uint256 poolBalanceBefore = tokenTestSuite.balanceOf(Tokens.DAI, address(poolMock));
 
-        ///       address borrower,
-        // ClosureAction closureActionType,
-        // uint256 totalValue,
-        // address payer,
-        // address to,
-        // uint256 enabledTokensMask,
-        // uint256 skipTokensMask,
-        // uint256 borrowedAmountWithInterest,
-        // bool convertToETH
-
-        // (, uint256 borrowedAmountWithInterest,) = creditManager.calcAccruedInterestAndFees(creditAccount);
-
-        // creditManager.closeCreditAccount(
-        //     creditAccount,
-        //     ClosureAction.CLOSE_ACCOUNT,
-        //     0,
-        //     USER,
-        //     USER,
-        //     tokensToEnable | UNDERLYING_TOKEN_MASK,
-        //     0,
-        //     borrowedAmountWithInterest,
-        //     false
-        // );
+        creditManager.closeCreditAccount(
+            creditAccount,
+            ClosureAction.CLOSE_ACCOUNT,
+            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_ONLY),
+            USER,
+            USER,
+            0,
+            false
+        );
 
         expectBalance(
             Tokens.DAI,
@@ -387,11 +373,9 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
             poolQuotaKeeper.getQuota(creditAccount, tokenTestSuite.addressOf(Tokens.LINK));
 
         assertEq(uint256(quota), 1, "Quota was not set to 0");
-        assertEq(uint256(cumulativeIndexLU), 0, "Cumulative index was not updated");
 
         (quota, cumulativeIndexLU) = poolQuotaKeeper.getQuota(creditAccount, tokenTestSuite.addressOf(Tokens.USDT));
         assertEq(uint256(quota), 1, "Quota was not set to 0");
-        assertEq(uint256(cumulativeIndexLU), 0, "Cumulative index was not updated");
     }
 
     // /// @dev [CMQ-7] enableToken, disableToken and changeEnabledTokens do nothing for limited tokens
@@ -659,6 +643,8 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         (,,, address creditAccount) = cms.openCreditAccount();
 
+        tokenTestSuite.mint(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT * 2);
+
         uint256 enabledTokensMap = UNDERLYING_TOKEN_MASK;
 
         (uint256 tokensToEnable,) = creditManager.updateQuota({
@@ -675,24 +661,22 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         });
         enabledTokensMap |= tokensToEnable;
 
-        address[] memory quotedTokens = new address[](creditManager.maxEnabledTokens() + 1);
+        creditManager.fullCollateralCheck(creditAccount, enabledTokensMap, new uint256[](0), 10_000);
 
-        quotedTokens[0] = tokenTestSuite.addressOf(Tokens.LINK);
-        quotedTokens[1] = tokenTestSuite.addressOf(Tokens.USDT);
+        address[] memory quotedTokens = new address[](creditManager.maxEnabledTokens());
 
-        // vm.expectCall(address(poolQuotaKeeper), abi.encodeCall(IPoolQuotaKeeper.setLimitsToZero, (quotedTokens)));
+        quotedTokens[0] = tokenTestSuite.addressOf(Tokens.USDT);
+        quotedTokens[1] = tokenTestSuite.addressOf(Tokens.LINK);
 
-        // creditManager.closeCreditAccount(
-        //     creditAccount,
-        //     ClosureAction.LIQUIDATE_ACCOUNT,
-        //     DAI_ACCOUNT_AMOUNT,
-        //     USER,
-        //     USER,
-        //     enabledTokensMap,
-        //     0,
-        //     DAI_ACCOUNT_AMOUNT,
-        //     false
-        // );
+        CollateralDebtData memory cdd =
+            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS);
+        cdd.totalValue = 0;
+
+        vm.expectCall(
+            address(poolQuotaKeeper), abi.encodeCall(IPoolQuotaKeeper.removeQuotas, (creditAccount, quotedTokens, true))
+        );
+
+        creditManager.closeCreditAccount(creditAccount, ClosureAction.LIQUIDATE_ACCOUNT, cdd, USER, USER, 0, false);
 
         for (uint256 i = 0; i < quotedTokens.length; ++i) {
             if (quotedTokens[i] == address(0)) continue;

@@ -50,7 +50,7 @@ uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS
 uint256 constant CLOSE_CREDIT_ACCOUNT_FLAGS = EXTERNAL_CALLS_PERMISSION;
 
 /// @title CreditFacadeV3
-/// @notice User interface for interacting with Credit Manager.
+/// @notice A contract that provides a user interface for interacting with Credit Manager.
 /// @dev CreditFacadeV3 provides an interface between the user and the Credit Manager. Direct interactions
 /// with the Credit Manager are forbidden. Credit Facade provides access to all account management functions,
 /// opening, closing, liquidating, managing debt, as well as calls to external protocols (through adapters, which
@@ -59,109 +59,109 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     using Address for address;
     using BitMask for uint256;
 
-    /// @dev Credit Manager connected to this Credit Facade
+    /// @notice Credit Manager connected to this Credit Facade
     address public immutable creditManager;
 
-    /// @dev Whether the whitelisted mode is active
+    /// @notice Whether the whitelisted mode is active
     bool public immutable whitelisted;
 
-    /// @dev Whether the Credit Facade implements expirable logic
+    /// @notice Whether the Credit Facade implements expirable logic
     bool public immutable expirable;
 
-    /// @dev Address of WETH
+    /// @notice Address of WETH
     address public immutable weth;
 
-    /// @dev Address of WETH Gateway
+    /// @notice Address of WETH Gateway
     address public immutable wethGateway;
 
-    /// @dev Address of the DegenNFT that gatekeeps account openings in whitelisted mode
+    /// @notice Address of the DegenNFT that gatekeeps account openings in whitelisted mode
     address public immutable override degenNFT;
 
-    /// @dev Date of the next Credit Account expiration (for CF's with expirable logic)
+    /// @notice Date of the next Credit Account expiration (for CF's with expirable logic)
     uint40 public expirationDate;
 
-    /// @dev Maximal amount of new debt that can be taken per block
+    /// @notice Maximal amount of new debt that can be taken per block
     uint8 public override maxDebtPerBlockMultiplier;
 
-    /// @dev Last block in which debt was increased on a Credit Account
+    /// @notice Last block in which debt was increased on a Credit Account
     uint64 internal lastBlockBorrowed;
 
-    /// @dev The total amount of new debt in the last block where debt was increased
+    /// @notice The total amount of new debt in the last block where debt was increased
     uint128 internal totalBorrowedInBlock;
 
-    /// @dev Contract containing permissions from borrowers to bots
+    /// @notice Contract containing permissions from borrowers to bots
     address public botList;
 
-    /// @dev Limits on debt principal for a single Credit Account
+    /// @notice Limits on debt principal for a single Credit Account
     DebtLimits public debtLimits;
 
-    /// @dev Bit mask encoding a set of forbidden tokens
+    /// @notice Bit mask encoding a set of forbidden tokens
     uint256 public forbiddenTokenMask;
 
-    /// @dev Keeps parameters that are used to pause the system after too much bad debt over a short period
+    /// @notice Keeps parameters that are used to pause the system after too much bad debt over a short period
     CumulativeLossParams public override lossParams;
 
-    /// @dev A map that stores whether a user allows a transfer of an account from another user to themselves
+    /// @notice A map that stores whether a user allows a transfer of an account from another user to themselves
     mapping(address => mapping(address => bool)) public override transfersAllowed;
 
-    /// @dev Maps addresses to their status as emergency liquidator.
-    /// @notice Emergency liquidators are trusted addresses
+    /// @notice Maps addresses to their status as emergency liquidator.
+    /// @dev Emergency liquidators are trusted addresses
     /// that are able to liquidate positions while the contracts are paused,
     /// e.g. when there is a risk of bad debt while an exploit is being patched.
     /// In the interest of fairness, emergency liquidators do not receive a premium
     /// And are compensated by the Gearbox DAO separately.
     mapping(address => bool) public override canLiquidateWhilePaused;
 
-    /// @dev Contract version
+    /// @notice Contract version
     uint256 public constant override version = 3_00;
 
-    /// @dev Restricts functions to the connected Credit Configurator only
+    /// @notice Restricts functions to the connected Credit Configurator only
     modifier creditConfiguratorOnly() {
         _checkCreditConfigurator();
         _;
     }
 
-    /// @dev Private function for `creditConfiguratorOnly`; used for contract size optimization
+    /// @notice Private function for `creditConfiguratorOnly`; used for contract size optimization
     function _checkCreditConfigurator() private view {
         if (msg.sender != ICreditManagerV3(creditManager).creditConfigurator()) {
             revert CallerNotConfiguratorException();
         }
     }
 
-    /// @dev Restricts functions to the owner of a Credit Account
+    /// @notice Restricts functions to the owner of a Credit Account
     modifier creditAccountOwnerOnly(address creditAccount) {
         _checkCreditAccountOwner(creditAccount);
         _;
     }
 
-    /// @dev Private function for `creditAccountOwnerOnly`; used for contract size optimization
+    /// @notice Private function for `creditAccountOwnerOnly`; used for contract size optimization
     function _checkCreditAccountOwner(address creditAccount) private view {
         if (msg.sender != _getBorrowerOrRevert(creditAccount)) {
             revert CallerNotCreditAccountOwnerException();
         }
     }
 
-    /// @dev Restricts functions to the non-paused contract state, unless the caller
+    /// @notice Restricts functions to the non-paused contract state, unless the caller
     ///      is an emergency liquidator
     modifier whenNotPausedOrEmergency() {
         require(!paused() || canLiquidateWhilePaused[msg.sender], "Pausable: paused");
         _;
     }
 
-    /// @dev Restricts functions to when the CF is not expired
+    /// @notice Restricts functions to when the CF is not expired
     modifier whenNotExpired() {
         _checkExpired();
         _;
     }
 
-    /// @dev Reverts if the contract is expired
+    /// @notice Reverts if the contract is expired
     function _checkExpired() private view {
         if (_isExpired()) {
             revert NotAllowedAfterExpirationException(); // F: [FA-46]
         }
     }
 
-    /// @dev Initializes creditFacade and connects it to CreditManagerV3
+    /// @notice Initializes creditFacade and connects it to CreditManagerV3
     /// @param _creditManager address of Credit Manager
     /// @param _degenNFT address of the DegenNFT or address(0) if whitelisted mode is not used
     /// @param _expirable Whether the CreditFacadeV3 can expire and implements expiration-related logic
@@ -188,7 +188,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     // ETH more flexible and consistent, since there is no need to pre-wrap WETH before
     // interacting with the protocol, and no need to compute how much unused ETH has to be sent back.
 
-    /// @dev Opens a Credit Account and runs a batch of operations in a multicall
+    /// @notice Opens a Credit Account and runs a batch of operations in a multicall
     /// - Performs sanity checks
     /// - Burns DegenNFT (in whitelisted mode)
     /// - Opens credit account with the desired debt amount
@@ -263,7 +263,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         }); // F:[FA-8, 9]
     }
 
-    /// @dev Runs a batch of transactions within a multicall and closes the account
+    /// @notice Runs a batch of transactions within a multicall and closes the account
     /// - Retrieves all debt data from the Credit Manager, such as debt and accrued interest and fees
     /// - Forces all pending withdrawals, even if they are not mature yet: successful account closure means
     ///   that there was enough collateral on the account to fully repay all debt - so this action is safe
@@ -335,7 +335,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         emit CloseCreditAccount(creditAccount, msg.sender, to); // F:[FA-12]
     }
 
-    /// @dev Runs a batch of transactions within a multicall and liquidates the account
+    /// @notice Runs a batch of transactions within a multicall and liquidates the account
     /// - Computes the total value and checks that hf < 1. An account can't be liquidated when hf >= 1.
     ///   Total value has to be computed before the multicall, otherwise the liquidator would be able
     ///   to manipulate it. Withdrawals are included into the total value according to the following logic
@@ -445,7 +445,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         emit LiquidateCreditAccount(creditAccount, borrower, msg.sender, to, closeAction, remainingFunds); // F:[FA-15]
     }
 
-    /// @dev Executes a batch of transactions within a Multicall, to manage an existing account
+    /// @notice Executes a batch of transactions within a Multicall, to manage an existing account
     ///  - Wraps ETH and sends it back to msg.sender, if value > 0
     ///  - Executes the Multicall
     ///  - Performs a fullCollateralCheck to verify that hf > 1 after all actions
@@ -465,7 +465,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         _multicallFullCollateralCheck(creditAccount, calls, ALL_PERMISSIONS);
     }
 
-    /// @dev Executes a batch of transactions within a Multicall from bot on behalf of a Credit Account's owner
+    /// @notice Executes a batch of transactions within a Multicall from bot on behalf of a Credit Account's owner
     ///  - Retrieves bot permissions from botList and checks whether it is forbidden
     ///  - Executes the Multicall, with actions limited to `botPermissions`
     ///  - Performs a fullCollateralCheck to verify that hf > 1 after all actions
@@ -487,18 +487,18 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         _multicallFullCollateralCheck(creditAccount, calls, botPermissions | PAY_BOT_PERMISSION);
     }
 
-    /// @dev Convenience internal function that packages a multicall and a fullCheck together,
+    /// @notice Convenience internal function that packages a multicall and a fullCheck together,
     ///      since they one is always performed after the other (except for account opening/closing)
     function _multicallFullCollateralCheck(address creditAccount, MultiCall[] calldata calls, uint256 permissions)
         internal
     {
-        /// V3 checks forbidden tokens at the end of the multicall. Two conditions have to be fulfilled for
+        /// V3 checks forbidden tokens at the end of the multicall. Three conditions have to be fulfilled for
         /// a multicall to be successful:
         /// - No new forbidden tokens can be enabled during the multicall
         /// - Forbidden token balances cannot be increased during the multicall
-        /// - Debt cannot be increased while forbidden tokens are enabled on an account TODO: implement this
-        /// This ensures that no pool funds can be used to increase exposure to forbidden tokens. To that end
-        /// before the multicall forbidden token balances are stored to compare with balances after the multicall
+        /// - Debt cannot be increased while forbidden tokens are enabled on an account
+        /// This ensures that no pool funds can be used to increase exposure to forbidden tokens. To that end,
+        /// before the multicall forbidden token balances are stored to compare with balances after
         uint256 _forbiddenTokenMask = forbiddenTokenMask;
         uint256 enabledTokensMaskBefore = ICreditManagerV3(creditManager).enabledTokensMaskOf(creditAccount);
         uint256[] memory forbiddenBalances = CreditLogic.storeForbiddenBalances({
@@ -520,14 +520,16 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         });
     }
 
-    /// @dev IMPLEMENTATION: multicall
+    /// @notice IMPLEMENTATION: multicall
     /// - Executes the provided list of calls:
     ///   + if targetContract == address(this), parses call data in the struct and calls the appropriate function
     ///   + if targetContract != address(this), checks that the address is an adapter and calls with calldata as provided.
     /// - For all calls, there are usually additional check and actions performed (see each action below for more details)
+    /// @dev Unlike previous versions, in Gearbox V3 the mid-multicall enabledTokensMask is kept on the stack and updated based on values
+    ///      returned from the Credit Manager and adapter functions. enabledTokensMask in storage is only updated once at the end of fullCollateralCheck.
     /// @param creditAccount Credit Account address
     /// @param calls List of calls to perform
-    /// @param enabledTokenMask The mask of tokens enabled on the account before the multicall
+    /// @param enabledTokensMask The mask of tokens enabled on the account before the multicall
     /// @param flags A bit mask of flags that encodes permissions, as well as other important information
     ///              that needs to persist throughout the multicall
     /// @return fullCheckParams Parameters passed to the full collateral check after the multicall
@@ -569,7 +571,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     bytes4 method = bytes4(mcall.callData);
 
                     //
-                    // REVERT_IF_RECEIVED_LESS_THAN
+                    // REVERT IF RECEIVED LESS THAN
                     //
                     /// Method allows the user to enable slippage control, verifying that
                     /// the multicall has produced expected minimal token balances
@@ -719,6 +721,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     //
                     // PAY BOT
                     //
+                    /// Requests the bot list to pay a bot. Used by bots to receive payment for their services.
+                    /// Only available in `botMulticall` and can only be called once
                     else if (method == ICreditFacadeMulticall.payBot.selector) {
                         _revertIfNoPermission(flags, PAY_BOT_PERMISSION);
                         flags = flags.disable(PAY_BOT_PERMISSION);
@@ -770,22 +774,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             CreditLogic.compareBalances(creditAccount, expectedBalances);
         }
 
-        /// @dev Checks that there are no intersections between the user's enabled tokens
-        /// and the set of forbidden tokens
-        /// @notice The main purpose of forbidding tokens is to prevent exposing
-        /// pool funds to dangerous or exploited collateral, without immediately
-        /// liquidating accounts that hold the forbidden token
-        /// There are two ways pool funds can be exposed:
-        ///     - The CA owner tries to swap borrowed funds to the forbidden asset:
-        ///       this will be blocked by checkAndEnableToken, which is invoked for tokenOut
-        ///       after every operation;
-        ///     - The CA owner with an already enabled forbidden token transfers it
-        ///       to the account - they can't use addCollateral / enableToken due to checkAndEnableToken,
-        ///       but can transfer the token directly when it is enabled and it will be counted in the collateral -
-        ///       an borrows against it. This check is used to prevent this.
-        /// If the owner has a forbidden token and want to take more debt, they must first
-        /// dispose of the token and disable it.
-
         /// If increaseDebt was called during the multicall, all forbidden tokens must be disabled at the end
         /// otherwise, funds could be borrowed against forbidden token, which is prohibited
         if ((flags & INCREASE_DEBT_WAS_CALLED != 0) && (enabledTokensMask & forbiddenTokenMask != 0)) {
@@ -805,20 +793,20 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         fullCheckParams.enabledTokensMaskAfter = enabledTokensMask;
     }
 
-    /// @dev Sets the `activeCreditAccount` in Credit Manager
+    /// @notice Sets the `activeCreditAccount` in Credit Manager
     ///      to the passed Credit Account
     /// @param creditAccount CA address
     function _setActiveCreditAccount(address creditAccount) internal {
         ICreditManagerV3(creditManager).setActiveCreditAccount(creditAccount); // F:[FA-26]
     }
 
-    /// @dev Sets the `externalCallCreditAccount` in Credit Manager
+    /// @notice Sets the `externalCallCreditAccount` in Credit Manager
     ///      to the default value
     function _unsetActiveCreditAccount() internal {
         _setActiveCreditAccount(address(1)); // F:[FA-26]
     }
 
-    /// @dev Reverts if provided flags contain no permission for the requested action
+    /// @notice Reverts if provided flags contain no permission for the requested action
     /// @param flags A bitmask with flags for the multicall operation
     /// @param permission The flag of the permission to check
     function _revertIfNoPermission(uint256 flags, uint256 permission) internal pure {
@@ -827,10 +815,10 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         }
     }
 
-    /// @dev Requests an on-demand price update from a price feed
+    /// @notice Requests an on-demand price update from a price feed
     ///      The price update accepts a generic data blob that is processed
     ///      on the price feed side.
-    /// @notice Should generally be called only when interacting with tokens
+    /// @dev Should generally be called only when interacting with tokens
     ///         that use on-demand price feeds
     /// @param callData Bytes calldata for parsing
     function _onDemandPriceUpdate(bytes calldata callData) internal {
@@ -842,7 +830,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         IPriceFeedOnDemand(priceFeed).updatePrice(data);
     }
 
-    /// @dev Requests Credit Manager to update a Credit Account's quota for a certain token
+    /// @notice Requests Credit Manager to update a Credit Account's quota for a certain token
     /// @param creditAccount Credit Account to update the quota for
     /// @param callData Bytes calldata for parsing
     function _updateQuota(address creditAccount, bytes calldata callData)
@@ -853,7 +841,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         return ICreditManagerV3(creditManager).updateQuota(creditAccount, token, quotaChange);
     }
 
-    /// @dev Requests Credit Manager to remove a set of existing allowances
+    /// @notice Requests Credit Manager to remove a set of existing allowances
     /// @param creditAccount Credit Account to revoke allowances for
     /// @param callData Bytes calldata for parsing
     function _revokeAdapterAllowances(address creditAccount, bytes calldata callData) internal {
@@ -861,7 +849,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         ICreditManagerV3(creditManager).revokeAdapterAllowances(creditAccount, revocations);
     }
 
-    /// @dev Requests the bot list to pay the bot for performed services
+    /// @notice Requests the bot list to pay the bot for performed services
     /// @param creditAccount Credit account the service was performed for
     /// @param callData Bytes calldata for parsing
     function _payBot(address creditAccount, bytes calldata callData) internal {
@@ -873,7 +861,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         IBotList(botList).payBot(payer, creditAccount, msg.sender, paymentAmount);
     }
 
-    /// @dev Requests the Credit Manager to change the CA's debt
+    /// @notice Requests the Credit Manager to change the CA's debt
     /// @param creditAccount CA to change debt for
     /// @param callData Bytes calldata for parsing
     function _manageDebt(
@@ -907,7 +895,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         }
     }
 
-    /// @dev Requests the Credit Manager to transfer collateral from the caller to the Credit Account
+    /// @notice Requests the Credit Manager to transfer collateral from the caller to the Credit Account
     /// @param creditAccount Credit Account to add collateral for
     /// @param callData Bytes calldata for parsing
     function _addCollateral(address creditAccount, bytes calldata callData) internal returns (uint256 tokenMaskAfter) {
@@ -919,7 +907,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         emit AddCollateral(creditAccount, token, amount); // F:[FA-21]
     }
 
-    /// @dev Requests the Credit Manager to schedule a withdrawal
+    /// @notice Requests the Credit Manager to schedule a withdrawal
     /// @param creditAccount Credit Account to schedule withdrawals for
     /// @param callData Bytes calldata for parsing
     function _scheduleWithdrawal(address creditAccount, bytes calldata callData)
@@ -930,7 +918,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         tokensToDisable = ICreditManagerV3(creditManager).scheduleWithdrawal(creditAccount, token, amount);
     }
 
-    /// @dev Transfers credit account from owner to another user
+    /// @notice Transfers credit account from owner to another user
     /// By default, this action is forbidden, and the user has to approve transfers from sender to itself
     /// by calling approveAccountTransfer.
     /// This is done to prevent malicious actors from transferring compromised accounts to other users.
@@ -964,7 +952,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         emit TransferAccount(creditAccount, msg.sender, to); // F:[FA-35]
     }
 
-    /// @dev Claims all mature delayed withdrawals, transferring funds from
+    /// @notice Claims all mature delayed withdrawals, transferring funds from
     ///      withdrawal manager to the address provided by the CA owner
     /// @param creditAccount CA to claim withdrawals for
     /// @param to Address to transfer the withdrawals to
@@ -979,7 +967,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         _claimWithdrawals(creditAccount, to, ClaimAction.CLAIM);
     }
 
-    /// @dev Sets permissions and funding parameters for a bot
+    /// @notice Sets permissions and funding parameters for a bot
     ///      Also manages BOT_PERMISSIONS_SET_FLAG, to allow
     ///      the contracts to determine whether a CA has permissions for any bot
     /// @param creditAccount CA to set permissions for
@@ -1011,7 +999,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         }
     }
 
-    /// @dev Convenience function to erase all bot permissions for a Credit Account
+    /// @notice Convenience function to erase all bot permissions for a Credit Account
     ///      Called on transferring or closing an account
     function _eraseAllBotPermissions(address creditAccount, bool setFlag) internal {
         IBotList(botList).eraseAllBotPermissions(creditAccount);
@@ -1021,20 +1009,20 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         }
     }
 
-    /// @dev Internal wrapper for `CreditManager.setFlagFor()`. The external call is wrapped
+    /// @notice Internal wrapper for `CreditManager.setFlagFor()`. The external call is wrapped
     ///      to optimize contract size
     function _setFlagFor(address creditAccount, uint16 flag, bool value) internal {
         ICreditManagerV3(creditManager).setFlagFor(creditAccount, flag, value);
     }
 
-    /// @dev Checks that transfer is allowed
+    /// @notice Checks that transfer is allowed
     function _revertIfAccountTransferNotAllowed(address from, address to) internal view {
         if (!transfersAllowed[from][to]) {
             revert AccountTransferNotAllowedException();
         } // F:[FA-33]
     }
 
-    /// @dev Checks that the per-block borrow limit was not violated and updates the
+    /// @notice Checks that the per-block borrow limit was not violated and updates the
     /// amount borrowed in current block
     function _revertIfOutOfBorrowingLimit(uint256 amount) internal {
         uint8 _maxDebtPerBlockMultiplier = maxDebtPerBlockMultiplier; // F:[FA-18]\
@@ -1061,7 +1049,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         totalBorrowedInBlock = uint128(newDebtInCurrentBlock);
     }
 
-    /// @dev Checks that the borrowed principal is within borrowing debtLimits
+    /// @notice Checks that the borrowed principal is within borrowing debtLimits
     /// @param debt The current principal of a Credit Account
     function _revertIfOutOfDebtLimits(uint256 debt) internal view {
         // Checks that amount is in debtLimits
@@ -1070,7 +1058,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         } // F:
     }
 
-    /// @dev Approves account transfer from another user to msg.sender
+    /// @notice Approves account transfer from another user to msg.sender
     /// @param from Address for which account transfers are allowed/forbidden
     /// @param allowTransfer True is transfer is allowed, false if forbidden
     function approveAccountTransfer(address from, bool allowTransfer) external override nonReentrant {
@@ -1088,20 +1076,20 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     // HELPERS
     //
 
-    /// @dev Internal wrapper for `creditManager.getBorrowerOrRevert()`
-    /// @notice The external call is wrapped to optimize contract size
+    /// @notice Internal wrapper for `creditManager.getBorrowerOrRevert()`
+    /// @dev The external call is wrapped to optimize contract size
     function _getBorrowerOrRevert(address creditAccount) internal view returns (address) {
         return ICreditManagerV3(creditManager).getBorrowerOrRevert({creditAccount: creditAccount});
     }
 
-    /// @dev Internal wrapper for `creditManager.getTokenMaskOrRevert()`
-    /// @notice The external call is wrapped to optimize contract size
+    /// @notice Internal wrapper for `creditManager.getTokenMaskOrRevert()`
+    /// @dev The external call is wrapped to optimize contract size
     function _getTokenMaskOrRevert(address token) internal view returns (uint256 mask) {
         mask = ICreditManagerV3(creditManager).getTokenMaskOrRevert(token);
     }
 
-    /// @dev Internal wrapper for `creditManager.closeCreditAccount()`
-    /// @notice The external call is wrapped to optimize contract size
+    /// @notice Internal wrapper for `creditManager.closeCreditAccount()`
+    /// @dev The external call is wrapped to optimize contract size
     function _closeCreditAccount(
         address creditAccount,
         ClosureAction closureAction,
@@ -1122,8 +1110,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         }); // F:[FA-15,49]
     }
 
-    /// @dev Internal wrapper for `creditManager.fullCollateralCheck()`
-    /// @notice The external call is wrapped to optimize contract size
+    /// @notice Internal wrapper for `creditManager.fullCollateralCheck()`
+    /// @dev The external call is wrapped to optimize contract size
     function _fullCollateralCheck(
         address creditAccount,
         uint256 enabledTokensMaskBefore,
@@ -1148,12 +1136,12 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         });
     }
 
-    /// @dev Returns whether the Credit Facade is expired
+    /// @notice Returns whether the Credit Facade is expired
     function _isExpired() internal view returns (bool isExpired) {
         isExpired = (expirable) && (block.timestamp >= expirationDate); // F: [FA-46,47,48]
     }
 
-    /// @dev Wraps ETH into WETH and sends it back to msg.sender
+    /// @notice Wraps ETH into WETH and sends it back to msg.sender
     /// TODO: Check L2 networks for supporting native currencies
     function _wrapETH() internal {
         if (msg.value > 0) {
@@ -1162,7 +1150,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         }
     }
 
-    /// @dev Checks if account is liquidatable (i.e., hf < 1)
+    /// @notice Checks if account is liquidatable (i.e., hf < 1)
     /// @param creditAccount Address of credit account to check
     function _isAccountLiquidatable(address creditAccount, bool isEmergency)
         internal
@@ -1191,8 +1179,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         }
     }
 
-    /// @dev Internal wrapper for `creditManager.calcDebtAndCollateral()`
-    /// @notice The external call is wrapped to optimize contract size
+    /// @notice Internal wrapper for `creditManager.calcDebtAndCollateral()`
+    /// @dev The external call is wrapped to optimize contract size
     function _calcDebtAndCollateral(address creditAccount, CollateralCalcTask task)
         internal
         view
@@ -1201,14 +1189,14 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         return ICreditManagerV3(creditManager).calcDebtAndCollateral(creditAccount, task);
     }
 
-    /// @dev Internal wrapper for `creditManager.getTokenByMask()`
-    /// @notice The external call is wrapped to optimize contract size
+    /// @notice Internal wrapper for `creditManager.getTokenByMask()`
+    /// @dev The external call is wrapped to optimize contract size
     function _getTokenByMask(uint256 mask) internal view returns (address) {
         return ICreditManagerV3(creditManager).getTokenByMask(mask);
     }
 
-    /// @dev Internal wrapper for `creditManager.claimWithdrawals()`
-    /// @notice The external call is wrapped to optimize contract size
+    /// @notice Internal wrapper for `creditManager.claimWithdrawals()`
+    /// @dev The external call is wrapped to optimize contract size
     function _claimWithdrawals(address creditAccount, address to, ClaimAction action)
         internal
         returns (uint256 tokensToEnable)
@@ -1216,9 +1204,9 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         tokensToEnable = ICreditManagerV3(creditManager).claimWithdrawals(creditAccount, to, action);
     }
 
-    /// @dev Internal wrapper for `IWETHGateway.withdrawTo()`
-    /// @notice The external call is wrapped to optimize contract size
-    /// @notice Used to convert WETH to ETH and send it to user
+    /// @notice Internal wrapper for `IWETHGateway.withdrawTo()`
+    /// @dev The external call is wrapped to optimize contract size
+    /// @dev Used to convert WETH to ETH and send it to user
     function _wethWithdrawTo(address to) internal {
         IWETHGateway(wethGateway).withdrawTo(to);
     }
@@ -1227,8 +1215,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     // CONFIGURATION
     //
 
-    /// @dev Sets Credit Facade expiration date
-    /// @notice See more at https://dev.gearbox.fi/docs/documentation/credit/liquidation#liquidating-accounts-by-expiration
+    /// @notice Sets Credit Facade expiration date
+    /// @dev See more at https://dev.gearbox.fi/docs/documentation/credit/liquidation#liquidating-accounts-by-expiration
     function setExpirationDate(uint40 newExpirationDate) external creditConfiguratorOnly {
         if (!expirable) {
             revert NotAllowedWhenNotExpirableException();
@@ -1236,7 +1224,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         expirationDate = newExpirationDate;
     }
 
-    /// @dev Sets borrowing debtLimits per single Credit Account
+    /// @notice Sets borrowing debtLimits per single Credit Account
     /// @param _minDebt The minimal borrowed amount per Credit Account. Minimal amount can be relevant
     /// for liquidations, since very small amounts will make liquidations unprofitable for liquidators
     /// @param _maxDebt The maximal borrowed amount per Credit Account. Used to limit exposure per a single
@@ -1250,7 +1238,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         maxDebtPerBlockMultiplier = _maxDebtPerBlockMultiplier;
     }
 
-    /// @dev Sets the bot list for this Credit Facade
+    /// @notice Sets the bot list for this Credit Facade
     ///      The bot list is used to determine whether an address has a right to
     ///      run multicalls for a borrower as a bot. The relationship is stored in a separate
     ///      contract for easier transferability
@@ -1258,7 +1246,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         botList = _botList;
     }
 
-    /// @dev Sets the max cumulative loss that can be accrued before pausing the Credit Manager
+    /// @notice Sets the max cumulative loss that can be accrued before pausing the Credit Manager
     /// @param _maxCumulativeLoss The threshold of cumulative loss that triggers a system pause
     /// @param resetCumulativeLoss Whether to reset the current cumulative loss
     function setCumulativeLossParams(uint128 _maxCumulativeLoss, bool resetCumulativeLoss)
@@ -1271,7 +1259,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         }
     }
 
-    /// @dev Changes the token's forbidden status
+    /// @notice Changes the token's forbidden status
     /// @param token Address of the token to set status for
     /// @param allowance Status to set (ALLOW / FORBID)
     function setTokenAllowance(address token, AllowanceAction allowance) external creditConfiguratorOnly {
@@ -1282,7 +1270,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             : forbiddenTokenMask.enable(tokenMask);
     }
 
-    /// @dev Changes the status of an emergency liquidator
+    /// @notice Changes the status of an emergency liquidator
     /// @param liquidator Address to change status for
     /// @param allowanceAction Status to set (ALLOW / FORBID)
     function setEmergencyLiquidator(address liquidator, AllowanceAction allowanceAction)

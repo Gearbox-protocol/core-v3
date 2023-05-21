@@ -117,6 +117,9 @@ contract CreditFacadeTestSuite is PoolDeployer {
             poolQuotaKeeper.addCreditManager(address(creditManager));
         }
 
+        vm.prank(CONFIGURATOR);
+        botList.setApprovedCreditManagerStatus(address(creditManager), true);
+
         vm.label(address(poolMock), "Pool");
         vm.label(address(creditFacade), "CreditFacadeV3");
         vm.label(address(creditManager), "CreditManagerV3");
