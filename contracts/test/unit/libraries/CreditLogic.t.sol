@@ -191,17 +191,19 @@ contract CreditLogicTest is TestHelper {
         uint256 quotaInterest,
         uint16 feeInterest
     ) public {
-        vm.assume(debt > WAD);
-        vm.assume(debt < 2 ** 128 - 1);
-        vm.assume(delta < 2 ** 128 - 1);
-        vm.assume(quotaInterest < 2 ** 128 - 1);
+        debt = WAD + debt % (2 ** 128 - WAD - 1);
+        delta = delta % (2 ** 128 - 1);
+        quotaInterest = quotaInterest % (2 ** 128 - 1);
+
         vm.assume(debt + delta <= 2 ** 128 - 1);
-        vm.assume(feeInterest <= PERCENTAGE_FACTOR);
+
+        feeInterest %= PERCENTAGE_FACTOR + 1;
 
         indexNow = indexNow < RAY ? indexNow + RAY : indexNow;
         indexAtOpen = indexAtOpen < RAY ? indexAtOpen + RAY : indexAtOpen;
 
-        vm.assume(indexNow <= 100 * RAY);
+        indexNow %= 100 * RAY + 1;
+
         vm.assume(indexNow >= indexAtOpen);
         vm.assume(indexNow - indexAtOpen < 10 * RAY);
 
@@ -235,17 +237,19 @@ contract CreditLogicTest is TestHelper {
         uint256 quotaInterest,
         uint16 feeInterest
     ) public {
-        vm.assume(debt > WAD);
-        vm.assume(debt < 2 ** 128 - 1);
-        vm.assume(delta < 2 ** 128 - 1);
-        vm.assume(quotaInterest < 2 ** 128 - 1);
+        debt = WAD + debt % (2 ** 128 - WAD - 1);
+        delta = delta % (2 ** 128 - 1);
+        quotaInterest = quotaInterest % (2 ** 128 - 1);
+
         vm.assume(debt + delta <= 2 ** 128 - 1);
-        vm.assume(feeInterest <= PERCENTAGE_FACTOR);
+
+        feeInterest %= PERCENTAGE_FACTOR + 1;
 
         indexNow = indexNow < RAY ? indexNow + RAY : indexNow;
         indexAtOpen = indexAtOpen < RAY ? indexAtOpen + RAY : indexAtOpen;
 
-        vm.assume(indexNow <= 100 * RAY);
+        indexNow %= 100 * RAY + 1;
+
         vm.assume(indexNow >= indexAtOpen);
         vm.assume(indexNow - indexAtOpen < 10 * RAY);
 
