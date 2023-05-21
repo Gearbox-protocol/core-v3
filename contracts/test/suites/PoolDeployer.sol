@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
-import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
+import "../../interfaces/IAddressProviderV3.sol";
 import {IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {PriceFeedConfig} from "@gearbox-protocol/core-v2/contracts/oracles/PriceOracle.sol";
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
@@ -12,10 +12,11 @@ import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFa
 import {GenesisFactory} from "./GenesisFactory.sol";
 import {PoolFactory, PoolOpts} from "@gearbox-protocol/core-v2/contracts/factories/PoolFactory.sol";
 import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
+import {BotList} from "../../support/BotList.sol";
 
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
-import {PoolServiceMock} from "../mocks/pool/PoolServiceMock.sol";
-import {GaugeMock} from "../mocks/pool/GaugeMock.sol";
+import {PoolMock} from "../mocks//pool/PoolMock.sol";
+import {GaugeMock} from "../mocks//pool/GaugeMock.sol";
 import {PoolQuotaKeeper} from "../../pool/PoolQuotaKeeper.sol";
 
 import "../lib/constants.sol";
@@ -31,14 +32,15 @@ struct PoolCreditOpts {
 /// @title CreditManagerTestSuite
 /// @notice Deploys contract for unit testing of CreditManagerV3.sol
 contract PoolDeployer is Test {
-    AddressProvider public addressProvider;
+    IAddressProviderV3 public addressProvider;
     GenesisFactory public gp;
     AccountFactory public af;
-    PoolServiceMock public poolMock;
+    PoolMock public poolMock;
     PoolQuotaKeeper public poolQuotaKeeper;
     GaugeMock public gaugeMock;
     ContractsRegister public cr;
     WithdrawalManager public withdrawalManager;
+    BotList public botList;
     ACL public acl;
 
     IPriceOracleV2Ext public priceOracle;
@@ -58,7 +60,6 @@ contract PoolDeployer is Test {
         gp = new GenesisFactory(wethToken, DUMB_ADDRESS, accountFactoryVersion);
 
         gp.acl().claimOwnership();
-        gp.addressProvider().claimOwnership();
 
         gp.acl().addPausableAdmin(CONFIGURATOR);
         gp.acl().addUnpausableAdmin(CONFIGURATOR);
@@ -70,19 +71,21 @@ contract PoolDeployer is Test {
         gp.acl().claimOwnership();
 
         addressProvider = gp.addressProvider();
-        af = AccountFactory(addressProvider.getAccountFactory());
+        af = AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL));
 
-        priceOracle = IPriceOracleV2Ext(addressProvider.getPriceOracle());
+        priceOracle = IPriceOracleV2Ext(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 2));
 
-        acl = ACL(addressProvider.getACL());
+        acl = ACL(addressProvider.getAddressOrRevert(AP_ACL, 0));
 
-        cr = ContractsRegister(addressProvider.getContractsRegister());
+        cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
 
-        withdrawalManager = new WithdrawalManager(address(addressProvider), 1 days);
+        withdrawalManager = WithdrawalManager(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00));
+
+        botList = BotList(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00));
 
         underlying = _underlying;
 
-        poolMock = new PoolServiceMock(
+        poolMock = new PoolMock(
             address(gp.addressProvider()),
             underlying
         );
@@ -101,13 +104,11 @@ contract PoolDeployer is Test {
 
         poolMock.setPoolQuotaKeeper(address(poolQuotaKeeper));
 
-        addressProvider.transferOwnership(CONFIGURATOR);
         acl.transferOwnership(CONFIGURATOR);
 
         vm.startPrank(CONFIGURATOR);
 
         acl.claimOwnership();
-        addressProvider.claimOwnership();
 
         vm.stopPrank();
     }

@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
+import "../interfaces/IAddressProviderV3.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 
 import {
@@ -20,29 +20,35 @@ abstract contract ContractsRegisterTrait is SanityCheckTrait {
     // ACL contract to check rights
     ContractsRegister immutable _cr;
 
+    /// @dev Checks that credit manager is registered
+    modifier registeredCreditManagerOnly(address addr) {
+        _checkRegisteredCreditManagerOnly(addr);
+        _;
+    }
+
+    /// @dev Checks that credit manager is registered
+    modifier registeredPoolOnly(address addr) {
+        _checkRegisteredPoolOnly(addr);
+        _;
+    }
+
     constructor(address addressProvider) nonZeroAddress(addressProvider) {
-        _cr = ContractsRegister(AddressProvider(addressProvider).getContractsRegister());
+        _cr = ContractsRegister(IAddressProviderV3(addressProvider).getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
     }
 
     function isRegisteredPool(address _pool) internal view returns (bool) {
         return _cr.isPool(_pool);
     }
 
-    function isRegisteredCreditManager(address _pool) internal view returns (bool) {
-        return _cr.isCreditManager(_pool);
+    function isRegisteredCreditManager(address _creditManager) internal view returns (bool) {
+        return _cr.isCreditManager(_creditManager);
     }
 
-    /// @dev Checks that credit manager is registered
-    modifier registeredCreditManagerOnly(address addr) {
-        if (!isRegisteredCreditManager(addr)) revert RegisteredCreditManagerOnlyException(); // T:[WG-3]
-
-        _;
+    function _checkRegisteredCreditManagerOnly(address addr) internal view {
+        if (!isRegisteredCreditManager(addr)) revert RegisteredCreditManagerOnlyException();
     }
 
-    /// @dev Checks that credit manager is registered
-    modifier registeredPoolOnly(address addr) {
+    function _checkRegisteredPoolOnly(address addr) internal view {
         if (!isRegisteredPool(addr)) revert RegisteredPoolOnlyException();
-
-        _;
     }
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
@@ -15,7 +15,7 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 import "../lib/constants.sol";
-import {CreditManagerTestInternal} from "../mocks/credit/CreditManagerTestInternal.sol";
+import {CreditManagerV3Harness} from "../unit/credit/CreditManagerV3Harness.sol";
 import {PoolDeployer} from "./PoolDeployer.sol";
 import {ICreditConfig} from "../interfaces/ICreditConfig.sol";
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
@@ -57,8 +57,8 @@ contract CreditManagerTestSuite is PoolDeployer {
         tokenTestSuite = creditConfig.tokenTestSuite();
 
         creditManager = internalSuite
-            ? new CreditManagerTestInternal(address(poolMock), address(withdrawalManager))
-            : new CreditManagerV3(address(poolMock), address(withdrawalManager));
+            ? new CreditManagerV3Harness(address(addressProvider), address(poolMock))
+            : new CreditManagerV3(address(addressProvider), address(poolMock));
 
         creditFacade = msg.sender;
 
@@ -67,7 +67,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         vm.startPrank(CONFIGURATOR);
         creditManager.setCreditFacade(creditFacade);
 
-        creditManager.setParams(
+        creditManager.setFees(
             DEFAULT_FEE_INTEREST,
             DEFAULT_FEE_LIQUIDATION,
             PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM,
@@ -100,7 +100,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         }
 
         if (accountFactoryVer == 2) {
-            AccountFactoryV3(address(af)).addCreditManager(address(creditManager), 1);
+            AccountFactoryV3(address(af)).addCreditManager(address(creditManager));
         }
 
         vm.stopPrank();
@@ -148,18 +148,18 @@ contract CreditManagerTestSuite is PoolDeployer {
         borrowedAmount = _borrowedAmount;
 
         cumulativeIndexLastUpdate = RAY;
-        poolMock.setCumulative_RAY(cumulativeIndexLastUpdate);
+        poolMock.setCumulativeIndexNow(cumulativeIndexLastUpdate);
 
         vm.prank(creditFacade);
 
         // Existing address case
-        creditAccount = creditManager.openCreditAccount(borrowedAmount, USER, false);
+        creditAccount = creditManager.openCreditAccount(borrowedAmount, USER);
 
         // Increase block number cause it's forbidden to close credit account in the same block
         vm.roll(block.number + 1);
 
         cumulativeIndexAtClose = (cumulativeIndexLastUpdate * 12) / 10;
-        poolMock.setCumulative_RAY(cumulativeIndexAtClose);
+        poolMock.setCumulativeIndexNow(cumulativeIndexAtClose);
     }
 
     function makeTokenQuoted(address token, uint16 rate, uint96 limit) external {
@@ -172,7 +172,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         gaugeMock.updateEpoch();
 
         uint256 tokenMask = creditManager.getTokenMaskOrRevert(token);
-        uint256 limitedMask = creditManager.quotedTokenMask();
+        uint256 limitedMask = creditManager.quotedTokensMask();
 
         creditManager.setQuotedMask(limitedMask | tokenMask);
 

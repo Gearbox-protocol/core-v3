@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import {ControllerTimelock} from "../../../support/risk-controller/ControllerTimelock.sol";
 import {Policy} from "../../../support/risk-controller/PolicyManager.sol";
@@ -11,8 +11,8 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import {ICreditFacade} from "../../../interfaces/ICreditFacade.sol";
 import {ICreditConfigurator} from "../../../interfaces/ICreditConfiguratorV3.sol";
-import {IPool4626} from "../../../interfaces/IPool4626.sol";
-import {Pool4626} from "../../../pool/Pool4626.sol";
+import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
+import {PoolV3} from "../../../pool/PoolV3.sol";
 import {ILPPriceFeed} from "../../../interfaces/ILPPriceFeed.sol";
 import {IControllerTimelockEvents, IControllerTimelockErrors} from "../../../interfaces/IControllerTimelock.sol";
 
@@ -21,13 +21,13 @@ import "../../lib/constants.sol";
 import {Test} from "forge-std/Test.sol";
 
 // MOCKS
-import {AddressProviderACLMock} from "../../mocks/core/AddressProviderACLMock.sol";
+import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
 contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerTimelockErrors {
-    AddressProviderACLMock public addressProvider;
+    AddressProviderV3ACLMock public addressProvider;
 
     ControllerTimelock public controllerTimelock;
 
@@ -39,7 +39,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         vetoAdmin = makeAddr("VETO_ADMIN");
 
         vm.prank(CONFIGURATOR);
-        addressProvider = new AddressProviderACLMock();
+        addressProvider = new AddressProviderV3ACLMock();
         controllerTimelock = new ControllerTimelock(address(addressProvider), admin, vetoAdmin);
     }
 
@@ -90,7 +90,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         );
 
         vm.mockCall(
-            pool, abi.encodeWithSelector(IPool4626.creditManagerBorrowed.selector, creditManager), abi.encode(1234)
+            pool, abi.encodeWithSelector(IPoolV3.creditManagerBorrowed.selector, creditManager), abi.encode(1234)
         );
 
         Policy memory policy = Policy({
@@ -126,9 +126,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         vm.prank(admin);
         controllerTimelock.setExpirationDate(creditManager, uint40(block.timestamp + 5));
 
-        vm.mockCall(
-            pool, abi.encodeWithSelector(IPool4626.creditManagerBorrowed.selector, creditManager), abi.encode(0)
-        );
+        vm.mockCall(pool, abi.encodeWithSelector(IPoolV3.creditManagerBorrowed.selector, creditManager), abi.encode(0));
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
@@ -395,9 +393,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
 
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "CREDIT_MANAGER_DEBT_LIMIT"));
 
-        vm.mockCall(
-            pool, abi.encodeWithSelector(IPool4626.creditManagerLimit.selector, creditManager), abi.encode(1e18)
-        );
+        vm.mockCall(pool, abi.encodeWithSelector(IPoolV3.creditManagerLimit.selector, creditManager), abi.encode(1e18));
 
         Policy memory policy = Policy({
             enabled: false,
@@ -449,7 +445,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         vm.prank(admin);
         controllerTimelock.setCreditManagerDebtLimit(creditManager, 2e18);
 
-        vm.expectCall(pool, abi.encodeWithSelector(Pool4626.setCreditManagerLimit.selector, creditManager, 2e18));
+        vm.expectCall(pool, abi.encodeWithSelector(PoolV3.setCreditManagerLimit.selector, creditManager, 2e18));
 
         vm.warp(block.timestamp + 1 days);
 
@@ -497,24 +493,36 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
         vm.expectRevert(CallerNotAdminException.selector);
         vm.prank(USER);
-        controllerTimelock.rampLiquidationThreshold(creditManager, token, 6000, 7 days);
+        controllerTimelock.rampLiquidationThreshold(
+            creditManager, token, 6000, uint40(block.timestamp + 14 days), 7 days
+        );
 
         // VERIFY THAT POLICY CHECKS ARE PERFORMED
         vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(admin);
-        controllerTimelock.rampLiquidationThreshold(creditManager, token, 5000, 7 days);
+        controllerTimelock.rampLiquidationThreshold(
+            creditManager, token, 5000, uint40(block.timestamp + 14 days), 7 days
+        );
 
         // VERIFY THAT EXTRA CHECKS ARE PERFORMED
         vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(admin);
-        controllerTimelock.rampLiquidationThreshold(creditManager, token, 6000, 1 days);
+        controllerTimelock.rampLiquidationThreshold(
+            creditManager, token, 6000, uint40(block.timestamp + 14 days), 1 days
+        );
+
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.rampLiquidationThreshold(
+            creditManager, token, 6000, uint40(block.timestamp + 1 days / 2), 7 days
+        );
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
             abi.encode(
                 creditConfigurator,
-                "rampLiquidationThreshold(address,uint16,uint24)",
-                abi.encode(token, 6000, 7 days),
+                "rampLiquidationThreshold(address,uint16,uint40,uint24)",
+                abi.encode(token, 6000, block.timestamp + 14 days, 7 days),
                 block.timestamp + 1 days
             )
         );
@@ -523,17 +531,25 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         emit QueueTransaction(
             txHash,
             creditConfigurator,
-            "rampLiquidationThreshold(address,uint16,uint24)",
-            abi.encode(token, 6000, 7 days),
+            "rampLiquidationThreshold(address,uint16,uint40,uint24)",
+            abi.encode(token, 6000, block.timestamp + 14 days, 7 days),
             uint40(block.timestamp + 1 days)
         );
 
         vm.prank(admin);
-        controllerTimelock.rampLiquidationThreshold(creditManager, token, 6000, 7 days);
+        controllerTimelock.rampLiquidationThreshold(
+            creditManager, token, 6000, uint40(block.timestamp + 14 days), 7 days
+        );
 
         vm.expectCall(
             creditConfigurator,
-            abi.encodeWithSelector(ICreditConfigurator.rampLiquidationThreshold.selector, token, 6000, 7 days)
+            abi.encodeWithSelector(
+                ICreditConfigurator.rampLiquidationThreshold.selector,
+                token,
+                6000,
+                uint40(block.timestamp + 14 days),
+                7 days
+            )
         );
 
         vm.warp(block.timestamp + 1 days);
@@ -556,9 +572,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
             creditFacade, abi.encodeWithSelector(ICreditFacade.expirationDate.selector), abi.encode(block.timestamp)
         );
 
-        vm.mockCall(
-            pool, abi.encodeWithSelector(IPool4626.creditManagerBorrowed.selector, creditManager), abi.encode(0)
-        );
+        vm.mockCall(pool, abi.encodeWithSelector(IPoolV3.creditManagerBorrowed.selector, creditManager), abi.encode(0));
 
         Policy memory policy = Policy({
             enabled: false,
@@ -660,14 +674,14 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
             creditFacade, abi.encodeWithSelector(ICreditFacade.expirationDate.selector), abi.encode(block.timestamp)
         );
 
-        vm.mockCall(
-            pool, abi.encodeWithSelector(IPool4626.creditManagerBorrowed.selector, creditManager), abi.encode(0)
-        );
+        vm.mockCall(pool, abi.encodeWithSelector(IPoolV3.creditManagerBorrowed.selector, creditManager), abi.encode(0));
+
+        uint40 expirationDate = uint40(block.timestamp + 2 days);
 
         Policy memory policy = Policy({
             enabled: false,
             flags: 1,
-            exactValue: block.timestamp + 5,
+            exactValue: expirationDate,
             minValue: 0,
             maxValue: 0,
             referencePoint: 0,
@@ -682,15 +696,15 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         vm.prank(CONFIGURATOR);
         controllerTimelock.setPolicy(POLICY_CODE, policy);
 
-        uint40 expirationDate = uint40(block.timestamp + 1 days);
-
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
-            abi.encode(creditConfigurator, "setExpirationDate(uint40)", abi.encode(block.timestamp + 5), expirationDate)
+            abi.encode(
+                creditConfigurator, "setExpirationDate(uint40)", abi.encode(expirationDate), block.timestamp + 1 days
+            )
         );
 
         vm.prank(admin);
-        controllerTimelock.setExpirationDate(creditManager, uint40(block.timestamp + 5));
+        controllerTimelock.setExpirationDate(creditManager, expirationDate);
 
         vm.expectRevert(CallerNotAdminException.selector);
 
@@ -709,20 +723,17 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
 
         vm.warp(block.timestamp - 10 days);
 
-        // vm.mockCallRevert(
-        //     creditConfigurator,
-        //     abi.encodeWithSelector(
-        //         ICreditConfigurator.setExpirationDate.selector,
-        //         expirationDate
-        //     ),
-        //     abi.encode("error")
-        // );
+        vm.mockCallRevert(
+            creditConfigurator,
+            abi.encodeWithSelector(ICreditConfigurator.setExpirationDate.selector, expirationDate),
+            abi.encode("error")
+        );
 
-        // vm.expectRevert(TxExecutionRevertedException.selector);
-        // vm.prank(admin);
-        // controllerTimelock.executeTransaction(txHash);
+        vm.expectRevert(TxExecutionRevertedException.selector);
+        vm.prank(admin);
+        controllerTimelock.executeTransaction(txHash);
 
-        // vm.clearMockedCalls();
+        vm.clearMockedCalls();
 
         vm.expectEmit(true, false, false, false);
         emit ExecuteTransaction(txHash);

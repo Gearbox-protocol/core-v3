@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 pragma abicoder v1;
 
+import "../interfaces/IAddressProviderV3.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
-import {IPool4626} from "../interfaces/IPool4626.sol";
+import {IPoolV3} from "../interfaces/IPoolV3.sol";
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
@@ -68,7 +68,7 @@ contract WETHGateway is IWETHGateway, ReentrancyGuard, ContractsRegisterTrait {
     /// @param addressProvider Address Repository for upgradable contract model
     constructor(address addressProvider) ContractsRegisterTrait(addressProvider) {
         if (addressProvider == address(0)) revert ZeroAddressException();
-        weth = AddressProvider(addressProvider).getWethToken();
+        weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, 0);
     }
 
     /// FOR POOLS V3
@@ -83,7 +83,7 @@ contract WETHGateway is IWETHGateway, ReentrancyGuard, ContractsRegisterTrait {
         IWETH(weth).deposit{value: msg.value}();
 
         _checkAllowance(pool, msg.value);
-        return IPool4626(pool).deposit(msg.value, receiver);
+        return IPoolV3(pool).deposit(msg.value, receiver);
     }
 
     function depositReferral(address pool, address receiver, uint16 referralCode)
@@ -96,7 +96,7 @@ contract WETHGateway is IWETHGateway, ReentrancyGuard, ContractsRegisterTrait {
         IWETH(weth).deposit{value: msg.value}();
 
         _checkAllowance(pool, msg.value);
-        return IPool4626(pool).depositReferral(msg.value, receiver, referralCode);
+        return IPoolV3(pool).depositReferral(msg.value, receiver, referralCode);
     }
 
     function mint(address pool, uint256 shares, address receiver)
@@ -110,7 +110,7 @@ contract WETHGateway is IWETHGateway, ReentrancyGuard, ContractsRegisterTrait {
         IWETH(weth).deposit{value: msg.value}();
 
         _checkAllowance(pool, msg.value);
-        assets = IPool4626(pool).mint(shares, receiver);
+        assets = IPoolV3(pool).mint(shares, receiver);
     }
 
     function withdraw(address pool, uint256 assets, address receiver, address owner)
@@ -120,7 +120,7 @@ contract WETHGateway is IWETHGateway, ReentrancyGuard, ContractsRegisterTrait {
         unwrapAndTransferWethTo(receiver)
         returns (uint256 shares)
     {
-        return IPool4626(pool).withdraw(assets, address(this), owner);
+        return IPoolV3(pool).withdraw(assets, address(this), owner);
     }
 
     function redeem(address pool, uint256 shares, address receiver, address owner)
@@ -130,7 +130,7 @@ contract WETHGateway is IWETHGateway, ReentrancyGuard, ContractsRegisterTrait {
         unwrapAndTransferWethTo(receiver)
         returns (uint256 assets)
     {
-        return IPool4626(pool).redeem(shares, address(this), owner);
+        return IPoolV3(pool).redeem(shares, address(this), owner);
     }
 
     // CREDIT MANAGERS

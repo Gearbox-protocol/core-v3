@@ -3,18 +3,34 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {BitMask} from "./BitMask.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {CollateralDebtData, CollateralTokenData} from "../interfaces/ICreditManagerV3.sol";
+import {IERC20Helper} from "./IERC20Helper.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
-import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
+import {SECONDS_PER_YEAR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import "../interfaces/IExceptions.sol";
 
+import {BitMask} from "./BitMask.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
+
 uint256 constant INDEX_PRECISION = 10 ** 9;
+
+import "forge-std/console.sol";
 
 /// @title Credit Logic Library
 library CreditLogic {
     using BitMask for uint256;
+
+    function calcLinearGrowth(uint256 value, uint256 timestampLastUpdate) internal view returns (uint256) {
+        // timeDifference = blockTime - previous timeStamp
+
+        //                             timeDifference
+        //  valueGrowth = value  *  -------------------
+        //                           SECONDS_PER_YEAR
+        //
+        return value * (block.timestamp - timestampLastUpdate) / SECONDS_PER_YEAR;
+    }
 
     function calcAccruedInterest(uint256 amount, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow)
         internal
@@ -79,6 +95,7 @@ library CreditLogic {
             if (totalFunds > amountToPoolWithFee) {
                 remainingFunds = totalFunds - amountToPoolWithFee - 1; // F:[CM-43]
             } else {
+                amountToPoolWithFee = totalFunds;
                 amountToPool = amountMinusFeeFn(totalFunds); // F:[CM-43]
             }
 
@@ -89,15 +106,7 @@ library CreditLogic {
             }
         }
 
-        amountToPool = amountWithFeeFn(amountToPool);
-    }
-
-    function _calcAmountToPool(uint256 debt, uint256 debtWithInterest, uint16 feeInterest)
-        internal
-        pure
-        returns (uint256 amountToPool)
-    {
-        amountToPool = debtWithInterest + ((debtWithInterest - debt) * feeInterest) / PERCENTAGE_FACTOR;
+        amountToPool = amountToPoolWithFee;
     }
 
     function getTokenOrRevert(CollateralTokenData storage tokenData) internal view returns (address token) {
@@ -137,19 +146,7 @@ library CreditLogic {
 
     /// MANAGE DEBT
 
-    /// @dev Calculates the new cumulative index when debt is updated
-    /// @param debt Current debt principal
-    /// @param delta Absolute value of total debt amount change
-    /// @param cumulativeIndexNow Current cumulative index of the pool
-    /// @param cumulativeIndexOpen Last updated cumulative index recorded for the corresponding debt position
-    /// @notice Handles two potential cases:
-    ///         * Debt principal is increased by delta - in this case, the principal is changed
-    ///           but the interest / fees have to stay the same
-    ///         * Interest is decreased by delta - in this case, the principal stays the same,
-    ///           but the interest changes. The delta is assumed to have fee repayment excluded.
-    ///         The debt decrease case where delta > interest + fees is trivial and should be handled outside
-    ///         this function.
-    function calcIncrease(uint256 debt, uint256 delta, uint256 cumulativeIndexNow, uint256 cumulativeIndexOpen)
+    function calcIncrease(uint256 amount, uint256 debt, uint256 cumulativeIndexNow, uint256 cumulativeIndexLastUpdate)
         internal
         pure
         returns (uint256 newDebt, uint256 newCumulativeIndex)
@@ -159,21 +156,21 @@ library CreditLogic {
         // debt * (cumulativeIndexNow / cumulativeIndexOpen - 1) ==
         // == (debt + delta) * (cumulativeIndexNow / newCumulativeIndex - 1)
 
-        newDebt = debt + delta;
+        newDebt = debt + amount;
 
         newCumulativeIndex = (
             (cumulativeIndexNow * newDebt * INDEX_PRECISION)
-                / ((INDEX_PRECISION * cumulativeIndexNow * debt) / cumulativeIndexOpen + INDEX_PRECISION * delta)
+                / ((INDEX_PRECISION * cumulativeIndexNow * debt) / cumulativeIndexLastUpdate + INDEX_PRECISION * amount)
         );
     }
 
-    function calcDescrease(
+    function calcDecrease(
         uint256 amount,
-        uint256 quotaInterestAccrued,
-        uint16 feeInterest,
         uint256 debt,
         uint256 cumulativeIndexNow,
-        uint256 cumulativeIndexLastUpdate
+        uint256 cumulativeIndexLastUpdate,
+        uint256 cumulativeQuotaInterest,
+        uint16 feeInterest
     )
         internal
         pure
@@ -182,25 +179,25 @@ library CreditLogic {
             uint256 newCumulativeIndex,
             uint256 amountToRepay,
             uint256 profit,
-            uint256 cumulativeQuotaInterest
+            uint256 newCumulativeQuotaInterest
         )
     {
         amountToRepay = amount;
 
-        if (quotaInterestAccrued > 1) {
-            uint256 quotaProfit = (quotaInterestAccrued * feeInterest) / PERCENTAGE_FACTOR;
+        if (cumulativeQuotaInterest != 0) {
+            uint256 quotaProfit = (cumulativeQuotaInterest * feeInterest) / PERCENTAGE_FACTOR;
 
-            if (amountToRepay >= quotaInterestAccrued + quotaProfit) {
-                amountToRepay -= quotaInterestAccrued + quotaProfit; // F: [CMQ-5]
+            if (amountToRepay >= cumulativeQuotaInterest + quotaProfit) {
+                amountToRepay -= cumulativeQuotaInterest + quotaProfit; // F: [CMQ-5]
                 profit += quotaProfit; // F: [CMQ-5]
-                cumulativeQuotaInterest = 1; // F: [CMQ-5]
+                newCumulativeQuotaInterest = 0; // F: [CMQ-5]
             } else {
                 uint256 amountToPool = (amountToRepay * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
 
                 profit += amountToRepay - amountToPool; // F: [CMQ-4]
                 amountToRepay = 0; // F: [CMQ-4]
 
-                cumulativeQuotaInterest = quotaInterestAccrued - amountToPool + 1; // F: [CMQ-4]
+                newCumulativeQuotaInterest = cumulativeQuotaInterest - amountToPool; // F: [CMQ-4]
 
                 newDebt = debt;
                 newCumulativeIndex = cumulativeIndexLastUpdate;
@@ -209,7 +206,7 @@ library CreditLogic {
 
         if (amountToRepay > 0) {
             // Computes the interest accrued thus far
-            uint256 interestAccrued = (debt * newCumulativeIndex) / cumulativeIndexLastUpdate - debt; // F:[CM-21]
+            uint256 interestAccrued = (debt * cumulativeIndexNow) / cumulativeIndexLastUpdate - debt; // F:[CM-21]
 
             // Computes profit, taken as a percentage of the interest rate
             uint256 profitFromInterest = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR; // F:[CM-21]
@@ -257,103 +254,9 @@ library CreditLogic {
                             - (INDEX_PRECISION * amountToPool * cumulativeIndexLastUpdate) / debt
                     );
             }
-        }
-
-        // TODO: delete after tests or write Invaraiant test
-        require(debt - newDebt == amountToRepay, "Ooops, something was wring");
-    }
-
-    /// @param creditAccount Credit Account to compute balances for
-    /// @param callData Bytes calldata for parsing
-    function storeBalances(address creditAccount, bytes memory callData)
-        internal
-        view
-        returns (Balance[] memory expected)
-    {
-        // Retrieves the balance list from calldata
-        expected = abi.decode(callData, (Balance[])); // F:[FA-45]
-        uint256 len = expected.length; // F:[FA-45]
-
-        for (uint256 i = 0; i < len;) {
-            expected[i].balance += _balanceOf(expected[i].token, creditAccount); // F:[FA-45]
-            unchecked {
-                ++i;
-            }
-        }
-    }
-
-    /// @dev Compares current balances to previously saved expected balances.
-    /// Reverts if at least one balance is lower than expected
-    /// @param creditAccount Credit Account to check
-    /// @param expected Expected balances after all operations
-
-    function compareBalances(address creditAccount, Balance[] memory expected) internal view {
-        uint256 len = expected.length; // F:[FA-45]
-        unchecked {
-            for (uint256 i = 0; i < len; ++i) {
-                if (_balanceOf(expected[i].token, creditAccount) < expected[i].balance) {
-                    revert BalanceLessThanMinimumDesiredException(expected[i].token);
-                } // F:[FA-45]
-            }
-        }
-    }
-
-    function _balanceOf(address token, address holder) internal view returns (uint256) {
-        return IERC20(token).balanceOf(holder);
-    }
-
-    function storeForbiddenBalances(
-        address creditAccount,
-        uint256 enabledTokensMask,
-        uint256 forbiddenTokenMask,
-        function (uint256) view returns (address) getTokenByMaskFn
-    ) internal view returns (uint256[] memory forbiddenBalances) {
-        uint256 forbiddenTokensOnAccount = enabledTokensMask & forbiddenTokenMask;
-
-        if (forbiddenTokensOnAccount != 0) {
-            forbiddenBalances = new uint256[](forbiddenTokensOnAccount.calcEnabledTokens());
-            unchecked {
-                uint256 i;
-                for (uint256 tokenMask = 1; tokenMask < forbiddenTokensOnAccount; tokenMask <<= 1) {
-                    if (forbiddenTokensOnAccount & tokenMask != 0) {
-                        address token = getTokenByMaskFn(tokenMask);
-                        forbiddenBalances[i] = _balanceOf(token, creditAccount);
-                        ++i;
-                    }
-                }
-            }
-        }
-    }
-
-    function checkForbiddenBalances(
-        address creditAccount,
-        uint256 enabledTokensMaskBefore,
-        uint256 enabledTokensMaskAfter,
-        uint256[] memory forbiddenBalances,
-        uint256 forbiddenTokenMask,
-        function (uint256) view returns (address) getTokenByMaskFn
-    ) internal view {
-        uint256 forbiddenTokensOnAccount = enabledTokensMaskAfter & forbiddenTokenMask;
-        if (forbiddenTokensOnAccount == 0) return;
-
-        uint256 forbiddenTokensOnAccountBefore = enabledTokensMaskBefore & forbiddenTokenMask;
-        if (forbiddenTokensOnAccount & ~forbiddenTokensOnAccountBefore != 0) revert ForbiddenTokensException();
-
-        unchecked {
-            uint256 i;
-            for (uint256 tokenMask = 1; tokenMask < forbiddenTokensOnAccountBefore; tokenMask <<= 1) {
-                if (forbiddenTokensOnAccountBefore & tokenMask != 0) {
-                    if (forbiddenTokensOnAccount & tokenMask != 0) {
-                        address token = getTokenByMaskFn(tokenMask);
-                        uint256 balance = _balanceOf(token, creditAccount);
-                        if (balance > forbiddenBalances[i]) {
-                            revert ForbiddenTokensException();
-                        }
-                    }
-
-                    ++i;
-                }
-            }
+        } else {
+            newDebt = debt;
+            newCumulativeIndex = cumulativeIndexLastUpdate;
         }
     }
 }

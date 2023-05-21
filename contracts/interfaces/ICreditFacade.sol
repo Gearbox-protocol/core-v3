@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 import {ICreditManagerV3} from "./ICreditManagerV3.sol";
@@ -9,6 +9,20 @@ import {ICreditManagerV3} from "./ICreditManagerV3.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 import {ClosureAction} from "../interfaces/ICreditManagerV3.sol";
 import "./ICreditFacadeMulticall.sol";
+
+struct DebtLimits {
+    /// @dev Minimal borrowed amount per credit account
+    uint128 minDebt;
+    /// @dev Maximum aborrowed amount per credit account
+    uint128 maxDebt;
+}
+
+struct CumulativeLossParams {
+    /// @dev Current cumulative loss from all bad debt liquidations
+    uint128 currentCumulativeLoss;
+    /// @dev Max cumulative loss accrued before the system is paused
+    uint128 maxCumulativeLoss;
+}
 
 struct FullCheckParams {
     uint256[] collateralHints;
@@ -73,13 +87,10 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     /// @param calls The array of MultiCall structs encoding the required operations. Generally must have
     /// at least a call to addCollateral, as otherwise the health check at the end will fail.
     /// @param referralCode Referral code which is used for potential rewards. 0 if no referral code provided
-    function openCreditAccount(
-        uint256 debt,
-        address onBehalfOf,
-        MultiCall[] calldata calls,
-        bool deployNewAccount,
-        uint16 referralCode
-    ) external payable returns (address creditAccount);
+    function openCreditAccount(uint256 debt, address onBehalfOf, MultiCall[] calldata calls, uint16 referralCode)
+        external
+        payable
+        returns (address creditAccount);
 
     /// @dev Runs a batch of transactions within a multicall and closes the account
     /// - Wraps ETH to WETH and sends it msg.sender if value > 0
@@ -90,18 +101,18 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     ///      from the Credit Account and proceeds. If not, tries to transfer the shortfall from msg.sender.
     ///    + Transfers all enabled assets with non-zero balances to the "to" address, unless they are marked
     ///      to be skipped in skipTokenMask
-    ///    + If convertWETH is true, converts WETH into ETH before sending to the recipient
+    ///    + If convertToETH is true, converts WETH into ETH before sending to the recipient
     /// - Emits a CloseCreditAccount event
     ///
     /// @param to Address to send funds to during account closing
     /// @param skipTokenMask Uint-encoded bit mask where 1's mark tokens that shouldn't be transferred
-    /// @param convertWETH If true, converts WETH into ETH before sending to "to"
+    /// @param convertToETH If true, converts WETH into ETH before sending to "to"
     /// @param calls The array of MultiCall structs encoding the operations to execute before closing the account.
     function closeCreditAccount(
         address creditAccount,
         address to,
         uint256 skipTokenMask,
-        bool convertWETH,
+        bool convertToETH,
         MultiCall[] calldata calls
     ) external payable;
 
@@ -122,18 +133,18 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     ///    + Transfers all enabled assets with non-zero balances to the "to" address, unless they are marked
     ///      to be skipped in skipTokenMask. If the liquidator is confident that all assets were converted
     ///      during the multicall, they can set the mask to uint256.max - 1, to only transfer the underlying
-    ///    + If convertWETH is true, converts WETH into ETH before sending
+    ///    + If convertToETH is true, converts WETH into ETH before sending
     /// - Emits LiquidateCreditAccount event
     ///
     /// @param to Address to send funds to after liquidation
     /// @param skipTokenMask Uint-encoded bit mask where 1's mark tokens that shouldn't be transferred
-    /// @param convertWETH If true, converts WETH into ETH before sending to "to"
+    /// @param convertToETH If true, converts WETH into ETH before sending to "to"
     /// @param calls The array of MultiCall structs encoding the operations to execute before liquidating the account.
     function liquidateCreditAccount(
         address creditAccount,
         address to,
         uint256 skipTokenMask,
-        bool convertWETH,
+        bool convertToETH,
         MultiCall[] calldata calls
     ) external payable;
 
@@ -176,6 +187,20 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
 
     function claimWithdrawals(address creditAccount, address to) external;
 
+    /// @dev Sets permissions and funding parameters for a bot
+    /// @param creditAccount CA to set permissions for
+    /// @param bot Bot to set permissions for
+    /// @param permissions A bit mask of permissions
+    /// @param fundingAmount Total amount of ETH available to the bot for payments
+    /// @param weeklyFundingAllowance Amount of ETH available to the bot weekly
+    function setBotPermissions(
+        address creditAccount,
+        address bot,
+        uint192 permissions,
+        uint72 fundingAmount,
+        uint72 weeklyFundingAllowance
+    ) external;
+
     //
     // GETTERS
     //
@@ -184,7 +209,7 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     function forbiddenTokenMask() external view returns (uint256);
 
     /// @dev Returns the CreditManagerV3 connected to this Credit Facade
-    function creditManager() external view returns (ICreditManagerV3);
+    function creditManager() external view returns (address);
 
     /// @dev Returns true if 'from' is allowed to transfer Credit Accounts to 'to'
     /// @param from Sender address to check allowance for
@@ -202,9 +227,6 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
 
     /// @dev Address of the DegenNFT that gatekeeps account openings in whitelisted mode
     function degenNFT() external view returns (address);
-
-    /// @dev Address of the underlying asset
-    function underlying() external view returns (address);
 
     /// @dev Maps addresses to their status as emergency liquidator.
     /// @notice Emergency liquidators are trusted addresses

@@ -8,6 +8,10 @@ import {IERC20Helper} from "./IERC20Helper.sol";
 
 import {ICreditAccount} from "../interfaces/ICreditAccount.sol";
 import {AllowanceFailedException} from "../interfaces/IExceptions.sol";
+
+import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
+import {IWithdrawalManager} from "../interfaces/IWithdrawalManager.sol";
+
 /// @title CreditAccount Helper library
 
 library CreditAccountHelper {
@@ -15,8 +19,9 @@ library CreditAccountHelper {
 
     function safeApprove(ICreditAccount creditAccount, address token, address spender, uint256 amount) internal {
         if (!_approve(creditAccount, token, spender, amount, false)) {
-            _approve(creditAccount, token, spender, 0, true); // F:
-            _approve(creditAccount, token, spender, amount, true);
+            // U:[CAH-1,2]
+            _approve(creditAccount, token, spender, 0, true); //U:[CAH-1,2]
+            _approve(creditAccount, token, spender, amount, true); // U:[CAH-1,2]
         }
     }
 
@@ -45,18 +50,16 @@ library CreditAccountHelper {
         return false;
     }
 
-    function _safeTransfer(ICreditAccount creditAccount, address token, address to, uint256 amount) internal {
+    function transfer(ICreditAccount creditAccount, address token, address to, uint256 amount) internal {
         ICreditAccount(creditAccount).safeTransfer(token, to, amount);
     }
 
-    function safeTransferDeliveredBalanceControl(
-        ICreditAccount creditAccount,
-        address token,
-        address to,
-        uint256 amount
-    ) internal returns (uint256 delivered) {
-        uint256 balanceBefore = IERC20(token)._balanceOf(to);
-        _safeTransfer(creditAccount, token, to, amount);
-        delivered = IERC20(token)._balanceOf(to) - balanceBefore;
+    function transferDeliveredBalanceControl(ICreditAccount creditAccount, address token, address to, uint256 amount)
+        internal
+        returns (uint256 delivered)
+    {
+        uint256 balanceBefore = IERC20Helper.balanceOf(token, to);
+        transfer(creditAccount, token, to, amount);
+        delivered = IERC20Helper.balanceOf(token, to) - balanceBefore;
     }
 }

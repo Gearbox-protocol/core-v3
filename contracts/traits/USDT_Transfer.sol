@@ -1,15 +1,19 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IUSDT} from "../interfaces/external/IUSDT.sol";
+import {USDTFees} from "../libraries/USDTFees.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
+interface IUSDT {
+    function basisPointsRate() external view returns (uint256);
+
+    function maximumFee() external view returns (uint256);
+}
+
 contract USDT_Transfer {
-    using SafeERC20 for IERC20;
+    using USDTFees for uint256;
 
     address private immutable usdt;
 
@@ -17,32 +21,17 @@ contract USDT_Transfer {
         usdt = _usdt;
     }
 
-    function _safeUSDTTransfer(address to, uint256 amount) internal returns (uint256) {
-        uint256 balanceBefore = IERC20(usdt).balanceOf(to);
-        IERC20(usdt).balanceOf(msg.sender);
-
-        IERC20(usdt).safeTransferFrom(msg.sender, to, amount);
-
-        return IERC20(usdt).balanceOf(to) - balanceBefore;
-    }
-
     /// @dev Computes how much usdt you should send to get exact amount on destination account
     function _amountUSDTWithFee(uint256 amount) internal view virtual returns (uint256) {
-        uint256 amountWithBP = (amount * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR - IUSDT(usdt).basisPointsRate());
-        uint256 maximumFee = IUSDT(usdt).maximumFee();
-        unchecked {
-            uint256 amountWithMaxFee = maximumFee > type(uint256).max - amount ? maximumFee : amount + maximumFee;
-            return amountWithBP > amountWithMaxFee ? amountWithMaxFee : amountWithBP;
-        }
+        uint256 basisPointsRate = IUSDT(usdt).basisPointsRate(); // U:[UTT_01]
+        uint256 maximumFee = IUSDT(usdt).maximumFee(); // U:[UTT_01]
+        return amount.amountUSDTWithFee({basisPointsRate: basisPointsRate, maximumFee: maximumFee}); // U:[UTT_01]
     }
 
     /// @dev Computes how much usdt you should send to get exact amount on destination account
     function _amountUSDTMinusFee(uint256 amount) internal view virtual returns (uint256) {
-        uint256 fee = amount * IUSDT(usdt).basisPointsRate() / 10000;
-        uint256 maximumFee = IUSDT(usdt).maximumFee();
-        if (fee > maximumFee) {
-            fee = maximumFee;
-        }
-        return amount - fee;
+        uint256 basisPointsRate = IUSDT(usdt).basisPointsRate(); // U:[UTT_01]
+        uint256 maximumFee = IUSDT(usdt).maximumFee(); // U:[UTT_01]
+        return amount.amountUSDTMinusFee({basisPointsRate: basisPointsRate, maximumFee: maximumFee}); // U:[UTT_01]
     }
 }

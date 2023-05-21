@@ -15,12 +15,17 @@ error NotImplementedException();
 error IncorrectParameterException();
 
 error RegisteredCreditManagerOnlyException();
+
 error RegisteredPoolOnlyException();
 
 error WethPoolsOnlyException();
+
 error ReceiveIsNotAllowedException();
 
 error IncompatibleCreditManagerException();
+
+/// @dev Reverts if address isn't found in address provider
+error AddressNotFoundException();
 
 /// @dev Thrown on attempting to set an EOA as an important contract in the system
 error AddressIsNotContractException(address);
@@ -38,6 +43,9 @@ error IncorrectTokenContractException();
 ///      correct price feed
 error IncorrectPriceFeedException();
 
+/// @dev Thrown on attempting to get a result for a token that does not have a price feed
+error PriceFeedNotExistsException();
+
 ///
 /// ACCESS
 ///
@@ -47,6 +55,9 @@ error CallerNotCreditAccountOwnerException();
 
 /// @dev Thrown on attempting to call an access restricted function as a non-Configurator
 error CallerNotConfiguratorException();
+
+/// @dev Thrown on attempting to call an access-restructed function not as account factory
+error CallerNotAccountFactoryException();
 
 /// @dev Thrown on attempting to call an access restricted function as a non-CreditManagerV3
 error CallerNotCreditManagerException();
@@ -76,9 +87,6 @@ error CallerNotVoterException();
 /// @dev Thrown if an access-restricted function is called by an address that is not
 ///      the connected Credit Facade, or an allowed adapter
 error CallerNotAdapterException();
-
-/// @dev Thrown if an access-restricted function is called by an address that is not withdrawal manager
-error CallerNotWithdrawalManagerException();
 
 /// interface ICreditConfiguratorExceptions {
 
@@ -207,7 +215,7 @@ error BorrowingMoreU2ForbiddenException();
 /// @dev Thrown on returning a value that violates the current bounds
 error ValueOutOfRangeException();
 
-// interface IPool4626Exceptions {
+// interface IPoolV3Exceptions {
 error ExpectedLiquidityLimitException();
 
 error CreditManagerCantBorrowException();
@@ -235,4 +243,13 @@ error NoFreeWithdrawalSlotsException();
 
 error NoPermissionException(uint256 permission);
 
-error ExternalCallCreditAccountNotSetException();
+error ActiveCreditAccountNotSetException();
+
+/// @dev Thrown when attempting to set positive funding for a bot with 0 permissions
+error PositiveFundingForInactiveBotException();
+
+/// @dev Thrown when trying to deploy second master credit account for a credit manager
+error MasterCreditAccountAlreadyDeployedException();
+
+/// @dev Thrown when trying to rescue funds from a credit account that is currently in use
+error CreditAccountIsInUseException();

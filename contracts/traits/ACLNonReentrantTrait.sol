@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
@@ -15,20 +15,16 @@ import {
 } from "../interfaces/IExceptions.sol";
 
 import {ACLTrait} from "./ACLTrait.sol";
+import {ReentrancyGuardTrait} from "./ReentrancyGuardTrait.sol";
 
 /// @title ACL Trait
 /// @notice Utility class for ACL consumers
-abstract contract ACLNonReentrantTrait is ACLTrait, Pausable {
+abstract contract ACLNonReentrantTrait is ACLTrait, ReentrancyGuardTrait, Pausable {
     /// @dev Emitted when new external controller is set
     event NewController(address indexed newController);
 
-    uint8 private constant _NOT_ENTERED = 1;
-    uint8 private constant _ENTERED = 2;
-
     address public controller;
     bool public externalController;
-
-    uint8 private _status = _NOT_ENTERED;
 
     /// @dev Ensures that caller is external controller (if it is set) or configurator
     modifier controllerOnly() {
@@ -58,26 +54,6 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable {
             revert CallerNotUnpausableAdminException();
         }
         _;
-    }
-
-    /// @dev Prevents a contract from calling itself, directly or indirectly.
-    /// Calling a `nonReentrant` function from another `nonReentrant`
-    /// function is not supported. It is possible to prevent this from happening
-    /// by making the `nonReentrant` function external, and making it call a
-    /// `private` function that does the actual work.
-    ///
-    modifier nonReentrant() {
-        // On the first call to nonReentrant, _notEntered will be true
-        require(_status != _ENTERED, "ReentrancyGuard: reentrant call");
-
-        // Any calls to nonReentrant after this point will fail
-        _status = _ENTERED;
-
-        _;
-
-        // By storing the original value once again, a refund is triggered (see
-        // https://eips.ethereum.org/EIPS/eip-2200)
-        _status = _NOT_ENTERED;
     }
 
     /// @dev constructor

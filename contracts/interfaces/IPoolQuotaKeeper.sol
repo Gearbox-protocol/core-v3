@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
-import {IPool4626} from "./IPool4626.sol";
+import {IPoolV3} from "./IPoolV3.sol";
 
 struct TokenQuotaParams {
     uint96 totalQuoted;
@@ -56,9 +56,7 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
     /// @dev Computes the accrued quota interest and updates interest indexes
     /// @param creditAccount Address of the Credit Account to accrue interest for
     /// @param tokens Array of all active quoted tokens on the account
-    function accrueQuotaInterest(address creditAccount, address[] memory tokens)
-        external
-        returns (uint256 caQuotaInterestChange);
+    function accrueQuotaInterest(address creditAccount, address[] memory tokens) external;
 
     /// @dev Gauge management
 
@@ -73,7 +71,7 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
     //
 
     /// @dev Returns the gauge address
-    function pool() external view returns (IPool4626);
+    function pool() external view returns (address);
 
     /// @dev Returns the gauge address
     function gauge() external view returns (address);
@@ -97,16 +95,8 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
         returns (uint96 quota, uint192 cumulativeIndexLU);
 
     /// @dev Computes collateral value for quoted tokens on the account, as well as accrued quota interest
-    function computeQuotedCollateralUSD(
-        address creditAccount,
-        address _priceOracle,
-        address[] memory tokens,
-        uint256[] memory lts
-    ) external view returns (uint256 totalValue, uint256 twv, uint256 totalQuotaInterest);
-
-    /// @dev Computes outstanding quota interest
-    function outstandingQuotaInterest(address creditAccount, address[] memory tokens)
+    function getQuotaAndOutstandingInterest(address creditAccount, address token)
         external
         view
-        returns (uint256 caQuotaInterestChange);
+        returns (uint256 quoted, uint256 outstandingInterest);
 }

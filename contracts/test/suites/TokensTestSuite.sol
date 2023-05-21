@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox. Generalized leverage protocol that allows to take leverage and then use it across other DeFi protocols and platforms in a composable way.
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {WETHMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/WETHMock.sol";
-import {ERC20BlacklistableMock} from "../mocks/token/ERC20Blacklistable.sol";
+import {ERC20BlacklistableMock} from "../mocks//token/ERC20Blacklistable.sol";
 
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import {PriceFeedConfig} from "@gearbox-protocol/core-v2/contracts/oracles/PriceOracle.sol";
 
 // MOCKS
 import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
-import {ERC20FeeMock} from "../mocks/token/ERC20FeeMock.sol";
+import {ERC20FeeMock} from "../mocks//token/ERC20FeeMock.sol";
 
 import {PriceFeedMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/oracles/PriceFeedMock.sol";
 
@@ -92,19 +92,45 @@ contract TokensTestSuite is Test, TokensData, TokensTestSuiteHelper {
         return balanceOf(addressOf[t], holder);
     }
 
-    function approve(Tokens t, address holder, address targetContract) public {
-        approve(addressOf[t], holder, targetContract);
+    function approve(Tokens t, address from, address spender) public {
+        approve(addressOf[t], from, spender);
     }
 
-    function approve(Tokens t, address holder, address targetContract, uint256 amount) public {
-        approve(addressOf[t], holder, targetContract, amount);
+    function approve(Tokens t, address from, address spender, uint256 amount) public {
+        approve(addressOf[t], from, spender, amount);
     }
 
-    function allowance(Tokens t, address holder, address targetContract) external view returns (uint256) {
-        return IERC20(addressOf[t]).allowance(holder, targetContract);
+    function allowance(Tokens t, address from, address spender) external view returns (uint256) {
+        return IERC20(addressOf[t]).allowance(from, spender);
     }
 
     function burn(Tokens t, address from, uint256 amount) external {
         burn(addressOf[t], from, amount);
+    }
+
+    function listOf(Tokens t1) external view returns (address[] memory tokensList) {
+        tokensList = new address[](1);
+        tokensList[0] = addressOf[t1];
+    }
+
+    function listOf(Tokens t1, Tokens t2) external view returns (address[] memory tokensList) {
+        tokensList = new address[](2);
+        tokensList[0] = addressOf[t1];
+        tokensList[1] = addressOf[t2];
+    }
+
+    function listOf(Tokens t1, Tokens t2, Tokens t3) external view returns (address[] memory tokensList) {
+        tokensList = new address[](3);
+        tokensList[0] = addressOf[t1];
+        tokensList[1] = addressOf[t2];
+        tokensList[2] = addressOf[t3];
+    }
+
+    function listOf(Tokens t1, Tokens t2, Tokens t3, Tokens t4) external view returns (address[] memory tokensList) {
+        tokensList = new address[](4);
+        tokensList[0] = addressOf[t1];
+        tokensList[1] = addressOf[t2];
+        tokensList[2] = addressOf[t3];
+        tokensList[3] = addressOf[t4];
     }
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -53,7 +53,6 @@ contract CreditFacadeTestHelper is TestHelper {
                     callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, amount))
                 })
             ),
-            false,
             referralCode
         );
     }
@@ -94,7 +93,7 @@ contract CreditFacadeTestHelper is TestHelper {
         // switch to new block to be able to close account
         vm.roll(block.number + 1);
 
-        // (,, uint256 underlyingToClose) = creditManager.calcCreditAccountAccruedInterest(creditAccount);
+        // (,, uint256 underlyingToClose) = creditManager.calcAccruedInterestAndFees(creditAccount);
         // uint256 underlyingBalance = cft.tokenTestSuite().balanceOf(underlying, creditAccount);
 
         // if (underlyingToClose > underlyingBalance) {
@@ -183,7 +182,7 @@ contract CreditFacadeTestHelper is TestHelper {
     function expectSafeAllowance(address creditAccount, address target) internal {
         uint256 len = creditManager.collateralTokensCount();
         for (uint256 i = 0; i < len; i++) {
-            (address token,) = creditManager.collateralTokens(i);
+            (address token,) = creditManager.collateralTokensByMask(1 << i);
             assertLe(IERC20(token).allowance(creditAccount, target), 1, "allowance is too high");
         }
     }

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 pragma experimental ABIEncoderV2;
 
+import "../interfaces/IAddressProviderV3.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
@@ -15,7 +16,7 @@ import {ICreditFilter} from "@gearbox-protocol/core-v2/contracts/interfaces/V1/I
 import {ICreditConfigurator} from "../interfaces/ICreditConfiguratorV3.sol";
 import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
-import {IPool4626} from "../interfaces/IPool4626.sol";
+import {IPoolV3} from "../interfaces/IPoolV3.sol";
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
@@ -39,7 +40,7 @@ import {ZeroAddressException} from "../interfaces/IExceptions.sol";
 /// Do not use for data from any onchain activities
 contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
     /// @dev Address of the AddressProvider
-    AddressProvider public immutable addressProvider;
+    IAddressProviderV3 public immutable addressProvider;
 
     /// @dev Address of the ContractsRegister
     ContractsRegister public immutable contractsRegister;
@@ -53,9 +54,9 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
     constructor(address _addressProvider) ContractsRegisterTrait(_addressProvider) {
         if (_addressProvider == address(0)) revert ZeroAddressException();
 
-        addressProvider = AddressProvider(_addressProvider);
-        contractsRegister = ContractsRegister(addressProvider.getContractsRegister());
-        WETHToken = addressProvider.getWethToken();
+        addressProvider = IAddressProviderV3(_addressProvider);
+        contractsRegister = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
+        WETHToken = addressProvider.getAddressOrRevert(AP_WETH_TOKEN, 0);
     }
 
     /// @dev Returns CreditAccountData for all opened accounts for particular borrower
@@ -153,14 +154,14 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
 
             result.borrowedAmount = ICreditAccount(creditAccount).borrowedAmount();
 
-            result.borrowedAmountPlusInterest = creditFilter.calcCreditAccountAccruedInterest(creditAccount);
+            // result.borrowedAmountPlusInterest = creditFilter.calcAccruedInterestAndFees(creditAccount);
         } else {
             result.underlying = creditManagerV2.underlying();
             // (result.totalValue,) = creditFacade.calcTotalValue(creditAccount);
             // result.healthFactor = creditFacade.calcCreditAccountHealthFactor(creditAccount);
 
             // (result.borrowedAmount, result.borrowedAmountPlusInterest, result.borrowedAmountPlusInterestAndFees) =
-            //     creditManagerV2.calcCreditAccountAccruedInterest(creditAccount);
+            //     creditManagerV2.calcAccruedInterestAndFees(creditAccount);
         }
 
         address pool = address((ver == 1) ? creditManager.poolService() : creditManagerV2.pool());
@@ -181,7 +182,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
                     (balance.token, balance.balance,,) = creditFilter.getCreditAccountTokenById(creditAccount, i);
                     balance.isAllowed = creditFilter.isTokenAllowed(balance.token);
                 } else {
-                    (balance.token,) = creditManagerV2.collateralTokens(i);
+                    (balance.token,) = creditManagerV2.collateralTokensByMask(1 << i);
                     balance.balance = IERC20(balance.token).balanceOf(creditAccount);
                     // TODO: change
                     balance.isAllowed = true; //creditFacade.isAllowToken(balance.token);
@@ -260,7 +261,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
                         result.liquidationThresholds[i] = creditFilter.liquidationThresholds(token);
                     } else {
                         (result.collateralTokens[i], result.liquidationThresholds[i]) =
-                            creditManagerV2.collateralTokens(i);
+                            creditManagerV2.collateralTokensByMask(1 << i);
                     }
                 }
             }
@@ -311,7 +312,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
             result.degenNFT = creditFacade.degenNFT();
             result.isIncreaseDebtForbidden = creditFacade.maxDebtPerBlockMultiplier() == 0; // V2 only: true if increasing debt is forbidden
             result.forbiddenTokenMask = creditFacade.forbiddenTokenMask(); // V2 only: mask which forbids some particular tokens
-            result.maxEnabledTokensLength = creditManagerV2.maxAllowedEnabledTokenLength(); // V2 only: a limit on enabled tokens imposed for security
+            result.maxEnabledTokensLength = creditManagerV2.maxEnabledTokens(); // V2 only: a limit on enabled tokens imposed for security
             {
                 (
                     result.feeInterest,
@@ -349,7 +350,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
         uint256 dieselSupply = IERC20(result.dieselToken).totalSupply();
 
         uint256 totalLP =
-            (result.version > 1) ? IPool4626(_pool).convertToAssets(dieselSupply) : pool.fromDiesel(dieselSupply);
+            (result.version > 1) ? IPoolV3(_pool).convertToAssets(dieselSupply) : pool.fromDiesel(dieselSupply);
 
         result.depositAPY_RAY = totalLP == 0
             ? result.borrowAPY_RAY

@@ -3,20 +3,18 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {AdapterType} from "@gearbox-protocol/core-v2/contracts/interfaces/adapters/IAdapter.sol";
-import {ICreditManagerV3} from "./ICreditManagerV3.sol";
 
 /// @title Adapter interface
 interface IAdapter {
-    /// @notice Credit Manager the adapter is connected to
-    function creditManager() external view returns (ICreditManagerV3);
+    /// @notice Credit manager the adapter is connected to
+    function creditManager() external view returns (address);
 
     /// @notice Address of the contract the adapter is interacting with
     function targetContract() external view returns (address);
 
-    /// @notice Address provider
-    function addressProvider() external view returns (IAddressProvider);
+    /// @notice Address provider contract
+    function addressProvider() external view returns (address);
 
     /// @notice Adapter type
     function _gearboxAdapterType() external pure returns (AdapterType);

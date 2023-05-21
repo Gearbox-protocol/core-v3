@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
 import {CreditConfigurator} from "../../credit/CreditConfiguratorV3.sol";
@@ -83,9 +83,8 @@ contract CreditFacadeTestSuite is PoolDeployer {
             cmOpts.degenNFT = address(degenNFT);
         }
 
-        cmOpts.withdrawalManager = address(withdrawalManager);
-
         CreditManagerFactory cmf = new CreditManagerFactory(
+            address(addressProvider),
             address(poolMock),
             cmOpts,
             0
@@ -110,13 +109,16 @@ contract CreditFacadeTestSuite is PoolDeployer {
 
         if (accountFactoryVer == 2) {
             vm.prank(CONFIGURATOR);
-            AccountFactoryV3(address(af)).addCreditManager(address(creditManager), 1);
+            AccountFactoryV3(address(af)).addCreditManager(address(creditManager));
         }
 
         if (supportQuotas) {
             vm.prank(CONFIGURATOR);
             poolQuotaKeeper.addCreditManager(address(creditManager));
         }
+
+        vm.prank(CONFIGURATOR);
+        botList.setApprovedCreditManagerStatus(address(creditManager), true);
 
         vm.label(address(poolMock), "Pool");
         vm.label(address(creditFacade), "CreditFacadeV3");

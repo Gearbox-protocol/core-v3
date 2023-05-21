@@ -66,13 +66,9 @@ interface IWithdrawalManagerEvents {
     /// @notice Emitted when new scheduled withdrawal delay is set by configurator
     /// @param delay New delay for scheduled withdrawals
     event SetWithdrawalDelay(uint40 delay);
-
-    /// @notice Emitted when new credit manager status is set by configurator
-    /// @param creditManager Credit manager for which the status is set
-    /// @param status New status of the credit manager
-    event SetCreditManagerStatus(address indexed creditManager, bool status);
 }
 
+/// @title Withdrawal manager interface
 interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
     /// --------------------- ///
     /// IMMEDIATE WITHDRAWALS ///
@@ -82,13 +78,13 @@ interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
     function immediateWithdrawals(address account, address token) external view returns (uint256);
 
     /// @notice Adds new immediate withdrawal for the account
-    /// @param account Account to add immediate withdrawal for
     /// @param token Token to withdraw
+    /// @param to Account to add immediate withdrawal for
     /// @param amount Amount to withdraw
     /// @custom:expects Credit manager transferred `amount` of `token` to this contract prior to calling this function
-    function addImmediateWithdrawal(address account, address token, uint256 amount) external;
+    function addImmediateWithdrawal(address token, address to, uint256 amount) external;
 
-    /// @notice Claims `msg.sender`'s immediate withdrawal
+    /// @notice Claims caller's immediate withdrawal
     /// @param token Token to claim
     /// @param to Token recipient
     function claimImmediateWithdrawal(address token, address to) external;
@@ -138,15 +134,7 @@ interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
     /// CONFIGURATION ///
     /// ------------- ///
 
-    /// @notice Whether given address is a supported credit manager
-    function creditManagerStatus(address) external view returns (bool);
-
     /// @notice Sets delay for scheduled withdrawals, only affects new withdrawal requests
     /// @param delay New delay for scheduled withdrawals
     function setWithdrawalDelay(uint40 delay) external;
-
-    /// @notice Sets status for the credit manager
-    /// @param creditManager Credit manager to set the status for
-    /// @param status New status of the credit manager
-    function setCreditManagerStatus(address creditManager, bool status) external;
 }

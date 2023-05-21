@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import {GearStaking} from "../../../support/GearStaking.sol";
 import {IGearStakingEvents, MultiVote, VotingContractStatus} from "../../../interfaces/IGearStaking.sol";
 import {IVotingContract} from "../../../interfaces/IVotingContract.sol";
-
 import {CallerNotConfiguratorException} from "../../../interfaces/IExceptions.sol";
+import "../../../interfaces/IAddressProviderV3.sol";
 
 // TEST
 import "../../lib/constants.sol";
 
 // MOCKS
-import {AddressProviderACLMock} from "../../mocks/core/AddressProviderACLMock.sol";
+import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
 import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
 
@@ -32,7 +32,7 @@ uint256 constant EPOCH_LENGTH = 7 days;
 contract GearStakingTest is Test, IGearStakingEvents {
     address gearToken;
 
-    AddressProviderACLMock public addressProvider;
+    AddressProviderV3ACLMock public addressProvider;
 
     GearStaking gearStaking;
 
@@ -42,13 +42,14 @@ contract GearStakingTest is Test, IGearStakingEvents {
 
     function setUp() public {
         vm.prank(CONFIGURATOR);
-        addressProvider = new AddressProviderACLMock();
+        addressProvider = new AddressProviderV3ACLMock();
 
         tokenTestSuite = new TokensTestSuite();
 
         gearToken = tokenTestSuite.addressOf(Tokens.WETH);
 
-        addressProvider.setGearToken(gearToken);
+        vm.prank(CONFIGURATOR);
+        addressProvider.setAddress(AP_GEAR_TOKEN, gearToken, false);
 
         gearStaking = new GearStaking(address(addressProvider), block.timestamp + 1);
 

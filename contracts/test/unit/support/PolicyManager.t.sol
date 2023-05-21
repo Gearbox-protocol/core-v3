@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import {PolicyManager, Policy} from "../../../support/risk-controller/PolicyManager.sol";
 import {PolicyManagerInternal} from "../../mocks/support/PolicyManagerInternal.sol";
@@ -11,20 +11,20 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 import "../../lib/constants.sol";
 
 // MOCKS
-import {AddressProviderACLMock} from "../../mocks/core/AddressProviderACLMock.sol";
+import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 import {Test} from "forge-std/Test.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
 contract PolicyManagerTest is Test {
-    AddressProviderACLMock public addressProvider;
+    AddressProviderV3ACLMock public addressProvider;
 
     PolicyManagerInternal public policyManager;
 
     function setUp() public {
         vm.prank(CONFIGURATOR);
-        addressProvider = new AddressProviderACLMock();
+        addressProvider = new AddressProviderV3ACLMock();
 
         policyManager = new PolicyManagerInternal(address(addressProvider));
     }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {CreditManagerV3} from "../credit/CreditManagerV3.sol";
@@ -146,7 +146,12 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
     /// @param token Token to ramp LT for
     /// @param liquidationThresholdFinal Liquidation threshold after ramping
     /// @param rampDuration Duration of ramping
-    function rampLiquidationThreshold(address token, uint16 liquidationThresholdFinal, uint24 rampDuration) external;
+    function rampLiquidationThreshold(
+        address token,
+        uint16 liquidationThresholdFinal,
+        uint40 rampStart,
+        uint24 rampDuration
+    ) external;
 
     /// @dev Allow a known collateral token if it was forbidden before.
     /// @param token Address of collateral token
@@ -169,11 +174,6 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
     /// @param targetContract Address of a contract to be forbidden
     function forbidContract(address targetContract) external;
 
-    /// @dev Forbids adapter (and only the adapter - the target contract is not affected)
-    /// @param adapter Address of adapter to disable
-    /// @notice Used to clean up orphaned adapters
-    function forbidAdapter(address adapter) external;
-
     /// @dev Sets borrowed amount limits in Credit Facade
     /// @param _minBorrowedAmount Minimum borrowed amount
     /// @param _maxBorrowedAmount Maximum borrowed amount
@@ -195,7 +195,7 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
 
     /// @dev Upgrades the price oracle in the Credit Manager, taking the address
     /// from the address provider
-    function setPriceOracle() external;
+    function setPriceOracle(uint256 version) external;
 
     /// @dev Upgrades the Credit Facade corresponding to the Credit Manager
     /// @param _creditFacade address of the new CreditFacadeV3
@@ -242,15 +242,16 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
     function resetCumulativeLoss() external;
 
     /// @dev Sets the bot list contract
-    /// @param botList The address of the new bot list
-    function setBotList(address botList) external;
+    /// @param version The version of the new bot list contract
+    ///                The contract address is retrieved from addressProvider
+    function setBotList(uint256 version) external;
 
     //
     // GETTERS
     //
 
     /// @dev Address provider (needed for upgrading the Price Oracle)
-    function addressProvider() external view returns (IAddressProvider);
+    function addressProvider() external view returns (address);
 
     /// @dev Returns the Credit Facade currently connected to the Credit Manager
     function creditFacade() external view returns (CreditFacadeV3);
@@ -263,4 +264,10 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
 
     /// @dev Returns all allowed contracts
     function allowedContracts() external view returns (address[] memory);
+
+    /// @dev Returns all emergency liquidators
+    function emergencyLiquidators() external view returns (address[] memory);
+
+    /// @dev Returns all forbidden tokens
+    function forbiddenTokens() external view returns (address[] memory);
 }
