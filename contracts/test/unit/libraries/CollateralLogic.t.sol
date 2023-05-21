@@ -15,7 +15,7 @@ import {RAY, WAD} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.
 
 import "../../lib/constants.sol";
 import {Tokens} from "../../config/Tokens.sol";
-import {CollateralLogicHelper, PRICE_ORACLE, B} from "./CollateralLogicHelper.sol";
+import {CollateralLogicHelper, PRICE_ORACLE, B, Q} from "./CollateralLogicHelper.sol";
 
 import "forge-std/console.sol";
 
@@ -345,6 +345,288 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
                 convertToUSDFn: _convertToUSD,
                 collateralTokensByMaskFn: _collateralTokensByMask,
                 tokensToCheckMask: _case.tokensToCheckMask,
+                priceOracle: PRICE_ORACLE
+            });
+
+            expectTokensOrder({tokens: _case.expectedOrder, debug: false});
+
+            assertEq(totalValueUSD, _case.expectedTotalValueUSD, _testCaseErr("Incorrect totalValueUSD"));
+            assertEq(twvUSD, _case.expectedTwvUSD, _testCaseErr("Incorrect weightedValueUSD"));
+            assertEq(tokensToDisable, _case.expectedTokensToDisable, _testCaseErr("Incorrect nonZeroBalance"));
+
+            vm.revertTo(snapshot);
+        }
+    }
+
+    struct CalcQuotedTokenCollateralTestCase {
+        string name;
+        B[] balances;
+        Q[] quotas;
+        uint256 limit;
+        // expected
+        uint256 expectedTotalValueUSD;
+        uint256 expectedTwvUSD;
+        Tokens[] expectedOrder;
+    }
+
+    /// @dev U:[CLL-4]: calcQuotedTokensCollateral works correctly
+    function test_U_CLL_04_calcQuotedTokensCollateral_works_correctly() public withTokenSetup {
+        CalcQuotedTokenCollateralTestCase[5] memory cases = [
+            CalcQuotedTokenCollateralTestCase({
+                name: "One token calc, no limit, twv < quota",
+                balances: arrayOf(B({t: Tokens.USDT, balance: 10_000})),
+                quotas: arrayOf(Q({t: Tokens.USDT, quota: 10_000})),
+                limit: type(uint256).max,
+                expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.USDT],
+                expectedTwvUSD: (10_000 - 1) * prices[Tokens.USDT] * lts[Tokens.USDT] / PERCENTAGE_FACTOR,
+                expectedOrder: arrayOf(Tokens.USDT)
+            }),
+            CalcQuotedTokenCollateralTestCase({
+                name: "One token calc, no limit, twv > quota",
+                balances: arrayOf(B({t: Tokens.USDT, balance: 10_000})),
+                quotas: arrayOf(Q({t: Tokens.USDT, quota: 5_000})),
+                limit: type(uint256).max,
+                expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.USDT],
+                expectedTwvUSD: 5_000 * prices[Tokens.DAI] * lts[Tokens.USDT] / PERCENTAGE_FACTOR,
+                expectedOrder: arrayOf(Tokens.USDT)
+            }),
+            CalcQuotedTokenCollateralTestCase({
+                name: "Two token calc, no limit, one twv<quota, another twv > quota",
+                balances: arrayOf(B({t: Tokens.USDT, balance: 10_000}), B({t: Tokens.LINK, balance: 1_000})),
+                quotas: arrayOf(Q({t: Tokens.USDT, quota: 5_000}), Q({t: Tokens.LINK, quota: 20_000})),
+                limit: type(uint256).max,
+                expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.USDT] + (1_000 - 1) * prices[Tokens.LINK],
+                expectedTwvUSD: 5_000 * prices[Tokens.DAI] * lts[Tokens.USDT] / PERCENTAGE_FACTOR
+                    + (1_000 - 1) * prices[Tokens.LINK] * lts[Tokens.LINK] / PERCENTAGE_FACTOR,
+                expectedOrder: arrayOf(Tokens.USDT, Tokens.LINK)
+            }),
+            CalcQuotedTokenCollateralTestCase({
+                name: "Stops if token[i] == address(0), Tokens.NO_TOKEN has address(0)",
+                balances: arrayOf(B({t: Tokens.USDT, balance: 10_000})),
+                quotas: arrayOf(
+                    Q({t: Tokens.WETH, quota: 10_000}),
+                    Q({t: Tokens.NO_TOKEN, quota: 10_000}),
+                    Q({t: Tokens.USDT, quota: 10_000})
+                    ),
+                limit: type(uint256).max,
+                expectedTotalValueUSD: 0,
+                expectedTwvUSD: 0,
+                expectedOrder: arrayOf(Tokens.WETH)
+            }),
+            CalcQuotedTokenCollateralTestCase({
+                name: "Stops when limit reached",
+                balances: arrayOf(B({t: Tokens.USDT, balance: 10_000})),
+                quotas: arrayOf(
+                    Q({t: Tokens.USDT, quota: 5_000}), Q({t: Tokens.WETH, quota: 50}), Q({t: Tokens.LINK, quota: 50_000})
+                    ),
+                limit: 5_000 * prices[Tokens.DAI] * lts[Tokens.USDT] / PERCENTAGE_FACTOR,
+                expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.USDT],
+                expectedTwvUSD: 5_000 * prices[Tokens.DAI] * lts[Tokens.USDT] / PERCENTAGE_FACTOR,
+                expectedOrder: arrayOf(Tokens.USDT)
+            })
+        ];
+
+        address creditAccount = makeAddr("creditAccount");
+
+        for (uint256 i; i < cases.length; ++i) {
+            uint256 snapshot = vm.snapshot();
+
+            CalcQuotedTokenCollateralTestCase memory _case = cases[i];
+            caseName = _case.name;
+
+            setBalances(_case.balances);
+
+            uint256 underlyingPriceRAY = RAY * prices[Tokens.DAI];
+
+            CollateralDebtData memory collateralDebtData;
+
+            collateralDebtData = setQuotas(collateralDebtData, _case.quotas);
+
+            startSession();
+
+            (uint256 totalValueUSD, uint256 twvUSD) = CollateralLogic.calcQuotedTokensCollateral({
+                collateralDebtData: collateralDebtData,
+                creditAccount: creditAccount,
+                underlyingPriceRAY: underlyingPriceRAY,
+                limit: _case.limit,
+                convertToUSDFn: _convertToUSD,
+                priceOracle: PRICE_ORACLE
+            });
+
+            expectTokensOrder({tokens: _case.expectedOrder, debug: false});
+
+            assertEq(totalValueUSD, _case.expectedTotalValueUSD, _testCaseErr("Incorrect totalValueUSD"));
+            assertEq(twvUSD, _case.expectedTwvUSD, _testCaseErr("Incorrect twvUSD"));
+
+            vm.revertTo(snapshot);
+        }
+    }
+
+    //
+    //
+    // CALC COLLATERAL
+    //
+    //
+    struct CalcCollateralTestCase {
+        string name;
+        B[] balances;
+        Q[] quotas;
+        uint256 enabledTokensMask;
+        uint256 quotedTokensMask;
+        bool lazy;
+        uint16 minHealthFactor;
+        uint256[] collateralHints;
+        uint256 totalDebtUSD;
+        // expected
+        uint256 expectedTotalValueUSD;
+        uint256 expectedTwvUSD;
+        uint256 expectedTokensToDisable;
+        Tokens[] expectedOrder;
+    }
+
+    /// @dev U:[CLL-5]: calcCollateral works correctly
+    function test_U_CLL_05_calcCollateral_works_correctly() public withTokenSetup {
+        CalcCollateralTestCase[7] memory cases = [
+            CalcCollateralTestCase({
+                name: "One non-quoted token calc, no limit, no hints",
+                balances: arrayOf(B({t: Tokens.DAI, balance: 10_000})),
+                quotas: new Q[](0),
+                enabledTokensMask: getTokenMask(arrayOf(Tokens.DAI)),
+                quotedTokensMask: 0,
+                lazy: false,
+                minHealthFactor: PERCENTAGE_FACTOR,
+                collateralHints: new uint256[](0),
+                totalDebtUSD: 0,
+                expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.DAI],
+                expectedTwvUSD: (10_000 - 1) * prices[Tokens.DAI] * lts[Tokens.DAI] / PERCENTAGE_FACTOR,
+                expectedTokensToDisable: 0,
+                expectedOrder: arrayOf(Tokens.DAI)
+            }),
+            CalcCollateralTestCase({
+                name: "One quoted token calc, no limit, no hints, value < quota",
+                balances: arrayOf(B({t: Tokens.USDT, balance: 10_000})),
+                quotas: arrayOf(Q({t: Tokens.USDT, quota: 10_000})),
+                enabledTokensMask: getTokenMask(arrayOf(Tokens.USDT)),
+                quotedTokensMask: getTokenMask(arrayOf(Tokens.USDT)),
+                lazy: false,
+                minHealthFactor: PERCENTAGE_FACTOR,
+                collateralHints: new uint256[](0),
+                totalDebtUSD: 0,
+                expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.USDT],
+                expectedTwvUSD: (10_000 - 1) * prices[Tokens.USDT] * lts[Tokens.USDT] / PERCENTAGE_FACTOR,
+                expectedTokensToDisable: 0,
+                expectedOrder: arrayOf(Tokens.USDT)
+            }),
+            CalcCollateralTestCase({
+                name: "One quoted token calc, no limit, no hints, value < quota",
+                balances: arrayOf(B({t: Tokens.USDT, balance: 10_000})),
+                quotas: arrayOf(Q({t: Tokens.USDT, quota: 5_000})),
+                enabledTokensMask: getTokenMask(arrayOf(Tokens.USDT)),
+                quotedTokensMask: getTokenMask(arrayOf(Tokens.USDT)),
+                lazy: false,
+                minHealthFactor: PERCENTAGE_FACTOR,
+                collateralHints: new uint256[](0),
+                totalDebtUSD: 0,
+                expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.USDT],
+                expectedTwvUSD: 5_000 * prices[Tokens.DAI] * lts[Tokens.USDT] / PERCENTAGE_FACTOR,
+                expectedTokensToDisable: 0,
+                expectedOrder: arrayOf(Tokens.USDT)
+            }),
+            CalcCollateralTestCase({
+                name: "It removes non-quoted tokens with 0 and 1 balances",
+                balances: arrayOf(B({t: Tokens.USDT, balance: 10_000}), B({t: Tokens.LINK, balance: 1})),
+                quotas: arrayOf(Q({t: Tokens.USDT, quota: 5_000})),
+                enabledTokensMask: getTokenMask(arrayOf(Tokens.USDT, Tokens.LINK, Tokens.DAI)),
+                quotedTokensMask: getTokenMask(arrayOf(Tokens.USDT)),
+                lazy: false,
+                minHealthFactor: PERCENTAGE_FACTOR,
+                collateralHints: new uint256[](0),
+                totalDebtUSD: 0,
+                expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.USDT],
+                expectedTwvUSD: 5_000 * prices[Tokens.DAI] * lts[Tokens.USDT] / PERCENTAGE_FACTOR,
+                expectedTokensToDisable: getTokenMask(arrayOf(Tokens.LINK, Tokens.DAI)),
+                expectedOrder: arrayOf(Tokens.USDT, Tokens.DAI, Tokens.LINK)
+            }),
+            CalcCollateralTestCase({
+                name: "It stops if limit reached during quoted token collateral computation",
+                balances: arrayOf(B({t: Tokens.USDT, balance: 10_000}), B({t: Tokens.LINK, balance: 1})),
+                quotas: arrayOf(Q({t: Tokens.USDT, quota: 5_000}), Q({t: Tokens.WETH, quota: 5_000})),
+                enabledTokensMask: getTokenMask(arrayOf(Tokens.USDT, Tokens.WETH, Tokens.LINK, Tokens.DAI)),
+                quotedTokensMask: getTokenMask(arrayOf(Tokens.USDT, Tokens.WETH)),
+                lazy: true,
+                minHealthFactor: 2 * PERCENTAGE_FACTOR,
+                collateralHints: new uint256[](0),
+                totalDebtUSD: (5_000 * prices[Tokens.DAI] * lts[Tokens.USDT] / PERCENTAGE_FACTOR) / 2,
+                expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.USDT],
+                expectedTwvUSD: 5_000 * prices[Tokens.DAI] * lts[Tokens.USDT] / PERCENTAGE_FACTOR,
+                expectedTokensToDisable: 0,
+                expectedOrder: arrayOf(Tokens.USDT)
+            }),
+            CalcCollateralTestCase({
+                name: "It stops if limit reached during non-quoted token collateral computation, and updates limit properly after quoted calc",
+                balances: arrayOf(B({t: Tokens.USDT, balance: 10_000}), B({t: Tokens.DAI, balance: 8_000})),
+                quotas: arrayOf(Q({t: Tokens.USDT, quota: 5_000}), Q({t: Tokens.WETH, quota: 5_000})),
+                enabledTokensMask: getTokenMask(arrayOf(Tokens.USDT, Tokens.WETH, Tokens.LINK, Tokens.DAI)),
+                quotedTokensMask: getTokenMask(arrayOf(Tokens.USDT, Tokens.WETH)),
+                lazy: true,
+                minHealthFactor: PERCENTAGE_FACTOR,
+                collateralHints: new uint256[](0),
+                totalDebtUSD: 5_000 * prices[Tokens.DAI] * lts[Tokens.USDT] / PERCENTAGE_FACTOR
+                    + (8_000 - 1) * prices[Tokens.DAI] * lts[Tokens.DAI] / PERCENTAGE_FACTOR,
+                expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.USDT] + (8_000 - 1) * prices[Tokens.DAI],
+                expectedTwvUSD: 5_000 * prices[Tokens.DAI] * lts[Tokens.USDT] / PERCENTAGE_FACTOR
+                    + (8_000 - 1) * prices[Tokens.DAI] * lts[Tokens.DAI] / PERCENTAGE_FACTOR,
+                expectedTokensToDisable: 0,
+                expectedOrder: arrayOf(Tokens.USDT, Tokens.WETH, Tokens.DAI)
+            }),
+            CalcCollateralTestCase({
+                name: "Collateral hints work for non-quoted tokens",
+                balances: arrayOf(B({t: Tokens.USDT, balance: 10_000}), B({t: Tokens.DAI, balance: 8_000})),
+                quotas: arrayOf(Q({t: Tokens.USDT, quota: 5_000})),
+                enabledTokensMask: getTokenMask(arrayOf(Tokens.USDT, Tokens.WETH, Tokens.LINK, Tokens.DAI)),
+                quotedTokensMask: getTokenMask(arrayOf(Tokens.USDT)),
+                lazy: false,
+                minHealthFactor: PERCENTAGE_FACTOR,
+                collateralHints: getHints(arrayOf(Tokens.WETH, Tokens.LINK)),
+                totalDebtUSD: 5_000 * prices[Tokens.DAI] * lts[Tokens.USDT] / PERCENTAGE_FACTOR
+                    + (8_000 - 1) * prices[Tokens.DAI] * lts[Tokens.DAI] / PERCENTAGE_FACTOR,
+                expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.USDT] + (8_000 - 1) * prices[Tokens.DAI],
+                expectedTwvUSD: 5_000 * prices[Tokens.DAI] * lts[Tokens.USDT] / PERCENTAGE_FACTOR
+                    + (8_000 - 1) * prices[Tokens.DAI] * lts[Tokens.DAI] / PERCENTAGE_FACTOR,
+                expectedTokensToDisable: getTokenMask(arrayOf(Tokens.WETH, Tokens.LINK)),
+                expectedOrder: arrayOf(Tokens.USDT, Tokens.WETH, Tokens.LINK, Tokens.DAI)
+            })
+        ];
+
+        address creditAccount = makeAddr("creditAccount");
+
+        for (uint256 i; i < cases.length; ++i) {
+            uint256 snapshot = vm.snapshot();
+
+            CalcCollateralTestCase memory _case = cases[i];
+            caseName = _case.name;
+
+            setBalances(_case.balances);
+
+            CollateralDebtData memory collateralDebtData;
+
+            collateralDebtData.totalDebtUSD = _case.totalDebtUSD;
+            collateralDebtData.enabledTokensMask = _case.enabledTokensMask;
+            collateralDebtData.quotedTokensMask = _case.quotedTokensMask;
+
+            collateralDebtData = setQuotas(collateralDebtData, _case.quotas);
+
+            startSession();
+
+            (uint256 totalValueUSD, uint256 twvUSD, uint256 tokensToDisable) = CollateralLogic.calcCollateral({
+                collateralDebtData: collateralDebtData,
+                creditAccount: creditAccount,
+                underlying: addressOf[Tokens.DAI],
+                lazy: _case.lazy,
+                minHealthFactor: _case.minHealthFactor,
+                collateralHints: _case.collateralHints,
+                convertToUSDFn: _convertToUSD,
+                collateralTokensByMaskFn: _collateralTokensByMask,
                 priceOracle: PRICE_ORACLE
             });
 

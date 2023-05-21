@@ -6,6 +6,7 @@ pragma solidity ^0.8.17;
 import {Tokens} from "../../config/Tokens.sol";
 import {TokensData, TestToken} from "../../config/TokensData.sol";
 import {TestHelper} from "../../lib/helper.sol";
+import {CollateralDebtData} from "../../../interfaces/ICreditManagerV3.sol";
 
 import "../../lib/constants.sol";
 import {Test} from "forge-std/Test.sol";
@@ -16,6 +17,11 @@ address constant PRICE_ORACLE = DUMB_ADDRESS4;
 struct B {
     Tokens t;
     uint256 balance;
+}
+
+struct Q {
+    Tokens t;
+    uint256 quota;
 }
 
 contract CollateralLogicHelper is Test, TokensData {
@@ -196,6 +202,28 @@ contract CollateralLogicHelper is Test, TokensData {
         }
     }
 
+    function setQuotas(CollateralDebtData memory collateralDebtData, Q[] memory quotas)
+        internal
+        view
+        returns (CollateralDebtData memory)
+    {
+        uint256 len = quotas.length;
+
+        collateralDebtData.quotedTokens = new address[](len);
+        collateralDebtData.quotas = new uint256[](len);
+        collateralDebtData.quotedLts = new uint16[](len);
+
+        for (uint256 i; i < len; ++i) {
+            collateralDebtData.quotedTokens[i] = addressOf[quotas[i].t];
+            collateralDebtData.quotas[i] = quotas[i].quota;
+            collateralDebtData.quotedLts[i] = lts[quotas[i].t];
+        }
+
+        return collateralDebtData;
+    }
+
+    ///
+
     function arrayOf(Tokens t1) internal pure returns (Tokens[] memory result) {
         result = new Tokens[](1);
         result[0] = t1;
@@ -267,6 +295,45 @@ contract CollateralLogicHelper is Test, TokensData {
         returns (B[] memory result)
     {
         result = new B[](5);
+        result[0] = t1;
+        result[1] = t2;
+        result[2] = t3;
+        result[3] = t4;
+        result[4] = t5;
+    }
+
+    function arrayOf(Q memory t1) internal pure returns (Q[] memory result) {
+        result = new Q[](1);
+        result[0] = t1;
+    }
+
+    function arrayOf(Q memory t1, Q memory t2) internal pure returns (Q[] memory result) {
+        result = new Q[](2);
+        result[0] = t1;
+        result[1] = t2;
+    }
+
+    function arrayOf(Q memory t1, Q memory t2, Q memory t3) internal pure returns (Q[] memory result) {
+        result = new Q[](3);
+        result[0] = t1;
+        result[1] = t2;
+        result[2] = t3;
+    }
+
+    function arrayOf(Q memory t1, Q memory t2, Q memory t3, Q memory t4) internal pure returns (Q[] memory result) {
+        result = new Q[](4);
+        result[0] = t1;
+        result[1] = t2;
+        result[2] = t3;
+        result[3] = t4;
+    }
+
+    function arrayOf(Q memory t1, Q memory t2, Q memory t3, Q memory t4, Q memory t5)
+        internal
+        pure
+        returns (Q[] memory result)
+    {
+        result = new Q[](5);
         result[0] = t1;
         result[1] = t2;
         result[2] = t3;

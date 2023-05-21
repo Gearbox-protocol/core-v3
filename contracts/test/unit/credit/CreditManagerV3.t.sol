@@ -1618,7 +1618,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         );
 
         assertEq(
-            collateralDebtData.enabledQuotedTokenMask,
+            collateralDebtData.quotedTokensMask,
             supportsQuotas ? LINK_TOKEN_MASK | STETH_TOKEN_MASK : 0,
             "Incorrect quotedLts"
         );

@@ -516,7 +516,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         internal
         returns (FullCheckParams memory fullCheckParams)
     {
-        uint256 quotedTokenMaskInverted = ~ICreditManagerV3(creditManager).quotedTokenMask();
+        uint256 quotedTokensMaskInverted = ~ICreditManagerV3(creditManager).quotedTokensMask();
         // Emits event for multicall start - used in analytics to track actions within multicalls
         emit StartMultiCall(creditAccount); // F:[FA-26]
 
@@ -576,7 +576,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                         _revertIfNoPermission(flags, ADD_COLLATERAL_PERMISSION);
                         enabledTokensMask = enabledTokensMask.enable({
                             bitsToEnable: _addCollateral(creditAccount, mcall.callData[4:]),
-                            invertedSkipMask: quotedTokenMaskInverted
+                            invertedSkipMask: quotedTokensMaskInverted
                         }); // F:[FA-26, 27]
                     }
                     //
@@ -616,7 +616,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                         address token = abi.decode(mcall.callData[4:], (address)); // F: [FA-53]
                         enabledTokensMask = enabledTokensMask.enable({
                             bitsToEnable: _getTokenMaskOrRevert(token),
-                            invertedSkipMask: quotedTokenMaskInverted
+                            invertedSkipMask: quotedTokensMaskInverted
                         });
                     }
                     //
@@ -629,7 +629,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                         /// IGNORE QUOTED TOKEN MASK
                         enabledTokensMask = enabledTokensMask.disable({
                             bitsToDisable: _getTokenMaskOrRevert(token),
-                            invertedSkipMask: quotedTokenMaskInverted
+                            invertedSkipMask: quotedTokensMaskInverted
                         });
                     }
                     //
@@ -650,7 +650,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                         /// IGNORE QUOTED TOKEN MASK
                         enabledTokensMask = enabledTokensMask.disable({
                             bitsToDisable: tokensToDisable,
-                            invertedSkipMask: quotedTokenMaskInverted
+                            invertedSkipMask: quotedTokensMaskInverted
                         });
                     }
                     //
@@ -700,7 +700,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     enabledTokensMask = enabledTokensMask.enableDisable({
                         bitsToEnable: tokensToEnable,
                         bitsToDisable: tokensToDisable,
-                        invertedSkipMask: quotedTokenMaskInverted
+                        invertedSkipMask: quotedTokensMaskInverted
                     });
                 }
             }

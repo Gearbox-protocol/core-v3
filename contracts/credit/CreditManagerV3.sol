@@ -133,7 +133,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     uint8 public collateralTokensCount;
 
     /// @dev Mask of tokens to apply quotas for
-    uint256 public override quotedTokenMask;
+    uint256 public override quotedTokensMask;
 
     /// @dev Withdrawal manager
     address public immutable override withdrawalManager;
@@ -691,7 +691,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 collateralDebtData.cumulativeQuotaInterest,
                 collateralDebtData.quotas,
                 collateralDebtData.quotedLts,
-                collateralDebtData.enabledQuotedTokenMask
+                collateralDebtData.quotedTokensMask
             ) = _getQuotedTokensData({
                 creditAccount: creditAccount,
                 enabledTokensMask: enabledTokensMask,
@@ -767,12 +767,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             uint256 outstandingQuotaInterest,
             uint256[] memory quotas,
             uint16[] memory lts,
-            uint256 quotedMask
+            uint256 _quotedTokensMask
         )
     {
         uint256 _maxEnabledTokens = maxEnabledTokens;
+        _quotedTokensMask = quotedTokensMask;
 
-        quotedMask = enabledTokensMask & quotedTokenMask;
+        uint256 quotedMask = enabledTokensMask & _quotedTokensMask;
 
         if (quotedMask != 0) {
             quotaTokens = new address[](_maxEnabledTokens);
@@ -1265,15 +1266,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     /// @dev Sets the limited token mask
-    /// @param _quotedTokenMask The new mask
+    /// @param _quotedTokensMask The new mask
     /// @notice Limited tokens are counted as collateral not based on their balances,
     ///         but instead based on their quotas set in the poolQuotaKeeper contract
     ///         Tokens in the mask also incur additional interest based on their quotas
-    function setQuotedMask(uint256 _quotedTokenMask)
+    function setQuotedMask(uint256 _quotedTokensMask)
         external
         creditConfiguratorOnly // U:[CM-4]
     {
-        quotedTokenMask = _quotedTokenMask; // F: [CMQ-2]
+        quotedTokensMask = _quotedTokensMask; // F: [CMQ-2]
     }
 
     /// @dev Sets the maximal number of enabled tokens on a single Credit Account.

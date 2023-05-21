@@ -40,13 +40,13 @@ library CollateralLogic {
                 limit: limit,
                 convertToUSDFn: convertToUSDFn,
                 priceOracle: priceOracle
-            });
+            }); // U:[CLL-5]
 
-            if (lazy && twvUSD > limit) {
-                return (totalValueUSD, twvUSD, 0);
+            if (twvUSD >= limit) {
+                return (totalValueUSD, twvUSD, 0); // U:[CLL-5]
             } else {
                 unchecked {
-                    limit -= twvUSD;
+                    limit -= twvUSD; // U:[CLL-5]
                 }
             }
         }
@@ -55,7 +55,7 @@ library CollateralLogic {
 
         {
             uint256 tokensToCheckMask =
-                collateralDebtData.enabledTokensMask.disable(collateralDebtData.enabledQuotedTokenMask);
+                collateralDebtData.enabledTokensMask.disable(collateralDebtData.quotedTokensMask); // U:[CLL-5]
 
             uint256 tvDelta;
             uint256 twvDelta;
@@ -68,10 +68,10 @@ library CollateralLogic {
                 collateralHints: collateralHints,
                 collateralTokensByMaskFn: collateralTokensByMaskFn,
                 convertToUSDFn: convertToUSDFn
-            });
+            }); // U:[CLL-5]
 
-            totalValueUSD += tvDelta;
-            twvUSD += twvDelta;
+            totalValueUSD += tvDelta; // U:[CLL-5]
+            twvUSD += twvDelta; // U:[CLL-5]
         }
     }
 
@@ -83,14 +83,15 @@ library CollateralLogic {
         function (address, uint256, address) view returns(uint256) convertToUSDFn,
         address priceOracle
     ) internal view returns (uint256 totalValueUSD, uint256 twvUSD) {
-        uint256 len = collateralDebtData.quotedTokens.length;
+        uint256 len = collateralDebtData.quotedTokens.length; // U:[CLL-4]
 
         for (uint256 i; i < len;) {
-            address token = collateralDebtData.quotedTokens[i];
-            if (token == address(0)) break;
+            address token = collateralDebtData.quotedTokens[i]; // U:[CLL-4]
+            if (token == address(0)) break; // U:[CLL-4]
             {
-                uint16 liquidationThreshold = collateralDebtData.quotedLts[i];
-                uint256 quotaUSD = collateralDebtData.quotas[i] * underlyingPriceRAY / RAY;
+                uint16 liquidationThreshold = collateralDebtData.quotedLts[i]; // U:[CLL-4]
+                uint256 quotaUSD = collateralDebtData.quotas[i] * underlyingPriceRAY / RAY; // U:[CLL-4]
+
                 (uint256 valueUSD, uint256 weightedValueUSD,) = calcOneTokenCollateral({
                     priceOracle: priceOracle,
                     creditAccount: creditAccount,
@@ -98,13 +99,13 @@ library CollateralLogic {
                     liquidationThreshold: liquidationThreshold,
                     quotaUSD: quotaUSD,
                     convertToUSDFn: convertToUSDFn
-                });
+                }); // U:[CLL-4]
 
-                totalValueUSD += valueUSD;
-                twvUSD += weightedValueUSD;
+                totalValueUSD += valueUSD; // U:[CLL-4]
+                twvUSD += weightedValueUSD; // U:[CLL-4]
             }
             if (twvUSD >= limit) {
-                return (totalValueUSD, twvUSD);
+                return (totalValueUSD, twvUSD); // U:[CLL-4]
             }
 
             unchecked {

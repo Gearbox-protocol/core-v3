@@ -53,7 +53,7 @@ struct CollateralDebtData {
     uint256 totalValueUSD;
     uint256 twvUSD;
     uint256 enabledTokensMask;
-    uint256 enabledQuotedTokenMask;
+    uint256 quotedTokensMask;
     address[] quotedTokens;
     uint16[] quotedLts;
     uint256[] quotas;
@@ -233,7 +233,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     function getTokenMaskOrRevert(address token) external view returns (uint256);
 
     /// @dev Mask of tokens to apply quotas for
-    function quotedTokenMask() external view returns (uint256);
+    function quotedTokensMask() external view returns (uint256);
 
     /// @dev Maps allowed adapters to their respective target contracts.
     function adapterToContract(address adapter) external view returns (address);
