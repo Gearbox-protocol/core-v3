@@ -53,7 +53,7 @@ struct CollateralDebtData {
     uint256 totalValueUSD;
     uint256 twvUSD;
     uint256 enabledTokensMask;
-    uint256 quotedTokenMask;
+    uint256 enabledQuotedTokenMask;
     address[] quotedTokens;
     uint16[] quotedLts;
     uint256[] quotas;
@@ -308,6 +308,8 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
         view
         returns (CollateralDebtData memory collateralDebtData);
 
+    function isLiquidatable(address creditAccount, uint16 minHealthFactor) external view returns (bool);
+
     /// @dev Withdrawal manager
     function withdrawalManager() external view returns (address);
 
@@ -323,9 +325,9 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @param revocations Spender/token pairs to revoke allowances for
     function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external;
 
-    function setCreditAccountForExternalCall(address creditAccount) external;
+    function setActiveCreditAccount(address creditAccount) external;
 
-    function getExternalCallCreditAccountOrRevert() external view returns (address creditAccount);
+    function getActiveCreditAccountOrRevert() external view returns (address creditAccount);
 
     function getTokenByMask(uint256 tokenMask) external view returns (address token);
 

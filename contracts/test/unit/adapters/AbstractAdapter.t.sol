@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {ZeroAddressException} from "../../../interfaces/IExceptions.sol";
+import {CallerNotCreditFacadeException, ZeroAddressException} from "../../../interfaces/IExceptions.sol";
 
 import {TestHelper} from "../../lib/helper.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
@@ -26,7 +26,7 @@ contract AbstractAdapterUnitTest is TestHelper, CreditManagerMockEvents {
         target = makeAddr("TARGET_CONTRACT");
 
         addressProvider = new AddressProviderV3ACLMock();
-        creditManager = new CreditManagerMock(address(addressProvider));
+        creditManager = new CreditManagerMock(address(addressProvider), facade);
         abstractAdapter = new AbstractAdapterHarness(address(creditManager), target);
     }
 
@@ -41,21 +41,30 @@ contract AbstractAdapterUnitTest is TestHelper, CreditManagerMockEvents {
 
     /// @notice U:[AA-1B]: constructor sets correct values
     function test_U_AA_01B_constructor_sets_correct_values() public {
-        assertEq(address(abstractAdapter.creditManager()), address(creditManager), "Incorrect credit manager");
-        assertEq(address(abstractAdapter.addressProvider()), address(addressProvider), "Incorrect address provider");
+        assertEq(abstractAdapter.creditManager(), address(creditManager), "Incorrect credit manager");
+        assertEq(abstractAdapter.addressProvider(), address(addressProvider), "Incorrect address provider");
         assertEq(abstractAdapter.targetContract(), target, "Incorrect target contract");
     }
 
-    /// @notice U:[AA-2]: `_creditAccount` works correctly
-    function test_U_AA_02_creditAccount_works_correctly(address creditAccount) public {
-        creditManager.setExternalCallCreditAccount(creditAccount);
+    /// @notice U:[AA-2]: `_revertIfCallerNotCreditFacade` works correctly
+    function test_U_AA_02_revertIfCallerNotCreditFacade_works_correctly(address caller) public {
+        vm.assume(caller != facade);
 
-        vm.expectCall(address(creditManager), abi.encodeCall(creditManager.getExternalCallCreditAccountOrRevert, ()));
+        vm.expectRevert(CallerNotCreditFacadeException.selector);
+        vm.prank(caller);
+        abstractAdapter.revertIfCallerNotCreditFacade();
+    }
+
+    /// @notice U:[AA-3]: `_creditAccount` works correctly
+    function test_U_AA_03_creditAccount_works_correctly(address creditAccount) public {
+        creditManager.setActiveCreditAccount(creditAccount);
+
+        vm.expectCall(address(creditManager), abi.encodeCall(creditManager.getActiveCreditAccountOrRevert, ()));
         assertEq(abstractAdapter.creditAccount(), creditAccount, "Incorrect external call credit account");
     }
 
-    /// @notice U:[AA-3]: `_getMaskOrRevert` works correctly
-    function test_U_AA_03_getMaskOrRevert_works_correctly(address token, uint8 index) public {
+    /// @notice U:[AA-4]: `_getMaskOrRevert` works correctly
+    function test_U_AA_04_getMaskOrRevert_works_correctly(address token, uint8 index) public {
         uint256 mask = 1 << index;
         creditManager.setMask(token, mask);
 
@@ -63,22 +72,22 @@ contract AbstractAdapterUnitTest is TestHelper, CreditManagerMockEvents {
         assertEq(abstractAdapter.getMaskOrRevert(token), mask, "Incorrect token mask");
     }
 
-    /// @notice U:[AA-4]: `_approveToken` works correctly
-    function test_U_AA_04_approveToken_works_correctly(address token, uint256 amount) public {
+    /// @notice U:[AA-5]: `_approveToken` works correctly
+    function test_U_AA_05_approveToken_works_correctly(address token, uint256 amount) public {
         vm.expectCall(address(creditManager), abi.encodeCall(creditManager.approveCreditAccount, (token, amount)));
         abstractAdapter.approveToken(token, amount);
     }
 
-    /// @notice U:[AA-5]: `_execute` works correctly
-    function test_U_AA_05_execute_works_correctly(bytes memory data, bytes memory expectedResult) public {
+    /// @notice U:[AA-6]: `_execute` works correctly
+    function test_U_AA_06_execute_works_correctly(bytes memory data, bytes memory expectedResult) public {
         creditManager.setExecuteOrderResult(expectedResult);
 
         vm.expectCall(address(creditManager), abi.encodeCall(creditManager.executeOrder, (data)));
         assertEq(abstractAdapter.execute(data), expectedResult, "Incorrect result");
     }
 
-    /// @notice U:[AA-6]: `_executeSwapNoApprove` works correctly
-    function test_U_AA_06_executeSwapNoApprove_works_correctly(
+    /// @notice U:[AA-7]: `_executeSwapNoApprove` works correctly
+    function test_U_AA_07_executeSwapNoApprove_works_correctly(
         address tokenIn,
         address tokenOut,
         uint8 tokenInIndex,
@@ -114,8 +123,8 @@ contract AbstractAdapterUnitTest is TestHelper, CreditManagerMockEvents {
         }
     }
 
-    /// @notice U:[AA-7]: `_executeSwapSafeApprove` works correctly
-    function test_U_AA_07_executeSwapSafeApprove_works_correctly(
+    /// @notice U:[AA-8]: `_executeSwapSafeApprove` works correctly
+    function test_U_AA_08_executeSwapSafeApprove_works_correctly(
         address tokenIn,
         address tokenOut,
         uint8 tokenInIndex,

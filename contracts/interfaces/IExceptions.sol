@@ -56,6 +56,9 @@ error CallerNotCreditAccountOwnerException();
 /// @dev Thrown on attempting to call an access restricted function as a non-Configurator
 error CallerNotConfiguratorException();
 
+/// @dev Thrown on attempting to call an access-restructed function not as account factory
+error CallerNotAccountFactoryException();
+
 /// @dev Thrown on attempting to call an access restricted function as a non-CreditManagerV3
 error CallerNotCreditManagerException();
 
@@ -240,12 +243,13 @@ error NoFreeWithdrawalSlotsException();
 
 error NoPermissionException(uint256 permission);
 
-error ExternalCallCreditAccountNotSetException();
-
-/// @dev Thrown when the caller is not a Credit Facade associated with required Credit Account
-error CallerNotCreditAccountFacadeException();
+error ActiveCreditAccountNotSetException();
 
 /// @dev Thrown when attempting to set positive funding for a bot with 0 permissions
 error PositiveFundingForInactiveBotException();
 
-error MasterCreditAccountAlreadyDeployed();
+/// @dev Thrown when trying to deploy second master credit account for a credit manager
+error MasterCreditAccountAlreadyDeployedException();
+
+/// @dev Thrown when trying to rescue funds from a credit account that is currently in use
+error CreditAccountIsInUseException();

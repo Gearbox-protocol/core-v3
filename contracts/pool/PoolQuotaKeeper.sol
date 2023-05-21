@@ -181,7 +181,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
     //
     // GETTERS
     //
-    function getQuotaAndInterest(address creditAccount, address token)
+    function getQuotaAndOutstandingInterest(address creditAccount, address token)
         external
         view
         override

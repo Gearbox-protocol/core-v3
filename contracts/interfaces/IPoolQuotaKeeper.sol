@@ -95,7 +95,7 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
         returns (uint96 quota, uint192 cumulativeIndexLU);
 
     /// @dev Computes collateral value for quoted tokens on the account, as well as accrued quota interest
-    function getQuotaAndInterest(address creditAccount, address token)
+    function getQuotaAndOutstandingInterest(address creditAccount, address token)
         external
         view
         returns (uint256 quoted, uint256 outstandingInterest);

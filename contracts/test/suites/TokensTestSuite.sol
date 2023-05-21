@@ -107,4 +107,30 @@ contract TokensTestSuite is Test, TokensData, TokensTestSuiteHelper {
     function burn(Tokens t, address from, uint256 amount) external {
         burn(addressOf[t], from, amount);
     }
+
+    function listOf(Tokens t1) external view returns (address[] memory tokensList) {
+        tokensList = new address[](1);
+        tokensList[0] = addressOf[t1];
+    }
+
+    function listOf(Tokens t1, Tokens t2) external view returns (address[] memory tokensList) {
+        tokensList = new address[](2);
+        tokensList[0] = addressOf[t1];
+        tokensList[1] = addressOf[t2];
+    }
+
+    function listOf(Tokens t1, Tokens t2, Tokens t3) external view returns (address[] memory tokensList) {
+        tokensList = new address[](3);
+        tokensList[0] = addressOf[t1];
+        tokensList[1] = addressOf[t2];
+        tokensList[2] = addressOf[t3];
+    }
+
+    function listOf(Tokens t1, Tokens t2, Tokens t3, Tokens t4) external view returns (address[] memory tokensList) {
+        tokensList = new address[](4);
+        tokensList[0] = addressOf[t1];
+        tokensList[1] = addressOf[t2];
+        tokensList[2] = addressOf[t3];
+        tokensList[3] = addressOf[t4];
+    }
 }

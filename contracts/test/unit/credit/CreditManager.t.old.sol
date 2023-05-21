@@ -449,12 +449,12 @@ contract OldCreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
     //     creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
 
     //     vm.prank(ADAPTER);
-    //     vm.expectRevert(ExternalCallCreditAccountNotSetException.selector);
+    //     vm.expectRevert(ActiveCreditAccountNotSetException.selector);
     //     creditManager.approveCreditAccount(token, 100);
 
     //     // / TODO: decide about test
     //     vm.prank(ADAPTER);
-    //     vm.expectRevert(ExternalCallCreditAccountNotSetException.selector);
+    //     vm.expectRevert(ActiveCreditAccountNotSetException.selector);
     //     creditManager.executeOrder(bytes("dd"));
     // }
 
@@ -476,7 +476,7 @@ contract OldCreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
 
     //     uint256 blockAtOpen = block.number;
     //     uint256 cumulativeAtOpen = 1012;
-    //     poolMock.setCumulative_RAY(cumulativeAtOpen);
+    //     poolMock.setCumulativeIndexNow(cumulativeAtOpen);
 
     //     // Existing address case
     //     address creditAccount = creditManager.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, false);
@@ -1058,7 +1058,7 @@ contract OldCreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
 
     //     tokenTestSuite.mint(Tokens.DAI, address(poolMock), amount);
 
-    //     poolMock.setCumulative_RAY(cumulativeIndexLastUpdate * 2);
+    //     poolMock.setCumulativeIndexNow(cumulativeIndexLastUpdate * 2);
 
     //     uint256 expectedNewCulumativeIndex =
     //         (2 * cumulativeIndexLastUpdate * (borrowedAmount + amount)) / (2 * borrowedAmount + amount);
@@ -1210,7 +1210,7 @@ contract OldCreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
     // /// @dev [CM-25A]: approveCreditAccount reverts if the token is not added
     // function test_CM_25A_approveCreditAccount_reverts_if_the_token_is_not_added() public {
     //     (,,, address creditAccount) = _openCreditAccount();
-    //     creditManager.setCreditAccountForExternalCall(creditAccount);
+    //     creditManager.setActiveCreditAccount(creditAccount);
 
     //     vm.prank(CONFIGURATOR);
     //     creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
@@ -1224,7 +1224,7 @@ contract OldCreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
     // /// @dev [CM-26]: approveCreditAccount approves with desired allowance
     // function test_CM_26_approveCreditAccount_approves_with_desired_allowance() public {
     //     (,,, address creditAccount) = _openCreditAccount();
-    //     creditManager.setCreditAccountForExternalCall(creditAccount);
+    //     creditManager.setActiveCreditAccount(creditAccount);
 
     //     vm.prank(CONFIGURATOR);
     //     creditManager.setContractAllowance(ADAPTER, DUMB_ADDRESS);
@@ -1247,7 +1247,7 @@ contract OldCreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
     // /// @dev [CM-29]: executeOrder calls credit account method and emit event
     // function test_CM_29_executeOrder_calls_credit_account_method_and_emit_event() public {
     //     (,,, address creditAccount) = _openCreditAccount();
-    //     creditManager.setCreditAccountForExternalCall(creditAccount);
+    //     creditManager.setActiveCreditAccount(creditAccount);
 
     //     TargetContractMock targetMock = new TargetContractMock();
 

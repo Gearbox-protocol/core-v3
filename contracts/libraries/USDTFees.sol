@@ -15,7 +15,7 @@ library USDTFees {
     {
         uint256 amountWithBP = (amount * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR - basisPointsRate); // U:[UTT_01]
         unchecked {
-            uint256 amountWithMaxFee = maximumFee > type(uint256).max - amount ? maximumFee : amount + maximumFee;
+            uint256 amountWithMaxFee = maximumFee > type(uint256).max - amount ? type(uint256).max : amount + maximumFee;
             return Math.min(amountWithMaxFee, amountWithBP); // U:[UTT_01]
         }
     }

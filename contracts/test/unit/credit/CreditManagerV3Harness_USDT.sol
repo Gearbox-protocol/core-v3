@@ -1,3 +1,5 @@
+pragma solidity ^0.8.17;
+
 import {CreditManagerV3Harness} from "./CreditManagerV3Harness.sol";
 import {USDT_Transfer} from "../../../traits/USDT_Transfer.sol";
 import {IPoolBase} from "../../../interfaces/IPool4626.sol";

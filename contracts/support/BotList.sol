@@ -10,8 +10,9 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {IBotList, BotFunding} from "../interfaces/IBotList.sol";
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
-import {ICreditAccount} from "../interfaces/ICreditAccount.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
+import {ICreditFacade} from "../interfaces/ICreditFacade.sol";
+import {ICreditAccount} from "../interfaces/ICreditAccount.sol";
 
 import "../interfaces/IExceptions.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
@@ -24,6 +25,10 @@ contract BotList is ACLNonReentrantTrait, IBotList {
     using Address for address;
     using Address for address payable;
     using EnumerableSet for EnumerableSet.AddressSet;
+
+    /// @dev Mapping from Credit Manager address to their status as an approved Credit Manager
+    ///      Only Credit Facades connected to approved Credit Managers can alter bot permissions
+    mapping(address => bool) public approvedCreditManager;
 
     /// @dev Mapping from (creditAccount, bot) to bit permissions
     mapping(address => mapping(address => uint192)) public botPermissions;
@@ -53,10 +58,11 @@ contract BotList is ACLNonReentrantTrait, IBotList {
         treasury = IAddressProvider(_addressProvider).getTreasuryContract();
     }
 
-    modifier onlyCreditAccountFacade(address creditAccount) {
-        address creditManager = ICreditAccount(creditAccount).creditManager();
-        if (msg.sender != ICreditManagerV3(creditManager).creditFacade()) {
-            revert CallerNotCreditAccountFacadeException();
+    /// @dev Limits access to a function only to Credit Facades connected to approved CMs
+    modifier onlyValidCreditFacade() {
+        address creditManager = ICreditFacade(msg.sender).creditManager();
+        if (!approvedCreditManager[creditManager] || ICreditManagerV3(creditManager).creditFacade() != msg.sender) {
+            revert CallerNotCreditFacadeException();
         }
         _;
     }
@@ -76,7 +82,7 @@ contract BotList is ACLNonReentrantTrait, IBotList {
     )
         external
         nonZeroAddress(bot)
-        onlyCreditAccountFacade(creditAccount) // F: [BL-03]
+        onlyValidCreditFacade // F: [BL-03]
         returns (uint256 activeBotsRemaining)
     {
         if (!bot.isContract()) {
@@ -112,7 +118,7 @@ contract BotList is ACLNonReentrantTrait, IBotList {
     /// @param creditAccount Credit Account to erase permissions for
     function eraseAllBotPermissions(address creditAccount)
         external
-        onlyCreditAccountFacade(creditAccount) // F: [BL-06]
+        onlyValidCreditFacade // F: [BL-06]
     {
         uint256 len = activeBots[creditAccount].length();
 
@@ -134,17 +140,20 @@ contract BotList is ACLNonReentrantTrait, IBotList {
         }
     }
 
-    /// @dev Takes payment from the user to the bot for performed services
+    /// @dev Takes payment for performed services from the user's balance and sends to the bot
+    /// @param payer Address to charge
     /// @param creditAccount Address of the credit account paid for
-    /// @param paymentAmount Amount to pull
-    function pullPayment(address creditAccount, uint72 paymentAmount) external nonReentrant {
+    /// @param bot Address of the bot to pay
+    /// @param paymentAmount Amount to pay
+    function payBot(address payer, address creditAccount, address bot, uint72 paymentAmount)
+        external
+        onlyValidCreditFacade
+    {
         if (paymentAmount == 0) {
             revert AmountCantBeZeroException(); // F: [BL-05]
         }
 
-        address payer = _getCreditAccountOwner(creditAccount); // F: [BL-05]
-
-        BotFunding storage bf = botFunding[creditAccount][msg.sender]; // F: [BL-05]
+        BotFunding storage bf = botFunding[creditAccount][bot]; // F: [BL-05]
 
         if (block.timestamp >= bf.allowanceLU + uint40(7 days)) {
             bf.allowanceLU = uint40(block.timestamp); // F: [BL-05]
@@ -158,10 +167,10 @@ contract BotList is ACLNonReentrantTrait, IBotList {
 
         fundingBalances[payer] -= uint256(paymentAmount + feeAmount); // F: [BL-05]
 
-        payable(msg.sender).sendValue(paymentAmount); // F: [BL-05]
+        payable(bot).sendValue(paymentAmount); // F: [BL-05]
         if (feeAmount > 0) payable(treasury).sendValue(feeAmount); // F: [BL-05]
 
-        emit PullBotPayment(payer, creditAccount, msg.sender, paymentAmount, feeAmount); // F: [BL-05]
+        emit PayBot(payer, creditAccount, bot, paymentAmount, feeAmount); // F: [BL-05]
     }
 
     /// @dev Adds funds to the borrower's bot payment wallet
@@ -223,5 +232,18 @@ contract BotList is ACLNonReentrantTrait, IBotList {
         daoFee = newFee; // F: [BL-02]
 
         emit SetBotDAOFee(newFee); // F: [BL-02]
+    }
+
+    /// @dev Sets an address' status as an approved Credit Manager
+    /// @param creditManager Address of the Credit Manager to change status for
+    /// @param status The new status
+    function setApprovedCreditManagerStatus(address creditManager, bool status) external configuratorOnly {
+        approvedCreditManager[creditManager] = status;
+
+        if (status) {
+            emit CreditManagerAdded(creditManager);
+        } else {
+            emit CreditManagerRemoved(creditManager);
+        }
     }
 }

@@ -1,113 +1,145 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Holdings, 2022
+// (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 pragma abicoder v1;
 
-import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 
+import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+
 import {CreditAccountV3} from "../credit/CreditAccountV3.sol";
+import {CreditManagerV3} from "../credit/CreditManagerV3.sol";
+import {IAccountFactoryV3} from "../interfaces/IAccountFactoryV3.sol";
+import {
+    CallerNotCreditManagerException,
+    CreditAccountIsInUseException,
+    MasterCreditAccountAlreadyDeployedException
+} from "../interfaces/IExceptions.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
-
-import {IAccountFactory} from "../interfaces/IAccountFactory.sol";
-
-// EXCEPTIONS
-import "../interfaces/IExceptions.sol";
+import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
 /// @dev Struct storing per-CreditManager data on account usage queue
-struct CreditManagerFactory {
+struct FactoryParams {
     /// @dev Address of the contract being cloned to create new Credit Accounts
     address masterCreditAccount;
     /// @dev Id of the next reused Credit Account in the used account queue, i.e.
     ///      the front of the reused CA queue
-    uint32 head;
+    uint40 head;
     /// @dev Id of the last returned Credit Account in the used account queue, i.e.
     ///      the back of the reused CA queue
-    uint32 tail;
-    /// @dev Min used account queue size in order to start reusing accounts
-    uint16 minUsedInQueue;
+    uint40 tail;
 }
 
-/// @title Disposable credit accounts factory
-contract AccountFactoryV3 is IAccountFactory, ACLTrait, ContractsRegisterTrait {
-    /// @dev Mapping from Credit Manager to their Credit Account queue data
-    mapping(address => CreditManagerFactory) public masterCreditAccounts;
+/// @dev Struct compressing the credit account address and the
+///      timestamp at which it is reusable
+struct QueuedAccount {
+    address creditAccount;
+    uint40 reusableAfter;
+}
 
-    /// @dev Mapping from Credit Manager to their used account queue
-    mapping(address => address[]) public usedCreditAccounts;
+/// @title Account factory V3
+/// @notice Reusable credit accounts factory.
+///         - Account deployment is cheap thanks to the clones proxy pattern
+///         - Accounts are reusable: new accounts are only deployed when the queue of reusable accounts is empty
+///           (a separate queue is maintained for each credit manager)
+///         - When account is returned to the factory, it is only added to the queue after a certain delay, which
+///           allows DAO to rescue funds that might have been accidentally left upon account closure
+contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait {
+    /// @inheritdoc IVersion
+    uint256 public constant override version = 3_00;
 
-    /// @dev Contract version
-    uint256 public constant version = 3_00;
+    /// @inheritdoc IAccountFactoryV3
+    uint40 public constant override delay = 3 days;
 
-    /// @param addressProvider Address of address repository
+    /// @dev Mapping credit manager => factory params
+    mapping(address => FactoryParams) internal _factoryParams;
+
+    /// @dev Mapping credit manager => queued accounts
+    mapping(address => QueuedAccount[]) internal _queuedAccounts;
+
+    /// @notice Constructor
+    /// @param addressProvider Address provider contract address
     constructor(address addressProvider) ACLTrait(addressProvider) ContractsRegisterTrait(addressProvider) {}
 
-    /// @dev Provides a new credit account to a Credit Manager
-    /// @return creditAccount Address of credit account
+    /// @inheritdoc IAccountFactoryV3
     function takeCreditAccount(uint256, uint256) external override returns (address creditAccount) {
-        CreditManagerFactory storage cmf = masterCreditAccounts[msg.sender];
-        address masterCreditAccount = cmf.masterCreditAccount;
+        FactoryParams storage fp = _factoryParams[msg.sender];
 
+        address masterCreditAccount = fp.masterCreditAccount;
         if (masterCreditAccount == address(0)) {
-            revert CallerNotCreditManagerException();
+            revert CallerNotCreditManagerException(); // U:[AF-1]
         }
 
-        ///  A used Credit Account is only given to a user if there is a sufficiently
-        ///  large number of other accounts opened before it. The minimal number of
-        ///  accounts to cycle through before a particular account is reusable is determined
-        ///  by minUsedInQueue for each Credit Manager.
-        ///  This is done to make it hard for a user to intentionally reopen an account
+        ///  A used Credit Account is only given to a user if sufficiently long
+        ///  time has passed since it was last taken out.
+        ///  This is done to prevent a user from intentionally reopening an account
         ///  that they closed shortly prior, as this can potentially be used as an element
         ///  in an attack.
-        uint256 totalUsed = cmf.tail - cmf.head;
-        if (totalUsed < cmf.minUsedInQueue) {
-            creditAccount = Clones.clone(masterCreditAccount);
-            emit DeployCreditAccount(creditAccount);
+        uint256 head = fp.head;
+        if (head == fp.tail || block.timestamp < _queuedAccounts[msg.sender][head].reusableAfter) {
+            creditAccount = Clones.clone(masterCreditAccount); // U:[AF-2A]
+            emit DeployCreditAccount({creditAccount: creditAccount, creditManager: msg.sender}); // U:[AF-2A]
         } else {
-            creditAccount = usedCreditAccounts[msg.sender][cmf.head];
-            ++cmf.head;
-            emit ReuseCreditAccount(creditAccount);
-        }
-    }
-
-    /// @dev Returns a Credit Account from the Credit Manager into the used account queue
-    /// @param usedAccount Credit Account to return
-    function returnCreditAccount(address usedAccount) external override {
-        CreditManagerFactory storage cmf = masterCreditAccounts[msg.sender];
-
-        if (cmf.masterCreditAccount == address(0)) {
-            revert CallerNotCreditManagerException();
+            creditAccount = _queuedAccounts[msg.sender][head].creditAccount; // U:[AF-2B]
+            delete _queuedAccounts[msg.sender][head]; // U:[AF-2B]
+            unchecked {
+                ++fp.head; // U:[AF-2B]
+            }
         }
 
-        usedCreditAccounts[msg.sender][cmf.tail] = usedAccount;
-        ++cmf.tail;
-        emit ReturnCreditAccount(usedAccount);
+        emit TakeCreditAccount({creditAccount: creditAccount, creditManager: msg.sender}); // U:[AF-2A,2B]
     }
 
-    // CONFIGURATION
+    /// @inheritdoc IAccountFactoryV3
+    function returnCreditAccount(address creditAccount) external override {
+        FactoryParams storage fp = _factoryParams[msg.sender];
 
-    /// @dev Adds a new Credit Manager to the account factory and initializes its master Credit Account
-    /// @param creditManager Address of the CA to add
-    /// @param minUsedInQueue Minimal number of opened accounts before a CA is reusable
-    function addCreditManager(address creditManager, uint16 minUsedInQueue)
+        if (fp.masterCreditAccount == address(0)) {
+            revert CallerNotCreditManagerException(); // U:[AF-1]
+        }
+
+        _queuedAccounts[msg.sender].push(
+            QueuedAccount({creditAccount: creditAccount, reusableAfter: uint40(block.timestamp) + delay})
+        ); // U:[AF-3]
+        unchecked {
+            ++fp.tail; // U:[AF-3]
+        }
+        emit ReturnCreditAccount({creditAccount: creditAccount, creditManager: msg.sender}); // U:[AF-3]
+    }
+
+    /// ------------- ///
+    /// CONFIGURATION ///
+    /// ------------- ///
+
+    /// @inheritdoc IAccountFactoryV3
+    function addCreditManager(address creditManager)
         external
-        configuratorOnly
-        registeredCreditManagerOnly(creditManager)
+        override
+        configuratorOnly // U:[AF-1]
+        registeredCreditManagerOnly(creditManager) // U:[AF-4A]
     {
-        if (masterCreditAccounts[creditManager].masterCreditAccount != address(0)) {
-            revert MasterCreditAccountAlreadyDeployed();
+        if (_factoryParams[creditManager].masterCreditAccount != address(0)) {
+            revert MasterCreditAccountAlreadyDeployedException(); // U:[AF-4B]
+        }
+        address masterCreditAccount = address(new CreditAccountV3(creditManager)); // U:[AF-4C]
+        _factoryParams[creditManager].masterCreditAccount = masterCreditAccount; // U:[AF-4C]
+        emit AddCreditManager(creditManager, masterCreditAccount); // U:[AF-4C]
+    }
+
+    /// @inheritdoc IAccountFactoryV3
+    function rescue(address creditAccount, address target, bytes calldata data)
+        external
+        configuratorOnly // U:[AF-1]
+    {
+        address creditManager = CreditAccountV3(creditAccount).creditManager();
+        _checkRegisteredCreditManagerOnly(creditManager); // U:[AF-5A]
+
+        (,,,,, address borrower) = CreditManagerV3(creditManager).creditAccountInfo(creditAccount);
+        if (borrower != address(0)) {
+            revert CreditAccountIsInUseException(); // U:[AF-5B]
         }
 
-        /// As `creditManager` is an immutable field in a Credit Account,
-        /// it will be copied as part of the code when the master Credit Account is cloned
-        masterCreditAccounts[creditManager] = CreditManagerFactory({
-            masterCreditAccount: address(new CreditAccountV3(creditManager)),
-            head: 0,
-            tail: 0,
-            minUsedInQueue: minUsedInQueue
-        });
-
-        emit AddCreditManager(creditManager);
+        CreditAccountV3(creditAccount).rescue(target, data); // U:[AF-5C]
     }
 }

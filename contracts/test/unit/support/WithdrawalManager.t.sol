@@ -105,7 +105,7 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerEvents {
         vm.expectEmit(true, true, false, true);
         emit AddImmediateWithdrawal(USER, address(token0), AMOUNT);
 
-        manager.addImmediateWithdrawal(USER, address(token0), AMOUNT);
+        manager.addImmediateWithdrawal(address(token0), USER, AMOUNT);
 
         assertEq(
             manager.immediateWithdrawals(USER, address(token0)),
@@ -119,7 +119,7 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerEvents {
         vm.expectEmit(true, true, false, true);
         emit AddImmediateWithdrawal(USER, address(token0), AMOUNT);
 
-        manager.addImmediateWithdrawal(USER, address(token0), AMOUNT);
+        manager.addImmediateWithdrawal(address(token0), USER, AMOUNT);
 
         assertEq(
             manager.immediateWithdrawals(USER, address(token0)),
@@ -149,7 +149,7 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerEvents {
         deal(address(token0), address(manager), AMOUNT);
 
         vm.prank(creditManager);
-        manager.addImmediateWithdrawal(USER, address(token0), 10 ether);
+        manager.addImmediateWithdrawal(address(token0), USER, 10 ether);
 
         vm.expectEmit(true, true, false, true);
         emit ClaimImmediateWithdrawal(USER, address(token0), USER, AMOUNT - 1);

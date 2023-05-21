@@ -40,7 +40,7 @@ contract LinearInterestRateModel is IInterestRateModel {
     /// @dev Constructor
     /// @param U_1 Optimal U in percentage format: x10.000 - percentage plus two decimals
     /// @param U_2 Optimal U in percentage format: x10.000 - percentage plus two decimals
-    /// @param R_base R_base in percentage format: x10.000 - percentage plus two decimals @param R_slope1 R_Slope1 in Ray
+    /// @param R_base R_base in percentage format: x10.000 - percentage plus two decimals
     /// @param R_slope1 R_Slope1 in percentage format: x10.000 - percentage plus two decimals
     /// @param R_slope2 R_Slope2 in percentage format: x10.000 - percentage plus two decimals
     /// @param R_slope3 R_Slope3 in percentage format: x10.000 - percentage plus two decimals

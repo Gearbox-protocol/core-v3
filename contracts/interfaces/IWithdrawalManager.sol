@@ -68,6 +68,7 @@ interface IWithdrawalManagerEvents {
     event SetWithdrawalDelay(uint40 delay);
 }
 
+/// @title Withdrawal manager interface
 interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
     /// --------------------- ///
     /// IMMEDIATE WITHDRAWALS ///
@@ -77,13 +78,13 @@ interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
     function immediateWithdrawals(address account, address token) external view returns (uint256);
 
     /// @notice Adds new immediate withdrawal for the account
-    /// @param account Account to add immediate withdrawal for
     /// @param token Token to withdraw
+    /// @param to Account to add immediate withdrawal for
     /// @param amount Amount to withdraw
     /// @custom:expects Credit manager transferred `amount` of `token` to this contract prior to calling this function
-    function addImmediateWithdrawal(address account, address token, uint256 amount) external;
+    function addImmediateWithdrawal(address token, address to, uint256 amount) external;
 
-    /// @notice Claims `msg.sender`'s immediate withdrawal
+    /// @notice Claims caller's immediate withdrawal
     /// @param token Token to claim
     /// @param to Token recipient
     function claimImmediateWithdrawal(address token, address to) external;

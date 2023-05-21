@@ -68,12 +68,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @dev Whether the Credit Facade implements expirable logic
     bool public immutable expirable;
 
-    /// @dev Address of the pool
-    address public immutable pool;
-
-    /// @dev Address of the underlying token
-    address public immutable underlying;
-
     /// @dev Address of WETH
     address public immutable weth;
 
@@ -173,21 +167,18 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @param _expirable Whether the CreditFacadeV3 can expire and implements expiration-related logic
     constructor(address _creditManager, address _degenNFT, bool _expirable)
         ACLNonReentrantTrait(ICreditManagerV3(_creditManager).addressProvider())
-        nonZeroAddress(_creditManager)
     {
-        creditManager = _creditManager; // F:[FA-1A]
-        pool = ICreditManagerV3(_creditManager).pool();
-        underlying = ICreditManagerV3(_creditManager).underlying(); // F:[FA-1A]
+        creditManager = _creditManager; // U:[FA-1] // F:[FA-1A]
 
-        weth = ICreditManagerV3(_creditManager).weth(); // F:[FA-1A]
-        wethGateway = ICreditManagerV3(_creditManager).wethGateway();
+        weth = ICreditManagerV3(_creditManager).weth(); // U:[FA-1] // F:[FA-1A]
+        wethGateway = ICreditManagerV3(_creditManager).wethGateway(); // U:[FA-1]
         botList =
             IAddressProviderV3(ICreditManagerV3(_creditManager).addressProvider()).getAddressOrRevert(AP_BOT_LIST, 3_00);
 
-        degenNFT = _degenNFT; // F:[FA-1A]
-        whitelisted = _degenNFT != address(0); // F:[FA-1A]
+        degenNFT = _degenNFT; // U:[FA-1]  // F:[FA-1A]
+        whitelisted = _degenNFT != address(0); // U:[FA-1] // F:[FA-1A]
 
-        expirable = _expirable;
+        expirable = _expirable; // U:[FA-1] // F:[FA-1A]
     }
 
     // Notice: ETH interactions
@@ -225,7 +216,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         _revertIfOutOfDebtLimits(debt); // F:[FA-11B]
 
         // Checks whether the new borrowed amount does not violate the block limit
-        _checkIncreaseDebtAllowedAndUpdateBlockLimit(debt); // F:[FA-11]
+        _revertIfOutOfBorrowingLimit(debt); // F:[FA-11]
 
         // Checks that the msg.sender can open an account for onBehalfOf
         // msg.sender must either be the account owner themselves, or be approved for transfers
@@ -493,7 +484,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             revert NotApprovedBotException(); // F: [FA-58]
         }
 
-        _multicallFullCollateralCheck(creditAccount, calls, botPermissions);
+        _multicallFullCollateralCheck(creditAccount, calls, botPermissions | PAY_BOT_PERMISSION);
     }
 
     /// @dev Convenience internal function that packages a multicall and a fullCheck together,
@@ -726,6 +717,14 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                         _revokeAdapterAllowances(creditAccount, mcall.callData[4:]);
                     }
                     //
+                    // PAY BOT
+                    //
+                    else if (method == ICreditFacadeMulticall.payBot.selector) {
+                        _revertIfNoPermission(flags, PAY_BOT_PERMISSION);
+                        flags = flags.disable(PAY_BOT_PERMISSION);
+                        _payBot(creditAccount, mcall.callData[4:]);
+                    }
+                    //
                     // UNKNOWN METHOD
                     //
                     else {
@@ -747,7 +746,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     /// After the multicall, the value is set back to address(1)
                     if (flags & EXTERNAL_CONTRACT_WAS_CALLED == 0) {
                         flags = flags.enable(EXTERNAL_CONTRACT_WAS_CALLED);
-                        _setCaForExterallCall(creditAccount);
+                        _setActiveCreditAccount(creditAccount);
                     }
 
                     /// Performs an adapter call. Each external adapter function returns
@@ -795,7 +794,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
         /// If the `externalCallCreditAccount` value was set to the current CA, it must be reset
         if (flags & EXTERNAL_CONTRACT_WAS_CALLED != 0) {
-            _returnCaForExterallCall();
+            _unsetActiveCreditAccount();
         }
 
         /// Emits event for multicall end - used in analytics to track actions within multicalls
@@ -806,26 +805,17 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         fullCheckParams.enabledTokensMaskAfter = enabledTokensMask;
     }
 
-    /// @dev Sets the `externalCallCreditAccount` in Credit Manager
+    /// @dev Sets the `activeCreditAccount` in Credit Manager
     ///      to the passed Credit Account
     /// @param creditAccount CA address
-    function _setCaForExterallCall(address creditAccount) internal {
-        // Takes ownership of the Credit Account
-        _setCreditAccountForExternalCall(creditAccount); // F:[FA-26]
+    function _setActiveCreditAccount(address creditAccount) internal {
+        ICreditManagerV3(creditManager).setActiveCreditAccount(creditAccount); // F:[FA-26]
     }
 
     /// @dev Sets the `externalCallCreditAccount` in Credit Manager
-    ///      to the default value Credit Account
-    function _returnCaForExterallCall() internal {
-        // Takes ownership of the Credit Account
-        _setCreditAccountForExternalCall(address(1)); // F:[FA-26]
-    }
-
-    /// @dev Call to `setCreditAccountForExternalCall`. Isolated into a separate function
-    ///      to optimize code size
-    /// @param creditAccount CA address
-    function _setCreditAccountForExternalCall(address creditAccount) internal {
-        ICreditManagerV3(creditManager).setCreditAccountForExternalCall(creditAccount); // F:[FA-26]
+    ///      to the default value
+    function _unsetActiveCreditAccount() internal {
+        _setActiveCreditAccount(address(1)); // F:[FA-26]
     }
 
     /// @dev Reverts if provided flags contain no permission for the requested action
@@ -871,6 +861,18 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         ICreditManagerV3(creditManager).revokeAdapterAllowances(creditAccount, revocations);
     }
 
+    /// @dev Requests the bot list to pay the bot for performed services
+    /// @param creditAccount Credit account the service was performed for
+    /// @param callData Bytes calldata for parsing
+    function _payBot(address creditAccount, bytes calldata callData) internal {
+        uint72 paymentAmount = abi.decode(callData, (uint72));
+
+        /// The current owner of the account always pays for bot services
+        address payer = _getBorrowerOrRevert(creditAccount);
+
+        IBotList(botList).payBot(payer, creditAccount, msg.sender, paymentAmount);
+    }
+
     /// @dev Requests the Credit Manager to change the CA's debt
     /// @param creditAccount CA to change debt for
     /// @param callData Bytes calldata for parsing
@@ -886,7 +888,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             // Checks that the borrowed amount does not violate the per block limit
             // This also ensures that increaseDebt can't be called when borrowing is forbidden
             // (since the block limit will be 0)
-            _checkIncreaseDebtAllowedAndUpdateBlockLimit(amount); // F:[FA-18A]
+            _revertIfOutOfBorrowingLimit(amount); // F:[FA-18A]
         }
 
         uint256 newDebt;
@@ -1034,7 +1036,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
     /// @dev Checks that the per-block borrow limit was not violated and updates the
     /// amount borrowed in current block
-    function _checkIncreaseDebtAllowedAndUpdateBlockLimit(uint256 amount) internal {
+    function _revertIfOutOfBorrowingLimit(uint256 amount) internal {
         uint8 _maxDebtPerBlockMultiplier = maxDebtPerBlockMultiplier; // F:[FA-18]\
 
         if (_maxDebtPerBlockMultiplier == 0) {

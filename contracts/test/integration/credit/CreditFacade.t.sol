@@ -128,11 +128,6 @@ contract CreditFacadeIntegrationTest is
         vm.prank(CONFIGURATOR);
         creditConfigurator.allowContract(address(targetMock), address(adapterMock));
 
-        botList = new BotList(address(cft.addressProvider()));
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setBotList(address(botList));
-
         vm.label(address(adapterMock), "AdapterMock");
         vm.label(address(targetMock), "TargetContractMock");
     }
@@ -197,7 +192,7 @@ contract CreditFacadeIntegrationTest is
     /// @dev [FA-1A]: constructor sets correct values
     function test_FA_01A_constructor_sets_correct_values() public {
         assertEq(address(creditFacade.creditManager()), address(creditManager), "Incorrect creditManager");
-        assertEq(creditFacade.underlying(), underlying, "Incorrect underlying token");
+        // assertEq(creditFacade.underlying(), underlying, "Incorrect underlying token");
 
         assertEq(creditFacade.weth(), creditManager.weth(), "Incorrect weth token");
 
@@ -699,9 +694,7 @@ contract CreditFacadeIntegrationTest is
             MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
         );
 
-        vm.expectCall(
-            address(creditManager), abi.encodeCall(ICreditManagerV3.setCreditAccountForExternalCall, (creditAccount))
-        );
+        vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount)));
 
         vm.expectEmit(true, false, false, false);
         emit StartMultiCall(creditAccount);
@@ -720,9 +713,7 @@ contract CreditFacadeIntegrationTest is
 
         vm.expectCall(address(botList), abi.encodeCall(BotList.eraseAllBotPermissions, (creditAccount)));
 
-        vm.expectCall(
-            address(creditManager), abi.encodeCall(ICreditManagerV3.setCreditAccountForExternalCall, (address(1)))
-        );
+        vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (address(1))));
 
         // vm.expectCall(
         //     address(creditManager),
@@ -791,9 +782,7 @@ contract CreditFacadeIntegrationTest is
 
         // EXPECTED STACK TRACE & EVENTS
 
-        vm.expectCall(
-            address(creditManager), abi.encodeCall(ICreditManagerV3.setCreditAccountForExternalCall, (creditAccount))
-        );
+        vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount)));
 
         vm.expectEmit(true, false, false, false);
         emit StartMultiCall(creditAccount);
@@ -812,9 +801,7 @@ contract CreditFacadeIntegrationTest is
 
         vm.expectCall(address(botList), abi.encodeCall(BotList.eraseAllBotPermissions, (creditAccount)));
 
-        vm.expectCall(
-            address(creditManager), abi.encodeCall(ICreditManagerV3.setCreditAccountForExternalCall, (address(1)))
-        );
+        vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (address(1))));
 
         // Total value = 2 * DAI_ACCOUNT_AMOUNT, cause we have x2 leverage
         uint256 totalValue = 2 * DAI_ACCOUNT_AMOUNT;
@@ -1384,9 +1371,7 @@ contract CreditFacadeIntegrationTest is
             MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
         );
 
-        vm.expectCall(
-            address(creditManager), abi.encodeCall(ICreditManagerV3.setCreditAccountForExternalCall, (creditAccount))
-        );
+        vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount)));
 
         vm.expectEmit(true, true, false, true);
         emit StartMultiCall(creditAccount);
@@ -1403,9 +1388,7 @@ contract CreditFacadeIntegrationTest is
         vm.expectEmit(false, false, false, true);
         emit FinishMultiCall();
 
-        vm.expectCall(
-            address(creditManager), abi.encodeCall(ICreditManagerV3.setCreditAccountForExternalCall, (address(1)))
-        );
+        vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (address(1))));
 
         vm.expectCall(
             address(creditManager),
@@ -1890,7 +1873,7 @@ contract CreditFacadeIntegrationTest is
 
         // // EXPECTED STACK TRACE & EVENTS
 
-        // vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setCreditAccountForExternalCall, (creditAccount)));
+        // vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount)));
 
         // vm.expectEmit(true, false, false, false);
         // emit StartMultiCall(creditAccount);
@@ -1907,7 +1890,7 @@ contract CreditFacadeIntegrationTest is
         // vm.expectEmit(false, false, false, false);
         // emit FinishMultiCall();
 
-        // vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setCreditAccountForExternalCall, (address(1))));
+        // vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (address(1))));
         // // Total value = 2 * DAI_ACCOUNT_AMOUNT, cause we have x2 leverage
         // uint256 totalValue = balance;
 
@@ -2093,9 +2076,7 @@ contract CreditFacadeIntegrationTest is
             MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
         );
 
-        vm.expectCall(
-            address(creditManager), abi.encodeCall(ICreditManagerV3.setCreditAccountForExternalCall, (creditAccount))
-        );
+        vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount)));
 
         vm.expectEmit(true, true, false, true);
         emit StartMultiCall(creditAccount);
@@ -2112,9 +2093,7 @@ contract CreditFacadeIntegrationTest is
         vm.expectEmit(false, false, false, true);
         emit FinishMultiCall();
 
-        vm.expectCall(
-            address(creditManager), abi.encodeCall(ICreditManagerV3.setCreditAccountForExternalCall, (address(1)))
-        );
+        vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (address(1))));
 
         vm.expectCall(
             address(creditManager),

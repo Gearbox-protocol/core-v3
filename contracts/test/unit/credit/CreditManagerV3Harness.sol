@@ -1,7 +1,10 @@
+pragma solidity ^0.8.17;
+
 import {CreditManagerV3, CreditAccountInfo} from "../../../credit/CreditManagerV3.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {CollateralDebtData} from "../../../interfaces/ICreditManagerV3.sol";
+import {CollateralDebtData, CollateralCalcTask} from "../../../interfaces/ICreditManagerV3.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 contract CreditManagerV3Harness is CreditManagerV3 {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -24,12 +27,16 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         return _getTargetContractOrRevert();
     }
 
+    function addToCAList(address creditAccount) external {
+        creditAccountsSet.add(creditAccount);
+    }
+
     function setBorrower(address creditAccount, address borrower) external {
         creditAccountInfo[creditAccount].borrower = borrower;
     }
 
-    function addToCAList(address creditAccount) external {
-        creditAccountsSet.add(creditAccount);
+    function setDebt(address creditAccount, uint256 debt) external {
+        creditAccountInfo[creditAccount].debt = debt;
     }
 
     function setCreditAccountInfoMap(
@@ -49,56 +56,6 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         creditAccountInfo[creditAccount].borrower = borrower;
     }
 
-    // function calcFullCollateral(
-    //     address creditAccount,
-    //     uint256 enabledTokensMask,
-    //     uint16 minHealthFactor,
-    //     uint256[] memory collateralHints,
-    //     address _priceOracle,
-    //     bool lazy
-    // ) external view returns (CollateralDebtData memory collateralDebtData) {
-    //     return
-    //         _calcFullCollateral(creditAccount, enabledTokensMask, minHealthFactor, collateralHints, _priceOracle, lazy);
-    // }
-
-    // function calcQuotedTokensCollateral(address creditAccount, uint256 enabledTokensMask, address _priceOracle)
-    //     external
-    //     view
-    //     returns (uint256 totalValueUSD, uint256 twvUSD, uint256 quotaInterest)
-    // {
-    //     return _calcQuotedTokensCollateral(creditAccount, enabledTokensMask, _priceOracle);
-    // }
-
-    // function calcNonQuotedTokensCollateral(
-    //     address creditAccount,
-    //     uint256 enabledTokensMask,
-    //     uint256 enoughCollateralUSD,
-    //     uint256[] memory collateralHints,
-    //     address _priceOracle
-    // ) external view returns (uint256 tokensToDisable, uint256 totalValueUSD, uint256 twvUSD) {
-    //     return _calcNonQuotedTokensCollateral(
-    //         creditAccount, enabledTokensMask, enoughCollateralUSD, collateralHints, _priceOracle
-    //     );
-    // }
-
-    // function calcOneNonQuotedTokenCollateral(
-    //     address _priceOracle,
-    //     uint256 tokenMask,
-    //     address creditAccount,
-    //     uint256 _totalValueUSD,
-    //     uint256 _twvUSDx10K
-    // ) external view returns (uint256 totalValueUSD, uint256 twvUSDx10K, bool nonZeroBalance) {
-    //     return _calcOneNonQuotedTokenCollateral(_priceOracle, tokenMask, creditAccount, _totalValueUSD, _twvUSDx10K);
-    // }
-
-    // function _getQuotedTokensLT(uint256 enabledTokensMask, bool withLTs)
-    //     external
-    //     view
-    //     returns (address[] memory tokens, uint256[] memory lts)
-    // {
-    //     return _getQuotedTokens(enabledTokensMask, withLTs);
-    // }
-
     function batchTokensTransfer(address creditAccount, address to, bool convertToETH, uint256 enabledTokensMask)
         external
     {
@@ -111,10 +68,6 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         _safeTokenTransfer(creditAccount, token, to, amount, convertToETH);
     }
 
-    function checkEnabledTokenLength(uint256 enabledTokensMask) external view {
-        _checkEnabledTokenLength(enabledTokensMask);
-    }
-
     function collateralTokensByMaskCalcLT(uint256 tokenMask, bool calcLT)
         external
         view
@@ -123,35 +76,42 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         return _collateralTokensByMask(tokenMask, calcLT);
     }
 
-    // function calcAccruedInterestAndFees(address creditAccount, uint256 quotaInterest)
-    //     external
-    //     view
-    //     returns (uint256 debt, uint256 accruedInterest, uint256 accruedFees)
-    // {
-    //     return _calcAccruedInterestAndFees(creditAccount, quotaInterest);
-    // }
+    /// @dev Calculates collateral and debt parameters
+    function calcDebtAndCollateralFC(address creditAccount, CollateralCalcTask task)
+        external
+        view
+        returns (CollateralDebtData memory collateralDebtData)
+    {
+        uint256[] memory collateralHints;
 
-    // function getCreditAccountParameters(address creditAccount)
-    //     external
-    //     view
-    //     returns (uint256 debt, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow)
-    // {
-    //     return _getCreditAccountParameters(creditAccount);
-    // }
+        collateralDebtData = _calcDebtAndCollateral({
+            creditAccount: creditAccount,
+            enabledTokensMask: enabledTokensMaskOf(creditAccount),
+            collateralHints: collateralHints,
+            minHealthFactor: PERCENTAGE_FACTOR,
+            task: task
+        });
+    }
 
     function hasWithdrawals(address creditAccount) external view returns (bool) {
         return _hasWithdrawals(creditAccount);
     }
 
-    // function calcCancellableWithdrawalsValue(address creditAccount, bool isForceCancel) external {
-    //     _calcCancellableWithdrawalsValue(creditAccount, isForceCancel);
-    // }
-
     function saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) external {
         _saveEnabledTokensMask(creditAccount, enabledTokensMask);
     }
 
-    // function convertToUSD(uint256 amountInToken, address token) external returns (uint256 amountInUSD) {
-    //     return _convertToUSD(amountInToken, token);
-    // }
+    function getQuotedTokensData(address creditAccount, uint256 enabledTokensMask, address _poolQuotaKeeper)
+        external
+        view
+        returns (
+            address[] memory quotaTokens,
+            uint256 outstandingQuotaInterest,
+            uint256[] memory quotas,
+            uint16[] memory lts,
+            uint256 quotedMask
+        )
+    {
+        return _getQuotedTokensData(creditAccount, enabledTokensMask, _poolQuotaKeeper);
+    }
 }

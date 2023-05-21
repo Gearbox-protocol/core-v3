@@ -124,8 +124,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     /// @dev Points to creditAccount during multicall, otherwise keeps address(1) for gas savings
     /// CreditFacade is trusted source, so primarly it sends creditAccount as parameter
-    /// _externalCallCreditAccount is used for adapters interation when adapter calls approve / execute methods
-    address internal _externalCallCreditAccount;
+    /// _activeCreditAccount is used for adapters interation when adapter calls approve / execute methods
+    address internal _activeCreditAccount;
 
     /// @dev Total number of known collateral tokens.
     uint8 public collateralTokensCount;
@@ -221,7 +221,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         creditConfigurator = msg.sender; // U:[CM-1]
 
-        _externalCallCreditAccount = address(1);
+        _activeCreditAccount = address(1);
     }
 
     //
@@ -248,7 +248,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditAccountInfo[creditAccount].flags = 0; // U:[CM-6]
         creditAccountInfo[creditAccount].borrower = onBehalfOf; // U:[CM-6]
 
-        if (supportsQuotas) creditAccountInfo[creditAccount].cumulativeQuotaInterest = 1; // U:[CM-6]
+        if (supportsQuotas) {
+            creditAccountInfo[creditAccount].cumulativeQuotaInterest = 1;
+        } // U:[CM-6]
 
         // OUTDATED: enabledTokensMap is set in FullCollateralCheck
         // enabledTokensMap[creditAccount] = 1;
@@ -329,7 +331,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 feeLiquidation: closureAction == ClosureAction.LIQUIDATE_ACCOUNT ? feeLiquidation : feeLiquidationExpired,
                 amountWithFeeFn: _amountWithFee,
                 amountMinusFeeFn: _amountMinusFee
-            });
+            }); // U:[CM-8]
         }
         {
             uint256 underlyingBalance = IERC20Helper.balanceOf({token: underlying, holder: creditAccount}); // U:[CM-8]
@@ -352,7 +354,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         // Signals to the pool that debt has been repaid. The pool relies
         // on the Credit Manager to repay the debt correctly, and does not
         // check internally whether the underlying was actually transferred
-        _poolRepayCreditAccount(collateralDebtData.debt, profit, loss);
+        _poolRepayCreditAccount(collateralDebtData.debt, profit, loss); // U:[CM-8]
 
         // transfer remaining funds to the borrower [liquidations only]
         if (remainingFunds > 1) {
@@ -362,7 +364,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 to: borrower,
                 amount: remainingFunds,
                 convertToETH: false
-            });
+            }); // U:[CM-8]
         }
 
         if (supportsQuotas && collateralDebtData.quotedTokens.length != 0) {
@@ -381,7 +383,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             to: to,
             convertToETH: convertToETH,
             tokensToTransferMask: collateralDebtData.enabledTokensMask.disable(skipTokensMask)
-        });
+        }); // U:[CM-8, 9]
 
         // Returns Credit Account to the factory
         IAccountFactory(accountFactory).returnCreditAccount({usedAccount: creditAccount}); // U:[CM-8]
@@ -421,12 +423,19 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 collateralHints: collateralHints,
                 minHealthFactor: PERCENTAGE_FACTOR,
                 task: CollateralCalcTask.GENERIC_PARAMS
-            });
-            (newDebt, newCumulativeIndex) = collateralDebtData.calcIncrease(amount);
+            }); // U:[CM-10]
+
+            (newDebt, newCumulativeIndex) = CreditLogic.calcIncrease({
+                amount: amount,
+                debt: collateralDebtData.debt,
+                cumulativeIndexNow: collateralDebtData.cumulativeIndexNow,
+                cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate
+            }); // U:[CM-10]
 
             // Requests the pool to lend additional funds to the Credit Account
-            _poolLendCreditAccount(amount, creditAccount); // F:[CM-20]
-            tokensToEnable = UNDERLYING_TOKEN_MASK;
+            _poolLendCreditAccount(amount, creditAccount); // U:[CM-10]
+
+            tokensToEnable = UNDERLYING_TOKEN_MASK; // U:[CM-10]
         } else {
             // Decrease
             collateralDebtData = _calcDebtAndCollateral({
@@ -435,37 +444,44 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 collateralHints: collateralHints,
                 minHealthFactor: PERCENTAGE_FACTOR,
                 task: CollateralCalcTask.DEBT_ONLY
-            });
+            }); // U:[CM-11]
+
+            uint256 newCumulativeQuotaInterest;
+            // Pays the amount back to the pool
+            ICreditAccount(creditAccount).transfer({token: underlying, to: pool, amount: amount}); // U:[CM-11]
+            {
+                uint256 amountToRepay;
+                uint256 profit;
+
+                (newDebt, newCumulativeIndex, amountToRepay, profit, newCumulativeQuotaInterest) = CreditLogic
+                    .calcDecrease({
+                    amount: _amountMinusFee(amount),
+                    debt: collateralDebtData.debt,
+                    cumulativeIndexNow: collateralDebtData.cumulativeIndexNow,
+                    cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
+                    cumulativeQuotaInterest: collateralDebtData.cumulativeQuotaInterest,
+                    feeInterest: feeInterest
+                }); // U:[CM-11]
+
+                /// @notice fee is accounted in amountToRepay because we reduce amount as parameter
+                _poolRepayCreditAccount(amountToRepay, profit, 0); // U:[CM-11]
+            }
 
             if (supportsQuotas) {
                 IPoolQuotaKeeper(collateralDebtData._poolQuotaKeeper).accrueQuotaInterest({
                     creditAccount: creditAccount,
                     tokens: collateralDebtData.quotedTokens
-                }); // F: [CMQ-4,5]
-                creditAccountInfo[creditAccount].cumulativeQuotaInterest =
-                    collateralDebtData.cumulativeQuotaInterest + 1;
-            }
-
-            // Pays the amount back to the pool
-            ICreditAccount(creditAccount).transfer({token: underlying, to: pool, amount: amount}); // F:[CM-21]
-            {
-                uint256 amountToRepay;
-                uint256 profit;
-
-                (newDebt, newCumulativeIndex, amountToRepay, profit) =
-                    collateralDebtData.calcDecrease({amount: amount, feeInterest: feeInterest});
-
-                _poolRepayCreditAccount(amountToRepay, profit, 0); // F:[CM-21]
+                });
+                creditAccountInfo[creditAccount].cumulativeQuotaInterest = newCumulativeQuotaInterest; // U:[CM-11]
             }
 
             if (IERC20Helper.balanceOf({token: underlying, holder: creditAccount}) <= 1) {
-                tokensToDisable = UNDERLYING_TOKEN_MASK;
+                tokensToDisable = UNDERLYING_TOKEN_MASK; // U:[CM-11]
             }
         }
-        //
-        creditAccountInfo[creditAccount].debt = newDebt;
-        // F:[CM-20. 21]
-        creditAccountInfo[creditAccount].cumulativeIndexLastUpdate = newCumulativeIndex; // F:[CM-20. 21]
+
+        creditAccountInfo[creditAccount].debt = newDebt; // U:[CM-10, 11]
+        creditAccountInfo[creditAccount].cumulativeIndexLastUpdate = newCumulativeIndex; // U:[CM-10, 11]
     }
 
     /// @dev Adds collateral to borrower's credit account
@@ -475,12 +491,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param amount Amount to add
     function addCollateral(address payer, address creditAccount, address token, uint256 amount)
         external
-        nonReentrant
+        nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
         returns (uint256 tokenMask)
     {
-        tokenMask = getTokenMaskOrRevert({token: token});
-        IERC20(token).safeTransferFrom({from: payer, to: creditAccount, value: amount}); // F:[CM-22]
+        tokenMask = getTokenMaskOrRevert({token: token}); // U:[CM-13]
+        IERC20(token).safeTransferFrom({from: payer, to: creditAccount, value: amount}); // U:[CM-13]
     }
 
     /// @dev Transfers Credit Account ownership to another address
@@ -492,9 +508,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
     {
-        getBorrowerOrRevert({creditAccount: creditAccount});
-        creditAccountInfo[creditAccount].borrower = to; // F:[CM-7]
+        getBorrowerOrRevert({creditAccount: creditAccount}); //  U:[CM-14]
+        creditAccountInfo[creditAccount].borrower = to; //  U:[CM-14]
     }
+
+    ///
+    /// ADAPTER FUNCTIONS
+    ///
 
     /// @dev Requests the Credit Account to approve a collateral token to another contract.
     /// @param token Collateral token to approve
@@ -506,26 +526,26 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         address targetContract = _getTargetContractOrRevert(); // U:[CM-3]
         _approveSpender({
-            creditAccount: getExternalCallCreditAccountOrRevert(),
+            creditAccount: getActiveCreditAccountOrRevert(),
             token: token,
             spender: targetContract,
             amount: amount
-        });
+        }); // U:[CM-15]
     }
 
     function _approveSpender(address creditAccount, address token, address spender, uint256 amount) internal {
         // Checks that the token is a collateral token
         // Forbidden tokens can be approved, since users need that to
         // sell them off
-        getTokenMaskOrRevert({token: token});
+        getTokenMaskOrRevert({token: token}); // U:[CM-15]
 
-        ICreditAccount(creditAccount).safeApprove({token: token, spender: spender, amount: amount});
+        ICreditAccount(creditAccount).safeApprove({token: token, spender: spender, amount: amount}); // U:[CM-15]
     }
 
     /// @dev Requests a Credit Account to make a low-level call with provided data
     /// This is the intended pathway for state-changing interactions with 3rd-party protocols
     /// @param data Data to pass with the call
-    function executeOrder(bytes memory data)
+    function executeOrder(bytes calldata data)
         external
         override
         nonReentrant // U:[CM-5]
@@ -533,23 +553,37 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         address targetContract = _getTargetContractOrRevert(); // U:[CM-3]
         // Emits an event
-        emit ExecuteOrder(targetContract); // F:[CM-29]
+        emit ExecuteOrder(targetContract); // U:[CM-16]
 
         // Returned data is provided as-is to the caller;
         // It is expected that is is parsed and returned as a correct type
         // by the adapter itself.
-        address creditAccount = getExternalCallCreditAccountOrRevert();
-        return ICreditAccount(creditAccount).execute(targetContract, data); // F:[CM-29]
+        address creditAccount = getActiveCreditAccountOrRevert(); // U:[CM-16]
+        return ICreditAccount(creditAccount).execute(targetContract, data); // U:[CM-16]
     }
 
     function _getTargetContractOrRevert() internal view returns (address targetContract) {
-        targetContract = adapterToContract[msg.sender];
+        targetContract = adapterToContract[msg.sender]; // U:[CM-15, 16]
 
         // Checks that msg.sender is the adapter associated with the passed target contract.
         if (targetContract == address(0)) {
-            revert CallerNotAdapterException();
-            // F:[CM-28]
+            revert CallerNotAdapterException(); // U:[CM-3]
         }
+    }
+
+    ///
+    function setActiveCreditAccount(address creditAccount)
+        external
+        override
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // U:[CM-2]
+    {
+        _activeCreditAccount = creditAccount;
+    }
+
+    function getActiveCreditAccountOrRevert() public view override returns (address creditAccount) {
+        creditAccount = _activeCreditAccount;
+        if (creditAccount == address(1)) revert ActiveCreditAccountNotSetException();
     }
 
     //
@@ -572,7 +606,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacadeOnly // U:[CM-2]
     {
         if (minHealthFactor < PERCENTAGE_FACTOR) {
-            revert CustomHealthFactorTooLowException();
+            revert CustomHealthFactorTooLowException(); // U:[CM-17]
         }
 
         CollateralDebtData memory collateralDebtData = _calcDebtAndCollateral({
@@ -581,21 +615,31 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             collateralHints: collateralHints,
             enabledTokensMask: enabledTokensMask,
             task: CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY
-        });
+        }); // U:[CM-18]
 
         if (collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD) {
-            revert NotEnoughCollateralException();
+            revert NotEnoughCollateralException(); // U:[CM-18]
         }
 
-        _saveEnabledTokensMask(creditAccount, collateralDebtData.enabledTokensMask);
+        _saveEnabledTokensMask(creditAccount, collateralDebtData.enabledTokensMask); // U:[CM-18]
     }
 
-    /// @dev Calculates total value for provided Credit Account in underlying
-    /// More: https://dev.gearbox.fi/developers/credit/economy#totalUSD-value
-    ///
-    /// @param creditAccount Credit Account address
-    // @return total Total value in underlying
-    // @return twv Total weighted (discounted by liquidation thresholds) value in underlying
+    /// Q: move to CF?
+    function isLiquidatable(address creditAccount, uint16 minHealthFactor) external view override returns (bool) {
+        uint256[] memory collateralHints;
+
+        CollateralDebtData memory collateralDebtData = _calcDebtAndCollateral({
+            creditAccount: creditAccount,
+            enabledTokensMask: enabledTokensMaskOf(creditAccount),
+            collateralHints: collateralHints,
+            minHealthFactor: minHealthFactor,
+            task: CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY
+        }); // U:[CM-18]
+
+        return collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD; // U:[CM-18]
+    }
+
+    /// @dev Calculates collateral and debt parameters
     function calcDebtAndCollateral(address creditAccount, CollateralCalcTask task)
         external
         view
@@ -604,13 +648,18 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         uint256[] memory collateralHints;
 
+        /// @notice FULL_COLLATERAL_CHECK_LAZY is used for internal calculations only
+        if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) {
+            revert IncorrectParameterException(); // U:[CM-19]
+        }
+
         collateralDebtData = _calcDebtAndCollateral({
             creditAccount: creditAccount,
             enabledTokensMask: enabledTokensMaskOf(creditAccount),
             collateralHints: collateralHints,
             minHealthFactor: PERCENTAGE_FACTOR,
             task: task
-        });
+        }); // U:[CM-20]
     }
 
     function _calcDebtAndCollateral(
@@ -621,47 +670,54 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         CollateralCalcTask task
     ) internal view returns (CollateralDebtData memory collateralDebtData) {
         /// GET GENERIC PARAMS
-        collateralDebtData.debt = creditAccountInfo[creditAccount].debt;
-        collateralDebtData.cumulativeIndexLastUpdate = creditAccountInfo[creditAccount].cumulativeIndexLastUpdate;
-        collateralDebtData.cumulativeIndexNow = _poolCumulativeIndexNow();
+        collateralDebtData.debt = creditAccountInfo[creditAccount].debt; // U:[CM-20]
+        collateralDebtData.cumulativeIndexLastUpdate = creditAccountInfo[creditAccount].cumulativeIndexLastUpdate; // U:[CM-20]
+        collateralDebtData.cumulativeIndexNow = _poolCumulativeIndexNow(); // U:[CM-20]
 
-        if (task == CollateralCalcTask.GENERIC_PARAMS) return collateralDebtData;
+        if (task == CollateralCalcTask.GENERIC_PARAMS) {
+            return collateralDebtData;
+        } // U:[CM-20]
         ///
         /// COMPUTE DEBT PARAMS
-        collateralDebtData.enabledTokensMask = enabledTokensMask;
+        collateralDebtData.enabledTokensMask = enabledTokensMask; // U:[CM-21]
 
         if (supportsQuotas) {
-            collateralDebtData.cumulativeQuotaInterest = creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1;
-            collateralDebtData.quotedTokenMask = quotedTokenMask & collateralDebtData.enabledTokensMask;
-            collateralDebtData._poolQuotaKeeper = poolQuotaKeeper();
+            collateralDebtData._poolQuotaKeeper = poolQuotaKeeper(); // U:[CM-21]
 
             (
                 collateralDebtData.quotedTokens,
                 collateralDebtData.cumulativeQuotaInterest,
                 collateralDebtData.quotas,
                 collateralDebtData.quotedLts,
-                collateralDebtData.quotedTokenMask
-            ) = _getQuotaTokenData({
+                collateralDebtData.enabledQuotedTokenMask
+            ) = _getQuotedTokensData({
                 creditAccount: creditAccount,
                 enabledTokensMask: enabledTokensMask,
                 _poolQuotaKeeper: collateralDebtData._poolQuotaKeeper
-            });
+            }); // U:[CM-21]
+
+            collateralDebtData.cumulativeQuotaInterest += creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1; // U:[CM-21]
         }
 
-        (collateralDebtData.accruedInterest, collateralDebtData.accruedFees) =
-            collateralDebtData.calcAccruedInterestAndFees({feeInterest: feeInterest});
+        collateralDebtData.accruedInterest = CreditLogic.calcAccruedInterest({
+            amount: collateralDebtData.debt,
+            cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
+            cumulativeIndexNow: collateralDebtData.cumulativeIndexNow
+        }) + collateralDebtData.cumulativeQuotaInterest; // U:[CM-21]
 
-        if (task == CollateralCalcTask.DEBT_ONLY) return collateralDebtData;
+        collateralDebtData.accruedFees = (collateralDebtData.accruedInterest * feeInterest) / PERCENTAGE_FACTOR; // U:[CM-21]
+
+        if (task == CollateralCalcTask.DEBT_ONLY) return collateralDebtData; // U:[CM-21]
         ///
         /// COMPUTES COLLATERAL
-        /// If task == FULL_COLLATERAL_CHECK_LAZY, until it finds enough collateral
+        /// If task == FULL_COLLATERAL_CHECK_LAZY, collateral is computed until it less enough
         address _priceOracle = priceOracle;
 
         collateralDebtData.totalDebtUSD = _convertToUSD({
             _priceOracle: _priceOracle,
-            amountInToken: collateralDebtData.calcTotalDebt(), // F: [CM-42]
+            amountInToken: collateralDebtData.calcTotalDebt(),
             token: underlying
-        });
+        }); // U:[CM-22]
 
         uint256 tokensToDisable;
         (collateralDebtData.totalValueUSD, collateralDebtData.twvUSD, tokensToDisable) = collateralDebtData
@@ -674,18 +730,22 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             priceOracle: _priceOracle,
             collateralTokensByMaskFn: _collateralTokensByMask,
             convertToUSDFn: _convertToUSD
-        });
+        }); // U:[CM-22]
 
-        collateralDebtData.enabledTokensMask = enabledTokensMask.disable(tokensToDisable);
+        collateralDebtData.enabledTokensMask = enabledTokensMask.disable(tokensToDisable); // U:[CM-22]
 
-        if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) return collateralDebtData;
+        if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) {
+            return collateralDebtData;
+        }
         //
         // EXTRA PARAMS
         // If there is not fullCoolaralCheck calc, than it adds some useful pararms
 
         collateralDebtData.totalValue = _convertFromUSD(_priceOracle, collateralDebtData.totalValueUSD, underlying); // F:[FA-41]
 
-        if (task == CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS) return collateralDebtData;
+        if (task == CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS) {
+            return collateralDebtData;
+        }
         ///
         /// ADDS WITHDRAWAL VALUE
         if (_hasWithdrawals(creditAccount)) {
@@ -694,6 +754,53 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 creditAccount: creditAccount,
                 isForceCancel: task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
             });
+        }
+    }
+
+    function _getQuotedTokensData(address creditAccount, uint256 enabledTokensMask, address _poolQuotaKeeper)
+        internal
+        view
+        returns (
+            address[] memory quotaTokens,
+            uint256 outstandingQuotaInterest,
+            uint256[] memory quotas,
+            uint16[] memory lts,
+            uint256 quotedMask
+        )
+    {
+        uint256 _maxEnabledTokens = maxEnabledTokens;
+
+        quotedMask = enabledTokensMask & quotedTokenMask;
+
+        if (quotedMask != 0) {
+            quotaTokens = new address[](_maxEnabledTokens);
+            quotas = new uint256[](_maxEnabledTokens);
+            lts = new uint16[](_maxEnabledTokens);
+
+            uint256 j;
+            unchecked {
+                for (uint256 tokenMask = 2; tokenMask <= quotedMask; tokenMask <<= 1) {
+                    if (j == _maxEnabledTokens) {
+                        revert TooManyEnabledTokensException();
+                    }
+
+                    if (quotedMask & tokenMask != 0) {
+                        address token;
+                        (token, lts[j]) = _collateralTokensByMask({tokenMask: tokenMask, calcLT: true});
+
+                        quotaTokens[j] = token;
+
+                        uint256 outstandingInterestDelta;
+                        (quotas[j], outstandingInterestDelta) =
+                            IPoolQuotaKeeper(_poolQuotaKeeper).getQuotaAndOutstandingInterest(creditAccount, token);
+
+                        // Safe because quotaInterest =  (quota is uint96) * APY * time, so even with 1000% APY, it will take 10**10 years for overflow
+                        outstandingQuotaInterest += outstandingInterestDelta;
+
+                        ++j;
+                    }
+                }
+            }
         }
     }
 
@@ -727,8 +834,109 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditAccountInfo[creditAccount].cumulativeQuotaInterest += caInterestChange; // F: [CMQ-3]
     }
 
+    ///
+    /// WITHDRAWALS
+    ///
+
+    /// @inheritdoc ICreditManagerV3
+    function scheduleWithdrawal(address creditAccount, address token, uint256 amount)
+        external
+        override
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // U:[CM-2]
+        returns (uint256 tokensToDisable)
+    {
+        uint256 tokenMask = getTokenMaskOrRevert({token: token});
+
+        if (IWithdrawalManager(withdrawalManager).delay() == 0) {
+            address borrower = getBorrowerOrRevert({creditAccount: creditAccount});
+            _safeTokenTransfer({
+                creditAccount: creditAccount,
+                token: token,
+                to: borrower,
+                amount: amount,
+                convertToETH: false
+            });
+        } else {
+            uint256 delivered =
+                ICreditAccount(creditAccount).transferDeliveredBalanceControl(token, withdrawalManager, amount);
+
+            IWithdrawalManager(withdrawalManager).addScheduledWithdrawal(
+                creditAccount, token, delivered, tokenMask.calcIndex()
+            );
+            // enables withdrawal flag
+            _enableFlag({creditAccount: creditAccount, flag: WITHDRAWAL_FLAG});
+        }
+
+        if (IERC20Helper.balanceOf({token: token, holder: creditAccount}) <= 1) {
+            tokensToDisable = tokenMask;
+        }
+    }
+
+    /// @inheritdoc ICreditManagerV3
+    function claimWithdrawals(address creditAccount, address to, ClaimAction action)
+        external
+        override
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // U:[CM-2]
+        returns (uint256 tokensToEnable)
+    {
+        if (_hasWithdrawals(creditAccount)) {
+            bool hasScheduled;
+
+            (hasScheduled, tokensToEnable) =
+                IWithdrawalManager(withdrawalManager).claimScheduledWithdrawals(creditAccount, to, action);
+            if (!hasScheduled) {
+                // disables withdrawal flag
+                _disableFlag(creditAccount, WITHDRAWAL_FLAG);
+            }
+        }
+    }
+
+    function addCancellableWithdrawalsValue(address _priceOracle, address creditAccount, bool isForceCancel)
+        internal
+        view
+        returns (uint256 totalValueUSD)
+    {
+        (address token1, uint256 amount1, address token2, uint256 amount2) =
+            IWithdrawalManager(withdrawalManager).cancellableScheduledWithdrawals(creditAccount, isForceCancel);
+
+        if (amount1 != 0) {
+            totalValueUSD = _convertToUSD({_priceOracle: _priceOracle, amountInToken: amount1, token: token1});
+        }
+        if (amount2 != 0) {
+            totalValueUSD += _convertToUSD({_priceOracle: _priceOracle, amountInToken: amount2, token: token2});
+        }
+    }
+
+    /// @notice Revokes allowances for specified spender/token pairs
+    /// @param revocations Spender/token pairs to revoke allowances for
+    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations)
+        external
+        override
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // U:[CM-2]
+    {
+        uint256 numRevocations = revocations.length;
+        unchecked {
+            for (uint256 i; i < numRevocations; ++i) {
+                address spender = revocations[i].spender;
+                address token = revocations[i].token;
+
+                if (spender == address(0) || token == address(0)) {
+                    revert ZeroAddressException();
+                }
+                uint256 allowance = IERC20(token).allowance(creditAccount, spender);
+                /// It checks that token is in collateral token list in _approveSpender function
+                if (allowance > 1) {
+                    _approveSpender({creditAccount: creditAccount, token: token, spender: spender, amount: 0});
+                }
+            }
+        }
+    }
+
     //
-    // INTERNAL HELPERS
+    // TRANSFER HELPERS
     //
 
     /// @dev Transfers all enabled assets from a Credit Account to the "to" address
@@ -778,43 +986,19 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             ICreditAccount(creditAccount).transfer({token: token, to: wethGateway, amount: amount}); // F:[CM-45]
             IWETHGateway(wethGateway).depositFor({to: to, amount: amount}); // F:[CM-45]
         } else {
-            try ICreditAccount(creditAccount).safeTransfer({token: token, to: to, amount: amount}) { // F:[CM-45]
+            try ICreditAccount(creditAccount).safeTransfer({token: token, to: to, amount: amount}) {
+                // F:[CM-45]
             } catch {
                 uint256 delivered = ICreditAccount(creditAccount).transferDeliveredBalanceControl({
                     token: token,
                     to: withdrawalManager,
                     amount: amount
                 });
-                /// what `account` is ?
-                IWithdrawalManager(withdrawalManager).addImmediateWithdrawal({
-                    account: to,
-                    token: token,
-                    amount: delivered
-                });
+                IWithdrawalManager(withdrawalManager).addImmediateWithdrawal({token: token, to: to, amount: delivered});
             }
         }
     }
 
-    function _checkEnabledTokenLength(uint256 enabledTokensMask) internal view {
-        if (enabledTokensMask.calcEnabledTokens() > maxEnabledTokens) {
-            revert TooManyEnabledTokensException();
-        }
-    }
-
-    //
-    // POOL HELPERS
-    //
-    function _poolCumulativeIndexNow() internal view returns (uint256) {
-        return IPoolBase(pool).calcLinearCumulative_RAY();
-    }
-
-    function _poolRepayCreditAccount(uint256 debt, uint256 profit, uint256 loss) internal {
-        IPoolBase(pool).repayCreditAccount(debt, profit, loss);
-    }
-
-    function _poolLendCreditAccount(uint256 amount, address creditAccount) internal {
-        IPoolBase(pool).lendCreditAccount(amount, creditAccount); // F:[CM-20]
-    }
     //
     // GETTERS
     //
@@ -871,13 +1055,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
     }
 
-    /// @dev Returns the address of a borrower's Credit Account, or reverts if there is none.
-    /// @param borrower Borrower's address
-    function getBorrowerOrRevert(address creditAccount) public view override returns (address borrower) {
-        borrower = creditAccountInfo[creditAccount].borrower; // F:[CM-48]
-        if (borrower == address(0)) revert CreditAccountNotExistsException(); // F:[CM-48]
-    }
-
     /// @dev Returns the fee parameters of the Credit Manager
     /// @return _feeInterest Percentage of interest taken by the protocol as profit
     /// @return _feeLiquidation Percentage of account value taken by the protocol as profit
@@ -915,6 +1092,75 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     function poolQuotaKeeper() public view returns (address) {
         return IPool4626(pool).poolQuotaKeeper();
+    }
+
+    ///
+    /// CREDIT ACCOUNT INFO
+    ///
+
+    /// @dev Returns the address of a borrower's Credit Account, or reverts if there is none.
+    /// @param borrower Borrower's address
+    function getBorrowerOrRevert(address creditAccount) public view override returns (address borrower) {
+        borrower = creditAccountInfo[creditAccount].borrower; // F:[CM-48]
+        if (borrower == address(0)) revert CreditAccountNotExistsException(); // F:[CM-48]
+    }
+
+    function enabledTokensMaskOf(address creditAccount) public view override returns (uint256) {
+        return creditAccountInfo[creditAccount].enabledTokensMask;
+    }
+
+    function flagsOf(address creditAccount) external view override returns (uint16) {
+        return creditAccountInfo[creditAccount].flags;
+    }
+
+    function setFlagFor(address creditAccount, uint16 flag, bool value)
+        external
+        override
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // U:[CM-2]
+    {
+        if (value) {
+            _enableFlag(creditAccount, flag);
+        } else {
+            _disableFlag(creditAccount, flag);
+        }
+    }
+
+    function _enableFlag(address creditAccount, uint16 flag) internal {
+        creditAccountInfo[creditAccount].flags |= flag;
+    }
+
+    function _disableFlag(address creditAccount, uint16 flag) internal {
+        creditAccountInfo[creditAccount].flags &= ~flag;
+    }
+
+    function _hasWithdrawals(address creditAccount) internal view returns (bool) {
+        return creditAccountInfo[creditAccount].flags & WITHDRAWAL_FLAG != 0;
+    }
+
+    /// @dev Checks quantity of enabled tokens and saves it to creditAccountInfo
+    function _saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) internal {
+        if (enabledTokensMask.calcEnabledTokens() > maxEnabledTokens) {
+            revert TooManyEnabledTokensException();
+        }
+        creditAccountInfo[creditAccount].enabledTokensMask = enabledTokensMask;
+    }
+
+    ///
+    /// FEE TOKEN SUPPORT
+    ///
+
+    function _amountWithFee(uint256 amount) internal view virtual returns (uint256) {
+        return amount;
+    }
+
+    function _amountMinusFee(uint256 amount) internal view virtual returns (uint256) {
+        return amount;
+    }
+
+    // CREDIT ACCOUNTS
+    function creditAccounts() external view returns (address[] memory) {
+        return creditAccountsSet.values();
     }
 
     //
@@ -1087,185 +1333,28 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         emit SetCreditConfigurator(_creditConfigurator); // F:[CM-58]
     }
 
-    /// ----------- ///
-    /// WITHDRAWALS ///
-    /// ----------- ///
-
-    /// @inheritdoc ICreditManagerV3
-    function scheduleWithdrawal(address creditAccount, address token, uint256 amount)
-        external
-        override
-        nonReentrant // U:[CM-5]
-        creditFacadeOnly // U:[CM-2]
-        returns (uint256 tokensToDisable)
-    {
-        uint256 tokenMask = getTokenMaskOrRevert({token: token});
-
-        if (IWithdrawalManager(withdrawalManager).delay() == 0) {
-            address borrower = getBorrowerOrRevert({creditAccount: creditAccount});
-            _safeTokenTransfer({
-                creditAccount: creditAccount,
-                token: token,
-                to: borrower,
-                amount: amount,
-                convertToETH: false
-            });
-        } else {
-            uint256 delivered =
-                ICreditAccount(creditAccount).transferDeliveredBalanceControl(token, withdrawalManager, amount);
-
-            IWithdrawalManager(withdrawalManager).addScheduledWithdrawal(
-                creditAccount, token, delivered, tokenMask.calcIndex()
-            );
-            // enables withdrawal flag
-            _enableFlag({creditAccount: creditAccount, flag: WITHDRAWAL_FLAG});
-        }
-
-        if (IERC20Helper.balanceOf({token: token, holder: creditAccount}) <= 1) {
-            tokensToDisable = tokenMask;
-        }
-    }
-
-    /// @inheritdoc ICreditManagerV3
-    function claimWithdrawals(address creditAccount, address to, ClaimAction action)
-        external
-        override
-        nonReentrant // U:[CM-5]
-        creditFacadeOnly // U:[CM-2]
-        returns (uint256 tokensToEnable)
-    {
-        if (_hasWithdrawals(creditAccount)) {
-            bool hasScheduled;
-
-            (hasScheduled, tokensToEnable) =
-                IWithdrawalManager(withdrawalManager).claimScheduledWithdrawals(creditAccount, to, action);
-            if (!hasScheduled) {
-                // disables withdrawal flag
-                _disableFlag(creditAccount, WITHDRAWAL_FLAG);
-            }
-        }
-    }
-
-    function addCancellableWithdrawalsValue(address _priceOracle, address creditAccount, bool isForceCancel)
-        internal
-        view
-        returns (uint256 totalValueUSD)
-    {
-        (address token1, uint256 amount1, address token2, uint256 amount2) =
-            IWithdrawalManager(withdrawalManager).cancellableScheduledWithdrawals(creditAccount, isForceCancel);
-
-        if (amount1 != 0) {
-            totalValueUSD = _convertToUSD({_priceOracle: _priceOracle, amountInToken: amount1, token: token1});
-        }
-        if (amount2 != 0) {
-            totalValueUSD += _convertToUSD({_priceOracle: _priceOracle, amountInToken: amount2, token: token2});
-        }
-    }
-
-    function _hasWithdrawals(address creditAccount) internal view returns (bool) {
-        return creditAccountInfo[creditAccount].flags & WITHDRAWAL_FLAG != 0;
-    }
-
-    /// @notice Revokes allowances for specified spender/token pairs
-    /// @param revocations Spender/token pairs to revoke allowances for
-    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations)
-        external
-        override
-        nonReentrant // U:[CM-5]
-        creditFacadeOnly // U:[CM-2]
-    {
-        uint256 numRevocations = revocations.length;
-        unchecked {
-            for (uint256 i; i < numRevocations; ++i) {
-                address spender = revocations[i].spender;
-                address token = revocations[i].token;
-
-                if (spender == address(0) || token == address(0)) {
-                    revert ZeroAddressException();
-                }
-                uint256 allowance = IERC20(token).allowance(creditAccount, spender);
-                /// It checks that token is in collateral token list in _approveSpender function
-                if (allowance > 1) {
-                    _approveSpender({creditAccount: creditAccount, token: token, spender: spender, amount: 0});
-                }
-            }
-        }
-    }
-
     ///
-    function setCreditAccountForExternalCall(address creditAccount)
-        external
-        override
-        nonReentrant // U:[CM-5]
-        creditFacadeOnly // U:[CM-2]
-    {
-        _externalCallCreditAccount = creditAccount;
-    }
-
-    function getExternalCallCreditAccountOrRevert() public view override returns (address creditAccount) {
-        creditAccount = _externalCallCreditAccount;
-        if (creditAccount == address(1)) revert ExternalCallCreditAccountNotSetException();
-    }
-
-    function enabledTokensMaskOf(address creditAccount) public view override returns (uint256) {
-        return creditAccountInfo[creditAccount].enabledTokensMask;
-    }
-
-    function flagsOf(address creditAccount) external view override returns (uint16) {
-        return creditAccountInfo[creditAccount].flags;
-    }
-
-    function setFlagFor(address creditAccount, uint16 flag, bool value)
-        external
-        override
-        nonReentrant // U:[CM-5]
-        creditFacadeOnly // U:[CM-2]
-    {
-        if (value) {
-            _enableFlag(creditAccount, flag);
-        } else {
-            _disableFlag(creditAccount, flag);
-        }
-    }
-
-    function _enableFlag(address creditAccount, uint16 flag) internal {
-        creditAccountInfo[creditAccount].flags |= flag;
-    }
-
-    function _disableFlag(address creditAccount, uint16 flag) internal {
-        creditAccountInfo[creditAccount].flags &= ~flag;
-    }
-
-    function _saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) internal {
-        _checkEnabledTokenLength(enabledTokensMask);
-        creditAccountInfo[creditAccount].enabledTokensMask = enabledTokensMask;
-    }
-
-    ///
-    /// FEE TOKEN SUPPORT
+    /// EXTERNAL CALLS HELPERS
     ///
 
-    function _amountWithFee(uint256 amount) internal view virtual returns (uint256) {
-        return amount;
+    //
+    // POOL HELPERS
+    //
+    function _poolCumulativeIndexNow() internal view returns (uint256) {
+        return IPoolBase(pool).calcLinearCumulative_RAY();
     }
 
-    function _amountMinusFee(uint256 amount) internal view virtual returns (uint256) {
-        return amount;
+    function _poolRepayCreditAccount(uint256 debt, uint256 profit, uint256 loss) internal {
+        IPoolBase(pool).repayCreditAccount(debt, profit, loss);
     }
 
-    // CREDIT ACCOUNTS
-    function creditAccounts() external view returns (address[] memory) {
-        return creditAccountsSet.values();
+    function _poolLendCreditAccount(uint256 amount, address creditAccount) internal {
+        IPoolBase(pool).lendCreditAccount(amount, creditAccount); // F:[CM-20]
     }
 
-    function _getQuotaAndOutstandingInterest(address _poolQuotaKeeper, address creditAccount, address token)
-        internal
-        view
-        returns (uint256 quoted, uint256 outstandingInterest)
-    {
-        return IPoolQuotaKeeper(_poolQuotaKeeper).getQuotaAndInterest(creditAccount, token);
-    }
-
+    //
+    // PRICE ORACLE
+    //
     function _convertToUSD(address _priceOracle, uint256 amountInToken, address token)
         internal
         view
@@ -1280,49 +1369,5 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (uint256 amountInToken)
     {
         amountInToken = IPriceOracleV2(_priceOracle).convertFromUSD(amountInUSD, token);
-    }
-
-    function _getQuotaTokenData(address creditAccount, uint256 enabledTokensMask, address _poolQuotaKeeper)
-        internal
-        view
-        returns (
-            address[] memory quotaTokens,
-            uint256 outstandingQuotaInterest,
-            uint256[] memory quotas,
-            uint16[] memory lts,
-            uint256 quotedMask
-        )
-    {
-        uint256 _maxEnabledTokens = maxEnabledTokens;
-
-        quotedMask = enabledTokensMask & quotedTokenMask;
-        quotaTokens = new address[](_maxEnabledTokens);
-        quotas = new uint256[](_maxEnabledTokens);
-        lts = new uint16[](_maxEnabledTokens);
-
-        uint256 j;
-        unchecked {
-            for (uint256 tokenMask = 2; tokenMask <= quotedMask; tokenMask <<= 1) {
-                if (quotedMask & tokenMask != 0) {
-                    address token;
-                    (token, lts[j]) = _collateralTokensByMask(tokenMask, true);
-
-                    quotaTokens[j] = token;
-
-                    uint256 outstandingInterestDelta;
-                    (quotas[j], outstandingInterestDelta) =
-                        _getQuotaAndOutstandingInterest(_poolQuotaKeeper, creditAccount, token);
-
-                    // Safe because quotaInterest =  (quota is uint96) * APY * time, so even with 1000% APY, it will take 10**10 years for overflow
-                    outstandingQuotaInterest += outstandingInterestDelta;
-
-                    ++j;
-
-                    if (j >= _maxEnabledTokens) {
-                        revert TooManyEnabledTokensException();
-                    }
-                }
-            }
-        }
     }
 }
