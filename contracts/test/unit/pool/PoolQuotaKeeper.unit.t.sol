@@ -48,6 +48,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
 
     PoolServiceMock pool;
     address underlying;
+
     CreditManagerMock cmMock;
 
     function setUp() public {
@@ -68,12 +69,10 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
 
         pqk = new PoolQuotaKeeper(address(pool));
 
-        // vm.prank(CONFIGURATOR);
         pool.setPoolQuotaManager(address(pqk));
 
         gaugeMock = new GaugeMock(address(pool));
 
-        // vm.prank(CONFIGURATOR);
         pqk.setGauge(address(gaugeMock));
 
         vm.startPrank(CONFIGURATOR);
@@ -191,35 +190,31 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
         uint16 USDC_QUOTA_RATE = 45_00;
 
         for (uint256 caseIndex; caseIndex < 2; ++caseIndex) {
-            string memory caseName = caseIndex == 1 ? "With totalQuoted" : "Without totalQuotae";
+            caseName = caseIndex == 1 ? "With totalQuoted" : "Without totalQuotae";
 
             setUp();
-            vm.prank(CONFIGURATOR);
+
             gaugeMock.addQuotaToken(DAI, DAI_QUOTA_RATE);
 
-            vm.prank(CONFIGURATOR);
             gaugeMock.addQuotaToken(USDC, USDC_QUOTA_RATE);
 
             int96 daiQuota;
             int96 usdcQuota;
 
             if (caseIndex == 1) {
-                vm.startPrank(CONFIGURATOR);
                 pqk.addCreditManager(address(cmMock));
 
                 pqk.setTokenLimit(DAI, uint96(100_000 * WAD));
                 pqk.setTokenLimit(USDC, uint96(100_000 * WAD));
 
-                cmMock.addToken(DAI, 1);
-                cmMock.addToken(USDC, 2);
-
-                vm.stopPrank();
-
                 daiQuota = int96(uint96(100 * WAD));
                 usdcQuota = int96(uint96(200 * WAD));
 
-                cmMock.updateQuota({_creditAccount: DUMB_ADDRESS, token: DAI, quotaChange: daiQuota});
-                cmMock.updateQuota({_creditAccount: DUMB_ADDRESS, token: USDC, quotaChange: usdcQuota});
+                vm.prank(address(cmMock));
+                pqk.updateQuota({creditAccount: DUMB_ADDRESS, token: DAI, quotaChange: daiQuota});
+
+                vm.prank(address(cmMock));
+                pqk.updateQuota({creditAccount: DUMB_ADDRESS, token: USDC, quotaChange: usdcQuota});
             }
 
             vm.warp(block.timestamp + 365 days);
@@ -243,37 +238,31 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
 
             (uint96 totalQuoted, uint96 limit, uint16 rate, uint192 cumulativeIndexLU_RAY) = pqk.totalQuotaParams(DAI);
 
-            assertEq(rate, DAI_QUOTA_RATE, _testCaseErr(caseName, "Incorrect DAI rate"));
+            assertEq(rate, DAI_QUOTA_RATE, _testCaseErr("Incorrect DAI rate"));
             assertEq(
                 cumulativeIndexLU_RAY,
                 RAY * (PERCENTAGE_FACTOR + DAI_QUOTA_RATE) / PERCENTAGE_FACTOR,
-                _testCaseErr(caseName, "Incorrect DAI cumulativeIndexLU")
+                _testCaseErr("Incorrect DAI cumulativeIndexLU")
             );
 
             (totalQuoted, limit, rate, cumulativeIndexLU_RAY) = pqk.totalQuotaParams(USDC);
 
-            assertEq(rate, USDC_QUOTA_RATE, _testCaseErr(caseName, "Incorrect USDC rate"));
+            assertEq(rate, USDC_QUOTA_RATE, _testCaseErr("Incorrect USDC rate"));
             assertEq(
                 cumulativeIndexLU_RAY,
                 RAY * (PERCENTAGE_FACTOR + USDC_QUOTA_RATE) / PERCENTAGE_FACTOR,
-                _testCaseErr(caseName, "Incorrect USDC cumulativeIndexLU")
+                _testCaseErr("Incorrect USDC cumulativeIndexLU")
             );
 
-            assertEq(
-                pqk.lastQuotaRateUpdate(),
-                block.timestamp,
-                _testCaseErr(caseName, "Incorect lastQuotaRateUpdate timestamp")
-            );
+            assertEq(pqk.lastQuotaRateUpdate(), block.timestamp, _testCaseErr("Incorect lastQuotaRateUpdate timestamp"));
 
-            assertEq(pool.quotaRevenue(), expectedQuotaRevenue, _testCaseErr(caseName, "Incorect expectedQuotaRevenue"));
+            assertEq(pool.quotaRevenue(), expectedQuotaRevenue, _testCaseErr("Incorect expectedQuotaRevenue"));
         }
     }
 
     // U:[PQK-8]: setGauge works as expected
     function test_U_PQK_08_setGauge_works_as_expected() public {
         pqk = new PoolQuotaKeeper(address(pool));
-
-        vm.startPrank(CONFIGURATOR);
 
         assertEq(pqk.gauge(), address(0), "SETUP: incorrect address at start");
 
@@ -294,14 +283,10 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
         // IF address the same, the function updates nothing
         pqk.setGauge(address(gaugeMock));
         assertEq(pqk.lastQuotaRateUpdate(), gaugeUpdateTimestamp, "lastQuotaRateUpdate was unexpectedly updated");
-
-        vm.stopPrank();
     }
 
     // U:[PQK-9]: addCreditManager works as expected
     function test_U_PQK_09_addCreditManager_reverts_for_non_cm_contract() public {
-        vm.prank(CONFIGURATOR);
-
         vm.expectRevert(RegisteredCreditManagerOnlyException.selector);
         pqk.addCreditManager(DUMB_ADDRESS);
 
@@ -309,7 +294,6 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
 
         vm.expectRevert(IncompatibleCreditManagerException.selector);
 
-        vm.prank(CONFIGURATOR);
         pqk.addCreditManager(address(cmMock));
     }
 
@@ -324,7 +308,6 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
         vm.expectEmit(true, true, false, false);
         emit AddCreditManager(address(cmMock));
 
-        vm.prank(CONFIGURATOR);
         pqk.addCreditManager(address(cmMock));
 
         managers = pqk.creditManagers();
@@ -332,7 +315,6 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
         assertEq(managers[0], address(cmMock), "Incorrect address was added to creditManagerSet");
 
         // check that funciton works correctly for another one step
-        vm.prank(CONFIGURATOR);
         pqk.addCreditManager(address(cmMock));
 
         managers = pqk.creditManagers();
@@ -343,8 +325,6 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
     // U:[PQK-11]: setTokenLimit reverts for unregistered token
     function test_U_PQK_11_reverts_for_unregistered_token() public {
         vm.expectRevert(TokenIsNotQuotedException.selector);
-        vm.prank(CONFIGURATOR);
-
         pqk.setTokenLimit(DUMB_ADDRESS, 1);
     }
 
@@ -352,10 +332,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
     function test_U_PQK_12_setTokenLimit_works_as_expected() public {
         uint96 limit = 435_223_999;
 
-        vm.prank(CONFIGURATOR);
         gaugeMock.addQuotaToken(DUMB_ADDRESS, 11);
-
-        vm.prank(CONFIGURATOR);
 
         vm.expectEmit(true, true, false, true);
         emit SetTokenLimit(DUMB_ADDRESS, limit);
@@ -367,17 +344,15 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
         assertEq(limitSet, limit, "Incorrect limit was set");
     }
 
-    // U:[PQK-13]: updateQuotas reverts for unregistered token
+    // U:[PQK-13]: updateQuota reverts for unregistered token
     function test_U_PQK_13_updateQuotas_reverts_for_unregistered_token() public {
-        vm.prank(CONFIGURATOR);
         pqk.addCreditManager(address(cmMock));
 
+        address link = tokenTestSuite.addressOf(Tokens.LINK);
         vm.expectRevert(TokenIsNotQuotedException.selector);
-        cmMock.updateQuota({
-            _creditAccount: DUMB_ADDRESS,
-            token: tokenTestSuite.addressOf(Tokens.LINK),
-            quotaChange: int96(uint96(100 * WAD))
-        });
+
+        vm.prank(address(cmMock));
+        pqk.updateQuota({creditAccount: DUMB_ADDRESS, token: link, quotaChange: int96(uint96(100 * WAD))});
     }
 
     struct QuotaTest {
