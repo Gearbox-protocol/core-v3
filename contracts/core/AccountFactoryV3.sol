@@ -19,12 +19,20 @@ import {
 import {ACLTrait} from "../traits/ACLTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
+/// @dev Struct storing per-CreditManager data on account usage queue
 struct FactoryParams {
+    /// @dev Address of the contract being cloned to create new Credit Accounts
     address masterCreditAccount;
+    /// @dev Id of the next reused Credit Account in the used account queue, i.e.
+    ///      the front of the reused CA queue
     uint40 head;
+    /// @dev Id of the last returned Credit Account in the used account queue, i.e.
+    ///      the back of the reused CA queue
     uint40 tail;
 }
 
+/// @dev Struct compressing the credit account address and the
+///      timestamp at which it is reusable
 struct QueuedAccount {
     address creditAccount;
     uint40 reusableAfter;
@@ -63,6 +71,11 @@ contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait
             revert CallerNotCreditManagerException(); // U:[AF-1]
         }
 
+        ///  A used Credit Account is only given to a user if sufficiently long
+        ///  time has passed since it was last taken out.
+        ///  This is done to prevent a user from intentionally reopening an account
+        ///  that they closed shortly prior, as this can potentially be used as an element
+        ///  in an attack.
         uint256 head = fp.head;
         if (head == fp.tail || block.timestamp < _queuedAccounts[msg.sender][head].reusableAfter) {
             creditAccount = Clones.clone(masterCreditAccount); // U:[AF-2A]

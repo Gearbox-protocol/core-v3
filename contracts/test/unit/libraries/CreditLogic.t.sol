@@ -122,7 +122,7 @@ contract CreditLogicTest is TestHelper {
     }
 
     /// @notice U:[CL-1]: `calcIndex` reverts for zero value
-    function test_CL_01_calcAccruedInterest_computes_interest_with_small_error(
+    function test_U_CL_01_calcAccruedInterest_computes_interest_with_small_error(
         uint256 debt,
         uint256 cumulativeIndexAtOpen,
         uint256 borrowRate,
@@ -149,7 +149,7 @@ contract CreditLogicTest is TestHelper {
     }
 
     /// @notice U:[CL-2]: `calcIncrease` outputs new interest that is old interest with at most a small error
-    function test_CL_02_calcIncrease_preserves_interest(
+    function test_U_CL_02_calcIncrease_preserves_interest(
         uint256 debt,
         uint256 indexNow,
         uint256 indexAtOpen,
@@ -183,7 +183,7 @@ contract CreditLogicTest is TestHelper {
     }
 
     /// @notice U:[CL-3A]: `calcDecrease` outputs newTotalDebt that is different by delta with at most a small error
-    function test_CL_03A_calcDecrease_outputs_correct_new_total_debt(
+    function test_U_CL_03A_calcDecrease_outputs_correct_new_total_debt(
         uint256 debt,
         uint256 indexNow,
         uint256 indexAtOpen,
@@ -191,17 +191,19 @@ contract CreditLogicTest is TestHelper {
         uint256 quotaInterest,
         uint16 feeInterest
     ) public {
-        vm.assume(debt > WAD);
-        vm.assume(debt < 2 ** 128 - 1);
-        vm.assume(delta < 2 ** 128 - 1);
-        vm.assume(quotaInterest < 2 ** 128 - 1);
+        debt = WAD + debt % (2 ** 128 - WAD - 1);
+        delta = delta % (2 ** 128 - 1);
+        quotaInterest = quotaInterest % (2 ** 128 - 1);
+
         vm.assume(debt + delta <= 2 ** 128 - 1);
-        vm.assume(feeInterest <= PERCENTAGE_FACTOR);
+
+        feeInterest %= PERCENTAGE_FACTOR + 1;
 
         indexNow = indexNow < RAY ? indexNow + RAY : indexNow;
         indexAtOpen = indexAtOpen < RAY ? indexAtOpen + RAY : indexAtOpen;
 
-        vm.assume(indexNow <= 100 * RAY);
+        indexNow %= 100 * RAY + 1;
+
         vm.assume(indexNow >= indexAtOpen);
         vm.assume(indexNow - indexAtOpen < 10 * RAY);
 
@@ -227,7 +229,7 @@ contract CreditLogicTest is TestHelper {
     }
 
     /// @notice U:[CL-3B]: `calcDecrease` correctly outputs amountToRepay and profit
-    function test_CL_03B_calcDecrease_outputs_correct_amountToRepay_profit(
+    function test_U_CL_03B_calcDecrease_outputs_correct_amountToRepay_profit(
         uint256 debt,
         uint256 indexNow,
         uint256 indexAtOpen,
@@ -235,17 +237,19 @@ contract CreditLogicTest is TestHelper {
         uint256 quotaInterest,
         uint16 feeInterest
     ) public {
-        vm.assume(debt > WAD);
-        vm.assume(debt < 2 ** 128 - 1);
-        vm.assume(delta < 2 ** 128 - 1);
-        vm.assume(quotaInterest < 2 ** 128 - 1);
+        debt = WAD + debt % (2 ** 128 - WAD - 1);
+        delta = delta % (2 ** 128 - 1);
+        quotaInterest = quotaInterest % (2 ** 128 - 1);
+
         vm.assume(debt + delta <= 2 ** 128 - 1);
-        vm.assume(feeInterest <= PERCENTAGE_FACTOR);
+
+        feeInterest %= PERCENTAGE_FACTOR + 1;
 
         indexNow = indexNow < RAY ? indexNow + RAY : indexNow;
         indexAtOpen = indexAtOpen < RAY ? indexAtOpen + RAY : indexAtOpen;
 
-        vm.assume(indexNow <= 100 * RAY);
+        indexNow %= 100 * RAY + 1;
+
         vm.assume(indexNow >= indexAtOpen);
         vm.assume(indexNow - indexAtOpen < 10 * RAY);
 
@@ -286,7 +290,7 @@ contract CreditLogicTest is TestHelper {
     }
 
     /// @notice U:[CL-4]: `calcLiquidationPayments` gives expected outputs
-    function test_CL_04_calcLiquidationPayments_case_test() public {
+    function test_U_CL_04_calcLiquidationPayments_case_test() public {
         /// FEE INTEREST: 50%
         /// NORMAL LIQUIDATION PREMIUM: 4%
         /// NORMAL LIQUIDATION FEE: 1.5%
@@ -459,7 +463,7 @@ contract CreditLogicTest is TestHelper {
     }
 
     /// @notice U:[CL-5]: `calcLiquidationThreshold` gives expected outputs
-    function test_CL_05_getLiquidationThreshold_case_test() public {
+    function test_U_CL_05_getLiquidationThreshold_case_test() public {
         LiquidationThresholdTestCase[6] memory cases = [
             LiquidationThresholdTestCase({
                 name: "LIQUIDATION THRESHOLD RAMP IN THE FUTURE",

@@ -145,6 +145,9 @@ library QuotasLogic {
     {
         uint96 quoted = accountQuota.quota;
 
+        // Unlike general quota updates, quota removals do not update accountQuota.cumulativeIndexLU to save gas
+        // This is safe, since the quota is set to 1 and the index will be updated to the correct value on next change from
+        // zero to non-zero, without breaking any interest calculations
         if (quoted > 1) {
             quoted--;
 
