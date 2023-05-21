@@ -69,9 +69,7 @@ contract PoolDeployer is Test {
         gp.acl().claimOwnership();
 
         addressProvider = gp.addressProvider();
-        af = AccountFactory(
-            addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, accountFactoryVersion == 1 ? 1 : 3_00)
-        );
+        af = AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL));
 
         priceOracle = IPriceOracleV2Ext(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 2));
 
