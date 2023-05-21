@@ -45,7 +45,7 @@ import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";
 import {CreditManagerTestSuite} from "../../suites/CreditManagerTestSuite.sol";
-import {CreditManagerTestInternal} from "../../mocks/credit/CreditManagerTestInternal.sol";
+import {CreditManagerV3Harness} from "../../unit/credit/CreditManagerV3Harness.sol";
 
 import {CreditConfig} from "../../config/CreditConfig.sol";
 
@@ -465,7 +465,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         //     enabledTokensMap |= creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.WETH));
         // }
 
-        // CreditManagerTestInternal(address(creditManager)).setenabledTokensMask(creditAccount, enabledTokensMap);
+        // CreditManagerV3Harness(address(creditManager)).setenabledTokensMask(creditAccount, enabledTokensMap);
 
         // tokenTestSuite.mint(Tokens.WETH, creditAccount, wethBalance);
         // tokenTestSuite.mint(Tokens.USDC, creditAccount, usdcBalance);
@@ -605,7 +605,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         // uint256 enabledTokensMap = tokensToEnable | UNDERLYING_TOKEN_MASK;
 
-        // CreditManagerTestInternal(address(creditManager)).setenabledTokensMask(creditAccount, enabledTokensMap);
+        // CreditManagerV3Harness(address(creditManager)).setenabledTokensMask(creditAccount, enabledTokensMap);
 
         // vm.warp(block.timestamp + 60 * 60 * 24 * 365);
 

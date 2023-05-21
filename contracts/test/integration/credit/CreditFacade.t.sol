@@ -183,14 +183,14 @@ contract CreditFacadeIntegrationTest is
 
     // TODO: ideas how to revert with ZA?
 
-    // /// @dev [FA-1]: constructor reverts for zero address
-    // function test_FA_01_constructor_reverts_for_zero_address() public {
+    // /// @dev I:[FA-1]: constructor reverts for zero address
+    // function test_I_FA_01_constructor_reverts_for_zero_address() public {
     //     vm.expectRevert(ZeroAddressException.selector);
     //     new CreditFacadeV3(address(0), address(0), address(0), false);
     // }
 
-    /// @dev [FA-1A]: constructor sets correct values
-    function test_FA_01A_constructor_sets_correct_values() public {
+    /// @dev I:[FA-1A]: constructor sets correct values
+    function test_I_FA_01A_constructor_sets_correct_values() public {
         assertEq(address(creditFacade.creditManager()), address(creditManager), "Incorrect creditManager");
         // assertEq(creditFacade.underlying(), underlying, "Incorrect underlying token");
 
@@ -218,8 +218,8 @@ contract CreditFacadeIntegrationTest is
     // ALL FUNCTIONS REVERTS IF USER HAS NO ACCOUNT
     //
 
-    /// @dev [FA-2]: functions reverts if borrower has no account
-    function test_FA_02_functions_reverts_if_borrower_has_no_account() public {
+    /// @dev I:[FA-2]: functions reverts if borrower has no account
+    function test_I_FA_02_functions_reverts_if_borrower_has_no_account() public {
         vm.expectRevert(CreditAccountNotExistsException.selector);
         vm.prank(USER);
         creditFacade.closeCreditAccount(DUMB_ADDRESS, FRIEND, 0, false, multicallBuilder());
@@ -266,7 +266,7 @@ contract CreditFacadeIntegrationTest is
     //
     // ETH => WETH TESTS
     //
-    function test_FA_03B_openCreditAccountMulticall_correctly_wraps_ETH() public {
+    function test_I_FA_03B_openCreditAccountMulticall_correctly_wraps_ETH() public {
         /// - openCreditAccount
 
         _prepareForWETHTest();
@@ -286,7 +286,7 @@ contract CreditFacadeIntegrationTest is
         _checkForWETHTest();
     }
 
-    function test_FA_03C_closeCreditAccount_correctly_wraps_ETH() public {
+    function test_I_FA_03C_closeCreditAccount_correctly_wraps_ETH() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         vm.roll(block.number + 1);
@@ -297,7 +297,7 @@ contract CreditFacadeIntegrationTest is
         _checkForWETHTest();
     }
 
-    function test_FA_03D_liquidate_correctly_wraps_ETH() public {
+    function test_I_FA_03D_liquidate_correctly_wraps_ETH() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         vm.roll(block.number + 1);
@@ -317,7 +317,7 @@ contract CreditFacadeIntegrationTest is
         _checkForWETHTest(LIQUIDATOR);
     }
 
-    function test_FA_03F_multicall_correctly_wraps_ETH() public {
+    function test_I_FA_03F_multicall_correctly_wraps_ETH() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         // MULTICALL
@@ -340,8 +340,8 @@ contract CreditFacadeIntegrationTest is
     // OPEN CREDIT ACCOUNT
     //
 
-    /// @dev [FA-4A]: openCreditAccount reverts for using addresses which is not allowed by transfer allowance
-    function test_FA_04A_openCreditAccount_reverts_for_using_addresses_which_is_not_allowed_by_transfer_allowance()
+    /// @dev I:[FA-4A]: openCreditAccount reverts for using addresses which is not allowed by transfer allowance
+    function test_I_FA_04A_openCreditAccount_reverts_for_using_addresses_which_is_not_allowed_by_transfer_allowance()
         public
     {
         (uint256 minBorrowedAmount,) = creditFacade.debtLimits();
@@ -360,8 +360,8 @@ contract CreditFacadeIntegrationTest is
         vm.stopPrank();
     }
 
-    /// @dev [FA-4B]: openCreditAccount reverts if user has no NFT for degen mode
-    function test_FA_04B_openCreditAccount_reverts_for_non_whitelisted_account() public {
+    /// @dev I:[FA-4B]: openCreditAccount reverts if user has no NFT for degen mode
+    function test_I_FA_04B_openCreditAccount_reverts_for_non_whitelisted_account() public {
         _setUp({
             _underlying: Tokens.DAI,
             withDegenNFT: true,
@@ -388,8 +388,8 @@ contract CreditFacadeIntegrationTest is
         );
     }
 
-    /// @dev [FA-4C]: openCreditAccount opens account and burns token
-    function test_FA_04C_openCreditAccount_burns_token_in_whitelisted_mode() public {
+    /// @dev I:[FA-4C]: openCreditAccount opens account and burns token
+    function test_I_FA_04C_openCreditAccount_burns_token_in_whitelisted_mode() public {
         _setUp({
             _underlying: Tokens.DAI,
             withDegenNFT: true,
@@ -429,8 +429,8 @@ contract CreditFacadeIntegrationTest is
         expectBalance(address(degenNFT), USER, 0);
     }
 
-    // /// @dev [FA-5]: openCreditAccount sets correct values
-    // function test_FA_05_openCreditAccount_sets_correct_values() public {
+    // /// @dev I:[FA-5]: openCreditAccount sets correct values
+    // function test_I_FA_05_openCreditAccount_sets_correct_values() public {
     //     uint16 LEVERAGE = 300; // x3
 
     //     address expectedCreditAccountAddress = accountFactory.head();
@@ -468,8 +468,8 @@ contract CreditFacadeIntegrationTest is
     //     creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, FRIEND, LEVERAGE, REFERRAL_CODE);
     // }
 
-    /// @dev [FA-7]: openCreditAccount and openCreditAccount reverts when debt increase is forbidden
-    function test_FA_07_openCreditAccountMulticall_reverts_if_borrowing_forbidden() public {
+    /// @dev I:[FA-7]: openCreditAccount and openCreditAccount reverts when debt increase is forbidden
+    function test_I_FA_07_openCreditAccountMulticall_reverts_if_borrowing_forbidden() public {
         (uint256 minBorrowedAmount,) = creditFacade.debtLimits();
 
         vm.prank(CONFIGURATOR);
@@ -487,8 +487,8 @@ contract CreditFacadeIntegrationTest is
         creditFacade.openCreditAccount(minBorrowedAmount, USER, calls, 0);
     }
 
-    /// @dev [FA-8]: openCreditAccount runs operations in correct order
-    function test_FA_08_openCreditAccountMulticall_runs_operations_in_correct_order() public {
+    /// @dev I:[FA-8]: openCreditAccount runs operations in correct order
+    function test_I_FA_08_openCreditAccountMulticall_runs_operations_in_correct_order() public {
         vm.prank(FRIEND);
         creditFacade.approveAccountTransfer(USER, true);
 
@@ -554,8 +554,8 @@ contract CreditFacadeIntegrationTest is
         creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, FRIEND, calls, REFERRAL_CODE);
     }
 
-    /// @dev [FA-9]: openCreditAccount cant open credit account with hf <1;
-    function test_FA_09_openCreditAccountMulticall_cant_open_credit_account_with_hf_less_one(
+    /// @dev I:[FA-9]: openCreditAccount cant open credit account with hf <1;
+    function test_I_FA_09_openCreditAccountMulticall_cant_open_credit_account_with_hf_less_one(
         uint256 amount,
         uint8 token1
     ) public {
@@ -606,8 +606,8 @@ contract CreditFacadeIntegrationTest is
         );
     }
 
-    /// @dev [FA-10]: decrease debt during openCreditAccount
-    function test_FA_10_decrease_debt_forbidden_during_openCreditAccount() public {
+    /// @dev I:[FA-10]: decrease debt during openCreditAccount
+    function test_I_FA_10_decrease_debt_forbidden_during_openCreditAccount() public {
         vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, DECREASE_DEBT_PERMISSION));
 
         vm.prank(USER);
@@ -625,8 +625,8 @@ contract CreditFacadeIntegrationTest is
         );
     }
 
-    /// @dev [FA-11A]: openCreditAccount reverts if met borrowed limit per block
-    function test_FA_11A_openCreditAccount_reverts_if_met_borrowed_limit_per_block() public {
+    /// @dev I:[FA-11A]: openCreditAccount reverts if met borrowed limit per block
+    function test_I_FA_11A_openCreditAccount_reverts_if_met_borrowed_limit_per_block() public {
         (uint128 _minDebt, uint128 _maxDebt) = creditFacade.debtLimits();
 
         tokenTestSuite.mint(Tokens.DAI, address(cft.poolMock()), _maxDebt * 2);
@@ -658,8 +658,8 @@ contract CreditFacadeIntegrationTest is
         creditFacade.openCreditAccount(_minDebt + 1, USER, calls, 0);
     }
 
-    /// @dev [FA-11B]: openCreditAccount reverts if amount < minAmount or amount > maxAmount
-    function test_FA_11B_openCreditAccount_reverts_if_amount_less_minBorrowedAmount_or_bigger_than_maxBorrowedAmount()
+    /// @dev I:[FA-11B]: openCreditAccount reverts if amount < minAmount or amount > maxAmount
+    function test_I_FA_11B_openCreditAccount_reverts_if_amount_less_minBorrowedAmount_or_bigger_than_maxBorrowedAmount()
         public
     {
         (uint128 minBorrowedAmount, uint128 maxBorrowedAmount) = creditFacade.debtLimits();
@@ -684,8 +684,8 @@ contract CreditFacadeIntegrationTest is
     // CLOSE CREDIT ACCOUNT
     //
 
-    /// @dev [FA-12]: closeCreditAccount runs multicall operations in correct order
-    function test_FA_12_closeCreditAccount_runs_operations_in_correct_order() public {
+    /// @dev I:[FA-12]: closeCreditAccount runs multicall operations in correct order
+    function test_I_FA_12_closeCreditAccount_runs_operations_in_correct_order() public {
         (address creditAccount, uint256 balance) = _openTestCreditAccount();
 
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
@@ -735,8 +735,8 @@ contract CreditFacadeIntegrationTest is
         assertEq0(targetMock.callData(), DUMB_CALLDATA, "Incorrect calldata");
     }
 
-    /// @dev [FA-13]: closeCreditAccount reverts on internal calls in multicall
-    function test_FA_13_closeCreditAccount_reverts_on_internal_call_in_multicall_on_closure() public {
+    /// @dev I:[FA-13]: closeCreditAccount reverts on internal calls in multicall
+    function test_I_FA_13_closeCreditAccount_reverts_on_internal_call_in_multicall_on_closure() public {
         /// TODO: CHANGE TEST
         // bytes memory DUMB_CALLDATA = abi.encodeWithSignature("hello(string)", "world");
 
@@ -758,8 +758,8 @@ contract CreditFacadeIntegrationTest is
     // LIQUIDATE CREDIT ACCOUNT
     //
 
-    /// @dev [FA-14]: liquidateCreditAccount reverts if hf > 1
-    function test_FA_14_liquidateCreditAccount_reverts_if_hf_is_greater_than_1() public {
+    /// @dev I:[FA-14]: liquidateCreditAccount reverts if hf > 1
+    function test_I_FA_14_liquidateCreditAccount_reverts_if_hf_is_greater_than_1() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         vm.expectRevert(CreditAccountNotLiquidatableException.selector);
@@ -768,8 +768,8 @@ contract CreditFacadeIntegrationTest is
         creditFacade.liquidateCreditAccount(creditAccount, LIQUIDATOR, 0, true, multicallBuilder());
     }
 
-    /// @dev [FA-15]: liquidateCreditAccount executes needed calls and emits events
-    function test_FA_15_liquidateCreditAccount_executes_needed_calls_and_emits_events() public {
+    /// @dev I:[FA-15]: liquidateCreditAccount executes needed calls and emits events
+    function test_I_FA_15_liquidateCreditAccount_executes_needed_calls_and_emits_events() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
@@ -832,8 +832,8 @@ contract CreditFacadeIntegrationTest is
         creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 10, true, calls);
     }
 
-    /// @dev [FA-15A]: Borrowing is prohibited after a liquidation with loss
-    function test_FA_15A_liquidateCreditAccount_prohibits_borrowing_on_loss() public {
+    /// @dev I:[FA-15A]: Borrowing is prohibited after a liquidation with loss
+    function test_I_FA_15A_liquidateCreditAccount_prohibits_borrowing_on_loss() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         uint8 maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
@@ -856,8 +856,8 @@ contract CreditFacadeIntegrationTest is
         assertEq(maxDebtPerBlockMultiplier, 0, "Increase debt wasn't forbidden after loss");
     }
 
-    /// @dev [FA-15B]: CreditFacade is paused after too much cumulative loss from liquidations
-    function test_FA_15B_liquidateCreditAccount_pauses_CreditFacade_on_too_much_loss() public {
+    /// @dev I:[FA-15B]: CreditFacade is paused after too much cumulative loss from liquidations
+    function test_I_FA_15B_liquidateCreditAccount_pauses_CreditFacade_on_too_much_loss() public {
         vm.prank(CONFIGURATOR);
         creditConfigurator.setMaxCumulativeLoss(1);
 
@@ -877,7 +877,7 @@ contract CreditFacadeIntegrationTest is
         assertTrue(creditFacade.paused(), "Credit manager was not paused");
     }
 
-    function test_FA_16_liquidateCreditAccount_reverts_on_internal_call_in_multicall_on_closure() public {
+    function test_I_FA_16_liquidateCreditAccount_reverts_on_internal_call_in_multicall_on_closure() public {
         /// TODO: Add all cases with different permissions!
 
         MultiCall[] memory calls = multicallBuilder(
@@ -898,8 +898,8 @@ contract CreditFacadeIntegrationTest is
         creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 10, true, calls);
     }
 
-    // [FA-16A]: liquidateCreditAccount reverts when zero address is passed as to
-    function test_FA_16A_liquidateCreditAccount_reverts_on_zero_to_address() public {
+    // I:[FA-16A]: liquidateCreditAccount reverts when zero address is passed as to
+    function test_I_FA_16A_liquidateCreditAccount_reverts_on_zero_to_address() public {
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
 
         MultiCall[] memory calls = multicallBuilder(
@@ -920,8 +920,8 @@ contract CreditFacadeIntegrationTest is
     // INCREASE & DECREASE DEBT
     //
 
-    /// @dev [FA-17]: increaseDebt executes function as expected
-    function test_FA_17_increaseDebt_executes_actions_as_expected() public {
+    /// @dev I:[FA-17]: increaseDebt executes function as expected
+    function test_I_FA_17_increaseDebt_executes_actions_as_expected() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         vm.expectCall(
@@ -951,8 +951,8 @@ contract CreditFacadeIntegrationTest is
         );
     }
 
-    /// @dev [FA-18A]: increaseDebt revets if more than block limit
-    function test_FA_18A_increaseDebt_revets_if_more_than_block_limit() public {
+    /// @dev I:[FA-18A]: increaseDebt revets if more than block limit
+    function test_I_FA_18A_increaseDebt_revets_if_more_than_block_limit() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         uint8 maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
@@ -972,8 +972,8 @@ contract CreditFacadeIntegrationTest is
         );
     }
 
-    /// @dev [FA-18B]: increaseDebt revets if more than maxBorrowedAmount
-    function test_FA_18B_increaseDebt_revets_if_more_than_block_limit() public {
+    /// @dev I:[FA-18B]: increaseDebt revets if more than maxBorrowedAmount
+    function test_I_FA_18B_increaseDebt_revets_if_more_than_block_limit() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         (, uint128 maxBorrowedAmount) = creditFacade.debtLimits();
@@ -996,8 +996,8 @@ contract CreditFacadeIntegrationTest is
         );
     }
 
-    /// @dev [FA-18C]: increaseDebt revets isIncreaseDebtForbidden is enabled
-    function test_FA_18C_increaseDebt_revets_isIncreaseDebtForbidden_is_enabled() public {
+    /// @dev I:[FA-18C]: increaseDebt revets isIncreaseDebtForbidden is enabled
+    function test_I_FA_18C_increaseDebt_revets_isIncreaseDebtForbidden_is_enabled() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         vm.prank(CONFIGURATOR);
@@ -1017,8 +1017,8 @@ contract CreditFacadeIntegrationTest is
         );
     }
 
-    /// @dev [FA-18D]: increaseDebt reverts if there is a forbidden token on account
-    function test_FA_18D_increaseDebt_reverts_with_forbidden_tokens() public {
+    /// @dev I:[FA-18D]: increaseDebt reverts if there is a forbidden token on account
+    function test_I_FA_18D_increaseDebt_reverts_with_forbidden_tokens() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         address link = tokenTestSuite.addressOf(Tokens.LINK);
@@ -1051,8 +1051,8 @@ contract CreditFacadeIntegrationTest is
         );
     }
 
-    /// @dev [FA-19]: decreaseDebt executes function as expected
-    function test_FA_19_decreaseDebt_executes_actions_as_expected() public {
+    /// @dev I:[FA-19]: decreaseDebt executes function as expected
+    function test_I_FA_19_decreaseDebt_executes_actions_as_expected() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         vm.expectCall(
@@ -1082,8 +1082,8 @@ contract CreditFacadeIntegrationTest is
         );
     }
 
-    /// @dev [FA-20]:decreaseDebt revets if less than minBorrowedAmount
-    function test_FA_20_decreaseDebt_revets_if_less_than_minBorrowedAmount() public {
+    /// @dev I:[FA-20]:decreaseDebt revets if less than minBorrowedAmount
+    function test_I_FA_20_decreaseDebt_revets_if_less_than_minBorrowedAmount() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         (uint128 minBorrowedAmount,) = creditFacade.debtLimits();
@@ -1110,8 +1110,8 @@ contract CreditFacadeIntegrationTest is
     // ADD COLLATERAL
     //
 
-    /// @dev [FA-21]: addCollateral executes function as expected
-    function test_FA_21_addCollateral_executes_actions_as_expected() public {
+    /// @dev I:[FA-21]: addCollateral executes function as expected
+    function test_I_FA_21_addCollateral_executes_actions_as_expected() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
@@ -1145,8 +1145,8 @@ contract CreditFacadeIntegrationTest is
         expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
     }
 
-    /// @dev [FA-21C]: addCollateral calls checkEnabledTokensLength
-    function test_FA_21C_addCollateral_optimizes_enabled_tokens() public {
+    /// @dev I:[FA-21C]: addCollateral calls checkEnabledTokensLength
+    function test_I_FA_21C_addCollateral_optimizes_enabled_tokens() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         vm.prank(USER);
@@ -1170,8 +1170,8 @@ contract CreditFacadeIntegrationTest is
     // MULTICALL
     //
 
-    /// @dev [FA-22]: multicall reverts if calldata length is less than 4 bytes
-    function test_FA_22_multicall_reverts_if_calldata_length_is_less_than_4_bytes() public {
+    /// @dev I:[FA-22]: multicall reverts if calldata length is less than 4 bytes
+    function test_I_FA_22_multicall_reverts_if_calldata_length_is_less_than_4_bytes() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         vm.expectRevert(IncorrectCallDataException.selector);
@@ -1182,8 +1182,8 @@ contract CreditFacadeIntegrationTest is
         );
     }
 
-    /// @dev [FA-23]: multicall reverts for unknown methods
-    function test_FA_23_multicall_reverts_for_unknown_methods() public {
+    /// @dev I:[FA-23]: multicall reverts for unknown methods
+    function test_I_FA_23_multicall_reverts_for_unknown_methods() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         bytes memory DUMB_CALLDATA = abi.encodeWithSignature("hello(string)", "world");
@@ -1196,8 +1196,8 @@ contract CreditFacadeIntegrationTest is
         );
     }
 
-    /// @dev [FA-24]: multicall reverts for creditManager address
-    function test_FA_24_multicall_reverts_for_creditManager_address() public {
+    /// @dev I:[FA-24]: multicall reverts for creditManager address
+    function test_I_FA_24_multicall_reverts_for_creditManager_address() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         bytes memory DUMB_CALLDATA = abi.encodeWithSignature("hello(string)", "world");
@@ -1210,8 +1210,8 @@ contract CreditFacadeIntegrationTest is
         );
     }
 
-    /// @dev [FA-25]: multicall reverts on non-adapter targets
-    function test_FA_25_multicall_reverts_for_non_adapters() public {
+    /// @dev I:[FA-25]: multicall reverts on non-adapter targets
+    function test_I_FA_25_multicall_reverts_for_non_adapters() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         bytes memory DUMB_CALLDATA = abi.encodeWithSignature("hello(string)", "world");
@@ -1223,8 +1223,10 @@ contract CreditFacadeIntegrationTest is
         );
     }
 
-    /// @dev [FA-26]: multicall addCollateral and oncreaseDebt works with creditFacade calls as expected
-    function test_FA_26_multicall_addCollateral_and_increase_debt_works_with_creditFacade_calls_as_expected() public {
+    /// @dev I:[FA-26]: multicall addCollateral and oncreaseDebt works with creditFacade calls as expected
+    function test_I_FA_26_multicall_addCollateral_and_increase_debt_works_with_creditFacade_calls_as_expected()
+        public
+    {
         (address creditAccount,) = _openTestCreditAccount();
 
         address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
@@ -1280,8 +1282,8 @@ contract CreditFacadeIntegrationTest is
         );
     }
 
-    /// @dev [FA-27]: multicall addCollateral and decreaseDebt works with creditFacade calls as expected
-    function test_FA_27_multicall_addCollateral_and_decreaseDebt_works_with_creditFacade_calls_as_expected() public {
+    /// @dev I:[FA-27]: multicall addCollateral and decreaseDebt works with creditFacade calls as expected
+    function test_I_FA_27_multicall_addCollateral_and_decreaseDebt_works_with_creditFacade_calls_as_expected() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
@@ -1337,8 +1339,8 @@ contract CreditFacadeIntegrationTest is
         );
     }
 
-    /// @dev [FA-28]: multicall reverts for decrease opeartion after increase one
-    function test_FA_28_multicall_reverts_for_decrease_opeartion_after_increase_one() public {
+    /// @dev I:[FA-28]: multicall reverts for decrease opeartion after increase one
+    function test_I_FA_28_multicall_reverts_for_decrease_opeartion_after_increase_one() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, DECREASE_DEBT_PERMISSION));
@@ -1359,8 +1361,8 @@ contract CreditFacadeIntegrationTest is
         );
     }
 
-    /// @dev [FA-29]: multicall works with adapters calls as expected
-    function test_FA_29_multicall_works_with_adapters_calls_as_expected() public {
+    /// @dev I:[FA-29]: multicall works with adapters calls as expected
+    function test_I_FA_29_multicall_works_with_adapters_calls_as_expected() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
@@ -1405,9 +1407,9 @@ contract CreditFacadeIntegrationTest is
     // TRANSFER ACCOUNT OWNERSHIP
     //
 
-    // /// @dev [FA-32]: transferAccountOwnership reverts if "to" user doesn't provide allowance
+    // /// @dev I:[FA-32]: transferAccountOwnership reverts if "to" user doesn't provide allowance
     /// TODO: CHANGE TO ALLOWANCE METHOD
-    // function test_FA_32_transferAccountOwnership_reverts_if_whitelisted_enabled() public {
+    // function test_I_FA_32_transferAccountOwnership_reverts_if_whitelisted_enabled() public {
     //     cft.testFacadeWithDegenNFT();
     //     creditFacade = cft.creditFacade();
 
@@ -1416,8 +1418,8 @@ contract CreditFacadeIntegrationTest is
     //     creditFacade.transferAccountOwnership(DUMB_ADDRESS);
     // }
 
-    /// @dev [FA-33]: transferAccountOwnership reverts if "to" user doesn't provide allowance
-    function test_FA_33_transferAccountOwnership_reverts_if_to_user_doesnt_provide_allowance() public {
+    /// @dev I:[FA-33]: transferAccountOwnership reverts if "to" user doesn't provide allowance
+    function test_I_FA_33_transferAccountOwnership_reverts_if_to_user_doesnt_provide_allowance() public {
         (address creditAccount,) = _openTestCreditAccount();
         vm.expectRevert(AccountTransferNotAllowedException.selector);
 
@@ -1425,8 +1427,8 @@ contract CreditFacadeIntegrationTest is
         creditFacade.transferAccountOwnership(creditAccount, DUMB_ADDRESS);
     }
 
-    /// @dev [FA-34]: transferAccountOwnership reverts if hf less 1
-    function test_FA_34_transferAccountOwnership_reverts_if_hf_less_1() public {
+    /// @dev I:[FA-34]: transferAccountOwnership reverts if hf less 1
+    function test_I_FA_34_transferAccountOwnership_reverts_if_hf_less_1() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         vm.prank(FRIEND);
@@ -1440,8 +1442,8 @@ contract CreditFacadeIntegrationTest is
         creditFacade.transferAccountOwnership(creditAccount, FRIEND);
     }
 
-    /// @dev [FA-35]: transferAccountOwnership transfers account if it's allowed
-    function test_FA_35_transferAccountOwnership_transfers_account_if_its_allowed() public {
+    /// @dev I:[FA-35]: transferAccountOwnership transfers account if it's allowed
+    function test_I_FA_35_transferAccountOwnership_transfers_account_if_its_allowed() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         vm.prank(FRIEND);
@@ -1462,8 +1464,8 @@ contract CreditFacadeIntegrationTest is
         // );
     }
 
-    /// @dev [FA-36]: checkAndUpdateBorrowedBlockLimit doesn't change block limit if maxBorrowedAmountPerBlock = type(uint128).max
-    function test_FA_36_checkAndUpdateBorrowedBlockLimit_doesnt_change_block_limit_if_set_to_max() public {
+    /// @dev I:[FA-36]: checkAndUpdateBorrowedBlockLimit doesn't change block limit if maxBorrowedAmountPerBlock = type(uint128).max
+    function test_I_FA_36_checkAndUpdateBorrowedBlockLimit_doesnt_change_block_limit_if_set_to_max() public {
         // vm.prank(CONFIGURATOR);
         // creditConfigurator.setMaxDebtLimitPerBlock(type(uint128).max);
 
@@ -1478,8 +1480,8 @@ contract CreditFacadeIntegrationTest is
         // assertEq(borrowedInBlock, 0, "Incorrect currentBlockLimit");
     }
 
-    /// @dev [FA-37]: checkAndUpdateBorrowedBlockLimit doesn't change block limit if maxBorrowedAmountPerBlock = type(uint128).max
-    function test_FA_37_checkAndUpdateBorrowedBlockLimit_updates_block_limit_properly() public {
+    /// @dev I:[FA-37]: checkAndUpdateBorrowedBlockLimit doesn't change block limit if maxBorrowedAmountPerBlock = type(uint128).max
+    function test_I_FA_37_checkAndUpdateBorrowedBlockLimit_updates_block_limit_properly() public {
         // (uint64 blockLastUpdate, uint128 borrowedInBlock) = creditFacade.getTotalBorrowedInBlock();
 
         // assertEq(blockLastUpdate, 0, "Incorrect blockLastUpdate");
@@ -1530,8 +1532,8 @@ contract CreditFacadeIntegrationTest is
     // APPROVE ACCOUNT TRANSFER
     //
 
-    /// @dev [FA-38]: approveAccountTransfer changes transfersAllowed
-    function test_FA_38_transferAccountOwnership_with_allowed_to_transfers_account() public {
+    /// @dev I:[FA-38]: approveAccountTransfer changes transfersAllowed
+    function test_I_FA_38_transferAccountOwnership_with_allowed_to_transfers_account() public {
         assertTrue(creditFacade.transfersAllowed(USER, FRIEND) == false, "Transfer is unexpectedly allowed ");
 
         vm.expectEmit(true, true, false, true);
@@ -1554,8 +1556,8 @@ contract CreditFacadeIntegrationTest is
     // ENABLE TOKEN
     //
 
-    /// @dev [FA-39]: enable token works as expected
-    function test_FA_39_enable_token_is_correct() public {
+    /// @dev I:[FA-39]: enable token works as expected
+    function test_I_FA_39_enable_token_is_correct() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
@@ -1581,8 +1583,8 @@ contract CreditFacadeIntegrationTest is
     // GETTERS
     //
 
-    /// @dev [FA-41]: calcTotalValue computes correctly
-    function test_FA_41_calcTotalValue_computes_correctly() public {
+    /// @dev I:[FA-41]: calcTotalValue computes correctly
+    function test_I_FA_41_calcTotalValue_computes_correctly() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         // AFTER OPENING CREDIT ACCOUNT
@@ -1641,8 +1643,8 @@ contract CreditFacadeIntegrationTest is
         // assertEq(tvw, expectedTWV, "Incorrect Threshold weighthed value for 3 asset");
     }
 
-    /// @dev [FA-42]: calcCreditAccountHealthFactor computes correctly
-    function test_FA_42_calcCreditAccountHealthFactor_computes_correctly() public {
+    /// @dev I:[FA-42]: calcCreditAccountHealthFactor computes correctly
+    function test_I_FA_42_calcCreditAccountHealthFactor_computes_correctly() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         // AFTER OPENING CREDIT ACCOUNT
@@ -1678,8 +1680,8 @@ contract CreditFacadeIntegrationTest is
 
     /// CHECK IS ACCOUNT LIQUIDATABLE
 
-    /// @dev [FA-44]: setContractToAdapter reverts if called non-configurator
-    function test_FA_44_config_functions_revert_if_called_non_configurator() public {
+    /// @dev I:[FA-44]: setContractToAdapter reverts if called non-configurator
+    function test_I_FA_44_config_functions_revert_if_called_non_configurator() public {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         vm.prank(USER);
         creditFacade.setDebtLimits(100, 100, 100);
@@ -1697,8 +1699,8 @@ contract CreditFacadeIntegrationTest is
 
     /// [TODO]: add new test
 
-    /// @dev [FA-45]: rrevertIfGetLessThan during multicalls works correctly
-    function test_FA_45_revertIfGetLessThan_works_correctly() public {
+    /// @dev I:[FA-45]: rrevertIfGetLessThan during multicalls works correctly
+    function test_I_FA_45_revertIfGetLessThan_works_correctly() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         uint256 expectedDAI = 1000;
@@ -1760,8 +1762,8 @@ contract CreditFacadeIntegrationTest is
         }
     }
 
-    /// @dev [FA-45A]: rrevertIfGetLessThan everts if called twice
-    function test_FA_45A_revertIfGetLessThan_reverts_if_called_twice() public {
+    /// @dev I:[FA-45A]: rrevertIfGetLessThan everts if called twice
+    function test_I_FA_45A_revertIfGetLessThan_reverts_if_called_twice() public {
         uint256 expectedDAI = 1000;
 
         Balance[] memory expectedBalances = new Balance[](1);
@@ -1788,8 +1790,8 @@ contract CreditFacadeIntegrationTest is
 
     /// CREDIT FACADE WITH EXPIRATION
 
-    /// @dev [FA-46]: openCreditAccount and openCreditAccount no longer work if the CreditFacadeV3 is expired
-    function test_FA_46_openCreditAccount_reverts_on_expired_CreditFacade() public {
+    /// @dev I:[FA-46]: openCreditAccount and openCreditAccount no longer work if the CreditFacadeV3 is expired
+    function test_I_FA_46_openCreditAccount_reverts_on_expired_CreditFacade() public {
         _setUp({
             _underlying: Tokens.DAI,
             withDegenNFT: false,
@@ -1816,8 +1818,8 @@ contract CreditFacadeIntegrationTest is
         );
     }
 
-    /// @dev [FA-47]: liquidateExpiredCreditAccount should not work before the CreditFacadeV3 is expired
-    function test_FA_47_liquidateExpiredCreditAccount_reverts_before_expiration() public {
+    /// @dev I:[FA-47]: liquidateExpiredCreditAccount should not work before the CreditFacadeV3 is expired
+    function test_I_FA_47_liquidateExpiredCreditAccount_reverts_before_expiration() public {
         _setUp({
             _underlying: Tokens.DAI,
             withDegenNFT: false,
@@ -1834,8 +1836,8 @@ contract CreditFacadeIntegrationTest is
         // creditFacade.liquidateExpiredCreditAccount(USER, LIQUIDATOR, 0, false, multicallBuilder());
     }
 
-    /// @dev [FA-48]: liquidateExpiredCreditAccount should not work when expiration is set to zero (i.e. CreditFacadeV3 is non-expiring)
-    function test_FA_48_liquidateExpiredCreditAccount_reverts_on_CreditFacade_with_no_expiration() public {
+    /// @dev I:[FA-48]: liquidateExpiredCreditAccount should not work when expiration is set to zero (i.e. CreditFacadeV3 is non-expiring)
+    function test_I_FA_48_liquidateExpiredCreditAccount_reverts_on_CreditFacade_with_no_expiration() public {
         _openTestCreditAccount();
 
         // vm.expectRevert(CantLiquidateNonExpiredException.selector);
@@ -1844,8 +1846,8 @@ contract CreditFacadeIntegrationTest is
         // creditFacade.liquidateExpiredCreditAccount(USER, LIQUIDATOR, 0, false, multicallBuilder());
     }
 
-    /// @dev [FA-49]: liquidateExpiredCreditAccount works correctly and emits events
-    function test_FA_49_liquidateExpiredCreditAccount_works_correctly_after_expiration() public {
+    /// @dev I:[FA-49]: liquidateExpiredCreditAccount works correctly and emits events
+    function test_I_FA_49_liquidateExpiredCreditAccount_works_correctly_after_expiration() public {
         _setUp({
             _underlying: Tokens.DAI,
             withDegenNFT: false,
@@ -1925,8 +1927,8 @@ contract CreditFacadeIntegrationTest is
     /// ENABLE TOKEN
     ///
 
-    /// @dev [FA-53]: enableToken works as expected in a multicall
-    function test_FA_53_enableToken_works_as_expected_multicall() public {
+    /// @dev I:[FA-53]: enableToken works as expected in a multicall
+    function test_I_FA_53_enableToken_works_as_expected_multicall() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         address token = tokenTestSuite.addressOf(Tokens.USDC);
@@ -1949,8 +1951,8 @@ contract CreditFacadeIntegrationTest is
         expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
     }
 
-    /// @dev [FA-54]: disableToken works as expected in a multicall
-    function test_FA_54_disableToken_works_as_expected_multicall() public {
+    /// @dev I:[FA-54]: disableToken works as expected in a multicall
+    function test_I_FA_54_disableToken_works_as_expected_multicall() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         address token = tokenTestSuite.addressOf(Tokens.USDC);
@@ -1982,8 +1984,8 @@ contract CreditFacadeIntegrationTest is
         expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
     }
 
-    // /// @dev [FA-56]: liquidateCreditAccount correctly uses BlacklistHelper during liquidations
-    // function test_FA_56_liquidateCreditAccount_correctly_handles_blacklisted_borrowers() public {
+    // /// @dev I:[FA-56]: liquidateCreditAccount correctly uses BlacklistHelper during liquidations
+    // function test_I_FA_56_liquidateCreditAccount_correctly_handles_blacklisted_borrowers() public {
     //     _setUp(Tokens.USDC);
 
     //     cft.testFacadeWithBlacklistHelper();
@@ -2029,8 +2031,8 @@ contract CreditFacadeIntegrationTest is
     //     assertEq(tokenTestSuite.balanceOf(Tokens.USDC, FRIEND2), expectedAmount, "Transferred amount incorrect");
     // }
 
-    // /// @dev [FA-57]: openCreditAccount reverts when the borrower is blacklisted on a blacklistable underlying
-    // function test_FA_57_openCreditAccount_reverts_on_blacklisted_borrower() public {
+    // /// @dev I:[FA-57]: openCreditAccount reverts when the borrower is blacklisted on a blacklistable underlying
+    // function test_I_FA_57_openCreditAccount_reverts_on_blacklisted_borrower() public {
     //     _setUp(Tokens.USDC);
 
     //     cft.testFacadeWithBlacklistHelper();
@@ -2061,8 +2063,8 @@ contract CreditFacadeIntegrationTest is
     // BOT LIST INTEGRATION
     //
 
-    /// @dev [FA-58]: botMulticall works correctly
-    function test_FA_58_botMulticall_works_correctly() public {
+    /// @dev I:[FA-58]: botMulticall works correctly
+    function test_I_FA_58_botMulticall_works_correctly() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         address bot = address(new GeneralMock());
@@ -2118,8 +2120,8 @@ contract CreditFacadeIntegrationTest is
         creditFacade.botMulticall(creditAccount, calls);
     }
 
-    /// @dev [FA-58A]: setBotPermissions works correctly in CF
-    function test_FA_58A_setBotPermissions_works_correctly() public {
+    /// @dev I:[FA-58A]: setBotPermissions works correctly in CF
+    function test_I_FA_58A_setBotPermissions_works_correctly() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         address bot = address(new GeneralMock());
@@ -2155,8 +2157,8 @@ contract CreditFacadeIntegrationTest is
     // FULL CHECK PARAMS
     //
 
-    /// @dev [FA-59]: setFullCheckParams performs correct full check after multicall
-    function test_FA_59_setFullCheckParams_correctly_passes_params_to_fullCollateralCheck() public {
+    /// @dev I:[FA-59]: setFullCheckParams performs correct full check after multicall
+    function test_I_FA_59_setFullCheckParams_correctly_passes_params_to_fullCollateralCheck() public {
         (address creditAccount,) = _openTestCreditAccount();
 
         uint256[] memory collateralHints = new uint256[](1);
@@ -2187,8 +2189,8 @@ contract CreditFacadeIntegrationTest is
     // EMERGENCY LIQUIDATIONS
     //
 
-    /// @dev [FA-62]: addEmergencyLiquidator correctly sets value
-    function test_FA_62_setEmergencyLiquidator_works_correctly() public {
+    /// @dev I:[FA-62]: addEmergencyLiquidator correctly sets value
+    function test_I_FA_62_setEmergencyLiquidator_works_correctly() public {
         vm.prank(address(creditConfigurator));
         creditFacade.setEmergencyLiquidator(DUMB_ADDRESS, AllowanceAction.ALLOW);
 

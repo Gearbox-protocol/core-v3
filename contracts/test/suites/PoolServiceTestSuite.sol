@@ -16,7 +16,7 @@ import {Tokens} from "../config/Tokens.sol";
 import {LinearInterestRateModel} from "../../pool/LinearInterestRateModel.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {CreditManagerMockForPoolTest} from "../mocks/pool/CreditManagerMockForPoolTest.sol";
+import {CreditManagerMock} from "../mocks/credit/CreditManagerMock.sol";
 import {WETHMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/WETHMock.sol";
 import {ERC20FeeMock} from "../mocks/token/ERC20FeeMock.sol";
 
@@ -45,7 +45,7 @@ contract PoolServiceTestSuite is Test {
     ContractsRegister public cr;
     TestPoolService public poolService;
     Pool4626 public pool4626;
-    CreditManagerMockForPoolTest public cmMock;
+    CreditManagerMock public cmMock;
     IERC20 public underlying;
     DieselToken public dieselToken;
     LinearInterestRateModel public linearIRModel;
@@ -98,19 +98,19 @@ contract PoolServiceTestSuite is Test {
         if (is4626) {
             pool4626 = isFeeToken
                 ? new Pool4626_USDT({
-                                                                                                                                    _addressProvider: address(addressProvider),
-                                                                                                                                    _underlyingToken: _underlying,
-                                                                                                                                    _interestRateModel: address(linearIRModel),
-                                                                                                                                    _expectedLiquidityLimit: type(uint256).max,
-                                                                                                                                    _supportsQuotas: supportQuotas
-                                                                                                                                })
+                                                                                                                                                    _addressProvider: address(addressProvider),
+                                                                                                                                                    _underlyingToken: _underlying,
+                                                                                                                                                    _interestRateModel: address(linearIRModel),
+                                                                                                                                                    _expectedLiquidityLimit: type(uint256).max,
+                                                                                                                                                    _supportsQuotas: supportQuotas
+                                                                                                                                                })
                 : new Pool4626({
-                                                                                                                                    _addressProvider: address(addressProvider),
-                                                                                                                                    _underlyingToken: _underlying,
-                                                                                                                                    _interestRateModel: address(linearIRModel),
-                                                                                                                                    _expectedLiquidityLimit: type(uint256).max,
-                                                                                                                                    _supportsQuotas: supportQuotas
-                                                                                                                                });
+                                                                                                                                                    _addressProvider: address(addressProvider),
+                                                                                                                                                    _underlyingToken: _underlying,
+                                                                                                                                                    _interestRateModel: address(linearIRModel),
+                                                                                                                                                    _expectedLiquidityLimit: type(uint256).max,
+                                                                                                                                                    _supportsQuotas: supportQuotas
+                                                                                                                                                });
             newPool = address(pool4626);
 
             if (supportQuotas) {
@@ -138,7 +138,7 @@ contract PoolServiceTestSuite is Test {
 
         vm.startPrank(CONFIGURATOR);
 
-        cmMock = new CreditManagerMockForPoolTest(newPool);
+        cmMock = new CreditManagerMock(address(addressProvider), newPool);
 
         cr.addPool(newPool);
         cr.addCreditManager(address(cmMock));

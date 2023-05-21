@@ -110,7 +110,9 @@ contract CreditFacadeUnitTest is BalanceHelper, ICreditFacadeEvents {
 
         addressProvider = new AddressProviderV3ACLMock();
 
-        creditManagerMock = new CreditManagerMock(address(addressProvider));
+        addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
+
+        creditManagerMock = new CreditManagerMock({_addressProvider: address(addressProvider), _pool: address(0)});
     }
 
     function _withoutDegenNFT() internal {

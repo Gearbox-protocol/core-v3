@@ -14,7 +14,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {PoolServiceMock} from "../../mocks/pool/PoolServiceMock.sol";
 
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
-import {CreditManagerMockForPoolTest} from "../../mocks/pool/CreditManagerMockForPoolTest.sol";
+import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 import {addLiquidity, referral, PoolQuotaKeeperTestSuite} from "../../suites/PoolQuotaKeeperTestSuite.sol";
 
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
@@ -47,7 +47,7 @@ contract PoolQuotaKeeperTest is TestHelper, BalanceHelper, IPoolQuotaKeeperEvent
     ACL acl;
     PoolServiceMock pool;
     address underlying;
-    CreditManagerMockForPoolTest cmMock;
+    CreditManagerMock cmMock;
 
     function setUp() public {
         _setUp(Tokens.DAI);
@@ -284,7 +284,7 @@ contract PoolQuotaKeeperTest is TestHelper, BalanceHelper, IPoolQuotaKeeperEvent
         vm.expectRevert(RegisteredCreditManagerOnlyException.selector);
         pqk.addCreditManager(DUMB_ADDRESS);
 
-        cmMock.changePoolService(DUMB_ADDRESS);
+        cmMock.setPoolService(DUMB_ADDRESS);
 
         vm.expectRevert(IncompatibleCreditManagerException.selector);
 

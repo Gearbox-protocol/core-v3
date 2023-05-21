@@ -19,7 +19,7 @@ import {IERC4626Events} from "../../interfaces/IERC4626.sol";
 import {IInterestRateModel} from "../../../interfaces/IInterestRateModel.sol";
 
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
-import {CreditManagerMockForPoolTest} from "../../mocks/pool/CreditManagerMockForPoolTest.sol";
+import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 import {
     liquidityProviderInitBalance,
     addLiquidity,
@@ -66,7 +66,7 @@ contract Pool4626UnitTest is TestHelper, BalanceHelper, IPool4626Events, IERC462
     ACL acl;
     Pool4626 pool;
     address underlying;
-    CreditManagerMockForPoolTest cmMock;
+    CreditManagerMock cmMock;
     IInterestRateModel irm;
 
     function setUp() public {
@@ -1471,7 +1471,7 @@ contract Pool4626UnitTest is TestHelper, BalanceHelper, IPool4626Events, IERC462
 
     // U:[P4-20]: setCreditManagerLimit reverts if another pool is setup in CreditManagerV3
     function test_U_P4_20_connectCreditManager_fails_on_incompatible_CM() public {
-        cmMock.changePoolService(DUMB_ADDRESS);
+        cmMock.setPoolService(DUMB_ADDRESS);
 
         vm.expectRevert(IncompatibleCreditManagerException.selector);
 
@@ -1734,7 +1734,8 @@ contract Pool4626UnitTest is TestHelper, BalanceHelper, IPool4626Events, IERC462
                 testCase.isBorrowingMoreU2Forbidden
             );
 
-            CreditManagerMockForPoolTest cmMock2 = new CreditManagerMockForPoolTest(
+            CreditManagerMock cmMock2 = new CreditManagerMock(
+               address( psts.addressProvider()),
                     address(pool)
                 );
 

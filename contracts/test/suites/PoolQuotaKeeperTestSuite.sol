@@ -15,7 +15,7 @@ import {Tokens} from "../config/Tokens.sol";
 import {LinearInterestRateModel} from "../../pool/LinearInterestRateModel.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {CreditManagerMockForPoolTest} from "../mocks/pool/CreditManagerMockForPoolTest.sol";
+import {CreditManagerMock} from "../mocks/credit/CreditManagerMock.sol";
 import {WETHMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/WETHMock.sol";
 import {ERC20FeeMock} from "../mocks/token/ERC20FeeMock.sol";
 
@@ -43,7 +43,7 @@ contract PoolQuotaKeeperTestSuite is Test {
     ContractsRegister public cr;
 
     PoolServiceMock public pool4626;
-    CreditManagerMockForPoolTest public cmMock;
+    CreditManagerMock public cmMock;
     IERC20 public underlying;
 
     PoolQuotaKeeper public poolQuotaKeeper;
@@ -85,7 +85,7 @@ contract PoolQuotaKeeperTestSuite is Test {
 
         vm.startPrank(CONFIGURATOR);
 
-        cmMock = new CreditManagerMockForPoolTest(address(pool4626));
+        cmMock = new CreditManagerMock(address(addressProvider), address(pool4626));
 
         cr.addPool(address(pool4626));
         cr.addCreditManager(address(cmMock));

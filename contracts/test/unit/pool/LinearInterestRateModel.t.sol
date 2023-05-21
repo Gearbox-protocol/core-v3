@@ -19,21 +19,19 @@ import "../../../interfaces/IExceptions.sol";
 import {TestHelper} from "../../lib/helper.sol";
 import "forge-std/console.sol";
 
-/// @title pool
-/// @notice Business logic for borrowing liquidity pools
-contract LinearInterestRateModelTest is TestHelper {
+contract LinearInterestRateModelUniTest is TestHelper {
     using Math for uint256;
 
     LinearInterestRateModel irm;
 
     function setUp() public {
         irm = new LinearInterestRateModel(
-            8000,
-            9500,
-            1000,
-            2000,
-            3000,
-            4000,
+            80_00,
+            95_00,
+            10_00,
+            20_00,
+            30_00,
+            40_00,
             true
         );
     }
@@ -42,8 +40,8 @@ contract LinearInterestRateModelTest is TestHelper {
     // TESTS
     //
 
-    // [LIM-1]: start parameters are correct
-    function test_LIM_01_start_parameters_correct() public {
+    // U:[LIM-1]: start parameters are correct
+    function test_U_LIM_01_start_parameters_correct() public {
         (uint16 U_1, uint16 U_2, uint16 R_base, uint16 R_slope1, uint16 R_slope2, uint16 R_slope3) =
             irm.getModelParameters();
 
@@ -67,8 +65,8 @@ contract LinearInterestRateModelTest is TestHelper {
         uint16 R_slope3;
     }
 
-    // [LIM-2]: linear model constructor reverts for incorrect params
-    function test_LIM_02_linear_model_constructor_reverts_for_incorrect_params() public {
+    // U:[LIM-2]: linear model constructor reverts for incorrect params
+    function test_U_LIM_02_linear_model_constructor_reverts_for_incorrect_params() public {
         // adds liqudity to mint initial diesel tokens to change 1:1 rate
 
         IncorrectParamCase[8] memory cases = [
@@ -189,8 +187,8 @@ contract LinearInterestRateModelTest is TestHelper {
         bool expectedRevert;
     }
 
-    // [LIM-3]: linear model computes available to borrow and borrow rate correctly
-    function test_LIM_03_linear_model_computes_available_to_borrow_and_borrow_rate_correctly() public {
+    // U:[LIM-3]: linear model computes available to borrow and borrow rate correctly
+    function test_U_LIM_03_linear_model_computes_available_to_borrow_and_borrow_rate_correctly() public {
         // adds liqudity to mint initial diesel tokens to change 1:1 rate
 
         LinearCalculationsCase[12] memory cases = [

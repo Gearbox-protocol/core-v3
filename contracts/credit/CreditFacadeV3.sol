@@ -7,7 +7,7 @@ import "../interfaces/IAddressProviderV3.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 // LIBS & TRAITS
-import {CreditLogic} from "../libraries/CreditLogic.sol";
+import {BalancesLogic} from "../libraries/BalancesLogic.sol";
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {BitMask, UNDERLYING_TOKEN_MASK} from "../libraries/BitMask.sol";
 
@@ -501,7 +501,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         /// before the multicall forbidden token balances are stored to compare with balances after
         uint256 _forbiddenTokenMask = forbiddenTokenMask;
         uint256 enabledTokensMaskBefore = ICreditManagerV3(creditManager).enabledTokensMaskOf(creditAccount);
-        uint256[] memory forbiddenBalances = CreditLogic.storeForbiddenBalances({
+        uint256[] memory forbiddenBalances = BalancesLogic.storeForbiddenBalances({
             creditAccount: creditAccount,
             forbiddenTokenMask: _forbiddenTokenMask,
             enabledTokensMask: enabledTokensMaskBefore,
@@ -587,7 +587,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
                         // Sets expected balances to currentBalance + delta
                         Balance[] memory expected = abi.decode(mcall.callData[4:], (Balance[])); // F:[FA-45]
-                        expectedBalances = CreditLogic.storeBalances(creditAccount, expected); // F:[FA-45]
+                        expectedBalances = BalancesLogic.storeBalances(creditAccount, expected); // F:[FA-45]
                     }
                     //
                     // SET FULL CHECK PARAMS
@@ -771,7 +771,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         // If expectedBalances was set by calling revertIfGetLessThan,
         // checks that actual token balances are not less than expected balances
         if (expectedBalances.length != 0) {
-            CreditLogic.compareBalances(creditAccount, expectedBalances);
+            BalancesLogic.compareBalances(creditAccount, expectedBalances);
         }
 
         /// If increaseDebt was called during the multicall, all forbidden tokens must be disabled at the end
@@ -1126,7 +1126,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             fullCheckParams.minHealthFactor
         );
 
-        CreditLogic.checkForbiddenBalances({
+        BalancesLogic.checkForbiddenBalances({
             creditAccount: creditAccount,
             enabledTokensMaskBefore: enabledTokensMaskBefore,
             enabledTokensMaskAfter: fullCheckParams.enabledTokensMaskAfter,

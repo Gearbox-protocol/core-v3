@@ -41,9 +41,7 @@ import {CollateralTokensItem} from "../../config/CreditConfig.sol";
 
 import {Test} from "forge-std/Test.sol";
 
-/// @title CreditConfiguratorTest
-/// @notice Designed for unit test purposes only
-contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConfiguratorEvents {
+contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICreditConfiguratorEvents {
     using AddressList for address[];
 
     TokensTestSuite tokenTestSuite;
@@ -157,8 +155,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
     ///
     ///
 
-    /// @dev U:[CC-1]: constructor sets correct values
-    function test_U_CC_01_constructor_sets_correct_values() public {
+    /// @dev I:[CC-1]: constructor sets correct values
+    function test_I_CC_01_constructor_sets_correct_values() public {
         assertEq(address(creditConfigurator.creditManager()), address(creditManager), "Incorrect creditManager");
 
         assertEq(address(creditConfigurator.creditFacade()), address(creditFacade), "Incorrect creditFacade");
@@ -241,8 +239,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         assertEq(expirationDate, 0, "Incorrect expiration date");
     }
 
-    /// @dev U:[CC-1A]: constructor emits all events
-    function test_U_CC_01A_constructor_emits_all_events() public {
+    /// @dev I:[CC-1A]: constructor emits all events
+    function test_I_CC_01A_constructor_emits_all_events() public {
         CollateralToken[] memory cTokens = new CollateralToken[](1);
 
         cTokens[0] = CollateralToken({token: tokenTestSuite.addressOf(Tokens.USDC), liquidationThreshold: 6000});
@@ -308,8 +306,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         _deploy(configuratorByteCode, 0);
     }
 
-    /// @dev U:[CC-2]: all functions revert if called non-configurator
-    function test_U_CC_02_all_functions_revert_if_called_non_configurator() public {
+    /// @dev I:[CC-2]: all functions revert if called non-configurator
+    function test_I_CC_02_all_functions_revert_if_called_non_configurator() public {
         vm.startPrank(USER);
 
         // Token mgmt
@@ -352,7 +350,7 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         vm.stopPrank();
     }
 
-    function test_U_CC_02A_forbidBorrowing_on_non_pausable_admin() public {
+    function test_I_CC_02A_forbidBorrowing_on_non_pausable_admin() public {
         vm.expectRevert(CallerNotPausableAdminException.selector);
         creditConfigurator.forbidBorrowing();
 
@@ -360,7 +358,7 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         creditConfigurator.forbidBorrowing();
     }
 
-    function test_U_CC_02B_controllerOnly_functions_revert_on_non_controller() public {
+    function test_I_CC_02B_controllerOnly_functions_revert_on_non_controller() public {
         vm.expectRevert(CallerNotControllerException.selector);
         creditConfigurator.setLiquidationThreshold(DUMB_ADDRESS, uint16(0));
 
@@ -387,8 +385,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
     // TOKEN MANAGEMENT
     //
 
-    /// @dev U:[CC-3]: addCollateralToken reverts for zero address or in priceFeed
-    function test_U_CC_03_addCollateralToken_reverts_for_zero_address_or_in_priceFeed() public {
+    /// @dev I:[CC-3]: addCollateralToken reverts for zero address or in priceFeed
+    function test_I_CC_03_addCollateralToken_reverts_for_zero_address_or_in_priceFeed() public {
         vm.startPrank(CONFIGURATOR);
 
         vm.expectRevert(ZeroAddressException.selector);
@@ -408,8 +406,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         vm.stopPrank();
     }
 
-    /// @dev U:[CC-4]: addCollateralToken adds new token to creditManager
-    function test_U_CC_04_addCollateralToken_adds_new_token_to_creditManager_and_set_lt() public {
+    /// @dev I:[CC-4]: addCollateralToken adds new token to creditManager
+    function test_I_CC_04_addCollateralToken_adds_new_token_to_creditManager_and_set_lt() public {
         uint256 tokensCountBefore = creditManager.collateralTokensCount();
 
         address cLINKToken = tokenTestSuite.addressOf(Tokens.LUNA);
@@ -431,8 +429,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         assertEq(creditManager.liquidationThresholds(cLINKToken), 8800, "Threshold wasn't set");
     }
 
-    /// @dev U:[CC-5]: setLiquidationThreshold reverts for underling token and incorrect values
-    function test_U_CC_05_setLiquidationThreshold_reverts_for_underling_token_and_incorrect_values() public {
+    /// @dev I:[CC-5]: setLiquidationThreshold reverts for underling token and incorrect values
+    function test_I_CC_05_setLiquidationThreshold_reverts_for_underling_token_and_incorrect_values() public {
         vm.startPrank(CONFIGURATOR);
 
         vm.expectRevert(SetLTForUnderlyingException.selector);
@@ -447,8 +445,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         vm.stopPrank();
     }
 
-    /// @dev U:[CC-6]: setLiquidationThreshold sets liquidation threshold in creditManager
-    function test_U_CC_06_setLiquidationThreshold_sets_liquidation_threshold_in_creditManager() public {
+    /// @dev I:[CC-6]: setLiquidationThreshold sets liquidation threshold in creditManager
+    function test_I_CC_06_setLiquidationThreshold_sets_liquidation_threshold_in_creditManager() public {
         address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
         uint16 newLT = 24;
 
@@ -461,8 +459,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         assertEq(creditManager.liquidationThresholds(usdcToken), newLT);
     }
 
-    /// @dev U:[CC-7]: allowToken and forbidToken reverts for unknown or underlying token
-    function test_U_CC_07_allowToken_and_forbidToken_reverts_for_unknown_or_underlying_token() public {
+    /// @dev I:[CC-7]: allowToken and forbidToken reverts for unknown or underlying token
+    function test_I_CC_07_allowToken_and_forbidToken_reverts_for_unknown_or_underlying_token() public {
         vm.startPrank(CONFIGURATOR);
 
         vm.expectRevert(TokenNotAllowedException.selector);
@@ -480,8 +478,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         vm.stopPrank();
     }
 
-    /// @dev U:[CC-8]: allowToken doesn't change forbidden mask if its already allowed
-    function test_U_CC_08_allowToken_doesnt_change_forbidden_mask_if_its_already_allowed() public {
+    /// @dev I:[CC-8]: allowToken doesn't change forbidden mask if its already allowed
+    function test_I_CC_08_allowToken_doesnt_change_forbidden_mask_if_its_already_allowed() public {
         address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
         uint256 forbiddenMask = creditFacade.forbiddenTokenMask();
 
@@ -493,8 +491,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
 
     // TODO: change tests
 
-    // /// @dev U:[CC-9]: allowToken allows token if it was forbidden
-    // function test_U_CC_09_allows_token_if_it_was_forbidden() public {
+    // /// @dev I:[CC-9]: allowToken allows token if it was forbidden
+    // function test_I_CC_09_allows_token_if_it_was_forbidden() public {
     //     address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
     //     uint256 tokenMask = creditManager.getTokenMaskOrRevert(usdcToken);
 
@@ -510,8 +508,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
     //     assertEq(creditManager.forbiddenTokenMask(), 0, "Incorrect forbidden mask");
     // }
 
-    // /// @dev U:[CC-10]: forbidToken doesn't change forbidden mask if its already forbidden
-    // function test_U_CC_10_forbidToken_doesnt_change_forbidden_mask_if_its_already_forbidden() public {
+    // /// @dev I:[CC-10]: forbidToken doesn't change forbidden mask if its already forbidden
+    // function test_I_CC_10_forbidToken_doesnt_change_forbidden_mask_if_its_already_forbidden() public {
     //     address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
     //     uint256 tokenMask = creditManager.getTokenMaskOrRevert(usdcToken);
 
@@ -526,8 +524,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
     //     assertEq(creditManager.forbiddenTokenMask(), forbiddenMask, "Incorrect forbidden mask");
     // }
 
-    // /// @dev U:[CC-11]: forbidToken forbids token and enable IncreaseDebtForbidden mode if it was allowed
-    // function test_U_CC_11_forbidToken_forbids_token_if_it_was_allowed() public {
+    // /// @dev I:[CC-11]: forbidToken forbids token and enable IncreaseDebtForbidden mode if it was allowed
+    // function test_I_CC_11_forbidToken_forbids_token_if_it_was_allowed() public {
     //     address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
     //     uint256 tokenMask = creditManager.getTokenMaskOrRevert(usdcToken);
 
@@ -547,8 +545,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
     // CONFIGURATION: CONTRACTS & ADAPTERS MANAGEMENT
     //
 
-    /// @dev U:[CC-12]: allowContract and forbidContract reverts for zero address
-    function test_U_CC_12_allowContract_and_forbidContract_reverts_for_zero_address() public {
+    /// @dev I:[CC-12]: allowContract and forbidContract reverts for zero address
+    function test_I_CC_12_allowContract_and_forbidContract_reverts_for_zero_address() public {
         vm.startPrank(CONFIGURATOR);
 
         vm.expectRevert(ZeroAddressException.selector);
@@ -563,8 +561,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         vm.stopPrank();
     }
 
-    /// @dev U:[CC-12A]: allowContract reverts for non contract addresses
-    function test_U_CC_12A_allowContract_reverts_for_non_contract_addresses() public {
+    /// @dev I:[CC-12A]: allowContract reverts for non contract addresses
+    function test_I_CC_12A_allowContract_reverts_for_non_contract_addresses() public {
         vm.startPrank(CONFIGURATOR);
 
         vm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, DUMB_ADDRESS));
@@ -576,8 +574,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         vm.stopPrank();
     }
 
-    /// @dev U:[CC-12B]: allowContract reverts for non compartible adapter contract
-    function test_U_CC_12B_allowContract_reverts_for_non_compartible_adapter_contract() public {
+    /// @dev I:[CC-12B]: allowContract reverts for non compartible adapter contract
+    function test_I_CC_12B_allowContract_reverts_for_non_compartible_adapter_contract() public {
         vm.startPrank(CONFIGURATOR);
 
         // Should be reverted, cause undelring token has no .creditManager() method
@@ -591,8 +589,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         vm.stopPrank();
     }
 
-    /// @dev U:[CC-13]: allowContract reverts for creditManager and creditFacade contracts
-    function test_U_CC_13_allowContract_reverts_for_creditManager_and_creditFacade_contracts() public {
+    /// @dev I:[CC-13]: allowContract reverts for creditManager and creditFacade contracts
+    function test_I_CC_13_allowContract_reverts_for_creditManager_and_creditFacade_contracts() public {
         vm.startPrank(CONFIGURATOR);
 
         vm.expectRevert(TargetContractNotAllowedException.selector);
@@ -607,8 +605,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         vm.stopPrank();
     }
 
-    /// @dev U:[CC-14]: allowContract: adapter could not be used twice
-    function test_U_CC_14_allowContract_adapter_cannot_be_used_twice() public {
+    /// @dev I:[CC-14]: allowContract: adapter could not be used twice
+    function test_I_CC_14_allowContract_adapter_cannot_be_used_twice() public {
         vm.startPrank(CONFIGURATOR);
 
         creditConfigurator.allowContract(DUMB_COMPARTIBLE_CONTRACT, address(adapter1));
@@ -619,8 +617,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         vm.stopPrank();
     }
 
-    /// @dev U:[CC-15]: allowContract allows targetContract <-> adapter and emits event
-    function test_U_CC_15_allowContract_allows_targetContract_adapter_and_emits_event() public {
+    /// @dev I:[CC-15]: allowContract allows targetContract <-> adapter and emits event
+    function test_I_CC_15_allowContract_allows_targetContract_adapter_and_emits_event() public {
         address[] memory allowedContracts = creditConfigurator.allowedContracts();
         uint256 allowedContractCount = allowedContracts.length;
 
@@ -648,8 +646,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         assertTrue(allowedContracts.includes(TARGET_CONTRACT), "Target contract wasnt found");
     }
 
-    // /// @dev U:[CC-15A]: allowContract allows universal adapter for universal contract
-    // function test_U_CC_15A_allowContract_allows_universal_contract() public {
+    // /// @dev I:[CC-15A]: allowContract allows universal adapter for universal contract
+    // function test_I_CC_15A_allowContract_allows_universal_contract() public {
     //     vm.prank(CONFIGURATOR);
 
     //     vm.expectEmit(true, true, false, false);
@@ -660,8 +658,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
     //     assertEq(creditManager.universalAdapter(), address(adapter1), "Universal adapter wasn't updated");
     // }
 
-    /// @dev U:[CC-15A]: allowContract removes existing adapter
-    function test_U_CC_15A_allowContract_removes_old_adapter_if_it_exists() public {
+    /// @dev I:[CC-15A]: allowContract removes existing adapter
+    function test_I_CC_15A_allowContract_removes_old_adapter_if_it_exists() public {
         vm.prank(CONFIGURATOR);
         creditConfigurator.allowContract(TARGET_CONTRACT, address(adapter1));
 
@@ -684,16 +682,16 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         assertEq(creditManager.adapterToContract(address(adapter1)), address(0), "Old adapter was not removed");
     }
 
-    /// @dev U:[CC-16]: forbidContract reverts for unknown contract
-    function test_U_CC_16_forbidContract_reverts_for_unknown_contract() public {
+    /// @dev I:[CC-16]: forbidContract reverts for unknown contract
+    function test_I_CC_16_forbidContract_reverts_for_unknown_contract() public {
         vm.expectRevert(ContractIsNotAnAllowedAdapterException.selector);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.forbidContract(TARGET_CONTRACT);
     }
 
-    /// @dev U:[CC-17]: forbidContract forbids contract and emits event
-    function test_U_CC_17_forbidContract_forbids_contract_and_emits_event() public {
+    /// @dev I:[CC-17]: forbidContract forbids contract and emits event
+    function test_I_CC_17_forbidContract_forbids_contract_and_emits_event() public {
         vm.startPrank(CONFIGURATOR);
         creditConfigurator.allowContract(DUMB_COMPARTIBLE_CONTRACT, address(adapter1));
 
@@ -728,8 +726,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
     // CREDIT MANAGER MGMT
     //
 
-    /// @dev U:[CC-18]: setLimits reverts if minAmount > maxAmount
-    function test_U_CC_18_setLimits_reverts_if_minAmount_gt_maxAmount() public {
+    /// @dev I:[CC-18]: setLimits reverts if minAmount > maxAmount
+    function test_I_CC_18_setLimits_reverts_if_minAmount_gt_maxAmount() public {
         (uint128 minBorrowedAmount, uint128 maxBorrowedAmount) = creditFacade.debtLimits();
 
         vm.expectRevert(IncorrectLimitsException.selector);
@@ -738,8 +736,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         creditConfigurator.setLimits(maxBorrowedAmount, minBorrowedAmount);
     }
 
-    /// @dev U:[CC-19]: setLimits sets limits
-    function test_U_CC_19_setLimits_sets_limits() public {
+    /// @dev I:[CC-19]: setLimits sets limits
+    function test_I_CC_19_setLimits_sets_limits() public {
         (uint128 minBorrowedAmount, uint128 maxBorrowedAmount) = creditFacade.debtLimits();
         uint128 newMinBorrowedAmount = minBorrowedAmount + 1000;
         uint128 newMaxBorrowedAmount = maxBorrowedAmount + 1000;
@@ -753,8 +751,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         assertEq(maxBorrowedAmount, newMaxBorrowedAmount, "Incorrect maxBorrowedAmount");
     }
 
-    /// @dev U:[CC-23]: setFees reverts for incorrect fees
-    function test_U_CC_23_setFees_reverts_for_incorrect_fees() public {
+    /// @dev I:[CC-23]: setFees reverts for incorrect fees
+    function test_I_CC_23_setFees_reverts_for_incorrect_fees() public {
         (, uint16 feeLiquidation,, uint16 feeLiquidationExpired,) = creditManager.fees();
 
         vm.expectRevert(IncorrectParameterException.selector);
@@ -779,8 +777,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         );
     }
 
-    /// @dev U:[CC-25]: setFees updates LT for underlying and for all tokens which bigger than new LT
-    function test_U_CC_25_setFees_updates_LT_for_underlying_and_for_all_tokens_which_bigger_than_new_LT() public {
+    /// @dev I:[CC-25]: setFees updates LT for underlying and for all tokens which bigger than new LT
+    function test_I_CC_25_setFees_updates_LT_for_underlying_and_for_all_tokens_which_bigger_than_new_LT() public {
         vm.startPrank(CONFIGURATOR);
 
         (uint16 feeInterest,,,,) = creditManager.fees();
@@ -814,8 +812,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         assertEq(creditManager.liquidationThresholds(wethToken), wethLTBefore, "Incorrect WETH for underlying token");
     }
 
-    /// @dev U:[CC-26]: setFees sets fees and doesn't change others
-    function test_U_CC_26_setFees_sets_fees_and_doesnt_change_others() public {
+    /// @dev I:[CC-26]: setFees sets fees and doesn't change others
+    function test_I_CC_26_setFees_sets_fees_and_doesnt_change_others() public {
         (
             uint16 feeInterest,
             uint16 feeLiquidation,
@@ -861,8 +859,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
     // CONTRACT UPGRADES
     //
 
-    /// @dev U:[CC-28]: setPriceOracle upgrades priceOracleCorrectly and doesnt change facade
-    function test_U_CC_28_setPriceOracle_upgrades_priceOracleCorrectly_and_doesnt_change_facade() public {
+    /// @dev I:[CC-28]: setPriceOracle upgrades priceOracleCorrectly and doesnt change facade
+    function test_I_CC_28_setPriceOracle_upgrades_priceOracleCorrectly_and_doesnt_change_facade() public {
         vm.startPrank(CONFIGURATOR);
         cct.addressProvider().setAddress(AP_PRICE_ORACLE, DUMB_ADDRESS, false);
 
@@ -875,8 +873,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         vm.stopPrank();
     }
 
-    /// @dev U:[CC-29]: setPriceOracle upgrades priceOracleCorrectly and doesnt change facade
-    function test_U_CC_29_setCreditFacade_upgradeCreditConfigurator_reverts_for_incompatible_contracts() public {
+    /// @dev I:[CC-29]: setPriceOracle upgrades priceOracleCorrectly and doesnt change facade
+    function test_I_CC_29_setCreditFacade_upgradeCreditConfigurator_reverts_for_incompatible_contracts() public {
         vm.startPrank(CONFIGURATOR);
 
         vm.expectRevert(ZeroAddressException.selector);
@@ -904,8 +902,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         creditConfigurator.upgradeCreditConfigurator(address(adapterDifferentCM));
     }
 
-    /// @dev U:[CC-30]: setCreditFacade upgrades creditFacade and doesnt change priceOracle
-    function test_U_CC_30_setCreditFacade_upgrades_creditFacade_and_doesnt_change_priceOracle() public {
+    /// @dev I:[CC-30]: setCreditFacade upgrades creditFacade and doesnt change priceOracle
+    function test_I_CC_30_setCreditFacade_upgrades_creditFacade_and_doesnt_change_priceOracle() public {
         for (uint256 ex = 0; ex < 2; ex++) {
             bool isExpirable = ex != 0;
             for (uint256 ms = 0; ms < 2; ms++) {
@@ -973,8 +971,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         }
     }
 
-    /// @dev U:[CC-30A]: usetCreditFacade transfers bot list
-    function test_U_CC_30A_botList_is_transferred_on_CreditFacade_upgrade() public {
+    /// @dev I:[CC-30A]: usetCreditFacade transfers bot list
+    function test_I_CC_30A_botList_is_transferred_on_CreditFacade_upgrade() public {
         for (uint256 ms = 0; ms < 2; ms++) {
             bool migrateSettings = ms != 0;
 
@@ -997,8 +995,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         }
     }
 
-    /// @dev U:[CC-31]: uupgradeCreditConfigurator upgrades creditConfigurator
-    function test_U_CC_31_upgradeCreditConfigurator_upgrades_creditConfigurator() public {
+    /// @dev I:[CC-31]: uupgradeCreditConfigurator upgrades creditConfigurator
+    function test_I_CC_31_upgradeCreditConfigurator_upgrades_creditConfigurator() public {
         vm.expectEmit(true, false, false, false);
         emit CreditConfiguratorUpgraded(DUMB_COMPARTIBLE_CONTRACT);
 
@@ -1008,8 +1006,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         assertEq(address(creditManager.creditConfigurator()), DUMB_COMPARTIBLE_CONTRACT);
     }
 
-    /// @dev U:[CC-32]: setBorrowingAllowance sets IncreaseDebtForbidden
-    function test_U_CC_32_setBorrowingAllowance_sets_IncreaseDebtForbidden() public {
+    /// @dev I:[CC-32]: setBorrowingAllowance sets IncreaseDebtForbidden
+    function test_I_CC_32_setBorrowingAllowance_sets_IncreaseDebtForbidden() public {
         /// TODO: Change test
         // for (uint256 id = 0; id < 2; id++) {
         //     bool isIDF = id != 0;
@@ -1038,8 +1036,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         // }
     }
 
-    /// @dev U:[CC-33]: setMaxDebtLimitPerBlock reverts if it lt maxLimit otherwise sets limitPerBlock
-    function test_U_CC_33_setMaxDebtLimitPerBlock_reverts_if_it_lt_maxLimit_otherwise_sets_limitPerBlock() public {
+    /// @dev I:[CC-33]: setMaxDebtLimitPerBlock reverts if it lt maxLimit otherwise sets limitPerBlock
+    function test_I_CC_33_setMaxDebtLimitPerBlock_reverts_if_it_lt_maxLimit_otherwise_sets_limitPerBlock() public {
         // (, uint128 maxBorrowedAmount) = creditFacade.debtLimits();
 
         // vm.prank(CONFIGURATOR);
@@ -1059,8 +1057,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         // assertEq(maxBorrowedAmountPerBlock, newLimitBlock, "Incorrect new limits block");
     }
 
-    /// @dev U:[CC-34]: setExpirationDate reverts if the new expiration date is stale, otherwise sets it
-    function test_U_CC_34_setExpirationDate_reverts_on_incorrect_newExpirationDate_otherwise_sets() public {
+    /// @dev I:[CC-34]: setExpirationDate reverts if the new expiration date is stale, otherwise sets it
+    function test_I_CC_34_setExpirationDate_reverts_on_incorrect_newExpirationDate_otherwise_sets() public {
         // cct.testFacadeWithExpiration();
         // creditFacade = cct.creditFacade();
 
@@ -1091,8 +1089,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         assertEq(expirationDate, newExpirationDate, "Incorrect new expirationDate");
     }
 
-    /// @dev U:[CC-37]: setMaxEnabledTokens works correctly and emits event
-    function test_U_CC_37_setMaxEnabledTokens_works_correctly() public {
+    /// @dev I:[CC-37]: setMaxEnabledTokens works correctly and emits event
+    function test_I_CC_37_setMaxEnabledTokens_works_correctly() public {
         vm.expectRevert(CallerNotControllerException.selector);
         creditConfigurator.setMaxEnabledTokens(255);
 
@@ -1105,8 +1103,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         assertEq(creditManager.maxEnabledTokens(), 255, "Credit manager max enabled tokens incorrect");
     }
 
-    /// @dev U:[CC-38]: addEmergencyLiquidator works correctly and emits event
-    function test_U_CC_38_addEmergencyLiquidator_works_correctly() public {
+    /// @dev I:[CC-38]: addEmergencyLiquidator works correctly and emits event
+    function test_I_CC_38_addEmergencyLiquidator_works_correctly() public {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS);
 
@@ -1121,8 +1119,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         );
     }
 
-    /// @dev U:[CC-39]: removeEmergencyLiquidator works correctly and emits event
-    function test_U_CC_39_removeEmergencyLiquidator_works_correctly() public {
+    /// @dev I:[CC-39]: removeEmergencyLiquidator works correctly and emits event
+    function test_I_CC_39_removeEmergencyLiquidator_works_correctly() public {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.removeEmergencyLiquidator(DUMB_ADDRESS);
 
@@ -1140,8 +1138,8 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         );
     }
 
-    /// @dev U:[CC-41]: allowedContracts migrate correctly
-    function test_U_CC_41_allowedContracts_are_migrated_correctly_for_new_CC() public {
+    /// @dev I:[CC-41]: allowedContracts migrate correctly
+    function test_I_CC_41_allowedContracts_are_migrated_correctly_for_new_CC() public {
         vm.prank(CONFIGURATOR);
         creditConfigurator.allowContract(TARGET_CONTRACT, address(adapter1));
 
@@ -1183,7 +1181,7 @@ contract CreditConfiguratorUnitTest is Test, ICreditManagerV3Events, ICreditConf
         }
     }
 
-    function test_U_CC_42_rampLiquidationThreshold_works_correctly() public {
+    function test_I_CC_42_rampLiquidationThreshold_works_correctly() public {
         address dai = tokenTestSuite.addressOf(Tokens.DAI);
         address usdc = tokenTestSuite.addressOf(Tokens.USDC);
 

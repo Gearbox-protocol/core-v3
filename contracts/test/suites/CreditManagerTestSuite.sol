@@ -15,7 +15,7 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 import "../lib/constants.sol";
-import {CreditManagerTestInternal} from "../mocks/credit/CreditManagerTestInternal.sol";
+import {CreditManagerV3Harness} from "../unit/credit/CreditManagerV3Harness.sol";
 import {PoolDeployer} from "./PoolDeployer.sol";
 import {ICreditConfig} from "../interfaces/ICreditConfig.sol";
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
@@ -57,7 +57,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         tokenTestSuite = creditConfig.tokenTestSuite();
 
         creditManager = internalSuite
-            ? new CreditManagerTestInternal(address(addressProvider), address(poolMock))
+            ? new CreditManagerV3Harness(address(addressProvider), address(poolMock))
             : new CreditManagerV3(address(addressProvider), address(poolMock));
 
         creditFacade = msg.sender;
