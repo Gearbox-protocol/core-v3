@@ -474,7 +474,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     creditAccount: creditAccount,
                     tokens: collateralDebtData.quotedTokens
                 });
-                creditAccountInfo[creditAccount].cumulativeQuotaInterest = newCumulativeQuotaInterest; // U:[CM-11]
+                creditAccountInfo[creditAccount].cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // U:[CM-11]
             }
 
             if (IERC20Helper.balanceOf({token: underlying, holder: creditAccount}) <= 1) {
@@ -743,20 +743,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         // EXTRA PARAMS
         // If there is not fullCoolaralCheck calc, than it adds some useful pararms
 
-        collateralDebtData.totalValue = _convertFromUSD(_priceOracle, collateralDebtData.totalValueUSD, underlying); // F:[FA-41]
-
-        if (task == CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS) {
-            return collateralDebtData;
-        }
-        ///
-        /// ADDS WITHDRAWAL VALUE
-        if (_hasWithdrawals(creditAccount)) {
-            collateralDebtData.totalValueUSD += addCancellableWithdrawalsValue({
+        if ((task != CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS) && _hasWithdrawals(creditAccount)) {
+            collateralDebtData.totalValueUSD += _addCancellableWithdrawalsValue({
                 _priceOracle: _priceOracle,
                 creditAccount: creditAccount,
                 isForceCancel: task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
-            });
+            }); // U:[CM-23]
         }
+
+        collateralDebtData.totalValue = _convertFromUSD(_priceOracle, collateralDebtData.totalValueUSD, underlying); // U:[CM-22,23]
     }
 
     function _getQuotedTokensData(address creditAccount, uint256 enabledTokensMask, address _poolQuotaKeeper)
@@ -770,37 +765,37 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             uint256 _quotedTokensMask
         )
     {
-        uint256 _maxEnabledTokens = maxEnabledTokens;
-        _quotedTokensMask = quotedTokensMask;
+        uint256 _maxEnabledTokens = maxEnabledTokens; // U:[CM-24]
+        _quotedTokensMask = quotedTokensMask; // U:[CM-24]
 
-        uint256 quotedMask = enabledTokensMask & _quotedTokensMask;
+        uint256 quotedMask = enabledTokensMask & _quotedTokensMask; // U:[CM-24]
 
         if (quotedMask != 0) {
-            quotaTokens = new address[](_maxEnabledTokens);
-            quotas = new uint256[](_maxEnabledTokens);
-            lts = new uint16[](_maxEnabledTokens);
+            quotaTokens = new address[](_maxEnabledTokens); // U:[CM-24]
+            quotas = new uint256[](_maxEnabledTokens); // U:[CM-24]
+            lts = new uint16[](_maxEnabledTokens); // U:[CM-24]
 
             uint256 j;
             unchecked {
                 for (uint256 tokenMask = 2; tokenMask <= quotedMask; tokenMask <<= 1) {
                     if (j == _maxEnabledTokens) {
-                        revert TooManyEnabledTokensException();
+                        revert TooManyEnabledTokensException(); // U:[CM-24]
                     }
 
                     if (quotedMask & tokenMask != 0) {
-                        address token;
-                        (token, lts[j]) = _collateralTokensByMask({tokenMask: tokenMask, calcLT: true});
+                        address token; // U:[CM-24]
+                        (token, lts[j]) = _collateralTokensByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
 
-                        quotaTokens[j] = token;
+                        quotaTokens[j] = token; // U:[CM-24]
 
                         uint256 outstandingInterestDelta;
                         (quotas[j], outstandingInterestDelta) =
-                            IPoolQuotaKeeper(_poolQuotaKeeper).getQuotaAndOutstandingInterest(creditAccount, token);
+                            IPoolQuotaKeeper(_poolQuotaKeeper).getQuotaAndOutstandingInterest(creditAccount, token); // U:[CM-24]
 
                         // Safe because quotaInterest =  (quota is uint96) * APY * time, so even with 1000% APY, it will take 10**10 years for overflow
-                        outstandingQuotaInterest += outstandingInterestDelta;
+                        outstandingQuotaInterest += outstandingInterestDelta; // U:[CM-24]
 
-                        ++j;
+                        ++j; // U:[CM-24]
                     }
                 }
             }
@@ -896,7 +891,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
     }
 
-    function addCancellableWithdrawalsValue(address _priceOracle, address creditAccount, bool isForceCancel)
+    function _addCancellableWithdrawalsValue(address _priceOracle, address creditAccount, bool isForceCancel)
         internal
         view
         returns (uint256 totalValueUSD)
