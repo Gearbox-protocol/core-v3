@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {CreditManagerV3} from "./CreditManagerV3.sol";
 import {USDT_Transfer} from "../traits/USDT_Transfer.sol";
-import {IPoolBase} from "../interfaces/IPool4626.sol";
+import {IPoolBase} from "../interfaces/IPoolV3.sol";
 /// @title Credit Manager
 
 contract CreditManagerV3_USDT is CreditManagerV3, USDT_Transfer {

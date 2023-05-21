@@ -18,7 +18,7 @@ import {CreditLogic} from "../libraries/CreditLogic.sol";
 
 import {QuotasLogic} from "../libraries/QuotasLogic.sol";
 
-import {IPool4626} from "../interfaces/IPool4626.sol";
+import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IPoolQuotaKeeper, TokenQuotaParams, AccountQuota} from "../interfaces/IPoolQuotaKeeper.sol";
 import {IGauge} from "../interfaces/IGauge.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
@@ -86,11 +86,11 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
     /// @dev Constructor
     /// @param _pool Pool address
     constructor(address _pool)
-        ACLNonReentrantTrait(IPool4626(_pool).addressProvider())
-        ContractsRegisterTrait(IPool4626(_pool).addressProvider())
+        ACLNonReentrantTrait(IPoolV3(_pool).addressProvider())
+        ContractsRegisterTrait(IPoolV3(_pool).addressProvider())
     {
         pool = _pool; // F:[PQK-1]
-        underlying = IPool4626(_pool).asset(); // F:[PQK-1]
+        underlying = IPoolV3(_pool).asset(); // F:[PQK-1]
     }
 
     /// @dev Updates credit account's accountQuotas for multiple tokens
@@ -114,7 +114,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         });
 
         if (quotaRevenueChange != 0) {
-            IPool4626(pool).changeQuotaRevenue(quotaRevenueChange);
+            IPoolV3(pool).changeQuotaRevenue(quotaRevenueChange);
         }
     }
 
@@ -150,7 +150,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         }
 
         if (quotaRevenueChange != 0) {
-            IPool4626(pool).changeQuotaRevenue(quotaRevenueChange);
+            IPoolV3(pool).changeQuotaRevenue(quotaRevenueChange);
         }
     }
 
@@ -283,7 +283,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
             }
         }
 
-        IPool4626(pool).updateQuotaRevenue(quotaRevenue); // F:[PQK-7]
+        IPoolV3(pool).updateQuotaRevenue(quotaRevenue); // F:[PQK-7]
         lastQuotaRateUpdate = uint40(block.timestamp); // F:[PQK-7]
     }
 

@@ -24,7 +24,7 @@ import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 import {CreditLogic} from "../libraries/CreditLogic.sol";
 
 import {IInterestRateModel} from "../interfaces/IInterestRateModel.sol";
-import {IPool4626} from "../interfaces/IPool4626.sol";
+import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
 
@@ -42,7 +42,7 @@ struct CreditManagerDebt {
 
 /// @title Core pool contract compatible with ERC4626
 /// @notice Implements pool & diesel token business logic
-contract Pool4626 is ERC4626, IPool4626, ACLNonReentrantTrait, ContractsRegisterTrait {
+contract PoolV3 is ERC4626, IPoolV3, ACLNonReentrantTrait, ContractsRegisterTrait {
     using Math for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;

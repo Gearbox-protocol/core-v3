@@ -12,8 +12,8 @@ import {LinearInterestRateModel} from "../../../pool/LinearInterestRateModel.sol
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import "../../../core/AddressProviderV3.sol";
-import {Pool4626} from "../../../pool/Pool4626.sol";
-import {IPool4626Events} from "../../../interfaces/IPool4626.sol";
+import {PoolV3} from "../../../pool/PoolV3.sol";
+import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
 import {IERC4626Events} from "../../interfaces/IERC4626.sol";
 
 import {IInterestRateModel} from "../../../interfaces/IInterestRateModel.sol";
@@ -47,9 +47,7 @@ import "../../../interfaces/IExceptions.sol";
 
 uint256 constant fee = 6000;
 
-/// @title pool
-/// @notice Business logic for borrowing liquidity pools
-contract Pool4626UnitTest is TestHelper, BalanceHelper, IPool4626Events, IERC4626Events {
+contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Events {
     using Math for uint256;
 
     PoolServiceTestSuite psts;
@@ -64,7 +62,7 @@ contract Pool4626UnitTest is TestHelper, BalanceHelper, IPool4626Events, IERC462
     event Transfer(address indexed from, address indexed to, uint256 value);
 
     ACL acl;
-    Pool4626 pool;
+    PoolV3 pool;
     address underlying;
     CreditManagerMock cmMock;
     IInterestRateModel irm;
@@ -195,7 +193,7 @@ contract Pool4626UnitTest is TestHelper, BalanceHelper, IPool4626Events, IERC462
         address ap = address(psts.addressProvider());
 
         vm.expectRevert(ZeroAddressException.selector);
-        new Pool4626({
+        new PoolV3({
             _addressProvider: address(0),
             _underlyingToken: underlying,
             _interestRateModel: irmodel,
@@ -207,7 +205,7 @@ contract Pool4626UnitTest is TestHelper, BalanceHelper, IPool4626Events, IERC462
         // opts.interestRateModel = address(0);
 
         vm.expectRevert(ZeroAddressException.selector);
-        new Pool4626({
+        new PoolV3({
               _addressProvider: ap,
             _underlyingToken: underlying,
             _interestRateModel: address(0),
@@ -219,7 +217,7 @@ contract Pool4626UnitTest is TestHelper, BalanceHelper, IPool4626Events, IERC462
         // opts.underlyingToken = address(0);
 
         vm.expectRevert(ZeroAddressException.selector);
-        new Pool4626({
+        new PoolV3({
             _addressProvider: ap,
             _underlyingToken: address(0),
             _interestRateModel: irmodel,
@@ -241,7 +239,7 @@ contract Pool4626UnitTest is TestHelper, BalanceHelper, IPool4626Events, IERC462
         vm.expectEmit(false, false, false, true);
         emit SetTotalBorrowedLimit(limit);
 
-        new Pool4626({
+        new PoolV3({
             _addressProvider: address(psts.addressProvider()),
             _underlyingToken: underlying,
             _interestRateModel: address(psts.linearIRModel()),
@@ -1554,7 +1552,7 @@ contract Pool4626UnitTest is TestHelper, BalanceHelper, IPool4626Events, IERC462
     // U:[P4-23]: setPoolQuotaManager updates quotaRevenue and emits event
 
     function test_U_P4_23_setPoolQuotaManager_updates_quotaRevenue_and_emits_event() public {
-        pool = new Pool4626({
+        pool = new PoolV3({
             _addressProvider: address(psts.addressProvider()),
             _underlyingToken: tokenTestSuite.addressOf(Tokens.DAI),
             _interestRateModel: address(irm),

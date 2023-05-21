@@ -4,6 +4,7 @@
 pragma solidity ^0.8.17;
 
 /// MOCKS
+import "../../../interfaces/IAddressProviderV3.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 import {AccountFactoryMock} from "../../mocks/core/AccountFactoryMock.sol";
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
@@ -22,7 +23,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 
 /// INTERFACE
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../../../interfaces/IAddressProviderV3.sol";
+
 import {ENTERED} from "../../../traits/ReentrancyGuardTrait.sol";
 import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
 import {IAccountFactory} from "../../../interfaces/IAccountFactory.sol";

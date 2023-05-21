@@ -15,8 +15,8 @@ import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
 import {BotList} from "../../support/BotList.sol";
 
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
-import {PoolServiceMock} from "../mocks/pool/PoolServiceMock.sol";
-import {GaugeMock} from "../mocks/pool/GaugeMock.sol";
+import {PoolServiceMock} from "../mocks//pool/PoolServiceMock.sol";
+import {GaugeMock} from "../mocks//pool/GaugeMock.sol";
 import {PoolQuotaKeeper} from "../../pool/PoolQuotaKeeper.sol";
 
 import "../lib/constants.sol";

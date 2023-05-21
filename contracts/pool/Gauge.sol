@@ -21,7 +21,7 @@ import {IGearStaking} from "../interfaces/IGearStaking.sol";
 
 import {RAY, SECONDS_PER_YEAR, MAX_WITHDRAW_FEE} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
-import {Pool4626} from "./Pool4626.sol";
+import {PoolV3} from "./PoolV3.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
@@ -35,7 +35,7 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
     address public immutable addressProvider;
 
     /// @dev Address of the pool
-    Pool4626 public immutable pool;
+    PoolV3 public immutable pool;
 
     /// @dev Mapping from token address to its rate parameters
     mapping(address => QuotaRateParams) public quotaRateParams;
@@ -59,14 +59,14 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
     /// @dev Constructor
 
     constructor(address _pool, address _gearStaking)
-        ACLNonReentrantTrait(address(Pool4626(_pool).addressProvider()))
+        ACLNonReentrantTrait(address(PoolV3(_pool).addressProvider()))
         nonZeroAddress(_pool)
         nonZeroAddress(_gearStaking)
     {
         // Additional check that receiver is not address(0)
 
-        addressProvider = address(Pool4626(_pool).addressProvider()); // F:[P4-01]
-        pool = Pool4626(_pool); // F:[P4-01]
+        addressProvider = address(PoolV3(_pool).addressProvider()); // F:[P4-01]
+        pool = PoolV3(_pool); // F:[P4-01]
         voter = IGearStaking(_gearStaking);
         epochLU = voter.getCurrentEpoch();
     }

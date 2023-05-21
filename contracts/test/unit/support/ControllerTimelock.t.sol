@@ -11,8 +11,8 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import {ICreditFacade} from "../../../interfaces/ICreditFacade.sol";
 import {ICreditConfigurator} from "../../../interfaces/ICreditConfiguratorV3.sol";
-import {IPool4626} from "../../../interfaces/IPool4626.sol";
-import {Pool4626} from "../../../pool/Pool4626.sol";
+import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
+import {PoolV3} from "../../../pool/PoolV3.sol";
 import {ILPPriceFeed} from "../../../interfaces/ILPPriceFeed.sol";
 import {IControllerTimelockEvents, IControllerTimelockErrors} from "../../../interfaces/IControllerTimelock.sol";
 
@@ -90,7 +90,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         );
 
         vm.mockCall(
-            pool, abi.encodeWithSelector(IPool4626.creditManagerBorrowed.selector, creditManager), abi.encode(1234)
+            pool, abi.encodeWithSelector(IPoolV3.creditManagerBorrowed.selector, creditManager), abi.encode(1234)
         );
 
         Policy memory policy = Policy({
@@ -126,9 +126,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         vm.prank(admin);
         controllerTimelock.setExpirationDate(creditManager, uint40(block.timestamp + 5));
 
-        vm.mockCall(
-            pool, abi.encodeWithSelector(IPool4626.creditManagerBorrowed.selector, creditManager), abi.encode(0)
-        );
+        vm.mockCall(pool, abi.encodeWithSelector(IPoolV3.creditManagerBorrowed.selector, creditManager), abi.encode(0));
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
@@ -395,9 +393,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
 
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "CREDIT_MANAGER_DEBT_LIMIT"));
 
-        vm.mockCall(
-            pool, abi.encodeWithSelector(IPool4626.creditManagerLimit.selector, creditManager), abi.encode(1e18)
-        );
+        vm.mockCall(pool, abi.encodeWithSelector(IPoolV3.creditManagerLimit.selector, creditManager), abi.encode(1e18));
 
         Policy memory policy = Policy({
             enabled: false,
@@ -449,7 +445,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         vm.prank(admin);
         controllerTimelock.setCreditManagerDebtLimit(creditManager, 2e18);
 
-        vm.expectCall(pool, abi.encodeWithSelector(Pool4626.setCreditManagerLimit.selector, creditManager, 2e18));
+        vm.expectCall(pool, abi.encodeWithSelector(PoolV3.setCreditManagerLimit.selector, creditManager, 2e18));
 
         vm.warp(block.timestamp + 1 days);
 
@@ -576,9 +572,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
             creditFacade, abi.encodeWithSelector(ICreditFacade.expirationDate.selector), abi.encode(block.timestamp)
         );
 
-        vm.mockCall(
-            pool, abi.encodeWithSelector(IPool4626.creditManagerBorrowed.selector, creditManager), abi.encode(0)
-        );
+        vm.mockCall(pool, abi.encodeWithSelector(IPoolV3.creditManagerBorrowed.selector, creditManager), abi.encode(0));
 
         Policy memory policy = Policy({
             enabled: false,
@@ -680,9 +674,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
             creditFacade, abi.encodeWithSelector(ICreditFacade.expirationDate.selector), abi.encode(block.timestamp)
         );
 
-        vm.mockCall(
-            pool, abi.encodeWithSelector(IPool4626.creditManagerBorrowed.selector, creditManager), abi.encode(0)
-        );
+        vm.mockCall(pool, abi.encodeWithSelector(IPoolV3.creditManagerBorrowed.selector, creditManager), abi.encode(0));
 
         uint40 expirationDate = uint40(block.timestamp + 2 days);
 

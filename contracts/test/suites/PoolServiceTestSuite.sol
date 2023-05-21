@@ -4,29 +4,29 @@
 pragma solidity ^0.8.17;
 
 import "../../core/AddressProviderV3.sol";
-import {AddressProviderV3ACLMock} from "../mocks/core/AddressProviderV3ACLMock.sol";
+import {AddressProviderV3ACLMock} from "../mocks//core/AddressProviderV3ACLMock.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {DieselToken} from "@gearbox-protocol/core-v2/contracts/tokens/DieselToken.sol";
 
-import {IPool4626} from "../../interfaces/IPool4626.sol";
+import {IPoolV3} from "../../interfaces/IPoolV3.sol";
 import {TestPoolService} from "@gearbox-protocol/core-v2/contracts/test/mocks/pool/TestPoolService.sol";
 import {Tokens} from "../config/Tokens.sol";
 
 import {LinearInterestRateModel} from "../../pool/LinearInterestRateModel.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {CreditManagerMock} from "../mocks/credit/CreditManagerMock.sol";
+import {CreditManagerMock} from "../mocks//credit/CreditManagerMock.sol";
 import {WETHMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/WETHMock.sol";
-import {ERC20FeeMock} from "../mocks/token/ERC20FeeMock.sol";
+import {ERC20FeeMock} from "../mocks//token/ERC20FeeMock.sol";
 
 import "../lib/constants.sol";
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
-import {Pool4626} from "../../pool/Pool4626.sol";
+import {PoolV3} from "../../pool/PoolV3.sol";
 import {PoolQuotaKeeper} from "../../pool/PoolQuotaKeeper.sol";
-import {GaugeMock} from "../mocks/pool/GaugeMock.sol";
+import {GaugeMock} from "../mocks//pool/GaugeMock.sol";
 
-import {Pool4626_USDT} from "../../pool/Pool4626_USDT.sol";
+import {PoolV3_USDT} from "../../pool/PoolV3_USDT.sol";
 
 import {Test} from "forge-std/Test.sol";
 
@@ -35,8 +35,6 @@ uint256 constant addLiquidity = 10 ether;
 uint256 constant removeLiquidity = 5 ether;
 uint16 constant referral = 12333;
 
-/// @title PoolServiceTestSuite
-/// @notice Deploys contract for unit testing of PoolService.sol
 contract PoolServiceTestSuite is Test {
     ACL public acl;
     WETHMock public weth;
@@ -44,7 +42,7 @@ contract PoolServiceTestSuite is Test {
     IAddressProviderV3 public addressProvider;
     ContractsRegister public cr;
     TestPoolService public poolService;
-    Pool4626 public pool4626;
+    PoolV3 public pool4626;
     CreditManagerMock public cmMock;
     IERC20 public underlying;
     DieselToken public dieselToken;
@@ -97,20 +95,20 @@ contract PoolServiceTestSuite is Test {
 
         if (is4626) {
             pool4626 = isFeeToken
-                ? new Pool4626_USDT({
-                                                                                                                                                    _addressProvider: address(addressProvider),
-                                                                                                                                                    _underlyingToken: _underlying,
-                                                                                                                                                    _interestRateModel: address(linearIRModel),
-                                                                                                                                                    _expectedLiquidityLimit: type(uint256).max,
-                                                                                                                                                    _supportsQuotas: supportQuotas
-                                                                                                                                                })
-                : new Pool4626({
-                                                                                                                                                    _addressProvider: address(addressProvider),
-                                                                                                                                                    _underlyingToken: _underlying,
-                                                                                                                                                    _interestRateModel: address(linearIRModel),
-                                                                                                                                                    _expectedLiquidityLimit: type(uint256).max,
-                                                                                                                                                    _supportsQuotas: supportQuotas
-                                                                                                                                                });
+                ? new PoolV3_USDT({
+                                                                                                                                                                                        _addressProvider: address(addressProvider),
+                                                                                                                                                                                        _underlyingToken: _underlying,
+                                                                                                                                                                                        _interestRateModel: address(linearIRModel),
+                                                                                                                                                                                        _expectedLiquidityLimit: type(uint256).max,
+                                                                                                                                                                                        _supportsQuotas: supportQuotas
+                                                                                                                                                                                    })
+                : new PoolV3({
+                                                                                                                                                                                        _addressProvider: address(addressProvider),
+                                                                                                                                                                                        _underlyingToken: _underlying,
+                                                                                                                                                                                        _interestRateModel: address(linearIRModel),
+                                                                                                                                                                                        _expectedLiquidityLimit: type(uint256).max,
+                                                                                                                                                                                        _supportsQuotas: supportQuotas
+                                                                                                                                                                                    });
             newPool = address(pool4626);
 
             if (supportQuotas) {

@@ -41,7 +41,7 @@ import {TokenAlreadyAddedException} from "../../../interfaces/IExceptions.sol";
 
 // MOCKS
 import {PriceFeedMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/oracles/PriceFeedMock.sol";
-import {PoolServiceMock} from "../../mocks/pool/PoolServiceMock.sol";
+import {PoolServiceMock} from "../../mocks//pool/PoolServiceMock.sol";
 import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
 import {
     ERC20ApproveRestrictedRevert,

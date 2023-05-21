@@ -28,7 +28,7 @@ import "../../../interfaces/IExceptions.sol";
 import "../../lib/constants.sol";
 
 // MOCKS
-import {AdapterMock} from "../../mocks/adapters/AdapterMock.sol";
+import {AdapterMock} from "../../mocks//adapters/AdapterMock.sol";
 import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
 
 // SUITES

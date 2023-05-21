@@ -8,7 +8,7 @@ import "../../../interfaces/IAddressProviderV3.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
-import {IPool4626} from "../../../interfaces/IPool4626.sol";
+import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 import {IPoolQuotaKeeper} from "../../../interfaces/IPoolQuotaKeeper.sol";
 
 contract CreditManagerMock {
@@ -44,12 +44,12 @@ contract CreditManagerMock {
 
     /// @notice Outdated
     function lendCreditAccount(uint256 borrowedAmount, address ca) external {
-        IPool4626(poolService).lendCreditAccount(borrowedAmount, ca);
+        IPoolV3(poolService).lendCreditAccount(borrowedAmount, ca);
     }
 
     /// @notice Outdated
     function repayCreditAccount(uint256 borrowedAmount, uint256 profit, uint256 loss) external {
-        IPool4626(poolService).repayCreditAccount(borrowedAmount, profit, loss);
+        IPoolV3(poolService).repayCreditAccount(borrowedAmount, profit, loss);
     }
 
     /// @notice Outdated
@@ -58,7 +58,7 @@ contract CreditManagerMock {
         returns (uint256 caQuotaInterestChange, bool tokensToEnable, uint256 tokensToDisable)
     {
         (caQuotaInterestChange,,) =
-            IPoolQuotaKeeper(IPool4626(pool).poolQuotaKeeper()).updateQuota(_creditAccount, token, quotaChange);
+            IPoolQuotaKeeper(IPoolV3(pool).poolQuotaKeeper()).updateQuota(_creditAccount, token, quotaChange);
     }
 
     function addToken(address token, uint256 mask) external {

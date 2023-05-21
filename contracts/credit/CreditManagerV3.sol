@@ -22,7 +22,7 @@ import {IERC20Helper} from "../libraries/IERC20Helper.sol";
 // INTERFACES
 import {IAccountFactory} from "../interfaces/IAccountFactory.sol";
 import {ICreditAccount} from "../interfaces/ICreditAccount.sol";
-import {IPoolBase, IPool4626} from "../interfaces/IPool4626.sol";
+import {IPoolBase, IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
 import {ClaimAction, IWithdrawalManager} from "../interfaces/IWithdrawalManager.sol";
 import {
@@ -210,7 +210,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         underlying = IPoolBase(pool).underlyingToken(); // U:[CM-1]
 
-        try IPool4626(_pool).supportsQuotas() returns (bool sq) {
+        try IPoolV3(_pool).supportsQuotas() returns (bool sq) {
             supportsQuotas = sq;
         } catch {}
 
@@ -1243,7 +1243,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     ///      this contract is responsible for aligning quota interest values between the
     ///      pool, gauge and the Credit Manager
     function poolQuotaKeeper() public view returns (address) {
-        return IPool4626(pool).poolQuotaKeeper();
+        return IPoolV3(pool).poolQuotaKeeper();
     }
 
     ///

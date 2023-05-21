@@ -16,7 +16,7 @@ import {ICreditFilter} from "@gearbox-protocol/core-v2/contracts/interfaces/V1/I
 import {ICreditConfigurator} from "../interfaces/ICreditConfiguratorV3.sol";
 import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
-import {IPool4626} from "../interfaces/IPool4626.sol";
+import {IPoolV3} from "../interfaces/IPoolV3.sol";
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
@@ -350,7 +350,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
         uint256 dieselSupply = IERC20(result.dieselToken).totalSupply();
 
         uint256 totalLP =
-            (result.version > 1) ? IPool4626(_pool).convertToAssets(dieselSupply) : pool.fromDiesel(dieselSupply);
+            (result.version > 1) ? IPoolV3(_pool).convertToAssets(dieselSupply) : pool.fromDiesel(dieselSupply);
 
         result.depositAPY_RAY = totalLP == 0
             ? result.borrowAPY_RAY

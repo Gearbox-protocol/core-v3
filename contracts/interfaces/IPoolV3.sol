@@ -8,7 +8,7 @@ import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
-interface IPool4626Events {
+interface IPoolV3Events {
     /// @dev Emits on new liquidity being added to the pool
     event DepositWithReferral(address indexed sender, address indexed onBehalfOf, uint256 amount, uint16 referralCode);
 
@@ -76,7 +76,7 @@ interface IPoolBase {
 
 /// @title Pool 4626
 /// More: https://dev.gearbox.fi/developers/pool/abstractpoolservice
-interface IPool4626 is IPool4626Events, IPoolBase, IERC4626, IVersion {
+interface IPoolV3 is IPoolV3Events, IPoolBase, IERC4626, IVersion {
     function depositReferral(uint256 assets, address receiver, uint16 referralCode) external returns (uint256 shares);
 
     function burn(uint256 shares) external;

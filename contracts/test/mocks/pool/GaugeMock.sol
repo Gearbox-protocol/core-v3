@@ -21,7 +21,7 @@ import {IGearStaking} from "../../../interfaces/IGearStaking.sol";
 import {RAY, SECONDS_PER_YEAR, MAX_WITHDRAW_FEE} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
-import {Pool4626} from "../../../pool/Pool4626.sol";
+import {PoolV3} from "../../../pool/PoolV3.sol";
 
 import "forge-std/console.sol";
 
@@ -34,7 +34,7 @@ contract GaugeMock is ACLNonReentrantTrait {
     address public immutable addressProvider;
 
     /// @dev Address of the pool
-    Pool4626 public immutable pool;
+    PoolV3 public immutable pool;
 
     /// @dev Mapping from token address to its rate parameters
     mapping(address => uint16) public rates;
@@ -45,9 +45,9 @@ contract GaugeMock is ACLNonReentrantTrait {
 
     /// @dev Constructor
 
-    constructor(address _pool) ACLNonReentrantTrait(address(Pool4626(_pool).addressProvider())) nonZeroAddress(_pool) {
-        addressProvider = address(Pool4626(_pool).addressProvider()); // F:[P4-01]
-        pool = Pool4626(payable(_pool)); // F:[P4-01]
+    constructor(address _pool) ACLNonReentrantTrait(address(PoolV3(_pool).addressProvider())) nonZeroAddress(_pool) {
+        addressProvider = address(PoolV3(_pool).addressProvider()); // F:[P4-01]
+        pool = PoolV3(payable(_pool)); // F:[P4-01]
     }
 
     /// @dev Rolls the new epoch and updates all quota rates

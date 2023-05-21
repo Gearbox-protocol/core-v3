@@ -215,7 +215,7 @@ error BorrowingMoreU2ForbiddenException();
 /// @dev Thrown on returning a value that violates the current bounds
 error ValueOutOfRangeException();
 
-// interface IPool4626Exceptions {
+// interface IPoolV3Exceptions {
 error ExpectedLiquidityLimitException();
 
 error CreditManagerCantBorrowException();

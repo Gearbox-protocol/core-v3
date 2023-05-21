@@ -10,7 +10,7 @@ import {IControllerTimelock, QueuedTransactionData} from "../../interfaces/ICont
 import {ICreditManagerV3} from "../../interfaces/ICreditManagerV3.sol";
 import {ICreditConfigurator} from "../../interfaces/ICreditConfiguratorV3.sol";
 import {ICreditFacade} from "../../interfaces/ICreditFacade.sol";
-import {IPool4626} from "../../interfaces/IPool4626.sol";
+import {IPoolV3} from "../../interfaces/IPoolV3.sol";
 import {ILPPriceFeed} from "../../interfaces/ILPPriceFeed.sol";
 
 /// @dev
@@ -59,7 +59,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
     {
         ICreditFacade creditFacade = ICreditFacade(ICreditManagerV3(creditManager).creditFacade());
         address creditConfigurator = ICreditManagerV3(creditManager).creditConfigurator();
-        IPool4626 pool = IPool4626(ICreditManagerV3(creditManager).pool());
+        IPoolV3 pool = IPoolV3(ICreditManagerV3(creditManager).pool());
 
         uint40 oldExpirationDate = creditFacade.expirationDate();
         uint256 totalBorrowed = pool.creditManagerBorrowed(address(creditManager));
@@ -159,7 +159,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
         external
         adminOnly // F: [RCT-05]
     {
-        IPool4626 pool = IPool4626(ICreditManagerV3(creditManager).pool());
+        IPoolV3 pool = IPoolV3(ICreditManagerV3(creditManager).pool());
 
         uint256 debtLimitCurrent = pool.creditManagerLimit(address(creditManager));
 

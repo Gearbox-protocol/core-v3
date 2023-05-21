@@ -42,9 +42,9 @@ import {CreditFacadeTestHelper} from "../../helpers/CreditFacadeTestHelper.sol";
 import "../../../interfaces/IExceptions.sol";
 
 // MOCKS
-import {AdapterMock} from "../../mocks/adapters/AdapterMock.sol";
+import {AdapterMock} from "../../mocks//adapters/AdapterMock.sol";
 import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
-import {ERC20BlacklistableMock} from "../../mocks/token/ERC20Blacklistable.sol";
+import {ERC20BlacklistableMock} from "../../mocks//token/ERC20Blacklistable.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";

@@ -2,7 +2,7 @@ pragma solidity ^0.8.17;
 
 import {CreditManagerV3Harness} from "./CreditManagerV3Harness.sol";
 import {USDT_Transfer} from "../../../traits/USDT_Transfer.sol";
-import {IPoolBase} from "../../../interfaces/IPool4626.sol";
+import {IPoolBase} from "../../../interfaces/IPoolV3.sol";
 /// @title Credit Manager
 
 contract CreditManagerV3Harness_USDT is CreditManagerV3Harness, USDT_Transfer {

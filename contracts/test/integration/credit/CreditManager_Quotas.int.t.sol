@@ -37,7 +37,7 @@ import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 
 // MOCKS
 import {PriceFeedMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/oracles/PriceFeedMock.sol";
-import {PoolServiceMock} from "../../mocks/pool/PoolServiceMock.sol";
+import {PoolServiceMock} from "../../mocks//pool/PoolServiceMock.sol";
 import {PoolQuotaKeeper} from "../../../pool/PoolQuotaKeeper.sol";
 import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
 

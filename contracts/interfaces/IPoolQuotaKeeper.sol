@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
-import {IPool4626} from "./IPool4626.sol";
+import {IPoolV3} from "./IPoolV3.sol";
 
 struct TokenQuotaParams {
     uint96 totalQuoted;

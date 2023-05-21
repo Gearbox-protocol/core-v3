@@ -31,7 +31,7 @@ import {ClaimAction} from "../interfaces/IWithdrawalManager.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IPriceFeedOnDemand} from "../interfaces/IPriceFeedOnDemand.sol";
 
-import {IPool4626} from "../interfaces/IPool4626.sol";
+import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IDegenNFT} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
