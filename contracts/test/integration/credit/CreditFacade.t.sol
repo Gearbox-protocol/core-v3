@@ -257,10 +257,6 @@ contract CreditFacadeIntegrationTest is
 
         // vm.prank(CONFIGURATOR);
         // creditConfigurator.allowContract(address(targetMock), address(adapterMock));
-
-        vm.expectRevert(CreditAccountNotExistsException.selector);
-        vm.prank(USER);
-        creditFacade.transferAccountOwnership(DUMB_ADDRESS, FRIEND);
     }
 
     //
@@ -339,26 +335,6 @@ contract CreditFacadeIntegrationTest is
     //
     // OPEN CREDIT ACCOUNT
     //
-
-    /// @dev [FA-4A]: openCreditAccount reverts for using addresses which is not allowed by transfer allowance
-    function test_FA_04A_openCreditAccount_reverts_for_using_addresses_which_is_not_allowed_by_transfer_allowance()
-        public
-    {
-        (uint256 minBorrowedAmount,) = creditFacade.debtLimits();
-
-        vm.startPrank(USER);
-
-        MultiCall[] memory calls = multicallBuilder(
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
-            })
-        );
-        vm.expectRevert(AccountTransferNotAllowedException.selector);
-        creditFacade.openCreditAccount(minBorrowedAmount, FRIEND, calls, 0);
-
-        vm.stopPrank();
-    }
 
     /// @dev [FA-4B]: openCreditAccount reverts if user has no NFT for degen mode
     function test_FA_04B_openCreditAccount_reverts_for_non_whitelisted_account() public {
@@ -489,9 +465,6 @@ contract CreditFacadeIntegrationTest is
 
     /// @dev [FA-8]: openCreditAccount runs operations in correct order
     function test_FA_08_openCreditAccountMulticall_runs_operations_in_correct_order() public {
-        vm.prank(FRIEND);
-        creditFacade.approveAccountTransfer(USER, true);
-
         RevocationPair[] memory revocations = new RevocationPair[](1);
 
         revocations[0] = RevocationPair({spender: address(this), token: underlying});
@@ -1149,9 +1122,6 @@ contract CreditFacadeIntegrationTest is
     function test_FA_21C_addCollateral_optimizes_enabled_tokens() public {
         (address creditAccount,) = _openTestCreditAccount();
 
-        vm.prank(USER);
-        creditFacade.approveAccountTransfer(FRIEND, true);
-
         address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
 
         tokenTestSuite.mint(Tokens.USDC, FRIEND, 512);
@@ -1416,52 +1386,6 @@ contract CreditFacadeIntegrationTest is
     //     creditFacade.transferAccountOwnership(DUMB_ADDRESS);
     // }
 
-    /// @dev [FA-33]: transferAccountOwnership reverts if "to" user doesn't provide allowance
-    function test_FA_33_transferAccountOwnership_reverts_if_to_user_doesnt_provide_allowance() public {
-        (address creditAccount,) = _openTestCreditAccount();
-        vm.expectRevert(AccountTransferNotAllowedException.selector);
-
-        vm.prank(USER);
-        creditFacade.transferAccountOwnership(creditAccount, DUMB_ADDRESS);
-    }
-
-    /// @dev [FA-34]: transferAccountOwnership reverts if hf less 1
-    function test_FA_34_transferAccountOwnership_reverts_if_hf_less_1() public {
-        (address creditAccount,) = _openTestCreditAccount();
-
-        vm.prank(FRIEND);
-        creditFacade.approveAccountTransfer(USER, true);
-
-        _makeAccountsLiquitable();
-
-        vm.expectRevert(CantTransferLiquidatableAccountException.selector);
-
-        vm.prank(USER);
-        creditFacade.transferAccountOwnership(creditAccount, FRIEND);
-    }
-
-    /// @dev [FA-35]: transferAccountOwnership transfers account if it's allowed
-    function test_FA_35_transferAccountOwnership_transfers_account_if_its_allowed() public {
-        (address creditAccount,) = _openTestCreditAccount();
-
-        vm.prank(FRIEND);
-        creditFacade.approveAccountTransfer(USER, true);
-
-        vm.expectCall(
-            address(creditManager), abi.encodeCall(ICreditManagerV3.transferAccountOwnership, (creditAccount, FRIEND))
-        );
-
-        vm.expectEmit(true, true, false, false);
-        emit TransferAccount(creditAccount, USER, FRIEND);
-
-        vm.prank(USER);
-        creditFacade.transferAccountOwnership(creditAccount, FRIEND);
-
-        // assertEq(
-        //     creditManager.getCreditAccountOrRevert(FRIEND), creditAccount, "Credit account was not properly transferred"
-        // );
-    }
-
     /// @dev [FA-36]: checkAndUpdateBorrowedBlockLimit doesn't change block limit if maxBorrowedAmountPerBlock = type(uint128).max
     function test_FA_36_checkAndUpdateBorrowedBlockLimit_doesnt_change_block_limit_if_set_to_max() public {
         // vm.prank(CONFIGURATOR);
@@ -1524,30 +1448,6 @@ contract CreditFacadeIntegrationTest is
 
         // assertEq(blockLastUpdate, block.number, "blockLastUpdate");
         // assertEq(borrowedInBlock, DAI_EXCHANGE_AMOUNT, "Incorrect borrowedInBlock");
-    }
-
-    //
-    // APPROVE ACCOUNT TRANSFER
-    //
-
-    /// @dev [FA-38]: approveAccountTransfer changes transfersAllowed
-    function test_FA_38_transferAccountOwnership_with_allowed_to_transfers_account() public {
-        assertTrue(creditFacade.transfersAllowed(USER, FRIEND) == false, "Transfer is unexpectedly allowed ");
-
-        vm.expectEmit(true, true, false, true);
-        emit SetAccountTransferAllowance(USER, FRIEND, true);
-
-        vm.prank(FRIEND);
-        creditFacade.approveAccountTransfer(USER, true);
-
-        assertTrue(creditFacade.transfersAllowed(USER, FRIEND) == true, "Transfer is unexpectedly not allowed ");
-
-        vm.expectEmit(true, true, false, true);
-        emit SetAccountTransferAllowance(USER, FRIEND, false);
-
-        vm.prank(FRIEND);
-        creditFacade.approveAccountTransfer(USER, false);
-        assertTrue(creditFacade.transfersAllowed(USER, FRIEND) == false, "Transfer is unexpectedly allowed ");
     }
 
     //

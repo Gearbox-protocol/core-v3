@@ -389,9 +389,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.addCollateral(DUMB_ADDRESS, DUMB_ADDRESS, DUMB_ADDRESS, 100);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
-        creditManager.transferAccountOwnership(DUMB_ADDRESS, DUMB_ADDRESS);
-
-        vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.fullCollateralCheck(DUMB_ADDRESS, 0, new uint256[](0), 1);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
@@ -492,9 +489,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditManager.addCollateral(DUMB_ADDRESS, DUMB_ADDRESS, DUMB_ADDRESS, 100);
-
-        vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditManager.transferAccountOwnership(DUMB_ADDRESS, DUMB_ADDRESS);
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditManager.fullCollateralCheck(DUMB_ADDRESS, 0, new uint256[](0), 1);
@@ -1285,24 +1279,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         checkTokenTransfers({debug: false});
 
         assertEq(tokenToEnable, UNDERLYING_TOKEN_MASK, "Incorrect tokenToEnable");
-    }
-
-    //
-    //  TRANSFER ACCOUNT OWNERSHIP
-    //
-
-    /// @dev U:[CM-14]: transferAccountOwnership works as expected
-    function test_U_CM_14_transferAccountOwnership_works_as_expected() public withoutSupportQuotas {
-        address creditAccount = DUMB_ADDRESS;
-        vm.expectRevert(CreditAccountNotExistsException.selector);
-        creditManager.transferAccountOwnership(creditAccount, FRIEND);
-
-        creditManager.setBorrower({creditAccount: creditAccount, borrower: USER});
-        creditManager.transferAccountOwnership(creditAccount, FRIEND);
-
-        (,,,,, address borrower) = creditManager.creditAccountInfo(creditAccount);
-
-        assertEq(borrower, FRIEND, "Incorrect borrower");
     }
 
     //

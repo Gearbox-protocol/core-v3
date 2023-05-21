@@ -218,7 +218,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
 
     function _openAccountAndTransferToCF() internal returns (address creditAccount) {
         (,,, creditAccount) = _openCreditAccount();
-        creditManager.transferAccountOwnership(creditAccount, address(this));
+        // creditManager.transferAccountOwnership(creditAccount, address(this));
     }
 
     function _baseFullCollateralCheck(address creditAccount) internal {
@@ -655,7 +655,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
 
     function test_CM_14_close_credit_account_with_nonzero_skipTokenMask_sends_correct_tokens() public {
         (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
-        creditManager.transferAccountOwnership(creditAccount, address(this));
+        // creditManager.transferAccountOwnership(creditAccount, address(this));
 
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
         tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
@@ -671,7 +671,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         uint256 usdcTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.USDC));
         uint256 linkTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.LINK));
 
-        creditManager.transferAccountOwnership(creditAccount, USER);
+        // creditManager.transferAccountOwnership(creditAccount, USER);
 
         // creditManager.closeCreditAccount(
         //     creditAccount,
@@ -742,7 +742,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
     function test_CM_17_close_dai_credit_account_sends_eth_to_borrower() public {
         /// CLOSURE CASE
         (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
-        creditManager.transferAccountOwnership(creditAccount, address(this));
+        //creditManager.transferAccountOwnership(creditAccount, address(this));
 
         // Transfer additional borrowedAmount. After that underluying token balance = 2 * borrowedAmount
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
@@ -753,7 +753,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         uint256 wethTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.WETH));
         uint256 daiTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI));
 
-        creditManager.transferAccountOwnership(creditAccount, USER);
+        // creditManager.transferAccountOwnership(creditAccount, USER);
         // creditManager.closeCreditAccount(
         //     creditAccount,
         //     ClosureAction.CLOSE_ACCOUNT,
@@ -827,7 +827,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
     function test_CM_19_close_dai_credit_account_sends_eth_to_liquidator() public {
         /// CLOSURE CASE
         (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
-        creditManager.transferAccountOwnership(creditAccount, address(this));
+        // creditManager.transferAccountOwnership(creditAccount, address(this));
 
         // Transfer additional borrowedAmount. After that underluying token balance = 2 * borrowedAmount
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
@@ -835,7 +835,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         // Adds WETH to test how it would be converted
         tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
 
-        creditManager.transferAccountOwnership(creditAccount, USER);
+        // creditManager.transferAccountOwnership(creditAccount, USER);
         uint256 wethTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.WETH));
         uint256 daiTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI));
 
@@ -1017,7 +1017,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
     function test_CM_24_transferAccountOwnership_changes_creditAccounts_map_properly() public {
         (,,, address creditAccount) = _openCreditAccount();
 
-        creditManager.transferAccountOwnership(creditAccount, FRIEND);
+        // creditManager.transferAccountOwnership(creditAccount, FRIEND);
 
         // assertEq(creditManager.creditAccounts(USER), address(0), "From account wasn't deleted");
 
@@ -1162,7 +1162,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
     function test_CM_39_fullCollateralCheck_diables_tokens_if_they_have_zero_balance() public {
         (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow, address creditAccount) =
             _openCreditAccount();
-        creditManager.transferAccountOwnership(creditAccount, address(this));
+        // creditManager.transferAccountOwnership(creditAccount, address(this));
 
         (uint256 feeInterest,,,,) = creditManager.fees();
 
@@ -1208,7 +1208,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
         vm.stopPrank();
 
         address creditAccount = cm.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER);
-        cm.transferAccountOwnership(creditAccount, address(this));
+        //cm.transferAccountOwnership(creditAccount, address(this));
 
         address revertToken = DUMB_ADDRESS;
         address linkToken = tokenTestSuite.addressOf(Tokens.LINK);
@@ -1560,7 +1560,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
 
             address friend = friends[i];
             (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
-            creditManager.transferAccountOwnership(creditAccount, address(this));
+            // creditManager.transferAccountOwnership(creditAccount, address(this));
 
             CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
 
@@ -1600,7 +1600,7 @@ contract CreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
 
             expectBalance(Tokens.LINK, friend, 0);
 
-            creditManager.transferAccountOwnership(creditAccount, USER);
+            // creditManager.transferAccountOwnership(creditAccount, USER);
             // creditManager.closeCreditAccount(
             //     creditAccount,
             //     ClosureAction.LIQUIDATE_ACCOUNT,

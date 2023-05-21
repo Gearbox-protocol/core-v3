@@ -122,9 +122,6 @@ error TokenIsNotQuotedException();
 ///      requires expirability
 error NotAllowedWhenNotExpirableException();
 
-/// @dev Thrown if a user attempts to transfer a CA to an address that didn't allow it or transfer in whitelisted mode
-error AccountTransferNotAllowedException();
-
 /// @dev Thrown if a liquidator tries to liquidate an account with a health factor above 1
 error CreditAccountNotLiquidatableException();
 
@@ -144,9 +141,6 @@ error UnknownMethodException();
 
 /// @dev Thrown if a user tries to open an account or increase debt with increaseDebtForbidden mode on
 error BorrowingForbiddenException();
-
-/// @dev Thrown if the account owner tries to transfer an unhealthy account
-error CantTransferLiquidatableAccountException();
 
 /// @dev Thrown if too much new debt was taken within a single block
 error BorrowedBlockLimitException();

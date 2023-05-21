@@ -218,7 +218,7 @@ contract OldCreditManagerTest is Test, ICreditManagerV3Events, BalanceHelper {
 
     function _openAccountAndTransferToCF() internal returns (address creditAccount) {
         (,,, creditAccount) = _openCreditAccount();
-        creditManager.transferAccountOwnership(creditAccount, address(this));
+        // creditManager.transferAccountOwnership(creditAccount, address(this));
     }
 
     function _baseFullCollateralCheck(address creditAccount) internal {

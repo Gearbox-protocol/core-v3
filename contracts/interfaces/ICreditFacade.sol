@@ -53,12 +53,6 @@ interface ICreditFacadeEvents {
 
     /// @dev Emits when a multicall is finished
     event FinishMultiCall();
-
-    /// @dev Emits when Credit Account ownership is transferred
-    event TransferAccount(address indexed creditAccount, address indexed oldOwner, address indexed newOwner);
-
-    /// @dev Emits when the user changes approval for account transfers to itself from another address
-    event SetAccountTransferAllowance(address indexed from, address indexed to, bool state);
 }
 
 interface ICreditFacade is ICreditFacadeEvents, IVersion {
@@ -155,21 +149,9 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     /// @param calls The array of MultiCall structs encoding the operations to execute.
     function botMulticall(address borrower, MultiCall[] calldata calls) external;
 
-    /// @dev Approves account transfer from another user to msg.sender
-    /// @param from Address for which account transfers are allowed/forbidden
-    /// @param state True is transfer is allowed, false if forbidden
-    function approveAccountTransfer(address from, bool state) external;
-
     // /// @dev Enables token in enabledTokensMask for the Credit Account of msg.sender
     // /// @param token Address of token to enable
     // function enableToken(address token) external;
-
-    /// @dev Transfers credit account to another user
-    /// By default, this action is forbidden, and the user has to approve transfers from sender to itself
-    /// by calling approveAccountTransfer.
-    /// This is done to prevent malicious actors from transferring compromised accounts to other users.
-    /// @param to Address to transfer the account to
-    function transferAccountOwnership(address creditAccount, address to) external;
 
     function claimWithdrawals(address creditAccount, address to) external;
 
@@ -196,11 +178,6 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
 
     /// @dev Returns the CreditManagerV3 connected to this Credit Facade
     function creditManager() external view returns (address);
-
-    /// @dev Returns true if 'from' is allowed to transfer Credit Accounts to 'to'
-    /// @param from Sender address to check allowance for
-    /// @param to Receiver address to check allowance for
-    function transfersAllowed(address from, address to) external view returns (bool);
 
     /// @return minDebt Minimal borrowed amount per credit account
     function debtLimits() external view returns (uint128 minDebt, uint128 maxDebt);

@@ -549,7 +549,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         tokenTestSuite.mint(Tokens.DAI, address(poolMock), 1_250_000 * WAD);
 
         (,,, address creditAccount) = cms.openCreditAccount(1_250_000 * WAD);
-        creditManager.transferAccountOwnership(creditAccount, address(this));
+        // creditManager.transferAccountOwnership(creditAccount, address(this));
 
         uint256 tokenToEnable;
 
