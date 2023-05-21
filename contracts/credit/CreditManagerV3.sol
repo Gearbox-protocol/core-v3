@@ -12,6 +12,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 // LIBS & TRAITS
 import {UNDERLYING_TOKEN_MASK, BitMask} from "../libraries/BitMask.sol";
 import {CreditLogic} from "../libraries/CreditLogic.sol";
+import {CollateralLogic} from "../libraries/CollateralLogic.sol";
 import {CreditAccountHelper} from "../libraries/CreditAccountHelper.sol";
 
 import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
@@ -59,8 +60,9 @@ import "../interfaces/IExceptions.sol";
 contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using BitMask for uint256;
-    using CreditLogic for CollateralDebtData;
     using CreditLogic for CollateralTokenData;
+    using CreditLogic for CollateralDebtData;
+    using CollateralLogic for CollateralDebtData;
     using SafeERC20 for IERC20;
     using IERC20Helper for IERC20;
     using CreditAccountHelper for ICreditAccount;
@@ -132,7 +134,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     uint8 public collateralTokensCount;
 
     /// @notice Mask of tokens to apply quota logic for
-    uint256 public override quotedTokenMask;
+    uint256 public override quotedTokensMask;
 
     /// @notice Contract that handles withdrawals
     address public immutable override withdrawalManager;
@@ -779,7 +781,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 collateralDebtData.cumulativeQuotaInterest,
                 collateralDebtData.quotas,
                 collateralDebtData.quotedLts,
-                collateralDebtData.enabledQuotedTokenMask
+                collateralDebtData.quotedTokensMask
             ) = _getQuotedTokensData({
                 creditAccount: creditAccount,
                 enabledTokensMask: enabledTokensMask,
@@ -844,13 +846,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         /// Withdrawals are added to the total value of the account primarily for liquidation purposes,
         /// since we want to return withdrawals to the Credit Account but also need to ensure that
         /// they are included into remainingFunds.
-        if (_hasWithdrawals(creditAccount)) {
+        if ((task != CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS) && _hasWithdrawals(creditAccount)) {
             collateralDebtData.totalValueUSD += _addCancellableWithdrawalsValue({
                 _priceOracle: _priceOracle,
                 creditAccount: creditAccount,
                 isForceCancel: task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
-            });
+            }); // U:[CM-23]
         }
+
+        collateralDebtData.totalValue = _convertFromUSD(_priceOracle, collateralDebtData.totalValueUSD, underlying); // U:[CM-22,23]
     }
 
     /// @notice Gathers all data on the Credit Account's quoted tokens and quota interest
@@ -861,7 +865,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @return outstandingQuotaInterest Quota interest that has not been saved in the Credit Manager
     /// @return quotas Current quotas on quoted tokens, in the same order as quoted tokens
     /// @return lts Current lts of quoted tokens, in the same order as quoted tokens
-    /// @return quotedMask The mask of enabled quoted tokens on the account
+    /// @return _quotedTokensMask The mask of enabled quoted tokens on the account
     function _getQuotedTokensData(address creditAccount, uint256 enabledTokensMask, address _poolQuotaKeeper)
         internal
         view
@@ -870,41 +874,42 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             uint256 outstandingQuotaInterest,
             uint256[] memory quotas,
             uint16[] memory lts,
-            uint256 quotedMask
+            uint256 _quotedTokensMask
         )
     {
-        uint256 _maxEnabledTokens = maxEnabledTokens;
+        uint256 _maxEnabledTokens = maxEnabledTokens; // U:[CM-24]
+        _quotedTokensMask = quotedTokensMask; // U:[CM-24]
 
-        quotedMask = enabledTokensMask & quotedTokenMask;
+        uint256 quotedMask = enabledTokensMask & _quotedTokensMask; // U:[CM-24]
 
         // If there are not quoted tokens on the account, then zero-length arrays are returned
         // This is desirable, as it makes it simple to check whether there are any quoted tokens
         if (quotedMask != 0) {
-            quotaTokens = new address[](_maxEnabledTokens);
-            quotas = new uint256[](_maxEnabledTokens);
-            lts = new uint16[](_maxEnabledTokens);
+            quotaTokens = new address[](_maxEnabledTokens); // U:[CM-24]
+            quotas = new uint256[](_maxEnabledTokens); // U:[CM-24]
+            lts = new uint16[](_maxEnabledTokens); // U:[CM-24]
 
             uint256 j;
             unchecked {
                 for (uint256 tokenMask = 2; tokenMask <= quotedMask; tokenMask <<= 1) {
                     if (j == _maxEnabledTokens) {
-                        revert TooManyEnabledTokensException();
+                        revert TooManyEnabledTokensException(); // U:[CM-24]
                     }
 
                     if (quotedMask & tokenMask != 0) {
-                        address token;
-                        (token, lts[j]) = _collateralTokensByMask({tokenMask: tokenMask, calcLT: true});
+                        address token; // U:[CM-24]
+                        (token, lts[j]) = _collateralTokensByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
 
-                        quotaTokens[j] = token;
+                        quotaTokens[j] = token; // U:[CM-24]
 
                         uint256 outstandingInterestDelta;
                         (quotas[j], outstandingInterestDelta) =
-                            IPoolQuotaKeeper(_poolQuotaKeeper).getQuotaAndOutstandingInterest(creditAccount, token);
+                            IPoolQuotaKeeper(_poolQuotaKeeper).getQuotaAndOutstandingInterest(creditAccount, token); // U:[CM-24]
 
                         /// Quota interest is equal to quota * APY * time. Since quota is a uint96, this is unlikely to overflow in any realistic scenario.
-                        outstandingQuotaInterest += outstandingInterestDelta;
+                        outstandingQuotaInterest += outstandingInterestDelta; // U:[CM-24]
 
-                        ++j;
+                        ++j; // U:[CM-24]
                     }
                 }
             }
@@ -1433,15 +1438,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     /// @notice Sets the quoted token mask
-    /// @param _quotedTokenMask The new mask
+    /// @param _quotedTokensMask The new mask
     /// @dev Quoted tokens are counted as collateral not only based on their balances,
     ///         but also on their quotas set in thePpoolQuotaKeeper contract
     ///         Tokens in the mask also incur additional interest based on their quotas
-    function setQuotedMask(uint256 _quotedTokenMask)
+    function setQuotedMask(uint256 _quotedTokensMask)
         external
         creditConfiguratorOnly // U:[CM-4]
     {
-        quotedTokenMask = _quotedTokenMask; // F: [CMQ-2]
+        quotedTokensMask = _quotedTokensMask; // F: [CMQ-2]
     }
 
     /// @notice Sets the maximal number of enabled tokens on a single Credit Account.

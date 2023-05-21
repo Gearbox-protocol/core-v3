@@ -172,7 +172,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         gaugeMock.updateEpoch();
 
         uint256 tokenMask = creditManager.getTokenMaskOrRevert(token);
-        uint256 limitedMask = creditManager.quotedTokenMask();
+        uint256 limitedMask = creditManager.quotedTokensMask();
 
         creditManager.setQuotedMask(limitedMask | tokenMask);
 

@@ -143,15 +143,15 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         uint256 usdcMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.USDC));
         uint256 linkMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.LINK));
 
-        uint256 quotedTokenMask = creditManager.quotedTokenMask();
+        uint256 quotedTokensMask = creditManager.quotedTokensMask();
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditManager.setQuotedMask(quotedTokenMask | usdcMask);
+        creditManager.setQuotedMask(quotedTokensMask | usdcMask);
 
         vm.prank(CONFIGURATOR);
-        creditManager.setQuotedMask(quotedTokenMask | usdcMask);
+        creditManager.setQuotedMask(quotedTokensMask | usdcMask);
 
-        assertEq(creditManager.quotedTokenMask(), usdcMask | linkMask, "New limited mask is incorrect");
+        assertEq(creditManager.quotedTokensMask(), usdcMask | linkMask, "New limited mask is incorrect");
     }
 
     /// @dev [CMQ-3]: updateQuotas works correctly

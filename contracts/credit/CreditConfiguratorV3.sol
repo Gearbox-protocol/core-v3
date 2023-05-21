@@ -366,13 +366,13 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         uint256 tokenMask = _getAndCheckTokenMaskForSettingLT(token);
 
         // Gets current limited mask
-        uint256 quotedTokenMask = creditManager.quotedTokenMask();
+        uint256 quotedTokensMask = creditManager.quotedTokensMask();
 
         // If the token was not limited before, flips the corresponding bit in the mask,
         // otherwise no actions done.
-        if (quotedTokenMask & tokenMask == 0) {
-            quotedTokenMask |= tokenMask;
-            creditManager.setQuotedMask(quotedTokenMask);
+        if (quotedTokensMask & tokenMask == 0) {
+            quotedTokensMask |= tokenMask;
+            creditManager.setQuotedMask(quotedTokensMask);
             emit QuoteToken(token);
         }
     }

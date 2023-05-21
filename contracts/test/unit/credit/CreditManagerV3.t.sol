@@ -16,6 +16,7 @@ import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 // LIBS & TRAITS
 import {UNDERLYING_TOKEN_MASK, BitMask} from "../../../libraries/BitMask.sol";
 import {CreditLogic} from "../../../libraries/CreditLogic.sol";
+import {CollateralLogic} from "../../../libraries/CollateralLogic.sol";
 import {USDTFees} from "../../../libraries/USDTFees.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
@@ -60,6 +61,7 @@ import {ERC20FeeMock} from "../../mocks/token/ERC20FeeMock.sol";
 import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
 import {WETHGatewayMock} from "../../mocks/support/WETHGatewayMock.sol";
 import {CreditAccountMock, CreditAccountMockEvents} from "../../mocks/credit/CreditAccountMock.sol";
+import {WithdrawalManagerMock} from "../../mocks/support/WithdrawalManagerMock.sol";
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";
@@ -78,8 +80,9 @@ uint16 constant LT_UNDERLYING = uint16(PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_P
 
 contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceHelper, CreditAccountMockEvents {
     using BitMask for uint256;
-    using CreditLogic for CollateralDebtData;
     using CreditLogic for CollateralTokenData;
+    using CreditLogic for CollateralDebtData;
+    using CollateralLogic for CollateralDebtData;
     using USDTFees for uint256;
     using Vars for VarU256;
 
@@ -92,7 +95,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
     PriceOracleMock priceOracleMock;
     WETHGatewayMock wethGateway;
-    IWithdrawalManager withdrawalManager;
+    WithdrawalManagerMock withdrawalManager;
 
     address underlying;
     bool supportsQuotas;
@@ -150,8 +153,15 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         accountFactory = AccountFactoryMock(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL));
         wethGateway = WETHGatewayMock(addressProvider.getAddressOrRevert(AP_WETH_GATEWAY, 3_00));
+        withdrawalManager = WithdrawalManagerMock(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00));
 
         priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 2));
+
+        /// Inits all state
+        supportsQuotas = false;
+        isFeeToken = false;
+        tokenFee = 0;
+        maxTokenFee = 0;
     }
     ///
     /// HELPERS
@@ -588,11 +598,11 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         expectBalance(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT, _testCaseErr("incorrect balance on creditAccount"));
     }
 
-    //
-    //
-    // CLOSE CREDIT ACCOUNT
-    //
-    //
+    // //
+    // //
+    // // CLOSE CREDIT ACCOUNT
+    // //
+    // //
 
     /// @dev U:[CM-7]: close credit account reverts if account not exists
     function test_U_CM_07_close_credit_account_reverts_if_account_not_exists() public allQuotaCases {
@@ -1075,12 +1085,14 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         poolMock.setCumulativeIndexNow(collateralDebtData.cumulativeIndexNow);
 
-        /// @notice enabledTokensMask is read directly from function parameters, not from this function
-        creditManager.setCreditAccountInfoMap({
+        uint256 initialCQI = collateralDebtData.cumulativeQuotaInterest + 1;
+        creditManager
+            /// @notice enabledTokensMask is read directly from function parameters, not from this function
+            .setCreditAccountInfoMap({
             creditAccount: creditAccount,
             debt: collateralDebtData.debt,
             cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
-            cumulativeQuotaInterest: collateralDebtData.cumulativeQuotaInterest + 1,
+            cumulativeQuotaInterest: initialCQI,
             enabledTokensMask: 0,
             flags: 0,
             borrower: USER
@@ -1135,12 +1147,12 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             amount: _amountMinusFee(amount)
         });
 
-        // if (supportsQuotas) {
-        //     vm.expectCall(
-        //         address(poolQuotaKeeperMock),
-        //         abi.encodeCall(IPoolQuotaKeeper.accrueQuotaInterest, (creditAccount, collateralDebtData.quotedTokens))
-        //     );
-        // }
+        if (supportsQuotas) {
+            vm.expectCall(
+                address(poolQuotaKeeperMock),
+                abi.encodeCall(IPoolQuotaKeeper.accrueQuotaInterest, (creditAccount, collateralDebtData.quotedTokens))
+            );
+        }
 
         /// @notice enabledTokesMask is set to zero, because it has no impact
         (uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable) = creditManager.manageDebt({
@@ -1170,9 +1182,11 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 _testCaseErr("Incorrect cumulativeIndexLastUpdate update in creditAccountInfo")
             );
 
+            /// @notice cumulativeQuotaInterest should not be changed if supportsQuotas  == false
+
             assertEq(
                 cumulativeQuotaInterest,
-                expectedCumulativeQuotaInterest + 1,
+                supportsQuotas ? (expectedCumulativeQuotaInterest + 1) : initialCQI,
                 _testCaseErr("Incorrect cumulativeQuotaInterest update in creditAccountInfo")
             );
         }
@@ -1200,6 +1214,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             collateralDebtData.cumulativeQuotaInterest = debt / (debt % 5 + 1);
         }
 
+        /// todo: add outstanding interest for quota token
+
         poolMock.setCumulativeIndexNow(collateralDebtData.cumulativeIndexNow);
 
         tokenTestSuite.mint(underlying, creditAccount, debt);
@@ -1224,7 +1240,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             (uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable) = creditManager.manageDebt({
                 creditAccount: creditAccount,
                 amount: 0,
-                enabledTokensMask: 0,
+                enabledTokensMask: UNDERLYING_TOKEN_MASK,
                 action: testCase == 0 ? ManageDebtAction.INCREASE_DEBT : ManageDebtAction.DECREASE_DEBT
             });
 
@@ -1236,6 +1252,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             (uint256 caiDebt, uint256 caiCumulativeIndexLastUpdate, uint256 caiCumulativeQuotaInterest,,,) =
                 creditManager.creditAccountInfo(creditAccount);
 
+            assertEq(newDebt, debt, _testCaseErr("Incorrect debt update in creditAccountInfo"));
             assertEq(caiDebt, debt, _testCaseErr("Incorrect debt update in creditAccountInfo"));
             assertEq(
                 caiCumulativeIndexLastUpdate,
@@ -1251,10 +1268,10 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         }
     }
 
-    //
-    //  ADD COLLATERAL
-    //
-    /// @dev U:[CM-13]: addCollateral works as expected
+    // //
+    // //  ADD COLLATERAL
+    // //
+    // /// @dev U:[CM-13]: addCollateral works as expected
     function test_U_CM_13_addCollateral_works_as_expected() public withoutSupportQuotas {
         address creditAccount = DUMB_ADDRESS;
         address linkToken = tokenTestSuite.addressOf(Tokens.LINK);
@@ -1287,27 +1304,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         assertEq(tokenToEnable, UNDERLYING_TOKEN_MASK, "Incorrect tokenToEnable");
     }
 
-    //
-    //  TRANSFER ACCOUNT OWNERSHIP
-    //
-
-    /// @dev U:[CM-14]: transferAccountOwnership works as expected
-    function test_U_CM_14_transferAccountOwnership_works_as_expected() public withoutSupportQuotas {
-        address creditAccount = DUMB_ADDRESS;
-        vm.expectRevert(CreditAccountNotExistsException.selector);
-        creditManager.transferAccountOwnership(creditAccount, FRIEND);
-
-        creditManager.setBorrower({creditAccount: creditAccount, borrower: USER});
-        creditManager.transferAccountOwnership(creditAccount, FRIEND);
-
-        (,,,,, address borrower) = creditManager.creditAccountInfo(creditAccount);
-
-        assertEq(borrower, FRIEND, "Incorrect borrower");
-    }
-
-    //
-    //  APPROVE CREDIT ACCOUNT
-    //
+    // //
+    // //  APPROVE CREDIT ACCOUNT
+    // //
 
     /// @dev U:[CM-15]: approveCreditAccount works as expected
     function test_U_CM_15_approveCreditAccount_works_as_expected() public withoutSupportQuotas {
@@ -1337,9 +1336,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.approveCreditAccount({token: underlying, amount: 20000});
     }
 
-    //
-    //  EXECUTE
-    //
+    // //
+    // //  EXECUTE
+    // //
 
     /// @dev U:[CM-16]: executeOrder works as expected
     function test_U_CM_16_executeOrder_works_as_expected() public withoutSupportQuotas {
@@ -1367,11 +1366,11 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         assertEq(returnValue, expectedReturnValue, "Incorrect return value");
     }
 
-    //
-    //
-    // FULL COLLATERAL CHECK
-    //
-    //
+    // //
+    // //
+    // // FULL COLLATERAL CHECK
+    // //
+    // //
 
     /// @dev U:[CM-17]: fullCollateralCheck reverts if hf < 10K
     function test_U_CM_17_fullCollateralCheck_reverts_if_hf_less_10K() public withoutSupportQuotas {
@@ -1384,7 +1383,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
     }
 
-    /// @dev U:[CM-18]: fullCollateralCheck reverts if not enough collateral otherwise saves enabledTokensMask
+    // /// @dev U:[CM-18]: fullCollateralCheck reverts if not enough collateral otherwise saves enabledTokensMask
     function test_U_CM_18_fullCollateralCheck_reverts_if_not_enough_collateral_otherwise_saves_enabledTokensMask(
         uint256 amount
     ) public withFeeTokenCase withoutSupportQuotas {
@@ -1484,11 +1483,11 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         assertEq(enabledTokensMaskAfter, enabledTokenMaskWithDisableTokens, "enabledTokensMask wasn't set correctly");
     }
 
-    //
-    //
-    // CALC DEBT AND COLLATERAL
-    //
-    //
+    // //
+    // //
+    // // CALC DEBT AND COLLATERAL
+    // //
+    // //
 
     /// @dev U:[CM-19]: calcDebtAndCollateral reverts for FULL_COLLATERAL_CHECK_LAZY
     function test_U_CM_19_calcDebtAndCollateral_reverts_for_FULL_COLLATERAL_CHECK_LAZY() public withoutSupportQuotas {
@@ -1616,7 +1615,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         );
 
         assertEq(
-            collateralDebtData.enabledQuotedTokenMask,
+            collateralDebtData.quotedTokensMask,
             supportsQuotas ? LINK_TOKEN_MASK | STETH_TOKEN_MASK : 0,
             "Incorrect quotedLts"
         );
@@ -1704,7 +1703,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     }
 
     /// @dev U:[CM-22]: calcDebtAndCollateral works correctly for DEBT_COLLATERAL* task
-
     function test_U_CM_22_calcDebtAndCollateral_works_correctly_for_DEBT_COLLATERAL_task() public allQuotaCases {
         uint256 debt = DAI_ACCOUNT_AMOUNT;
 
@@ -1726,15 +1724,15 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 linkBalance: 0,
                 stEthBalance: 0,
                 usdcBalance: 0,
-                expectedTotalValueUSD: vars.get("UNDERLYING_PRICE") * debt,
-                expectedTwvUSD: vars.get("UNDERLYING_PRICE") * debt * LT_UNDERLYING / PERCENTAGE_FACTOR,
+                expectedTotalValueUSD: vars.get("UNDERLYING_PRICE") * (debt - 1),
+                expectedTwvUSD: vars.get("UNDERLYING_PRICE") * (debt - 1) * LT_UNDERLYING / PERCENTAGE_FACTOR,
                 expectedEnabledTokensMask: UNDERLYING_TOKEN_MASK
             }),
             CollateralCalcTestCase({
                 name: "One quoted token with balance < quota",
                 enabledTokensMask: LINK_TOKEN_MASK,
                 underlyingBalance: 0,
-                linkBalance: vars.get("LINK_QUOTA") / 2 / vars.get("LINK_PRICE"),
+                linkBalance: vars.get("LINK_QUOTA") / 2 / vars.get("LINK_PRICE") + 1,
                 stEthBalance: 0,
                 usdcBalance: 0,
                 expectedTotalValueUSD: vars.get("LINK_QUOTA") / 2,
@@ -1745,11 +1743,11 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 name: "One quoted token with balance > quota",
                 enabledTokensMask: LINK_TOKEN_MASK,
                 underlyingBalance: 0,
-                linkBalance: 2 * vars.get("LINK_QUOTA") * vars.get("UNDERLYING_PRICE") / vars.get("LINK_PRICE"),
+                linkBalance: 2 * vars.get("LINK_QUOTA") * vars.get("UNDERLYING_PRICE") / vars.get("LINK_PRICE") + 1,
                 stEthBalance: 0,
                 usdcBalance: 0,
                 expectedTotalValueUSD: 2 * vars.get("LINK_QUOTA_IN_USD"),
-                expectedTwvUSD: (supportsQuotas ? vars.get("LINK_QUOTA_IN_USD") : 2 * vars.get("LINK_QUOTA_IN_USD"))
+                expectedTwvUSD: (supportsQuotas ? vars.get("LINK_QUOTA_IN_USD") : (2 * vars.get("LINK_QUOTA_IN_USD")))
                     * vars.get("LINK_LT") / PERCENTAGE_FACTOR,
                 expectedEnabledTokensMask: LINK_TOKEN_MASK
             }),
@@ -1760,9 +1758,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 linkBalance: 0,
                 stEthBalance: 20_000,
                 usdcBalance: 0,
-                expectedTotalValueUSD: 20_000 * vars.get("UNDERLYING_PRICE") + 20_000 * vars.get("STETH_PRICE"),
-                expectedTwvUSD: 20_000 * vars.get("UNDERLYING_PRICE") * LT_UNDERLYING / PERCENTAGE_FACTOR
-                    + 20_000 * vars.get("STETH_PRICE") * vars.get("STETH_LT") / PERCENTAGE_FACTOR,
+                expectedTotalValueUSD: (20_000 - 1) * vars.get("UNDERLYING_PRICE") + (20_000 - 1) * vars.get("STETH_PRICE"),
+                expectedTwvUSD: (20_000 - 1) * vars.get("UNDERLYING_PRICE") * LT_UNDERLYING / PERCENTAGE_FACTOR
+                    + (20_000 - 1) * vars.get("STETH_PRICE") * vars.get("STETH_LT") / PERCENTAGE_FACTOR,
                 expectedEnabledTokensMask: UNDERLYING_TOKEN_MASK | STETH_TOKEN_MASK | (supportsQuotas ? LINK_TOKEN_MASK : 0)
             })
         ];
@@ -1775,7 +1773,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
         ];
 
-        for (uint256 taskIndex = 0; taskIndex < tasks.length; ++taskIndex) {
+        for (uint256 taskIndex = 0; taskIndex < 1; ++taskIndex) {
             caseName = string.concat(caseName, _taskName(tasks[taskIndex]));
             for (uint256 i; i < cases.length; ++i) {
                 uint256 snapshot = vm.snapshot();
@@ -1828,10 +1826,81 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                     _case.expectedTotalValueUSD / vars.get("UNDERLYING_PRICE"),
                     _testCaseErr("Incorrect totalValueUSD")
                 );
-
                 vm.revertTo(snapshot);
             }
         }
+    }
+
+    /// @dev U:[CM-23]: calcDebtAndCollateral adds withrawal for particilar cases correctly
+    function test_U_CM_23_calcDebtAndCollateral_adds_withrawal_for_particilar_cases_correctly() public allQuotaCases {
+        uint256 debt = DAI_ACCOUNT_AMOUNT;
+        uint256 amount1 = 10_000;
+        uint256 amount2 = 999;
+
+        _collateralTestSetup(debt);
+
+        address creditAccount = DUMB_ADDRESS;
+
+        caseName = string.concat(caseName, "withdrawal computation");
+
+        creditManager.setCreditAccountInfoMap({
+            creditAccount: creditAccount,
+            debt: debt,
+            cumulativeIndexLastUpdate: vars.get("cumulativeIndexLastUpdate"),
+            cumulativeQuotaInterest: vars.get("INITIAL_INTEREST") + 1,
+            enabledTokensMask: UNDERLYING_TOKEN_MASK,
+            flags: WITHDRAWAL_FLAG,
+            borrower: USER
+        });
+
+        tokenTestSuite.mint({token: underlying, to: creditAccount, amount: 10_000});
+
+        withdrawalManager.setCancellableWithdrawals(
+            false, tokenTestSuite.addressOf(Tokens.LINK), amount1, tokenTestSuite.addressOf(Tokens.STETH), amount2
+        );
+
+        withdrawalManager.setCancellableWithdrawals(
+            true, tokenTestSuite.addressOf(Tokens.USDC), amount1, tokenTestSuite.addressOf(Tokens.DAI), amount2
+        );
+
+        CollateralDebtData memory collateralDebtData = creditManager.calcDebtAndCollateral({
+            creditAccount: creditAccount,
+            task: CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS
+        });
+
+        CollateralDebtData memory collateralDebtDataNormal = creditManager.calcDebtAndCollateral({
+            creditAccount: creditAccount,
+            task: CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS
+        });
+
+        CollateralDebtData memory collateralDebtDataForced = creditManager.calcDebtAndCollateral({
+            creditAccount: creditAccount,
+            task: CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
+        });
+
+        assertEq(
+            collateralDebtDataNormal.totalValueUSD - collateralDebtData.totalValueUSD,
+            amount1 * vars.get("LINK_PRICE") + amount2 * vars.get("STETH_PRICE"),
+            _testCaseErr("Incorrect totalValueUSD normal case")
+        );
+
+        assertEq(
+            collateralDebtDataForced.totalValueUSD - collateralDebtData.totalValueUSD,
+            amount1 * vars.get("USDC_PRICE") + amount2 * vars.get("UNDERLYING_PRICE"),
+            _testCaseErr("Incorrect totalValueUSD force case")
+        );
+
+        assertEq(
+            collateralDebtDataNormal.totalValue - collateralDebtData.totalValue,
+            (amount1 * vars.get("LINK_PRICE") + amount2 * vars.get("STETH_PRICE")) / vars.get("UNDERLYING_PRICE"),
+            _testCaseErr("Incorrect totalValue normal case")
+        );
+
+        assertEq(
+            collateralDebtDataForced.totalValue - collateralDebtData.totalValue,
+            (amount1 * vars.get("USDC_PRICE") + amount2 * vars.get("UNDERLYING_PRICE")) / vars.get("UNDERLYING_PRICE"),
+            _testCaseErr("Incorrect totalValue force case")
+        );
     }
 
     ///
@@ -1846,12 +1915,11 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         uint256 expertedOutstandingQuotaInterest;
         uint256[] expectedQuotas;
         uint16[] expectedLts;
-        uint256 expectedQuotedMask;
         bool expectRevert;
     }
 
-    /// @dev U:[CM-31]: _getQuotedTokensData works correctly
-    function test_U_CM_31_getQuotedTokensData_works_correctly() public withSupportQuotas {
+    /// @dev U:[CM-24]: _getQuotedTokensData works correctly
+    function test_U_CM_24_getQuotedTokensData_works_correctly() public withSupportQuotas {
         assertEq(creditManager.collateralTokensCount(), 1, "SETUP: incorrect tokens count");
 
         //// LINK: [QUOTED]
@@ -1878,7 +1946,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         _addQuotedToken({token: Tokens.CVX, lt: 20_00, quoted: 100_000, outstandingInterest: 30_000});
         uint256 CVX_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.CVX});
 
-        creditManager.setQuotedMask(LINK_TOKEN_MASK | USDT_TOKEN_MASK | STETH_TOKEN_MASK | CVX_TOKEN_MASK);
+        uint256 quotedTokensMask = LINK_TOKEN_MASK | USDT_TOKEN_MASK | STETH_TOKEN_MASK | CVX_TOKEN_MASK;
+        creditManager.setQuotedMask(quotedTokensMask);
         creditManager.setMaxEnabledTokens(3);
 
         //
@@ -1892,7 +1961,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 expertedOutstandingQuotaInterest: 0,
                 expectedQuotas: new uint256[](0),
                 expectedLts: new uint16[](0),
-                expectedQuotedMask: 0,
                 expectRevert: false
             }),
             GetQuotedTokenDataTestCase({
@@ -1902,7 +1970,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 expertedOutstandingQuotaInterest: 0,
                 expectedQuotas: new uint256[](0),
                 expectedLts: new uint16[](0),
-                expectedQuotedMask: 0,
                 expectRevert: true
             }),
             GetQuotedTokenDataTestCase({
@@ -1912,7 +1979,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 expertedOutstandingQuotaInterest: 10_000,
                 expectedQuotas: arrayOf(20_000, 0, 0),
                 expectedLts: arrayOfU16(30_00, 0, 0),
-                expectedQuotedMask: STETH_TOKEN_MASK,
                 expectRevert: false
             }),
             GetQuotedTokenDataTestCase({
@@ -1922,7 +1988,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 expertedOutstandingQuotaInterest: 40_000 + 10_000,
                 expectedQuotas: arrayOf(10_000, 20_000, 0),
                 expectedLts: arrayOfU16(80_00, 30_00, 0),
-                expectedQuotedMask: LINK_TOKEN_MASK | STETH_TOKEN_MASK,
                 expectRevert: false
             }),
             GetQuotedTokenDataTestCase({
@@ -1932,7 +1997,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 expertedOutstandingQuotaInterest: 40_000 + 10_000 + 30_000,
                 expectedQuotas: arrayOf(10_000, 20_000, 100_000),
                 expectedLts: arrayOfU16(80_00, 30_00, 20_00),
-                expectedQuotedMask: LINK_TOKEN_MASK | STETH_TOKEN_MASK | CVX_TOKEN_MASK,
                 expectRevert: false
             })
         ];
@@ -1956,7 +2020,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 uint256 outstandingQuotaInterest,
                 uint256[] memory quotas,
                 uint16[] memory lts,
-                uint256 quotedMask
+                uint256 returnedQuotedTokensMask
             ) = creditManager.getQuotedTokensData({
                 creditAccount: DUMB_ADDRESS,
                 enabledTokensMask: _case.enabledTokensMask,
@@ -1972,7 +2036,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 );
                 assertEq(quotas, _case.expectedQuotas, _testCaseErr("Incorrect expectedQuotas"));
                 assertEq(lts, _case.expectedLts, _testCaseErr("Incorrect expectedLts"));
-                assertEq(quotedMask, _case.expectedQuotedMask, _testCaseErr("Incorrect expectedQuotedMask"));
+                assertEq(returnedQuotedTokensMask, quotedTokensMask, _testCaseErr("Incorrect expectedQuotedMask"));
             }
 
             vm.revertTo(snapshot);

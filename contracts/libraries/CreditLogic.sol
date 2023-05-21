@@ -3,9 +3,8 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {CollateralDebtData, CollateralTokenData} from "../interfaces/ICreditManagerV3.sol";
 import {IERC20Helper} from "./IERC20Helper.sol";
-import {CollateralDebtData, CollateralTokenData, CreditAccountInfo} from "../interfaces/ICreditManagerV3.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 import {SECONDS_PER_YEAR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import "../interfaces/IExceptions.sol";
@@ -15,11 +14,6 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 
-/// INTERFACES
-import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
-import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {IWithdrawalManager} from "../interfaces/IWithdrawalManager.sol";
-
 uint256 constant INDEX_PRECISION = 10 ** 9;
 
 import "forge-std/console.sol";
@@ -27,7 +21,6 @@ import "forge-std/console.sol";
 /// @title Credit Logic Library
 library CreditLogic {
     using BitMask for uint256;
-    using IERC20Helper for IERC20;
 
     function calcLinearGrowth(uint256 value, uint256 timestampLastUpdate) internal view returns (uint256) {
         // timeDifference = blockTime - previous timeStamp
@@ -153,7 +146,6 @@ library CreditLogic {
 
     /// MANAGE DEBT
 
-    /// NEW VERSION which doesnt depend on structrure
     function calcIncrease(uint256 amount, uint256 debt, uint256 cumulativeIndexNow, uint256 cumulativeIndexLastUpdate)
         internal
         pure
@@ -192,7 +184,7 @@ library CreditLogic {
     {
         amountToRepay = amount;
 
-        if (cumulativeQuotaInterest > 1) {
+        if (cumulativeQuotaInterest != 0) {
             uint256 quotaProfit = (cumulativeQuotaInterest * feeInterest) / PERCENTAGE_FACTOR;
 
             if (amountToRepay >= cumulativeQuotaInterest + quotaProfit) {
@@ -265,199 +257,6 @@ library CreditLogic {
         } else {
             newDebt = debt;
             newCumulativeIndex = cumulativeIndexLastUpdate;
-        }
-    }
-
-    //
-    // COLLATERAL & DEBT COMPUTATION
-    //
-    function calcCollateral(
-        CollateralDebtData memory collateralDebtData,
-        address creditAccount,
-        address underlying,
-        bool lazy,
-        uint16 minHealthFactor,
-        uint256[] memory collateralHints,
-        function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn,
-        function (address, uint256, address) view returns(uint256) convertToUSDFn,
-        address priceOracle
-    ) internal view returns (uint256 totalValueUSD, uint256 twvUSD, uint256 tokensToDisable) {
-        uint256 limit = lazy ? collateralDebtData.totalDebtUSD * minHealthFactor / PERCENTAGE_FACTOR : type(uint256).max;
-
-        if (collateralDebtData.quotedTokens.length != 0) {
-            uint256 underlyingPriceRAY = convertToUSDFn(priceOracle, RAY, underlying);
-
-            (totalValueUSD, twvUSD) = calcQuotedTokensCollateral({
-                collateralDebtData: collateralDebtData,
-                creditAccount: creditAccount,
-                underlyingPriceRAY: underlyingPriceRAY,
-                limit: limit,
-                convertToUSDFn: convertToUSDFn,
-                priceOracle: priceOracle
-            });
-
-            if (lazy && twvUSD > limit) {
-                return (totalValueUSD, twvUSD, 0);
-            } else {
-                unchecked {
-                    limit -= twvUSD;
-                }
-            }
-        }
-
-        // @notice Computes non-quotes collateral
-
-        {
-            uint256 tokensToCheckMask =
-                collateralDebtData.enabledTokensMask.disable(collateralDebtData.enabledQuotedTokenMask);
-
-            uint256 tvDelta;
-            uint256 twvDelta;
-
-            (tvDelta, twvDelta, tokensToDisable) = calcNonQuotedTokensCollateral({
-                tokensToCheckMask: tokensToCheckMask,
-                priceOracle: priceOracle,
-                creditAccount: creditAccount,
-                limit: limit,
-                collateralHints: collateralHints,
-                collateralTokensByMaskFn: collateralTokensByMaskFn,
-                convertToUSDFn: convertToUSDFn
-            });
-
-            totalValueUSD += tvDelta;
-            twvUSD += twvDelta;
-        }
-    }
-
-    function calcQuotedTokensCollateral(
-        CollateralDebtData memory collateralDebtData,
-        address creditAccount,
-        uint256 underlyingPriceRAY,
-        uint256 limit,
-        function (address, uint256, address) view returns(uint256) convertToUSDFn,
-        address priceOracle
-    ) internal view returns (uint256 totalValueUSD, uint256 twvUSD) {
-        uint256 len = collateralDebtData.quotedTokens.length;
-
-        for (uint256 i; i < len;) {
-            address token = collateralDebtData.quotedTokens[i];
-            if (token == address(0)) break;
-            {
-                uint16 liquidationThreshold = collateralDebtData.quotedLts[i];
-                uint256 quotaUSD = collateralDebtData.quotas[i] * underlyingPriceRAY / RAY;
-                (uint256 valueUSD, uint256 weightedValueUSD,) = calcOneTokenCollateral({
-                    priceOracle: priceOracle,
-                    creditAccount: creditAccount,
-                    token: token,
-                    liquidationThreshold: liquidationThreshold,
-                    quotaUSD: quotaUSD,
-                    convertToUSDFn: convertToUSDFn
-                });
-
-                totalValueUSD += valueUSD;
-                twvUSD += weightedValueUSD;
-            }
-            if (twvUSD >= limit) {
-                return (totalValueUSD, twvUSD);
-            }
-
-            unchecked {
-                ++i;
-            }
-        }
-    }
-
-    function calcNonQuotedTokensCollateral(
-        address creditAccount,
-        uint256 limit,
-        uint256[] memory collateralHints,
-        function (address, uint256, address) view returns(uint256) convertToUSDFn,
-        function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn,
-        uint256 tokensToCheckMask,
-        address priceOracle
-    ) internal view returns (uint256 totalValueUSD, uint256 twvUSD, uint256 tokensToDisable) {
-        uint256 len = collateralHints.length;
-
-        address ca = creditAccount;
-        // TODO: add test that we check all values and it's always reachable
-        for (uint256 i; tokensToCheckMask != 0;) {
-            uint256 tokenMask;
-            unchecked {
-                // TODO: add check for super long collateralnhints and for double masks
-                tokenMask = (i < len) ? collateralHints[i] : 1 << (i - len); // F: [CM-68]
-            }
-            // CASE enabledTokensMask & tokenMask == 0 F:[CM-38]
-            if (tokensToCheckMask & tokenMask != 0) {
-                bool nonZero;
-                {
-                    uint256 valueUSD;
-                    uint256 weightedValueUSD;
-                    (valueUSD, weightedValueUSD, nonZero) = calcOneNonQuotedCollateral({
-                        priceOracle: priceOracle,
-                        creditAccount: ca,
-                        tokenMask: tokenMask,
-                        convertToUSDFn: convertToUSDFn,
-                        collateralTokensByMaskFn: collateralTokensByMaskFn
-                    });
-                    totalValueUSD += valueUSD;
-                    twvUSD += weightedValueUSD;
-                }
-                if (nonZero) {
-                    // Full collateral check evaluates a Credit Account's health factor lazily;
-                    // Once the TWV computed thus far exceeds the debt, the check is considered
-                    // successful, and the function returns without evaluating any further collateral
-                    if (twvUSD >= limit) {
-                        break;
-                    }
-                    // Zero-balance tokens are disabled; this is done by flipping the
-                    // bit in enabledTokensMask, which is then written into storage at the
-                    // very end, to avoid redundant storage writes
-                } else {
-                    tokensToDisable |= tokenMask;
-                }
-            }
-            tokensToCheckMask = tokensToCheckMask.disable(tokenMask);
-
-            unchecked {
-                ++i;
-            }
-        }
-    }
-
-    function calcOneNonQuotedCollateral(
-        address creditAccount,
-        function (address, uint256, address) view returns(uint256) convertToUSDFn,
-        function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn,
-        uint256 tokenMask,
-        address priceOracle
-    ) internal view returns (uint256 valueUSD, uint256 weightedValueUSD, bool nonZeroBalance) {
-        (address token, uint16 liquidationThreshold) = collateralTokensByMaskFn(tokenMask, true);
-
-        (valueUSD, weightedValueUSD, nonZeroBalance) = calcOneTokenCollateral({
-            priceOracle: priceOracle,
-            creditAccount: creditAccount,
-            token: token,
-            liquidationThreshold: liquidationThreshold,
-            quotaUSD: type(uint256).max,
-            convertToUSDFn: convertToUSDFn
-        });
-    }
-
-    function calcOneTokenCollateral(
-        address creditAccount,
-        function (address, uint256, address) view returns(uint256) convertToUSDFn,
-        address priceOracle,
-        address token,
-        uint16 liquidationThreshold,
-        uint256 quotaUSD
-    ) internal view returns (uint256 valueUSD, uint256 weightedValueUSD, bool nonZeroBalance) {
-        uint256 balance = IERC20Helper.balanceOf(token, creditAccount);
-
-        // Collateral calculations are only done if there is a non-zero balance
-        if (balance > 1) {
-            valueUSD = convertToUSDFn(priceOracle, balance, token);
-            weightedValueUSD = Math.min(valueUSD, quotaUSD) * liquidationThreshold / PERCENTAGE_FACTOR;
-            nonZeroBalance = true;
         }
     }
 
