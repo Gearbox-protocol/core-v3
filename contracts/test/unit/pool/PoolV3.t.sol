@@ -3,6 +3,10 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
+import "../../../interfaces/IAddressProviderV3.sol";
+import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
+import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
@@ -13,6 +17,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import "../../../core/AddressProviderV3.sol";
 import {PoolV3} from "../../../pool/PoolV3.sol";
+import {PoolV3_USDT} from "../../../pool/PoolV3_USDT.sol";
 import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
 import {IERC4626Events} from "../../interfaces/IERC4626.sol";
 
@@ -20,19 +25,13 @@ import {IInterestRateModel} from "../../../interfaces/IInterestRateModel.sol";
 
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
-import {
-    liquidityProviderInitBalance,
-    addLiquidity,
-    removeLiquidity,
-    referral,
-    PoolServiceTestSuite
-} from "../../suites/PoolServiceTestSuite.sol";
 
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 import {ERC20FeeMock} from "../../mocks/token/ERC20FeeMock.sol";
 import {PoolQuotaKeeper} from "../../../pool/PoolQuotaKeeper.sol";
+import {GaugeMock} from "../../mocks//pool/GaugeMock.sol";
 
 // TEST
 import {TestHelper} from "../../lib/helper.sol";
@@ -46,20 +45,19 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 import "../../../interfaces/IExceptions.sol";
 
 uint256 constant fee = 6000;
+uint256 constant liquidityProviderInitBalance = 100 ether;
+uint256 constant addLiquidity = 10 ether;
+uint256 constant removeLiquidity = 5 ether;
+uint16 constant referral = 12333;
 
 contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Events {
     using Math for uint256;
 
-    PoolServiceTestSuite psts;
-    PoolQuotaKeeper pqk;
+    AddressProviderV3ACLMock addressProvider;
+    ContractsRegister public cr;
 
-    /*
-     * @dev Emitted when `value` tokens are moved from one account (`from`) to
-     * another (`to`).
-     *
-     * Note that `value` may be zero.
-     */
-    event Transfer(address indexed from, address indexed to, uint256 value);
+    PoolQuotaKeeper public pqk;
+    GaugeMock public gaugeMock;
 
     ACL acl;
     PoolV3 pool;
@@ -67,25 +65,109 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
     CreditManagerMock cmMock;
     IInterestRateModel irm;
 
+    address treasury;
+    /*
+     * @dev Emitted when `value` tokens are moved from one account (`from`) to
+     * another (`to`).
+     *
+     * Note that `value` may be zero.
+     */
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
     function setUp() public {
         _setUp(Tokens.DAI, false);
     }
 
     function _setUp(Tokens t, bool supportQuotas) public {
         tokenTestSuite = new TokensTestSuite();
-        psts = new PoolServiceTestSuite(
-            tokenTestSuite,
-            tokenTestSuite.addressOf(t),
-            true,
-            supportQuotas
+        irm = new LinearInterestRateModel(
+            80_00,
+            90_00,
+            2_00,
+            4_00,
+            40_00,
+            75_00,
+            false
         );
 
-        pool = psts.pool4626();
-        irm = psts.linearIRModel();
-        underlying = address(psts.underlying());
-        cmMock = psts.cmMock();
-        acl = psts.acl();
-        pqk = psts.poolQuotaKeeper();
+        vm.startPrank(CONFIGURATOR);
+
+        addressProvider = new AddressProviderV3ACLMock();
+        addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
+
+        acl = ACL(addressProvider.getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL));
+        cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
+        treasury = addressProvider.getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL);
+
+        underlying = tokenTestSuite.addressOf(t);
+
+        tokenTestSuite.mint(underlying, USER, liquidityProviderInitBalance);
+        tokenTestSuite.mint(underlying, INITIAL_LP, liquidityProviderInitBalance);
+
+        address newPool;
+
+        bool isFeeToken = false;
+
+        try ERC20FeeMock(underlying).basisPointsRate() returns (uint256) {
+            isFeeToken = true;
+        } catch {}
+
+        if (isFeeToken) {
+            pool = new PoolV3_USDT({
+                        _addressProvider: address(addressProvider),
+                        _underlyingToken: underlying,
+                        _interestRateModel: address(irm),
+                        _expectedLiquidityLimit: type(uint256).max,
+                        _supportsQuotas: supportQuotas
+                    });
+        } else {
+            pool = new PoolV3({
+                        _addressProvider: address(addressProvider),
+                        _underlyingToken: underlying,
+                        _interestRateModel: address(irm),
+                        _expectedLiquidityLimit: type(uint256).max,
+                        _supportsQuotas: supportQuotas
+                    });
+        }
+        newPool = address(pool);
+
+        if (supportQuotas) {
+            _deployAndConnectPoolQuotaKeeper();
+        }
+
+        vm.stopPrank();
+
+        vm.prank(USER);
+        IERC20(underlying).approve(newPool, type(uint256).max);
+
+        vm.prank(INITIAL_LP);
+        IERC20(underlying).approve(newPool, type(uint256).max);
+
+        vm.startPrank(CONFIGURATOR);
+
+        cmMock = new CreditManagerMock(address(addressProvider), newPool);
+
+        cr.addPool(newPool);
+        cr.addCreditManager(address(cmMock));
+
+        vm.label(newPool, "Pool");
+
+        // vm.label(address(underlying), "UnderlyingToken");
+
+        vm.stopPrank();
+    }
+
+    function _deployAndConnectPoolQuotaKeeper() internal {
+        pqk = new PoolQuotaKeeper(address(pool));
+
+        // vm.prank(CONFIGURATOR);
+        pool.setPoolQuotaManager(address(pqk));
+
+        gaugeMock = new GaugeMock(address(pool));
+
+        // vm.prank(CONFIGURATOR);
+        pqk.setGauge(address(gaugeMock));
     }
 
     //
@@ -165,22 +247,20 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
     function test_U_P4_01_start_parameters_correct() public {
         assertEq(pool.name(), "diesel DAI", "Symbol incorrectly set up");
         assertEq(pool.symbol(), "dDAI", "Symbol incorrectly set up");
-        assertEq(address(pool.addressProvider()), address(psts.addressProvider()), "Incorrect address provider");
+        assertEq(address(pool.addressProvider()), address(addressProvider), "Incorrect address provider");
 
         assertEq(pool.asset(), underlying, "Incorrect underlying provider");
         assertEq(pool.underlyingToken(), underlying, "Incorrect underlying provider");
 
-        assertEq(pool.decimals(), IERC20Metadata(address(psts.underlying())).decimals(), "Incorrect decimals");
+        assertEq(pool.decimals(), IERC20Metadata(underlying).decimals(), "Incorrect decimals");
 
         assertEq(
-            pool.treasury(),
-            psts.addressProvider().getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL),
-            "Incorrect treasury"
+            pool.treasury(), addressProvider.getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL), "Incorrect treasury"
         );
 
         assertEq(pool.convertToAssets(RAY), RAY, "Incorrect diesel rate!");
 
-        assertEq(address(pool.interestRateModel()), address(psts.linearIRModel()), "Incorrect interest rate model");
+        assertEq(address(pool.interestRateModel()), address(irm), "Incorrect interest rate model");
 
         assertEq(pool.expectedLiquidityLimit(), type(uint256).max);
 
@@ -189,8 +269,8 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
 
     // U:[P4-2]: constructor reverts for zero addresses
     function test_U_P4_02_constructor_reverts_for_zero_addresses() public {
-        address irmodel = address(psts.linearIRModel());
-        address ap = address(psts.addressProvider());
+        address irmodel = address(irm);
+        address ap = address(addressProvider);
 
         vm.expectRevert(ZeroAddressException.selector);
         new PoolV3({
@@ -201,7 +281,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
             _supportsQuotas: false
         });
 
-        // opts.addressProvider = address(psts.addressProvider());
+        // opts.addressProvider = address(addressProvider);
         // opts.interestRateModel = address(0);
 
         vm.expectRevert(ZeroAddressException.selector);
@@ -213,7 +293,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
             _supportsQuotas: false
         });
 
-        // opts.interestRateModel = address(psts.linearIRModel());
+        // opts.interestRateModel = address(irm);
         // opts.underlyingToken = address(0);
 
         vm.expectRevert(ZeroAddressException.selector);
@@ -231,7 +311,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
         uint256 limit = 15890;
 
         vm.expectEmit(true, false, false, false);
-        emit SetInterestRateModel(address(psts.linearIRModel()));
+        emit SetInterestRateModel(address(irm));
 
         vm.expectEmit(true, false, false, true);
         emit SetExpectedLiquidityLimit(limit);
@@ -240,9 +320,9 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
         emit SetTotalBorrowedLimit(limit);
 
         new PoolV3({
-            _addressProvider: address(psts.addressProvider()),
+            _addressProvider: address(addressProvider),
             _underlyingToken: underlying,
-            _interestRateModel: address(psts.linearIRModel()),
+            _interestRateModel: address(irm),
             _expectedLiquidityLimit: limit,
             _supportsQuotas: false
         });
@@ -1228,7 +1308,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
                 false
             );
 
-            address treasury = pool.treasury();
+            treasury = pool.treasury();
 
             vm.prank(INITIAL_LP);
             pool.transfer(treasury, testCase.sharesInTreasury);
@@ -1324,7 +1404,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
 
             if (supportQuotas) {
                 vm.startPrank(CONFIGURATOR);
-                psts.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 100_00);
+                gaugeMock.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 100_00);
 
                 pqk.addCreditManager(address(cmMock));
 
@@ -1338,7 +1418,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
                     quotaChange: int96(int256(quotaInterestPerYear))
                 });
 
-                psts.gaugeMock().updateEpoch();
+                gaugeMock.updateEpoch();
 
                 vm.stopPrank();
             }
@@ -1351,7 +1431,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
             uint256 expectedInterest = ((addLiquidity / 2) * borrowRate) / RAY;
             uint256 expectedLiquidity = addLiquidity + expectedInterest + (supportQuotas ? quotaInterestPerYear : 0);
 
-            uint256 expectedBorrowRate = psts.linearIRModel().calcBorrowRate(expectedLiquidity, addLiquidity / 2);
+            uint256 expectedBorrowRate = irm.calcBorrowRate(expectedLiquidity, addLiquidity / 2);
 
             _updateBorrowrate();
 
@@ -1553,7 +1633,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
 
     function test_U_P4_23_setPoolQuotaManager_updates_quotaRevenue_and_emits_event() public {
         pool = new PoolV3({
-            _addressProvider: address(psts.addressProvider()),
+            _addressProvider: address(addressProvider),
             _underlyingToken: tokenTestSuite.addressOf(Tokens.DAI),
             _interestRateModel: address(irm),
             _expectedLiquidityLimit: type(uint256).max,
@@ -1733,12 +1813,12 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
             );
 
             CreditManagerMock cmMock2 = new CreditManagerMock(
-               address( psts.addressProvider()),
+               address( addressProvider),
                     address(pool)
                 );
 
             vm.startPrank(CONFIGURATOR);
-            psts.cr().addCreditManager(address(cmMock2));
+            cr.addCreditManager(address(cmMock2));
 
             pool.updateInterestRateModel(address(newIR));
             pool.setTotalBorrowedLimit(type(uint256).max);
