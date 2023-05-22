@@ -303,6 +303,9 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @dev Address of the connected Price Oracle
     function priceOracle() external view returns (address);
 
+    /// @notice Returns the full set of currently active Credit Accounts
+    function creditAccounts() external view returns (address[] memory);
+
     function calcDebtAndCollateral(address creditAccount, CollateralCalcTask task)
         external
         view

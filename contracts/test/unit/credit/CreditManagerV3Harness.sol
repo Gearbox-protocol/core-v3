@@ -2,7 +2,7 @@ pragma solidity ^0.8.17;
 
 import {CreditManagerV3, CreditAccountInfo} from "../../../credit/CreditManagerV3.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {CollateralDebtData, CollateralCalcTask} from "../../../interfaces/ICreditManagerV3.sol";
+import {CollateralDebtData, CollateralCalcTask, CollateralTokenData} from "../../../interfaces/ICreditManagerV3.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
@@ -121,5 +121,9 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         returns (uint256 totalValueUSD)
     {
         return _addCancellableWithdrawalsValue(_priceOracle, creditAccount, isForceCancel);
+    }
+
+    function getCollateralTokensData(uint256 tokenMask) external view returns (CollateralTokenData memory) {
+        return collateralTokensData[tokenMask];
     }
 }
