@@ -1019,10 +1019,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             bool hasScheduled;
 
             (hasScheduled, tokensToEnable) =
-                IWithdrawalManager(withdrawalManager).claimScheduledWithdrawals(creditAccount, to, action);
+                IWithdrawalManager(withdrawalManager).claimScheduledWithdrawals(creditAccount, to, action); // U:[CM-29]
             if (!hasScheduled) {
                 // WITHDRAWAL_FLAG is disabled when there are no more pending withdrawals
-                _disableFlag(creditAccount, WITHDRAWAL_FLAG);
+                _disableFlag(creditAccount, WITHDRAWAL_FLAG); // U:[CM-29]
             }
         }
     }
@@ -1037,13 +1037,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (uint256 totalValueUSD)
     {
         (address token1, uint256 amount1, address token2, uint256 amount2) =
-            IWithdrawalManager(withdrawalManager).cancellableScheduledWithdrawals(creditAccount, isForceCancel);
+            IWithdrawalManager(withdrawalManager).cancellableScheduledWithdrawals(creditAccount, isForceCancel); // U:[CM-30]
 
         if (amount1 != 0) {
-            totalValueUSD = _convertToUSD({_priceOracle: _priceOracle, amountInToken: amount1, token: token1});
+            totalValueUSD = _convertToUSD({_priceOracle: _priceOracle, amountInToken: amount1, token: token1}); // U:[CM-30]
         }
         if (amount2 != 0) {
-            totalValueUSD += _convertToUSD({_priceOracle: _priceOracle, amountInToken: amount2, token: token2});
+            totalValueUSD += _convertToUSD({_priceOracle: _priceOracle, amountInToken: amount2, token: token2}); // U:[CM-30]
         }
     }
 

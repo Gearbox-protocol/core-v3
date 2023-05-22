@@ -17,8 +17,14 @@ contract PriceOracleMock is Test, IPriceOracleV2 {
 
     uint256 public constant override version = 2;
 
+    mapping(address => bool) revertsOnGetPrice;
+
     constructor() {
         vm.label(address(this), "PRICE_ORACLE");
+    }
+
+    function setRevertOnGetPrice(address token, bool value) external {
+        revertsOnGetPrice[token] = value;
     }
 
     function setPrice(address token, uint256 price) external {
@@ -53,6 +59,11 @@ contract PriceOracleMock is Test, IPriceOracleV2 {
     function getPrice(address token) public view returns (uint256 price) {
         price = priceInUSD[token];
         if (price == 0) revert("Price is not set");
+
+        if (revertsOnGetPrice[token]) {
+            console.log("Getting price for ", token, " should not be called");
+            revert("PriceOracle mock should not be called reverted");
+        }
     }
 
     /// @dev Returns the price feed address for the passed token

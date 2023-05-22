@@ -114,4 +114,12 @@ contract CreditManagerV3Harness is CreditManagerV3 {
     {
         return _getQuotedTokensData(creditAccount, enabledTokensMask, _poolQuotaKeeper);
     }
+
+    function addCancellableWithdrawalsValue(address _priceOracle, address creditAccount, bool isForceCancel)
+        external
+        view
+        returns (uint256 totalValueUSD)
+    {
+        return _addCancellableWithdrawalsValue(_priceOracle, creditAccount, isForceCancel);
+    }
 }

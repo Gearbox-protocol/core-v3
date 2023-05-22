@@ -57,4 +57,9 @@ contract WithdrawalManagerMock {
         hasScheduled = return_hasScheduled;
         tokensToEnable = return_tokensToEnable;
     }
+
+    function setClaimScheduledWithdrawals(bool hasScheduled, uint256 tokensToEnable) external {
+        return_hasScheduled = hasScheduled;
+        return_tokensToEnable = tokensToEnable;
+    }
 }
