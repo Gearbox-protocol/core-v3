@@ -576,7 +576,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
 
     function test_I_CM_14_close_credit_account_with_nonzero_skipTokenMask_sends_correct_tokens() public {
         (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
-        creditManager.transferAccountOwnership(creditAccount, address(this));
+        // creditManager.transferAccountOwnership(creditAccount, address(this));
 
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
         tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
@@ -592,7 +592,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         uint256 usdcTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.USDC));
         uint256 linkTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.LINK));
 
-        creditManager.transferAccountOwnership(creditAccount, USER);
+        // creditManager.transferAccountOwnership(creditAccount, USER);
 
         // creditManager.closeCreditAccount(
         //     creditAccount,
@@ -663,7 +663,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
     function test_I_CM_17_close_dai_credit_account_sends_eth_to_borrower() public {
         /// CLOSURE CASE
         (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
-        creditManager.transferAccountOwnership(creditAccount, address(this));
+        // creditManager.transferAccountOwnership(creditAccount, address(this));
 
         // Transfer additional borrowedAmount. After that underluying token balance = 2 * borrowedAmount
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
@@ -674,7 +674,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         uint256 wethTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.WETH));
         uint256 daiTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI));
 
-        creditManager.transferAccountOwnership(creditAccount, USER);
+        // creditManager.transferAccountOwnership(creditAccount, USER);
         // creditManager.closeCreditAccount(
         //     creditAccount,
         //     ClosureAction.CLOSE_ACCOUNT,
@@ -748,7 +748,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
     function test_I_CM_19_close_dai_credit_account_sends_eth_to_liquidator() public {
         /// CLOSURE CASE
         (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
-        creditManager.transferAccountOwnership(creditAccount, address(this));
+        // creditManager.transferAccountOwnership(creditAccount, address(this));
 
         // Transfer additional borrowedAmount. After that underluying token balance = 2 * borrowedAmount
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
@@ -756,7 +756,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         // Adds WETH to test how it would be converted
         tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
 
-        creditManager.transferAccountOwnership(creditAccount, USER);
+        // creditManager.transferAccountOwnership(creditAccount, USER);
         uint256 wethTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.WETH));
         uint256 daiTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI));
 

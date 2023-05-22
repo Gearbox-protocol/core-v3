@@ -529,19 +529,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         IERC20(token).safeTransferFrom({from: payer, to: creditAccount, value: amount}); // U:[CM-13]
     }
 
-    /// @notice Transfers Credit Account ownership to another address
-    /// @param creditAccount Address of creditAccount to be transferred
-    /// @param to Address of new owner
-    function transferAccountOwnership(address creditAccount, address to)
-        external
-        override
-        nonReentrant // U:[CM-5]
-        creditFacadeOnly // U:[CM-2]
-    {
-        getBorrowerOrRevert({creditAccount: creditAccount}); //  U:[CM-14]
-        creditAccountInfo[creditAccount].borrower = to; //  U:[CM-14]
-    }
-
     ///
     /// ADAPTER FUNCTIONS
     ///

@@ -406,9 +406,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.addCollateral(DUMB_ADDRESS, DUMB_ADDRESS, DUMB_ADDRESS, 100);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
-        creditManager.transferAccountOwnership(DUMB_ADDRESS, DUMB_ADDRESS);
-
-        vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.fullCollateralCheck(DUMB_ADDRESS, 0, new uint256[](0), 1);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
@@ -505,9 +502,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditManager.addCollateral(DUMB_ADDRESS, DUMB_ADDRESS, DUMB_ADDRESS, 100);
-
-        vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditManager.transferAccountOwnership(DUMB_ADDRESS, DUMB_ADDRESS);
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditManager.fullCollateralCheck(DUMB_ADDRESS, 0, new uint256[](0), 1);
