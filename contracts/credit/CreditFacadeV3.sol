@@ -101,9 +101,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @notice Keeps parameters that are used to pause the system after too much bad debt over a short period
     CumulativeLossParams public override lossParams;
 
-    /// @notice A map that stores whether a user allows a transfer of an account from another user to themselves
-    mapping(address => mapping(address => bool)) public override transfersAllowed;
-
     /// @notice Maps addresses to their status as emergency liquidator.
     /// @dev Emergency liquidators are trusted addresses
     /// that are able to liquidate positions while the contracts are paused,
@@ -197,8 +194,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// - Emits OpenCreditAccount event
     ///
     /// @param debt Debt size
-    /// @param onBehalfOf The address to open an account for. Transfers to it have to be allowed if
-    /// msg.sender != onBehalfOf
+    /// @param onBehalfOf The address to open an account for
     /// @param calls The array of MultiCall structs encoding the required operations. Generally must have
     /// at least a call to addCollateral, as otherwise the health check at the end will fail.
     /// @param referralCode Referral code that is used for potential rewards. 0 if no referral code provided
@@ -217,12 +213,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
         // Checks whether the new borrowed amount does not violate the block limit
         _revertIfOutOfBorrowingLimit(debt); // F:[FA-11]
-
-        // Checks that the msg.sender can open an account for onBehalfOf
-        // msg.sender must either be the account owner themselves, or be approved for transfers
-        if (msg.sender != onBehalfOf) {
-            _revertIfAccountTransferNotAllowed(msg.sender, onBehalfOf);
-        } // F:[FA-04C]
 
         /// Attempts to burn the DegenNFT - if onBehalfOf has none, this will fail
         if (degenNFT != address(0)) {
@@ -918,40 +908,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         tokensToDisable = ICreditManagerV3(creditManager).scheduleWithdrawal(creditAccount, token, amount);
     }
 
-    /// @notice Transfers credit account from owner to another user
-    /// By default, this action is forbidden, and the user has to approve transfers from sender to itself
-    /// by calling approveAccountTransfer.
-    /// This is done to prevent malicious actors from transferring compromised accounts to other users.
-    /// @param creditAccount Address of CA to transfer
-    /// @param to Address to transfer the account to
-    function transferAccountOwnership(address creditAccount, address to)
-        external
-        override
-        whenNotPaused
-        whenNotExpired
-        nonZeroAddress(to)
-        creditAccountOwnerOnly(creditAccount)
-        nonReentrant
-    {
-        _revertIfAccountTransferNotAllowed({from: msg.sender, to: to});
-
-        /// Checks that the account hf > 1, as it is forbidden to transfer
-        /// accounts that are liquidatable
-        (,,, bool isLiquidatable) = _isAccountLiquidatable(creditAccount, false); // F:[FA-34]
-
-        if (isLiquidatable) revert CantTransferLiquidatableAccountException(); // F:[FA-34]
-
-        /// Bot permissions are specific to (owner, creditAccount),
-        /// so they need to be erased on account transfer
-        _eraseAllBotPermissions({creditAccount: creditAccount, setFlag: true});
-
-        // Requests the Credit Manager to transfer the account
-        ICreditManagerV3(creditManager).transferAccountOwnership(creditAccount, to); // F:[FA-35]
-
-        // Emits event
-        emit TransferAccount(creditAccount, msg.sender, to); // F:[FA-35]
-    }
-
     /// @notice Claims all mature delayed withdrawals, transferring funds from
     ///      withdrawal manager to the address provided by the CA owner
     /// @param creditAccount CA to claim withdrawals for
@@ -999,8 +955,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         }
     }
 
-    /// @notice Convenience function to erase all bot permissions for a Credit Account
-    ///      Called on transferring or closing an account
+    /// @notice Convenience function to erase all bot permissions for a Credit Account upon closure
     function _eraseAllBotPermissions(address creditAccount, bool setFlag) internal {
         IBotList(botList).eraseAllBotPermissions(creditAccount);
 
@@ -1013,13 +968,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     ///      to optimize contract size
     function _setFlagFor(address creditAccount, uint16 flag, bool value) internal {
         ICreditManagerV3(creditManager).setFlagFor(creditAccount, flag, value);
-    }
-
-    /// @notice Checks that transfer is allowed
-    function _revertIfAccountTransferNotAllowed(address from, address to) internal view {
-        if (!transfersAllowed[from][to]) {
-            revert AccountTransferNotAllowedException();
-        } // F:[FA-33]
     }
 
     /// @notice Checks that the per-block borrow limit was not violated and updates the
@@ -1056,20 +1004,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         if (debt < uint256(debtLimits.minDebt) || debt > uint256(debtLimits.maxDebt)) {
             revert BorrowAmountOutOfLimitsException();
         } // F:
-    }
-
-    /// @notice Approves account transfer from another user to msg.sender
-    /// @param from Address for which account transfers are allowed/forbidden
-    /// @param allowTransfer True is transfer is allowed, false if forbidden
-    function approveAccountTransfer(address from, bool allowTransfer) external override nonReentrant {
-        // In whitelisted mode only select addresses can have Credit Accounts
-        // So this action is prohibited
-        if (whitelisted) revert AccountTransferNotAllowedException(); // F:[FA-32]
-
-        transfersAllowed[from][msg.sender] = allowTransfer; // F:[FA-38]
-
-        // Emits event
-        emit SetAccountTransferAllowance(from, msg.sender, allowTransfer); // F:[FA-38]
     }
 
     //
@@ -1240,8 +1174,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
     /// @notice Sets the bot list for this Credit Facade
     ///      The bot list is used to determine whether an address has a right to
-    ///      run multicalls for a borrower as a bot. The relationship is stored in a separate
-    ///      contract for easier transferability
+    ///      run multicalls for a borrower as a bot. The relationship is stored in a separate contract.
     function setBotList(address _botList) external creditConfiguratorOnly {
         botList = _botList;
     }

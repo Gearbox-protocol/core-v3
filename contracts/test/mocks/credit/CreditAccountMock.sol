@@ -6,7 +6,7 @@ pragma abicoder v1;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-import {ICreditAccount} from "../../../interfaces/ICreditAccount.sol";
+import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
 
 interface CreditAccountMockEvents {
     event TransferCall(address token, address to, uint256 amount);
@@ -14,7 +14,7 @@ interface CreditAccountMockEvents {
     event ExecuteCall(address destination, bytes data);
 }
 
-contract CreditAccountMock is ICreditAccount, CreditAccountMockEvents {
+contract CreditAccountMock is ICreditAccountBase, CreditAccountMockEvents {
     using Address for address;
 
     address public creditManager;

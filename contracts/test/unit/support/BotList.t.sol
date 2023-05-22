@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {BotList} from "../../../support/BotList.sol";
 import {IBotListEvents, BotFunding} from "../../../interfaces/IBotList.sol";
-import {ICreditAccount} from "../../../interfaces/ICreditAccount.sol";
+import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import {ICreditFacade} from "../../../interfaces/ICreditFacade.sol";
 
@@ -80,7 +80,7 @@ contract BotListTest is Test, IBotListEvents {
 
         vm.mockCall(
             address(creditAccount),
-            abi.encodeWithSelector(ICreditAccount.creditManager.selector),
+            abi.encodeWithSelector(ICreditAccountBase.creditManager.selector),
             abi.encode(address(creditManager))
         );
 
