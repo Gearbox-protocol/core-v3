@@ -974,7 +974,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 to: borrower,
                 amount: amount,
                 convertToETH: false
-            });
+            }); // U:[CM-27]
         } else {
             uint256 delivered = ICreditAccount(creditAccount).transferDeliveredBalanceControl({
                 token: token,
@@ -995,7 +995,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
 
         if (IERC20Helper.balanceOf({token: token, holder: creditAccount}) <= 1) {
-            tokensToDisable = tokenMask;
+            tokensToDisable = tokenMask; // U:[CM-27]
         }
     }
 

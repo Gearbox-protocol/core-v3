@@ -2153,7 +2153,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         withFeeTokenCase
         withoutSupportQuotas
     {
-        address creditAccount = DUMB_ADDRESS;
+        address creditAccount = address(new CreditAccountMock());
 
         withdrawalManager.setDelay(0);
 
@@ -2163,12 +2163,47 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         (uint256 tokensToDisable) =
             creditManager.scheduleWithdrawal({creditAccount: creditAccount, token: underlying, amount: 20_000});
 
-        // creditManager.setBorrower({creditAccount: creditAccount, borrower: USER});
+        creditManager.setBorrower({creditAccount: creditAccount, borrower: USER});
 
-        // (tokensToDisable) =
-        //     creditManager.scheduleWithdrawal({creditAccount: creditAccount, token: underlying, amount: 20_000});
+        string memory caseNameBak = string.concat(caseName, "a part of funds");
+        startTokenTrackingSession(caseName);
 
-        // assertEq(tokensToDisable, 0, _testCaseErr("Incorrect token to disable"));
+        expectTokenTransfer({
+            reason: "direct transfer to borrower",
+            token: underlying,
+            from: creditAccount,
+            to: USER,
+            amount: _amountMinusFee(20_000)
+        });
+
+        (tokensToDisable) =
+            creditManager.scheduleWithdrawal({creditAccount: creditAccount, token: underlying, amount: 20_000});
+
+        checkTokenTransfers({debug: false});
+
+        assertEq(tokensToDisable, 0, _testCaseErr("Incorrect token to disable"));
+
+        // KEEP 1 CASE
+
+        caseName = string.concat(caseNameBak, " keep 1 token");
+        uint256 amount = IERC20(underlying).balanceOf(creditAccount) - 1;
+
+        startTokenTrackingSession(string.concat(caseName, "keep 1"));
+
+        expectTokenTransfer({
+            reason: "direct transfer to borrower",
+            token: underlying,
+            from: creditAccount,
+            to: USER,
+            amount: _amountMinusFee(amount)
+        });
+
+        (tokensToDisable) =
+            creditManager.scheduleWithdrawal({creditAccount: creditAccount, token: underlying, amount: amount});
+
+        checkTokenTransfers({debug: false});
+
+        assertEq(tokensToDisable, UNDERLYING_TOKEN_MASK, _testCaseErr("Incorrect token to disable"));
     }
     //
     //

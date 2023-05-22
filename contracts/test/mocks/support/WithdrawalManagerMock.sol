@@ -4,19 +4,23 @@
 pragma solidity ^0.8.17;
 pragma abicoder v1;
 
+import {ClaimAction} from "../../../interfaces/IWithdrawalManager.sol";
+
 struct CancellableWithdrawals {
     address token;
     uint256 amount;
 }
 
-/// @title WithdrawalManagerMock
 contract WithdrawalManagerMock {
     uint256 public constant version = 3_00;
-    // // CREDIT MANAGERS
 
     uint40 public delay;
 
     mapping(bool => CancellableWithdrawals[2]) amoucancellableWithdrawals;
+
+    bool public claimScheduledWithdrawalsWasCalled;
+    bool return_hasScheduled;
+    uint256 return_tokensToEnable;
 
     function cancellableScheduledWithdrawals(address, bool isForceCancel)
         external
@@ -41,5 +45,16 @@ contract WithdrawalManagerMock {
 
     function setDelay(uint40 _delay) external {
         delay = _delay;
+    }
+
+    function addScheduledWithdrawal(address creditAccount, address token, uint256 amount, uint8 tokenIndex) external {}
+
+    function claimScheduledWithdrawals(address creditAccount, address to, ClaimAction action)
+        external
+        returns (bool hasScheduled, uint256 tokensToEnable)
+    {
+        claimScheduledWithdrawalsWasCalled = true;
+        hasScheduled = return_hasScheduled;
+        tokensToEnable = return_tokensToEnable;
     }
 }
