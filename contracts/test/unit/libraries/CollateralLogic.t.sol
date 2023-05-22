@@ -212,7 +212,7 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
                 .calcOneNonQuotedCollateral({
                 creditAccount: creditAccount,
                 convertToUSDFn: _convertToUSD,
-                collateralTokensByMaskFn: _collateralTokensByMask,
+                collateralTokenByMaskFn: _collateralTokenByMask,
                 tokenMask: tokenMask[Tokens.DAI],
                 priceOracle: PRICE_ORACLE
             });
@@ -343,7 +343,7 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
                 limit: _case.limit,
                 collateralHints: _case.collateralHints,
                 convertToUSDFn: _convertToUSD,
-                collateralTokensByMaskFn: _collateralTokensByMask,
+                collateralTokenByMaskFn: _collateralTokenByMask,
                 tokensToCheckMask: _case.tokensToCheckMask,
                 priceOracle: PRICE_ORACLE
             });
@@ -626,7 +626,7 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
                 minHealthFactor: _case.minHealthFactor,
                 collateralHints: _case.collateralHints,
                 convertToUSDFn: _convertToUSD,
-                collateralTokensByMaskFn: _collateralTokensByMask,
+                collateralTokenByMaskFn: _collateralTokenByMask,
                 priceOracle: PRICE_ORACLE
             });
 

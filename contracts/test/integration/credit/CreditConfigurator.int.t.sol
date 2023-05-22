@@ -212,7 +212,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         assertEq(creditManager.collateralTokensCount(), len, "Incorrect quantity of allowed tokens");
 
         for (uint256 i = 0; i < len; i++) {
-            (address token, uint16 lt) = creditManager.collateralTokensByMask(1 << i);
+            (address token, uint16 lt) = creditManager.collateralTokenByMask(1 << i);
 
             assertEq(token, tokenTestSuite.addressOf(collateralTokenOpts[i].token), "Incorrect token address");
 
@@ -420,7 +420,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
 
         assertEq(creditManager.collateralTokensCount(), tokensCountBefore + 1, "Incorrect tokens count");
 
-        (address token,) = creditManager.collateralTokensByMask(1 << tokensCountBefore);
+        (address token,) = creditManager.collateralTokenByMask(1 << tokensCountBefore);
 
         assertEq(token, cLINKToken, "Token is not added to list");
 

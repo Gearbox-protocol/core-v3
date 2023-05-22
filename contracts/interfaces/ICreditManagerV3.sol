@@ -212,7 +212,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
 
     /// @dev Returns the collateral token with requested mask and its liquidationThreshold
     /// @param tokenMask Token mask corresponding to the token
-    function collateralTokensByMask(uint256 tokenMask)
+    function collateralTokenByMask(uint256 tokenMask)
         external
         view
         returns (address token, uint16 liquidationThreshold);
@@ -297,6 +297,9 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
 
     /// @dev Address of the connected Price Oracle
     function priceOracle() external view returns (address);
+
+    /// @notice Returns the full set of currently active Credit Accounts
+    function creditAccounts() external view returns (address[] memory);
 
     function calcDebtAndCollateral(address creditAccount, CollateralCalcTask task)
         external
