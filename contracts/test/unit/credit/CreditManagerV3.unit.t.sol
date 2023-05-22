@@ -329,7 +329,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         assertEq(creditManager.underlying(), tokenTestSuite.addressOf(Tokens.DAI), _testCaseErr("Incorrect underlying"));
 
-        (address token, uint16 lt) = creditManager.collateralTokensByMask(UNDERLYING_TOKEN_MASK);
+        (address token, uint16 lt) = creditManager.collateralTokenByMask(UNDERLYING_TOKEN_MASK);
 
         assertEq(token, tokenTestSuite.addressOf(Tokens.DAI), _testCaseErr("Incorrect underlying"));
 
@@ -1377,7 +1377,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         vm.mockCall(mockToken, abi.encodeCall(IERC20.allowance, (creditAccount, spender)), abi.encode(1));
 
         bytes memory approveCallData = abi.encodeCall(IERC20.approve, (spender, 0));
-        bytes memory executeCallData = abi.encodeCall(ICreditAccount.execute, (mockToken, approveCallData));
+        bytes memory executeCallData = abi.encodeCall(ICreditAccountBase.execute, (mockToken, approveCallData));
 
         vm.mockCallRevert(creditAccount, executeCallData, bytes(""));
         creditManager.revokeAdapterAllowances(creditAccount, revCase);
@@ -1391,7 +1391,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         vm.mockCall(mockToken, abi.encodeCall(IERC20.allowance, (creditAccount, spender)), abi.encode(2));
 
         approveCallData = abi.encodeCall(IERC20.approve, (spender, 0));
-        executeCallData = abi.encodeCall(ICreditAccount.execute, (mockToken, approveCallData));
+        executeCallData = abi.encodeCall(ICreditAccountBase.execute, (mockToken, approveCallData));
 
         vm.expectCall(creditAccount, executeCallData);
         creditManager.revokeAdapterAllowances(creditAccount, revCase);
@@ -2326,12 +2326,13 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         );
 
         string memory caseNameBak = caseName;
+
         for (uint256 i = 0; i < 2; ++i) {
             creditManager.setFlagFor(creditAccount, WITHDRAWAL_FLAG, true);
 
             bool hasScheduled = i == 1;
 
-            caseName = string.concat(caseName, "hasScheduled = ", hasScheduled ? "true" : "false");
+            caseName = string.concat(caseNameBak, "hasScheduled = ", hasScheduled ? "true" : "false");
 
             withdrawalManagerMock.setClaimScheduledWithdrawals(hasScheduled, tokenMask);
             (uint256 tokensToEnable) = creditManager.claimWithdrawals(creditAccount, FRIEND, ClaimAction.CLAIM);
@@ -2344,39 +2345,39 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         }
     }
 
-    struct AddCancellableWithdrawalsValueTestCase {
+    struct getCancellableWithdrawalsValueTestCase {
         string name;
         uint256 amount1;
         uint256 amount2;
         uint256 expectedTotalValueUSD;
     }
 
-    /// @dev U:[CM-30]: _addCancellableWithdrawalsValue works correctly
-    function test_U_CM_30_addCancellableWithdrawalsValue_works_correctly() public withoutSupportQuotas {
+    /// @dev U:[CM-30]: _getCancellableWithdrawalsValue works correctly
+    function test_U_CM_30_getCancellableWithdrawalsValue_works_correctly() public withoutSupportQuotas {
         priceOracleMock.setPrice(tokenTestSuite.addressOf(Tokens.DAI), 1 * (10 ** 8));
         priceOracleMock.setPrice(tokenTestSuite.addressOf(Tokens.WETH), 2_000 * (10 ** 8));
 
-        AddCancellableWithdrawalsValueTestCase[4] memory cases = [
-            AddCancellableWithdrawalsValueTestCase({
+        getCancellableWithdrawalsValueTestCase[4] memory cases = [
+            getCancellableWithdrawalsValueTestCase({
                 name: "amount1 == 0, amount2 == 0",
                 amount1: 0,
                 amount2: 0,
                 expectedTotalValueUSD: 0
             }),
-            AddCancellableWithdrawalsValueTestCase({
+            getCancellableWithdrawalsValueTestCase({
                 name: "amount1 == 100, amount2 == 0",
                 amount1: 100,
                 amount2: 0,
                 expectedTotalValueUSD: 100 * 1
             }),
-            AddCancellableWithdrawalsValueTestCase({
-                name: "amount1 == 0, amount2 == 0",
+            getCancellableWithdrawalsValueTestCase({
+                name: "amount1 == 0, amount2 == 20",
                 amount1: 0,
                 amount2: 20,
                 expectedTotalValueUSD: 20 * 2_000
             }),
-            AddCancellableWithdrawalsValueTestCase({
-                name: "amount1 == 0, amount2 == 0",
+            getCancellableWithdrawalsValueTestCase({
+                name: "amount1 == 15_00, amount2 == 8",
                 amount1: 15_00,
                 amount2: 8,
                 expectedTotalValueUSD: 15_00 * 1 + 8 * 20_00
@@ -2391,7 +2392,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             for (uint256 i; i < cases.length; ++i) {
                 uint256 snapshot = vm.snapshot();
 
-                AddCancellableWithdrawalsValueTestCase memory _case = cases[i];
+                getCancellableWithdrawalsValueTestCase memory _case = cases[i];
 
                 caseName = string.concat(caseName, _case.name, ", isForceCancel = ", isForceCancel ? "true" : "false");
 
@@ -2412,7 +2413,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 );
 
                 uint256 totalValueUSD =
-                    creditManager.addCancellableWithdrawalsValue(address(priceOracleMock), creditAccount, isForceCancel);
+                    creditManager.getCancellableWithdrawalsValue(address(priceOracleMock), creditAccount, isForceCancel);
 
                 assertEq(totalValueUSD, _case.expectedTotalValueUSD, _testCaseErr("Incorrect totalValueUSD"));
 
@@ -2595,13 +2596,13 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.getTokenByMask(1 << 255);
 
         vm.expectRevert(TokenNotAllowedException.selector);
-        creditManager.collateralTokensByMask(1 << 255);
+        creditManager.collateralTokenByMask(1 << 255);
 
         for (uint256 i = 0; i < numberOfTokens + 1; ++i) {
             uint256 tokenMask = 1 << i;
             assertEq(tokenMask, creditManager.getTokenMaskOrRevert(creditManager.getTokenByMask(tokenMask)));
 
-            (address token,) = creditManager.collateralTokensByMask(tokenMask);
+            (address token,) = creditManager.collateralTokenByMask(tokenMask);
             assertEq(tokenMask, creditManager.getTokenMaskOrRevert(token));
         }
     }
@@ -2696,8 +2697,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     // ADD TOKEN
     //
 
-    /// @dev U:[CM-38]: addToken reverts if token exists and if collateralTokens > 256
-    function test_U_CM_38_addToken_reverts_if_token_exists_and_if_collateralTokens_more_256()
+    /// @dev U:[CM-38]: addToken reverts if token exists and if collateralTokens > 255
+    function test_U_CM_38_addToken_reverts_if_token_exists_and_if_collateralTokens_more_255()
         public
         withoutSupportQuotas
     {
@@ -2830,7 +2831,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         assertEq(creditManager.liquidationThresholds(weth), expectedLT, "Incorrect LT for weth");
 
-        (, uint16 lt) = creditManager.collateralTokensByMask(creditManager.getTokenMaskOrRevert(weth));
+        (, uint16 lt) = creditManager.collateralTokenByMask(creditManager.getTokenMaskOrRevert(weth));
 
         assertEq(lt, expectedLT, "Incorrect LT for weth");
 

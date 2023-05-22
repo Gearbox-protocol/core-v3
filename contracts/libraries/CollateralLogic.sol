@@ -24,7 +24,7 @@ library CollateralLogic {
         bool lazy,
         uint16 minHealthFactor,
         uint256[] memory collateralHints,
-        function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn,
+        function (uint256, bool) view returns (address, uint16) collateralTokenByMaskFn,
         function (address, uint256, address) view returns(uint256) convertToUSDFn,
         address priceOracle
     ) internal view returns (uint256 totalValueUSD, uint256 twvUSD, uint256 tokensToDisable) {
@@ -66,7 +66,7 @@ library CollateralLogic {
                 creditAccount: creditAccount,
                 limit: limit,
                 collateralHints: collateralHints,
-                collateralTokensByMaskFn: collateralTokensByMaskFn,
+                collateralTokenByMaskFn: collateralTokenByMaskFn,
                 convertToUSDFn: convertToUSDFn
             }); // U:[CLL-5]
 
@@ -119,7 +119,7 @@ library CollateralLogic {
         uint256 limit,
         uint256[] memory collateralHints,
         function (address, uint256, address) view returns(uint256) convertToUSDFn,
-        function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn,
+        function (uint256, bool) view returns (address, uint16) collateralTokenByMaskFn,
         uint256 tokensToCheckMask,
         address priceOracle
     ) internal view returns (uint256 totalValueUSD, uint256 twvUSD, uint256 tokensToDisable) {
@@ -144,7 +144,7 @@ library CollateralLogic {
                         creditAccount: ca,
                         tokenMask: tokenMask,
                         convertToUSDFn: convertToUSDFn,
-                        collateralTokensByMaskFn: collateralTokensByMaskFn
+                        collateralTokenByMaskFn: collateralTokenByMaskFn
                     }); // U:[CLL-3]
                     totalValueUSD += valueUSD; // U:[CLL-3]
                     twvUSD += weightedValueUSD; // U:[CLL-3]
@@ -174,11 +174,11 @@ library CollateralLogic {
     function calcOneNonQuotedCollateral(
         address creditAccount,
         function (address, uint256, address) view returns(uint256) convertToUSDFn,
-        function (uint256, bool) view returns (address, uint16) collateralTokensByMaskFn,
+        function (uint256, bool) view returns (address, uint16) collateralTokenByMaskFn,
         uint256 tokenMask,
         address priceOracle
     ) internal view returns (uint256 valueUSD, uint256 weightedValueUSD, bool nonZeroBalance) {
-        (address token, uint16 liquidationThreshold) = collateralTokensByMaskFn(tokenMask, true); // U:[CLL-2]
+        (address token, uint16 liquidationThreshold) = collateralTokenByMaskFn(tokenMask, true); // U:[CLL-2]
 
         (valueUSD, weightedValueUSD, nonZeroBalance) = calcOneTokenCollateral({
             priceOracle: priceOracle,

@@ -68,12 +68,12 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         _safeTokenTransfer(creditAccount, token, to, amount, convertToETH);
     }
 
-    function collateralTokensByMaskCalcLT(uint256 tokenMask, bool calcLT)
+    function collateralTokenByMaskCalcLT(uint256 tokenMask, bool calcLT)
         external
         view
         returns (address token, uint16 liquidationThreshold)
     {
-        return _collateralTokensByMask(tokenMask, calcLT);
+        return _collateralTokenByMask(tokenMask, calcLT);
     }
 
     /// @dev Calculates collateral and debt parameters
@@ -115,12 +115,12 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         return _getQuotedTokensData(creditAccount, enabledTokensMask, _poolQuotaKeeper);
     }
 
-    function addCancellableWithdrawalsValue(address _priceOracle, address creditAccount, bool isForceCancel)
+    function getCancellableWithdrawalsValue(address _priceOracle, address creditAccount, bool isForceCancel)
         external
         view
         returns (uint256 totalValueUSD)
     {
-        return _addCancellableWithdrawalsValue(_priceOracle, creditAccount, isForceCancel);
+        return _getCancellableWithdrawalsValue(_priceOracle, creditAccount, isForceCancel);
     }
 
     function getCollateralTokensData(uint256 tokenMask) external view returns (CollateralTokenData memory) {

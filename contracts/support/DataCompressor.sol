@@ -182,7 +182,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
                     (balance.token, balance.balance,,) = creditFilter.getCreditAccountTokenById(creditAccount, i);
                     balance.isAllowed = creditFilter.isTokenAllowed(balance.token);
                 } else {
-                    (balance.token,) = creditManagerV2.collateralTokensByMask(1 << i);
+                    (balance.token,) = creditManagerV2.collateralTokenByMask(1 << i);
                     balance.balance = IERC20(balance.token).balanceOf(creditAccount);
                     // TODO: change
                     balance.isAllowed = true; //creditFacade.isAllowToken(balance.token);
@@ -261,7 +261,7 @@ contract DataCompressor is IDataCompressor, ContractsRegisterTrait {
                         result.liquidationThresholds[i] = creditFilter.liquidationThresholds(token);
                     } else {
                         (result.collateralTokens[i], result.liquidationThresholds[i]) =
-                            creditManagerV2.collateralTokensByMask(1 << i);
+                            creditManagerV2.collateralTokenByMask(1 << i);
                     }
                 }
             }

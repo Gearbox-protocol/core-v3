@@ -842,7 +842,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             minHealthFactor: minHealthFactor,
             collateralHints: collateralHints,
             priceOracle: _priceOracle,
-            collateralTokensByMaskFn: _collateralTokensByMask,
+            collateralTokenByMaskFn: _collateralTokenByMask,
             convertToUSDFn: _convertToUSD
         }); // U:[CM-22]
 
@@ -857,7 +857,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         /// since we want to return withdrawals to the Credit Account but also need to ensure that
         /// they are included into remainingFunds.
         if ((task != CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS) && _hasWithdrawals(creditAccount)) {
-            collateralDebtData.totalValueUSD += _addCancellableWithdrawalsValue({
+            collateralDebtData.totalValueUSD += _getCancellableWithdrawalsValue({
                 _priceOracle: _priceOracle,
                 creditAccount: creditAccount,
                 isForceCancel: task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
@@ -910,7 +910,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
                     if (quotedMask & tokenMask != 0) {
                         address token; // U:[CM-24]
-                        (token, lts[j]) = _collateralTokensByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
+                        (token, lts[j]) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
 
                         quotaTokens[j] = token; // U:[CM-24]
 
@@ -1048,7 +1048,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param _priceOracle Price Oracle to compute the value of withdrawn assets
     /// @param creditAccount Credit Account to compute value for
     /// @param isForceCancel Whether to cancel all withdrawals or only immature ones
-    function _addCancellableWithdrawalsValue(address _priceOracle, address creditAccount, bool isForceCancel)
+    function _getCancellableWithdrawalsValue(address _priceOracle, address creditAccount, bool isForceCancel)
         internal
         view
         returns (uint256 totalValueUSD)
@@ -1121,8 +1121,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             // In case a token transfer fails (e.g., borrower getting blacklisted by USDC), the token will be sent
             // to WithdrawalManager
             try ICreditAccountBase(creditAccount).safeTransfer({token: token, to: to, amount: amount}) {
-                 // U:[CM-31, 32, 33]
-
+                // U:[CM-31, 32, 33]
             } catch {
                 uint256 delivered = ICreditAccountBase(creditAccount).transferDeliveredBalanceControl({
                     token: token,
@@ -1148,30 +1147,30 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Returns the collateral token with requested mask
     /// @param tokenMask Token mask corresponding to the token
     function getTokenByMask(uint256 tokenMask) public view override returns (address token) {
-        (token,) = _collateralTokensByMask({tokenMask: tokenMask, calcLT: false}); // U:[CM-34]
+        (token,) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: false}); // U:[CM-34]
     }
 
     /// @notice Returns the liquidation threshold for the provided token
     /// @param token Token to retrieve the LT for
     function liquidationThresholds(address token) public view override returns (uint16 lt) {
         uint256 tokenMask = getTokenMaskOrRevert(token);
-        (, lt) = _collateralTokensByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-42]
+        (, lt) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-42]
     }
 
     /// @notice Returns the collateral token with requested mask and its liquidationThreshold
     /// @param tokenMask Token mask corresponding to the token
-    function collateralTokensByMask(uint256 tokenMask)
+    function collateralTokenByMask(uint256 tokenMask)
         public
         view
         override
         returns (address token, uint16 liquidationThreshold)
     {
-        return _collateralTokensByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-34, 42]
+        return _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-34, 42]
     }
 
     /// @notice Returns the collateral token with requested mask and its liquidationThreshold
     /// @param tokenMask Token mask corresponding to the token
-    function _collateralTokensByMask(uint256 tokenMask, bool calcLT)
+    function _collateralTokenByMask(uint256 tokenMask, bool calcLT)
         internal
         view
         returns (address token, uint16 liquidationThreshold)

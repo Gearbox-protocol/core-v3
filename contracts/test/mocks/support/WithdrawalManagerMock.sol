@@ -16,7 +16,7 @@ contract WithdrawalManagerMock {
 
     uint40 public delay;
 
-    mapping(bool => CancellableWithdrawals[2]) amoucancellableWithdrawals;
+    mapping(bool => CancellableWithdrawals[2]) cancellableWithdrawals;
 
     bool public claimScheduledWithdrawalsWasCalled;
     bool return_hasScheduled;
@@ -27,7 +27,7 @@ contract WithdrawalManagerMock {
         view
         returns (address token1, uint256 amount1, address token2, uint256 amount2)
     {
-        CancellableWithdrawals[2] storage cw = amoucancellableWithdrawals[isForceCancel];
+        CancellableWithdrawals[2] storage cw = cancellableWithdrawals[isForceCancel];
         (token1, amount1) = (cw[0].token, cw[0].amount);
         (token2, amount2) = (cw[1].token, cw[1].amount);
     }
@@ -39,8 +39,8 @@ contract WithdrawalManagerMock {
         address token2,
         uint256 amount2
     ) external {
-        amoucancellableWithdrawals[isForceCancel][0] = CancellableWithdrawals({token: token1, amount: amount1});
-        amoucancellableWithdrawals[isForceCancel][1] = CancellableWithdrawals({token: token2, amount: amount2});
+        cancellableWithdrawals[isForceCancel][0] = CancellableWithdrawals({token: token1, amount: amount1});
+        cancellableWithdrawals[isForceCancel][1] = CancellableWithdrawals({token: token2, amount: amount2});
     }
 
     function setDelay(uint40 _delay) external {
