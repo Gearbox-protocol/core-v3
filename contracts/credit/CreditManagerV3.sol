@@ -544,7 +544,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     ///
-    /// ADAPTER FUNCTIONS
+    /// APPROVALS
     ///
 
     /// @notice Requests the Credit Account to approve a collateral token to another contract.
@@ -561,7 +561,37 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             token: token,
             spender: targetContract,
             amount: amount
-        }); // U:[CM-15]
+        }); // U:[CM-14]
+    }
+
+    /// @notice Revokes allowances for specified spender/token pairs
+    /// @dev When used with an older account factory, the Credit Manager may receive
+    ///      an account with existing allowances. If the user is not comfortable with
+    ///      these allowances, they can revoke them.
+    /// @param creditAccount Credit Account to revoke allowances for
+    /// @param revocations Spender/token pairs to revoke allowances for
+    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations)
+        external
+        override
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // U:[CM-2]
+    {
+        uint256 numRevocations = revocations.length;
+        unchecked {
+            for (uint256 i; i < numRevocations; ++i) {
+                address spender = revocations[i].spender;
+                address token = revocations[i].token;
+
+                if (spender == address(0) || token == address(0)) {
+                    revert ZeroAddressException(); // U:[CM-15]
+                }
+                uint256 allowance = IERC20(token).allowance(creditAccount, spender); // U:[CM-15]
+                /// It checks that token is in collateral token list in _approveSpender function
+                if (allowance > 1) {
+                    _approveSpender({creditAccount: creditAccount, token: token, spender: spender, amount: 0}); // U:[CM-15]
+                }
+            }
+        }
     }
 
     /// @notice Internal wrapper for approving tokens, used to optimize contract size, since approvals
@@ -1044,36 +1074,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
         if (amount2 != 0) {
             totalValueUSD += _convertToUSD({_priceOracle: _priceOracle, amountInToken: amount2, token: token2}); // U:[CM-30]
-        }
-    }
-
-    /// @notice Revokes allowances for specified spender/token pairs
-    /// @dev When used with an older account factory, the Credit Manager may receive
-    ///      an account with existing allowances. If the user is not comfortable with
-    ///      these allowances, they can revoke them.
-    /// @param creditAccount Credit Account to revoke allowances for
-    /// @param revocations Spender/token pairs to revoke allowances for
-    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations)
-        external
-        override
-        nonReentrant // U:[CM-5]
-        creditFacadeOnly // U:[CM-2]
-    {
-        uint256 numRevocations = revocations.length;
-        unchecked {
-            for (uint256 i; i < numRevocations; ++i) {
-                address spender = revocations[i].spender;
-                address token = revocations[i].token;
-
-                if (spender == address(0) || token == address(0)) {
-                    revert ZeroAddressException();
-                }
-                uint256 allowance = IERC20(token).allowance(creditAccount, spender);
-                /// It checks that token is in collateral token list in _approveSpender function
-                if (allowance > 1) {
-                    _approveSpender({creditAccount: creditAccount, token: token, spender: spender, amount: 0});
-                }
-            }
         }
     }
 

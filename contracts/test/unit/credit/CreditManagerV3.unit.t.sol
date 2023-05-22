@@ -407,9 +407,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.addCollateral(DUMB_ADDRESS, DUMB_ADDRESS, DUMB_ADDRESS, 100);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
-        creditManager.transferAccountOwnership(DUMB_ADDRESS, DUMB_ADDRESS);
-
-        vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.fullCollateralCheck(DUMB_ADDRESS, 0, new uint256[](0), 1);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
@@ -506,9 +503,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditManager.addCollateral(DUMB_ADDRESS, DUMB_ADDRESS, DUMB_ADDRESS, 100);
-
-        vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditManager.transferAccountOwnership(DUMB_ADDRESS, DUMB_ADDRESS);
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditManager.fullCollateralCheck(DUMB_ADDRESS, 0, new uint256[](0), 1);
@@ -1316,8 +1310,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     //  APPROVE CREDIT ACCOUNT
     //
 
-    /// @dev U:[CM-15]: approveCreditAccount works as expected
-    function test_U_CM_15_approveCreditAccount_works_as_expected() public withoutSupportQuotas {
+    /// @dev U:[CM-14]: approveCreditAccount works as expected
+    function test_U_CM_14_approveCreditAccount_works_as_expected() public withoutSupportQuotas {
         address creditAccount = address(new CreditAccountMock());
         address linkToken = tokenTestSuite.addressOf(Tokens.LINK);
 
@@ -1344,6 +1338,60 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         vm.prank(ADAPTER);
         creditManager.approveCreditAccount({token: underlying, amount: 20000});
+    }
+
+    /// @dev U:[CM-15]: revokeAdapterAllowances works as expected
+    function test_U_CM_15_revokeAdapterAllowances_works_as_expected() public withoutSupportQuotas {
+        address creditAccount = DUMB_ADDRESS;
+
+        RevocationPair[] memory revCase = new RevocationPair[](1);
+
+        address mockToken = makeAddr("MOCK_TOKEN");
+
+        /// @notice case when token == address
+        revCase[0] = RevocationPair({token: address(0), spender: DUMB_ADDRESS});
+
+        vm.expectRevert(ZeroAddressException.selector);
+        creditManager.revokeAdapterAllowances(creditAccount, revCase);
+
+        /// @notice case when spender == address
+        revCase[0] = RevocationPair({token: DUMB_ADDRESS, spender: address(0)});
+
+        vm.expectRevert(ZeroAddressException.selector);
+        creditManager.revokeAdapterAllowances(creditAccount, revCase);
+
+        address spender = makeAddr("SPENDER");
+
+        /// @notice Reverts for unknown token
+        revCase[0] = RevocationPair({token: mockToken, spender: spender});
+        vm.mockCall(mockToken, abi.encodeCall(IERC20.allowance, (creditAccount, spender)), abi.encode(2));
+
+        vm.expectRevert(TokenNotAllowedException.selector);
+        creditManager.revokeAdapterAllowances(creditAccount, revCase);
+
+        /// @notice Do nothing if allowance == 1
+        revCase[0] = RevocationPair({token: mockToken, spender: spender});
+        vm.mockCall(mockToken, abi.encodeCall(IERC20.allowance, (creditAccount, spender)), abi.encode(1));
+
+        bytes memory approveCallData = abi.encodeCall(IERC20.approve, (spender, 0));
+        bytes memory executeCallData = abi.encodeCall(ICreditAccount.execute, (mockToken, approveCallData));
+
+        vm.mockCallRevert(creditAccount, executeCallData, bytes(""));
+        creditManager.revokeAdapterAllowances(creditAccount, revCase);
+
+        /// @notice Set allowance to zero, if it was >2
+
+        creditAccount = address(new CreditAccountMock());
+        _addToken(mockToken, 80_00);
+
+        revCase[0] = RevocationPair({token: mockToken, spender: spender});
+        vm.mockCall(mockToken, abi.encodeCall(IERC20.allowance, (creditAccount, spender)), abi.encode(2));
+
+        approveCallData = abi.encodeCall(IERC20.approve, (spender, 0));
+        executeCallData = abi.encodeCall(ICreditAccount.execute, (mockToken, approveCallData));
+
+        vm.expectCall(creditAccount, executeCallData);
+        creditManager.revokeAdapterAllowances(creditAccount, revCase);
     }
 
     //
@@ -2369,12 +2417,15 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             }
         }
     }
+
     //
     //
+    // TOKEN TRANSFER HELPERS
     //
     //
-    ///
+
     //
+
     //
     //
     //
