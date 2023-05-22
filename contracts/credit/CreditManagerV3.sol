@@ -1094,11 +1094,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         // Since tokensToTransferMask encodes all enabled tokens as 1, tokenMask > enabledTokensMask is equivalent
         // to the last 1 bit being passed. The loop can be ended at this point
         unchecked {
-            for (uint256 tokenMask = 1; tokenMask <= tokensToTransferMask; tokenMask = tokenMask << 1) {
+            for (
+                uint256 tokenMask = UNDERLYING_TOKEN_MASK; tokenMask <= tokensToTransferMask; tokenMask = tokenMask << 1
+            ) {
                 // enabledTokensMask & tokenMask == tokenMask when the token is enabled, and 0 otherwise
                 if (tokensToTransferMask & tokenMask != 0) {
-                    address token = getTokenByMask(tokenMask); // F:[CM-44]
-                    uint256 amount = IERC20Helper.balanceOf({token: token, holder: creditAccount}); // F:[CM-44]
+                    address token = getTokenByMask(tokenMask); // U:[CM-31]
+                    uint256 amount = IERC20Helper.balanceOf({token: token, holder: creditAccount}); // U:[CM-31]
                     if (amount > 1) {
                         // 1 is subtracted from amount to leave a non-zero value in the balance mapping, optimizing future writes
                         // Since the amount is checked to be more than 1, the block can be marked as unchecked
@@ -1108,7 +1110,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                             to: to,
                             amount: amount - 1,
                             convertToETH: convertToETH
-                        }); // F:[CM-44]
+                        }); // U:[CM-31]
                     }
                 }
             }
@@ -1126,20 +1128,20 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         internal
     {
         if (convertToETH && token == weth) {
-            ICreditAccount(creditAccount).transfer({token: token, to: wethGateway, amount: amount}); // F:[CM-45]
-            IWETHGateway(wethGateway).depositFor({to: to, amount: amount}); // F:[CM-45]
+            ICreditAccount(creditAccount).transfer({token: token, to: wethGateway, amount: amount}); // U:[CM-31, 32]
+            IWETHGateway(wethGateway).depositFor({to: to, amount: amount}); // U:[CM-31, 32]
         } else {
             // In case a token transfer fails (e.g., borrower getting blacklisted by USDC), the token will be sent
             // to WithdrawalManager
             try ICreditAccount(creditAccount).safeTransfer({token: token, to: to, amount: amount}) {
-                // F:[CM-45]
+                // U:[CM-31, 32, 33]
             } catch {
                 uint256 delivered = ICreditAccount(creditAccount).transferDeliveredBalanceControl({
                     token: token,
                     to: withdrawalManager,
                     amount: amount
-                });
-                IWithdrawalManager(withdrawalManager).addImmediateWithdrawal({token: token, to: to, amount: delivered});
+                }); // U:[CM-33]
+                IWithdrawalManager(withdrawalManager).addImmediateWithdrawal({token: token, to: to, amount: delivered}); // U:[CM-33]
             }
         }
     }
@@ -1149,17 +1151,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     //
 
     // TODO: naming!
-    /// @notice Returns the collateral token with requested mask and its liquidationThreshold
-    /// @param tokenMask Token mask corresponding to the token
-    function collateralTokensByMask(uint256 tokenMask)
-        public
-        view
-        override
-        returns (address token, uint16 liquidationThreshold)
-    {
-        return _collateralTokensByMask({tokenMask: tokenMask, calcLT: true});
-    }
-
     /// @notice Returns the mask for the provided token
     /// @param token Token to returns the mask for
     function getTokenMaskOrRevert(address token) public view override returns (uint256 tokenMask) {
@@ -1178,6 +1169,17 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     function liquidationThresholds(address token) public view override returns (uint16 lt) {
         uint256 tokenMask = getTokenMaskOrRevert(token);
         (, lt) = _collateralTokensByMask({tokenMask: tokenMask, calcLT: true}); // F:[CM-47]
+    }
+
+    /// @notice Returns the collateral token with requested mask and its liquidationThreshold
+    /// @param tokenMask Token mask corresponding to the token
+    function collateralTokensByMask(uint256 tokenMask)
+        public
+        view
+        override
+        returns (address token, uint16 liquidationThreshold)
+    {
+        return _collateralTokensByMask({tokenMask: tokenMask, calcLT: true});
     }
 
     /// @notice Returns the collateral token with requested mask and its liquidationThreshold
@@ -1225,11 +1227,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             uint16 _liquidationDiscountExpired
         )
     {
-        _feeInterest = feeInterest; // F:[CM-51]
-        _feeLiquidation = feeLiquidation; // F:[CM-51]
-        _liquidationDiscount = liquidationDiscount; // F:[CM-51]
-        _feeLiquidationExpired = feeLiquidationExpired; // F:[CM-51]
-        _liquidationDiscountExpired = liquidationDiscountExpired; // F:[CM-51]
+        _feeInterest = feeInterest; // U:[CM-37]
+        _feeLiquidation = feeLiquidation; // U:[CM-37]
+        _liquidationDiscount = liquidationDiscount; // U:[CM-37]
+        _feeLiquidationExpired = feeLiquidationExpired; // U:[CM-37]
+        _liquidationDiscountExpired = liquidationDiscountExpired; // U:[CM-37]
     }
 
     /// @notice Address of the connected pool
@@ -1400,11 +1402,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         external
         creditConfiguratorOnly // U:[CM-4]
     {
-        feeInterest = _feeInterest; // F:[CM-51]
-        feeLiquidation = _feeLiquidation; // F:[CM-51]
-        liquidationDiscount = _liquidationDiscount; // F:[CM-51]
-        feeLiquidationExpired = _feeLiquidationExpired; // F:[CM-51]
-        liquidationDiscountExpired = _liquidationDiscountExpired; // F:[CM-51]
+        feeInterest = _feeInterest; // U:[CM-37]
+        feeLiquidation = _feeLiquidation; // U:[CM-37]
+        liquidationDiscount = _liquidationDiscount; // U:[CM-37]
+        feeLiquidationExpired = _feeLiquidationExpired; // U:[CM-37]
+        liquidationDiscountExpired = _liquidationDiscountExpired; // U:[CM-37]
     }
 
     /// @notice Sets ramping parameters for a token's liquidation threshold

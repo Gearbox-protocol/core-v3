@@ -2425,7 +2425,152 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     //
 
     //
+    // BATCH TOKEN TRANSFER
+    //
 
+    /// @dev U:[CM-31]: batchTokensTransfer works correctly
+    function test_U_CM_31_batchTokensTransfer_works_correctly(uint256 tokensToTransferMask)
+        public
+        withFeeTokenCase
+        withoutSupportQuotas
+    {
+        bool convertToEth = (uint256(keccak256(abi.encode((tokensToTransferMask)))) % 2) != 0;
+        uint8 numberOfTokens = uint8(tokensToTransferMask % 253);
+
+        /// @notice `+2` for underlying and WETH token
+        tokensToTransferMask &= (1 << (numberOfTokens + 2)) - 1;
+
+        address creditAccount = address(new CreditAccountMock());
+        address weth = tokenTestSuite.addressOf(Tokens.WETH);
+
+        vm.startPrank(CONFIGURATOR);
+        creditManager.addToken(weth);
+        creditManager.setCollateralTokenData(weth, 8000, 8000, type(uint40).max, 0);
+
+        vm.stopPrank();
+
+        {
+            tokenTestSuite.mint({
+                token: underlying,
+                to: creditAccount,
+                amount: uint256(keccak256(abi.encode((tokensToTransferMask)))) % type(uint192).max
+            });
+            uint256 randomAmount = tokensToTransferMask % DAI_ACCOUNT_AMOUNT;
+            tokenTestSuite.mint({token: weth, to: creditAccount, amount: randomAmount});
+            _addTokensBatch({creditAccount: creditAccount, numberOfTokens: numberOfTokens, balance: randomAmount});
+        }
+
+        caseName = string.concat(caseName, "token transfer with ", Strings.toString(numberOfTokens), " on account");
+
+        startTokenTrackingSession(caseName);
+
+        uint8 len = creditManager.collateralTokensCount();
+
+        for (uint8 i = 0; i < len; ++i) {
+            uint256 tokenMask = 1 << i;
+            address token = creditManager.getTokenByMask(tokenMask);
+            uint256 balance = IERC20(token).balanceOf(creditAccount);
+
+            if ((tokensToTransferMask & tokenMask != 0) && (balance > 1)) {
+                expectTokenTransfer({
+                    reason: string.concat("transfer token ", IERC20Metadata(token).symbol()),
+                    token: token,
+                    from: creditAccount,
+                    to: (convertToEth && token == weth) ? address(wethGateway) : FRIEND,
+                    amount: (tokenMask == UNDERLYING_TOKEN_MASK) ? _amountMinusFee(balance - 1) : balance - 1
+                });
+            }
+        }
+
+        creditManager.batchTokensTransfer({
+            creditAccount: creditAccount,
+            to: FRIEND,
+            convertToETH: convertToEth,
+            tokensToTransferMask: tokensToTransferMask
+        });
+
+        checkTokenTransfers({debug: false});
+    }
+
+    //
+    // SAFE TOKEN TRANSFER
+    //
+
+    /// @dev U:[CM-32]: safeTokenTransfer works correctly no revert case
+    function test_U_CM_32_safeTokenTransfer_works_correctly_no_revert_case() public withoutSupportQuotas {
+        address weth = tokenTestSuite.addressOf(Tokens.WETH);
+
+        uint256 amount = 22423423;
+
+        for (uint256 i; i < 2; ++i) {
+            bool convertToEth = i == 1;
+
+            caseName = string.concat(caseName, ",  convertToEth =", convertToEth ? "true" : "false");
+
+            address creditAccount = address(new CreditAccountMock());
+            tokenTestSuite.mint({token: weth, to: creditAccount, amount: amount});
+
+            startTokenTrackingSession(caseName);
+
+            expectTokenTransfer({
+                reason: "transfer token ",
+                token: weth,
+                from: creditAccount,
+                to: convertToEth ? address(wethGateway) : FRIEND,
+                amount: amount
+            });
+
+            if (convertToEth) {
+                vm.expectCall(address(wethGateway), abi.encodeCall(IWETHGateway.depositFor, (FRIEND, amount)));
+            }
+
+            creditManager.safeTokenTransfer({
+                creditAccount: creditAccount,
+                token: weth,
+                to: FRIEND,
+                amount: amount,
+                convertToETH: convertToEth
+            });
+
+            checkTokenTransfers({debug: false});
+        }
+    }
+
+    /// @dev U:[CM-33]: batchTokensTransfer works correctly
+    function test_U_CM_33_batchTokensTransfer_works_correctly() public withFeeTokenCase withoutSupportQuotas {
+        uint256 amount = 22423423;
+        CreditAccountMock ca = new CreditAccountMock();
+        ca.setRevertOnTransfer(underlying, FRIEND);
+
+        address creditAccount = address(ca);
+
+        tokenTestSuite.mint({token: underlying, to: creditAccount, amount: amount});
+
+        startTokenTrackingSession(caseName);
+
+        expectTokenTransfer({
+            reason: "transfer token ",
+            token: underlying,
+            from: creditAccount,
+            to: address(withdrawalManagerMock),
+            amount: _amountMinusFee(amount)
+        });
+
+        vm.expectCall(
+            address(withdrawalManagerMock),
+            abi.encodeCall(IWithdrawalManager.addImmediateWithdrawal, (underlying, FRIEND, _amountMinusFee(amount)))
+        );
+
+        creditManager.safeTokenTransfer({
+            creditAccount: creditAccount,
+            token: underlying,
+            to: FRIEND,
+            amount: amount,
+            convertToETH: false
+        });
+
+        checkTokenTransfers({debug: false});
+    }
     //
     //
     //
@@ -2483,8 +2628,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
     /// FROM OLD TESTS
 
-    /// @dev U:[CM-51]: setFees sets configuration properly
-    function test_U_CM_51_setFees_sets_configuration_properly() public withoutSupportQuotas {
+    /// @dev U:[CM-37]: setFees sets configuration properly
+    function test_U_CM_37_setFees_sets_configuration_properly() public withoutSupportQuotas {
         uint16 s_feeInterest = 8733;
         uint16 s_feeLiquidation = 1233;
         uint16 s_liquidationPremium = 1220;

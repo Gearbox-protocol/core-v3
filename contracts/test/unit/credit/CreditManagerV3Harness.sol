@@ -56,10 +56,10 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         creditAccountInfo[creditAccount].borrower = borrower;
     }
 
-    function batchTokensTransfer(address creditAccount, address to, bool convertToETH, uint256 enabledTokensMask)
+    function batchTokensTransfer(address creditAccount, address to, bool convertToETH, uint256 tokensToTransferMask)
         external
     {
-        _batchTokensTransfer(creditAccount, to, convertToETH, enabledTokensMask);
+        _batchTokensTransfer(creditAccount, to, convertToETH, tokensToTransferMask);
     }
 
     function safeTokenTransfer(address creditAccount, address token, address to, uint256 amount, bool convertToETH)

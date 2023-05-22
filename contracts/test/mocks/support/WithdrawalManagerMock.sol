@@ -62,4 +62,6 @@ contract WithdrawalManagerMock {
         return_hasScheduled = hasScheduled;
         return_tokensToEnable = tokensToEnable;
     }
+
+    function addImmediateWithdrawal(address creditAccount, address to, uint256 amount) external {}
 }
