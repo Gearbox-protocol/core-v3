@@ -8,12 +8,14 @@ import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMoc
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 
-import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
+import {CreditFacadeV3Harness} from "./CreditFacadeV3Harness.sol";
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 import {DegenNFTMock} from "../../mocks/token/DegenNFTMock.sol";
 
 import {BotList} from "../../../support/BotList.sol";
+
+import {ENTERED} from "../../../traits/ReentrancyGuardTrait.sol";
 
 import "../../../interfaces/ICreditFacade.sol";
 import {ICreditManagerV3, ClosureAction, ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
@@ -54,7 +56,7 @@ contract CreditFacadeUnitTest is BalanceHelper, ICreditFacadeEvents {
 
     IAddressProviderV3 addressProvider;
 
-    CreditFacadeV3 creditFacade;
+    CreditFacadeV3Harness creditFacade;
     CreditManagerMock creditManagerMock;
 
     DegenNFTMock degenNFTMock;
@@ -112,7 +114,12 @@ contract CreditFacadeUnitTest is BalanceHelper, ICreditFacadeEvents {
 
         addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
 
-        creditManagerMock = new CreditManagerMock({_addressProvider: address(addressProvider), _pool: address(0)});
+        AddressProviderV3ACLMock(address(addressProvider)).addPausableAdmin(CONFIGURATOR);
+
+        creditManagerMock = new CreditManagerMock({
+            _addressProvider: address(addressProvider),
+            _pool: address(0)
+        });
     }
 
     function _withoutDegenNFT() internal {
@@ -126,12 +133,20 @@ contract CreditFacadeUnitTest is BalanceHelper, ICreditFacadeEvents {
 
     function _notExpirable() internal {
         expirable = false;
-        creditFacade = new CreditFacadeV3(address(creditManagerMock), address(degenNFTMock), expirable);
+        creditFacade = new CreditFacadeV3Harness(
+            address(creditManagerMock),
+            address(degenNFTMock),
+            expirable
+        );
     }
 
     function _expirable() internal {
         expirable = true;
-        creditFacade = new CreditFacadeV3(address(creditManagerMock), address(degenNFTMock), expirable);
+        creditFacade = new CreditFacadeV3Harness(
+            address(creditManagerMock),
+            address(degenNFTMock),
+            expirable
+        );
     }
 
     /// @dev U:[FA-1]: constructor sets correct values
@@ -145,5 +160,43 @@ contract CreditFacadeUnitTest is BalanceHelper, ICreditFacadeEvents {
         assertEq(creditFacade.degenNFT(), address(degenNFTMock), "Incorrect degenNFTMock");
 
         assertTrue(creditFacade.whitelisted() == whitelisted, "Incorrect whitelisted");
+    }
+
+    /// @dev U:[FA-2]: user functions revert if called on pause
+    function test_U_FA_02_user_functions_revert_if_called_on_pause() public notExpirableCase {
+        vm.prank(CONFIGURATOR);
+        creditFacade.pause();
+
+        vm.expectRevert("Pausable: paused");
+        creditFacade.openCreditAccount({debt: 0, onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
+
+        vm.expectRevert("Pausable: paused");
+        creditFacade.closeCreditAccount({
+            creditAccount: DUMB_ADDRESS,
+            to: DUMB_ADDRESS,
+            skipTokenMask: 0,
+            convertToETH: false,
+            calls: new MultiCall[](0)
+        });
+
+        vm.expectRevert("Pausable: paused");
+        creditFacade.multicall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
+
+        vm.expectRevert("Pausable: paused");
+        creditFacade.botMulticall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
+
+        vm.expectRevert("Pausable: paused");
+        creditFacade.claimWithdrawals({creditAccount: DUMB_ADDRESS, to: DUMB_ADDRESS});
+    }
+
+    /// @dev U:[FA-3]: user functions revert if credit facade is expired
+    function test_U_FA_03_user_functions_revert_if_credit_facade_is_expired() public expirableCase {
+        vm.prank(CONFIGURATOR);
+        creditFacade.setExpirationDate(uint40(block.timestamp));
+
+        vm.warp(block.timestamp + 1);
+
+        vm.expectRevert(NotAllowedAfterExpirationException.selector);
+        creditFacade.openCreditAccount({debt: 0, onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
     }
 }

@@ -202,7 +202,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         external
         payable
         override
-        whenNotPaused
+        whenNotPaused // U:[FA-2]
         whenNotExpired
         nonReentrant
         nonZeroAddress(onBehalfOf)
@@ -282,7 +282,14 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         uint256 skipTokenMask,
         bool convertToETH,
         MultiCall[] calldata calls
-    ) external payable override whenNotPaused creditAccountOwnerOnly(creditAccount) nonReentrant {
+    )
+        external
+        payable
+        override
+        whenNotPaused // U:[FA-2]
+        creditAccountOwnerOnly(creditAccount)
+        nonReentrant
+    {
         // Wraps ETH and sends it back to msg.sender
         _wrapETH(); // F:[FA-3C]
 
@@ -444,7 +451,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         external
         payable
         override
-        whenNotPaused
+        whenNotPaused // U:[FA-2]
         whenNotExpired
         creditAccountOwnerOnly(creditAccount)
         nonReentrant
@@ -464,7 +471,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     function botMulticall(address creditAccount, MultiCall[] calldata calls)
         external
         override
-        whenNotPaused
+        whenNotPaused // U:[FA-2]
         whenNotExpired
         nonReentrant
     {
@@ -915,7 +922,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     function claimWithdrawals(address creditAccount, address to)
         external
         override
-        whenNotPaused
+        whenNotPaused // U:[FA-2]
         nonZeroAddress(to)
         creditAccountOwnerOnly(creditAccount)
         nonReentrant
@@ -937,7 +944,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         uint192 permissions,
         uint72 fundingAmount,
         uint72 weeklyFundingAllowance
-    ) external override whenNotPaused creditAccountOwnerOnly(creditAccount) nonReentrant {
+    ) external override creditAccountOwnerOnly(creditAccount) nonReentrant {
         uint16 flags = ICreditManagerV3(creditManager).flagsOf(creditAccount);
 
         if (flags & BOT_PERMISSIONS_SET_FLAG == 0) {

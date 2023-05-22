@@ -11,6 +11,8 @@ import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 import {IPoolQuotaKeeper} from "../../../interfaces/IPoolQuotaKeeper.sol";
 
+import "../../lib/constants.sol";
+
 contract CreditManagerMock {
     /// @dev Factory contract for Credit Accounts
     address public addressProvider;
@@ -30,11 +32,14 @@ contract CreditManagerMock {
 
     mapping(address => uint256) public getTokenMaskOrRevert;
 
+    address public creditConfigurator;
+
     constructor(address _addressProvider, address _pool) {
         addressProvider = _addressProvider;
         weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // U:[CM-1]
         wethGateway = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_GATEWAY, 3_00); // U:[CM-1]
         setPoolService(_pool);
+        creditConfigurator = CONFIGURATOR;
     }
 
     function setPoolService(address newPool) public {
