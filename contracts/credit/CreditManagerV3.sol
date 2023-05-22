@@ -211,7 +211,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         underlying = IPoolBase(pool).underlyingToken(); // U:[CM-1]
 
         try IPoolV3(_pool).supportsQuotas() returns (bool sq) {
-            supportsQuotas = sq;
+            supportsQuotas = sq; // I:[CMQ-1]
         } catch {}
 
         // The underlying is the first token added as collateral
@@ -382,13 +382,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         // compute quota interest
         if (supportsQuotas && collateralDebtData.quotedTokens.length != 0) {
             /// In case of any loss, PQK sets limits to zero for all quoted tokens
-            bool setLimitsToZero = loss > 0; // U:[CM-8]
+            bool setLimitsToZero = loss > 0; // U:[CM-8] // I:[CMQ-8]
 
             IPoolQuotaKeeper(collateralDebtData._poolQuotaKeeper).removeQuotas({
                 creditAccount: creditAccount,
                 tokens: collateralDebtData.quotedTokens,
                 setLimitsToZero: setLimitsToZero
-            }); // U:[CM-8]
+            }); // U:[CM-8] I:[CMQ-6]
         }
 
         // All remaining assets on the account are transferred to the `to` address
@@ -418,7 +418,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     ///   + Repays the debt in the following order: quota interest + fees, normal interest + fees, debt;
     ///     In case of interest, if the (remaining) amount is not enough to cover it fully,
     ///     it is split pro-rata between interest and fees to preserve correct fee computations
-    ///   + If there were non-zer quota interest, updates to quota interest after repayment
+    ///   + If there were non-zero quota interest, updates the quota interest after repayment
     ///   + If base interest was repaid, updates `cumulativeIndexLastUpdate`
     ///   + If debt was repaid, updates `debt`
     /// @dev For details on cumulativeIndex computations, see `CreditLogic.calcIncrease` and `CreditLogic.calcDecrease`
@@ -795,7 +795,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             amount: collateralDebtData.debt,
             cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
             cumulativeIndexNow: collateralDebtData.cumulativeIndexNow
-        }) + collateralDebtData.cumulativeQuotaInterest; // U:[CM-21]
+        }) + collateralDebtData.cumulativeQuotaInterest; // U:[CM-21] // I: [CMQ-07]
 
         collateralDebtData.accruedFees = (collateralDebtData.accruedInterest * feeInterest) / PERCENTAGE_FACTOR; // U:[CM-21]
 

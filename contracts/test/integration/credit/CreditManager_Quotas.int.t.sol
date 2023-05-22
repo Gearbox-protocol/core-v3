@@ -29,6 +29,7 @@ import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWE
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {CreditLogic} from "../../../libraries/CreditLogic.sol";
 
 // TESTS
 import "../../lib/constants.sol";
@@ -53,9 +54,10 @@ import {CreditConfig} from "../../config/CreditConfig.sol";
 import "../../../interfaces/IExceptions.sol";
 
 import {Test} from "forge-std/Test.sol";
-import "forge-std/console.sol";
 
 contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper {
+    using CreditLogic for CollateralDebtData;
+
     CreditManagerTestSuite cms;
 
     IAddressProviderV3 addressProvider;
@@ -217,94 +219,100 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
     /// @dev I:[CMQ-4]: Quotas are handled correctly on debt decrease: amount < quota interest case
     function test_I_CMQ_04_quotas_are_handled_correctly_at_repayment_partial_case() public {
-        // _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
-        // _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
+        _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
+        _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
-        // (,,, address creditAccount) = cms.openCreditAccount();
-        // tokenTestSuite.mint(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT * 2);
+        (,,, address creditAccount) = cms.openCreditAccount();
+        tokenTestSuite.mint(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT * 2);
 
-        // QuotaUpdate[] memory quotaUpdates = new QuotaUpdate[](2);
-        // quotaUpdates[0] =
-        //     QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.LINK), quotaChange: int96(uint96(100 * WAD))});
-        // quotaUpdates[1] =
-        //     QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.USDT), quotaChange: int96(uint96(200 * WAD))});
+        uint256 enabledTokensMask = UNDERLYING_TOKEN_MASK;
 
-        // vm.expectCall(
-        //     address(poolQuotaKeeper), abi.encodeCall(IPoolQuotaKeeper.updateQuotas, (creditAccount, quotaUpdates))
-        // );
+        (uint256 tokensToEnable,) = creditManager.updateQuota({
+            creditAccount: creditAccount,
+            token: tokenTestSuite.addressOf(Tokens.LINK),
+            quotaChange: 100_000
+        });
 
-        // (uint256 tokensToEnable,) = creditManager.updateQuotas(creditAccount, quotaUpdates);
+        enabledTokensMask |= tokensToEnable;
 
-        // /// We use fullCollateralCheck to update enabledTokensMask
+        (tokensToEnable,) = creditManager.updateQuota({
+            creditAccount: creditAccount,
+            token: tokenTestSuite.addressOf(Tokens.USDT),
+            quotaChange: 200_000
+        });
 
-        // creditManager.fullCollateralCheck(
-        //     creditAccount, tokensToEnable | UNDERLYING_TOKEN_MASK, new uint256[](0), 10_000
-        // );
+        enabledTokensMask |= tokensToEnable;
 
-        // vm.warp(block.timestamp + 365 days);
+        creditManager.fullCollateralCheck(creditAccount, enabledTokensMask, new uint256[](0), 10_000);
 
-        // (uint16 feeInterest,,,,) = creditManager.fees();
+        vm.warp(block.timestamp + 365 days);
 
-        // uint256 amountRepaid = (PERCENTAGE_FACTOR + feeInterest) * WAD / 1_000;
+        (uint16 feeInterest,,,,) = creditManager.fees();
 
-        // uint256 expectedQuotaInterestRepaid = (amountRepaid * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
+        uint256 amountRepaid = 15000;
 
-        // (, uint256 totalDebtBefore, uint256 totalDebtBeforeFee) =
-        //     creditManager.calcAccruedInterestAndFees(creditAccount);
+        uint256 expectedQuotaInterestRepaid = (amountRepaid * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
 
-        // creditManager.manageDebt(
-        //     creditAccount, amountRepaid, tokensToEnable | UNDERLYING_TOKEN_MASK, ManageDebtAction.DECREASE_DEBT
-        // );
+        CollateralDebtData memory cdd1 =
+            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_ONLY);
 
-        // (, uint256 totalDebtAfter, uint256 totalDebtAfterFee) =
-        //     creditManager.calcAccruedInterestAndFees(creditAccount);
+        creditManager.manageDebt(creditAccount, amountRepaid, enabledTokensMask, ManageDebtAction.DECREASE_DEBT);
 
-        // assertEq(totalDebtAfter, totalDebtBefore - expectedQuotaInterestRepaid, "Debt updated incorrectly");
+        CollateralDebtData memory cdd2 =
+            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_ONLY);
 
-        // assertEq(totalDebtAfterFee, totalDebtBeforeFee - amountRepaid, "Debt updated incorrectly");
+        assertEq(
+            cdd1.accruedInterest, cdd2.accruedInterest + expectedQuotaInterestRepaid, "Interest updated incorrectly"
+        );
+
+        assertEq(
+            cdd1.accruedFees, cdd2.accruedFees + amountRepaid - expectedQuotaInterestRepaid, "Fees updated incorrectly"
+        );
     }
 
     /// @dev I:[CMQ-5]: Quotas are handled correctly on debt decrease: amount >= quota interest case
     function test_I_CMQ_05_quotas_are_handled_correctly_at_repayment_full_case() public {
-        // _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 1000, uint96(1_000_000 * WAD));
-        // _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
+        _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 1000, uint96(1_000_000 * WAD));
+        _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
-        // (,,, address creditAccount) = cms.openCreditAccount();
-        // tokenTestSuite.mint(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT * 2);
+        (,,, address creditAccount) = cms.openCreditAccount();
+        tokenTestSuite.mint(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT * 2);
 
-        // QuotaUpdate[] memory quotaUpdates = new QuotaUpdate[](2);
-        // quotaUpdates[0] =
-        //     QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.LINK), quotaChange: int96(uint96(100 * WAD))});
-        // quotaUpdates[1] =
-        //     QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.USDT), quotaChange: int96(uint96(200 * WAD))});
+        uint256 enabledTokensMask = UNDERLYING_TOKEN_MASK;
 
-        // vm.expectCall(
-        //     address(poolQuotaKeeper), abi.encodeCall(IPoolQuotaKeeper.updateQuotas, (creditAccount, quotaUpdates))
-        // );
+        (uint256 tokensToEnable,) = creditManager.updateQuota({
+            creditAccount: creditAccount,
+            token: tokenTestSuite.addressOf(Tokens.LINK),
+            quotaChange: 100_000
+        });
 
-        // (uint256 tokensToEnable,) = creditManager.updateQuotas(creditAccount, quotaUpdates);
+        enabledTokensMask |= tokensToEnable;
 
-        // creditManager.fullCollateralCheck(
-        //     creditAccount, tokensToEnable | UNDERLYING_TOKEN_MASK, new uint256[](0), 10_000
-        // );
+        (tokensToEnable,) = creditManager.updateQuota({
+            creditAccount: creditAccount,
+            token: tokenTestSuite.addressOf(Tokens.USDT),
+            quotaChange: 200_000
+        });
 
-        // vm.warp(block.timestamp + 365 days);
+        enabledTokensMask |= tokensToEnable;
 
-        // uint256 amountRepaid = 35 * WAD;
+        creditManager.fullCollateralCheck(creditAccount, enabledTokensMask, new uint256[](0), 10_000);
 
-        // (,, uint256 totalDebtBefore) = creditManager.calcAccruedInterestAndFees(creditAccount);
+        vm.warp(block.timestamp + 365 days);
 
-        // creditManager.manageDebt(
-        //     creditAccount, amountRepaid, tokensToEnable | UNDERLYING_TOKEN_MASK, ManageDebtAction.DECREASE_DEBT
-        // );
+        uint256 amountRepaid = 35000;
 
-        // (,, uint256 cumulativeQuotaInterest,,,) = creditManager.creditAccountInfo(creditAccount);
+        CollateralDebtData memory cdd1 =
+            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_ONLY);
 
-        // assertEq(cumulativeQuotaInterest, 1, "Cumulative quota interest was not updated correctly");
+        creditManager.manageDebt(creditAccount, amountRepaid, enabledTokensMask, ManageDebtAction.DECREASE_DEBT);
 
-        // (,, uint256 totalDebtAfter) = creditManager.calcAccruedInterestAndFees(creditAccount);
+        CollateralDebtData memory cdd2 =
+            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_ONLY);
 
-        // assertEq(totalDebtAfter, totalDebtBefore - amountRepaid, "Debt updated incorrectly");
+        assertEq(cdd2.cumulativeQuotaInterest, 0, "Interest updated incorrectly");
+
+        assertEq(cdd1.calcTotalDebt(), cdd2.calcTotalDebt() + amountRepaid, "Total debt updated incorrectly");
     }
 
     /// @dev I:[CMQ-6]: Quotas are disabled on closing an account
@@ -378,266 +386,69 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         assertEq(uint256(quota), 1, "Quota was not set to 0");
     }
 
-    // /// @dev I:[CMQ-7] enableToken, disableToken and changeEnabledTokens do nothing for limited tokens
-    // function test_I_CMQ_07_enable_disable_changeEnabled_do_nothing_for_limited_tokens() public {
-    //     _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
-    //     (,,, address creditAccount) = cms.openCreditAccount();
-    //     creditManager.transferAccountOwnership(USER, address(this));
-
-    //     // creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.LINK));
-    //     expectTokenIsEnabled(creditAccount, Tokens.LINK, false);
-
-    //     creditManager.changeEnabledTokens(creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.LINK)), 0);
-    //     expectTokenIsEnabled(creditAccount, Tokens.LINK, false);
-
-    //     QuotaUpdate[] memory quotaUpdates = new QuotaUpdate[](1);
-    //     quotaUpdates[0] =
-    //         QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.LINK), quotaChange: int96(uint96(100 * WAD))});
-
-    //     creditManager.updateQuotas(creditAccount, quotaUpdates);
-
-    //     creditManager.disableToken(tokenTestSuite.addressOf(Tokens.LINK));
-    //     expectTokenIsEnabled(creditAccount, Tokens.LINK, true);
-
-    //     creditManager.changeEnabledTokens(0, creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.LINK)));
-    //     expectTokenIsEnabled(creditAccount, Tokens.LINK, true);
-    // }
-
-    /// @dev I:[CMQ-8]: fullCollateralCheck fuzzing test with quotas
-    function test_I_CMQ_08_fullCollateralCheck_fuzzing_test_quotas(
-        uint128 borrowedAmount,
-        uint128 daiBalance,
-        uint128 usdcBalance,
-        uint128 linkBalance,
-        uint128 wethBalance,
-        uint96 usdcQuota,
-        uint96 linkQuota,
-        bool enableWETH,
-        uint16 minHealthFactor
-    ) public {
-        // _connectCreditManagerSuite(Tokens.DAI, true);
-
-        // _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
-        // _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDC), 500, uint96(1_000_000 * WAD));
-
-        // vm.assume(borrowedAmount > WAD);
-        // vm.assume(usdcQuota < type(uint96).max / 2);
-        // vm.assume(linkQuota < type(uint96).max / 2);
-        // vm.assume(minHealthFactor >= 10_000);
-
-        // console.log("ba", borrowedAmount);
-        // // uint128 daiBalance,
-        // // uint128 usdcBalance,
-        // // uint128 linkBalance,
-        // // uint128 wethBalance,
-        // // uint96 usdcQuota,
-        // // uint96 linkQuota,
-        // // bool enableWETH,
-        // // uint16 minHealthFactor)
-
-        // tokenTestSuite.mint(Tokens.DAI, address(poolMock), borrowedAmount);
-
-        // (,,, address creditAccount) = cms.openCreditAccount(borrowedAmount);
-        // creditManager.transferAccountOwnership(creditAccount, address(this));
-
-        // if (daiBalance > borrowedAmount) {
-        //     tokenTestSuite.mint(Tokens.DAI, creditAccount, daiBalance - borrowedAmount);
-        // } else {
-        //     tokenTestSuite.burn(Tokens.DAI, creditAccount, borrowedAmount - daiBalance);
-        // }
-
-        // expectBalance(Tokens.DAI, creditAccount, daiBalance);
-
-        // uint256 tokensToEnable;
-
-        // {
-        //     QuotaUpdate[] memory quotaUpdates = new QuotaUpdate[](2);
-        //     quotaUpdates[0] =
-        //         QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.LINK), quotaChange: int96(uint96(linkQuota))});
-        //     quotaUpdates[1] =
-        //         QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.USDC), quotaChange: int96(uint96(usdcQuota))});
-
-        //     (tokensToEnable,) = creditManager.updateQuotas(creditAccount, quotaUpdates);
-        // }
-
-        // uint256 enabledTokensMap = tokensToEnable | UNDERLYING_TOKEN_MASK;
-        // if (enableWETH) {
-        //     enabledTokensMap |= creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.WETH));
-        // }
-
-        // CreditManagerV3Harness(address(creditManager)).setenabledTokensMask(creditAccount, enabledTokensMap);
-
-        // tokenTestSuite.mint(Tokens.WETH, creditAccount, wethBalance);
-        // tokenTestSuite.mint(Tokens.USDC, creditAccount, usdcBalance);
-        // tokenTestSuite.mint(Tokens.LINK, creditAccount, linkBalance);
-
-        // uint256 twvUSD = (
-        //     tokenTestSuite.balanceOf(Tokens.DAI, creditAccount) * tokenTestSuite.prices(Tokens.DAI)
-        //         * creditConfig.lt(Tokens.DAI)
-        // ) / WAD;
-
-        // {
-        //     uint256 valueUsdc =
-        //         (tokenTestSuite.balanceOf(Tokens.USDC, creditAccount) * tokenTestSuite.prices(Tokens.USDC)) / (10 ** 6);
-
-        //     uint256 quotaUsdc = usdcQuota > 1_000_000 * WAD ? 1_000_000 * WAD : usdcQuota;
-
-        //     quotaUsdc = (quotaUsdc * tokenTestSuite.prices(Tokens.DAI)) / WAD;
-
-        //     uint256 tvIncrease = valueUsdc < quotaUsdc ? valueUsdc : quotaUsdc;
-
-        //     twvUSD += tvIncrease * creditConfig.lt(Tokens.USDC);
-        // }
-
-        // {
-        //     uint256 valueLink =
-        //         (tokenTestSuite.balanceOf(Tokens.LINK, creditAccount) * tokenTestSuite.prices(Tokens.LINK)) / WAD;
-
-        //     uint256 quotaLink = linkQuota > 1_000_000 * WAD ? 1_000_000 * WAD : linkQuota;
-
-        //     quotaLink = (quotaLink * tokenTestSuite.prices(Tokens.DAI)) / WAD;
-
-        //     uint256 tvIncrease = valueLink < quotaLink ? valueLink : quotaLink;
-
-        //     twvUSD += tvIncrease * creditConfig.lt(Tokens.LINK);
-        // }
-
-        // twvUSD += !enableWETH
-        //     ? 0
-        //     : (
-        //         tokenTestSuite.balanceOf(Tokens.WETH, creditAccount) * tokenTestSuite.prices(Tokens.WETH)
-        //             * creditConfig.lt(Tokens.WETH)
-        //     ) / WAD;
-
-        // (,, uint256 borrowedAmountWithInterestAndFees) = creditManager.calcAccruedInterestAndFees(creditAccount);
-
-        // uint256 debtUSD = (borrowedAmountWithInterestAndFees * minHealthFactor * tokenTestSuite.prices(Tokens.DAI))
-        //     / PERCENTAGE_FACTOR / WAD;
-
-        // twvUSD /= PERCENTAGE_FACTOR;
-
-        // bool shouldRevert = twvUSD < debtUSD;
-
-        // if (shouldRevert) {
-        //     vm.expectRevert(NotEnoughCollateralException.selector);
-        // }
-
-        // creditManager.fullCollateralCheck(creditAccount, enabledTokensMap, new uint256[](0), minHealthFactor);
-    }
-
-    /// @dev I:[CMQ-9]: fullCollateralCheck does not check non-limited tokens if limited are enough to cover debt
-    function test_I_CMQ_09_fullCollateralCheck_skips_normal_tokens_if_limited_tokens_cover_debt() public {
+    /// @dev I:[CMQ-07]: calcDebtAndCollateral correctly counts quota interest
+    function test_I_CMQ_07_calcDebtAndCollateral_correctly_includes_quota_interest(uint96 quotaLink, uint96 quotaUsdt)
+        public
+    {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
-        _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDC), 500, uint96(1_000_000 * WAD));
+        _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
-        tokenTestSuite.mint(Tokens.DAI, address(poolMock), 1_250_000 * WAD);
+        (
+            uint256 borrowedAmount,
+            uint256 cumulativeIndexLastUpdate,
+            uint256 cumulativeIndexAtClose,
+            address creditAccount
+        ) = cms.openCreditAccount();
 
-        (,,, address creditAccount) = cms.openCreditAccount(1_250_000 * WAD);
-        creditManager.transferAccountOwnership(creditAccount, address(this));
+        vm.assume(quotaLink < type(uint96).max / 2);
+        vm.assume(quotaUsdt < type(uint96).max / 2);
 
-        uint256 tokenToEnable;
+        tokenTestSuite.mint(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT * 2);
 
-        {
-            (uint256 tokenToEnable1,) = creditManager.updateQuota({
-                creditAccount: creditAccount,
-                token: tokenTestSuite.addressOf(Tokens.LINK),
-                quotaChange: int96(uint96(1_000_000 * WAD))
-            });
+        uint256 enabledTokensMask = UNDERLYING_TOKEN_MASK;
+        (uint256 tokensToEnable,) = creditManager.updateQuota({
+            creditAccount: creditAccount,
+            token: tokenTestSuite.addressOf(Tokens.LINK),
+            quotaChange: int96(quotaLink)
+        });
+        enabledTokensMask |= tokensToEnable;
 
-            tokenToEnable |= tokenToEnable1;
+        (tokensToEnable,) = creditManager.updateQuota({
+            creditAccount: creditAccount,
+            token: tokenTestSuite.addressOf(Tokens.USDT),
+            quotaChange: int96(quotaUsdt)
+        });
+        enabledTokensMask |= tokensToEnable;
 
-            (tokenToEnable1,) = creditManager.updateQuota({
-                creditAccount: creditAccount,
-                token: tokenTestSuite.addressOf(Tokens.USDC),
-                quotaChange: int96(uint96(1_000_000 * WAD))
-            });
-            tokenToEnable |= tokenToEnable1;
-        }
+        creditManager.fullCollateralCheck(creditAccount, enabledTokensMask, new uint256[](0), 10_000);
 
-        tokenTestSuite.mint(Tokens.USDC, creditAccount, RAY);
-        tokenTestSuite.mint(Tokens.LINK, creditAccount, RAY);
+        vm.warp(block.timestamp + 60 * 60 * 24 * 365);
 
-        vm.prank(CONFIGURATOR);
-        creditManager.addToken(DUMB_ADDRESS);
+        (uint16 feeInterest,,,,) = creditManager.fees();
 
-        // creditManager.checkAndEnableToken(DUMB_ADDRESS);
+        quotaLink = quotaLink > uint96(1_000_000 * WAD) ? uint96(1_000_000 * WAD) : quotaLink;
+        quotaUsdt = quotaUsdt > uint96(1_000_000 * WAD) ? uint96(1_000_000 * WAD) : quotaUsdt;
 
-        uint256 revertMask = creditManager.getTokenMaskOrRevert(DUMB_ADDRESS);
+        uint256 expectedTotalDebt = (borrowedAmount * cumulativeIndexAtClose) / cumulativeIndexLastUpdate;
+        expectedTotalDebt += (quotaLink * 1000) / PERCENTAGE_FACTOR;
+        expectedTotalDebt += (quotaUsdt * 500) / PERCENTAGE_FACTOR;
+        expectedTotalDebt += (expectedTotalDebt - borrowedAmount) * feeInterest / PERCENTAGE_FACTOR;
 
-        uint256[] memory collateralHints = new uint256[](1);
-        collateralHints[0] = revertMask;
+        CollateralDebtData memory cdd1 =
+            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_ONLY);
 
-        uint256 enableTokenMask = tokenToEnable | revertMask | UNDERLYING_TOKEN_MASK;
+        uint256 diff = cdd1.calcTotalDebt() > expectedTotalDebt
+            ? cdd1.calcTotalDebt() - expectedTotalDebt
+            : expectedTotalDebt - cdd1.calcTotalDebt();
 
-        creditManager.fullCollateralCheck(creditAccount, enableTokenMask, collateralHints, 10000);
+        emit log_uint(expectedTotalDebt);
+        emit log_uint(cdd1.calcTotalDebt());
+
+        assertLe(diff, 1, "Total debt updated incorrectly");
     }
 
-    /// @dev I:[CMQ-10]: calcAccruedInterestAndFees correctly counts quota interest
-    function test_I_CMQ_10_calcAccruedInterestAndFees_correctly_includes_quota_interest(
-        uint96 quotaLink,
-        uint96 quotaUsdt
-    ) public {
-        // _connectCreditManagerSuite(Tokens.DAI, true);
-
-        // _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
-        // _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
-
-        // (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexAtClose, address creditAccount) =
-        //     cms.openCreditAccount();
-
-        // vm.assume(quotaLink < type(uint96).max / 2);
-        // vm.assume(quotaUsdt < type(uint96).max / 2);
-
-        // QuotaUpdate[] memory quotaUpdates = new QuotaUpdate[](2);
-        // quotaUpdates[0] =
-        //     QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.LINK), quotaChange: int96(uint96(quotaLink))});
-        // quotaUpdates[1] =
-        //     QuotaUpdate({token: tokenTestSuite.addressOf(Tokens.USDT), quotaChange: int96(uint96(quotaUsdt))});
-
-        // quotaLink = quotaLink > 1_000_000 * WAD ? uint96(1_000_000 * WAD) : quotaLink;
-        // quotaUsdt = quotaUsdt > 1_000_000 * WAD ? uint96(1_000_000 * WAD) : quotaUsdt;
-
-        // vm.expectCall(
-        //     address(poolQuotaKeeper), abi.encodeCall(IPoolQuotaKeeper.updateQuotas, (creditAccount, quotaUpdates))
-        // );
-
-        // (uint256 tokensToEnable,) = creditManager.updateQuotas(creditAccount, quotaUpdates);
-
-        // uint256 enabledTokensMap = tokensToEnable | UNDERLYING_TOKEN_MASK;
-
-        // CreditManagerV3Harness(address(creditManager)).setenabledTokensMask(creditAccount, enabledTokensMap);
-
-        // vm.warp(block.timestamp + 60 * 60 * 24 * 365);
-
-        // (,, uint256 totalDebt) = creditManager.calcAccruedInterestAndFees(creditAccount);
-
-        // uint256 expectedTotalDebt = (borrowedAmount * cumulativeIndexAtClose) / cumulativeIndexLastUpdate;
-        // expectedTotalDebt += (quotaLink * 1000 + quotaUsdt * 500) / PERCENTAGE_FACTOR;
-
-        // (uint16 feeInterest,,,,) = creditManager.fees();
-
-        // expectedTotalDebt += ((expectedTotalDebt - borrowedAmount) * feeInterest) / PERCENTAGE_FACTOR;
-
-        // uint256 diff = expectedTotalDebt > totalDebt ? expectedTotalDebt - totalDebt : totalDebt - expectedTotalDebt;
-
-        // assertLe(diff, 2, "Total debt not equal");
-    }
-
-    // [DEPRECIATED]: We test that after full collateral
-    // /// @dev I:[CMQ-11]: updateQuotas reverts on too many enabled tokens
-    // function test_I_CMQ_11_updateQuotas_reverts_on_too_many_tokens_enabled() public {
-    //     (,,, address creditAccount) = cms.openCreditAccount();
-
-    //     uint256 maxTokens = creditManager.maxEnabledTokens();
-
-    //     QuotaUpdate[] memory quotaUpdates = _addManyLimitedTokens(maxTokens + 1, 100);
-
-    //     vm.expectRevert(TooManyEnabledTokensException.selector);
-    //     creditManager.updateQuotas(creditAccount, quotaUpdates);
-    // }
-
-    /// @dev I:[CMQ-12]: Credit Manager zeroes limits on quoted tokens upon incurring a loss
-    function test_I_CMQ_12_creditManager_triggers_limit_zeroing_on_loss() public {
+    /// @dev I:[CMQ-08]: Credit Manager zeroes limits on quoted tokens upon incurring a loss
+    function test_I_CMQ_08_creditManager_triggers_limit_zeroing_on_loss() public {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
