@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+import {IVersion} from "./IVersion.sol";
 
 /// @notice Withdrawal claim type
 ///         - `CLAIM` only claims mature withdrawals to specified address
@@ -70,9 +70,9 @@ interface IWithdrawalManagerEvents {
 
 /// @title Withdrawal manager interface
 interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
-    /// --------------------- ///
-    /// IMMEDIATE WITHDRAWALS ///
-    /// --------------------- ///
+    // --------------------- //
+    // IMMEDIATE WITHDRAWALS //
+    // --------------------- //
 
     /// @notice Returns amount of token claimable by the account
     function immediateWithdrawals(address account, address token) external view returns (uint256);
@@ -89,9 +89,9 @@ interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
     /// @param to Token recipient
     function claimImmediateWithdrawal(address token, address to) external;
 
-    /// --------------------- ///
-    /// SCHEDULED WITHDRAWALS ///
-    /// --------------------- ///
+    // --------------------- //
+    // SCHEDULED WITHDRAWALS //
+    // --------------------- //
 
     /// @notice Delay for scheduled withdrawals
     function delay() external view returns (uint40);
@@ -130,9 +130,9 @@ interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
         view
         returns (address token1, uint256 amount1, address token2, uint256 amount2);
 
-    /// ------------- ///
-    /// CONFIGURATION ///
-    /// ------------- ///
+    // ------------- //
+    // CONFIGURATION //
+    // ------------- //
 
     /// @notice Sets delay for scheduled withdrawals, only affects new withdrawal requests
     /// @param delay New delay for scheduled withdrawals

@@ -25,8 +25,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {ENTERED} from "../../../traits/ReentrancyGuardTrait.sol";
-import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
-import {IAccountFactory} from "../../../interfaces/IAccountFactory.sol";
+import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
 import {
     ICreditManagerV3,
     ClosureAction,
@@ -1332,7 +1331,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         vm.expectCall(
             creditAccount,
-            abi.encodeCall(ICreditAccount.execute, (underlying, abi.encodeCall(IERC20.approve, (DUMB_ADDRESS, 20000))))
+            abi.encodeCall(
+                ICreditAccountBase.execute, (underlying, abi.encodeCall(IERC20.approve, (DUMB_ADDRESS, 20000)))
+            )
         );
 
         vm.expectEmit(true, true, true, true);
@@ -1417,7 +1418,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         vm.expectEmit(true, false, false, false);
         emit ExecuteOrder(DUMB_ADDRESS);
 
-        vm.expectCall(creditAccount, abi.encodeCall(ICreditAccount.execute, (DUMB_ADDRESS, dumbCallData)));
+        vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountBase.execute, (DUMB_ADDRESS, dumbCallData)));
 
         vm.expectEmit(true, true, true, true);
         emit ExecuteCall(DUMB_ADDRESS, dumbCallData);

@@ -159,11 +159,6 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
         external
         returns (uint256);
 
-    /// @dev Transfers Credit Account ownership to another address
-    /// @param from Address of previous owner
-    /// @param to Address of new owner
-    function transferAccountOwnership(address from, address to) external;
-
     /// @dev Requests the Credit Account to approve a collateral token to another contract.\
     /// @param token Collateral token to approve
     /// @param amount New allowance amount

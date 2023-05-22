@@ -20,8 +20,8 @@ import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 import {IERC20Helper} from "../libraries/IERC20Helper.sol";
 
 // INTERFACES
-import {IAccountFactory} from "../interfaces/IAccountFactory.sol";
-import {ICreditAccount} from "../interfaces/ICreditAccount.sol";
+import {IAccountFactoryBase} from "../interfaces/IAccountFactoryV3.sol";
+import {ICreditAccountBase} from "../interfaces/ICreditAccountV3.sol";
 import {IPoolBase, IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
 import {ClaimAction, IWithdrawalManager} from "../interfaces/IWithdrawalManager.sol";
@@ -66,7 +66,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     using CollateralLogic for CollateralDebtData;
     using SafeERC20 for IERC20;
     using IERC20Helper for IERC20;
-    using CreditAccountHelper for ICreditAccount;
+    using CreditAccountHelper for ICreditAccountBase;
 
     // IMMUTABLE PARAMS
 
@@ -209,7 +209,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         addressProvider = _addressProvider;
         pool = _pool; // U:[CM-1]
 
-        underlying = IPoolBase(pool).underlyingToken(); // U:[CM-1]
+        underlying = IPoolBase(_pool).underlyingToken(); // U:[CM-1]
 
         try IPoolV3(_pool).supportsQuotas() returns (bool sq) {
             supportsQuotas = sq;
@@ -252,7 +252,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacadeOnly // // U:[CM-2]
         returns (address creditAccount)
     {
-        creditAccount = IAccountFactory(accountFactory).takeCreditAccount(0, 0); // U:[CM-6]
+        creditAccount = IAccountFactoryBase(accountFactory).takeCreditAccount(0, 0); // U:[CM-6]
 
         creditAccountInfo[creditAccount].debt = debt; // U:[CM-6]
         creditAccountInfo[creditAccount].cumulativeIndexLastUpdate = _poolCumulativeIndexNow(); // U:[CM-6]
@@ -360,7 +360,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
 
         // Transfers the due funds to the pool
-        ICreditAccount(creditAccount).transfer({token: underlying, to: pool, amount: amountToPool}); // U:[CM-8]
+        ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amountToPool}); // U:[CM-8]
 
         // Signals to the pool that debt has been repaid. The pool relies
         // on the Credit Manager to repay the debt correctly, and does not
@@ -403,7 +403,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }); // U:[CM-8, 9]
 
         // Returns Credit Account to the factory
-        IAccountFactory(accountFactory).returnCreditAccount({usedAccount: creditAccount}); // U:[CM-8]
+        IAccountFactoryBase(accountFactory).returnCreditAccount({creditAccount: creditAccount}); // U:[CM-8]
         creditAccountsSet.remove(creditAccount); // U:[CM-8]
     }
 
@@ -475,7 +475,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
             uint256 newCumulativeQuotaInterest;
             // Pays the entire amount back to the pool
-            ICreditAccount(creditAccount).transfer({token: underlying, to: pool, amount: amount}); // U:[CM-11]
+            ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amount}); // U:[CM-11]
             {
                 uint256 amountToRepay;
                 uint256 profit;
@@ -528,19 +528,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         tokenMask = getTokenMaskOrRevert({token: token}); // U:[CM-13]
         IERC20(token).safeTransferFrom({from: payer, to: creditAccount, value: amount}); // U:[CM-13]
-    }
-
-    /// @notice Transfers Credit Account ownership to another address
-    /// @param creditAccount Address of creditAccount to be transferred
-    /// @param to Address of new owner
-    function transferAccountOwnership(address creditAccount, address to)
-        external
-        override
-        nonReentrant // U:[CM-5]
-        creditFacadeOnly // U:[CM-2]
-    {
-        getBorrowerOrRevert({creditAccount: creditAccount}); //  U:[CM-14]
-        creditAccountInfo[creditAccount].borrower = to; //  U:[CM-14]
     }
 
     ///
@@ -608,7 +595,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         // The approval logic is isolated into `CreditAccountHelper.safeApprove`. See the corresponding
         // library for details
-        ICreditAccount(creditAccount).safeApprove({token: token, spender: spender, amount: amount}); // U:[CM-15]
+        ICreditAccountBase(creditAccount).safeApprove({token: token, spender: spender, amount: amount}); // U:[CM-15]
     }
 
     /// @notice Requests a Credit Account to make a low-level call with provided data
@@ -628,7 +615,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         // It is expected that is is parsed and returned as a correct type
         // by the adapter itself.
         address creditAccount = getActiveCreditAccountOrRevert(); // U:[CM-16]
-        return ICreditAccount(creditAccount).execute(targetContract, data); // U:[CM-16]
+        return ICreditAccountBase(creditAccount).execute(targetContract, data); // U:[CM-16]
     }
 
     /// @notice Returns the target contract associated with the calling address (which is assumed to be an adapter),
@@ -1007,7 +994,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 convertToETH: false
             }); // U:[CM-27]
         } else {
-            uint256 delivered = ICreditAccount(creditAccount).transferDeliveredBalanceControl({
+            uint256 delivered = ICreditAccountBase(creditAccount).transferDeliveredBalanceControl({
                 token: token,
                 to: withdrawalManager,
                 amount: amount
@@ -1128,15 +1115,16 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         internal
     {
         if (convertToETH && token == weth) {
-            ICreditAccount(creditAccount).transfer({token: token, to: wethGateway, amount: amount}); // U:[CM-31, 32]
+            ICreditAccountBase(creditAccount).transfer({token: token, to: wethGateway, amount: amount}); // U:[CM-31, 32]
             IWETHGateway(wethGateway).depositFor({to: to, amount: amount}); // U:[CM-31, 32]
         } else {
             // In case a token transfer fails (e.g., borrower getting blacklisted by USDC), the token will be sent
             // to WithdrawalManager
-            try ICreditAccount(creditAccount).safeTransfer({token: token, to: to, amount: amount}) {
-                // U:[CM-31, 32, 33]
+            try ICreditAccountBase(creditAccount).safeTransfer({token: token, to: to, amount: amount}) {
+                 // U:[CM-31, 32, 33]
+
             } catch {
-                uint256 delivered = ICreditAccount(creditAccount).transferDeliveredBalanceControl({
+                uint256 delivered = ICreditAccountBase(creditAccount).transferDeliveredBalanceControl({
                     token: token,
                     to: withdrawalManager,
                     amount: amount

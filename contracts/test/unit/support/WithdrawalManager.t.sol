@@ -63,9 +63,9 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerEvents {
         token1 = new ERC20Mock("Test token 2", "TEST2", 18);
     }
 
-    /// ------------- ///
-    /// GENERAL TESTS ///
-    /// ------------- ///
+    // ------------- //
+    // GENERAL TESTS //
+    // ------------- //
 
     /// @notice U:[WM-1]: Constructor sets correct values
     function test_U_WM_01_constructor_sets_correct_values() public {
@@ -91,9 +91,9 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerEvents {
         vm.stopPrank();
     }
 
-    /// --------------------------- ///
-    /// IMMEDIATE WITHDRAWALS TESTS ///
-    /// --------------------------- ///
+    // --------------------------- //
+    // IMMEDIATE WITHDRAWALS TESTS //
+    // --------------------------- //
 
     /// @notice U:[WM-3]: `addImmediateWithdrawal` works correctly
     function test_U_WM_03_addImmediateWithdrawal_works_correctly() public {
@@ -161,9 +161,9 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerEvents {
         assertEq(token0.balanceOf(USER), AMOUNT - 1, "Incorrect claimed amount");
     }
 
-    /// ----------------------------------------------- ///
-    /// SCHEDULED WITHDRAWALS: EXTERNAL FUNCTIONS TESTS ///
-    /// ----------------------------------------------- ///
+    // ----------------------------------------------- //
+    // SCHEDULED WITHDRAWALS: EXTERNAL FUNCTIONS TESTS //
+    // ----------------------------------------------- //
 
     /// @notice U:[WM-5A]: `addScheduledWithdrawal` reverts on zero amount
     function test_U_WM_05A_addScheduledWithdrawal_reverts_on_zero_amount() public {
@@ -443,9 +443,9 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerEvents {
         }
     }
 
-    /// ----------------------------------------------- ///
-    /// SCHEDULED WITHDRAWALS: INTERNAL FUNCTIONS TESTS ///
-    /// ----------------------------------------------- ///
+    // ----------------------------------------------- //
+    // SCHEDULED WITHDRAWALS: INTERNAL FUNCTIONS TESTS //
+    // ----------------------------------------------- //
 
     struct ProcessScheduledWithdrawalCase {
         string name;
@@ -665,9 +665,9 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerEvents {
         assertEq(tokensToEnable, TOKEN0_MASK, "Incorrect tokensToEnable");
     }
 
-    /// ------------------- ///
-    /// CONFIGURATION TESTS ///
-    /// ------------------- ///
+    // ------------------- //
+    // CONFIGURATION TESTS //
+    // ------------------- //
 
     /// @notice U:[WM-11]: `setWithdrawalDelay` works correctly
     function test_U_WM_11_setWithdrawalDelay_works_correctly() public {
@@ -682,9 +682,9 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerEvents {
         assertEq(manager.delay(), newDelay, "Incorrect delay");
     }
 
-    /// ------- ///
-    /// HELPERS ///
-    /// ------- ///
+    // ------- //
+    // HELPERS //
+    // ------- //
 
     function _addScheduledWithdrawal(uint8 slot, ScheduleTask task) internal {
         ScheduledWithdrawal memory withdrawal;

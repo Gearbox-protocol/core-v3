@@ -174,7 +174,7 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
     function test_U_AF_05A_rescue_reverts_on_non_registered_credit_manager(address creditAccount, address manager)
         public
     {
-        vm.assume(creditAccount != address(vm) && manager != creditManager);
+        vm.assume(creditAccount != address(vm) && creditAccount != CONSOLE && manager != creditManager);
 
         vm.mockCall(
             creditAccount, abi.encodeCall(CreditAccountV3(creditAccount).creditManager, ()), abi.encode(manager)
@@ -189,7 +189,7 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
     function test_U_AF_05B_rescue_reverts_when_credit_account_is_in_use(address creditAccount, address borrower)
         public
     {
-        vm.assume(creditAccount != address(vm) && borrower != address(0));
+        vm.assume(creditAccount != address(vm) && creditAccount != CONSOLE && borrower != address(0));
 
         CreditAccountInfo memory info;
         info.borrower = borrower;
@@ -209,7 +209,7 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
 
     /// @notice U:[AF-5C]: `rescue` works correctly
     function test_U_AF_05C_rescue_works_correctly(address creditAccount, address target, bytes calldata data) public {
-        vm.assume(creditAccount != address(vm));
+        vm.assume(creditAccount != address(vm) && creditAccount != CONSOLE);
 
         CreditAccountInfo memory info;
         vm.mockCall(
