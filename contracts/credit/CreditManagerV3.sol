@@ -52,6 +52,7 @@ import {
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
+import "forge-std/console.sol";
 
 /// @title Credit Manager
 /// @dev Encapsulates the business logic for managing Credit Accounts
@@ -980,14 +981,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 token: token,
                 to: withdrawalManager,
                 amount: amount
-            });
+            }); // U:[CM-28]
 
             IWithdrawalManager(withdrawalManager).addScheduledWithdrawal({
                 creditAccount: creditAccount,
                 token: token,
                 amount: delivered,
                 tokenIndex: tokenMask.calcIndex()
-            });
+            }); // U:[CM-28]
 
             // WITHDRAWAL_FLAG is enabled on the account to efficiently determine
             // whether the account has pending withdrawals in the future
