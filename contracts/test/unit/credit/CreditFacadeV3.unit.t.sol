@@ -46,12 +46,9 @@ import {Tokens} from "../../config/Tokens.sol";
 
 import "forge-std/console.sol";
 
-uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
 uint16 constant REFERRAL_CODE = 23;
 
-/// @title CreditFacadeTest
-/// @notice Designed for unit test purposes only
-contract CreditFacadeUnitTest is BalanceHelper, ICreditFacadeEvents {
+contract CreditFacadeV3UnitTest is BalanceHelper, ICreditFacadeEvents {
     using CreditFacadeCalls for CreditFacadeMulticaller;
 
     IAddressProviderV3 addressProvider;
@@ -164,6 +161,8 @@ contract CreditFacadeUnitTest is BalanceHelper, ICreditFacadeEvents {
 
     /// @dev U:[FA-2]: user functions revert if called on pause
     function test_U_FA_02_user_functions_revert_if_called_on_pause() public notExpirableCase {
+        creditManagerMock.setBorrower(address(this));
+
         vm.prank(CONFIGURATOR);
         creditFacade.pause();
 
@@ -172,6 +171,16 @@ contract CreditFacadeUnitTest is BalanceHelper, ICreditFacadeEvents {
 
         vm.expectRevert("Pausable: paused");
         creditFacade.closeCreditAccount({
+            creditAccount: DUMB_ADDRESS,
+            to: DUMB_ADDRESS,
+            skipTokenMask: 0,
+            convertToETH: false,
+            calls: new MultiCall[](0)
+        });
+
+        /// @notice We'll check that it works for emergency liquidatior as exceptions in another test
+        vm.expectRevert("Pausable: paused");
+        creditFacade.liquidateCreditAccount({
             creditAccount: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
             skipTokenMask: 0,
@@ -193,10 +202,154 @@ contract CreditFacadeUnitTest is BalanceHelper, ICreditFacadeEvents {
     function test_U_FA_03_user_functions_revert_if_credit_facade_is_expired() public expirableCase {
         vm.prank(CONFIGURATOR);
         creditFacade.setExpirationDate(uint40(block.timestamp));
+        creditManagerMock.setBorrower(address(this));
 
         vm.warp(block.timestamp + 1);
 
         vm.expectRevert(NotAllowedAfterExpirationException.selector);
         creditFacade.openCreditAccount({debt: 0, onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
+
+        vm.expectRevert(NotAllowedAfterExpirationException.selector);
+        creditFacade.multicall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
+
+        vm.expectRevert(NotAllowedAfterExpirationException.selector);
+        creditFacade.botMulticall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
+    }
+
+    /// @dev U:[FA-4]: non-reentrancy works for all non-cofigurable functions
+    function test_U_FA_04_non_reentrancy_works_for_all_non_cofigurable_functions() public notExpirableCase {
+        creditFacade.setReentrancy(ENTERED);
+        creditManagerMock.setBorrower(address(this));
+
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        creditFacade.openCreditAccount({debt: 0, onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
+
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        creditFacade.closeCreditAccount({
+            creditAccount: DUMB_ADDRESS,
+            to: DUMB_ADDRESS,
+            skipTokenMask: 0,
+            convertToETH: false,
+            calls: new MultiCall[](0)
+        });
+
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        creditFacade.liquidateCreditAccount({
+            creditAccount: DUMB_ADDRESS,
+            to: DUMB_ADDRESS,
+            skipTokenMask: 0,
+            convertToETH: false,
+            calls: new MultiCall[](0)
+        });
+
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        creditFacade.multicall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
+
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        creditFacade.botMulticall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
+
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        creditFacade.claimWithdrawals({creditAccount: DUMB_ADDRESS, to: DUMB_ADDRESS});
+
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        creditFacade.setBotPermissions({
+            creditAccount: DUMB_ADDRESS,
+            bot: DUMB_ADDRESS,
+            permissions: 0,
+            fundingAmount: 0,
+            weeklyFundingAllowance: 0
+        });
+    }
+
+    /// @dev U:[FA-5]: borrower related functions revert if called not by borrower
+    function test_U_FA_05_borrower_related_functions_revert_if_called_not_by_borrower() public notExpirableCase {
+        vm.expectRevert(CreditAccountNotExistsException.selector);
+        creditFacade.closeCreditAccount({
+            creditAccount: DUMB_ADDRESS,
+            to: DUMB_ADDRESS,
+            skipTokenMask: 0,
+            convertToETH: false,
+            calls: new MultiCall[](0)
+        });
+
+        vm.expectRevert(CreditAccountNotExistsException.selector);
+        creditFacade.liquidateCreditAccount({
+            creditAccount: DUMB_ADDRESS,
+            to: DUMB_ADDRESS,
+            skipTokenMask: 0,
+            convertToETH: false,
+            calls: new MultiCall[](0)
+        });
+
+        vm.expectRevert(CreditAccountNotExistsException.selector);
+        creditFacade.multicall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
+
+        vm.expectRevert(CreditAccountNotExistsException.selector);
+        creditFacade.claimWithdrawals({creditAccount: DUMB_ADDRESS, to: DUMB_ADDRESS});
+
+        vm.expectRevert(CreditAccountNotExistsException.selector);
+        creditFacade.setBotPermissions({
+            creditAccount: DUMB_ADDRESS,
+            bot: DUMB_ADDRESS,
+            permissions: 0,
+            fundingAmount: 0,
+            weeklyFundingAllowance: 0
+        });
+    }
+
+    /// @dev U:[FA-6]: all configurator functions revert if called by non-configurator
+    function test_U_FA_06_all_configurator_functions_revert_if_called_by_non_configurator() public notExpirableCase {
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditFacade.setExpirationDate(0);
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditFacade.setDebtLimits(0, 0, 0);
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditFacade.setBotList(address(1));
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditFacade.setCumulativeLossParams(0, false);
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditFacade.setTokenAllowance(address(0), AllowanceAction.ALLOW);
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditFacade.setEmergencyLiquidator(address(0), AllowanceAction.ALLOW);
+    }
+
+    /// @dev U:[FA-7]: payable functions wraps eth to msg.sender
+    function test_U_FA_07_payable_functions_wraps_eth_to_msg_sender() public notExpirableCase {
+        vm.deal(USER, 3 ether);
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setDebtLimits(1 ether, 9 ether, 9);
+
+        vm.prank(USER);
+        creditFacade.openCreditAccount{value: 1 ether}({
+            debt: 1 ether,
+            onBehalfOf: USER,
+            calls: new MultiCall[](0),
+            referralCode: 0
+        });
+
+        expectBalance({t: Tokens.WETH, holder: USER, expectedBalance: 1 ether});
+
+        creditManagerMock.setBorrower(USER);
+
+        vm.prank(USER);
+        creditFacade.closeCreditAccount{value: 1 ether}({
+            creditAccount: DUMB_ADDRESS,
+            to: DUMB_ADDRESS,
+            skipTokenMask: 0,
+            convertToETH: false,
+            calls: new MultiCall[](0)
+        });
+        expectBalance({t: Tokens.WETH, holder: USER, expectedBalance: 2 ether});
+
+        vm.prank(USER);
+        creditFacade.multicall{value: 1 ether}({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
+
+        expectBalance({t: Tokens.WETH, holder: USER, expectedBalance: 3 ether});
     }
 }

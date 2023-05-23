@@ -292,26 +292,6 @@ contract CreditFacadeIntegrationTest is
         _checkForWETHTest();
     }
 
-    function test_I_FA_03D_liquidate_correctly_wraps_ETH() public {
-        (address creditAccount,) = _openTestCreditAccount();
-
-        vm.roll(block.number + 1);
-
-        tokenTestSuite.burn(Tokens.DAI, creditAccount, tokenTestSuite.balanceOf(Tokens.DAI, creditAccount));
-
-        _prepareForWETHTest(LIQUIDATOR);
-
-        tokenTestSuite.approve(Tokens.DAI, LIQUIDATOR, address(creditManager));
-
-        tokenTestSuite.mint(Tokens.DAI, LIQUIDATOR, DAI_ACCOUNT_AMOUNT);
-
-        vm.prank(LIQUIDATOR);
-        creditFacade.liquidateCreditAccount{value: WETH_TEST_AMOUNT}(
-            creditAccount, LIQUIDATOR, 0, false, multicallBuilder()
-        );
-        _checkForWETHTest(LIQUIDATOR);
-    }
-
     function test_I_FA_03F_multicall_correctly_wraps_ETH() public {
         (address creditAccount,) = _openTestCreditAccount();
 

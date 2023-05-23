@@ -3,4 +3,6 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-contract BotListMock {}
+contract BotListMock {
+    function eraseAllBotPermissions(address creditAccount) external {}
+}

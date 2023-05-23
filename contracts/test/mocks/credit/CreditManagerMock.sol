@@ -2,14 +2,21 @@
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
-pragma abicoder v1;
 
 import "../../../interfaces/IAddressProviderV3.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
+import {
+    ICreditManagerV3,
+    ClosureAction,
+    CollateralDebtData,
+    CollateralCalcTask
+} from "../../../interfaces/ICreditManagerV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 import {IPoolQuotaKeeper} from "../../../interfaces/IPoolQuotaKeeper.sol";
+import {ClaimAction} from "../../../interfaces/IWithdrawalManager.sol";
+
+import "../../../interfaces/IExceptions.sol";
 
 import "../../lib/constants.sol";
 
@@ -33,6 +40,12 @@ contract CreditManagerMock {
     mapping(address => uint256) public getTokenMaskOrRevert;
 
     address public creditConfigurator;
+    address borrower;
+    uint256 public quotedTokensMask;
+    bool public supportsQuotas;
+
+    CollateralDebtData collateralDebtData;
+    uint256 internal enabledTokensMask;
 
     constructor(address _addressProvider, address _pool) {
         addressProvider = _addressProvider;
@@ -40,6 +53,11 @@ contract CreditManagerMock {
         wethGateway = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_GATEWAY, 3_00); // U:[CM-1]
         setPoolService(_pool);
         creditConfigurator = CONFIGURATOR;
+        supportsQuotas = true;
+    }
+
+    function setSupportsQuotas(bool _supportsQuotas) external {
+        supportsQuotas = _supportsQuotas;
     }
 
     function setPoolService(address newPool) public {
@@ -68,5 +86,66 @@ contract CreditManagerMock {
 
     function addToken(address token, uint256 mask) external {
         getTokenMaskOrRevert[token] = mask;
+    }
+
+    function setBorrower(address _borrower) external {
+        borrower = _borrower;
+    }
+
+    function getBorrowerOrRevert(address creditAccount) external view returns (address) {
+        if (borrower == address(0)) revert CreditAccountNotExistsException();
+        return borrower;
+    }
+
+    function openCreditAccount(uint256 debt, address onBehalfOf) external returns (address creditAccount) {}
+
+    function closeCreditAccount(
+        address creditAccount,
+        ClosureAction closureAction,
+        CollateralDebtData memory collateralDebtData,
+        address payer,
+        address to,
+        uint256 skipTokensMask,
+        bool convertToETH
+    ) external returns (uint256 remainingFunds, uint256 loss) {}
+
+    function fullCollateralCheck(
+        address creditAccount,
+        uint256 enabledTokensMask,
+        uint256[] memory collateralHints,
+        uint16 minHealthFactor
+    ) external {}
+
+    function setActiveCreditAccount(address creditAccount) external {
+        // _activeCreditAccount = creditAccount;
+    }
+
+    function setQuotedTokensMask(uint256 _quotedTokensMask) external {
+        quotedTokensMask = _quotedTokensMask;
+    }
+
+    function calcDebtAndCollateral(address creditAccount, CollateralCalcTask task)
+        external
+        view
+        returns (CollateralDebtData memory)
+    {
+        return collateralDebtData;
+    }
+
+    function setDebtAndCollateralData(CollateralDebtData calldata _collateralDebtData) external {
+        collateralDebtData = _collateralDebtData;
+    }
+
+    function claimWithdrawals(address creditAccount, address to, ClaimAction action)
+        external
+        returns (uint256 tokensToEnable)
+    {}
+
+    function enabledTokensMaskOf(address creditAccount) external view returns (uint256) {
+        return enabledTokensMask;
+    }
+
+    function setEnabledTokensMask(uint256 _enabledTokensMask) external {
+        enabledTokensMask = _enabledTokensMask;
     }
 }

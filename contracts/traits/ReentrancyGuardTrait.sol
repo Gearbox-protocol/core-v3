@@ -7,7 +7,7 @@ uint8 constant NOT_ENTERED = 1;
 uint8 constant ENTERED = 2;
 
 /// @title ReentrancyGuardTrait
-abstract contract ReentrancyGuardTrait {
+contract ReentrancyGuardTrait {
     uint8 internal _reentrancyStatus = NOT_ENTERED;
 
     /// @dev Prevents a contract from calling itself, directly or indirectly.

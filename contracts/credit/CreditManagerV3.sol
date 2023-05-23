@@ -248,6 +248,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     function openCreditAccount(uint256 debt, address onBehalfOf)
         external
         override
+        nonZeroAddress(onBehalfOf) // todo: add check
         nonReentrant // U:[CM-5]
         creditFacadeOnly // // U:[CM-2]
         returns (address creditAccount)
