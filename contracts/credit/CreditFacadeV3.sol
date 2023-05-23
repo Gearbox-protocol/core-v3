@@ -63,9 +63,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @notice Credit Manager connected to this Credit Facade
     address public immutable creditManager;
 
-    /// @notice Whether the whitelisted mode is active
-    bool public immutable whitelisted;
-
     /// @notice Whether the Credit Facade implements expirable logic
     bool public immutable expirable;
 
@@ -182,7 +179,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             IAddressProviderV3(ICreditManagerV3(_creditManager).addressProvider()).getAddressOrRevert(AP_BOT_LIST, 3_00);
 
         degenNFT = _degenNFT; // U:[FA-1]  // F:[FA-1A]
-        whitelisted = _degenNFT != address(0); // U:[FA-1] // F:[FA-1A]
 
         expirable = _expirable; // U:[FA-1] // F:[FA-1A]
 
@@ -220,21 +216,22 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         returns (address creditAccount)
     {
         // Checks that the borrowed amount is within the debt limits
-        _revertIfOutOfDebtLimits(debt); // F:[FA-11B]
+        _revertIfOutOfDebtLimits(debt); // U:[FA-8]
 
         // Checks whether the new borrowed amount does not violate the block limit
-        _revertIfOutOfBorrowingLimit(debt); // F:[FA-11]
+        _revertIfOutOfBorrowingLimit(debt); // U:[FA-8]
 
         /// Attempts to burn the DegenNFT - if onBehalfOf has none, this will fail
         if (degenNFT != address(0)) {
-            IDegenNFT(degenNFT).burn(onBehalfOf, 1); // F:[FA-4B]
+            if (msg.sender != onBehalfOf) revert ForbiddenInWhitelistedModeException(); // U:[FA-9]
+            IDegenNFT(degenNFT).burn(onBehalfOf, 1); // U:[FA-9]
         }
 
         // Requests the Credit Manager to open a Credit Account
-        creditAccount = ICreditManagerV3(creditManager).openCreditAccount({debt: debt, onBehalfOf: onBehalfOf}); // F:[FA-8]
+        creditAccount = ICreditManagerV3(creditManager).openCreditAccount({debt: debt, onBehalfOf: onBehalfOf}); // U:[FA-10]
 
         // Emits an event for Credit Account opening
-        emit OpenCreditAccount(creditAccount, onBehalfOf, msg.sender, debt, referralCode); // F:[FA-8]
+        emit OpenCreditAccount(creditAccount, onBehalfOf, msg.sender, debt, referralCode); // U:[FA-10]
 
         // Initially, only the underlying is on the Credit Account,
         // so the enabledTokenMask before the multicall is 1
@@ -245,7 +242,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             calls: calls,
             enabledTokensMask: UNDERLYING_TOKEN_MASK,
             flags: OPEN_CREDIT_ACCOUNT_FLAGS
-        }); // F:[FA-8]
+        }); // U:[FA-10]
 
         // Since it's not possible to enable any forbidden tokens on a new account,
         // this array is empty
@@ -258,7 +255,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             fullCheckParams: fullCheckParams,
             forbiddenBalances: forbiddenBalances,
             _forbiddenTokenMask: forbiddenTokenMask
-        }); // F:[FA-8, 9]
+        }); // U:[FA-10]
     }
 
     /// @notice Runs a batch of transactions within a multicall and closes the account
@@ -1095,8 +1092,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// TODO: Check L2 networks for supporting native currencies
     function _wrapETH() internal {
         if (msg.value > 0) {
-            IWETH(weth).deposit{value: msg.value}(); // F:[FA-3]
-            IWETH(weth).transfer(msg.sender, msg.value); // F:[FA-3]
+            IWETH(weth).deposit{value: msg.value}(); // U:[FA-7]
+            IWETH(weth).transfer(msg.sender, msg.value); // U:[FA-7]
         }
     }
 

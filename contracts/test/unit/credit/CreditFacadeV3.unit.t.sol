@@ -8,12 +8,13 @@ import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMoc
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 
+/// LIBS
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+
 import {CreditFacadeV3Harness} from "./CreditFacadeV3Harness.sol";
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 import {DegenNFTMock} from "../../mocks/token/DegenNFTMock.sol";
-
-import {BotList} from "../../../support/BotList.sol";
 
 import {ENTERED} from "../../../traits/ReentrancyGuardTrait.sol";
 
@@ -155,8 +156,6 @@ contract CreditFacadeV3UnitTest is BalanceHelper, ICreditFacadeEvents {
         assertEq(creditFacade.wethGateway(), creditManagerMock.wethGateway(), "Incorrect weth gateway");
 
         assertEq(creditFacade.degenNFT(), address(degenNFTMock), "Incorrect degenNFTMock");
-
-        assertTrue(creditFacade.whitelisted() == whitelisted, "Incorrect whitelisted");
     }
 
     /// @dev U:[FA-2]: user functions revert if called on pause
@@ -351,5 +350,93 @@ contract CreditFacadeV3UnitTest is BalanceHelper, ICreditFacadeEvents {
         creditFacade.multicall{value: 1 ether}({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
 
         expectBalance({t: Tokens.WETH, holder: USER, expectedBalance: 3 ether});
+    }
+
+    //
+    // OPEN CREDIT ACCOUNT
+    //
+
+    /// @dev U:[FA-8]: openCreditAccount reverts if out of limits
+    function test_U_FA_08_openCreditAccount_reverts_if_out_of_limits(uint128 a, uint128 b) public notExpirableCase {
+        vm.assume(a > 0 && b > 0);
+
+        uint128 minDebt = uint128(Math.min(a, b));
+        uint128 maxDebt = uint128(Math.max(a, b));
+        uint8 multiplier = uint8(maxDebt % 255 + 1);
+
+        vm.assume(maxDebt < type(uint128).max / 256);
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setDebtLimits(minDebt, maxDebt, 0);
+
+        vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
+        creditFacade.openCreditAccount({debt: minDebt - 1, onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
+
+        vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
+        creditFacade.openCreditAccount({debt: maxDebt + 1, onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
+
+        creditFacade.setTotalBorrowedInBlock(maxDebt * multiplier - minDebt + 1);
+
+        vm.expectRevert(BorrowedBlockLimitException.selector);
+        creditFacade.openCreditAccount({debt: minDebt, onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
+    }
+
+    /// @dev U:[FA-9]: openCreditAccount reverts in whitelisted if user has no rights
+    function test_U_FA_09_openCreditAccount_reverts_in_whitelisted_if_user_has_no_rights()
+        public
+        withDegenNFT
+        notExpirableCase
+    {
+        vm.prank(CONFIGURATOR);
+        creditFacade.setDebtLimits(1, 2, 2);
+
+        vm.prank(USER);
+
+        vm.expectRevert(ForbiddenInWhitelistedModeException.selector);
+        creditFacade.openCreditAccount({debt: 1, onBehalfOf: FRIEND, calls: new MultiCall[](0), referralCode: 0});
+
+        degenNFTMock.setRevertOnBurn(true);
+
+        vm.prank(USER);
+        vm.expectRevert(InsufficientBalanceException.selector);
+        creditFacade.openCreditAccount({debt: 1, onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
+    }
+
+    /// @dev U:[FA-10]: openCreditAccount wokrs as expected
+    function test_U_FA_10_openCreditAccount_works_as_expected() public notExpirableCase {
+        vm.prank(CONFIGURATOR);
+        creditFacade.setDebtLimits(100, 200, 1);
+
+        uint256 debt = 200;
+
+        address expectedCreditAccount = DUMB_ADDRESS;
+        creditManagerMock.setReturnOpenCreditAccount(expectedCreditAccount);
+
+        vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.openCreditAccount, (debt, FRIEND)));
+
+        vm.expectEmit(true, true, true, true);
+        emit OpenCreditAccount(expectedCreditAccount, FRIEND, USER, debt, REFERRAL_CODE);
+
+        vm.expectEmit(true, true, false, false);
+        emit StartMultiCall(expectedCreditAccount);
+
+        vm.expectEmit(true, false, false, false);
+        emit FinishMultiCall();
+
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(ICreditManagerV3.fullCollateralCheck),
+            (expectedCreditAccount, UNDERLYING_TOKEN_MASK, PERCENTAGE_FACTOR, new uint256[](0))
+        );
+
+        vm.prank(USER);
+        address creditAccount = creditFacade.openCreditAccount({
+            debt: debt,
+            onBehalfOf: FRIEND,
+            calls: new MultiCall[](0),
+            referralCode: REFERRAL_CODE
+        });
+
+        assertEq(creditAccount, expectedCreditAccount, "Incorrect credit account");
     }
 }

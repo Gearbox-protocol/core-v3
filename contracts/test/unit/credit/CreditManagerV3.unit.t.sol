@@ -329,7 +329,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         assertEq(creditManager.underlying(), tokenTestSuite.addressOf(Tokens.DAI), _testCaseErr("Incorrect underlying"));
 
-        (address token, uint16 lt) = creditManager.collateralTokenByMask(UNDERLYING_TOKEN_MASK);
+        (address token,) = creditManager.collateralTokenByMask(UNDERLYING_TOKEN_MASK);
 
         assertEq(token, tokenTestSuite.addressOf(Tokens.DAI), _testCaseErr("Incorrect underlying"));
 

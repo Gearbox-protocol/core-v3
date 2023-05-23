@@ -47,6 +47,8 @@ contract CreditManagerMock {
     CollateralDebtData collateralDebtData;
     uint256 internal enabledTokensMask;
 
+    address nextCreditAccount;
+
     constructor(address _addressProvider, address _pool) {
         addressProvider = _addressProvider;
         weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // U:[CM-1]
@@ -97,7 +99,13 @@ contract CreditManagerMock {
         return borrower;
     }
 
-    function openCreditAccount(uint256 debt, address onBehalfOf) external returns (address creditAccount) {}
+    function setReturnOpenCreditAccount(address _nextCreditAccount) external {
+        nextCreditAccount = _nextCreditAccount;
+    }
+
+    function openCreditAccount(uint256 debt, address onBehalfOf) external returns (address creditAccount) {
+        return nextCreditAccount;
+    }
 
     function closeCreditAccount(
         address creditAccount,

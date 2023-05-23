@@ -197,7 +197,7 @@ contract CreditFacadeIntegrationTest is
 
         assertEq(creditFacade.degenNFT(), address(0), "Incorrect degenNFT");
 
-        assertTrue(creditFacade.whitelisted() == false, "Incorrect whitelisted");
+        // assertTrue(creditFacade.whitelisted() == false, "Incorrect whitelisted");
 
         _setUp({
             _underlying: Tokens.DAI,
@@ -210,7 +210,7 @@ contract CreditFacadeIntegrationTest is
 
         assertEq(creditFacade.degenNFT(), address(cft.degenNFT()), "Incorrect degenNFT");
 
-        assertTrue(creditFacade.whitelisted() == true, "Incorrect whitelisted");
+        // assertTrue(creditFacade.whitelisted() == true, "Incorrect whitelisted");
     }
 
     //
