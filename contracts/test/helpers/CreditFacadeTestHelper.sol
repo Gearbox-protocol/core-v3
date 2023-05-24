@@ -87,25 +87,6 @@ contract CreditFacadeTestHelper is TestHelper {
         balance = IERC20(underlying).balanceOf(creditAccount);
     }
 
-    function _closeTestCreditAccount(address creditAccount) internal {
-        MultiCall[] memory closeCalls;
-
-        // switch to new block to be able to close account
-        vm.roll(block.number + 1);
-
-        // (,, uint256 underlyingToClose) = creditManager.calcAccruedInterestAndFees(creditAccount);
-        // uint256 underlyingBalance = cft.tokenTestSuite().balanceOf(underlying, creditAccount);
-
-        // if (underlyingToClose > underlyingBalance) {
-        //     cft.tokenTestSuite().mint(underlying, USER, underlyingToClose - underlyingBalance);
-
-        //     cft.tokenTestSuite().approve(underlying, USER, address(creditManager));
-        // }
-
-        vm.prank(USER);
-        creditFacade.closeCreditAccount(creditAccount, FRIEND, 0, false, closeCalls);
-    }
-
     function expectTokenIsEnabled(address creditAccount, address token, bool expectedState) internal {
         expectTokenIsEnabled(creditAccount, token, expectedState, "");
     }

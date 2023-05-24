@@ -298,21 +298,21 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     {
         /// Requests CM to calculate debt only, since we don't need to know the collateral value for
         /// full account closure
-        CollateralDebtData memory debtData = _calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_ONLY);
+        CollateralDebtData memory debtData = _calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_ONLY); // U:[FA-11]
 
         /// All pending withdrawals are claimed, even if they are not yet mature
-        _claimWithdrawals(creditAccount, to, ClaimAction.FORCE_CLAIM);
+        _claimWithdrawals(creditAccount, to, ClaimAction.FORCE_CLAIM); // U:[FA-11]
 
         if (calls.length != 0) {
             /// All account management functions are forbidden during closure
             FullCheckParams memory fullCheckParams =
-                _multicall(creditAccount, calls, debtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS);
-            debtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter;
-        } // F:[FA-2, 12, 13]
+                _multicall(creditAccount, calls, debtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS); // U:[FA-11]
+            debtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter; // U:[FA-11]
+        }
 
         /// Bot permissions are specific to (owner, creditAccount),
         /// so they need to be erased on account closure
-        _eraseAllBotPermissions({creditAccount: creditAccount, setFlag: false});
+        _eraseAllBotPermissionsAtClosure({creditAccount: creditAccount});
 
         // Requests the Credit manager to close the Credit Account
         _closeCreditAccount({
@@ -323,14 +323,14 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             to: to,
             skipTokensMask: skipTokenMask,
             convertToETH: convertToETH
-        }); // F:[FA-2, 12]
+        }); // U:[FA-11]
 
         if (convertToETH) {
-            _wethWithdrawTo(to);
+            _wethWithdrawTo(to); // U:[FA-11]
         }
 
         // Emits an event
-        emit CloseCreditAccount(creditAccount, msg.sender, to); // F:[FA-12]
+        emit CloseCreditAccount(creditAccount, msg.sender, to); // U:[FA-11]
     }
 
     /// @notice Runs a batch of transactions within a multicall and liquidates the account
@@ -383,7 +383,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         nonReentrant // U:[FA-4]
     {
         // Checks that the CA exists to revert early for late liquidations and save gas
-        address borrower = _getBorrowerOrRevert(creditAccount); // F:[FA-2]
+        address borrower = _getBorrowerOrRevert(creditAccount); // F:[FA-5]
 
         // Checks that the account hf < 1 and computes the totalValue
         // before the multicall
@@ -411,7 +411,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
         /// Bot permissions are specific to (owner, creditAccount),
         /// so they need to be erased on account closure
-        _eraseAllBotPermissions({creditAccount: creditAccount, setFlag: false});
+        _eraseAllBotPermissionsAtClosure({creditAccount: creditAccount});
 
         (uint256 remainingFunds, uint256 reportedLoss) = _closeCreditAccount({
             creditAccount: creditAccount,
@@ -951,11 +951,12 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         creditAccountOwnerOnly(creditAccount) // U:[FA-5]
         nonReentrant // U:[FA-4]
     {
-        uint16 flags = ICreditManagerV3(creditManager).flagsOf(creditAccount);
+        uint16 flags = _flagsOf(creditAccount);
 
         if (flags & BOT_PERMISSIONS_SET_FLAG == 0) {
-            _eraseAllBotPermissions({creditAccount: creditAccount, setFlag: false});
+            _eraseAllBotPermissions({creditAccount: creditAccount});
 
+            // If flag wasn't enabled before and bot has some permissions, it sets flag
             if (permissions != 0) {
                 _setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, true);
             }
@@ -963,18 +964,27 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
         uint256 remainingBots =
             IBotList(botList).setBotPermissions(creditAccount, bot, permissions, fundingAmount, weeklyFundingAllowance);
+
         if (remainingBots == 0) {
             _setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, false);
         }
     }
 
     /// @notice Convenience function to erase all bot permissions for a Credit Account upon closure
-    function _eraseAllBotPermissions(address creditAccount, bool setFlag) internal {
-        IBotList(botList).eraseAllBotPermissions(creditAccount);
+    function _eraseAllBotPermissionsAtClosure(address creditAccount) internal {
+        uint16 flags = _flagsOf(creditAccount);
 
-        if (setFlag) {
-            _setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, false);
+        if (flags & BOT_PERMISSIONS_SET_FLAG != 0) {
+            _eraseAllBotPermissions(creditAccount);
         }
+    }
+
+    function _eraseAllBotPermissions(address creditAccount) internal {
+        IBotList(botList).eraseAllBotPermissions(creditAccount);
+    }
+
+    function _flagsOf(address creditAccount) internal view returns (uint16) {
+        return ICreditManagerV3(creditManager).flagsOf(creditAccount);
     }
 
     /// @notice Internal wrapper for `CreditManager.setFlagFor()`. The external call is wrapped

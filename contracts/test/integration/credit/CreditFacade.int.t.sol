@@ -363,25 +363,6 @@ contract CreditFacadeIntegrationTest is
         (address creditAccount,) = _openTestCreditAccount();
 
         expectBalance(address(degenNFT), USER, 1);
-
-        _closeTestCreditAccount(creditAccount);
-
-        tokenTestSuite.mint(Tokens.DAI, USER, DAI_ACCOUNT_AMOUNT);
-
-        vm.prank(USER);
-        creditFacade.openCreditAccount(
-            DAI_ACCOUNT_AMOUNT,
-            USER,
-            multicallBuilder(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT))
-                })
-            ),
-            0
-        );
-
-        expectBalance(address(degenNFT), USER, 0);
     }
 
     // /// @dev I:[FA-5]: openCreditAccount sets correct values

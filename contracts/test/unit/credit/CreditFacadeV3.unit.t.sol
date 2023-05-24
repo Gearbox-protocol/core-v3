@@ -7,6 +7,7 @@ import "../../../interfaces/IAddressProviderV3.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
+import {IWETHGateway} from "../../../interfaces/IWETHGateway.sol";
 
 /// LIBS
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -15,19 +16,31 @@ import {CreditFacadeV3Harness} from "./CreditFacadeV3Harness.sol";
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 import {DegenNFTMock} from "../../mocks/token/DegenNFTMock.sol";
+import {AdapterMock} from "../../mocks/adapters/AdapterMock.sol";
+import {BotListMock} from "../../mocks/support/BotListMock.sol";
 
 import {ENTERED} from "../../../traits/ReentrancyGuardTrait.sol";
 
 import "../../../interfaces/ICreditFacade.sol";
-import {ICreditManagerV3, ClosureAction, ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
+import {
+    ICreditManagerV3,
+    ClosureAction,
+    ManageDebtAction,
+    CollateralCalcTask,
+    CollateralDebtData,
+    BOT_PERMISSIONS_SET_FLAG
+} from "../../../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
+import {IBotList} from "../../../interfaces/IBotList.sol";
 import {ICreditFacadeEvents} from "../../../interfaces/ICreditFacade.sol";
 import {IDegenNFT, IDegenNFTExceptions} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
+import {ClaimAction} from "../../../interfaces/IWithdrawalManager.sol";
+import {BitMask, UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
+import {MulticallBuilder} from "../../lib/MulticallBuilder.sol";
 
 // DATA
 import {MultiCall, MultiCallOps} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
-
 import {CreditFacadeMulticaller, CreditFacadeCalls} from "../../../multicall/CreditFacadeCalls.sol";
 
 // CONSTANTS
@@ -37,7 +50,8 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 
 import "../../lib/constants.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
-
+import {CreditFacadeTestHelper} from "../../helpers/CreditFacadeTestHelper.sol";
+import {TestHelper} from "../../lib/helper.sol";
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
@@ -49,13 +63,16 @@ import "forge-std/console.sol";
 
 uint16 constant REFERRAL_CODE = 23;
 
-contract CreditFacadeV3UnitTest is BalanceHelper, ICreditFacadeEvents {
+contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvents {
     using CreditFacadeCalls for CreditFacadeMulticaller;
 
     IAddressProviderV3 addressProvider;
 
     CreditFacadeV3Harness creditFacade;
     CreditManagerMock creditManagerMock;
+
+    IWETHGateway wethGateway;
+    BotListMock botListMock;
 
     DegenNFTMock degenNFTMock;
     bool whitelisted;
@@ -112,6 +129,10 @@ contract CreditFacadeV3UnitTest is BalanceHelper, ICreditFacadeEvents {
 
         addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
 
+        wethGateway = IWETHGateway(addressProvider.getAddressOrRevert(AP_WETH_GATEWAY, 3_00));
+
+        botListMock = BotListMock(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00));
+
         AddressProviderV3ACLMock(address(addressProvider)).addPausableAdmin(CONFIGURATOR);
 
         creditManagerMock = new CreditManagerMock({
@@ -136,6 +157,8 @@ contract CreditFacadeV3UnitTest is BalanceHelper, ICreditFacadeEvents {
             address(degenNFTMock),
             expirable
         );
+
+        creditManagerMock.setCreditFacade(address(creditFacade));
     }
 
     function _expirable() internal {
@@ -145,6 +168,8 @@ contract CreditFacadeV3UnitTest is BalanceHelper, ICreditFacadeEvents {
             address(degenNFTMock),
             expirable
         );
+
+        creditManagerMock.setCreditFacade(address(creditFacade));
     }
 
     /// @dev U:[FA-1]: constructor sets correct values
@@ -425,8 +450,10 @@ contract CreditFacadeV3UnitTest is BalanceHelper, ICreditFacadeEvents {
 
         vm.expectCall(
             address(creditManagerMock),
-            abi.encodeCall(ICreditManagerV3.fullCollateralCheck),
-            (expectedCreditAccount, UNDERLYING_TOKEN_MASK, PERCENTAGE_FACTOR, new uint256[](0))
+            abi.encodeCall(
+                ICreditManagerV3.fullCollateralCheck,
+                (expectedCreditAccount, UNDERLYING_TOKEN_MASK, new uint256[](0), PERCENTAGE_FACTOR)
+            )
         );
 
         vm.prank(USER);
@@ -438,5 +465,116 @@ contract CreditFacadeV3UnitTest is BalanceHelper, ICreditFacadeEvents {
         });
 
         assertEq(creditAccount, expectedCreditAccount, "Incorrect credit account");
+    }
+
+    /// @dev U:[FA-11]: closeCreditAccount wokrs as expected
+    function test_U_FA_11_closeCreditAccount_works_as_expected(uint256 enabledTokensMask) public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+
+        bool hasCalls = (getHash({value: enabledTokensMask, seed: 2}) % 2) == 0;
+        bool hasBotPermissions = (getHash({value: enabledTokensMask, seed: 3}) % 2) == 0;
+
+        uint256 LINK_TOKEN_MASK = 4;
+
+        address adapter = address(new AdapterMock(address(creditManagerMock), DUMB_ADDRESS));
+
+        creditManagerMock.setContractAllowance({adapter: adapter, targetContract: DUMB_ADDRESS});
+
+        MultiCall[] memory calls;
+
+        creditManagerMock.setBorrower(USER);
+        creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, hasBotPermissions);
+
+        CollateralDebtData memory collateralDebtData = CollateralDebtData({
+            debt: getHash({value: enabledTokensMask, seed: 2}),
+            cumulativeIndexNow: getHash({value: enabledTokensMask, seed: 3}),
+            cumulativeIndexLastUpdate: getHash({value: enabledTokensMask, seed: 4}),
+            cumulativeQuotaInterest: getHash({value: enabledTokensMask, seed: 5}),
+            accruedInterest: getHash({value: enabledTokensMask, seed: 6}),
+            accruedFees: getHash({value: enabledTokensMask, seed: 7}),
+            totalDebtUSD: 0,
+            totalValue: 0,
+            totalValueUSD: 0,
+            twvUSD: 0,
+            enabledTokensMask: enabledTokensMask,
+            quotedTokensMask: 0,
+            quotedTokens: new address[](0),
+            quotedLts: new uint16[](0),
+            quotas: new uint256[](0),
+            _poolQuotaKeeper: address(0)
+        });
+
+        CollateralDebtData memory expectedCollateralDebtData = clone(collateralDebtData);
+
+        if (hasCalls) {
+            calls = MulticallBuilder.build(
+                MultiCall({target: adapter, callData: abi.encodeCall(AdapterMock.dumbCall, (LINK_TOKEN_MASK, 0))})
+            );
+
+            expectedCollateralDebtData.enabledTokensMask |= LINK_TOKEN_MASK;
+        } else {
+            creditManagerMock.setRevertOnActiveAccount(true);
+        }
+
+        creditManagerMock.setDebtAndCollateralData(collateralDebtData);
+
+        bool convertToETH = (getHash({value: enabledTokensMask, seed: 1}) % 2) == 1;
+
+        caseName =
+            string.concat(caseName, "convertToETH = ", boolToStr(convertToETH), ", hasCalls = ", boolToStr(hasCalls));
+
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(ICreditManagerV3.calcDebtAndCollateral, (creditAccount, CollateralCalcTask.DEBT_ONLY))
+        );
+
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(ICreditManagerV3.claimWithdrawals, (creditAccount, FRIEND, ClaimAction.FORCE_CLAIM))
+        );
+
+        uint256 skipTokenMask = getHash({value: enabledTokensMask, seed: 1});
+
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(
+                ICreditManagerV3.closeCreditAccount,
+                (
+                    creditAccount,
+                    ClosureAction.CLOSE_ACCOUNT,
+                    expectedCollateralDebtData,
+                    USER,
+                    FRIEND,
+                    skipTokenMask,
+                    convertToETH
+                )
+            )
+        );
+
+        if (convertToETH) vm.expectCall(address(wethGateway), abi.encodeCall(IWETHGateway.withdrawTo, (FRIEND)));
+
+        if (hasBotPermissions) {
+            vm.expectCall(address(botListMock), abi.encodeCall(IBotList.eraseAllBotPermissions, (creditAccount)));
+        } else {
+            botListMock.setRevertOnErase(true);
+        }
+
+        vm.expectEmit(true, true, true, true);
+        emit CloseCreditAccount(creditAccount, USER, FRIEND);
+
+        vm.prank(USER);
+        creditFacade.closeCreditAccount({
+            creditAccount: creditAccount,
+            to: FRIEND,
+            skipTokenMask: skipTokenMask,
+            convertToETH: convertToETH,
+            calls: calls
+        });
+
+        assertEq(
+            creditManagerMock.closeCollateralDebtData(),
+            expectedCollateralDebtData,
+            _testCaseErr("Incorrect collateralDebtData")
+        );
     }
 }
