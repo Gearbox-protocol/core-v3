@@ -312,7 +312,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
         /// Bot permissions are specific to (owner, creditAccount),
         /// so they need to be erased on account closure
-        _eraseAllBotPermissionsAtClosure({creditAccount: creditAccount});
+        _eraseAllBotPermissionsAtClosure({creditAccount: creditAccount}); // U:[FA-11]
 
         // Requests the Credit manager to close the Credit Account
         _closeCreditAccount({
