@@ -1078,40 +1078,6 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         // }
     }
 
-    // /// @dev I:[CM-67]: checkEmergencyPausable returns pause state and enable emergencyLiquidation if needed
-    // function test_I_CM_67_checkEmergencyPausable_returns_pause_state_and_enable_emergencyLiquidation_if_needed() public {
-    //     bool p = creditManager.checkEmergencyPausable(DUMB_ADDRESS, true);
-    //     assertTrue(!p, "Incorrect paused() value for non-paused state");
-    //     assertTrue(!creditManager.emergencyLiquidation(), "Emergency liquidation true when expected false");
-
-    //     vm.prank(CONFIGURATOR);
-    //     creditManager.pause();
-
-    //     p = creditManager.checkEmergencyPausable(DUMB_ADDRESS, true);
-    //     assertTrue(p, "Incorrect paused() value for paused state");
-    //     assertTrue(!creditManager.emergencyLiquidation(), "Emergency liquidation true when expected false");
-
-    //     vm.prank(CONFIGURATOR);
-    //     creditManager.unpause();
-
-    //     vm.prank(CONFIGURATOR);
-    //     creditManager.addEmergencyLiquidator(DUMB_ADDRESS);
-    //     p = creditManager.checkEmergencyPausable(DUMB_ADDRESS, true);
-    //     assertTrue(!p, "Incorrect paused() value for non-paused state");
-    //     assertTrue(!creditManager.emergencyLiquidation(), "Emergency liquidation true when expected false");
-
-    //     vm.prank(CONFIGURATOR);
-    //     creditManager.pause();
-
-    //     p = creditManager.checkEmergencyPausable(DUMB_ADDRESS, true);
-    //     assertTrue(p, "Incorrect paused() value for paused state");
-    //     assertTrue(creditManager.emergencyLiquidation(), "Emergency liquidation flase when expected true");
-
-    //     p = creditManager.checkEmergencyPausable(DUMB_ADDRESS, false);
-    //     assertTrue(p, "Incorrect paused() value for paused state");
-    //     assertTrue(!creditManager.emergencyLiquidation(), "Emergency liquidation true when expected false");
-    // }
-
     /// @dev I:[CM-68]: fullCollateralCheck checks tokens in correct order
     function test_I_CM_68_fullCollateralCheck_is_evaluated_in_order_of_hints() public {
         (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow, address creditAccount) =
@@ -1176,74 +1142,5 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         uint256 enabledTokensMap = 1;
 
         creditManager.fullCollateralCheck(creditAccount, enabledTokensMap, ch, PERCENTAGE_FACTOR);
-    }
-
-    // /// @dev I:[CM-71]: rampLiquidationThreshold correctly updates the internal struct
-    // function test_I_CM_71_rampLiquidationThreshold_correctly_updates_parameters() public {
-    //     _connectCreditManagerSuite(Tokens.DAI, true);
-
-    //     address usdc = tokenTestSuite.addressOf(Tokens.USDC);
-
-    //     CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
-
-    //     vm.prank(CONFIGURATOR);
-    //     cmi.setCollateralTokenData(usdc, 8500, 9000, uint40(block.timestamp), 3600 * 24 * 7);
-
-    //     CollateralTokenData memory cd = cmi.collateralTokensDataExt(cmi.getTokenMaskOrRevert(usdc));
-
-    //     assertEq(uint256(cd.ltInitial), creditConfig.lt(Tokens.USDC), "Incorrect initial LT");
-
-    //     assertEq(uint256(cd.ltFinal), 8500, "Incorrect final LT");
-
-    //     assertEq(uint256(cd.timestampRampStart), block.timestamp, "Incorrect timestamp start");
-
-    //     assertEq(uint256(cd.rampDuration), 3600 * 24 * 7, "Incorrect ramp duration");
-    // }
-
-    /// @dev I:[CM-72]: Ramping liquidation threshold fuzzing
-    function test_I_CM_72_liquidation_ramping_fuzzing(
-        uint16 initialLT,
-        uint16 newLT,
-        uint24 duration,
-        uint256 timestampCheck
-    ) public {
-        // initialLT = 1000 + (initialLT % (DEFAULT_UNDERLYING_LT - 999));
-        // newLT = 1000 + (newLT % (DEFAULT_UNDERLYING_LT - 999));
-        // duration = 3600 + (duration % (3600 * 24 * 90 - 3600));
-
-        // timestampCheck = block.timestamp + (timestampCheck % (duration + 1));
-
-        // address usdc = tokenTestSuite.addressOf(Tokens.USDC);
-
-        // uint256 timestampStart = block.timestamp;
-
-        // vm.startPrank(CONFIGURATOR);
-        // creditManager.setCollateralTokenData(usdc, initialLT);
-        // creditManager.rampLiquidationThreshold(usdc, newLT, uint40(block.timestamp), duration);
-
-        // assertEq(creditManager.liquidationThresholds(usdc), initialLT, "LT at ramping start incorrect");
-
-        // uint16 expectedLT;
-        // if (newLT >= initialLT) {
-        //     expectedLT = uint16(
-        //         uint256(initialLT)
-        //             + (uint256(newLT - initialLT) * (timestampCheck - timestampStart)) / uint256(duration)
-        //     );
-        // } else {
-        //     expectedLT = uint16(
-        //         uint256(initialLT)
-        //             - (uint256(initialLT - newLT) * (timestampCheck - timestampStart)) / uint256(duration)
-        //     );
-        // }
-
-        // vm.warp(timestampCheck);
-        // uint16 actualLT = creditManager.liquidationThresholds(usdc);
-        // uint16 diff = actualLT > expectedLT ? actualLT - expectedLT : expectedLT - actualLT;
-
-        // assertLe(diff, 1, "LT off by more than 1");
-
-        // vm.warp(timestampStart + duration + 1);
-
-        // assertEq(creditManager.liquidationThresholds(usdc), newLT, "LT at ramping end incorrect");
     }
 }

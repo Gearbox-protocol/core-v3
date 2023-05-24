@@ -329,7 +329,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         assertEq(creditManager.underlying(), tokenTestSuite.addressOf(Tokens.DAI), _testCaseErr("Incorrect underlying"));
 
-        (address token, uint16 lt) = creditManager.collateralTokenByMask(UNDERLYING_TOKEN_MASK);
+        (address token,) = creditManager.collateralTokenByMask(UNDERLYING_TOKEN_MASK);
 
         assertEq(token, tokenTestSuite.addressOf(Tokens.DAI), _testCaseErr("Incorrect underlying"));
 
@@ -906,8 +906,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         collateralDebtData.debt = DAI_ACCOUNT_AMOUNT;
 
         /// @notice `+2` for underlying and WETH token
-        collateralDebtData.enabledTokensMask =
-            uint256(keccak256(abi.encode(skipTokenMask))) & ((1 << (numberOfTokens + 2)) - 1);
+        collateralDebtData.enabledTokensMask = getHash(skipTokenMask, 2) & ((1 << (numberOfTokens + 2)) - 1);
 
         address creditAccount = accountFactory.usedAccount();
 

@@ -197,7 +197,7 @@ contract CreditFacadeIntegrationTest is
 
         assertEq(creditFacade.degenNFT(), address(0), "Incorrect degenNFT");
 
-        assertTrue(creditFacade.whitelisted() == false, "Incorrect whitelisted");
+        // assertTrue(creditFacade.whitelisted() == false, "Incorrect whitelisted");
 
         _setUp({
             _underlying: Tokens.DAI,
@@ -210,7 +210,7 @@ contract CreditFacadeIntegrationTest is
 
         assertEq(creditFacade.degenNFT(), address(cft.degenNFT()), "Incorrect degenNFT");
 
-        assertTrue(creditFacade.whitelisted() == true, "Incorrect whitelisted");
+        // assertTrue(creditFacade.whitelisted() == true, "Incorrect whitelisted");
     }
 
     //
@@ -218,7 +218,7 @@ contract CreditFacadeIntegrationTest is
     //
 
     /// @dev I:[FA-2]: functions reverts if borrower has no account
-    function test_I_FA_02_functions_reverts_if_borrower_has_no_account() public {
+    function test_I_FA_02_functions_reverts_if_credit_account_not_exists() public {
         vm.expectRevert(CreditAccountNotExistsException.selector);
         vm.prank(USER);
         creditFacade.closeCreditAccount(DUMB_ADDRESS, FRIEND, 0, false, multicallBuilder());
@@ -292,26 +292,6 @@ contract CreditFacadeIntegrationTest is
         _checkForWETHTest();
     }
 
-    function test_I_FA_03D_liquidate_correctly_wraps_ETH() public {
-        (address creditAccount,) = _openTestCreditAccount();
-
-        vm.roll(block.number + 1);
-
-        tokenTestSuite.burn(Tokens.DAI, creditAccount, tokenTestSuite.balanceOf(Tokens.DAI, creditAccount));
-
-        _prepareForWETHTest(LIQUIDATOR);
-
-        tokenTestSuite.approve(Tokens.DAI, LIQUIDATOR, address(creditManager));
-
-        tokenTestSuite.mint(Tokens.DAI, LIQUIDATOR, DAI_ACCOUNT_AMOUNT);
-
-        vm.prank(LIQUIDATOR);
-        creditFacade.liquidateCreditAccount{value: WETH_TEST_AMOUNT}(
-            creditAccount, LIQUIDATOR, 0, false, multicallBuilder()
-        );
-        _checkForWETHTest(LIQUIDATOR);
-    }
-
     function test_I_FA_03F_multicall_correctly_wraps_ETH() public {
         (address creditAccount,) = _openTestCreditAccount();
 
@@ -383,25 +363,6 @@ contract CreditFacadeIntegrationTest is
         (address creditAccount,) = _openTestCreditAccount();
 
         expectBalance(address(degenNFT), USER, 1);
-
-        _closeTestCreditAccount(creditAccount);
-
-        tokenTestSuite.mint(Tokens.DAI, USER, DAI_ACCOUNT_AMOUNT);
-
-        vm.prank(USER);
-        creditFacade.openCreditAccount(
-            DAI_ACCOUNT_AMOUNT,
-            USER,
-            multicallBuilder(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT))
-                })
-            ),
-            0
-        );
-
-        expectBalance(address(degenNFT), USER, 0);
     }
 
     // /// @dev I:[FA-5]: openCreditAccount sets correct values

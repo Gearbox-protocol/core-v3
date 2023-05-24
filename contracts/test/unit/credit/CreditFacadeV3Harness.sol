@@ -12,4 +12,8 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
     function setReentrancy(uint8 _status) external {
         _reentrancyStatus = _status;
     }
+
+    function setTotalBorrowedInBlock(uint128 _totalBorrowedInBlock) external {
+        totalBorrowedInBlock = _totalBorrowedInBlock;
+    }
 }

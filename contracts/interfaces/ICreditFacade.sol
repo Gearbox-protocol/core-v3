@@ -139,13 +139,7 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
         uint256 skipTokenMask,
         bool convertToETH,
         MultiCall[] calldata calls
-    ) external payable;
-
-    // /// @dev Adds collateral to borrower's credit account
-    // /// @param onBehalfOf Address of the borrower whose account is funded
-    // /// @param token Address of a collateral token
-    // /// @param amount Amount to add
-    // function addCollateral(address onBehalfOf, address token, uint256 amount) external payable;
+    ) external;
 
     /// @dev Executes a batch of transactions within a Multicall, to manage an existing account
     ///  - Wraps ETH and sends it back to msg.sender, if value > 0

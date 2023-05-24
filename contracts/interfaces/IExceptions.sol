@@ -46,6 +46,8 @@ error IncorrectPriceFeedException();
 /// @dev Thrown on attempting to get a result for a token that does not have a price feed
 error PriceFeedNotExistsException();
 
+error ForbiddenInWhitelistedModeException();
+
 ///
 /// ACCESS
 ///
@@ -226,8 +228,6 @@ error NothingToClaimException();
 
 error LiquiditySanityCheckException();
 
-error ZeroCallsException();
-
 /// @dev Thrown when attempting to schedule withdrawal from a credit account that has no free withdrawal slots
 error NoFreeWithdrawalSlotsException();
 
@@ -243,3 +243,5 @@ error MasterCreditAccountAlreadyDeployedException();
 
 /// @dev Thrown when trying to rescue funds from a credit account that is currently in use
 error CreditAccountIsInUseException();
+
+error InsufficientBalanceException();
