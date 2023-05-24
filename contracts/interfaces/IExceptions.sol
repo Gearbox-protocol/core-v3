@@ -46,6 +46,8 @@ error IncorrectPriceFeedException();
 /// @dev Thrown on attempting to get a result for a token that does not have a price feed
 error PriceFeedNotExistsException();
 
+error ForbiddenInWhitelistedModeException();
+
 ///
 /// ACCESS
 ///
@@ -122,9 +124,6 @@ error TokenIsNotQuotedException();
 ///      requires expirability
 error NotAllowedWhenNotExpirableException();
 
-/// @dev Thrown if a user attempts to transfer a CA to an address that didn't allow it or transfer in whitelisted mode
-error AccountTransferNotAllowedException();
-
 /// @dev Thrown if a liquidator tries to liquidate an account with a health factor above 1
 error CreditAccountNotLiquidatableException();
 
@@ -144,9 +143,6 @@ error UnknownMethodException();
 
 /// @dev Thrown if a user tries to open an account or increase debt with increaseDebtForbidden mode on
 error BorrowingForbiddenException();
-
-/// @dev Thrown if the account owner tries to transfer an unhealthy account
-error CantTransferLiquidatableAccountException();
 
 /// @dev Thrown if too much new debt was taken within a single block
 error BorrowedBlockLimitException();
@@ -175,10 +171,6 @@ error NotAllowedForBlacklistedAddressException();
 error NotApprovedBotException();
 
 /// CM
-
-/// @dev Thrown on attempting to open a Credit Account for or transfer a Credit Account
-///      to the zero address or an address that already owns a Credit Account
-error UserAlreadyHasAccountException();
 
 /// @dev Thrown on attempting to execute an order to an address that is not an allowed
 ///      target contract
@@ -236,8 +228,6 @@ error NothingToClaimException();
 
 error LiquiditySanityCheckException();
 
-error ZeroCallsException();
-
 /// @dev Thrown when attempting to schedule withdrawal from a credit account that has no free withdrawal slots
 error NoFreeWithdrawalSlotsException();
 
@@ -253,3 +243,5 @@ error MasterCreditAccountAlreadyDeployedException();
 
 /// @dev Thrown when trying to rescue funds from a credit account that is currently in use
 error CreditAccountIsInUseException();
+
+error InsufficientBalanceException();

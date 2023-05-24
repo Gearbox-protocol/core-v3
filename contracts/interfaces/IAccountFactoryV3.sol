@@ -3,7 +3,14 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+import {IVersion} from "./IVersion.sol";
+
+/// @title Account factory base interface
+/// @notice Functions shared accross newer and older versions
+interface IAccountFactoryBase is IVersion {
+    function takeCreditAccount(uint256, uint256) external returns (address creditAccount);
+    function returnCreditAccount(address creditAccount) external;
+}
 
 interface IAccountFactoryV3Events {
     /// @notice Emitted when new credit account is deployed
@@ -20,7 +27,7 @@ interface IAccountFactoryV3Events {
 }
 
 /// @title Account factory V3 interface
-interface IAccountFactoryV3 is IAccountFactoryV3Events, IVersion {
+interface IAccountFactoryV3 is IAccountFactoryBase, IAccountFactoryV3Events {
     /// @notice Delay after which returned credit accounts can be reused
     function delay() external view returns (uint40);
 
@@ -29,13 +36,13 @@ interface IAccountFactoryV3 is IAccountFactoryV3Events, IVersion {
     /// @return creditAccount Address of the provided credit account
     /// @dev Parameters are ignored and only kept for backward compatibility
     /// @custom:expects Credit manager sets account's borrower to non-zero address after calling this function
-    function takeCreditAccount(uint256, uint256) external returns (address creditAccount);
+    function takeCreditAccount(uint256, uint256) external override returns (address creditAccount);
 
     /// @notice Returns a used credit account to the queue
     /// @param creditAccount Address of the returned credit account
     /// @custom:expects Credit account is connected to the calling credit manager
     /// @custom:expects Credit manager sets account's borrower to zero-address before calling this function
-    function returnCreditAccount(address creditAccount) external;
+    function returnCreditAccount(address creditAccount) external override;
 
     /// @notice Adds a credit manager to the factory and deploys the master credit account for it
     /// @param creditManager Credit manager address

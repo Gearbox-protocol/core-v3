@@ -6,8 +6,6 @@ pragma abicoder v1;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
-
 import {CreditAccountV3} from "../credit/CreditAccountV3.sol";
 import {CreditManagerV3} from "../credit/CreditManagerV3.sol";
 import {IAccountFactoryV3} from "../interfaces/IAccountFactoryV3.sol";
@@ -16,23 +14,21 @@ import {
     CreditAccountIsInUseException,
     MasterCreditAccountAlreadyDeployedException
 } from "../interfaces/IExceptions.sol";
+import {IVersion} from "../interfaces/IVersion.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
-/// @dev Struct storing per-CreditManager data on account usage queue
+/// @dev Struct holding factory and queue params for a credit manager
+/// @param masterCreditAccount Address of the contract to clone to create new accounts for the credit manager
+/// @param head Index of the next credit account to be taken from the queue in case it's already reusable
+/// @param tail Index of the last credit account returned to the queue
 struct FactoryParams {
-    /// @dev Address of the contract being cloned to create new Credit Accounts
     address masterCreditAccount;
-    /// @dev Id of the next reused Credit Account in the used account queue, i.e.
-    ///      the front of the reused CA queue
     uint40 head;
-    /// @dev Id of the last returned Credit Account in the used account queue, i.e.
-    ///      the back of the reused CA queue
     uint40 tail;
 }
 
-/// @dev Struct compressing the credit account address and the
-///      timestamp at which it is reusable
+/// @dev Struct holding queued credit account address and timestamp after which it becomes reusable
 struct QueuedAccount {
     address creditAccount;
     uint40 reusableAfter;
@@ -44,7 +40,8 @@ struct QueuedAccount {
 ///         - Accounts are reusable: new accounts are only deployed when the queue of reusable accounts is empty
 ///           (a separate queue is maintained for each credit manager)
 ///         - When account is returned to the factory, it is only added to the queue after a certain delay, which
-///           allows DAO to rescue funds that might have been accidentally left upon account closure
+///           allows DAO to rescue funds that might have been accidentally left upon account closure, and serves
+///           as protection against potential attacks involving reopening an account right after closing it
 contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait {
     /// @inheritdoc IVersion
     uint256 public constant override version = 3_00;
@@ -71,11 +68,6 @@ contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait
             revert CallerNotCreditManagerException(); // U:[AF-1]
         }
 
-        ///  A used Credit Account is only given to a user if sufficiently long
-        ///  time has passed since it was last taken out.
-        ///  This is done to prevent a user from intentionally reopening an account
-        ///  that they closed shortly prior, as this can potentially be used as an element
-        ///  in an attack.
         uint256 head = fp.head;
         if (head == fp.tail || block.timestamp < _queuedAccounts[msg.sender][head].reusableAfter) {
             creditAccount = Clones.clone(masterCreditAccount); // U:[AF-2A]
@@ -108,9 +100,9 @@ contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait
         emit ReturnCreditAccount({creditAccount: creditAccount, creditManager: msg.sender}); // U:[AF-3]
     }
 
-    /// ------------- ///
-    /// CONFIGURATION ///
-    /// ------------- ///
+    // ------------- //
+    // CONFIGURATION //
+    // ------------- //
 
     /// @inheritdoc IAccountFactoryV3
     function addCreditManager(address creditManager)

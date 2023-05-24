@@ -1,0 +1,90 @@
+[
+  {
+    "type": "File",
+    "name": "/home/mikko/Coding/core-v3/contracts/test/unit/credit/CreditFacadeV3.unit.t.sol",
+    "parent_id": null,
+    "workspaceRoot": "/home/mikko/Coding/core-v3",
+    "workspacePath": "contracts/test/unit/credit/CreditFacadeV3.unit.t.sol",
+    "id": "KOvXh9wVmyMt0HRk"
+  },
+  {
+    "type": "File",
+    "name": "/home/mikko/Coding/core-v3/contracts/interfaces/ICreditManagerV3.sol",
+    "parent_id": null,
+    "workspaceRoot": "/home/mikko/Coding/core-v3",
+    "workspacePath": "contracts/interfaces/ICreditManagerV3.sol",
+    "id": "LgHvirU2kdCQ4JTV"
+  },
+  {
+    "type": "File",
+    "name": "/home/mikko/Coding/core-v3/contracts/test/lib/helper.sol",
+    "parent_id": null,
+    "workspaceRoot": "/home/mikko/Coding/core-v3",
+    "workspacePath": "contracts/test/lib/helper.sol",
+    "id": "b7ukteGWFfUEPKqT"
+  },
+  {
+    "type": "File",
+    "name": "/home/mikko/Coding/core-v3/contracts/test/unit/credit/CreditManagerV3.unit.t.sol",
+    "parent_id": null,
+    "workspaceRoot": "/home/mikko/Coding/core-v3",
+    "workspacePath": "contracts/test/unit/credit/CreditManagerV3.unit.t.sol",
+    "id": "JRt56eHMTrLgD7Yp"
+  },
+  {
+    "type": "Group",
+    "name": "contracts",
+    "parent_id": null,
+    "workspaceRoot": null,
+    "workspacePath": null,
+    "id": "Upor4k72CDBXsMhf"
+  },
+  {
+    "type": "Group",
+    "name": "test",
+    "parent_id": null,
+    "workspaceRoot": null,
+    "workspacePath": null,
+    "id": "D3mIZYzSTkuAiGWM"
+  },
+  {
+    "type": "File",
+    "name": "/home/mikko/Coding/core-v3/contracts/credit/CreditFacadeV3.sol",
+    "parent_id": "Upor4k72CDBXsMhf",
+    "workspaceRoot": "/home/mikko/Coding/core-v3",
+    "workspacePath": "contracts/credit/CreditFacadeV3.sol",
+    "id": "wbu6Q2OztnsK1dR5"
+  },
+  {
+    "type": "Group",
+    "name": "mocks",
+    "parent_id": null,
+    "workspaceRoot": null,
+    "workspacePath": null,
+    "id": "UkIBp0yM5Tg6Wxr3"
+  },
+  {
+    "type": "File",
+    "name": "/home/mikko/Coding/core-v3/contracts/test/mocks/credit/CreditManagerMock.sol",
+    "parent_id": "UkIBp0yM5Tg6Wxr3",
+    "workspaceRoot": "/home/mikko/Coding/core-v3",
+    "workspacePath": "contracts/test/mocks/credit/CreditManagerMock.sol",
+    "id": "2manGMjEq198fN5y"
+  },
+  {
+    "type": "File",
+    "name": "/home/mikko/Coding/core-v3/contracts/credit/CreditManagerV3.sol",
+    "parent_id": "Upor4k72CDBXsMhf",
+    "workspaceRoot": "/home/mikko/Coding/core-v3",
+    "workspacePath": "contracts/credit/CreditManagerV3.sol",
+    "id": "DucCE5rtYLoWlSBQ"
+  },
+  {
+    "type": "File",
+    "name": "/home/mikko/Coding/core-v3/contracts/test/mocks/support/BotListMock.sol",
+    "parent_id": "UkIBp0yM5Tg6Wxr3",
+    "workspaceRoot": "/home/mikko/Coding/core-v3",
+    "workspacePath": "contracts/test/mocks/support/BotListMock.sol",
+    "id": "zmj1PWpDUcYuRGXy"
+  }
+]

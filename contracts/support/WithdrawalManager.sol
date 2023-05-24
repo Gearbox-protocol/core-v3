@@ -12,7 +12,8 @@ import {
     NoFreeWithdrawalSlotsException,
     NothingToClaimException
 } from "../interfaces/IExceptions.sol";
-import {ClaimAction, IWithdrawalManager, IVersion, ScheduledWithdrawal} from "../interfaces/IWithdrawalManager.sol";
+import {IVersion} from "../interfaces/IVersion.sol";
+import {ClaimAction, IWithdrawalManager, ScheduledWithdrawal} from "../interfaces/IWithdrawalManager.sol";
 import {IERC20Helper} from "../libraries/IERC20Helper.sol";
 import {WithdrawalsLogic} from "../libraries/WithdrawalsLogic.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
@@ -56,9 +57,9 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait, ContractsRegisterTra
         emit SetWithdrawalDelay(_delay);
     }
 
-    /// --------------------- ///
-    /// IMMEDIATE WITHDRAWALS ///
-    /// --------------------- ///
+    // --------------------- //
+    // IMMEDIATE WITHDRAWALS //
+    // --------------------- //
 
     /// @inheritdoc IWithdrawalManager
     function addImmediateWithdrawal(address token, address to, uint256 amount)
@@ -98,9 +99,9 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait, ContractsRegisterTra
         emit ClaimImmediateWithdrawal(account, token, to, amount); // U:[WM-4C]
     }
 
-    /// --------------------- ///
-    /// SCHEDULED WITHDRAWALS ///
-    /// --------------------- ///
+    // --------------------- //
+    // SCHEDULED WITHDRAWALS //
+    // --------------------- //
 
     /// @inheritdoc IWithdrawalManager
     function scheduledWithdrawals(address creditAccount)
@@ -214,9 +215,9 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait, ContractsRegisterTra
         tokensToEnable = tokenMask; // U:[WM-10]
     }
 
-    /// ------------- ///
-    /// CONFIGURATION ///
-    /// ------------- ///
+    // ------------- //
+    // CONFIGURATION //
+    // ------------- //
 
     /// @inheritdoc IWithdrawalManager
     function setWithdrawalDelay(uint40 _delay)
