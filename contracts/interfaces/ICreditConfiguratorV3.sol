@@ -123,6 +123,9 @@ interface ICreditConfiguratorEvents {
 
     /// @dev Emits when the current cumulative loss in Credit Facade is reset
     event ResetCumulativeLoss();
+
+    /// @dev Emits when new total debt limit is set
+    event SetTotalDebtLimit(uint128);
 }
 
 /// @dev CreditConfigurator Exceptions
@@ -245,6 +248,16 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
     /// @param version The version of the new bot list contract
     ///                The contract address is retrieved from addressProvider
     function setBotList(uint256 version) external;
+
+    /// @notice Sets a new total debt limit
+    /// @dev Only works for Credit Facades that track total debt limit
+    /// @param newLimit New total debt limit for Credit Manager
+    function setTotalDebtLimit(uint128 newLimit) external;
+
+    /// @notice Marks the token as limited, which enables quota logic and additional interest for it
+    /// @param token Token to make limited
+    /// @dev This action is irreversible!
+    function makeTokenQuoted(address token) external;
 
     //
     // GETTERS

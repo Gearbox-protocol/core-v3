@@ -88,8 +88,6 @@ error CallerNotVoterException();
 ///      the connected Credit Facade, or an allowed adapter
 error CallerNotAdapterException();
 
-/// interface ICreditConfiguratorExceptions {
-
 /// @dev Thrown if the underlying's LT is set directly
 /// @notice Underlying LT is derived from fee parameters and is set automatically
 ///         on updating fees
@@ -211,7 +209,6 @@ error VotingContractNotAllowedException();
 
 error BorrowingMoreU2ForbiddenException();
 
-// interface ILPPriceFeedExceptions {
 /// @dev Thrown on returning a value that violates the current bounds
 error ValueOutOfRangeException();
 
@@ -253,3 +250,6 @@ error MasterCreditAccountAlreadyDeployedException();
 
 /// @dev Thrown when trying to rescue funds from a credit account that is currently in use
 error CreditAccountIsInUseException();
+
+/// @dev Thrown when trying to manually set total debt parameters in a CF that doesn't track them
+error TotalDebtNotTrackedException();

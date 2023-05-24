@@ -12,4 +12,8 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
     function setReentrancy(uint8 _status) external {
         _reentrancyStatus = _status;
     }
+
+    function setCumulativeLoss(uint128 newLoss) external {
+        lossParams.currentCumulativeLoss = newLoss;
+    }
 }
