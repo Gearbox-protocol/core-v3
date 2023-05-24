@@ -219,7 +219,7 @@ contract CreditFacadeIntegrationTest is
     //
 
     /// @dev I:[FA-2]: functions reverts if borrower has no account
-    function test_I_FA_02_functions_reverts_if_borrower_has_no_account() public {
+    function test_I_FA_02_functions_reverts_if_credit_account_not_exists() public {
         vm.expectRevert(CreditAccountNotExistsException.selector);
         vm.prank(USER);
         creditFacade.closeCreditAccount(DUMB_ADDRESS, FRIEND, 0, false, multicallBuilder());
