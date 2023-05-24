@@ -379,7 +379,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     )
         external
         override
-        whenNotPausedOrEmergency // U:[FA-2]
+        whenNotPausedOrEmergency // U:[FA-2,12]
         nonReentrant // U:[FA-4]
     {
         // Checks that the CA exists to revert early for late liquidations and save gas
@@ -390,24 +390,40 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         ClosureAction closeAction;
         CollateralDebtData memory collateralDebtData;
         {
-            ClaimAction claimAction;
-            bool isLiquidatable;
-            (claimAction, closeAction, collateralDebtData, isLiquidatable) =
-                _isAccountLiquidatable({creditAccount: creditAccount, isEmergency: paused()}); // F:[FA-14]
+            bool isEmergency = paused();
 
-            if (!isLiquidatable) revert CreditAccountNotLiquidatableException();
+            collateralDebtData = _calcDebtAndCollateral(
+                creditAccount,
+                isEmergency
+                    ? CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
+                    : CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS
+            ); // U:[FA-15]
 
-            uint256 tokensToEnable =
-                _claimWithdrawals({action: claimAction, creditAccount: creditAccount, to: borrower});
+            closeAction = ClosureAction.LIQUIDATE_ACCOUNT; // U:[FA-14]
 
-            collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(tokensToEnable);
+            bool isLiquidatable = collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD; // U:[FA-13]
+
+            if (!isLiquidatable && _isExpired()) {
+                isLiquidatable = true; // U:[FA-13]
+                closeAction = ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT; // U:[FA-14]
+            }
+
+            if (!isLiquidatable) revert CreditAccountNotLiquidatableException(); // U:[FA-13]
+
+            uint256 tokensToEnable = _claimWithdrawals({
+                action: isEmergency ? ClaimAction.FORCE_CANCEL : ClaimAction.CANCEL,
+                creditAccount: creditAccount,
+                to: borrower
+            }); // U:[FA-15]
+
+            collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(tokensToEnable); // U:[FA-15]
         }
 
         if (calls.length != 0) {
             FullCheckParams memory fullCheckParams =
                 _multicall(creditAccount, calls, collateralDebtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS);
             collateralDebtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter;
-        } // F:[FA-15]
+        }
 
         /// Bot permissions are specific to (owner, creditAccount),
         /// so they need to be erased on account closure
@@ -421,7 +437,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             to: to,
             skipTokensMask: skipTokenMask,
             convertToETH: convertToETH
-        }); // F:[FA-15,49]
+        });
 
         /// If there is non-zero loss, then borrowing is forbidden in
         /// case this is an attack and there is risk of copycats afterwards
@@ -442,7 +458,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             _wethWithdrawTo(to);
         }
 
-        emit LiquidateCreditAccount(creditAccount, borrower, msg.sender, to, closeAction, remainingFunds); // F:[FA-15]
+        emit LiquidateCreditAccount(creditAccount, borrower, msg.sender, to, closeAction, remainingFunds);
     }
 
     /// @notice Executes a batch of transactions within a Multicall, to manage an existing account
@@ -1104,35 +1120,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         if (msg.value > 0) {
             IWETH(weth).deposit{value: msg.value}(); // U:[FA-7]
             IWETH(weth).transfer(msg.sender, msg.value); // U:[FA-7]
-        }
-    }
-
-    /// @notice Checks if account is liquidatable (i.e., hf < 1)
-    /// @param creditAccount Address of credit account to check
-    function _isAccountLiquidatable(address creditAccount, bool isEmergency)
-        internal
-        view
-        returns (
-            ClaimAction claimAction,
-            ClosureAction closeAction,
-            CollateralDebtData memory collateralDebtData,
-            bool isLiquidatable
-        )
-    {
-        claimAction = isEmergency ? ClaimAction.FORCE_CANCEL : ClaimAction.CANCEL;
-        collateralDebtData = _calcDebtAndCollateral(
-            creditAccount,
-            isEmergency
-                ? CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
-                : CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS
-        );
-        closeAction = ClosureAction.LIQUIDATE_ACCOUNT;
-
-        isLiquidatable = collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD;
-
-        if (!isLiquidatable && _isExpired()) {
-            isLiquidatable = true;
-            closeAction = ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT;
         }
     }
 
