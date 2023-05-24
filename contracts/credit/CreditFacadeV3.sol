@@ -421,13 +421,13 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
         if (calls.length != 0) {
             FullCheckParams memory fullCheckParams =
-                _multicall(creditAccount, calls, collateralDebtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS);
-            collateralDebtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter;
+                _multicall(creditAccount, calls, collateralDebtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS); // U:[FA-16]
+            collateralDebtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter; // U:[FA-16]
         }
 
         /// Bot permissions are specific to (owner, creditAccount),
         /// so they need to be erased on account closure
-        _eraseAllBotPermissionsAtClosure({creditAccount: creditAccount});
+        _eraseAllBotPermissionsAtClosure({creditAccount: creditAccount}); // U:[FA-16]
 
         (uint256 remainingFunds, uint256 reportedLoss) = _closeCreditAccount({
             creditAccount: creditAccount,
@@ -437,28 +437,28 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             to: to,
             skipTokensMask: skipTokenMask,
             convertToETH: convertToETH
-        });
+        }); // U:[FA-16]
 
         /// If there is non-zero loss, then borrowing is forbidden in
         /// case this is an attack and there is risk of copycats afterwards
         /// If cumulative loss exceeds maxCumulativeLoss, the CF is paused,
         /// which ensures that the attacker can create at most maxCumulativeLoss + maxBorrowedAmount of bad debt
         if (reportedLoss > 0) {
-            maxDebtPerBlockMultiplier = 0; // F: [FA-15A]
+            maxDebtPerBlockMultiplier = 0; // U:[FA-17]
 
             /// reportedLoss is always less than uint128, because
             /// maxLoss = maxBorrowAmount which is uint128
-            lossParams.currentCumulativeLoss += uint128(reportedLoss);
+            lossParams.currentCumulativeLoss += uint128(reportedLoss); // U:[FA-17]
             if (lossParams.currentCumulativeLoss > lossParams.maxCumulativeLoss) {
-                _pause(); // F: [FA-15B]
+                _pause(); // U:[FA-17]
             }
         }
 
         if (convertToETH) {
-            _wethWithdrawTo(to);
+            _wethWithdrawTo(to); // U:[FA-16]
         }
 
-        emit LiquidateCreditAccount(creditAccount, borrower, msg.sender, to, closeAction, remainingFunds);
+        emit LiquidateCreditAccount(creditAccount, borrower, msg.sender, to, closeAction, remainingFunds); // U:[FA-14,16,17]
     }
 
     /// @notice Executes a batch of transactions within a Multicall, to manage an existing account

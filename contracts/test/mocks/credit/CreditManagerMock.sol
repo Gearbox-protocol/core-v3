@@ -65,6 +65,9 @@ contract CreditManagerMock {
     /// @notice Maps 3rd party contracts to their respective adapters
     mapping(address => address) public contractToAdapter;
 
+    uint256 return_remainingFunds;
+    uint256 return_loss;
+
     constructor(address _addressProvider, address _pool) {
         addressProvider = _addressProvider;
         weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // U:[CM-1]
@@ -132,6 +135,11 @@ contract CreditManagerMock {
         return nextCreditAccount;
     }
 
+    function setCloseCreditAccountReturns(uint256 remainingFunds, uint256 loss) external {
+        return_remainingFunds = remainingFunds;
+        return_loss = loss;
+    }
+
     function closeCreditAccount(
         address creditAccount,
         ClosureAction closureAction,
@@ -142,6 +150,8 @@ contract CreditManagerMock {
         bool convertToETH
     ) external returns (uint256 remainingFunds, uint256 loss) {
         _closeCollateralDebtData = collateralDebtData;
+        remainingFunds = return_remainingFunds;
+        loss = return_loss;
     }
 
     function fullCollateralCheck(

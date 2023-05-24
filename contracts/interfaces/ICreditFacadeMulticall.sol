@@ -14,7 +14,7 @@ uint256 constant DISABLE_TOKEN_PERMISSION = 2 ** 4;
 uint256 constant WITHDRAW_PERMISSION = 2 ** 5;
 uint256 constant UPDATE_QUOTA_PERMISSION = 2 ** 6;
 uint256 constant REVOKE_ALLOWANCES_PERMISSION = 2 ** 7;
-uint256 constant PAY_BOT_PERMISSION = 2 ** 8;
+
 uint256 constant EXTERNAL_CALLS_PERMISSION = 2 ** 16;
 
 uint256 constant ALL_CREDIT_FACADE_CALLS_PERMISSION = ADD_COLLATERAL_PERMISSION | INCREASE_DEBT_PERMISSION
@@ -26,6 +26,9 @@ uint256 constant ALL_PERMISSIONS = ALL_CREDIT_FACADE_CALLS_PERMISSION | EXTERNAL
 // All flags start from 193rd bit, because bot permissions is uint192
 uint256 constant INCREASE_DEBT_WAS_CALLED = 2 ** 193;
 uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 2 ** 194;
+
+// Pay bot permisson is set there because it's used for bots only
+uint256 constant PAY_BOT_PERMISSION = 2 ** 195;
 
 interface ICreditFacadeMulticall {
     /// @dev Instructs CreditFacadeV3 to check token balances at the end
