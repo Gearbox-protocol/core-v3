@@ -13,7 +13,8 @@ import {
     ICreditManagerV3Events,
     ClosureAction,
     CollateralTokenData,
-    ManageDebtAction
+    ManageDebtAction,
+    CollateralDebtData
 } from "../../../interfaces/ICreditManagerV3.sol";
 
 import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
@@ -30,7 +31,7 @@ import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ER
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // LIBS & TRAITS
-import {BitMask} from "../../../libraries/BitMask.sol";
+import {BitMask, UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
 // TESTS
 
 import "../../lib/constants.sol";
@@ -205,7 +206,8 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
 
     /// @dev I:[CM-1]: openCreditAccount transfers_tokens_from_pool
     function test_I_CM_01_openCreditAccount_transfers_tokens_from_pool() public {
-        address expectedCreditAccount = AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 1)).head();
+        address expectedCreditAccount =
+            AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL)).head();
 
         uint256 blockAtOpen = block.number;
         uint256 cumulativeAtOpen = 1012;
@@ -233,13 +235,14 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
     // CLOSE CREDIT ACCOUNT
     //
 
-    /// @dev I:[CM-9]: closeCreditAccount updates pool correctly
+    /// @dev I:[CM-9]: closeCreditAccount returns account to the end of AF1s
     /// remove borrower from creditAccounts mapping
     function test_I_CM_09_close_credit_account_updates_pool_correctly() public {
         (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
 
         assertTrue(
-            creditAccount != AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 1)).tail(),
+            creditAccount
+                != AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL)).tail(),
             "credit account is already in tail!"
         );
 
@@ -249,18 +252,27 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         // Increase block number cause it's forbidden to close credit account in the same block
         vm.roll(block.number + 1);
 
-        // creditManager.closeCreditAccount(
-        //     creditAccount, ClosureAction.CLOSE_ACCOUNT, 0, USER, USER, 0, 0, DAI_ACCOUNT_AMOUNT, false
-        // );
+        CollateralDebtData memory collateralDebtData;
+        collateralDebtData.debt = DAI_ACCOUNT_AMOUNT;
+
+        creditManager.closeCreditAccount({
+            creditAccount: creditAccount,
+            closureAction: ClosureAction.CLOSE_ACCOUNT,
+            collateralDebtData: collateralDebtData,
+            payer: USER,
+            to: USER,
+            skipTokensMask: 0,
+            convertToETH: false
+        });
 
         assertEq(
             creditAccount,
-            AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 1)).tail(),
+            AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL)).tail(),
             "credit account is not in accountFactory tail!"
         );
 
-        // vm.expectRevert(CreditAccountNotExistsException.selector);
-        // creditManager.getCreditAccountOrRevert(USER);
+        vm.expectRevert(CreditAccountNotExistsException.selector);
+        address b = creditManager.getBorrowerOrRevert(creditAccount);
     }
 
     /// @dev I:[CM-10]: closeCreditAccount returns undelying tokens if credit account balance > amounToPool
@@ -296,21 +308,27 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
             abi.encodeWithSelector(IPoolService.repayCreditAccount.selector, borrowedAmount, profit, 0)
         );
 
-        // (uint256 remainingFunds, uint256 loss) = creditManager.closeCreditAccount(
-        //     creditAccount,
-        //     ClosureAction.CLOSE_ACCOUNT,
-        //     0,
-        //     USER,
-        //     FRIEND,
-        //     1,
-        //     0,
-        //     DAI_ACCOUNT_AMOUNT + interestAccrued,
-        //     false
-        // );
+        {
+            CollateralDebtData memory collateralDebtData;
+            collateralDebtData.debt = DAI_ACCOUNT_AMOUNT;
+            collateralDebtData.accruedInterest = interestAccrued;
+            collateralDebtData.accruedFees = profit;
+            collateralDebtData.enabledTokensMask = UNDERLYING_TOKEN_MASK;
 
-        // assertEq(remainingFunds, 0, "Remaining funds is not zero!");
+            (uint256 remainingFunds, uint256 loss) = creditManager.closeCreditAccount({
+                creditAccount: creditAccount,
+                closureAction: ClosureAction.CLOSE_ACCOUNT,
+                collateralDebtData: collateralDebtData,
+                payer: USER,
+                to: FRIEND,
+                skipTokensMask: 0,
+                convertToETH: false
+            });
 
-        // assertEq(loss, 0, "Loss is not zero");
+            assertEq(remainingFunds, 0, "Remaining funds is not zero!");
+
+            assertEq(loss, 0, "Loss is not zero");
+        }
 
         expectBalance(Tokens.DAI, creditAccount, 1);
 
@@ -351,21 +369,27 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
             address(poolMock),
             abi.encodeWithSelector(IPoolService.repayCreditAccount.selector, borrowedAmount, profit, 0)
         );
+        {
+            CollateralDebtData memory collateralDebtData;
+            collateralDebtData.debt = borrowedAmount;
+            collateralDebtData.accruedInterest = interestAccrued;
+            collateralDebtData.accruedFees = profit;
+            collateralDebtData.enabledTokensMask = UNDERLYING_TOKEN_MASK;
 
-        // (uint256 remainingFunds, uint256 loss) = creditManager.closeCreditAccount(
-        //     creditAccount,
-        //     ClosureAction.CLOSE_ACCOUNT,
-        //     0,
-        //     USER,
-        //     FRIEND,
-        //     1,
-        //     0,
-        //     DAI_ACCOUNT_AMOUNT + interestAccrued,
-        //     false
-        // );
-        // assertEq(remainingFunds, 0, "Remaining funds is not zero!");
+            (uint256 remainingFunds, uint256 loss) = creditManager.closeCreditAccount({
+                creditAccount: creditAccount,
+                closureAction: ClosureAction.CLOSE_ACCOUNT,
+                collateralDebtData: collateralDebtData,
+                payer: USER,
+                to: FRIEND,
+                skipTokensMask: 0,
+                convertToETH: false
+            });
 
-        // assertEq(loss, 0, "Loss is not zero");
+            assertEq(remainingFunds, 0, "Remaining funds is not zero!");
+
+            assertEq(loss, 0, "Loss is not zero");
+        }
 
         expectBalance(Tokens.DAI, creditAccount, 1, "Credit account balance != 1");
 
@@ -413,6 +437,12 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
             // uint256 totalValue = borrowedAmount;
             uint256 amountToPool = (borrowedAmount * discount) / PERCENTAGE_FACTOR;
 
+            CollateralDebtData memory collateralDebtData;
+            collateralDebtData.debt = borrowedAmount;
+            collateralDebtData.accruedInterest = interestAccrued;
+            collateralDebtData.accruedFees = 0;
+            collateralDebtData.totalValue = borrowedAmount;
+            collateralDebtData.enabledTokensMask = UNDERLYING_TOKEN_MASK;
             {
                 uint256 loss = borrowedAmount + interestAccrued - amountToPool;
 
@@ -421,13 +451,18 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
                     abi.encodeWithSelector(IPoolService.repayCreditAccount.selector, borrowedAmount, 0, loss)
                 );
             }
-            {
-                uint256 a = borrowedAmount + interestAccrued;
 
-                // (uint256 remainingFunds,) = creditManager.closeCreditAccount(
-                //     creditAccount, action, borrowedAmount, LIQUIDATOR, FRIEND, 1, 0, a, false
-                // );
-            }
+            (uint256 remainingFunds, uint256 loss) = creditManager.closeCreditAccount({
+                creditAccount: creditAccount,
+                closureAction: action,
+                collateralDebtData: collateralDebtData,
+                payer: LIQUIDATOR,
+                to: FRIEND,
+                skipTokensMask: 0,
+                convertToETH: false
+            });
+
+            assertEq(remainingFunds, 0, "Remaining funds is not zero!");
 
             expectBalance(Tokens.DAI, creditAccount, 1, "Credit account balance != 1");
 
@@ -521,28 +556,34 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
 
             expectBalance(Tokens.DAI, creditAccount, borrowedAmount, "creditAccount has incorrect initial balance");
 
-            vm.expectCall(
-                address(poolMock),
-                abi.encodeWithSelector(IPoolService.repayCreditAccount.selector, borrowedAmount, profit, 0)
-            );
-
             uint256 remainingFunds;
 
             {
                 uint256 loss;
 
-                uint256 a = borrowedAmount + interestAccrued;
-                // (remainingFunds, loss) = creditManager.closeCreditAccount(
-                //     creditAccount,
-                //     i == 1 ? ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT : ClosureAction.LIQUIDATE_ACCOUNT,
-                //     totalValue,
-                //     LIQUIDATOR,
-                //     FRIEND,
-                //     1,
-                //     0,
-                //     a,
-                //     false
-                // );
+                (uint16 feeInterest,,,,) = creditManager.fees();
+
+                CollateralDebtData memory collateralDebtData;
+                collateralDebtData.debt = borrowedAmount;
+                collateralDebtData.accruedInterest = interestAccrued;
+                collateralDebtData.accruedFees = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR;
+                collateralDebtData.totalValue = totalValue;
+                collateralDebtData.enabledTokensMask = UNDERLYING_TOKEN_MASK;
+
+                vm.expectCall(
+                    address(poolMock),
+                    abi.encodeWithSelector(IPoolService.repayCreditAccount.selector, borrowedAmount, profit, 0)
+                );
+
+                (remainingFunds, loss) = creditManager.closeCreditAccount({
+                    creditAccount: creditAccount,
+                    closureAction: i == 1 ? ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT : ClosureAction.LIQUIDATE_ACCOUNT,
+                    collateralDebtData: collateralDebtData,
+                    payer: LIQUIDATOR,
+                    to: FRIEND,
+                    skipTokensMask: 0,
+                    convertToETH: false
+                });
 
                 assertLe(expectedRemainingFunds - remainingFunds, 2, "Incorrect remaining funds");
 
@@ -576,35 +617,33 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
 
     function test_I_CM_14_close_credit_account_with_nonzero_skipTokenMask_sends_correct_tokens() public {
         (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
-        // creditManager.transferAccountOwnership(creditAccount, address(this));
 
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
         tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
-        // creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.WETH));
 
         tokenTestSuite.mint(Tokens.USDC, creditAccount, USDC_EXCHANGE_AMOUNT);
-        // creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.USDC));
 
         tokenTestSuite.mint(Tokens.LINK, creditAccount, LINK_EXCHANGE_AMOUNT);
-        // creditManager.checkAndEnableToken(tokenTestSuite.addressOf(Tokens.LINK));
 
         uint256 wethTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.WETH));
         uint256 usdcTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.USDC));
         uint256 linkTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.LINK));
 
-        // creditManager.transferAccountOwnership(creditAccount, USER);
+        CollateralDebtData memory collateralDebtData;
+        collateralDebtData.debt = borrowedAmount;
+        collateralDebtData.accruedInterest = 0;
+        collateralDebtData.accruedFees = 0;
+        collateralDebtData.enabledTokensMask = wethTokenMask | usdcTokenMask | linkTokenMask;
 
-        // creditManager.closeCreditAccount(
-        //     creditAccount,
-        //     ClosureAction.CLOSE_ACCOUNT,
-        //     0,
-        //     USER,
-        //     FRIEND,
-        //     wethTokenMask | usdcTokenMask | linkTokenMask,
-        //     wethTokenMask | usdcTokenMask,
-        //     DAI_ACCOUNT_AMOUNT,
-        //     false
-        // );
+        (uint256 remainingFunds, uint256 loss) = creditManager.closeCreditAccount({
+            creditAccount: creditAccount,
+            closureAction: ClosureAction.CLOSE_ACCOUNT,
+            collateralDebtData: collateralDebtData,
+            payer: USER,
+            to: FRIEND,
+            skipTokensMask: wethTokenMask | usdcTokenMask,
+            convertToETH: false
+        });
 
         expectBalance(Tokens.WETH, FRIEND, 0);
         expectBalance(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
@@ -642,11 +681,26 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         //     creditAccount, ClosureAction.CLOSE_ACCOUNT, 0, USER, USER, 1, 0, borrowedAmount + interestAccrued, true
         // );
 
-        expectBalance(Tokens.WETH, creditAccount, 1);
-
         (uint16 feeInterest,,,,) = creditManager.fees();
-
         uint256 profit = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR;
+
+        CollateralDebtData memory collateralDebtData;
+        collateralDebtData.debt = borrowedAmount;
+        collateralDebtData.accruedInterest = interestAccrued;
+        collateralDebtData.accruedFees = profit;
+        collateralDebtData.enabledTokensMask = UNDERLYING_TOKEN_MASK;
+
+        (uint256 remainingFunds, uint256 loss) = creditManager.closeCreditAccount({
+            creditAccount: creditAccount,
+            closureAction: ClosureAction.CLOSE_ACCOUNT,
+            collateralDebtData: collateralDebtData,
+            payer: USER,
+            to: USER,
+            skipTokensMask: 0,
+            convertToETH: true
+        });
+
+        expectBalance(Tokens.WETH, creditAccount, 1);
 
         uint256 amountToPool = borrowedAmount + interestAccrued + profit;
 
@@ -663,7 +717,6 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
     function test_I_CM_17_close_dai_credit_account_sends_eth_to_borrower() public {
         /// CLOSURE CASE
         (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
-        // creditManager.transferAccountOwnership(creditAccount, address(this));
 
         // Transfer additional borrowedAmount. After that underluying token balance = 2 * borrowedAmount
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
@@ -674,18 +727,21 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         uint256 wethTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.WETH));
         uint256 daiTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI));
 
-        // creditManager.transferAccountOwnership(creditAccount, USER);
-        // creditManager.closeCreditAccount(
-        //     creditAccount,
-        //     ClosureAction.CLOSE_ACCOUNT,
-        //     0,
-        //     USER,
-        //     USER,
-        //     wethTokenMask | daiTokenMask,
-        //     0,
-        //     borrowedAmount,
-        //     true
-        // );
+        CollateralDebtData memory collateralDebtData;
+        collateralDebtData.debt = borrowedAmount;
+        collateralDebtData.accruedInterest = 0;
+        collateralDebtData.accruedFees = 0;
+        collateralDebtData.enabledTokensMask = wethTokenMask | daiTokenMask;
+
+        (uint256 remainingFunds, uint256 loss) = creditManager.closeCreditAccount({
+            creditAccount: creditAccount,
+            closureAction: ClosureAction.CLOSE_ACCOUNT,
+            collateralDebtData: collateralDebtData,
+            payer: USER,
+            to: USER,
+            skipTokensMask: 0,
+            convertToETH: true
+        });
 
         expectBalance(Tokens.WETH, creditAccount, 1);
 
@@ -716,17 +772,22 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         uint256 wethTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.WETH));
         uint256 daiTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI));
 
-        // (uint256 remainingFunds,) = creditManager.closeCreditAccount(
-        //     creditAccount,
-        //     ClosureAction.LIQUIDATE_ACCOUNT,
-        //     totalValue,
-        //     LIQUIDATOR,
-        //     FRIEND,
-        //     wethTokenMask | daiTokenMask,
-        //     0,
-        //     borrowedAmount,
-        //     true
-        // );
+        CollateralDebtData memory collateralDebtData;
+        collateralDebtData.debt = borrowedAmount;
+        collateralDebtData.accruedInterest = 0;
+        collateralDebtData.accruedFees = 0;
+        collateralDebtData.totalValue = totalValue;
+        collateralDebtData.enabledTokensMask = wethTokenMask | daiTokenMask;
+
+        (uint256 remainingFunds, uint256 loss) = creditManager.closeCreditAccount({
+            creditAccount: creditAccount,
+            closureAction: ClosureAction.LIQUIDATE_ACCOUNT,
+            collateralDebtData: collateralDebtData,
+            payer: LIQUIDATOR,
+            to: FRIEND,
+            skipTokensMask: 0,
+            convertToETH: true
+        });
 
         // checks that no eth were sent to USER account
         expectEthBalance(USER, 0);
@@ -760,17 +821,22 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         uint256 wethTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.WETH));
         uint256 daiTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI));
 
-        // (uint256 remainingFunds,) = creditManager.closeCreditAccount(
-        //     creditAccount,
-        //     ClosureAction.LIQUIDATE_ACCOUNT,
-        //     borrowedAmount,
-        //     LIQUIDATOR,
-        //     FRIEND,
-        //     wethTokenMask | daiTokenMask,
-        //     0,
-        //     borrowedAmount,
-        //     true
-        // );
+        CollateralDebtData memory collateralDebtData;
+        collateralDebtData.debt = borrowedAmount;
+        collateralDebtData.accruedInterest = 0;
+        collateralDebtData.accruedFees = 0;
+        collateralDebtData.totalValue = borrowedAmount;
+        collateralDebtData.enabledTokensMask = wethTokenMask | daiTokenMask;
+
+        (uint256 remainingFunds, uint256 loss) = creditManager.closeCreditAccount({
+            creditAccount: creditAccount,
+            closureAction: ClosureAction.LIQUIDATE_ACCOUNT,
+            collateralDebtData: collateralDebtData,
+            payer: LIQUIDATOR,
+            to: FRIEND,
+            skipTokensMask: 0,
+            convertToETH: true
+        });
 
         expectBalance(Tokens.WETH, creditAccount, 1);
 
