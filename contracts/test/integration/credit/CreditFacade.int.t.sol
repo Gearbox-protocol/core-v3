@@ -125,7 +125,7 @@ contract CreditFacadeIntegrationTest is
         );
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.allowContract(address(targetMock), address(adapterMock));
+        creditConfigurator.allowAdapter(address(adapterMock));
 
         vm.label(address(adapterMock), "AdapterMock");
         vm.label(address(targetMock), "TargetContractMock");
@@ -169,7 +169,7 @@ contract CreditFacadeIntegrationTest is
 
     function _prepareMockCall() internal returns (bytes memory callData) {
         vm.prank(CONFIGURATOR);
-        creditConfigurator.allowContract(address(targetMock), address(adapterMock));
+        creditConfigurator.allowAdapter(address(adapterMock));
 
         callData = abi.encodeWithSignature("hello(string)", "world");
     }

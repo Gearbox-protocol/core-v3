@@ -42,7 +42,7 @@ interface IPoolV3Events {
     event SetWithdrawFee(uint256 fee);
 }
 
-interface IPoolBase {
+interface IPoolBase is IVersion {
     /// CREDIT MANAGERS FUNCTIONS
 
     /// @dev Lends pool funds to a Credit Account
@@ -76,7 +76,7 @@ interface IPoolBase {
 
 /// @title Pool 4626
 /// More: https://dev.gearbox.fi/developers/pool/abstractpoolservice
-interface IPoolV3 is IPoolV3Events, IPoolBase, IERC4626, IVersion {
+interface IPoolV3 is IPoolV3Events, IPoolBase, IERC4626 {
     function depositReferral(uint256 assets, address receiver, uint16 referralCode) external returns (uint256 shares);
 
     function burn(uint256 shares) external;

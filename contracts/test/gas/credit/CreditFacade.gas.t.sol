@@ -107,7 +107,7 @@ contract CreditFacadeGasTest is
         );
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.allowContract(address(targetMock), address(adapterMock));
+        creditConfigurator.allowAdapter(address(adapterMock));
 
         vm.label(address(adapterMock), "AdapterMock");
         vm.label(address(targetMock), "TargetContractMock");

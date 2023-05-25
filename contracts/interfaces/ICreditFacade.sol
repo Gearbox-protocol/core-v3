@@ -30,6 +30,13 @@ struct FullCheckParams {
     uint256 enabledTokensMaskAfter;
 }
 
+struct TotalDebt {
+    /// @dev Current total borrowing
+    uint128 currentTotalDebt;
+    /// @dev Total borrowing limit
+    uint128 totalDebtLimit;
+}
+
 interface ICreditFacadeEvents {
     /// @dev Emits when a new Credit Account is opened through the Credit Facade
     event OpenCreditAccount(
@@ -188,6 +195,10 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
 
     /// @return minDebt Minimal borrowed amount per credit account
     function debtLimits() external view returns (uint128 minDebt, uint128 maxDebt);
+
+    /// @return currentTotalDebt The current total debt of Credit Manager (if tracked in Credit Facade)
+    /// @return totalDebtLimit The current total debt limit of Credit Manager
+    function totalDebt() external view returns (uint128 currentTotalDebt, uint128 totalDebtLimit);
 
     function maxDebtPerBlockMultiplier() external view returns (uint8);
 

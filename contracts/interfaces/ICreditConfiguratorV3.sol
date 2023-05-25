@@ -56,13 +56,10 @@ interface ICreditConfiguratorEvents {
     event ForbidToken(address indexed token);
 
     /// @dev Emits when a contract <> adapter pair is linked for a Credit Manager
-    event AllowContract(address indexed protocol, address indexed adapter);
+    event AllowAdapter(address indexed protocol, address indexed adapter);
 
-    /// @dev Emits when a 3rd-party contract is forbidden
-    event ForbidContract(address indexed protocol);
-
-    /// @dev Emits when a particular adapter for a target contract is forbidden
-    event ForbidAdapter(address indexed adapter);
+    /// @dev Emits when an adapter is forbidden
+    event ForbidAdapter(address indexed protocol, address indexed adapter);
 
     /// @dev Emits when debt principal limits are changed
     event SetBorrowingLimits(uint256 minBorrowedAmount, uint256 maxBorrowedAmount);
@@ -123,6 +120,9 @@ interface ICreditConfiguratorEvents {
 
     /// @dev Emits when the current cumulative loss in Credit Facade is reset
     event ResetCumulativeLoss();
+
+    /// @dev Emits when new total debt limit is set
+    event SetTotalDebtLimit(uint128);
 }
 
 /// @dev CreditConfigurator Exceptions
@@ -166,13 +166,13 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
 
     /// @dev Adds pair [contract <-> adapter] to the list of allowed contracts
     /// or updates adapter address if a contract already has a connected adapter
-    /// @param targetContract Address of allowed contract
+    /// @dev The target contract is retrieved from the adapter
     /// @param adapter Adapter address
-    function allowContract(address targetContract, address adapter) external;
+    function allowAdapter(address adapter) external;
 
     /// @dev Forbids contract as a target for calls from Credit Accounts
     /// @param targetContract Address of a contract to be forbidden
-    function forbidContract(address targetContract) external;
+    function forbidAdapter(address targetContract) external;
 
     /// @dev Sets borrowed amount limits in Credit Facade
     /// @param _minBorrowedAmount Minimum borrowed amount
@@ -246,6 +246,16 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
     ///                The contract address is retrieved from addressProvider
     function setBotList(uint256 version) external;
 
+    /// @notice Sets a new total debt limit
+    /// @dev Only works for Credit Facades that track total debt limit
+    /// @param newLimit New total debt limit for Credit Manager
+    function setTotalDebtLimit(uint128 newLimit) external;
+
+    /// @notice Marks the token as limited, which enables quota logic and additional interest for it
+    /// @param token Token to make limited
+    /// @dev This action is irreversible!
+    function makeTokenQuoted(address token) external;
+
     //
     // GETTERS
     //
@@ -262,12 +272,9 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
     /// @dev Address of the Credit Manager's underlying asset
     function underlying() external view returns (address);
 
-    /// @dev Returns all allowed contracts
-    function allowedContracts() external view returns (address[] memory);
+    /// @dev Returns all allowed adapters
+    function allowedAdapters() external view returns (address[] memory);
 
     /// @dev Returns all emergency liquidators
     function emergencyLiquidators() external view returns (address[] memory);
-
-    /// @dev Returns all forbidden tokens
-    function forbiddenTokens() external view returns (address[] memory);
 }

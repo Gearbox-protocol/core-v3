@@ -15,6 +15,10 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
         _reentrancyStatus = _status;
     }
 
+    function setCumulativeLoss(uint128 newLoss) external {
+        lossParams.currentCumulativeLoss = newLoss;
+    }
+
     function setTotalBorrowedInBlock(uint128 _totalBorrowedInBlock) external {
         totalBorrowedInBlock = _totalBorrowedInBlock;
     }
