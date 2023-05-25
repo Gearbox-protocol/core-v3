@@ -23,6 +23,8 @@ import {WithdrawalManagerMock} from "../../mocks/support/WithdrawalManagerMock.s
 import {PriceOracleMock} from "../../mocks/oracles/PriceOracleMock.sol";
 import {PriceFeedOnDemandMock} from "../../mocks/oracles/PriceFeedOnDemandMock.sol";
 import {AdapterCallMock} from "../../mocks/adapters/AdapterCallMock.sol";
+import {PoolMock} from "../../mocks/pool/PoolMock.sol";
+
 import {ENTERED} from "../../../traits/ReentrancyGuardTrait.sol";
 
 import "../../../interfaces/ICreditFacade.sol";
@@ -77,6 +79,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
     CreditManagerMock creditManagerMock;
     WithdrawalManagerMock withdrawalManagerMock;
     PriceOracleMock priceOracleMock;
+    PoolMock poolMock;
 
     IWETHGateway wethGateway;
     BotListMock botListMock;
@@ -146,9 +149,11 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
 
         AddressProviderV3ACLMock(address(addressProvider)).addPausableAdmin(CONFIGURATOR);
 
+        poolMock = new PoolMock(address(addressProvider), tokenTestSuite.addressOf(Tokens.DAI));
+
         creditManagerMock = new CreditManagerMock({
             _addressProvider: address(addressProvider),
-            _pool: address(0)
+            _pool: address(poolMock)
         });
     }
 
