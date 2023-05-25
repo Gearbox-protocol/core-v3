@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
+pragma abicoder v1;
 
 import {WAD, RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 import {IInterestRateModel} from "../interfaces/IInterestRateModel.sol";
 
 // EXCEPTIONS
-import "../interfaces/IExceptions.sol";
+import {IncorrectParameterException, BorrowingMoreU2ForbiddenException} from "../interfaces/IExceptions.sol";
 
 /// @title Linear Interest Rate Model
 contract LinearInterestRateModel is IInterestRateModel {
@@ -39,7 +40,7 @@ contract LinearInterestRateModel is IInterestRateModel {
     /// @dev Constructor
     /// @param U_1 Optimal U in percentage format: x10.000 - percentage plus two decimals
     /// @param U_2 Optimal U in percentage format: x10.000 - percentage plus two decimals
-    /// @param R_base R_base in percentage format: x10.000 - percentage plus two decimals @param R_slope1 R_Slope1 in Ray
+    /// @param R_base R_base in percentage format: x10.000 - percentage plus two decimals
     /// @param R_slope1 R_Slope1 in percentage format: x10.000 - percentage plus two decimals
     /// @param R_slope2 R_Slope2 in percentage format: x10.000 - percentage plus two decimals
     /// @param R_slope3 R_Slope3 in percentage format: x10.000 - percentage plus two decimals
@@ -57,21 +58,21 @@ contract LinearInterestRateModel is IInterestRateModel {
                 || (R_slope1 > PERCENTAGE_FACTOR) || (R_slope2 > PERCENTAGE_FACTOR) || (R_slope1 > R_slope2)
                 || (R_slope2 > R_slope3)
         ) {
-            revert IncorrectParameterException(); // F:[LIM-2]
+            revert IncorrectParameterException(); // U:[LIM-2]
         }
 
         // Convert percetns to WAD
-        U_1_WAD = (WAD * U_1) / PERCENTAGE_FACTOR; // F:[LIM-1]
+        U_1_WAD = (WAD * U_1) / PERCENTAGE_FACTOR; // U:[LIM-1]
 
         // Convert percetns to WAD
-        U_2_WAD = (WAD * U_2) / PERCENTAGE_FACTOR; // F:[LIM-1]
+        U_2_WAD = (WAD * U_2) / PERCENTAGE_FACTOR; // U:[LIM-1]
 
-        R_base_RAY = (RAY * R_base) / PERCENTAGE_FACTOR; // F:[LIM-1]
-        R_slope1_RAY = (RAY * R_slope1) / PERCENTAGE_FACTOR; // F:[LIM-1]
-        R_slope2_RAY = (RAY * R_slope2) / PERCENTAGE_FACTOR; // F:[LIM-1]
-        R_slope3_RAY = (RAY * R_slope3) / PERCENTAGE_FACTOR; // F:[LIM-1]
+        R_base_RAY = (RAY * R_base) / PERCENTAGE_FACTOR; // U:[LIM-1]
+        R_slope1_RAY = (RAY * R_slope1) / PERCENTAGE_FACTOR; // U:[LIM-1]
+        R_slope2_RAY = (RAY * R_slope2) / PERCENTAGE_FACTOR; // U:[LIM-1]
+        R_slope3_RAY = (RAY * R_slope3) / PERCENTAGE_FACTOR; // U:[LIM-1]
 
-        isBorrowingMoreU2Forbidden = _isBorrowingMoreU2Forbidden; // F:[LIM-1]
+        isBorrowingMoreU2Forbidden = _isBorrowingMoreU2Forbidden; // U:[LIM-1]
     }
 
     /// @dev Returns the borrow rate calculated based on expectedLiquidity and availableLiquidity
@@ -99,13 +100,13 @@ contract LinearInterestRateModel is IInterestRateModel {
     {
         if (expectedLiquidity == 0 || expectedLiquidity < availableLiquidity) {
             return R_base_RAY;
-        } // F:[LIM-3]
+        } // U:[LIM-3]
 
         //      expectedLiquidity - availableLiquidity
         // U = -------------------------------------
         //             expectedLiquidity
 
-        uint256 U_WAD = (WAD * (expectedLiquidity - availableLiquidity)) / expectedLiquidity; // F:[LIM-3]
+        uint256 U_WAD = (WAD * (expectedLiquidity - availableLiquidity)) / expectedLiquidity; // U:[LIM-3]
 
         // if U < U1:
         //
@@ -114,7 +115,7 @@ contract LinearInterestRateModel is IInterestRateModel {
         //                                 U1
         //
         if (U_WAD < U_1_WAD) {
-            return R_base_RAY + ((R_slope1_RAY * U_WAD) / U_1_WAD); // F:[LIM-3]
+            return R_base_RAY + ((R_slope1_RAY * U_WAD) / U_1_WAD); // U:[LIM-3]
         }
 
         // if U >= U1 & U < U2:
@@ -124,12 +125,12 @@ contract LinearInterestRateModel is IInterestRateModel {
         //                                                     U2 - U1
 
         if (U_WAD >= U_1_WAD && U_WAD < U_2_WAD) {
-            return R_base_RAY + R_slope1_RAY + (R_slope2_RAY * (U_WAD - U_1_WAD)) / (U_2_WAD - U_1_WAD); // F:[LIM-3]
+            return R_base_RAY + R_slope1_RAY + (R_slope2_RAY * (U_WAD - U_1_WAD)) / (U_2_WAD - U_1_WAD); // U:[LIM-3]
         }
 
         /// if U > U2 && checkOptimalBorrowing && isBorrowingMoreU2Forbidden
         if (checkOptimalBorrowing && isBorrowingMoreU2Forbidden) {
-            revert BorrowingMoreU2ForbiddenException(); // F:[LIM-3]
+            revert BorrowingMoreU2ForbiddenException(); // U:[LIM-3]
         }
 
         // if U >= U2:
@@ -138,7 +139,7 @@ contract LinearInterestRateModel is IInterestRateModel {
         // borrowRate = Rbase + Rslope1 + Rslope2  + Rslope * ----------
         //                                                      1 - U2
 
-        return R_base_RAY + R_slope1_RAY + R_slope2_RAY + (R_slope3_RAY * (U_WAD - U_2_WAD)) / (WAD - U_2_WAD); // F:[LIM-3]
+        return R_base_RAY + R_slope1_RAY + R_slope2_RAY + (R_slope3_RAY * (U_WAD - U_2_WAD)) / (WAD - U_2_WAD); // U:[LIM-3]
     }
 
     /// @dev Returns the model's parameters
@@ -151,12 +152,12 @@ contract LinearInterestRateModel is IInterestRateModel {
         view
         returns (uint16 U_1, uint16 U_2, uint16 R_base, uint16 R_slope1, uint16 R_slope2, uint16 R_slope3)
     {
-        U_1 = uint16((U_1_WAD * PERCENTAGE_FACTOR) / WAD); // F:[LIM-1]
-        U_2 = uint16((U_2_WAD * PERCENTAGE_FACTOR) / WAD); // F:[LIM-1]
-        R_base = uint16(R_base_RAY * PERCENTAGE_FACTOR / RAY); // F:[LIM-1]
-        R_slope1 = uint16(R_slope1_RAY * PERCENTAGE_FACTOR / RAY); // F:[LIM-1]
-        R_slope2 = uint16(R_slope2_RAY * PERCENTAGE_FACTOR / RAY); // F:[LIM-1]
-        R_slope3 = uint16(R_slope3_RAY * PERCENTAGE_FACTOR / RAY); // F:[LIM-1]
+        U_1 = uint16((U_1_WAD * PERCENTAGE_FACTOR) / WAD); // U:[LIM-1]
+        U_2 = uint16((U_2_WAD * PERCENTAGE_FACTOR) / WAD); // U:[LIM-1]
+        R_base = uint16(R_base_RAY * PERCENTAGE_FACTOR / RAY); // U:[LIM-1]
+        R_slope1 = uint16(R_slope1_RAY * PERCENTAGE_FACTOR / RAY); // U:[LIM-1]
+        R_slope2 = uint16(R_slope2_RAY * PERCENTAGE_FACTOR / RAY); // U:[LIM-1]
+        R_slope3 = uint16(R_slope3_RAY * PERCENTAGE_FACTOR / RAY); // U:[LIM-1]
     }
 
     function availableToBorrow(uint256 expectedLiquidity, uint256 availableLiquidity)
@@ -166,11 +167,11 @@ contract LinearInterestRateModel is IInterestRateModel {
         returns (uint256)
     {
         if (isBorrowingMoreU2Forbidden && (expectedLiquidity >= availableLiquidity)) {
-            uint256 U_WAD = (WAD * (expectedLiquidity - availableLiquidity)) / expectedLiquidity; // F:[LIM-3]
+            uint256 U_WAD = (WAD * (expectedLiquidity - availableLiquidity)) / expectedLiquidity; // U:[LIM-3]
 
-            return (U_WAD < U_2_WAD) ? ((U_2_WAD - U_WAD) * expectedLiquidity) / WAD : 0; // F:[LIM-3]
+            return (U_WAD < U_2_WAD) ? ((U_2_WAD - U_WAD) * expectedLiquidity) / WAD : 0; // U:[LIM-3]
         } else {
-            return availableLiquidity; // F:[LIM-3]
+            return availableLiquidity; // U:[LIM-3]
         }
     }
 }

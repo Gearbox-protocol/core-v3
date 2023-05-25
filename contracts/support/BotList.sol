@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox. Generalized leverage protocol that allows to take leverage and then use it across other DeFi protocols and platforms in a composable way.
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {IBotList, BotFunding} from "../interfaces/IBotList.sol";
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
+import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
+import {ICreditFacade} from "../interfaces/ICreditFacade.sol";
+import {ICreditAccountBase} from "../interfaces/ICreditAccountV3.sol";
 
 import "../interfaces/IExceptions.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
@@ -20,14 +24,25 @@ contract BotList is ACLNonReentrantTrait, IBotList {
     using SafeCast for uint256;
     using Address for address;
     using Address for address payable;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
-    /// @dev Mapping from (borrower, bot) to bot approval status
-    mapping(address => mapping(address => bool)) public approvedBot;
+    /// @dev Mapping from Credit Manager address to their status as an approved Credit Manager
+    ///      Only Credit Facades connected to approved Credit Managers can alter bot permissions
+    mapping(address => bool) public approvedCreditManager;
+
+    /// @dev Mapping from (creditAccount, bot) to bit permissions
+    mapping(address => mapping(address => uint192)) public botPermissions;
+
+    /// @dev Mapping from credit account to the set of bots with non-zero permissions
+    mapping(address => EnumerableSet.AddressSet) internal activeBots;
 
     /// @dev Whether the bot is forbidden system-wide
     mapping(address => bool) public forbiddenBot;
 
-    /// @dev Mapping of (borrower, bot) to bot funding parameters
+    /// @dev Mapping from borrower to their bot funding balance
+    mapping(address => uint256) public fundingBalances;
+
+    /// @dev Mapping of (creditAccount, bot) to bot funding parameters
     mapping(address => mapping(address => BotFunding)) public botFunding;
 
     /// @dev A fee (in PERCENTAGE_FACTOR format) charged by the DAO on bot payments
@@ -43,98 +58,162 @@ contract BotList is ACLNonReentrantTrait, IBotList {
         treasury = IAddressProvider(_addressProvider).getTreasuryContract();
     }
 
-    /// @dev Adds or removes allowance for a bot to execute multicalls on behalf of sender
-    /// @param bot Bot address
-    /// @param status Whether allowance is added or removed
-    function setBotStatus(address bot, bool status) external nonZeroAddress(bot) {
-        if (!bot.isContract() && status) {
-            revert AddressIsNotContractException(bot);
+    /// @dev Limits access to a function only to Credit Facades connected to approved CMs
+    modifier onlyValidCreditFacade() {
+        address creditManager = ICreditFacade(msg.sender).creditManager();
+        if (!approvedCreditManager[creditManager] || ICreditManagerV3(creditManager).creditFacade() != msg.sender) {
+            revert CallerNotCreditFacadeException();
         }
-
-        if (forbiddenBot[bot] && status) {
-            revert InvalidBotException();
-        }
-
-        approvedBot[msg.sender][bot] = status;
-
-        emit BotApprovalChanged(msg.sender, bot, status);
+        _;
     }
 
-    /// @dev Adds funds to user's balance for a particular bot. The entire sent value in ETH is added
-    /// @param bot Address of the bot to fund
-    function increaseBotFunding(address bot) external payable nonReentrant {
-        if (msg.value == 0) {
-            revert AmountCantBeZeroException();
+    /// @dev Sets permissions and funding for (creditAccount, bot). Callable only through CreditFacade
+    /// @param creditAccount CA to set permissions for
+    /// @param bot Bot to set permissions for
+    /// @param permissions A bit mask of permissions
+    /// @param fundingAmount Total amount of ETH available to the bot for payments
+    /// @param weeklyFundingAllowance Amount of ETH available to the bot weekly
+    function setBotPermissions(
+        address creditAccount,
+        address bot,
+        uint192 permissions,
+        uint72 fundingAmount,
+        uint72 weeklyFundingAllowance
+    )
+        external
+        nonZeroAddress(bot)
+        onlyValidCreditFacade // F: [BL-03]
+        returns (uint256 activeBotsRemaining)
+    {
+        if (!bot.isContract()) {
+            revert AddressIsNotContractException(bot); // F: [BL-03]
         }
 
-        if (forbiddenBot[bot] || !approvedBot[msg.sender][bot]) {
-            revert InvalidBotException();
+        if (forbiddenBot[bot] && permissions != 0) {
+            revert InvalidBotException(); // F: [BL-03]
         }
 
-        uint72 newRemainingFunds = botFunding[msg.sender][bot].remainingFunds + msg.value.toUint72();
+        if (permissions != 0) {
+            activeBots[creditAccount].add(bot); // F: [BL-03]
+        } else if (permissions == 0) {
+            if (fundingAmount != 0 || weeklyFundingAllowance != 0) {
+                revert PositiveFundingForInactiveBotException(); // F: [BL-03]
+            }
 
-        botFunding[msg.sender][bot].remainingFunds = newRemainingFunds;
-
-        emit BotFundingChanged(msg.sender, bot, newRemainingFunds);
-    }
-
-    /// @dev Removes funds from the user's balance for a particular bot. The funds are sent to the user.
-    /// @param bot Address of the bot to remove funds from
-    /// @param decreaseAmount Amount to remove
-    function decreaseBotFunding(address bot, uint72 decreaseAmount) external nonReentrant {
-        if (decreaseAmount == 0) {
-            revert AmountCantBeZeroException();
+            activeBots[creditAccount].remove(bot); // F: [BL-03]
         }
 
-        uint72 newRemainingFunds = botFunding[msg.sender][bot].remainingFunds - decreaseAmount;
+        botPermissions[creditAccount][bot] = permissions; // F: [BL-03]
+        botFunding[creditAccount][bot].remainingFunds = fundingAmount; // F: [BL-03]
+        botFunding[creditAccount][bot].maxWeeklyAllowance = weeklyFundingAllowance; // F: [BL-03]
+        botFunding[creditAccount][bot].remainingWeeklyAllowance = weeklyFundingAllowance; // F: [BL-03]
+        botFunding[creditAccount][bot].allowanceLU = uint40(block.timestamp); // F: [BL-03]
 
-        botFunding[msg.sender][bot].remainingFunds = newRemainingFunds;
-        payable(msg.sender).sendValue(decreaseAmount);
+        activeBotsRemaining = activeBots[creditAccount].length(); // F: [BL-03]
 
-        emit BotFundingChanged(msg.sender, bot, newRemainingFunds);
+        emit SetBotPermissions(creditAccount, bot, permissions, fundingAmount, weeklyFundingAllowance); // F: [BL-03]
     }
 
-    /// @dev Sets the amount that can be pull by the bot per week
-    /// @param bot Address of the bot to set allowance for
-    /// @param allowanceAmount Amount of weekly allowance
-    function setWeeklyBotAllowance(address bot, uint72 allowanceAmount) external nonReentrant {
-        BotFunding memory bf = botFunding[msg.sender][bot];
+    /// @dev Removes permissions and funding for all bots with non-zero permissions for a credit account
+    /// @param creditAccount Credit Account to erase permissions for
+    function eraseAllBotPermissions(address creditAccount)
+        external
+        onlyValidCreditFacade // F: [BL-06]
+    {
+        uint256 len = activeBots[creditAccount].length();
 
-        bf.maxWeeklyAllowance = allowanceAmount;
-        bf.remainingWeeklyAllowance =
-            bf.remainingWeeklyAllowance > allowanceAmount ? allowanceAmount : bf.remainingWeeklyAllowance;
+        for (uint256 i = 0; i < len;) {
+            address bot = activeBots[creditAccount].at(0); // F: [BL-06]
+            botPermissions[creditAccount][bot] = 0; // F: [BL-06]
+            botFunding[creditAccount][bot].remainingFunds = 0; // F: [BL-06]
+            botFunding[creditAccount][bot].maxWeeklyAllowance = 0; // F: [BL-06]
+            botFunding[creditAccount][bot].remainingWeeklyAllowance = 0; // F: [BL-06]
+            botFunding[creditAccount][bot].allowanceLU = uint40(block.timestamp); // F: [BL-06]
+            activeBots[creditAccount].remove(bot); // F: [BL-06]
+            unchecked {
+                ++i;
+            }
+        }
 
-        botFunding[msg.sender][bot] = bf;
-
-        emit BotWeeklyAllowanceChanged(msg.sender, bot, allowanceAmount);
+        if (len > 0) {
+            emit EraseBots(creditAccount); // F: [BL-06]
+        }
     }
 
-    /// @dev Takes payment from the user to the bot for performed services
-    /// @param payer Address of the paying user
-    /// @param paymentAmount Amount to pull
-    function pullPayment(address payer, uint72 paymentAmount) external nonReentrant {
+    /// @dev Takes payment for performed services from the user's balance and sends to the bot
+    /// @param payer Address to charge
+    /// @param creditAccount Address of the credit account paid for
+    /// @param bot Address of the bot to pay
+    /// @param paymentAmount Amount to pay
+    function payBot(address payer, address creditAccount, address bot, uint72 paymentAmount)
+        external
+        onlyValidCreditFacade
+    {
         if (paymentAmount == 0) {
-            revert AmountCantBeZeroException();
+            revert AmountCantBeZeroException(); // F: [BL-05]
         }
 
-        BotFunding memory bf = botFunding[payer][msg.sender];
+        BotFunding storage bf = botFunding[creditAccount][bot]; // F: [BL-05]
 
         if (block.timestamp >= bf.allowanceLU + uint40(7 days)) {
-            bf.allowanceLU = uint40(block.timestamp);
-            bf.remainingWeeklyAllowance = bf.maxWeeklyAllowance;
+            bf.allowanceLU = uint40(block.timestamp); // F: [BL-05]
+            bf.remainingWeeklyAllowance = bf.maxWeeklyAllowance; // F: [BL-05]
         }
 
-        uint72 feeAmount = daoFee * paymentAmount / PERCENTAGE_FACTOR;
+        uint72 feeAmount = daoFee * paymentAmount / PERCENTAGE_FACTOR; // F: [BL-05]
 
-        bf.remainingWeeklyAllowance -= paymentAmount + feeAmount;
-        bf.remainingFunds -= paymentAmount + feeAmount;
+        bf.remainingWeeklyAllowance -= paymentAmount + feeAmount; // F: [BL-05]
+        bf.remainingFunds -= paymentAmount + feeAmount; // F: [BL-05]
 
-        botFunding[payer][msg.sender] = bf;
+        fundingBalances[payer] -= uint256(paymentAmount + feeAmount); // F: [BL-05]
 
-        payable(msg.sender).sendValue(paymentAmount);
-        if (feeAmount > 0) payable(treasury).sendValue(feeAmount);
+        payable(bot).sendValue(paymentAmount); // F: [BL-05]
+        if (feeAmount > 0) payable(treasury).sendValue(feeAmount); // F: [BL-05]
 
-        emit BotPaymentPulled(payer, msg.sender, paymentAmount, feeAmount);
+        emit PayBot(payer, creditAccount, bot, paymentAmount, feeAmount); // F: [BL-05]
+    }
+
+    /// @dev Adds funds to the borrower's bot payment wallet
+    function addFunding() external payable nonReentrant {
+        if (msg.value == 0) {
+            revert AmountCantBeZeroException(); // F: [BL-04]
+        }
+
+        uint256 newFunds = fundingBalances[msg.sender] + msg.value; // F: [BL-04]
+
+        fundingBalances[msg.sender] = newFunds; // F: [BL-04]
+
+        emit ChangeFunding(msg.sender, newFunds); // F: [BL-04]
+    }
+
+    /// @dev Removes funds from the borrower's bot payment wallet
+    function removeFunding(uint256 amount) external nonReentrant {
+        uint256 newFunds = fundingBalances[msg.sender] - amount; // F: [BL-04]
+
+        fundingBalances[msg.sender] = newFunds; // F: [BL-04]
+        payable(msg.sender).sendValue(amount); // F: [BL-04]
+
+        emit ChangeFunding(msg.sender, newFunds); // F: [BL-04]
+    }
+
+    /// @dev Returns all active bots currently on the account
+    function getActiveBots(address creditAccount) external view returns (address[] memory) {
+        return activeBots[creditAccount].values();
+    }
+
+    /// @dev Returns information about bot permissions
+    function getBotStatus(address bot, address creditAccount)
+        external
+        view
+        returns (uint192 permissions, bool forbidden)
+    {
+        return (botPermissions[creditAccount][bot], forbiddenBot[bot]);
+    }
+
+    /// @dev Internal function to retrieve the bot's owner
+    function _getCreditAccountOwner(address creditAccount) internal view returns (address owner) {
+        address creditManager = ICreditAccountBase(creditAccount).creditManager();
+        return ICreditManagerV3(creditManager).getBorrowerOrRevert(creditAccount);
     }
 
     //
@@ -150,8 +229,21 @@ contract BotList is ACLNonReentrantTrait, IBotList {
     /// @dev Sets the DAO fee on bot payments
     /// @param newFee The new fee value
     function setDAOFee(uint16 newFee) external configuratorOnly {
-        daoFee = newFee;
+        daoFee = newFee; // F: [BL-02]
 
-        emit NewBotDAOFee(newFee);
+        emit SetBotDAOFee(newFee); // F: [BL-02]
+    }
+
+    /// @dev Sets an address' status as an approved Credit Manager
+    /// @param creditManager Address of the Credit Manager to change status for
+    /// @param status The new status
+    function setApprovedCreditManagerStatus(address creditManager, bool status) external configuratorOnly {
+        approvedCreditManager[creditManager] = status;
+
+        if (status) {
+            emit CreditManagerAdded(creditManager);
+        } else {
+            emit CreditManagerRemoved(creditManager);
+        }
     }
 }

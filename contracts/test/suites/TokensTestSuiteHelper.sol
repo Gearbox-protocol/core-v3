@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox. Generalized leverage protocol that allows to take leverage and then use it across other DeFi protocols and platforms in a composable way.
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -13,8 +13,9 @@ import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
 import "../lib/constants.sol";
 
-contract TokensTestSuiteHelper is DSTest, ITokenTestSuite {
-    CheatCodes evm = CheatCodes(HEVM_ADDRESS);
+import {Test} from "forge-std/Test.sol";
+
+contract TokensTestSuiteHelper is Test, ITokenTestSuite {
     address public wethToken;
 
     function topUpWETH() public payable override {
@@ -22,13 +23,13 @@ contract TokensTestSuiteHelper is DSTest, ITokenTestSuite {
     }
 
     function topUpWETH(address onBehalfOf, uint256 value) public override {
-        evm.prank(onBehalfOf);
+        vm.prank(onBehalfOf);
         IWETH(wethToken).deposit{value: value}();
     }
 
     function mint(address token, address to, uint256 amount) public virtual override {
         if (token == wethToken) {
-            evm.deal(address(this), amount);
+            vm.deal(address(this), amount);
             IWETH(wethToken).deposit{value: amount}();
             IERC20(token).transfer(to, amount);
         } else {
@@ -45,7 +46,7 @@ contract TokensTestSuiteHelper is DSTest, ITokenTestSuite {
     }
 
     function approve(address token, address holder, address targetContract, uint256 amount) public override {
-        evm.prank(holder);
+        vm.prank(holder);
         IERC20(token).approve(targetContract, amount);
     }
 

@@ -32,6 +32,7 @@ jobs:
 
       - name: Run forge tests
         run: forge test
+        timeout-minutes: 10
 
       - name: Perform checks
         run: |

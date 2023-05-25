@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import {IPriceFeedType} from "./IPriceFeedType.sol";
 
 interface ILPPriceFeedEvents {
     /// @dev Emits on updating the virtual price bounds
-    event NewLimiterParams(uint256 lowerBound, uint256 upperBound);
+    event SetLimiterParams(uint256 lowerBound, uint256 upperBound);
 }
 
 /// @title Interface for LP PriceFeeds with limiter

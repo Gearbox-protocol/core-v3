@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
-import {CreditManager} from "../../credit/CreditManager.sol";
-import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfigurator.sol";
+import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
+import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
+import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
+import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
 
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 import "../lib/constants.sol";
-import {CreditManagerTestInternal} from "../mocks/credit/CreditManagerTestInternal.sol";
+import {CreditManagerV3Harness} from "../unit/credit/CreditManagerV3Harness.sol";
 import {PoolDeployer} from "./PoolDeployer.sol";
 import {ICreditConfig} from "../interfaces/ICreditConfig.sol";
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
@@ -21,11 +23,11 @@ import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 import "forge-std/console.sol";
 
 /// @title CreditManagerTestSuite
-/// @notice Deploys contract for unit testing of CreditManager.sol
+/// @notice Deploys contract for unit testing of CreditManagerV3.sol
 contract CreditManagerTestSuite is PoolDeployer {
     ITokenTestSuite public tokenTestSuite;
 
-    CreditManager public creditManager;
+    CreditManagerV3 public creditManager;
 
     IWETH wethToken;
 
@@ -34,13 +36,14 @@ contract CreditManagerTestSuite is PoolDeployer {
 
     bool supportsQuotas;
 
-    constructor(ICreditConfig creditConfig, bool internalSuite, bool _supportsQuotas)
+    constructor(ICreditConfig creditConfig, bool internalSuite, bool _supportsQuotas, uint8 accountFactoryVer)
         PoolDeployer(
             creditConfig.tokenTestSuite(),
             creditConfig.underlying(),
             creditConfig.wethToken(),
             10 * creditConfig.getAccountAmount(),
-            creditConfig.getPriceFeeds()
+            creditConfig.getPriceFeeds(),
+            accountFactoryVer
         )
     {
         supportsQuotas = _supportsQuotas;
@@ -53,18 +56,18 @@ contract CreditManagerTestSuite is PoolDeployer {
 
         tokenTestSuite = creditConfig.tokenTestSuite();
 
-        creditManager =
-            internalSuite ? new CreditManagerTestInternal(address(poolMock)) : new CreditManager(address(poolMock));
+        creditManager = internalSuite
+            ? new CreditManagerV3Harness(address(addressProvider), address(poolMock))
+            : new CreditManagerV3(address(addressProvider), address(poolMock));
 
         creditFacade = msg.sender;
 
-        creditManager.setConfigurator(CONFIGURATOR);
+        creditManager.setCreditConfigurator(CONFIGURATOR);
 
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
+        creditManager.setCreditFacade(creditFacade);
 
-        creditManager.upgradeCreditFacade(creditFacade);
-
-        creditManager.setParams(
+        creditManager.setFees(
             DEFAULT_FEE_INTEREST,
             DEFAULT_FEE_LIQUIDATION,
             PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM,
@@ -78,34 +81,33 @@ contract CreditManagerTestSuite is PoolDeployer {
             if (collateralTokens[i].token != underlying) {
                 address token = collateralTokens[i].token;
                 creditManager.addToken(token);
-                creditManager.setLiquidationThreshold(token, collateralTokens[i].liquidationThreshold);
+                creditManager.setCollateralTokenData(
+                    token,
+                    collateralTokens[i].liquidationThreshold,
+                    collateralTokens[i].liquidationThreshold,
+                    type(uint40).max,
+                    0
+                );
             }
         }
 
-        evm.stopPrank();
+        cr.addCreditManager(address(creditManager));
 
         assertEq(creditManager.creditConfigurator(), CONFIGURATOR, "Configurator wasn't set");
 
-        cr.addCreditManager(address(creditManager));
-
         if (supportsQuotas) {
             poolQuotaKeeper.addCreditManager(address(creditManager));
-            // poolQuotaKeeper.setGauge(CONFIGURATOR);
         }
+
+        if (accountFactoryVer == 2) {
+            AccountFactoryV3(address(af)).addCreditManager(address(creditManager));
+        }
+
+        vm.stopPrank();
 
         // Approve USER & LIQUIDATOR to credit manager
         tokenTestSuite.approve(underlying, USER, address(creditManager));
         tokenTestSuite.approve(underlying, LIQUIDATOR, address(creditManager));
-
-        addressProvider.transferOwnership(CONFIGURATOR);
-        acl.transferOwnership(CONFIGURATOR);
-
-        evm.startPrank(CONFIGURATOR);
-
-        acl.claimOwnership();
-        addressProvider.claimOwnership();
-
-        evm.stopPrank();
     }
 
     ///
@@ -116,7 +118,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         external
         returns (
             uint256 borrowedAmount,
-            uint256 cumulativeIndexAtOpen,
+            uint256 cumulativeIndexLastUpdate,
             uint256 cumulativeIndexAtClose,
             address creditAccount
         )
@@ -128,48 +130,52 @@ contract CreditManagerTestSuite is PoolDeployer {
         public
         returns (
             uint256 borrowedAmount,
-            uint256 cumulativeIndexAtOpen,
+            uint256 cumulativeIndexLastUpdate,
             uint256 cumulativeIndexAtClose,
             address creditAccount
         )
     {
         // Set up real value, which should be configired before CM would be launched
-        evm.prank(CONFIGURATOR);
-        creditManager.setLiquidationThreshold(
-            underlying, uint16(PERCENTAGE_FACTOR - DEFAULT_FEE_LIQUIDATION - DEFAULT_LIQUIDATION_PREMIUM)
+        vm.prank(CONFIGURATOR);
+        creditManager.setCollateralTokenData(
+            underlying,
+            uint16(PERCENTAGE_FACTOR - DEFAULT_FEE_LIQUIDATION - DEFAULT_LIQUIDATION_PREMIUM),
+            uint16(PERCENTAGE_FACTOR - DEFAULT_FEE_LIQUIDATION - DEFAULT_LIQUIDATION_PREMIUM),
+            type(uint40).max,
+            0
         );
 
         borrowedAmount = _borrowedAmount;
 
-        cumulativeIndexAtOpen = RAY;
-        poolMock.setCumulative_RAY(cumulativeIndexAtOpen);
+        cumulativeIndexLastUpdate = RAY;
+        poolMock.setCumulativeIndexNow(cumulativeIndexLastUpdate);
 
-        evm.prank(creditFacade);
+        vm.prank(creditFacade);
 
         // Existing address case
         creditAccount = creditManager.openCreditAccount(borrowedAmount, USER);
 
         // Increase block number cause it's forbidden to close credit account in the same block
-        evm.roll(block.number + 1);
+        vm.roll(block.number + 1);
 
-        cumulativeIndexAtClose = (cumulativeIndexAtOpen * 12) / 10;
-        poolMock.setCumulative_RAY(cumulativeIndexAtClose);
+        cumulativeIndexAtClose = (cumulativeIndexLastUpdate * 12) / 10;
+        poolMock.setCumulativeIndexNow(cumulativeIndexAtClose);
     }
 
-    function makeTokenLimited(address token, uint16 rate, uint96 limit) external {
+    function makeTokenQuoted(address token, uint16 rate, uint96 limit) external {
         require(supportsQuotas, "Test suite does not support quotas");
 
-        evm.startPrank(CONFIGURATOR);
+        vm.startPrank(CONFIGURATOR);
         gaugeMock.addQuotaToken(token, rate);
         poolQuotaKeeper.setTokenLimit(token, limit);
 
         gaugeMock.updateEpoch();
 
-        uint256 tokenMask = creditManager.tokenMasksMap(token);
-        uint256 limitedMask = creditManager.limitedTokenMask();
+        uint256 tokenMask = creditManager.getTokenMaskOrRevert(token);
+        uint256 limitedMask = creditManager.quotedTokensMask();
 
-        creditManager.setLimitedMask(limitedMask | tokenMask);
+        creditManager.setQuotedMask(limitedMask | tokenMask);
 
-        evm.stopPrank();
+        vm.stopPrank();
     }
 }

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
+pragma abicoder v1;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -20,7 +21,7 @@ import {IGearStaking} from "../interfaces/IGearStaking.sol";
 
 import {RAY, SECONDS_PER_YEAR, MAX_WITHDRAW_FEE} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
-import {Pool4626} from "./Pool4626.sol";
+import {PoolV3} from "./PoolV3.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
@@ -34,7 +35,7 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
     address public immutable addressProvider;
 
     /// @dev Address of the pool
-    Pool4626 public immutable pool;
+    PoolV3 public immutable pool;
 
     /// @dev Mapping from token address to its rate parameters
     mapping(address => QuotaRateParams) public quotaRateParams;
@@ -58,14 +59,14 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
     /// @dev Constructor
 
     constructor(address _pool, address _gearStaking)
-        ACLNonReentrantTrait(address(Pool4626(_pool).addressProvider()))
+        ACLNonReentrantTrait(address(PoolV3(_pool).addressProvider()))
         nonZeroAddress(_pool)
         nonZeroAddress(_gearStaking)
     {
         // Additional check that receiver is not address(0)
 
-        addressProvider = address(Pool4626(_pool).addressProvider()); // F:[P4-01]
-        pool = Pool4626(_pool); // F:[P4-01]
+        addressProvider = address(PoolV3(_pool).addressProvider()); // F:[P4-01]
+        pool = PoolV3(_pool); // F:[P4-01]
         voter = IGearStaking(_gearStaking);
         epochLU = voter.getCurrentEpoch();
     }
@@ -146,7 +147,7 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
             uv.votesCaSide += votes;
         }
 
-        emit VoteFor(user, token, votes, lpSide);
+        emit Vote(user, token, votes, lpSide);
     }
 
     /// @dev Removes the user's existing vote from the provided token and side
@@ -174,7 +175,7 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
             uv.votesCaSide -= votes;
         }
 
-        emit UnvoteFrom(user, token, votes, lpSide);
+        emit Unvote(user, token, votes, lpSide);
     }
 
     //
@@ -185,7 +186,7 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
     function setVoter(address newVoter) external configuratorOnly {
         voter = IGearStaking(newVoter);
 
-        emit VoterUpdated(newVoter);
+        emit SetVoter(newVoter);
     }
 
     /// @dev Adds a new quoted token to the Gauge and PoolQuotaKeeper, and sets the initial rate params
@@ -199,7 +200,7 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
         IPoolQuotaKeeper keeper = IPoolQuotaKeeper(pool.poolQuotaKeeper());
         keeper.addQuotaToken(token);
 
-        emit QuotaTokenAdded(token, _minRiskRate, _maxRate);
+        emit AddQuotaToken(token, _minRiskRate, _maxRate);
     }
 
     /// @dev Changes the rate params for a quoted token
@@ -214,6 +215,6 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
         qrp.maxRate = _maxRate;
         quotaRateParams[token] = qrp;
 
-        emit QuotaParametersChanged(token, _minRiskRate, _maxRate);
+        emit SetQuotaTokenParams(token, _minRiskRate, _maxRate);
     }
 }

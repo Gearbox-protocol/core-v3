@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
@@ -10,38 +10,23 @@ import {
     ZeroAddressException,
     CallerNotConfiguratorException,
     CallerNotPausableAdminException,
-    CallerNotUnPausableAdminException,
+    CallerNotUnpausableAdminException,
     CallerNotControllerException
 } from "../interfaces/IExceptions.sol";
 
-import {SanityCheckTrait} from "./SanityCheckTrait.sol";
+import {ACLTrait} from "./ACLTrait.sol";
+import {NOT_ENTERED, ENTERED} from "./ReentrancyGuardTrait.sol";
 
 /// @title ACL Trait
 /// @notice Utility class for ACL consumers
-abstract contract ACLNonReentrantTrait is Pausable, SanityCheckTrait {
-    uint8 private constant _NOT_ENTERED = 1;
-    uint8 private constant _ENTERED = 2;
+abstract contract ACLNonReentrantTrait is ACLTrait, Pausable {
+    /// @dev Emitted when new external controller is set
+    event NewController(address indexed newController);
 
-    // ACL contract to check rights
-    IACL public immutable _acl;
+    uint8 internal _reentrancyStatus = NOT_ENTERED;
 
     address public controller;
     bool public externalController;
-
-    uint8 private _status = _NOT_ENTERED;
-
-    /// @dev Modifier that allow pausable admin to call the function if pause is needed
-    /// and for unpausable admins if unpause is needed
-    /// @param callToPause True if pause action is needed
-    modifier pausableUnpausableAdminsOnly(bool callToPause) {
-        if (callToPause && !_acl.isPausableAdmin(msg.sender)) {
-            revert CallerNotPausableAdminException();
-        } else if (!callToPause && !_acl.isUnpausableAdmin(msg.sender)) {
-            revert CallerNotUnPausableAdminException();
-        }
-
-        _;
-    }
 
     /// @dev Prevents a contract from calling itself, directly or indirectly.
     /// Calling a `nonReentrant` function from another `nonReentrant`
@@ -51,41 +36,19 @@ abstract contract ACLNonReentrantTrait is Pausable, SanityCheckTrait {
     ///
     modifier nonReentrant() {
         // On the first call to nonReentrant, _notEntered will be true
-        require(_status != _ENTERED, "ReentrancyGuard: reentrant call");
+        require(_reentrancyStatus != ENTERED, "ReentrancyGuard: reentrant call");
 
         // Any calls to nonReentrant after this point will fail
-        _status = _ENTERED;
+        _reentrancyStatus = ENTERED;
 
         _;
 
         // By storing the original value once again, a refund is triggered (see
         // https://eips.ethereum.org/EIPS/eip-2200)
-        _status = _NOT_ENTERED;
+        _reentrancyStatus = NOT_ENTERED;
     }
 
-    event NewController(address indexed newController);
-
-    // modifier nonZeroAddress(address addr) {
-    //     if (addr == address(0)) revert ZeroAddressException(); // F:[P4-2]
-    //     _;
-    // }
-
-    /// @dev constructor
-    /// @param addressProvider Address of address repository
-    constructor(address addressProvider) nonZeroAddress(addressProvider) {
-        _acl = IACL(AddressProvider(addressProvider).getACL());
-        controller = IACL(AddressProvider(addressProvider).getACL()).owner();
-    }
-
-    /// @dev  Reverts if msg.sender is not configurator
-    modifier configuratorOnly() {
-        if (!_acl.isConfigurator(msg.sender)) {
-            revert CallerNotConfiguratorException();
-        }
-        _;
-    }
-
-    /// @dev  Reverts if msg.sender is not configurator
+    /// @dev Ensures that caller is external controller (if it is set) or configurator
     modifier controllerOnly() {
         if (externalController) {
             if (msg.sender != controller) {
@@ -99,28 +62,39 @@ abstract contract ACLNonReentrantTrait is Pausable, SanityCheckTrait {
         _;
     }
 
-    // modifier registeredCreditManagerOnly(address creditManager) {
-    //     if (!_cr.isCreditManager(creditManager)) revert();
-    //     _;
-    // }
-
-    ///@dev Pause contract
-    function pause() external {
+    /// @dev Ensures that caller is pausable admin
+    modifier pausableAdminsOnly() {
         if (!_acl.isPausableAdmin(msg.sender)) {
             revert CallerNotPausableAdminException();
         }
+        _;
+    }
+
+    /// @dev Ensures that caller is unpausable admin
+    modifier unpausableAdminsOnly() {
+        if (!_acl.isUnpausableAdmin(msg.sender)) {
+            revert CallerNotUnpausableAdminException();
+        }
+        _;
+    }
+
+    /// @dev constructor
+    /// @param addressProvider Address of address repository
+    constructor(address addressProvider) ACLTrait(addressProvider) nonZeroAddress(addressProvider) {
+        controller = IACL(AddressProvider(addressProvider).getACL()).owner();
+    }
+
+    ///@dev Pauses contract
+    function pause() external virtual pausableAdminsOnly {
         _pause();
     }
 
-    /// @dev Unpause contract
-    function unpause() external {
-        if (!_acl.isUnpausableAdmin(msg.sender)) {
-            revert CallerNotUnPausableAdminException();
-        }
-
+    /// @dev Unpauses contract
+    function unpause() external virtual unpausableAdminsOnly {
         _unpause();
     }
 
+    /// @dev Sets new external controller
     function setController(address newController) external configuratorOnly {
         externalController = !_acl.isConfigurator(newController);
         controller = newController;

@@ -1,23 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Holdings, 2022
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.17;
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
-import {IPool4626} from "./IPool4626.sol";
-
-/// @notice Quota update params
-/// @param token Address of the token to change the quota for
-/// @param quotaChange Requested quota change in pool's underlying asset units
-struct QuotaUpdate {
-    address token;
-    int96 quotaChange;
-}
-
-struct TokenLT {
-    address token;
-    uint16 lt;
-}
+import {IPoolV3} from "./IPoolV3.sol";
 
 struct TokenQuotaParams {
     uint96 totalQuoted;
@@ -33,51 +20,43 @@ struct AccountQuota {
 
 interface IPoolQuotaKeeperEvents {
     /// @dev Emits when CA's quota for token is changed
-    event AccountQuotaChanged(address creditAccount, address token, uint96 oldQuota, uint96 newQuota);
-
-    /// @dev Emits when pool's total quota for token is changed
-    event PoolQuotaChanged(address token, uint96 oldQuota, uint96 newQuota);
+    event ChangeAccountQuota(address creditAccount, address token, uint96 oldQuota, uint96 newQuota);
 
     /// @dev Emits when the quota rate is updated
-    event QuotaRateUpdated(address indexed token, uint16 rate);
+    event UpdateTokenQuotaRate(address indexed token, uint16 rate);
 
     /// @dev Emits when the gauge address is updated
-    event GaugeUpdated(address indexed newGauge);
+    event SetGauge(address indexed newGauge);
 
     /// @dev Emits when a new Credit Manager is allowed in PoolQuotaKeeper
-    event CreditManagerAdded(address indexed creditManager);
+    event AddCreditManager(address indexed creditManager);
 
     /// @dev Emits when a new token added to PoolQuotaKeeper
     event NewQuotaTokenAdded(address indexed token);
 
     /// @dev Emits when a new limit is set for a token
-    event TokenLimitSet(address indexed token, uint96 limit);
+    event SetTokenLimit(address indexed token, uint96 limit);
 }
 
 /// @title Pool Quotas Interface
 interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
     /// @dev Updates credit account's quotas for multiple tokens
     /// @param creditAccount Address of credit account
-    /// @param quotaUpdates Requested quota updates, see `QuotaUpdate`
-    function updateQuotas(address creditAccount, QuotaUpdate[] memory quotaUpdates, uint256 enableTokenMask)
+    /// @param token Address of the token to change the quota for
+    /// @param quotaChange Requested quota change in pool's underlying asset units
+    function updateQuota(address creditAccount, address token, int96 quotaChange)
         external
-        returns (uint256 caQuotaInterestChange, uint256 enableTokenMaskUpdated);
+        returns (uint256 caQuotaInterestChange, bool enableToken, bool disableToken);
 
     /// @dev Updates all quotas to zero when closing a credit account, and computes the final quota interest change
     /// @param creditAccount Address of the Credit Account being closed
-    /// @param tokensLT Array of all active quoted tokens on the account
-    function closeCreditAccount(address creditAccount, TokenLT[] memory tokensLT) external returns (uint256);
-
-    /// @dev Sets limits for a number of tokens to zero, preventing further quota increases
-    /// @notice Triggered by the Credit Manager when there is loss during liquidation
-    function setLimitsToZero(TokenLT[] memory tokensLT) external;
+    /// @param tokens Array of all active quoted tokens on the account
+    function removeQuotas(address creditAccount, address[] memory tokens, bool setLimitsToZero) external;
 
     /// @dev Computes the accrued quota interest and updates interest indexes
     /// @param creditAccount Address of the Credit Account to accrue interest for
-    /// @param tokensLT Array of all active quoted tokens on the account
-    function accrueQuotaInterest(address creditAccount, TokenLT[] memory tokensLT)
-        external
-        returns (uint256 caQuotaInterestChange);
+    /// @param tokens Array of all active quoted tokens on the account
+    function accrueQuotaInterest(address creditAccount, address[] memory tokens) external;
 
     /// @dev Gauge management
 
@@ -92,7 +71,7 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
     //
 
     /// @dev Returns the gauge address
-    function pool() external view returns (IPool4626);
+    function pool() external view returns (address);
 
     /// @dev Returns the gauge address
     function gauge() external view returns (address);
@@ -110,22 +89,14 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
     function isQuotedToken(address token) external view returns (bool);
 
     /// @dev Returns quota parameters for a single (account, token) pair
-    function getQuota(address creditManager, address creditAccount, address token)
+    function getQuota(address creditAccount, address token)
         external
         view
-        returns (AccountQuota memory);
+        returns (uint96 quota, uint192 cumulativeIndexLU);
 
     /// @dev Computes collateral value for quoted tokens on the account, as well as accrued quota interest
-    function computeQuotedCollateralUSD(
-        address creditManager,
-        address creditAccount,
-        address _priceOracle,
-        TokenLT[] memory tokens
-    ) external view returns (uint256 value, uint256 totalQuotaInterest);
-
-    /// @dev Computes outstanding quota interest
-    function outstandingQuotaInterest(address creditManager, address creditAccount, TokenLT[] memory tokens)
+    function getQuotaAndOutstandingInterest(address creditAccount, address token)
         external
         view
-        returns (uint256 caQuotaInterestChange);
+        returns (uint256 quoted, uint256 outstandingInterest);
 }
