@@ -28,7 +28,7 @@ uint256 constant INCREASE_DEBT_WAS_CALLED = 2 ** 193;
 uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 2 ** 194;
 
 // Pay bot permisson is set there because it's used for bots only
-uint256 constant PAY_BOT_PERMISSION = 2 ** 195;
+uint256 constant PAY_BOT_CAN_BE_CALLED = 2 ** 195;
 
 interface ICreditFacadeMulticall {
     /// @dev Instructs CreditFacadeV3 to check token balances at the end
