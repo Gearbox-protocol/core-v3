@@ -1157,7 +1157,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @notice Updates total debt and checks that it does not exceed the limit
     function _revertIfOutOfTotalDebtLimit(uint256 delta, ManageDebtAction action) internal {
         if (delta > 0) {
-            TotalDebt memory td = totalDebt;
+            TotalDebt storage td = totalDebt;
 
             if (action == ManageDebtAction.INCREASE_DEBT) {
                 td.currentTotalDebt += delta.toUint128();
@@ -1167,8 +1167,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             } else {
                 td.currentTotalDebt -= delta.toUint128();
             }
-
-            totalDebt = td;
         }
     }
 
