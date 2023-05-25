@@ -292,9 +292,9 @@ contract WithdrawalsLogicUnitTest is TestHelper {
         }
     }
 
-    /// ------- ///
-    /// HELPERS ///
-    /// ------- ///
+    // ------- //
+    // HELPERS //
+    // ------- //
 
     function _setupWithdrawalSlot(uint8 slot, ScheduleTask task) internal {
         if (task == ScheduleTask.NON_SCHEDULED) {

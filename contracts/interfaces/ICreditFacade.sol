@@ -74,12 +74,6 @@ interface ICreditFacadeEvents {
 
     /// @dev Emits when a multicall is finished
     event FinishMultiCall();
-
-    /// @dev Emits when Credit Account ownership is transferred
-    event TransferAccount(address indexed creditAccount, address indexed oldOwner, address indexed newOwner);
-
-    /// @dev Emits when the user changes approval for account transfers to itself from another address
-    event SetAccountTransferAllowance(address indexed from, address indexed to, bool state);
 }
 
 interface ICreditFacade is ICreditFacadeEvents, IVersion {
@@ -89,8 +83,7 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
 
     /// @dev Opens a Credit Account and runs a batch of operations in a multicall
     /// @param debt Debt size
-    /// @param onBehalfOf The address to open an account for. Transfers to it have to be allowed if
-    /// msg.sender != obBehalfOf
+    /// @param onBehalfOf The address to open an account for
     /// @param calls The array of MultiCall structs encoding the required operations. Generally must have
     /// at least a call to addCollateral, as otherwise the health check at the end will fail.
     /// @param referralCode Referral code which is used for potential rewards. 0 if no referral code provided
@@ -153,13 +146,7 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
         uint256 skipTokenMask,
         bool convertToETH,
         MultiCall[] calldata calls
-    ) external payable;
-
-    // /// @dev Adds collateral to borrower's credit account
-    // /// @param onBehalfOf Address of the borrower whose account is funded
-    // /// @param token Address of a collateral token
-    // /// @param amount Amount to add
-    // function addCollateral(address onBehalfOf, address token, uint256 amount) external payable;
+    ) external;
 
     /// @dev Executes a batch of transactions within a Multicall, to manage an existing account
     ///  - Wraps ETH and sends it back to msg.sender, if value > 0
@@ -176,21 +163,9 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     /// @param calls The array of MultiCall structs encoding the operations to execute.
     function botMulticall(address borrower, MultiCall[] calldata calls) external;
 
-    /// @dev Approves account transfer from another user to msg.sender
-    /// @param from Address for which account transfers are allowed/forbidden
-    /// @param state True is transfer is allowed, false if forbidden
-    function approveAccountTransfer(address from, bool state) external;
-
     // /// @dev Enables token in enabledTokensMask for the Credit Account of msg.sender
     // /// @param token Address of token to enable
     // function enableToken(address token) external;
-
-    /// @dev Transfers credit account to another user
-    /// By default, this action is forbidden, and the user has to approve transfers from sender to itself
-    /// by calling approveAccountTransfer.
-    /// This is done to prevent malicious actors from transferring compromised accounts to other users.
-    /// @param to Address to transfer the account to
-    function transferAccountOwnership(address creditAccount, address to) external;
 
     function claimWithdrawals(address creditAccount, address to) external;
 
@@ -217,11 +192,6 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
 
     /// @dev Returns the CreditManagerV3 connected to this Credit Facade
     function creditManager() external view returns (address);
-
-    /// @dev Returns true if 'from' is allowed to transfer Credit Accounts to 'to'
-    /// @param from Sender address to check allowance for
-    /// @param to Receiver address to check allowance for
-    function transfersAllowed(address from, address to) external view returns (bool);
 
     /// @return minDebt Minimal borrowed amount per credit account
     function debtLimits() external view returns (uint128 minDebt, uint128 maxDebt);

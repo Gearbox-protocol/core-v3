@@ -42,7 +42,7 @@ struct CreditManagerDebt {
 
 /// @title Core pool contract compatible with ERC4626
 /// @notice Implements pool & diesel token business logic
-contract PoolV3 is ERC4626, IPoolV3, ACLNonReentrantTrait, ContractsRegisterTrait {
+contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV3 {
     using Math for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;

@@ -159,11 +159,6 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
         external
         returns (uint256);
 
-    /// @dev Transfers Credit Account ownership to another address
-    /// @param from Address of previous owner
-    /// @param to Address of new owner
-    function transferAccountOwnership(address from, address to) external;
-
     /// @dev Requests the Credit Account to approve a collateral token to another contract.\
     /// @param token Collateral token to approve
     /// @param amount New allowance amount
@@ -217,7 +212,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
 
     /// @dev Returns the collateral token with requested mask and its liquidationThreshold
     /// @param tokenMask Token mask corresponding to the token
-    function collateralTokensByMask(uint256 tokenMask)
+    function collateralTokenByMask(uint256 tokenMask)
         external
         view
         returns (address token, uint16 liquidationThreshold);
@@ -302,6 +297,9 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
 
     /// @dev Address of the connected Price Oracle
     function priceOracle() external view returns (address);
+
+    /// @notice Returns the full set of currently active Credit Accounts
+    function creditAccounts() external view returns (address[] memory);
 
     function calcDebtAndCollateral(address creditAccount, CollateralCalcTask task)
         external

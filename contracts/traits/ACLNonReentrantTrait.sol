@@ -15,16 +15,38 @@ import {
 } from "../interfaces/IExceptions.sol";
 
 import {ACLTrait} from "./ACLTrait.sol";
-import {ReentrancyGuardTrait} from "./ReentrancyGuardTrait.sol";
+import {NOT_ENTERED, ENTERED} from "./ReentrancyGuardTrait.sol";
 
 /// @title ACL Trait
 /// @notice Utility class for ACL consumers
-abstract contract ACLNonReentrantTrait is ACLTrait, ReentrancyGuardTrait, Pausable {
+abstract contract ACLNonReentrantTrait is ACLTrait, Pausable {
     /// @dev Emitted when new external controller is set
     event NewController(address indexed newController);
 
+    uint8 internal _reentrancyStatus = NOT_ENTERED;
+
     address public controller;
     bool public externalController;
+
+    /// @dev Prevents a contract from calling itself, directly or indirectly.
+    /// Calling a `nonReentrant` function from another `nonReentrant`
+    /// function is not supported. It is possible to prevent this from happening
+    /// by making the `nonReentrant` function external, and making it call a
+    /// `private` function that does the actual work.
+    ///
+    modifier nonReentrant() {
+        // On the first call to nonReentrant, _notEntered will be true
+        require(_reentrancyStatus != ENTERED, "ReentrancyGuard: reentrant call");
+
+        // Any calls to nonReentrant after this point will fail
+        _reentrancyStatus = ENTERED;
+
+        _;
+
+        // By storing the original value once again, a refund is triggered (see
+        // https://eips.ethereum.org/EIPS/eip-2200)
+        _reentrancyStatus = NOT_ENTERED;
+    }
 
     /// @dev Ensures that caller is external controller (if it is set) or configurator
     modifier controllerOnly() {

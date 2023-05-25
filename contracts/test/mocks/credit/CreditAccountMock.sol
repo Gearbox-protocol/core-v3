@@ -6,7 +6,7 @@ pragma abicoder v1;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-import {ICreditAccount} from "../../../interfaces/ICreditAccount.sol";
+import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
 
 interface CreditAccountMockEvents {
     event TransferCall(address token, address to, uint256 amount);
@@ -14,7 +14,7 @@ interface CreditAccountMockEvents {
     event ExecuteCall(address destination, bytes data);
 }
 
-contract CreditAccountMock is ICreditAccount, CreditAccountMockEvents {
+contract CreditAccountMock is ICreditAccountBase, CreditAccountMockEvents {
     using Address for address;
 
     address public creditManager;
@@ -24,15 +24,14 @@ contract CreditAccountMock is ICreditAccount, CreditAccountMockEvents {
 
     bytes public return_executeResult;
 
-    mapping(address => uint8) public revertsOnTransfer;
+    mapping(address => mapping(address => bool)) public revertsOnTransfer;
 
-    function setRevertOnTransfer(address token, uint8 times) external {
-        revertsOnTransfer[token] = times;
+    function setRevertOnTransfer(address token, address to) external {
+        revertsOnTransfer[token][to] = true;
     }
 
     function safeTransfer(address token, address to, uint256 amount) external {
-        if (revertsOnTransfer[token] > 0) {
-            revertsOnTransfer[token]--;
+        if (revertsOnTransfer[token][to]) {
             revert("Token transfer reverted");
         }
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.17;
 
+import {CollateralDebtData} from "../../interfaces/ICreditManagerV3.sol";
 import "./constants.sol";
 import {Test} from "forge-std/Test.sol";
 
@@ -112,5 +113,65 @@ contract TestHelper is Test {
         assertEq(a1.length, a2.length, string.concat(reason, "Arrays has different length"));
 
         assertEq(_copyU16toU256(a1), _copyU16toU256(a2), reason);
+    }
+
+    function assertEq(CollateralDebtData memory cdd1, CollateralDebtData memory cdd2) internal {
+        assertEq(cdd1, cdd2, "");
+    }
+
+    function assertEq(CollateralDebtData memory cdd1, CollateralDebtData memory cdd2, string memory reason) internal {
+        assertEq(cdd1.debt, cdd2.debt, string.concat(reason, "\nIncorrect debt"));
+        assertEq(
+            cdd1.cumulativeIndexNow, cdd2.cumulativeIndexNow, string.concat(reason, "\nIncorrect cumulativeIndexNow")
+        );
+        assertEq(
+            cdd1.cumulativeIndexLastUpdate,
+            cdd2.cumulativeIndexLastUpdate,
+            string.concat(reason, "\nIncorrect cumulativeIndexLastUpdate")
+        );
+        assertEq(
+            cdd1.cumulativeQuotaInterest,
+            cdd2.cumulativeQuotaInterest,
+            string.concat(reason, "\nIncorrect cumulativeQuotaInterest")
+        );
+        assertEq(cdd1.accruedInterest, cdd2.accruedInterest, string.concat(reason, "\nIncorrect accruedInterest"));
+        assertEq(cdd1.accruedFees, cdd2.accruedFees, string.concat(reason, "\nIncorrect accruedFees"));
+        assertEq(cdd1.totalDebtUSD, cdd2.totalDebtUSD, string.concat(reason, "\nIncorrect totalDebtUSD"));
+        assertEq(cdd1.totalValue, cdd2.totalValue, string.concat(reason, "\nIncorrect totalValue"));
+        assertEq(cdd1.totalValueUSD, cdd2.totalValueUSD, string.concat(reason, "\nIncorrect totalValueUSD"));
+        assertEq(cdd1.twvUSD, cdd2.twvUSD, string.concat(reason, "\nIncorrect twvUSD"));
+        assertEq(cdd1.enabledTokensMask, cdd2.enabledTokensMask, string.concat(reason, "\nIncorrect enabledTokensMask"));
+        assertEq(cdd1.quotedTokensMask, cdd2.quotedTokensMask, string.concat(reason, "\nIncorrect quotedTokensMask"));
+        assertEq(cdd1.quotedTokens, cdd2.quotedTokens, string.concat(reason, "\nIncorrect quotedTokens"));
+        assertEq(cdd1.quotedLts, cdd2.quotedLts, string.concat(reason, "\nIncorrect quotedLts"));
+        assertEq(cdd1.quotas, cdd2.quotas, string.concat(reason, "\nIncorrect quotas"));
+        assertEq(cdd1._poolQuotaKeeper, cdd2._poolQuotaKeeper, string.concat(reason, "\nIncorrect _poolQuotaKeeper"));
+    }
+
+    function clone(CollateralDebtData memory src) internal pure returns (CollateralDebtData memory dst) {
+        dst.debt = src.debt;
+        dst.cumulativeIndexNow = src.cumulativeIndexNow;
+        dst.cumulativeIndexLastUpdate = src.cumulativeIndexLastUpdate;
+        dst.cumulativeQuotaInterest = src.cumulativeQuotaInterest;
+        dst.accruedInterest = src.accruedInterest;
+        dst.accruedFees = src.accruedFees;
+        dst.totalDebtUSD = src.totalDebtUSD;
+        dst.totalValue = src.totalValue;
+        dst.totalValueUSD = src.totalValueUSD;
+        dst.twvUSD = src.twvUSD;
+        dst.enabledTokensMask = src.enabledTokensMask;
+        dst.quotedTokensMask = src.quotedTokensMask;
+        dst.quotedTokens = src.quotedTokens;
+        dst.quotedLts = src.quotedLts;
+        dst.quotas = src.quotas;
+        dst._poolQuotaKeeper = src._poolQuotaKeeper;
+    }
+
+    function getHash(uint256 value, uint256 seed) internal pure returns (uint256) {
+        return uint256(keccak256(abi.encode(value, seed)));
+    }
+
+    function boolToStr(bool value) internal returns (string memory) {
+        return value ? "true" : "false";
     }
 }

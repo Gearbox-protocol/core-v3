@@ -576,7 +576,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
 
     function test_I_CM_14_close_credit_account_with_nonzero_skipTokenMask_sends_correct_tokens() public {
         (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
-        creditManager.transferAccountOwnership(creditAccount, address(this));
+        // creditManager.transferAccountOwnership(creditAccount, address(this));
 
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
         tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
@@ -592,7 +592,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         uint256 usdcTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.USDC));
         uint256 linkTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.LINK));
 
-        creditManager.transferAccountOwnership(creditAccount, USER);
+        // creditManager.transferAccountOwnership(creditAccount, USER);
 
         // creditManager.closeCreditAccount(
         //     creditAccount,
@@ -663,7 +663,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
     function test_I_CM_17_close_dai_credit_account_sends_eth_to_borrower() public {
         /// CLOSURE CASE
         (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
-        creditManager.transferAccountOwnership(creditAccount, address(this));
+        // creditManager.transferAccountOwnership(creditAccount, address(this));
 
         // Transfer additional borrowedAmount. After that underluying token balance = 2 * borrowedAmount
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
@@ -674,7 +674,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         uint256 wethTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.WETH));
         uint256 daiTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI));
 
-        creditManager.transferAccountOwnership(creditAccount, USER);
+        // creditManager.transferAccountOwnership(creditAccount, USER);
         // creditManager.closeCreditAccount(
         //     creditAccount,
         //     ClosureAction.CLOSE_ACCOUNT,
@@ -748,7 +748,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
     function test_I_CM_19_close_dai_credit_account_sends_eth_to_liquidator() public {
         /// CLOSURE CASE
         (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
-        creditManager.transferAccountOwnership(creditAccount, address(this));
+        // creditManager.transferAccountOwnership(creditAccount, address(this));
 
         // Transfer additional borrowedAmount. After that underluying token balance = 2 * borrowedAmount
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
@@ -756,7 +756,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         // Adds WETH to test how it would be converted
         tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
 
-        creditManager.transferAccountOwnership(creditAccount, USER);
+        // creditManager.transferAccountOwnership(creditAccount, USER);
         uint256 wethTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.WETH));
         uint256 daiTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI));
 
@@ -999,126 +999,6 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         assertEq0(targetMock.callData(), callData, "Incorrect calldata");
     }
 
-    //
-    // TRASNFER ASSETS TO
-    //
-
-    // /// @dev I:[CM-44]: _transferAssetsTo sends all tokens except underlying one and not-enabled to provided address
-    // function test_I_CM_44_transferAssetsTo_sends_all_tokens_except_underlying_one_to_provided_address() public {
-    //     // It enables  CreditManagerTestInternal for some test cases
-    //     _connectCreditManagerSuite(Tokens.DAI, true);
-
-    //     address[2] memory friends = [FRIEND, FRIEND2];
-
-    //     // CASE 0: convertToETH = false
-    //     // CASE 1: convertToETH = true
-    //     for (uint256 i = 0; i < 2; i++) {
-    //         bool convertToETH = i > 0;
-
-    //         address friend = friends[i];
-    //         (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
-    //         creditManager.transferAccountOwnership(creditAccount, address(this));
-
-    //         CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
-
-    //         tokenTestSuite.mint(Tokens.USDC, creditAccount, USDC_EXCHANGE_AMOUNT);
-    //         tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
-    //         tokenTestSuite.mint(Tokens.LINK, creditAccount, LINK_EXCHANGE_AMOUNT);
-
-    //         address wethTokenAddr = tokenTestSuite.addressOf(Tokens.WETH);
-    //         // creditManager.checkAndEnableToken(wethTokenAddr);
-
-    //         uint256 enabledTokensMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI))
-    //             | creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.WETH));
-
-    //         cmi.batchTokensTransfer(creditAccount, friend, convertToETH, enabledTokensMask);
-
-    //         expectBalance(Tokens.DAI, creditAccount, borrowedAmount, "Underlying assets were transffered!");
-
-    //         expectBalance(Tokens.DAI, friend, 0);
-
-    //         expectBalance(Tokens.USDC, creditAccount, USDC_EXCHANGE_AMOUNT);
-
-    //         expectBalance(Tokens.USDC, friend, 0);
-
-    //         expectBalance(Tokens.WETH, creditAccount, 1);
-
-    //         if (convertToETH) {
-    //             assertEq(
-    //                 wethGateway.balanceOf(friend),
-    //                 WETH_EXCHANGE_AMOUNT - 1,
-    //                 "Incorrect amount were sent to friend address"
-    //             );
-    //         } else {
-    //             expectBalance(Tokens.WETH, friend, WETH_EXCHANGE_AMOUNT - 1);
-    //         }
-
-    //         expectBalance(Tokens.LINK, creditAccount, LINK_EXCHANGE_AMOUNT);
-
-    //         expectBalance(Tokens.LINK, friend, 0);
-
-    //         creditManager.transferAccountOwnership(creditAccount, USER);
-    //         // creditManager.closeCreditAccount(
-    //         //     creditAccount,
-    //         //     ClosureAction.LIQUIDATE_ACCOUNT,
-    //         //     0,
-    //         //     LIQUIDATOR,
-    //         //     friend,
-    //         //     enabledTokensMask,
-    //         //     0,
-    //         //     DAI_ACCOUNT_AMOUNT,
-    //         //     false
-    //         // );
-    //     }
-    // }
-
-    //
-    // SAFE TOKEN TRANSFER
-    //
-
-    // /// @dev I:[CM-45]: _safeTokenTransfer transfers tokens
-    // function test_I_CM_45_safeTokenTransfer_transfers_tokens() public {
-    //     // It enables  CreditManagerTestInternal for some test cases
-    //     _connectCreditManagerSuite(Tokens.DAI, true);
-
-    //     uint256 WETH_TRANSFER = WETH_EXCHANGE_AMOUNT / 4;
-
-    //     address[2] memory friends = [FRIEND, FRIEND2];
-
-    //     // CASE 0: convertToETH = false
-    //     // CASE 1: convertToETH = true
-    //     for (uint256 i = 0; i < 2; i++) {
-    //         bool convertToETH = i > 0;
-
-    //         address friend = friends[i];
-    //         (,,, address creditAccount) = _openCreditAccount();
-
-    //         CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
-
-    //         tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
-
-    //         cmi.safeTokenTransfer(
-    //             creditAccount, tokenTestSuite.addressOf(Tokens.WETH), friend, WETH_TRANSFER, convertToETH
-    //         );
-
-    //         expectBalance(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT - WETH_TRANSFER);
-
-    //         if (convertToETH) {
-    //             assertEq(wethGateway.balanceOf(friend), WETH_TRANSFER, "Incorrect amount were sent to friend address");
-    //         } else {
-    //             expectBalance(Tokens.WETH, friend, WETH_TRANSFER);
-    //         }
-
-    //         // creditManager.closeCreditAccount(
-    //         //     creditAccount, ClosureAction.LIQUIDATE_ACCOUNT, 0, LIQUIDATOR, friend, 1, 0, DAI_ACCOUNT_AMOUNT, false
-    //         // );
-    //     }
-    // }
-
-    //
-    // SET PARAMS
-    //
-
     // /// @dev I:[CM-64]: closeCreditAccount reverts when attempting to liquidate while paused,
     // /// and the payer is not set as emergency liquidator
 
@@ -1198,40 +1078,6 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         // }
     }
 
-    // /// @dev I:[CM-67]: checkEmergencyPausable returns pause state and enable emergencyLiquidation if needed
-    // function test_I_CM_67_checkEmergencyPausable_returns_pause_state_and_enable_emergencyLiquidation_if_needed() public {
-    //     bool p = creditManager.checkEmergencyPausable(DUMB_ADDRESS, true);
-    //     assertTrue(!p, "Incorrect paused() value for non-paused state");
-    //     assertTrue(!creditManager.emergencyLiquidation(), "Emergency liquidation true when expected false");
-
-    //     vm.prank(CONFIGURATOR);
-    //     creditManager.pause();
-
-    //     p = creditManager.checkEmergencyPausable(DUMB_ADDRESS, true);
-    //     assertTrue(p, "Incorrect paused() value for paused state");
-    //     assertTrue(!creditManager.emergencyLiquidation(), "Emergency liquidation true when expected false");
-
-    //     vm.prank(CONFIGURATOR);
-    //     creditManager.unpause();
-
-    //     vm.prank(CONFIGURATOR);
-    //     creditManager.addEmergencyLiquidator(DUMB_ADDRESS);
-    //     p = creditManager.checkEmergencyPausable(DUMB_ADDRESS, true);
-    //     assertTrue(!p, "Incorrect paused() value for non-paused state");
-    //     assertTrue(!creditManager.emergencyLiquidation(), "Emergency liquidation true when expected false");
-
-    //     vm.prank(CONFIGURATOR);
-    //     creditManager.pause();
-
-    //     p = creditManager.checkEmergencyPausable(DUMB_ADDRESS, true);
-    //     assertTrue(p, "Incorrect paused() value for paused state");
-    //     assertTrue(creditManager.emergencyLiquidation(), "Emergency liquidation flase when expected true");
-
-    //     p = creditManager.checkEmergencyPausable(DUMB_ADDRESS, false);
-    //     assertTrue(p, "Incorrect paused() value for paused state");
-    //     assertTrue(!creditManager.emergencyLiquidation(), "Emergency liquidation true when expected false");
-    // }
-
     /// @dev I:[CM-68]: fullCollateralCheck checks tokens in correct order
     function test_I_CM_68_fullCollateralCheck_is_evaluated_in_order_of_hints() public {
         (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow, address creditAccount) =
@@ -1296,74 +1142,5 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         uint256 enabledTokensMap = 1;
 
         creditManager.fullCollateralCheck(creditAccount, enabledTokensMap, ch, PERCENTAGE_FACTOR);
-    }
-
-    // /// @dev I:[CM-71]: rampLiquidationThreshold correctly updates the internal struct
-    // function test_I_CM_71_rampLiquidationThreshold_correctly_updates_parameters() public {
-    //     _connectCreditManagerSuite(Tokens.DAI, true);
-
-    //     address usdc = tokenTestSuite.addressOf(Tokens.USDC);
-
-    //     CreditManagerTestInternal cmi = CreditManagerTestInternal(address(creditManager));
-
-    //     vm.prank(CONFIGURATOR);
-    //     cmi.setCollateralTokenData(usdc, 8500, 9000, uint40(block.timestamp), 3600 * 24 * 7);
-
-    //     CollateralTokenData memory cd = cmi.collateralTokensDataExt(cmi.getTokenMaskOrRevert(usdc));
-
-    //     assertEq(uint256(cd.ltInitial), creditConfig.lt(Tokens.USDC), "Incorrect initial LT");
-
-    //     assertEq(uint256(cd.ltFinal), 8500, "Incorrect final LT");
-
-    //     assertEq(uint256(cd.timestampRampStart), block.timestamp, "Incorrect timestamp start");
-
-    //     assertEq(uint256(cd.rampDuration), 3600 * 24 * 7, "Incorrect ramp duration");
-    // }
-
-    /// @dev I:[CM-72]: Ramping liquidation threshold fuzzing
-    function test_I_CM_72_liquidation_ramping_fuzzing(
-        uint16 initialLT,
-        uint16 newLT,
-        uint24 duration,
-        uint256 timestampCheck
-    ) public {
-        // initialLT = 1000 + (initialLT % (DEFAULT_UNDERLYING_LT - 999));
-        // newLT = 1000 + (newLT % (DEFAULT_UNDERLYING_LT - 999));
-        // duration = 3600 + (duration % (3600 * 24 * 90 - 3600));
-
-        // timestampCheck = block.timestamp + (timestampCheck % (duration + 1));
-
-        // address usdc = tokenTestSuite.addressOf(Tokens.USDC);
-
-        // uint256 timestampStart = block.timestamp;
-
-        // vm.startPrank(CONFIGURATOR);
-        // creditManager.setCollateralTokenData(usdc, initialLT);
-        // creditManager.rampLiquidationThreshold(usdc, newLT, uint40(block.timestamp), duration);
-
-        // assertEq(creditManager.liquidationThresholds(usdc), initialLT, "LT at ramping start incorrect");
-
-        // uint16 expectedLT;
-        // if (newLT >= initialLT) {
-        //     expectedLT = uint16(
-        //         uint256(initialLT)
-        //             + (uint256(newLT - initialLT) * (timestampCheck - timestampStart)) / uint256(duration)
-        //     );
-        // } else {
-        //     expectedLT = uint16(
-        //         uint256(initialLT)
-        //             - (uint256(initialLT - newLT) * (timestampCheck - timestampStart)) / uint256(duration)
-        //     );
-        // }
-
-        // vm.warp(timestampCheck);
-        // uint16 actualLT = creditManager.liquidationThresholds(usdc);
-        // uint16 diff = actualLT > expectedLT ? actualLT - expectedLT : expectedLT - actualLT;
-
-        // assertLe(diff, 1, "LT off by more than 1");
-
-        // vm.warp(timestampStart + duration + 1);
-
-        // assertEq(creditManager.liquidationThresholds(usdc), newLT, "LT at ramping end incorrect");
     }
 }

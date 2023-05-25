@@ -2,7 +2,7 @@ pragma solidity ^0.8.17;
 
 import {CreditManagerV3, CreditAccountInfo} from "../../../credit/CreditManagerV3.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {CollateralDebtData, CollateralCalcTask} from "../../../interfaces/ICreditManagerV3.sol";
+import {CollateralDebtData, CollateralCalcTask, CollateralTokenData} from "../../../interfaces/ICreditManagerV3.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
@@ -56,10 +56,10 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         creditAccountInfo[creditAccount].borrower = borrower;
     }
 
-    function batchTokensTransfer(address creditAccount, address to, bool convertToETH, uint256 enabledTokensMask)
+    function batchTokensTransfer(address creditAccount, address to, bool convertToETH, uint256 tokensToTransferMask)
         external
     {
-        _batchTokensTransfer(creditAccount, to, convertToETH, enabledTokensMask);
+        _batchTokensTransfer(creditAccount, to, convertToETH, tokensToTransferMask);
     }
 
     function safeTokenTransfer(address creditAccount, address token, address to, uint256 amount, bool convertToETH)
@@ -68,12 +68,12 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         _safeTokenTransfer(creditAccount, token, to, amount, convertToETH);
     }
 
-    function collateralTokensByMaskCalcLT(uint256 tokenMask, bool calcLT)
+    function collateralTokenByMaskCalcLT(uint256 tokenMask, bool calcLT)
         external
         view
         returns (address token, uint16 liquidationThreshold)
     {
-        return _collateralTokensByMask(tokenMask, calcLT);
+        return _collateralTokenByMask(tokenMask, calcLT);
     }
 
     /// @dev Calculates collateral and debt parameters
@@ -113,5 +113,17 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         )
     {
         return _getQuotedTokensData(creditAccount, enabledTokensMask, _poolQuotaKeeper);
+    }
+
+    function getCancellableWithdrawalsValue(address _priceOracle, address creditAccount, bool isForceCancel)
+        external
+        view
+        returns (uint256 totalValueUSD)
+    {
+        return _getCancellableWithdrawalsValue(_priceOracle, creditAccount, isForceCancel);
+    }
+
+    function getCollateralTokensData(uint256 tokenMask) external view returns (CollateralTokenData memory) {
+        return collateralTokensData[tokenMask];
     }
 }

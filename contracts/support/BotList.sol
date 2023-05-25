@@ -12,7 +12,7 @@ import {IBotList, BotFunding} from "../interfaces/IBotList.sol";
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {ICreditFacade} from "../interfaces/ICreditFacade.sol";
-import {ICreditAccount} from "../interfaces/ICreditAccount.sol";
+import {ICreditAccountBase} from "../interfaces/ICreditAccountV3.sol";
 
 import "../interfaces/IExceptions.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
@@ -212,7 +212,7 @@ contract BotList is ACLNonReentrantTrait, IBotList {
 
     /// @dev Internal function to retrieve the bot's owner
     function _getCreditAccountOwner(address creditAccount) internal view returns (address owner) {
-        address creditManager = ICreditAccount(creditAccount).creditManager();
+        address creditManager = ICreditAccountBase(creditAccount).creditManager();
         return ICreditManagerV3(creditManager).getBorrowerOrRevert(creditAccount);
     }
 
