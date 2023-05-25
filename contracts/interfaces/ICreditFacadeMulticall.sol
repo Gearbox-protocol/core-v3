@@ -27,7 +27,7 @@ uint256 constant ALL_PERMISSIONS = ALL_CREDIT_FACADE_CALLS_PERMISSION | EXTERNAL
 uint256 constant INCREASE_DEBT_WAS_CALLED = 2 ** 193;
 uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 2 ** 194;
 
-// Pay bot permisson is set there because it's used for bots only
+// pay bot is a flag which is enabled in botMulticall function only to allow one payment operation
 uint256 constant PAY_BOT_CAN_BE_CALLED = 2 ** 195;
 
 interface ICreditFacadeMulticall {
