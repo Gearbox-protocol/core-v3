@@ -47,7 +47,7 @@ contract CreditFacadeTestHelper is TestHelper {
         return creditFacade.openCreditAccount(
             borrowedAmount,
             onBehalfOf,
-            MultiCallBuilder(
+            multiCallBuilder(
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, amount))
@@ -132,14 +132,14 @@ contract CreditFacadeTestHelper is TestHelper {
         vm.roll(block.number + 1);
     }
 
-    function MultiCallBuilder() internal pure returns (MultiCall[] memory calls) {}
+    function multiCallBuilder() internal pure returns (MultiCall[] memory calls) {}
 
-    function MultiCallBuilder(MultiCall memory call1) internal pure returns (MultiCall[] memory calls) {
+    function multiCallBuilder(MultiCall memory call1) internal pure returns (MultiCall[] memory calls) {
         calls = new MultiCall[](1);
         calls[0] = call1;
     }
 
-    function MultiCallBuilder(MultiCall memory call1, MultiCall memory call2)
+    function multiCallBuilder(MultiCall memory call1, MultiCall memory call2)
         internal
         pure
         returns (MultiCall[] memory calls)
@@ -149,7 +149,7 @@ contract CreditFacadeTestHelper is TestHelper {
         calls[1] = call2;
     }
 
-    function MultiCallBuilder(MultiCall memory call1, MultiCall memory call2, MultiCall memory call3)
+    function multiCallBuilder(MultiCall memory call1, MultiCall memory call2, MultiCall memory call3)
         internal
         pure
         returns (MultiCall[] memory calls)
