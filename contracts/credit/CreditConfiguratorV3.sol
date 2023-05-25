@@ -67,9 +67,6 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     /// @notice Set of emergency liquidators
     EnumerableSet.AddressSet private emergencyLiquidatorsSet;
 
-    /// @notice Set of forbidden tokens
-    EnumerableSet.AddressSet private forbiddenTokensSet;
-
     /// @notice Contract version
     uint256 public constant version = 3_00;
 
@@ -125,18 +122,6 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
                 uint256 emergencyLiquidatorsLen = emergencyLiquidatorsPrev.length;
                 for (uint256 i = 0; i < emergencyLiquidatorsLen;) {
                     emergencyLiquidatorsSet.add(emergencyLiquidatorsPrev[i]); // I:[CC-29]
-
-                    unchecked {
-                        ++i;
-                    }
-                }
-            }
-            {
-                address[] memory forbiddenTokensPrev = CreditConfigurator(currentConfigurator).forbiddenTokens(); // I:[CC-29]
-
-                uint256 forbiddenTokensLen = forbiddenTokensPrev.length;
-                for (uint256 i = 0; i < forbiddenTokensLen;) {
-                    forbiddenTokensSet.add(forbiddenTokensPrev[i]); // I:[CC-29]
 
                     unchecked {
                         ++i;
@@ -324,7 +309,6 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         // Skipping case: I:[CC-8]
         if (forbiddenTokenMask & tokenMask != 0) {
             creditFacade().setTokenAllowance(token, AllowanceAction.ALLOW); // I:[CC-8]
-            forbiddenTokensSet.remove(token); // I:[CC-8]
             emit AllowToken(token); // I:[CC-8]
         }
     }
@@ -354,7 +338,6 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         // Skipping case: I:[CC-9]
         if (forbiddenTokenMask & tokenMask == 0) {
             creditFacade().setTokenAllowance(token, AllowanceAction.FORBID); // I:[CC-9]
-            forbiddenTokensSet.add(token); // I:[CC-9]
             emit ForbidToken(token); // I:[CC-9]
         }
     }
@@ -692,6 +675,8 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
             (totalDebtCurrent, totalDebtLimitCurrent) = creditFacade().totalDebt();
         }
 
+        uint256 forbiddenTokenMask = creditFacade().forbiddenTokenMask();
+
         // Sets Credit Facade to the new address
         creditManager.setCreditFacade(_creditFacade); // I:[CC-22]
 
@@ -706,7 +691,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
 
             // Migrates array-based parameters
             _migrateEmergencyLiquidators(); // I:[CC-22С]
-            _migrateForbiddenTokens(); // I:[CC-22С]
+            _migrateForbiddenTokens(forbiddenTokenMask); // I:[CC-22С]
 
             // Copies the expiration date if the contract is expirable
             if (expirable) _setExpirationDate(expirationDate); // I:[CC-22]
@@ -736,12 +721,11 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
 
     /// @notice Internal function to migrate forbidden tokens when
     ///      updating the Credit Facade
-    function _migrateForbiddenTokens() internal {
-        uint256 len = forbiddenTokensSet.length();
-        for (uint256 i; i < len;) {
-            _forbidToken(forbiddenTokensSet.at(i));
-            unchecked {
-                ++i;
+    function _migrateForbiddenTokens(uint256 forbiddenTokenMask) internal {
+        for (uint256 mask = 1; mask <= forbiddenTokenMask; mask = mask << 1) {
+            if (mask & forbiddenTokenMask != 0) {
+                address token = creditManager.getTokenByMask(mask);
+                _forbidToken(token);
             }
         }
     }
@@ -754,15 +738,6 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         uint256 len = emergencyLiquidators.length;
         for (uint256 i; i < len;) {
             emergencyLiquidatorsSet.remove(emergencyLiquidators[i]);
-            unchecked {
-                ++i;
-            }
-        }
-
-        address[] memory forbiddenTokens = forbiddenTokensSet.values();
-        len = forbiddenTokens.length;
-        for (uint256 i; i < len;) {
-            forbiddenTokensSet.remove(forbiddenTokens[i]);
             unchecked {
                 ++i;
             }
@@ -1038,18 +1013,6 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         result = new address[](len);
         for (uint256 i; i < len;) {
             result[i] = emergencyLiquidatorsSet.at(i);
-            unchecked {
-                ++i;
-            }
-        }
-    }
-
-    /// @notice Returns all forbidden tokens
-    function forbiddenTokens() external view override returns (address[] memory result) {
-        uint256 len = forbiddenTokensSet.length();
-        result = new address[](len);
-        for (uint256 i; i < len;) {
-            result[i] = forbiddenTokensSet.at(i);
             unchecked {
                 ++i;
             }

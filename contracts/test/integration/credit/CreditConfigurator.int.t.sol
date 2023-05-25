@@ -512,10 +512,6 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         creditConfigurator.allowToken(usdcToken);
 
         assertEq(creditFacade.forbiddenTokenMask(), 0, "Incorrect forbidden mask");
-
-        address[] memory forbiddenTokens = creditConfigurator.forbiddenTokens();
-
-        assertEq(forbiddenTokens.length, 0, "Token was not deleted from forbidden array");
     }
 
     /// @dev I:[CC-9]: forbidToken works correctly
@@ -531,20 +527,10 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
 
         assertEq(creditFacade.forbiddenTokenMask(), usdcMask, "Incorrect forbidden mask");
 
-        address[] memory forbiddenTokens = creditConfigurator.forbiddenTokens();
-
-        assertEq(forbiddenTokens.length, 1, "Token was not added to forbidden array");
-
-        assertEq(forbiddenTokens[0], usdcToken, "Token in array not correct");
-
         vm.prank(CONFIGURATOR);
         creditConfigurator.forbidToken(usdcToken);
 
         assertEq(creditFacade.forbiddenTokenMask(), usdcMask, "Incorrect forbidden mask");
-
-        forbiddenTokens = creditConfigurator.forbiddenTokens();
-
-        assertEq(forbiddenTokens.length, 1, "Token was added to array an extra time");
     }
 
     //
@@ -1092,9 +1078,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
 
                 assertEq(el.length, 0, "Emergency liquidator array was not deleted");
 
-                address[] memory ft = creditConfigurator.forbiddenTokens();
-
-                assertEq(ft.length, 0, "Emergency liquidator array was not deleted");
+                assertEq(cf.forbiddenTokenMask(), 0, "Incorrect forbidden token mask");
             }
         }
     }
@@ -1217,7 +1201,6 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         creditConfigurator.allowAdapter(address(adapter1));
         creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS);
         creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS2);
-        creditConfigurator.forbidToken(tokenTestSuite.addressOf(Tokens.CVX));
         vm.stopPrank();
 
         CollateralToken[] memory cTokens;
@@ -1249,12 +1232,6 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
             "Incorrect new emergency liquidators array"
         );
 
-        assertEq(
-            creditConfigurator.forbiddenTokens().length,
-            newCC.forbiddenTokens().length,
-            "Incorrect new emergency liquidators array"
-        );
-
         uint256 len = newCC.allowedAdapters().length;
 
         for (uint256 i = 0; i < len;) {
@@ -1276,20 +1253,6 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
                 creditConfigurator.emergencyLiquidators()[i],
                 newCC.emergencyLiquidators()[i],
                 "Emergency liquidators migrated incorrectly"
-            );
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        len = newCC.forbiddenTokens().length;
-
-        for (uint256 i = 0; i < len;) {
-            assertEq(
-                creditConfigurator.forbiddenTokens()[i],
-                newCC.forbiddenTokens()[i],
-                "Forbidden tokens migrated incorrectly"
             );
 
             unchecked {

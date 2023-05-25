@@ -277,7 +277,4 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
 
     /// @dev Returns all emergency liquidators
     function emergencyLiquidators() external view returns (address[] memory);
-
-    /// @dev Returns all forbidden tokens
-    function forbiddenTokens() external view returns (address[] memory);
 }
