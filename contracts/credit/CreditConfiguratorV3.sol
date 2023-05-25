@@ -3,7 +3,6 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import "../interfaces/IAddressProviderV3.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
@@ -27,6 +26,7 @@ import {CreditFacadeV3} from "./CreditFacadeV3.sol";
 import {CreditManagerV3} from "./CreditManagerV3.sol";
 
 // INTERFACES
+import {IAdapter} from "../interfaces/IAdapter.sol";
 import {
     ICreditConfigurator,
     CollateralToken,
@@ -36,6 +36,7 @@ import {
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
 import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
+import "../interfaces/IAddressProviderV3.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
@@ -61,7 +62,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     address public override underlying;
 
     /// @notice Set of allowed contracts
-    EnumerableSet.AddressSet private allowedContractsSet;
+    EnumerableSet.AddressSet private allowedAdaptersSet;
 
     /// @notice Set of emergency liquidators
     EnumerableSet.AddressSet private emergencyLiquidatorsSet;
@@ -106,11 +107,11 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
             /// 2. Emergency liquidator set stores all emergency liquidators - used for parameter migration when changing the Credit Facade
             /// 3. Forbidden token set stores all forbidden tokens - used for parameter migration when changing the Credit Facade
             {
-                address[] memory allowedContractsPrev = CreditConfigurator(currentConfigurator).allowedContracts(); // I:[CC-29]
+                address[] memory allowedContractsPrev = CreditConfigurator(currentConfigurator).allowedAdapters(); // I:[CC-29]
 
                 uint256 allowedContractsLen = allowedContractsPrev.length;
                 for (uint256 i = 0; i < allowedContractsLen;) {
-                    allowedContractsSet.add(allowedContractsPrev[i]); // I:[CC-29]
+                    allowedAdaptersSet.add(allowedContractsPrev[i]); // I:[CC-29]
 
                     unchecked {
                         ++i;
@@ -407,29 +408,25 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
 
     /// @notice Adds pair [contract <-> adapter] to the list of allowed contracts
     /// or updates adapter address if a contract already has a connected adapter
-    /// @param targetContract Address of allowed contract
+    /// @dev The target contract is retrieved from the adapter
     /// @param adapter Adapter address
-    function allowContract(address targetContract, address adapter)
+    function allowAdapter(address adapter)
         external
         override
         configuratorOnly // I:[CC-2]
     {
-        _allowContract(targetContract, adapter);
+        address targetContract = _getAdapterTargetOrRevert(adapter);
+        _allowAdapter(targetContract, adapter);
     }
 
     /// @notice IMPLEMENTATION: allowContract
-    function _allowContract(address targetContract, address adapter)
+    function _allowAdapter(address targetContract, address adapter)
         internal
-        nonZeroAddress(targetContract) // I: [CC-10A]
+        nonZeroAddress(targetContract) // I: [CC-10]
     {
-        // Checks that targetContract or adapter != address(0)
-
         if (!targetContract.isContract()) {
             revert AddressIsNotContractException(targetContract);
         } // I:[CC-10A]
-
-        // Checks that the adapter is an actual contract and has the correct Credit Manager and is an actual contract
-        _revertIfContractIncompatible(adapter); // I:[CC-10, CC-10B]
 
         // Additional check that adapter or targetContract is not
         // creditManager or creditFacade.
@@ -439,11 +436,6 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
             targetContract == address(creditManager) || targetContract == address(creditFacade())
                 || adapter == address(creditManager) || adapter == address(creditFacade())
         ) revert TargetContractNotAllowedException(); // I:[CC-10C]
-
-        // Checks that adapter is not used for another target
-        if (creditManager.adapterToContract(adapter) != address(0)) {
-            revert AdapterUsedTwiceException();
-        } // I:[CC-10D]
 
         // If there is an existing adapter for the target contract, it has to be removed
         address currentAdapter = creditManager.contractToAdapter(targetContract);
@@ -455,24 +447,32 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         creditManager.setContractAllowance({adapter: adapter, targetContract: targetContract}); // I:[CC-11]
 
         // adds contract to the list of allowed contracts
-        allowedContractsSet.add(targetContract); // I:[CC-11]
+        allowedAdaptersSet.add(adapter); // I:[CC-11]
 
-        emit AllowContract(targetContract, adapter); // I:[CC-11]
+        emit AllowAdapter(targetContract, adapter); // I:[CC-11]
     }
 
-    /// @notice Forbids contract as a target for calls from Credit Accounts
+    /// @notice Forbids an adapter as a target for calls from Credit Accounts
     /// Internally, mappings that determine the adapter <> targetContract link
     /// Are reset to zero addresses
-    /// @param targetContract Address of a contract to be forbidden
-    function forbidContract(address targetContract)
+    /// @param adapter Address of an adapter to be forbidden
+    function forbidAdapter(address adapter)
         external
         override
         controllerOnly // I:[CC-2B]
-        nonZeroAddress(targetContract) // I:[CC-10]
     {
-        // Checks that targetContract has a connected adapter
-        address adapter = creditManager.contractToAdapter(targetContract);
-        if (adapter == address(0)) {
+        address targetContract = _getAdapterTargetOrRevert(adapter);
+        _forbidAdapter(targetContract, adapter);
+    }
+
+    function _forbidAdapter(address targetContract, address adapter)
+        internal
+        nonZeroAddress(targetContract) // I:[CC-10]
+        nonZeroAddress(adapter) // I:[CC-10]
+    {
+        // Checks that adapter in the CM is the same as the passed adapter
+        address adapterCM = creditManager.contractToAdapter(targetContract);
+        if (adapter != adapterCM) {
             revert ContractIsNotAnAllowedAdapterException();
         } // I:[CC-13]
 
@@ -483,9 +483,20 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         creditManager.setContractAllowance({adapter: address(0), targetContract: targetContract}); // I:[CC-14]
 
         // removes contract from the list of allowed contracts
-        allowedContractsSet.remove(targetContract); // I:[CC-14]
+        allowedAdaptersSet.remove(adapter); // I:[CC-14]
 
-        emit ForbidContract(targetContract); // I:[CC-14]
+        emit ForbidAdapter(targetContract, adapter); // I:[CC-14]
+    }
+
+    /// @notice Checks adapter compatibility and retrieves the target contract with proper error handling
+    function _getAdapterTargetOrRevert(address adapter) internal view returns (address targetContract) {
+        _revertIfContractIncompatible(adapter); // I: [CC-10, CC-10B]
+
+        try IAdapter(adapter).targetContract() returns (address tc) {
+            targetContract = tc;
+        } catch {
+            revert IncompatibleContractException();
+        }
     }
 
     //
@@ -1009,12 +1020,12 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     // GETTERS
     //
 
-    /// @notice Returns all allowed contracts
-    function allowedContracts() external view override returns (address[] memory result) {
-        uint256 len = allowedContractsSet.length();
+    /// @notice Returns all allowed adapters
+    function allowedAdapters() external view override returns (address[] memory result) {
+        uint256 len = allowedAdaptersSet.length();
         result = new address[](len);
         for (uint256 i; i < len;) {
-            result[i] = allowedContractsSet.at(i);
+            result[i] = allowedAdaptersSet.at(i);
             unchecked {
                 ++i;
             }

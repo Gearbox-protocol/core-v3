@@ -327,7 +327,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         creditConfigurator.allowToken(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.allowContract(DUMB_ADDRESS, DUMB_ADDRESS);
+        creditConfigurator.allowAdapter(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.setFees(0, 0, 0, 0, 0);
@@ -392,7 +392,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         creditConfigurator.setExpirationDate(0);
 
         vm.expectRevert(CallerNotControllerException.selector);
-        creditConfigurator.forbidContract(DUMB_ADDRESS);
+        creditConfigurator.forbidAdapter(DUMB_ADDRESS);
     }
 
     //
@@ -551,91 +551,82 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
     // CONFIGURATION: CONTRACTS & ADAPTERS MANAGEMENT
     //
 
-    /// @dev I:[CC-10]: allowContract and forbidContract reverts for zero address
-    function test_I_CC_10_allowContract_and_forbidContract_reverts_for_zero_address() public {
+    /// @dev I:[CC-10]: allowAdapter and forbidAdapter reverts for zero address
+    function test_I_CC_10_allowAdapter_and_forbidAdapter_reverts_for_zero_address() public {
         vm.startPrank(CONFIGURATOR);
 
         vm.expectRevert(ZeroAddressException.selector);
-        creditConfigurator.allowContract(address(0), address(this));
+        creditConfigurator.allowAdapter(address(0));
+
+        vm.mockCall(address(adapter1), abi.encodeCall(IAdapter.targetContract, ()), abi.encode(address(0)));
 
         vm.expectRevert(ZeroAddressException.selector);
-        creditConfigurator.allowContract(address(this), address(0));
+        creditConfigurator.allowAdapter(address(adapter1));
 
         vm.expectRevert(ZeroAddressException.selector);
-        creditConfigurator.forbidContract(address(0));
+        creditConfigurator.forbidAdapter(address(0));
+
+        vm.expectRevert(ZeroAddressException.selector);
+        creditConfigurator.forbidAdapter(address(adapter1));
 
         vm.stopPrank();
     }
 
-    /// @dev I:[CC-10A]: allowContract reverts for non contract addresses
-    function test_I_CC_10A_allowContract_reverts_for_non_contract_addresses() public {
+    /// @dev I:[CC-10A]: allowAdapter reverts for non contract addresses
+    function test_I_CC_10A_allowAdapter_reverts_for_non_contract_addresses() public {
         vm.startPrank(CONFIGURATOR);
 
         vm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, DUMB_ADDRESS));
-        creditConfigurator.allowContract(address(this), DUMB_ADDRESS);
-
-        vm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, DUMB_ADDRESS));
-        creditConfigurator.allowContract(DUMB_ADDRESS, address(this));
+        creditConfigurator.allowAdapter(DUMB_ADDRESS);
 
         vm.stopPrank();
     }
 
-    /// @dev I:[CC-10B]: allowContract reverts for non compartible adapter contract
-    function test_I_CC_10B_allowContract_reverts_for_non_compartible_adapter_contract() public {
+    /// @dev I:[CC-10B]: allowAdapter reverts for non compartible adapter contract
+    function test_I_CC_10B_allowAdapter_reverts_for_non_compartible_adapter_contract() public {
         vm.startPrank(CONFIGURATOR);
-
-        // Should be reverted, cause undelring token has no .creditManager() method
-        vm.expectRevert(IncompatibleContractException.selector);
-        creditConfigurator.allowContract(address(this), underlying);
 
         // Should be reverted, cause it's conncted to another creditManager
         vm.expectRevert(IncompatibleContractException.selector);
-        creditConfigurator.allowContract(address(this), address(adapterDifferentCM));
+        creditConfigurator.allowAdapter(address(adapterDifferentCM));
 
         vm.stopPrank();
     }
 
-    /// @dev I:[CC-10C]: allowContract reverts for creditManager and creditFacade contracts
-    function test_I_CC_10C_allowContract_reverts_for_creditManager_and_creditFacade_contracts() public {
+    /// @dev I:[CC-10C]: allowAdapter reverts for creditManager and creditFacade contracts
+    function test_I_CC_10C_allowAdapter_reverts_for_creditManager_and_creditFacade_contracts() public {
         vm.startPrank(CONFIGURATOR);
 
-        vm.expectRevert(TargetContractNotAllowedException.selector);
-        creditConfigurator.allowContract(address(creditManager), DUMB_COMPARTIBLE_CONTRACT);
+        vm.mockCall(
+            DUMB_COMPARTIBLE_CONTRACT, abi.encodeCall(IAdapter.targetContract, ()), abi.encode(address(creditManager))
+        );
 
         vm.expectRevert(TargetContractNotAllowedException.selector);
-        creditConfigurator.allowContract(DUMB_COMPARTIBLE_CONTRACT, address(creditFacade));
+        creditConfigurator.allowAdapter(DUMB_COMPARTIBLE_CONTRACT);
+
+        vm.mockCall(
+            DUMB_COMPARTIBLE_CONTRACT, abi.encodeCall(IAdapter.targetContract, ()), abi.encode(address(creditFacade))
+        );
 
         vm.expectRevert(TargetContractNotAllowedException.selector);
-        creditConfigurator.allowContract(address(creditFacade), DUMB_COMPARTIBLE_CONTRACT);
+        creditConfigurator.allowAdapter(DUMB_COMPARTIBLE_CONTRACT);
 
         vm.stopPrank();
     }
 
-    /// @dev I:[CC-10D]: allowContract: adapter could not be used twice
-    function test_I_CC_10D_allowContract_adapter_cannot_be_used_twice() public {
-        vm.startPrank(CONFIGURATOR);
-
-        creditConfigurator.allowContract(DUMB_COMPARTIBLE_CONTRACT, address(adapter1));
-
-        vm.expectRevert(AdapterUsedTwiceException.selector);
-        creditConfigurator.allowContract(address(adapterDifferentCM), address(adapter1));
-
-        vm.stopPrank();
-    }
-
-    /// @dev I:[CC-11]: allowContract allows targetContract <-> adapter and emits event
-    function test_I_CC_11_allowContract_allows_targetContract_adapter_and_emits_event() public {
-        address[] memory allowedContracts = creditConfigurator.allowedContracts();
-        uint256 allowedContractCount = allowedContracts.length;
+    /// @dev I:[CC-11]: allowAdapter allows targetContract <-> adapter and emits event
+    function test_I_CC_11_allowAdapter_allows_targetContract_adapter_and_emits_event() public {
+        address[] memory allowedAdapters = creditConfigurator.allowedAdapters();
+        uint256 allowedAdapterCount = allowedAdapters.length;
 
         vm.prank(CONFIGURATOR);
 
         vm.expectEmit(true, true, false, false);
-        emit AllowContract(TARGET_CONTRACT, address(adapter1));
+        emit AllowAdapter(TARGET_CONTRACT, address(adapter1));
 
-        assertTrue(!allowedContracts.includes(TARGET_CONTRACT), "Contract already added");
+        assertTrue(!allowedAdapters.includes(TARGET_CONTRACT), "Contract already added");
 
-        creditConfigurator.allowContract(TARGET_CONTRACT, address(adapter1));
+        creditConfigurator.allowAdapter(address(adapter1));
 
         assertEq(
             creditManager.adapterToContract(address(adapter1)), TARGET_CONTRACT, "adapterToContract wasn't udpated"
@@ -645,17 +636,17 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
             creditManager.contractToAdapter(TARGET_CONTRACT), address(adapter1), "contractToAdapter wasn't udpated"
         );
 
-        allowedContracts = creditConfigurator.allowedContracts();
+        allowedAdapters = creditConfigurator.allowedAdapters();
 
-        assertEq(allowedContracts.length, allowedContractCount + 1, "Incorrect allowed contracts count");
+        assertEq(allowedAdapters.length, allowedAdapterCount + 1, "Incorrect allowed contracts count");
 
-        assertTrue(allowedContracts.includes(TARGET_CONTRACT), "Target contract wasnt found");
+        assertTrue(allowedAdapters.includes(address(adapter1)), "Target contract wasnt found");
     }
 
-    /// @dev I:[CC-12]: allowContract removes existing adapter
-    function test_I_CC_12_allowContract_removes_old_adapter_if_it_exists() public {
+    /// @dev I:[CC-12]: allowAdapter removes existing adapter
+    function test_I_CC_12_allowAdapter_removes_old_adapter_if_it_exists() public {
         vm.prank(CONFIGURATOR);
-        creditConfigurator.allowContract(TARGET_CONTRACT, address(adapter1));
+        creditConfigurator.allowAdapter(address(adapter1));
 
         AdapterMock adapter2 = new AdapterMock(
             address(creditManager),
@@ -663,7 +654,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         );
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.allowContract(TARGET_CONTRACT, address(adapter2));
+        creditConfigurator.allowAdapter(address(adapter2));
 
         assertEq(creditManager.contractToAdapter(TARGET_CONTRACT), address(adapter2), "Incorrect adapter");
 
@@ -676,42 +667,45 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         assertEq(creditManager.adapterToContract(address(adapter1)), address(0), "Old adapter was not removed");
     }
 
-    /// @dev I:[CC-13]: forbidContract reverts for unknown contract
-    function test_I_CC_13_forbidContract_reverts_for_unknown_contract() public {
+    /// @dev I:[CC-13]: forbidAdapter reverts for non-connected adapter
+    function test_I_CC_13_forbidAdapter_reverts_for_unknown_contract() public {
+        AdapterMock adapter2 = new AdapterMock(address(creditManager), TARGET_CONTRACT);
+
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.allowAdapter(address(adapter1));
+
         vm.expectRevert(ContractIsNotAnAllowedAdapterException.selector);
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.forbidContract(TARGET_CONTRACT);
+        creditConfigurator.forbidAdapter(address(adapter2));
     }
 
-    /// @dev I:[CC-14]: forbidContract forbids contract and emits event
-    function test_I_CC_14_forbidContract_forbids_contract_and_emits_event() public {
+    /// @dev I:[CC-14]: forbidAdapter forbids contract and emits event
+    function test_I_CC_14_forbidAdapter_forbids_contract_and_emits_event() public {
         vm.startPrank(CONFIGURATOR);
-        creditConfigurator.allowContract(DUMB_COMPARTIBLE_CONTRACT, address(adapter1));
+        creditConfigurator.allowAdapter(address(adapter1));
 
-        address[] memory allowedContracts = creditConfigurator.allowedContracts();
+        address[] memory allowedAdapters = creditConfigurator.allowedAdapters();
 
-        uint256 allowedContractCount = allowedContracts.length;
+        uint256 allowedAdapterCount = allowedAdapters.length;
 
-        assertTrue(allowedContracts.includes(DUMB_COMPARTIBLE_CONTRACT), "Target contract wasnt found");
+        assertTrue(allowedAdapters.includes(address(adapter1)), "Target contract wasnt found");
 
-        vm.expectEmit(true, false, false, false);
-        emit ForbidContract(DUMB_COMPARTIBLE_CONTRACT);
+        vm.expectEmit(true, true, false, false);
+        emit ForbidAdapter(TARGET_CONTRACT, address(adapter1));
 
-        creditConfigurator.forbidContract(DUMB_COMPARTIBLE_CONTRACT);
+        creditConfigurator.forbidAdapter(address(adapter1));
 
         //
-        allowedContracts = creditConfigurator.allowedContracts();
+        allowedAdapters = creditConfigurator.allowedAdapters();
 
         assertEq(creditManager.adapterToContract(address(adapter1)), address(0), "CreditManagerV3 wasn't udpated");
 
-        assertEq(
-            creditManager.contractToAdapter(DUMB_COMPARTIBLE_CONTRACT), address(0), "CreditFacadeV3 wasn't udpated"
-        );
+        assertEq(creditManager.contractToAdapter(TARGET_CONTRACT), address(0), "CreditFacadeV3 wasn't udpated");
 
-        assertEq(allowedContracts.length, allowedContractCount - 1, "Incorrect allowed contracts count");
+        assertEq(allowedAdapters.length, allowedAdapterCount - 1, "Incorrect allowed contracts count");
 
-        assertTrue(!allowedContracts.includes(DUMB_COMPARTIBLE_CONTRACT), "Target contract wasn't removed");
+        assertTrue(!allowedAdapters.includes(address(adapter1)), "Target contract wasn't removed");
 
         vm.stopPrank();
     }
@@ -1220,7 +1214,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
     /// @dev I:[CC-29]: Array-based parameters are migrated correctly to new CC
     function test_I_CC_29_arrays_are_migrated_correctly_for_new_CC() public {
         vm.startPrank(CONFIGURATOR);
-        creditConfigurator.allowContract(TARGET_CONTRACT, address(adapter1));
+        creditConfigurator.allowAdapter(address(adapter1));
         creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS);
         creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS2);
         creditConfigurator.forbidToken(tokenTestSuite.addressOf(Tokens.CVX));
@@ -1244,8 +1238,8 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         );
 
         assertEq(
-            creditConfigurator.allowedContracts().length,
-            newCC.allowedContracts().length,
+            creditConfigurator.allowedAdapters().length,
+            newCC.allowedAdapters().length,
             "Incorrect new allowed contracts array"
         );
 
@@ -1261,12 +1255,12 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
             "Incorrect new emergency liquidators array"
         );
 
-        uint256 len = newCC.allowedContracts().length;
+        uint256 len = newCC.allowedAdapters().length;
 
         for (uint256 i = 0; i < len;) {
             assertEq(
-                creditConfigurator.allowedContracts()[i],
-                newCC.allowedContracts()[i],
+                creditConfigurator.allowedAdapters()[i],
+                newCC.allowedAdapters()[i],
                 "Allowed contracts migrated incorrectly"
             );
 

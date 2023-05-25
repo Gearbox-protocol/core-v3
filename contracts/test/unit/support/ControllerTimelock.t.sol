@@ -742,11 +742,11 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         controllerTimelock.executeTransaction(txHash);
     }
 
-    /// @dev [RCT-10]: forbidContract works correctly
-    function test_RCT_10_forbidContract_works_correctly() public {
+    /// @dev [RCT-10]: forbidAdapter works correctly
+    function test_RCT_10_forbidAdapter_works_correctly() public {
         (address creditManager, address creditFacade, address creditConfigurator, address pool) = _makeMocks();
 
-        bytes32 POLICY_CODE = keccak256(abi.encode("CM", "FORBID_CONTRACT"));
+        bytes32 POLICY_CODE = keccak256(abi.encode("CM", "FORBID_ADAPTER"));
 
         Policy memory policy = Policy({
             enabled: false,
@@ -766,7 +766,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
         vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(admin);
-        controllerTimelock.forbidContract(creditManager, DUMB_ADDRESS);
+        controllerTimelock.forbidAdapter(creditManager, DUMB_ADDRESS);
 
         vm.prank(CONFIGURATOR);
         controllerTimelock.setPolicy(POLICY_CODE, policy);
@@ -774,29 +774,27 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
         vm.expectRevert(CallerNotAdminException.selector);
         vm.prank(USER);
-        controllerTimelock.forbidContract(creditManager, DUMB_ADDRESS);
+        controllerTimelock.forbidAdapter(creditManager, DUMB_ADDRESS);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
-            abi.encode(
-                creditConfigurator, "forbidContract(address)", abi.encode(DUMB_ADDRESS), block.timestamp + 1 days
-            )
+            abi.encode(creditConfigurator, "forbidAdapter(address)", abi.encode(DUMB_ADDRESS), block.timestamp + 1 days)
         );
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
             txHash,
             creditConfigurator,
-            "forbidContract(address)",
+            "forbidAdapter(address)",
             abi.encode(DUMB_ADDRESS),
             uint40(block.timestamp + 1 days)
         );
 
         vm.prank(admin);
-        controllerTimelock.forbidContract(creditManager, DUMB_ADDRESS);
+        controllerTimelock.forbidAdapter(creditManager, DUMB_ADDRESS);
 
         vm.expectCall(
-            creditConfigurator, abi.encodeWithSelector(ICreditConfigurator.forbidContract.selector, DUMB_ADDRESS)
+            creditConfigurator, abi.encodeWithSelector(ICreditConfigurator.forbidAdapter.selector, DUMB_ADDRESS)
         );
 
         vm.warp(block.timestamp + 1 days);

@@ -210,28 +210,24 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
     }
 
     /// @notice Queues a transaction to forbid a third party contract
-    /// @dev Requires the policy for keccak(group(contractManager), "FORBID_CONTRACT") to be enabled, otherwise auto-fails the check
+    /// @dev Requires the policy for keccak(group(contractManager), "FORBID_ADAPTER") to be enabled, otherwise auto-fails the check
     /// @param creditManager Adress of CM to forbid a contract for
-    /// @param targetContract Target contract to forbid
-    function forbidContract(address creditManager, address targetContract)
+    /// @param adapter Address of adapter to forbid
+    function forbidAdapter(address creditManager, address adapter)
         external
         adminOnly // F: [RCT-10]
     {
-        bytes32 policyHash = keccak256(abi.encode(_group[creditManager], "FORBID_CONTRACT"));
+        bytes32 policyHash = keccak256(abi.encode(_group[creditManager], "FORBID_ADAPTER"));
 
         address creditConfigurator = ICreditManagerV3(creditManager).creditConfigurator();
 
-        // For `forbidContract`, there is no value to manipulate
+        // For `forbidAdapter`, there is no value to manipulate
         // A policy check simply verifies that this controller has access to the function in a given group
         if (!_checkPolicy(policyHash, 0, 0)) {
             revert ParameterChecksFailedException(); // F: [RCT-10]
         }
 
-        _queueTransaction({
-            target: creditConfigurator,
-            signature: "forbidContract(address)",
-            data: abi.encode(targetContract)
-        }); // F: [RCT-10]
+        _queueTransaction({target: creditConfigurator, signature: "forbidAdapter(address)", data: abi.encode(adapter)}); // F: [RCT-10]
     }
 
     /// @dev Internal function that records the transaction into the queued tx map
