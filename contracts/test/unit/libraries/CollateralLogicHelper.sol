@@ -67,11 +67,7 @@ contract CollateralLogicHelper is Test, TokensData {
         }
     }
 
-    function _collateralTokensByMask(uint256 _tokenMask, bool calcLT)
-        internal
-        view
-        returns (address token, uint16 lt)
-    {
+    function _collateralTokenByMask(uint256 _tokenMask, bool calcLT) internal view returns (address token, uint16 lt) {
         Tokens t = tokenByMask[_tokenMask];
         if (t == Tokens.NO_TOKEN) {
             console.log("Cant find token with mask");

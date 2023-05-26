@@ -24,15 +24,14 @@ contract CreditAccountMock is ICreditAccountBase, CreditAccountMockEvents {
 
     bytes public return_executeResult;
 
-    mapping(address => uint8) public revertsOnTransfer;
+    mapping(address => mapping(address => bool)) public revertsOnTransfer;
 
-    function setRevertOnTransfer(address token, uint8 times) external {
-        revertsOnTransfer[token] = times;
+    function setRevertOnTransfer(address token, address to) external {
+        revertsOnTransfer[token][to] = true;
     }
 
     function safeTransfer(address token, address to, uint256 amount) external {
-        if (revertsOnTransfer[token] > 0) {
-            revertsOnTransfer[token]--;
+        if (revertsOnTransfer[token][to]) {
             revert("Token transfer reverted");
         }
 

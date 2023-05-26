@@ -69,7 +69,7 @@ abstract contract AbstractAdapter is IAdapter, ACLTrait {
     /// @param callData Data to call the target contract with
     /// @return result Call result
     function _execute(bytes memory callData) internal returns (bytes memory result) {
-        return ICreditManagerV3(creditManager).executeOrder(callData); // U:[AA-6]
+        return ICreditManagerV3(creditManager).execute(callData); // U:[AA-6]
     }
 
     /// @dev Executes a swap operation without input token approval

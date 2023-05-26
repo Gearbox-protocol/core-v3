@@ -65,7 +65,7 @@ contract PoolMock is IPoolService {
     uint256 public override _cumulativeIndex_RAY;
 
     // Contract version
-    uint256 public constant override version = 3_00;
+    uint256 public override version = 3_00;
 
     uint96 public quotaRevenue;
 
@@ -86,6 +86,10 @@ contract PoolMock is IPoolService {
         asset = _underlyingToken;
         borrowAPY_RAY = RAY / 10;
         _cumulativeIndex_RAY = RAY;
+    }
+
+    function setVersion(uint256 ver) external {
+        version = ver;
     }
 
     function setPoolQuotaKeeper(address _poolQuotaKeeper) external {

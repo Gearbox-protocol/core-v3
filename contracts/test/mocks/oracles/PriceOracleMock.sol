@@ -17,12 +17,23 @@ contract PriceOracleMock is Test, IPriceOracleV2 {
 
     uint256 public constant override version = 2;
 
+    mapping(address => bool) revertsOnGetPrice;
+    mapping(address => address) public priceFeeds;
+
     constructor() {
         vm.label(address(this), "PRICE_ORACLE");
     }
 
+    function setRevertOnGetPrice(address token, bool value) external {
+        revertsOnGetPrice[token] = value;
+    }
+
     function setPrice(address token, uint256 price) external {
         priceInUSD[token] = price;
+    }
+
+    function setPriceFeed(address token, address priceFeed) external {
+        priceFeeds[token] = priceFeed;
     }
 
     /// @dev Converts a quantity of an asset to USD (decimals = 8).
@@ -53,11 +64,19 @@ contract PriceOracleMock is Test, IPriceOracleV2 {
     function getPrice(address token) public view returns (uint256 price) {
         price = priceInUSD[token];
         if (price == 0) revert("Price is not set");
+
+        if (revertsOnGetPrice[token]) {
+            console.log("Getting price for ", token, " should not be called");
+            revert("PriceOracle mock should not be called reverted");
+        }
     }
 
     /// @dev Returns the price feed address for the passed token
     /// @param token Token to get the price feed for
-    function priceFeeds(address token) external view returns (address priceFeed) {}
+    function priceFeedsOrRevert(address token) external view returns (address priceFeed) {
+        priceFeed = priceFeeds[token];
+        require(priceFeed != address(0), "Price feed is not set");
+    }
 
     /// @dev Returns the price feed for the passed token,
     ///      with additional parameters

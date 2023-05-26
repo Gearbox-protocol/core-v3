@@ -107,7 +107,7 @@ contract CreditFacadeGasTest is
         );
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.allowContract(address(targetMock), address(adapterMock));
+        creditConfigurator.allowAdapter(address(adapterMock));
 
         vm.label(address(adapterMock), "AdapterMock");
         vm.label(address(targetMock), "TargetContractMock");
@@ -117,7 +117,7 @@ contract CreditFacadeGasTest is
         uint256 collateralTokensCount = creditManager.collateralTokensCount();
 
         for (uint256 i = 0; i < collateralTokensCount; ++i) {
-            (address token,) = creditManager.collateralTokensByMask(1 << i);
+            (address token,) = creditManager.collateralTokenByMask(1 << i);
 
             vm.prank(address(creditConfigurator));
             CreditManagerV3(address(creditManager)).setCollateralTokenData(token, 0, 0, type(uint40).max, 0);

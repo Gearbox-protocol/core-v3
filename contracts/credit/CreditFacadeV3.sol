@@ -3,8 +3,8 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import "../interfaces/IAddressProviderV3.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 // LIBS & TRAITS
 import {BalancesLogic} from "../libraries/BalancesLogic.sol";
@@ -17,6 +17,7 @@ import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.so
 
 /// INTERFACES
 import "../interfaces/ICreditFacade.sol";
+import "../interfaces/IAddressProviderV3.sol";
 import {
     ICreditManagerV3,
     ClosureAction,
@@ -31,7 +32,7 @@ import {ClaimAction} from "../interfaces/IWithdrawalManager.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IPriceFeedOnDemand} from "../interfaces/IPriceFeedOnDemand.sol";
 
-import {IPoolV3} from "../interfaces/IPoolV3.sol";
+import {IPoolV3, IPoolBase} from "../interfaces/IPoolV3.sol";
 import {IDegenNFT} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
@@ -43,6 +44,7 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
+import "forge-std/console.sol";
 
 uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS
     & ~(INCREASE_DEBT_PERMISSION | DECREASE_DEBT_PERMISSION | WITHDRAW_PERMISSION) | INCREASE_DEBT_WAS_CALLED;
@@ -58,15 +60,17 @@ uint256 constant CLOSE_CREDIT_ACCOUNT_FLAGS = EXTERNAL_CALLS_PERMISSION;
 contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     using Address for address;
     using BitMask for uint256;
+    using SafeCast for uint256;
 
     /// @notice Credit Manager connected to this Credit Facade
     address public immutable creditManager;
 
-    /// @notice Whether the whitelisted mode is active
-    bool public immutable whitelisted;
-
     /// @notice Whether the Credit Facade implements expirable logic
     bool public immutable expirable;
+
+    /// @notice Whether to track total debt on Credit Facade
+    /// @dev Only true for older pool versions that do not track total debt themselves
+    bool public immutable trackTotalDebt;
 
     /// @notice Address of WETH
     address public immutable weth;
@@ -76,6 +80,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
     /// @notice Address of the DegenNFT that gatekeeps account openings in whitelisted mode
     address public immutable override degenNFT;
+
+    bool immutable supportsQuotas;
 
     /// @notice Date of the next Credit Account expiration (for CF's with expirable logic)
     uint40 public expirationDate;
@@ -100,6 +106,10 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
     /// @notice Keeps parameters that are used to pause the system after too much bad debt over a short period
     CumulativeLossParams public override lossParams;
+
+    /// @notice Keeps the current total debt and the total debt cap
+    /// @dev Only used with pools that do not track total debt of the CM themselves
+    TotalDebt public override totalDebt;
 
     /// @notice Maps addresses to their status as emergency liquidator.
     /// @dev Emergency liquidators are trusted addresses
@@ -158,6 +168,12 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         }
     }
 
+    /// @notice Wraps ETH and sends it back to msg.sender address
+    modifier wrapETH() {
+        _wrapETH();
+        _;
+    }
+
     /// @notice Initializes creditFacade and connects it to CreditManagerV3
     /// @param _creditManager address of Credit Manager
     /// @param _degenNFT address of the DegenNFT or address(0) if whitelisted mode is not used
@@ -172,10 +188,15 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         botList =
             IAddressProviderV3(ICreditManagerV3(_creditManager).addressProvider()).getAddressOrRevert(AP_BOT_LIST, 3_00);
 
+        IPoolBase pool = IPoolBase(ICreditManagerV3(_creditManager).pool());
+
+        trackTotalDebt = pool.version() < 3_00;
+
         degenNFT = _degenNFT; // U:[FA-1]  // F:[FA-1A]
-        whitelisted = _degenNFT != address(0); // U:[FA-1] // F:[FA-1A]
 
         expirable = _expirable; // U:[FA-1] // F:[FA-1A]
+
+        supportsQuotas = ICreditManagerV3(_creditManager).supportsQuotas();
     }
 
     // Notice: ETH interactions
@@ -202,31 +223,36 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         external
         payable
         override
-        whenNotPaused
-        whenNotExpired
-        nonReentrant
-        nonZeroAddress(onBehalfOf)
+        whenNotPaused // U:[FA-2]
+        whenNotExpired // U:[FA-3]
+        nonReentrant // U:[FA-4]
+        wrapETH // U:[FA-7]
         returns (address creditAccount)
     {
         // Checks that the borrowed amount is within the debt limits
-        _revertIfOutOfDebtLimits(debt); // F:[FA-11B]
+        _revertIfOutOfDebtLimits(debt); // U:[FA-8]
 
         // Checks whether the new borrowed amount does not violate the block limit
         _revertIfOutOfBorrowingLimit(debt); // F:[FA-11]
 
-        /// Attempts to burn the DegenNFT - if onBehalfOf has none, this will fail
-        if (degenNFT != address(0)) {
-            IDegenNFT(degenNFT).burn(onBehalfOf, 1); // F:[FA-4B]
+        // Checks whether the total debt amount does not exceed the limit and updates
+        // the current total debt amount
+        // Only in `trackTotalDebt` mode
+        if (trackTotalDebt) {
+            _revertIfOutOfTotalDebtLimit(debt, ManageDebtAction.INCREASE_DEBT);
         }
 
-        // Wraps ETH and sends it back to msg.sender address
-        _wrapETH(); // F:[FA-3B]
+        /// Attempts to burn the DegenNFT - if onBehalfOf has none, this will fail
+        if (degenNFT != address(0)) {
+            if (msg.sender != onBehalfOf) revert ForbiddenInWhitelistedModeException(); // U:[FA-9]
+            IDegenNFT(degenNFT).burn(onBehalfOf, 1); // U:[FA-9]
+        }
 
         // Requests the Credit Manager to open a Credit Account
-        creditAccount = ICreditManagerV3(creditManager).openCreditAccount({debt: debt, onBehalfOf: onBehalfOf}); // F:[FA-8]
+        creditAccount = ICreditManagerV3(creditManager).openCreditAccount({debt: debt, onBehalfOf: onBehalfOf}); // U:[FA-10]
 
         // Emits an event for Credit Account opening
-        emit OpenCreditAccount(creditAccount, onBehalfOf, msg.sender, debt, referralCode); // F:[FA-8]
+        emit OpenCreditAccount(creditAccount, onBehalfOf, msg.sender, debt, referralCode); // U:[FA-10]
 
         // Initially, only the underlying is on the Credit Account,
         // so the enabledTokenMask before the multicall is 1
@@ -237,7 +263,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             calls: calls,
             enabledTokensMask: UNDERLYING_TOKEN_MASK,
             flags: OPEN_CREDIT_ACCOUNT_FLAGS
-        }); // F:[FA-8]
+        }); // U:[FA-10]
 
         // Since it's not possible to enable any forbidden tokens on a new account,
         // this array is empty
@@ -250,7 +276,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             fullCheckParams: fullCheckParams,
             forbiddenBalances: forbiddenBalances,
             _forbiddenTokenMask: forbiddenTokenMask
-        }); // F:[FA-8, 9]
+        }); // U:[FA-10]
     }
 
     /// @notice Runs a batch of transactions within a multicall and closes the account
@@ -282,28 +308,32 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         uint256 skipTokenMask,
         bool convertToETH,
         MultiCall[] calldata calls
-    ) external payable override whenNotPaused creditAccountOwnerOnly(creditAccount) nonReentrant {
-        // Wraps ETH and sends it back to msg.sender
-        _wrapETH(); // F:[FA-3C]
-
+    )
+        external
+        payable
+        override
+        creditAccountOwnerOnly(creditAccount) // U:[FA-5]
+        whenNotPaused // U:[FA-2]
+        nonReentrant // U:[FA-4]
+        wrapETH // U:[FA-7]
+    {
         /// Requests CM to calculate debt only, since we don't need to know the collateral value for
         /// full account closure
-        CollateralDebtData memory debtData = _calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_ONLY);
+        CollateralDebtData memory debtData = _calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_ONLY); // U:[FA-11]
 
         /// All pending withdrawals are claimed, even if they are not yet mature
-        _claimWithdrawals(creditAccount, to, ClaimAction.FORCE_CLAIM);
+        _claimWithdrawals(creditAccount, to, ClaimAction.FORCE_CLAIM); // U:[FA-11]
 
         if (calls.length != 0) {
-            // TODO: CHANGE
             /// All account management functions are forbidden during closure
             FullCheckParams memory fullCheckParams =
-                _multicall(creditAccount, calls, debtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS);
-            debtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter;
-        } // F:[FA-2, 12, 13]
+                _multicall(creditAccount, calls, debtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS); // U:[FA-11]
+            debtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter; // U:[FA-11]
+        }
 
         /// Bot permissions are specific to (owner, creditAccount),
         /// so they need to be erased on account closure
-        _eraseAllBotPermissions({creditAccount: creditAccount, setFlag: false});
+        _eraseAllBotPermissionsAtClosure({creditAccount: creditAccount}); // U:[FA-11]
 
         // Requests the Credit manager to close the Credit Account
         _closeCreditAccount({
@@ -314,15 +344,20 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             to: to,
             skipTokensMask: skipTokenMask,
             convertToETH: convertToETH
-        }); // F:[FA-2, 12]
+        }); // U:[FA-11]
 
-        // TODO: add test
         if (convertToETH) {
-            _wethWithdrawTo(to);
+            _wethWithdrawTo(to); // U:[FA-11]
+        }
+
+        // Updates the current total debt amount
+        // Only in `trackTotalDebt` mode
+        if (trackTotalDebt) {
+            _revertIfOutOfTotalDebtLimit(debtData.debt, ManageDebtAction.DECREASE_DEBT);
         }
 
         // Emits an event
-        emit CloseCreditAccount(creditAccount, msg.sender, to); // F:[FA-12]
+        emit CloseCreditAccount(creditAccount, msg.sender, to); // U:[FA-11]
     }
 
     /// @notice Runs a batch of transactions within a multicall and liquidates the account
@@ -368,39 +403,58 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         uint256 skipTokenMask,
         bool convertToETH,
         MultiCall[] calldata calls
-    ) external payable override whenNotPausedOrEmergency nonZeroAddress(to) nonReentrant {
+    )
+        external
+        override
+        whenNotPausedOrEmergency // U:[FA-2,12]
+        nonReentrant // U:[FA-4]
+    {
         // Checks that the CA exists to revert early for late liquidations and save gas
-        address borrower = _getBorrowerOrRevert(creditAccount); // F:[FA-2]
+        address borrower = _getBorrowerOrRevert(creditAccount); // F:[FA-5]
 
         // Checks that the account hf < 1 and computes the totalValue
         // before the multicall
         ClosureAction closeAction;
         CollateralDebtData memory collateralDebtData;
         {
-            ClaimAction claimAction;
-            bool isLiquidatable;
-            (claimAction, closeAction, collateralDebtData, isLiquidatable) =
-                _isAccountLiquidatable({creditAccount: creditAccount, isEmergency: paused()}); // F:[FA-14]
+            bool isEmergency = paused();
 
-            if (!isLiquidatable) revert CreditAccountNotLiquidatableException();
+            collateralDebtData = _calcDebtAndCollateral(
+                creditAccount,
+                isEmergency
+                    ? CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
+                    : CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS
+            ); // U:[FA-15]
 
-            collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(
-                _claimWithdrawals({action: claimAction, creditAccount: creditAccount, to: borrower})
-            );
+            closeAction = ClosureAction.LIQUIDATE_ACCOUNT; // U:[FA-14]
+
+            bool isLiquidatable = collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD; // U:[FA-13]
+
+            if (!isLiquidatable && _isExpired()) {
+                isLiquidatable = true; // U:[FA-13]
+                closeAction = ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT; // U:[FA-14]
+            }
+
+            if (!isLiquidatable) revert CreditAccountNotLiquidatableException(); // U:[FA-13]
+
+            uint256 tokensToEnable = _claimWithdrawals({
+                action: isEmergency ? ClaimAction.FORCE_CANCEL : ClaimAction.CANCEL,
+                creditAccount: creditAccount,
+                to: borrower
+            }); // U:[FA-15]
+
+            collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(tokensToEnable); // U:[FA-15]
         }
-
-        // Wraps ETH and sends it back to msg.sender
-        _wrapETH(); // F:[FA-3D]
 
         if (calls.length != 0) {
             FullCheckParams memory fullCheckParams =
-                _multicall(creditAccount, calls, collateralDebtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS);
-            collateralDebtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter;
-        } // F:[FA-15]
+                _multicall(creditAccount, calls, collateralDebtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS); // U:[FA-16]
+            collateralDebtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter; // U:[FA-16]
+        }
 
         /// Bot permissions are specific to (owner, creditAccount),
         /// so they need to be erased on account closure
-        _eraseAllBotPermissions({creditAccount: creditAccount, setFlag: false});
+        _eraseAllBotPermissionsAtClosure({creditAccount: creditAccount}); // U:[FA-16]
 
         (uint256 remainingFunds, uint256 reportedLoss) = _closeCreditAccount({
             creditAccount: creditAccount,
@@ -410,29 +464,34 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             to: to,
             skipTokensMask: skipTokenMask,
             convertToETH: convertToETH
-        }); // F:[FA-15,49]
+        }); // U:[FA-16]
+
+        // Updates the current total debt amount
+        // Only in `trackTotalDebt` mode
+        if (trackTotalDebt) {
+            _revertIfOutOfTotalDebtLimit(collateralDebtData.debt, ManageDebtAction.DECREASE_DEBT);
+        }
 
         /// If there is non-zero loss, then borrowing is forbidden in
         /// case this is an attack and there is risk of copycats afterwards
         /// If cumulative loss exceeds maxCumulativeLoss, the CF is paused,
         /// which ensures that the attacker can create at most maxCumulativeLoss + maxBorrowedAmount of bad debt
         if (reportedLoss > 0) {
-            maxDebtPerBlockMultiplier = 0; // F: [FA-15A]
+            maxDebtPerBlockMultiplier = 0; // U:[FA-17]
 
             /// reportedLoss is always less than uint128, because
             /// maxLoss = maxBorrowAmount which is uint128
-            lossParams.currentCumulativeLoss += uint128(reportedLoss);
+            lossParams.currentCumulativeLoss += uint128(reportedLoss); // U:[FA-17]
             if (lossParams.currentCumulativeLoss > lossParams.maxCumulativeLoss) {
-                _pause(); // F: [FA-15B]
+                _pause(); // U:[FA-17]
             }
         }
 
-        // TODO: add test
         if (convertToETH) {
-            _wethWithdrawTo(to);
+            _wethWithdrawTo(to); // U:[FA-16]
         }
 
-        emit LiquidateCreditAccount(creditAccount, borrower, msg.sender, to, closeAction, remainingFunds); // F:[FA-15]
+        emit LiquidateCreditAccount(creditAccount, borrower, msg.sender, to, closeAction, remainingFunds); // U:[FA-14,16,17]
     }
 
     /// @notice Executes a batch of transactions within a Multicall, to manage an existing account
@@ -444,15 +503,13 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         external
         payable
         override
-        whenNotPaused
-        whenNotExpired
-        creditAccountOwnerOnly(creditAccount)
-        nonReentrant
+        creditAccountOwnerOnly(creditAccount) // U:[FA-5]
+        whenNotPaused // U:[FA-2]
+        whenNotExpired // U:[FA-3]
+        nonReentrant // U:[FA-4]
+        wrapETH // U:[FA-7]
     {
-        // Wraps ETH and sends it back to msg.sender
-        _wrapETH(); // F:[FA-3F]
-
-        _multicallFullCollateralCheck(creditAccount, calls, ALL_PERMISSIONS);
+        _multicallFullCollateralCheck(creditAccount, calls, ALL_PERMISSIONS); // U:[FA-18]
     }
 
     /// @notice Executes a batch of transactions within a Multicall from bot on behalf of a Credit Account's owner
@@ -464,17 +521,18 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     function botMulticall(address creditAccount, MultiCall[] calldata calls)
         external
         override
-        whenNotPaused
-        whenNotExpired
-        nonReentrant
+        whenNotPaused // U:[FA-2]
+        whenNotExpired // U:[FA-3]
+        nonReentrant // U:[FA-4]
     {
-        (uint256 botPermissions, bool forbidden) = IBotList(botList).getBotStatus(creditAccount, msg.sender);
+        (uint256 botPermissions, bool forbidden) =
+            IBotList(botList).getBotStatus({bot: msg.sender, creditAccount: creditAccount});
         // Checks that the bot is approved by the borrower and is not forbidden
         if (botPermissions == 0 || forbidden) {
-            revert NotApprovedBotException(); // F: [FA-58]
+            revert NotApprovedBotException(); // U:[FA-19]
         }
 
-        _multicallFullCollateralCheck(creditAccount, calls, botPermissions | PAY_BOT_PERMISSION);
+        _multicallFullCollateralCheck(creditAccount, calls, botPermissions | PAY_BOT_CAN_BE_CALLED); // U:[FA-19, 20]
     }
 
     /// @notice Convenience internal function that packages a multicall and a fullCheck together,
@@ -490,7 +548,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         /// This ensures that no pool funds can be used to increase exposure to forbidden tokens. To that end,
         /// before the multicall forbidden token balances are stored to compare with balances after
         uint256 _forbiddenTokenMask = forbiddenTokenMask;
-        uint256 enabledTokensMaskBefore = ICreditManagerV3(creditManager).enabledTokensMaskOf(creditAccount);
+        uint256 enabledTokensMaskBefore = ICreditManagerV3(creditManager).enabledTokensMaskOf(creditAccount); // U:[FA-18]
+
         uint256[] memory forbiddenBalances = BalancesLogic.storeForbiddenBalances({
             creditAccount: creditAccount,
             forbiddenTokenMask: _forbiddenTokenMask,
@@ -507,7 +566,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
             fullCheckParams: fullCheckParams,
             forbiddenBalances: forbiddenBalances,
             _forbiddenTokenMask: _forbiddenTokenMask
-        });
+        }); // U:[FA-18]
     }
 
     /// @notice IMPLEMENTATION: multicall
@@ -535,10 +594,11 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     {
         /// Inverted mask of quoted tokens is pre-compute to avoid
         /// enabling or disabling them outside `updateQuota`
-        uint256 quotedTokensMaskInverted = ~ICreditManagerV3(creditManager).quotedTokensMask();
+        uint256 quotedTokensMaskInverted =
+            supportsQuotas ? ~ICreditManagerV3(creditManager).quotedTokensMask() : type(uint256).max;
 
         // Emits event for multicall start - used in analytics to track actions within multicalls
-        emit StartMultiCall(creditAccount); // F:[FA-26]
+        emit StartMultiCall(creditAccount); // U:[FA-18]
 
         // Declares the expectedBalances array, which can later be used for slippage control
         Balance[] memory expectedBalances;
@@ -546,18 +606,15 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         // Minimal HF is set to PERCENTAGE_FACTOR by default
         fullCheckParams.minHealthFactor = PERCENTAGE_FACTOR;
 
-        uint256 len = calls.length; // F:[FA-26]
+        uint256 len = calls.length;
 
         unchecked {
             for (uint256 i = 0; i < len; ++i) {
-                MultiCall calldata mcall = calls[i]; // F:[FA-26]
+                MultiCall calldata mcall = calls[i];
                 //
                 // CREDIT FACADE
                 //
                 if (mcall.target == address(this)) {
-                    // Reverts of calldata has less than 4 bytes
-                    if (mcall.callData.length < 4) revert IncorrectCallDataException(); // F:[FA-22]
-
                     bytes4 method = bytes4(mcall.callData);
 
                     //
@@ -572,12 +629,12 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                         // Calling this function again could potentially override old values
                         // and cause confusion, especially if called later in the MultiCall
                         if (expectedBalances.length != 0) {
-                            revert ExpectedBalancesAlreadySetException();
-                        } // F:[FA-45A]
+                            revert ExpectedBalancesAlreadySetException(); // U:[FA-23]
+                        }
 
                         // Sets expected balances to currentBalance + delta
-                        Balance[] memory expected = abi.decode(mcall.callData[4:], (Balance[])); // F:[FA-45]
-                        expectedBalances = BalancesLogic.storeBalances(creditAccount, expected); // F:[FA-45]
+                        Balance[] memory expected = abi.decode(mcall.callData[4:], (Balance[])); // U:[FA-23]
+                        expectedBalances = BalancesLogic.storeBalances(creditAccount, expected); // U:[FA-23]
                     }
                     //
                     // SET FULL CHECK PARAMS
@@ -589,7 +646,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     /// is especially useful for bots.
                     else if (method == ICreditFacadeMulticall.setFullCheckParams.selector) {
                         (fullCheckParams.collateralHints, fullCheckParams.minHealthFactor) =
-                            abi.decode(mcall.callData[4:], (uint256[], uint16));
+                            abi.decode(mcall.callData[4:], (uint256[], uint16)); // U:[FA-24]
                     }
                     //
                     // ON DEMAND PRICE UPDATE
@@ -598,18 +655,18 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     /// price updates. This helps support tokens where there is no traditional price feeds,
                     /// but there is attested off-chain price data.
                     else if (method == ICreditFacadeMulticall.onDemandPriceUpdate.selector) {
-                        _onDemandPriceUpdate(mcall.callData[4:]);
+                        _onDemandPriceUpdate(mcall.callData[4:]); // U:[FA-25]
                     }
                     //
                     // ADD COLLATERAL
                     //
                     /// Transfers new collateral from the caller to the Credit Account.
                     else if (method == ICreditFacadeMulticall.addCollateral.selector) {
-                        _revertIfNoPermission(flags, ADD_COLLATERAL_PERMISSION);
+                        _revertIfNoPermission(flags, ADD_COLLATERAL_PERMISSION); // U:[FA-21]
                         enabledTokensMask = enabledTokensMask.enable({
                             bitsToEnable: _addCollateral(creditAccount, mcall.callData[4:]),
                             invertedSkipMask: quotedTokensMaskInverted
-                        }); // F:[FA-26, 27]
+                        }); // U:[FA-26]
                     }
                     //
                     // INCREASE DEBT
@@ -619,14 +676,14 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     /// in order to enforce some restrictions after increasing debt,
                     /// such is decreaseDebt or having forbidden tokens being prohibited
                     else if (method == ICreditFacadeMulticall.increaseDebt.selector) {
-                        _revertIfNoPermission(flags, INCREASE_DEBT_PERMISSION);
+                        _revertIfNoPermission(flags, INCREASE_DEBT_PERMISSION); // U:[FA-21]
 
-                        flags = flags.enable(INCREASE_DEBT_WAS_CALLED).disable(DECREASE_DEBT_PERMISSION); // F:[FA-28]
+                        flags = flags.enable(INCREASE_DEBT_WAS_CALLED).disable(DECREASE_DEBT_PERMISSION); // U:[FA-29]
 
-                        (uint256 tokensToEnable, uint256 tokensToDisable) = _manageDebt(
+                        (uint256 tokensToEnable,) = _manageDebt(
                             creditAccount, mcall.callData[4:], enabledTokensMask, ManageDebtAction.INCREASE_DEBT
-                        ); // F:[FA-26]
-                        enabledTokensMask = enabledTokensMask.enableDisable(tokensToEnable, tokensToDisable);
+                        ); // U:[FA-27]
+                        enabledTokensMask = enabledTokensMask.enable(tokensToEnable); // U:[FA-27]
                     }
                     //
                     // DECREASE DEBT
@@ -634,13 +691,12 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     /// Decreases the Credit Account's debt and sends the funds back to the pool
                     else if (method == ICreditFacadeMulticall.decreaseDebt.selector) {
                         // it's forbidden to call decreaseDebt after increaseDebt, in the same multicall
-                        _revertIfNoPermission(flags, DECREASE_DEBT_PERMISSION);
-                        // F:[FA-28]
+                        _revertIfNoPermission(flags, DECREASE_DEBT_PERMISSION); // U:[FA-21]
 
-                        (uint256 tokensToEnable, uint256 tokensToDisable) = _manageDebt(
+                        (, uint256 tokensToDisable) = _manageDebt(
                             creditAccount, mcall.callData[4:], enabledTokensMask, ManageDebtAction.DECREASE_DEBT
-                        ); // F:[FA-27]
-                        enabledTokensMask = enabledTokensMask.enableDisable(tokensToEnable, tokensToDisable);
+                        ); // U:[FA-31]
+                        enabledTokensMask = enabledTokensMask.disable(tokensToDisable); // U:[FA-31]
                     }
                     //
                     // ENABLE TOKEN
@@ -648,13 +704,13 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     /// Enables a token on a Credit Account, which includes it into collateral
                     /// computations
                     else if (method == ICreditFacadeMulticall.enableToken.selector) {
-                        _revertIfNoPermission(flags, ENABLE_TOKEN_PERMISSION);
+                        _revertIfNoPermission(flags, ENABLE_TOKEN_PERMISSION); // U:[FA-21]
                         // Parses token
-                        address token = abi.decode(mcall.callData[4:], (address)); // F: [FA-53]
+                        address token = abi.decode(mcall.callData[4:], (address)); // U:[FA-33]
                         enabledTokensMask = enabledTokensMask.enable({
                             bitsToEnable: _getTokenMaskOrRevert(token),
                             invertedSkipMask: quotedTokensMaskInverted
-                        });
+                        }); // U:[FA-33]
                     }
                     //
                     // DISABLE TOKEN
@@ -662,14 +718,14 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     /// Disables a token on a Credit Account, which excludes it from collateral
                     /// computations
                     else if (method == ICreditFacadeMulticall.disableToken.selector) {
-                        _revertIfNoPermission(flags, DISABLE_TOKEN_PERMISSION);
+                        _revertIfNoPermission(flags, DISABLE_TOKEN_PERMISSION); // U:[FA-21]
                         // Parses token
-                        address token = abi.decode(mcall.callData[4:], (address)); // F: [FA-53]
+                        address token = abi.decode(mcall.callData[4:], (address)); // U:[FA-33]
                         /// IGNORE QUOTED TOKEN MASK
                         enabledTokensMask = enabledTokensMask.disable({
                             bitsToDisable: _getTokenMaskOrRevert(token),
                             invertedSkipMask: quotedTokensMaskInverted
-                        });
+                        }); // U:[FA-33]
                     }
                     //
                     // UPDATE QUOTA
@@ -679,10 +735,10 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     /// Tokens with quota logic are only enabled and disabled on updating the quota
                     /// from zero to positive value and back, respectively.
                     else if (method == ICreditFacadeMulticall.updateQuota.selector) {
-                        _revertIfNoPermission(flags, UPDATE_QUOTA_PERMISSION);
+                        _revertIfNoPermission(flags, UPDATE_QUOTA_PERMISSION); // U:[FA-21]
                         (uint256 tokensToEnable, uint256 tokensToDisable) =
-                            _updateQuota(creditAccount, mcall.callData[4:]);
-                        enabledTokensMask = enabledTokensMask.enableDisable(tokensToEnable, tokensToDisable);
+                            _updateQuota(creditAccount, mcall.callData[4:]); // U:[FA-34]
+                        enabledTokensMask = enabledTokensMask.enableDisable(tokensToEnable, tokensToDisable); // U:[FA-34]
                     }
                     //
                     // WITHDRAW
@@ -692,7 +748,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     /// from collateral computations (with some exceptions). After a delay,
                     /// the account owner can claim the withdrawal.
                     else if (method == ICreditFacadeMulticall.scheduleWithdrawal.selector) {
-                        _revertIfNoPermission(flags, WITHDRAW_PERMISSION);
+                        _revertIfNoPermission(flags, WITHDRAW_PERMISSION); // U:[FA-21]
                         uint256 tokensToDisable = _scheduleWithdrawal(creditAccount, mcall.callData[4:]);
                         enabledTokensMask = enabledTokensMask.disable({
                             bitsToDisable: tokensToDisable,
@@ -705,7 +761,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     /// Sets allowance to the provided list of contracts to one. Can be used
                     /// to clean up leftover allowances from old contracts
                     else if (method == ICreditFacadeMulticall.revokeAdapterAllowances.selector) {
-                        _revertIfNoPermission(flags, REVOKE_ALLOWANCES_PERMISSION);
+                        _revertIfNoPermission(flags, REVOKE_ALLOWANCES_PERMISSION); // U:[FA-21]
                         _revokeAdapterAllowances(creditAccount, mcall.callData[4:]);
                     }
                     //
@@ -714,26 +770,27 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     /// Requests the bot list to pay a bot. Used by bots to receive payment for their services.
                     /// Only available in `botMulticall` and can only be called once
                     else if (method == ICreditFacadeMulticall.payBot.selector) {
-                        _revertIfNoPermission(flags, PAY_BOT_PERMISSION);
-                        flags = flags.disable(PAY_BOT_PERMISSION);
+                        _revertIfNoPermission(flags, PAY_BOT_CAN_BE_CALLED); // U:[FA-21]
+                        flags = flags.disable(PAY_BOT_CAN_BE_CALLED);
                         _payBot(creditAccount, mcall.callData[4:]);
                     }
                     //
                     // UNKNOWN METHOD
                     //
                     else {
-                        revert UnknownMethodException(); // F:[FA-23]
+                        revert UnknownMethodException(); // U:[FA-22]
                     }
                 } else {
                     //
                     // ADAPTERS
                     //
                     _revertIfNoPermission(flags, EXTERNAL_CALLS_PERMISSION);
+                    // U:[FA-21]
 
                     // Checks that the target is an allowed adapter in Credit Manager
                     if (ICreditManagerV3(creditManager).adapterToContract(mcall.target) == address(0)) {
                         revert TargetContractNotAllowedException();
-                    } // F:[FA-24]
+                    }
 
                     /// The `externalCallCreditAccount` value in CreditManager is set to the currently processed
                     /// Credit Account. This value is used by adapters to retrieve the CA that is being worked on
@@ -747,7 +804,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     /// the masks of tokens to enable and disable, which are applied to the mask
                     /// on the stack; the net change in the enabled token set is saved to storage
                     /// only in fullCollateralCheck at the end of the multicall
-                    bytes memory result = mcall.target.functionCall(mcall.callData); // F:[FA-29]
+                    bytes memory result = mcall.target.functionCall(mcall.callData);
+
                     (uint256 tokensToEnable, uint256 tokensToDisable) = abi.decode(result, (uint256, uint256));
                     enabledTokensMask = enabledTokensMask.enableDisable({
                         bitsToEnable: tokensToEnable,
@@ -761,13 +819,13 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         // If expectedBalances was set by calling revertIfGetLessThan,
         // checks that actual token balances are not less than expected balances
         if (expectedBalances.length != 0) {
-            BalancesLogic.compareBalances(creditAccount, expectedBalances);
+            BalancesLogic.compareBalances(creditAccount, expectedBalances); // U:[FA-23]
         }
 
         /// If increaseDebt was called during the multicall, all forbidden tokens must be disabled at the end
         /// otherwise, funds could be borrowed against forbidden token, which is prohibited
         if ((flags & INCREASE_DEBT_WAS_CALLED != 0) && (enabledTokensMask & forbiddenTokenMask != 0)) {
-            revert ForbiddenTokensException();
+            revert ForbiddenTokensException(); // U:[FA-27]
         }
 
         /// If the `externalCallCreditAccount` value was set to the current CA, it must be reset
@@ -776,7 +834,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         }
 
         /// Emits event for multicall end - used in analytics to track actions within multicalls
-        emit FinishMultiCall(); // F:[FA-27,27,29]
+        emit FinishMultiCall(); // U:[FA-18]
 
         /// Saves the final enabledTokensMask to be later passed into the fullCollateralCheck,
         /// where it will be saved to storage
@@ -812,12 +870,71 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     ///         that use on-demand price feeds
     /// @param callData Bytes calldata for parsing
     function _onDemandPriceUpdate(bytes calldata callData) internal {
-        (address token, bytes memory data) = abi.decode(callData, (address, bytes));
+        (address token, bytes memory data) = abi.decode(callData, (address, bytes)); // U:[FA-25]
 
-        address priceFeed = IPriceOracleV2(ICreditManagerV3(creditManager).priceOracle()).priceFeeds(token);
-        if (priceFeed == address(0)) revert PriceFeedNotExistsException();
+        address priceFeed = IPriceOracleV2(ICreditManagerV3(creditManager).priceOracle()).priceFeeds(token); // U:[FA-25]
+        if (priceFeed == address(0)) revert PriceFeedNotExistsException(); // U:[FA-25]
 
-        IPriceFeedOnDemand(priceFeed).updatePrice(data);
+        IPriceFeedOnDemand(priceFeed).updatePrice(data); // U:[FA-25]
+    }
+
+    /// @notice Requests the Credit Manager to transfer collateral from the caller to the Credit Account
+    /// @param creditAccount Credit Account to add collateral for
+    /// @param callData Bytes calldata for parsing
+    function _addCollateral(address creditAccount, bytes calldata callData) internal returns (uint256 tokenMaskAfter) {
+        (address token, uint256 amount) = abi.decode(callData, (address, uint256)); // U:[FA-26]
+        // Requests Credit Manager to transfer collateral to the Credit Account
+
+        tokenMaskAfter = ICreditManagerV3(creditManager).addCollateral({
+            payer: msg.sender,
+            creditAccount: creditAccount,
+            token: token,
+            amount: amount
+        }); // U:[FA-26]
+
+        // Emits event
+        emit AddCollateral(creditAccount, token, amount); // U:[FA-26]
+    }
+
+    /// @notice Requests the Credit Manager to change the CA's debt
+    /// @param creditAccount CA to change debt for
+    /// @param callData Bytes calldata for parsing
+    function _manageDebt(
+        address creditAccount,
+        bytes calldata callData,
+        uint256 enabledTokensMask,
+        ManageDebtAction action
+    ) internal returns (uint256 tokensToEnable, uint256 tokensToDisable) {
+        uint256 amount = abi.decode(callData, (uint256)); // U:[FA-27,31]
+
+        if (action == ManageDebtAction.INCREASE_DEBT) {
+            // Checks that the borrowed amount does not violate the per block limit
+            // This also ensures that increaseDebt can't be called when borrowing is forbidden
+            // (since the block limit will be 0)
+            _revertIfOutOfBorrowingLimit(amount); // U:[FA-28]
+        }
+
+        // Checks whether the total debt amount does not exceed the limit and updates
+        // the current total debt amount
+        // Only in `trackTotalDebt` mode
+        if (trackTotalDebt) {
+            _revertIfOutOfTotalDebtLimit(amount, action);
+        }
+
+        uint256 newDebt;
+        // Requests the Credit Manager to borrow additional funds from the pool
+        (newDebt, tokensToEnable, tokensToDisable) =
+            ICreditManagerV3(creditManager).manageDebt(creditAccount, amount, enabledTokensMask, action); // U:[FA-27,31]
+
+        // Checks that the new total borrowed amount is within bounds
+        _revertIfOutOfDebtLimits(newDebt); // U:[FA-28, 32]
+
+        // Emits event
+        if (action == ManageDebtAction.INCREASE_DEBT) {
+            emit IncreaseDebt(creditAccount, amount); // U:[FA-27]
+        } else {
+            emit DecreaseDebt(creditAccount, amount); // U:[FA-31]
+        }
     }
 
     /// @notice Requests Credit Manager to update a Credit Account's quota for a certain token
@@ -827,8 +944,11 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         internal
         returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
-        (address token, int96 quotaChange) = abi.decode(callData, (address, int96));
-        return ICreditManagerV3(creditManager).updateQuota(creditAccount, token, quotaChange);
+        (address token, int96 quotaChange) = abi.decode(callData, (address, int96)); // U:[FA-34]
+        (tokensToEnable, tokensToDisable) =
+            ICreditManagerV3(creditManager).updateQuota(creditAccount, token, quotaChange); // U:[FA-34]
+
+        emit UpdateQuota(creditAccount, token, quotaChange); // U:[FA-34]
     }
 
     /// @notice Requests Credit Manager to remove a set of existing allowances
@@ -851,52 +971,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         IBotList(botList).payBot(payer, creditAccount, msg.sender, paymentAmount);
     }
 
-    /// @notice Requests the Credit Manager to change the CA's debt
-    /// @param creditAccount CA to change debt for
-    /// @param callData Bytes calldata for parsing
-    function _manageDebt(
-        address creditAccount,
-        bytes calldata callData,
-        uint256 enabledTokensMask,
-        ManageDebtAction action
-    ) internal returns (uint256 tokensToEnable, uint256 tokensToDisable) {
-        uint256 amount = abi.decode(callData, (uint256)); // F:[FA-26]
-
-        if (action == ManageDebtAction.INCREASE_DEBT) {
-            // Checks that the borrowed amount does not violate the per block limit
-            // This also ensures that increaseDebt can't be called when borrowing is forbidden
-            // (since the block limit will be 0)
-            _revertIfOutOfBorrowingLimit(amount); // F:[FA-18A]
-        }
-
-        uint256 newDebt;
-        // Requests the Credit Manager to borrow additional funds from the pool
-        (newDebt, tokensToEnable, tokensToDisable) =
-            ICreditManagerV3(creditManager).manageDebt(creditAccount, amount, enabledTokensMask, action); // F:[FA-17]
-
-        // Checks that the new total borrowed amount is within bounds
-        _revertIfOutOfDebtLimits(newDebt); // F:[FA-18B]
-
-        // Emits event
-        if (action == ManageDebtAction.INCREASE_DEBT) {
-            emit IncreaseDebt(creditAccount, amount); // F:[FA-17]
-        } else {
-            emit DecreaseDebt(creditAccount, amount); // F:[FA-19]
-        }
-    }
-
-    /// @notice Requests the Credit Manager to transfer collateral from the caller to the Credit Account
-    /// @param creditAccount Credit Account to add collateral for
-    /// @param callData Bytes calldata for parsing
-    function _addCollateral(address creditAccount, bytes calldata callData) internal returns (uint256 tokenMaskAfter) {
-        (address token, uint256 amount) = abi.decode(callData, (address, uint256)); // F:[FA-26, 27]
-        // Requests Credit Manager to transfer collateral to the Credit Account
-        tokenMaskAfter = ICreditManagerV3(creditManager).addCollateral(msg.sender, creditAccount, token, amount); // F:[FA-21]
-
-        // Emits event
-        emit AddCollateral(creditAccount, token, amount); // F:[FA-21]
-    }
-
     /// @notice Requests the Credit Manager to schedule a withdrawal
     /// @param creditAccount Credit Account to schedule withdrawals for
     /// @param callData Bytes calldata for parsing
@@ -915,10 +989,9 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     function claimWithdrawals(address creditAccount, address to)
         external
         override
-        whenNotPaused
-        nonZeroAddress(to)
-        creditAccountOwnerOnly(creditAccount)
-        nonReentrant
+        creditAccountOwnerOnly(creditAccount) // U:[FA-5]
+        whenNotPaused // U:[FA-2]
+        nonReentrant // U:[FA-4]
     {
         _claimWithdrawals(creditAccount, to, ClaimAction.CLAIM);
     }
@@ -937,12 +1010,18 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         uint192 permissions,
         uint72 fundingAmount,
         uint72 weeklyFundingAllowance
-    ) external override whenNotPaused creditAccountOwnerOnly(creditAccount) nonReentrant {
-        uint16 flags = ICreditManagerV3(creditManager).flagsOf(creditAccount);
+    )
+        external
+        override
+        creditAccountOwnerOnly(creditAccount) // U:[FA-5]
+        nonReentrant // U:[FA-4]
+    {
+        uint16 flags = _flagsOf(creditAccount);
 
         if (flags & BOT_PERMISSIONS_SET_FLAG == 0) {
-            _eraseAllBotPermissions({creditAccount: creditAccount, setFlag: false});
+            _eraseAllBotPermissions({creditAccount: creditAccount});
 
+            // If flag wasn't enabled before and bot has some permissions, it sets flag
             if (permissions != 0) {
                 _setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, true);
             }
@@ -950,18 +1029,27 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
         uint256 remainingBots =
             IBotList(botList).setBotPermissions(creditAccount, bot, permissions, fundingAmount, weeklyFundingAllowance);
+
         if (remainingBots == 0) {
             _setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, false);
         }
     }
 
     /// @notice Convenience function to erase all bot permissions for a Credit Account upon closure
-    function _eraseAllBotPermissions(address creditAccount, bool setFlag) internal {
-        IBotList(botList).eraseAllBotPermissions(creditAccount);
+    function _eraseAllBotPermissionsAtClosure(address creditAccount) internal {
+        uint16 flags = _flagsOf(creditAccount);
 
-        if (setFlag) {
-            _setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, false);
+        if (flags & BOT_PERMISSIONS_SET_FLAG != 0) {
+            _eraseAllBotPermissions(creditAccount);
         }
+    }
+
+    function _eraseAllBotPermissions(address creditAccount) internal {
+        IBotList(botList).eraseAllBotPermissions(creditAccount);
+    }
+
+    function _flagsOf(address creditAccount) internal view returns (uint16) {
+        return ICreditManagerV3(creditManager).flagsOf(creditAccount);
     }
 
     /// @notice Internal wrapper for `CreditManager.setFlagFor()`. The external call is wrapped
@@ -1075,41 +1163,28 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         isExpired = (expirable) && (block.timestamp >= expirationDate); // F: [FA-46,47,48]
     }
 
+    /// @notice Updates total debt and checks that it does not exceed the limit
+    function _revertIfOutOfTotalDebtLimit(uint256 delta, ManageDebtAction action) internal {
+        if (delta > 0) {
+            TotalDebt storage td = totalDebt;
+
+            if (action == ManageDebtAction.INCREASE_DEBT) {
+                td.currentTotalDebt += delta.toUint128();
+                if (td.currentTotalDebt > td.totalDebtLimit) {
+                    revert CreditManagerCantBorrowException();
+                }
+            } else {
+                td.currentTotalDebt -= delta.toUint128();
+            }
+        }
+    }
+
     /// @notice Wraps ETH into WETH and sends it back to msg.sender
     /// TODO: Check L2 networks for supporting native currencies
     function _wrapETH() internal {
         if (msg.value > 0) {
-            IWETH(weth).deposit{value: msg.value}(); // F:[FA-3]
-            IWETH(weth).transfer(msg.sender, msg.value); // F:[FA-3]
-        }
-    }
-
-    /// @notice Checks if account is liquidatable (i.e., hf < 1)
-    /// @param creditAccount Address of credit account to check
-    function _isAccountLiquidatable(address creditAccount, bool isEmergency)
-        internal
-        view
-        returns (
-            ClaimAction claimAction,
-            ClosureAction closeAction,
-            CollateralDebtData memory collateralDebtData,
-            bool isLiquidatable
-        )
-    {
-        claimAction = isEmergency ? ClaimAction.FORCE_CANCEL : ClaimAction.CANCEL;
-        collateralDebtData = _calcDebtAndCollateral(
-            creditAccount,
-            isEmergency
-                ? CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
-                : CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS
-        );
-        closeAction = ClosureAction.LIQUIDATE_ACCOUNT;
-
-        isLiquidatable = collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD;
-
-        if (!isLiquidatable && _isExpired()) {
-            isLiquidatable = true;
-            closeAction = ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT;
+            IWETH(weth).deposit{value: msg.value}(); // U:[FA-7]
+            IWETH(weth).transfer(msg.sender, msg.value); // U:[FA-7]
         }
     }
 
@@ -1151,7 +1226,10 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
     /// @notice Sets Credit Facade expiration date
     /// @dev See more at https://dev.gearbox.fi/docs/documentation/credit/liquidation#liquidating-accounts-by-expiration
-    function setExpirationDate(uint40 newExpirationDate) external creditConfiguratorOnly {
+    function setExpirationDate(uint40 newExpirationDate)
+        external
+        creditConfiguratorOnly // U:[FA-6]
+    {
         if (!expirable) {
             revert NotAllowedWhenNotExpirableException();
         }
@@ -1165,7 +1243,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// credit account - especially relevant in whitelisted mode.
     function setDebtLimits(uint128 _minDebt, uint128 _maxDebt, uint8 _maxDebtPerBlockMultiplier)
         external
-        creditConfiguratorOnly
+        creditConfiguratorOnly // U:[FA-6]
     {
         debtLimits.minDebt = _minDebt; // F:
         debtLimits.maxDebt = _maxDebt; // F:
@@ -1175,7 +1253,10 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @notice Sets the bot list for this Credit Facade
     ///      The bot list is used to determine whether an address has a right to
     ///      run multicalls for a borrower as a bot. The relationship is stored in a separate contract.
-    function setBotList(address _botList) external creditConfiguratorOnly {
+    function setBotList(address _botList)
+        external
+        creditConfiguratorOnly // U:[FA-6]
+    {
         botList = _botList;
     }
 
@@ -1184,7 +1265,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @param resetCumulativeLoss Whether to reset the current cumulative loss
     function setCumulativeLossParams(uint128 _maxCumulativeLoss, bool resetCumulativeLoss)
         external
-        creditConfiguratorOnly
+        creditConfiguratorOnly // U:[FA-6]
     {
         lossParams.maxCumulativeLoss = _maxCumulativeLoss;
         if (resetCumulativeLoss) {
@@ -1195,7 +1276,10 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @notice Changes the token's forbidden status
     /// @param token Address of the token to set status for
     /// @param allowance Status to set (ALLOW / FORBID)
-    function setTokenAllowance(address token, AllowanceAction allowance) external creditConfiguratorOnly {
+    function setTokenAllowance(address token, AllowanceAction allowance)
+        external
+        creditConfiguratorOnly // U:[FA-6]
+    {
         uint256 tokenMask = _getTokenMaskOrRevert(token);
 
         forbiddenTokenMask = (allowance == AllowanceAction.ALLOW)
@@ -1208,8 +1292,17 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @param allowanceAction Status to set (ALLOW / FORBID)
     function setEmergencyLiquidator(address liquidator, AllowanceAction allowanceAction)
         external
-        creditConfiguratorOnly // F:[CM-4]
+        creditConfiguratorOnly // U:[FA-6]
     {
         canLiquidateWhilePaused[liquidator] = allowanceAction == AllowanceAction.ALLOW;
+    }
+
+    /// @notice Sets the total debt limit and the current total debt value
+    /// @dev The current total debt value is only changed during Credit Facade migration
+    /// @param newCurrentTotalDebt The current total debt value (should differ from recorded value only on Credit Facade migration)
+    /// @param newLimit The new value for total debt limit
+    function setTotalDebtParams(uint128 newCurrentTotalDebt, uint128 newLimit) external creditConfiguratorOnly {
+        totalDebt.currentTotalDebt = newCurrentTotalDebt;
+        totalDebt.totalDebtLimit = newLimit;
     }
 }

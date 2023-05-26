@@ -9,6 +9,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
 import {CreditConfigurator} from "../../credit/CreditConfiguratorV3.sol";
 import {MultiCall} from "../../interfaces/ICreditFacade.sol";
+import {MultiCallBuilder} from "../lib/MultiCallBuilder.sol";
 
 import {ICreditFacadeMulticall} from "../../interfaces/ICreditFacade.sol";
 import {ICreditManagerV3, ICreditManagerV3Events} from "../../interfaces/ICreditManagerV3.sol";
@@ -47,7 +48,7 @@ contract CreditFacadeTestHelper is TestHelper {
         return creditFacade.openCreditAccount(
             borrowedAmount,
             onBehalfOf,
-            multicallBuilder(
+            MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, amount))
@@ -85,25 +86,6 @@ contract CreditFacadeTestHelper is TestHelper {
         vm.stopPrank();
 
         balance = IERC20(underlying).balanceOf(creditAccount);
-    }
-
-    function _closeTestCreditAccount(address creditAccount) internal {
-        MultiCall[] memory closeCalls;
-
-        // switch to new block to be able to close account
-        vm.roll(block.number + 1);
-
-        // (,, uint256 underlyingToClose) = creditManager.calcAccruedInterestAndFees(creditAccount);
-        // uint256 underlyingBalance = cft.tokenTestSuite().balanceOf(underlying, creditAccount);
-
-        // if (underlyingToClose > underlyingBalance) {
-        //     cft.tokenTestSuite().mint(underlying, USER, underlyingToClose - underlyingBalance);
-
-        //     cft.tokenTestSuite().approve(underlying, USER, address(creditManager));
-        // }
-
-        vm.prank(USER);
-        creditFacade.closeCreditAccount(creditAccount, FRIEND, 0, false, closeCalls);
     }
 
     function expectTokenIsEnabled(address creditAccount, address token, bool expectedState) internal {
@@ -151,38 +133,10 @@ contract CreditFacadeTestHelper is TestHelper {
         vm.roll(block.number + 1);
     }
 
-    function multicallBuilder() internal pure returns (MultiCall[] memory calls) {}
-
-    function multicallBuilder(MultiCall memory call1) internal pure returns (MultiCall[] memory calls) {
-        calls = new MultiCall[](1);
-        calls[0] = call1;
-    }
-
-    function multicallBuilder(MultiCall memory call1, MultiCall memory call2)
-        internal
-        pure
-        returns (MultiCall[] memory calls)
-    {
-        calls = new MultiCall[](2);
-        calls[0] = call1;
-        calls[1] = call2;
-    }
-
-    function multicallBuilder(MultiCall memory call1, MultiCall memory call2, MultiCall memory call3)
-        internal
-        pure
-        returns (MultiCall[] memory calls)
-    {
-        calls = new MultiCall[](3);
-        calls[0] = call1;
-        calls[1] = call2;
-        calls[2] = call3;
-    }
-
     function expectSafeAllowance(address creditAccount, address target) internal {
         uint256 len = creditManager.collateralTokensCount();
         for (uint256 i = 0; i < len; i++) {
-            (address token,) = creditManager.collateralTokensByMask(1 << i);
+            (address token,) = creditManager.collateralTokenByMask(1 << i);
             assertLe(IERC20(token).allowance(creditAccount, target), 1, "allowance is too high");
         }
     }

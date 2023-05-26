@@ -30,6 +30,13 @@ struct FullCheckParams {
     uint256 enabledTokensMaskAfter;
 }
 
+struct TotalDebt {
+    /// @dev Current total borrowing
+    uint128 currentTotalDebt;
+    /// @dev Total borrowing limit
+    uint128 totalDebtLimit;
+}
+
 interface ICreditFacadeEvents {
     /// @dev Emits when a new Credit Account is opened through the Credit Facade
     event OpenCreditAccount(
@@ -61,6 +68,9 @@ interface ICreditFacadeEvents {
 
     /// @dev Emits when the account owner add new collateral to a CA
     event AddCollateral(address indexed creditAccount, address indexed token, uint256 value);
+
+    /// @dev Emits when the quota updated
+    event UpdateQuota(address indexed creditAccount, address indexed token, int96 quotaChange);
 
     /// @dev Emits when a multicall is started
     event StartMultiCall(address indexed creditAccount);
@@ -139,13 +149,7 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
         uint256 skipTokenMask,
         bool convertToETH,
         MultiCall[] calldata calls
-    ) external payable;
-
-    // /// @dev Adds collateral to borrower's credit account
-    // /// @param onBehalfOf Address of the borrower whose account is funded
-    // /// @param token Address of a collateral token
-    // /// @param amount Amount to add
-    // function addCollateral(address onBehalfOf, address token, uint256 amount) external payable;
+    ) external;
 
     /// @dev Executes a batch of transactions within a Multicall, to manage an existing account
     ///  - Wraps ETH and sends it back to msg.sender, if value > 0
@@ -194,6 +198,10 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
 
     /// @return minDebt Minimal borrowed amount per credit account
     function debtLimits() external view returns (uint128 minDebt, uint128 maxDebt);
+
+    /// @return currentTotalDebt The current total debt of Credit Manager (if tracked in Credit Facade)
+    /// @return totalDebtLimit The current total debt limit of Credit Manager
+    function totalDebt() external view returns (uint128 currentTotalDebt, uint128 totalDebtLimit);
 
     function maxDebtPerBlockMultiplier() external view returns (uint8);
 

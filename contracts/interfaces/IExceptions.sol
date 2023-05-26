@@ -46,6 +46,8 @@ error IncorrectPriceFeedException();
 /// @dev Thrown on attempting to get a result for a token that does not have a price feed
 error PriceFeedNotExistsException();
 
+error ForbiddenInWhitelistedModeException();
+
 ///
 /// ACCESS
 ///
@@ -88,8 +90,6 @@ error CallerNotVoterException();
 ///      the connected Credit Facade, or an allowed adapter
 error CallerNotAdapterException();
 
-/// interface ICreditConfiguratorExceptions {
-
 /// @dev Thrown if the underlying's LT is set directly
 /// @notice Underlying LT is derived from fee parameters and is set automatically
 ///         on updating fees
@@ -124,9 +124,6 @@ error NotAllowedWhenNotExpirableException();
 
 /// @dev Thrown if a liquidator tries to liquidate an account with a health factor above 1
 error CreditAccountNotLiquidatableException();
-
-/// @dev Thrown if call data passed to a multicall is too short
-error IncorrectCallDataException();
 
 /// @dev Thrown inside account closure multicall if the borrower attempts an action that is forbidden on closing
 ///      an account
@@ -201,7 +198,6 @@ error VotingContractNotAllowedException();
 
 error BorrowingMoreU2ForbiddenException();
 
-// interface ILPPriceFeedExceptions {
 /// @dev Thrown on returning a value that violates the current bounds
 error ValueOutOfRangeException();
 
@@ -225,8 +221,6 @@ error NothingToClaimException();
 
 error LiquiditySanityCheckException();
 
-error ZeroCallsException();
-
 /// @dev Thrown when attempting to schedule withdrawal from a credit account that has no free withdrawal slots
 error NoFreeWithdrawalSlotsException();
 
@@ -242,3 +236,8 @@ error MasterCreditAccountAlreadyDeployedException();
 
 /// @dev Thrown when trying to rescue funds from a credit account that is currently in use
 error CreditAccountIsInUseException();
+
+/// @dev Thrown when trying to manually set total debt parameters in a CF that doesn't track them
+error TotalDebtNotTrackedException();
+
+error InsufficientBalanceException();

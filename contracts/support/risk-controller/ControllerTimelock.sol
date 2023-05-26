@@ -49,7 +49,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
         _;
     }
 
-    /// @dev Queues a transaction to set a new expiration date in the Credit Facade
+    /// @notice Queues a transaction to set a new expiration date in the Credit Facade
     /// @dev Requires the policy for keccak(group(creditManager), "EXPIRATION_DATE") to be enabled, otherwise auto-fails the check
     /// @param creditManager Adress of CM to update the expiration date for
     /// @param expirationDate The new expiration date
@@ -78,7 +78,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
         }); // F: [RCT-01]
     }
 
-    /// @dev Queues a transaction to set a new limiter value in a price feed
+    /// @notice Queues a transaction to set a new limiter value in a price feed
     /// @dev Requires the policy for keccak(group(priceFeed), "LP_PRICE_FEED_LIMITER") to be enabled, otherwise auto-fails the check
     /// @param priceFeed The price feed to update the limiter in
     /// @param lowerBound The new limiter lower bound value
@@ -95,7 +95,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
         _queueTransaction({target: priceFeed, signature: "setLimiter(uint256)", data: abi.encode(lowerBound)}); // F: [RCT-02]
     }
 
-    /// @dev Queues a transaction to set a new max debt per block multiplier
+    /// @notice Queues a transaction to set a new max debt per block multiplier
     /// @dev Requires the policy for keccak(group(creditManager), "MAX_DEBT_PER_BLOCK_MULTIPLIER") to be enabled, otherwise auto-fails the check
     /// @param creditManager Adress of CM to update the multiplier for
     /// @param multiplier The new multiplier value
@@ -123,7 +123,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
         }); // F: [RCT-03]
     }
 
-    /// @dev Queues a transaction to set a new max debt per block multiplier
+    /// @notice Queues a transaction to set a new max debt per block multiplier
     /// @dev Requires policies for keccak(group(creditManager), "MIN_DEBT") and keccak(group(creditManager), "MAX_DEBT") to be enabled, otherwise auto-fails the check
     /// @param creditManager Adress of CM to update the limits for
     /// @param minDebt The minimal debt amount
@@ -151,7 +151,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
         }); // F: [RCT-04]
     }
 
-    /// @dev Queues a transaction to set a new debt limit for a Credit Manager
+    /// @notice Queues a transaction to set a new debt limit for a Credit Manager
     /// @dev Requires the policy for keccak(group(creditManager), "CREDIT_MANAGER_DEBT_LIMIT") to be enabled, otherwise auto-fails the check
     /// @param creditManager Adress of CM to update the debt limit for
     /// @param debtLimit The new debt limit
@@ -174,7 +174,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
         }); // F: [RCT-05]
     }
 
-    /// @dev Queues a transaction to start a liquidation threshold ramp
+    /// @notice Queues a transaction to start a liquidation threshold ramp
     /// @dev Requires the policy for keccak(group(contractManager), group(token), "TOKEN_LT") to be enabled, otherwise auto-fails the check
     /// @param creditManager Adress of CM to update the LT for
     /// @param token Token to ramp the LT for
@@ -207,6 +207,27 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
             signature: "rampLiquidationThreshold(address,uint16,uint40,uint24)",
             data: abi.encode(token, liquidationThresholdFinal, rampStart, rampDuration)
         }); // F: [RCT-06]
+    }
+
+    /// @notice Queues a transaction to forbid a third party contract
+    /// @dev Requires the policy for keccak(group(contractManager), "FORBID_ADAPTER") to be enabled, otherwise auto-fails the check
+    /// @param creditManager Adress of CM to forbid a contract for
+    /// @param adapter Address of adapter to forbid
+    function forbidAdapter(address creditManager, address adapter)
+        external
+        adminOnly // F: [RCT-10]
+    {
+        bytes32 policyHash = keccak256(abi.encode(_group[creditManager], "FORBID_ADAPTER"));
+
+        address creditConfigurator = ICreditManagerV3(creditManager).creditConfigurator();
+
+        // For `forbidAdapter`, there is no value to manipulate
+        // A policy check simply verifies that this controller has access to the function in a given group
+        if (!_checkPolicy(policyHash, 0, 0)) {
+            revert ParameterChecksFailedException(); // F: [RCT-10]
+        }
+
+        _queueTransaction({target: creditConfigurator, signature: "forbidAdapter(address)", data: abi.encode(adapter)}); // F: [RCT-10]
     }
 
     /// @dev Internal function that records the transaction into the queued tx map

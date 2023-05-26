@@ -743,4 +743,69 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
     }
+
+    /// @dev [RCT-10]: forbidAdapter works correctly
+    function test_RCT_10_forbidAdapter_works_correctly() public {
+        (address creditManager, address creditFacade, address creditConfigurator, address pool) = _makeMocks();
+
+        bytes32 POLICY_CODE = keccak256(abi.encode("CM", "FORBID_ADAPTER"));
+
+        Policy memory policy = Policy({
+            enabled: false,
+            flags: 0,
+            exactValue: 0,
+            minValue: 0,
+            maxValue: 0,
+            referencePoint: 0,
+            referencePointUpdatePeriod: 0,
+            referencePointTimestampLU: 0,
+            minPctChange: 0,
+            maxPctChange: 0,
+            minChange: 0,
+            maxChange: 0
+        });
+
+        // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.forbidAdapter(creditManager, DUMB_ADDRESS);
+
+        vm.prank(CONFIGURATOR);
+        controllerTimelock.setPolicy(POLICY_CODE, policy);
+
+        // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
+        vm.expectRevert(CallerNotAdminException.selector);
+        vm.prank(USER);
+        controllerTimelock.forbidAdapter(creditManager, DUMB_ADDRESS);
+
+        // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
+        bytes32 txHash = keccak256(
+            abi.encode(creditConfigurator, "forbidAdapter(address)", abi.encode(DUMB_ADDRESS), block.timestamp + 1 days)
+        );
+
+        vm.expectEmit(true, false, false, true);
+        emit QueueTransaction(
+            txHash,
+            creditConfigurator,
+            "forbidAdapter(address)",
+            abi.encode(DUMB_ADDRESS),
+            uint40(block.timestamp + 1 days)
+        );
+
+        vm.prank(admin);
+        controllerTimelock.forbidAdapter(creditManager, DUMB_ADDRESS);
+
+        vm.expectCall(
+            creditConfigurator, abi.encodeWithSelector(ICreditConfigurator.forbidAdapter.selector, DUMB_ADDRESS)
+        );
+
+        vm.warp(block.timestamp + 1 days);
+
+        vm.prank(admin);
+        controllerTimelock.executeTransaction(txHash);
+
+        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+
+        assertTrue(!queued, "Transaction is still queued after execution");
+    }
 }
