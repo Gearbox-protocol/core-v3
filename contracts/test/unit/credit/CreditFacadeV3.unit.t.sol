@@ -8,6 +8,7 @@ import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMoc
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IWETHGateway} from "../../../interfaces/IWETHGateway.sol";
+import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
 
 /// LIBS
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -19,6 +20,10 @@ import {DegenNFTMock} from "../../mocks/token/DegenNFTMock.sol";
 import {AdapterMock} from "../../mocks/adapters/AdapterMock.sol";
 import {BotListMock} from "../../mocks/support/BotListMock.sol";
 import {WithdrawalManagerMock} from "../../mocks/support/WithdrawalManagerMock.sol";
+import {PriceOracleMock} from "../../mocks/oracles/PriceOracleMock.sol";
+import {PriceFeedOnDemandMock} from "../../mocks/oracles/PriceFeedOnDemandMock.sol";
+import {AdapterCallMock} from "../../mocks/adapters/AdapterCallMock.sol";
+import {PoolMock} from "../../mocks/pool/PoolMock.sol";
 
 import {ENTERED} from "../../../traits/ReentrancyGuardTrait.sol";
 
@@ -37,7 +42,7 @@ import {ICreditFacadeEvents} from "../../../interfaces/ICreditFacade.sol";
 import {IDegenNFT, IDegenNFTExceptions} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
 import {ClaimAction} from "../../../interfaces/IWithdrawalManager.sol";
 import {BitMask, UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
-import {MulticallBuilder} from "../../lib/MulticallBuilder.sol";
+import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // DATA
 import {MultiCall, MultiCallOps} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
@@ -66,12 +71,15 @@ uint16 constant REFERRAL_CODE = 23;
 
 contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvents {
     using CreditFacadeCalls for CreditFacadeMulticaller;
+    using BitMask for uint256;
 
     IAddressProviderV3 addressProvider;
 
     CreditFacadeV3Harness creditFacade;
     CreditManagerMock creditManagerMock;
     WithdrawalManagerMock withdrawalManagerMock;
+    PriceOracleMock priceOracleMock;
+    PoolMock poolMock;
 
     IWETHGateway wethGateway;
     BotListMock botListMock;
@@ -137,11 +145,15 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
 
         withdrawalManagerMock = WithdrawalManagerMock(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00));
 
+        priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 2));
+
         AddressProviderV3ACLMock(address(addressProvider)).addPausableAdmin(CONFIGURATOR);
+
+        poolMock = new PoolMock(address(addressProvider), tokenTestSuite.addressOf(Tokens.DAI));
 
         creditManagerMock = new CreditManagerMock({
             _addressProvider: address(addressProvider),
-            _pool: address(0)
+            _pool: address(poolMock)
         });
     }
 
@@ -511,7 +523,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
         CollateralDebtData memory expectedCollateralDebtData = clone(collateralDebtData);
 
         if (hasCalls) {
-            calls = MulticallBuilder.build(
+            calls = MultiCallBuilder.build(
                 MultiCall({target: adapter, callData: abi.encodeCall(AdapterMock.dumbCall, (LINK_TOKEN_MASK, 0))})
             );
 
@@ -825,7 +837,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
         expectedCollateralDebtData.enabledTokensMask = cancelMask;
 
         if (hasCalls) {
-            calls = MulticallBuilder.build(
+            calls = MultiCallBuilder.build(
                 MultiCall({target: adapter, callData: abi.encodeCall(AdapterMock.dumbCall, (LINK_TOKEN_MASK, 0))})
             );
 
@@ -965,5 +977,286 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
 
             assertEq(creditFacade.paused(), shoudBePaused, "Paused wasn't set");
         } while (expectedCumulativeLoss < maxLoss);
+    }
+
+    //
+    //
+    // Multicall
+    //
+    //
+    /// @dev U:[FA-18]: multicall execute calls and call fullCollateralCheck
+    function test_U_FA_18_multicall_and_botMulticall_execute_calls_and_call_fullCollateralCheck()
+        public
+        notExpirableCase
+    {
+        address creditAccount = DUMB_ADDRESS;
+        MultiCall[] memory calls;
+
+        uint256 enabledTokensMaskBefore = 123123123;
+
+        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false);
+
+        creditManagerMock.setEnabledTokensMask(enabledTokensMaskBefore);
+        creditManagerMock.setBorrower(USER);
+
+        uint256 enabledTokensMaskAfter = enabledTokensMaskBefore;
+
+        for (uint256 testCase = 0; testCase < 2; ++testCase) {
+            bool botMulticallCase = testCase == 1;
+
+            vm.expectCall(
+                address(creditManagerMock),
+                abi.encodeCall(
+                    ICreditManagerV3.fullCollateralCheck,
+                    (creditAccount, enabledTokensMaskAfter, new uint256[](0), PERCENTAGE_FACTOR)
+                )
+            );
+
+            vm.expectEmit(true, true, false, false);
+            emit StartMultiCall(creditAccount);
+
+            vm.expectEmit(true, false, false, false);
+            emit FinishMultiCall();
+
+            if (botMulticallCase) {
+                creditFacade.botMulticall(creditAccount, calls);
+            } else {
+                vm.prank(USER);
+                creditFacade.multicall(creditAccount, calls);
+            }
+        }
+    }
+
+    /// @dev U:[FA-19]: botMulticall reverts if bot forbidden or has no permission
+    function test_U_FA_19_botMulticall_reverts_if_bot_forbidden_or_has_no_permission() public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+        MultiCall[] memory calls;
+
+        botListMock.setBotStatusReturns(ALL_PERMISSIONS, true);
+
+        vm.expectRevert(NotApprovedBotException.selector);
+        creditFacade.botMulticall(creditAccount, calls);
+
+        botListMock.setBotStatusReturns(0, false);
+
+        vm.expectRevert(NotApprovedBotException.selector);
+        creditFacade.botMulticall(creditAccount, calls);
+    }
+
+    /// @dev U:[FA-20]: only botMulticall doesn't revert for pay bot call
+    function test_U_FA_20_only_botMulticall_doesnt_revert_for_pay_bot_call() public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setDebtLimits(1, 100, 1);
+
+        creditManagerMock.setBorrower(USER);
+        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false);
+
+        MultiCall[] memory calls = MultiCallBuilder.build(
+            MultiCall({target: address(creditFacade), callData: abi.encodeCall(ICreditFacadeMulticall.payBot, (1))})
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, PAY_BOT_CAN_BE_CALLED));
+        creditFacade.openCreditAccount({debt: 1, onBehalfOf: USER, calls: calls, referralCode: 0});
+
+        vm.prank(USER);
+        vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, PAY_BOT_CAN_BE_CALLED));
+        creditFacade.multicall(creditAccount, calls);
+
+        /// Case: it works for bot multicall
+        creditFacade.botMulticall(creditAccount, calls);
+    }
+
+    function _fullCheckParams() internal returns (FullCheckParams memory fullCheckParams) {
+        fullCheckParams.minHealthFactor = PERCENTAGE_FACTOR;
+    }
+
+    function _fullCheckParams(uint256 enabledTokensMask) internal returns (FullCheckParams memory fullCheckParams) {
+        fullCheckParams.minHealthFactor = PERCENTAGE_FACTOR;
+        fullCheckParams.enabledTokensMaskAfter = enabledTokensMask;
+    }
+
+    struct MultiCallPermissionTestCase {
+        bytes callData;
+        uint256 permissionRquired;
+    }
+
+    /// @dev U:[FA-21]: multicall reverts if called without particaular permission
+    function test_U_FA_21_multicall_reverts_if_called_without_particaular_permission() public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+
+        address token = tokenTestSuite.addressOf(Tokens.LINK);
+        creditManagerMock.addToken(token, 1 << 4);
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setDebtLimits(1, 100, 1);
+
+        creditManagerMock.setManageDebt(2, 0, 0);
+
+        creditManagerMock.setPriceOracle(address(priceOracleMock));
+
+        address priceFeedOnDemandMock = address(new PriceFeedOnDemandMock());
+
+        priceOracleMock.setPriceFeed(token, priceFeedOnDemandMock);
+
+        creditManagerMock.setBorrower(USER);
+
+        MultiCallPermissionTestCase[12] memory cases = [
+            MultiCallPermissionTestCase({
+                callData: abi.encodeCall(ICreditFacadeMulticall.revertIfReceivedLessThan, (new Balance[](0))),
+                permissionRquired: 0
+            }),
+            MultiCallPermissionTestCase({
+                callData: abi.encodeCall(ICreditFacadeMulticall.enableToken, (token)),
+                permissionRquired: ENABLE_TOKEN_PERMISSION
+            }),
+            MultiCallPermissionTestCase({
+                callData: abi.encodeCall(ICreditFacadeMulticall.disableToken, (token)),
+                permissionRquired: DISABLE_TOKEN_PERMISSION
+            }),
+            MultiCallPermissionTestCase({
+                callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (token, 0)),
+                permissionRquired: ADD_COLLATERAL_PERMISSION
+            }),
+            MultiCallPermissionTestCase({
+                callData: abi.encodeCall(ICreditFacadeMulticall.increaseDebt, (1)),
+                permissionRquired: INCREASE_DEBT_PERMISSION
+            }),
+            MultiCallPermissionTestCase({
+                callData: abi.encodeCall(ICreditFacadeMulticall.decreaseDebt, (0)),
+                permissionRquired: DECREASE_DEBT_PERMISSION
+            }),
+            MultiCallPermissionTestCase({
+                callData: abi.encodeCall(ICreditFacadeMulticall.updateQuota, (token, 0)),
+                permissionRquired: UPDATE_QUOTA_PERMISSION
+            }),
+            MultiCallPermissionTestCase({
+                callData: abi.encodeCall(ICreditFacadeMulticall.setFullCheckParams, (new uint256[](0), 10_001)),
+                permissionRquired: 0
+            }),
+            MultiCallPermissionTestCase({
+                callData: abi.encodeCall(ICreditFacadeMulticall.scheduleWithdrawal, (token, 0)),
+                permissionRquired: WITHDRAW_PERMISSION
+            }),
+            MultiCallPermissionTestCase({
+                callData: abi.encodeCall(ICreditFacadeMulticall.revokeAdapterAllowances, (new RevocationPair[](0))),
+                permissionRquired: REVOKE_ALLOWANCES_PERMISSION
+            }),
+            MultiCallPermissionTestCase({
+                callData: abi.encodeCall(ICreditFacadeMulticall.onDemandPriceUpdate, (token, bytes(""))),
+                permissionRquired: 0
+            }),
+            MultiCallPermissionTestCase({
+                callData: abi.encodeCall(ICreditFacadeMulticall.payBot, (0)),
+                permissionRquired: PAY_BOT_CAN_BE_CALLED
+            })
+        ];
+
+        uint256 len = cases.length;
+        for (uint256 i = 0; i < len; ++i) {
+            uint256 flags = type(uint256).max.disable(cases[i].permissionRquired);
+            for (uint256 j = 0; j < len; ++j) {
+                if (i == j && cases[i].permissionRquired != 0) {
+                    vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, cases[i].permissionRquired));
+                }
+                creditFacade.multicallInt({
+                    creditAccount: creditAccount,
+                    calls: MultiCallBuilder.build(MultiCall({target: address(creditFacade), callData: cases[j].callData})),
+                    enabledTokensMask: 0,
+                    flags: flags
+                });
+            }
+        }
+
+        uint256 flags = type(uint256).max.disable(EXTERNAL_CALLS_PERMISSION);
+
+        vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, EXTERNAL_CALLS_PERMISSION));
+        creditFacade.multicallInt(
+            creditAccount, MultiCallBuilder.build(MultiCall({target: DUMB_ADDRESS4, callData: bytes("")})), 0, flags
+        );
+    }
+
+    /// @dev U:[FA-22]: multicall reverts if called without particaular permission
+    function test_U_FA_22_multicall_reverts_if_called_without_particaular_permission() public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+
+        vm.expectRevert(UnknownMethodException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(MultiCall({target: address(creditFacade), callData: bytes("123")})),
+            enabledTokensMask: 0,
+            flags: 0
+        });
+    }
+
+    /// @dev U:[FA-23]: multicall revertIfReceivedLessThan works properly
+    function test_U_FA_23_multicall_revertIfReceivedLessThan_works_properly() public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+
+        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        Balance[] memory expectedBalance = new Balance[](1);
+
+        address acm = address(new AdapterCallMock());
+
+        creditManagerMock.setContractAllowance(acm, DUMB_ADDRESS3);
+
+        ERC20Mock(link).set_minter(acm);
+
+        for (uint256 testCase = 0; testCase < 4; ++testCase) {
+            /// case 0: no revert if expected 0
+            /// case 1: reverts because expect 1
+            /// case 2: no reverty because expect 1 and it mints 1 duyring the call
+            /// case 3: reverts because called twice
+
+            expectedBalance[0] = Balance({token: link, balance: testCase > 0 ? 1 : 0});
+
+            MultiCall[] memory calls = MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeMulticall.revertIfReceivedLessThan, (expectedBalance))
+                })
+            );
+
+            if (testCase == 1) {
+                vm.expectRevert(abi.encodeWithSelector(BalanceLessThanMinimumDesiredException.selector, (link)));
+            }
+
+            if (testCase == 2) {
+                calls = MultiCallBuilder.build(
+                    MultiCall({
+                        target: address(creditFacade),
+                        callData: abi.encodeCall(ICreditFacadeMulticall.revertIfReceivedLessThan, (expectedBalance))
+                    }),
+                    MultiCall({
+                        target: acm,
+                        callData: abi.encodeCall(
+                            AdapterCallMock.makeCall, (link, abi.encodeCall(ERC20Mock.mint, (creditAccount, 1)))
+                            )
+                    })
+                );
+            }
+
+            if (testCase == 3) {
+                calls = MultiCallBuilder.build(
+                    MultiCall({
+                        target: address(creditFacade),
+                        callData: abi.encodeCall(ICreditFacadeMulticall.revertIfReceivedLessThan, (expectedBalance))
+                    }),
+                    MultiCall({
+                        target: address(creditFacade),
+                        callData: abi.encodeCall(ICreditFacadeMulticall.revertIfReceivedLessThan, (expectedBalance))
+                    })
+                );
+                vm.expectRevert(ExpectedBalancesAlreadySetException.selector);
+            }
+
+            creditFacade.multicallInt({
+                creditAccount: creditAccount,
+                calls: calls,
+                enabledTokensMask: 0,
+                flags: EXTERNAL_CALLS_PERMISSION
+            });
+        }
     }
 }

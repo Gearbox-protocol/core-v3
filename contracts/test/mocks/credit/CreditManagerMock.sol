@@ -10,7 +10,9 @@ import {
     ICreditManagerV3,
     ClosureAction,
     CollateralDebtData,
-    CollateralCalcTask
+    CollateralCalcTask,
+    ManageDebtAction,
+    RevocationPair
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 import {IPoolQuotaKeeper} from "../../../interfaces/IPoolQuotaKeeper.sol";
@@ -59,6 +61,8 @@ contract CreditManagerMock {
 
     uint16 flags;
 
+    address public priceOracle;
+
     /// @notice Maps allowed adapters to their respective target contracts.
     mapping(address => address) public adapterToContract;
 
@@ -68,6 +72,10 @@ contract CreditManagerMock {
     uint256 return_remainingFunds;
     uint256 return_loss;
 
+    uint256 return_newDebt;
+    uint256 md_return_tokensToEnable;
+    uint256 md_return_tokensToDisable;
+
     constructor(address _addressProvider, address _pool) {
         addressProvider = _addressProvider;
         weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // U:[CM-1]
@@ -75,6 +83,10 @@ contract CreditManagerMock {
         setPoolService(_pool);
         creditConfigurator = CONFIGURATOR;
         supportsQuotas = true;
+    }
+
+    function setPriceOracle(address _priceOracle) external {
+        priceOracle = _priceOracle;
     }
 
     function getTokenMaskOrRevert(address token) public view returns (uint256 tokenMask) {
@@ -110,8 +122,8 @@ contract CreditManagerMock {
         external
         returns (uint256 caQuotaInterestChange, bool tokensToEnable, uint256 tokensToDisable)
     {
-        (caQuotaInterestChange,,) =
-            IPoolQuotaKeeper(IPoolV3(pool).poolQuotaKeeper()).updateQuota(_creditAccount, token, quotaChange);
+        //     (caQuotaInterestChange,,) =
+        //         IPoolQuotaKeeper(IPoolV3(pool).poolQuotaKeeper()).updateQuota(_creditAccount, token, quotaChange);
     }
 
     function addToken(address token, uint256 mask) external {
@@ -247,4 +259,31 @@ contract CreditManagerMock {
     function _disableFlag(address creditAccount, uint16 flag) internal {
         flags &= ~flag; // U:[CM-36]
     }
+
+    function addCollateral(address payer, address creditAccount, address token, uint256 amount)
+        external
+        returns (uint256 tokenMask)
+    {}
+
+    function setManageDebt(uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable) external {
+        return_newDebt = newDebt;
+        md_return_tokensToEnable = tokensToEnable;
+        md_return_tokensToDisable = tokensToDisable;
+    }
+
+    function manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)
+        external
+        returns (uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable)
+    {
+        newDebt = return_newDebt;
+        tokensToEnable = md_return_tokensToEnable;
+        tokensToDisable = md_return_tokensToDisable;
+    }
+
+    function scheduleWithdrawal(address creditAccount, address token, uint256 amount)
+        external
+        returns (uint256 tokensToDisable)
+    {}
+
+    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external {}
 }

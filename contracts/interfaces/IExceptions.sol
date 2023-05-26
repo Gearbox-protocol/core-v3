@@ -125,9 +125,6 @@ error NotAllowedWhenNotExpirableException();
 /// @dev Thrown if a liquidator tries to liquidate an account with a health factor above 1
 error CreditAccountNotLiquidatableException();
 
-/// @dev Thrown if call data passed to a multicall is too short
-error IncorrectCallDataException();
-
 /// @dev Thrown inside account closure multicall if the borrower attempts an action that is forbidden on closing
 ///      an account
 error ForbiddenDuringClosureException();
