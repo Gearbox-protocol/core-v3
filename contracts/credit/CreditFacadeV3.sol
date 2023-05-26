@@ -678,12 +678,12 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeMulticall.increaseDebt.selector) {
                         _revertIfNoPermission(flags, INCREASE_DEBT_PERMISSION); // U:[FA-21]
 
-                        flags = flags.enable(INCREASE_DEBT_WAS_CALLED).disable(DECREASE_DEBT_PERMISSION);
+                        flags = flags.enable(INCREASE_DEBT_WAS_CALLED).disable(DECREASE_DEBT_PERMISSION); // U:[FA-29]
 
-                        (uint256 tokensToEnable, uint256 tokensToDisable) = _manageDebt(
+                        (uint256 tokensToEnable,) = _manageDebt(
                             creditAccount, mcall.callData[4:], enabledTokensMask, ManageDebtAction.INCREASE_DEBT
-                        );
-                        enabledTokensMask = enabledTokensMask.enableDisable(tokensToEnable, tokensToDisable);
+                        ); // U:[FA-27]
+                        enabledTokensMask = enabledTokensMask.enable(tokensToEnable); // U:[FA-27]
                     }
                     //
                     // DECREASE DEBT
@@ -693,10 +693,10 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                         // it's forbidden to call decreaseDebt after increaseDebt, in the same multicall
                         _revertIfNoPermission(flags, DECREASE_DEBT_PERMISSION); // U:[FA-21]
 
-                        (uint256 tokensToEnable, uint256 tokensToDisable) = _manageDebt(
+                        (, uint256 tokensToDisable) = _manageDebt(
                             creditAccount, mcall.callData[4:], enabledTokensMask, ManageDebtAction.DECREASE_DEBT
-                        );
-                        enabledTokensMask = enabledTokensMask.enableDisable(tokensToEnable, tokensToDisable);
+                        ); // U:[FA-31]
+                        enabledTokensMask = enabledTokensMask.disable(tokensToDisable); // U:[FA-31]
                     }
                     //
                     // ENABLE TOKEN
@@ -706,11 +706,11 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeMulticall.enableToken.selector) {
                         _revertIfNoPermission(flags, ENABLE_TOKEN_PERMISSION); // U:[FA-21]
                         // Parses token
-                        address token = abi.decode(mcall.callData[4:], (address));
+                        address token = abi.decode(mcall.callData[4:], (address)); // U:[FA-33]
                         enabledTokensMask = enabledTokensMask.enable({
                             bitsToEnable: _getTokenMaskOrRevert(token),
                             invertedSkipMask: quotedTokensMaskInverted
-                        });
+                        }); // U:[FA-33]
                     }
                     //
                     // DISABLE TOKEN
@@ -720,12 +720,12 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeMulticall.disableToken.selector) {
                         _revertIfNoPermission(flags, DISABLE_TOKEN_PERMISSION); // U:[FA-21]
                         // Parses token
-                        address token = abi.decode(mcall.callData[4:], (address));
+                        address token = abi.decode(mcall.callData[4:], (address)); // U:[FA-33]
                         /// IGNORE QUOTED TOKEN MASK
                         enabledTokensMask = enabledTokensMask.disable({
                             bitsToDisable: _getTokenMaskOrRevert(token),
                             invertedSkipMask: quotedTokensMaskInverted
-                        });
+                        }); // U:[FA-33]
                     }
                     //
                     // UPDATE QUOTA
@@ -819,13 +819,13 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         // If expectedBalances was set by calling revertIfGetLessThan,
         // checks that actual token balances are not less than expected balances
         if (expectedBalances.length != 0) {
-            BalancesLogic.compareBalances(creditAccount, expectedBalances);
+            BalancesLogic.compareBalances(creditAccount, expectedBalances); // U:[FA-23]
         }
 
         /// If increaseDebt was called during the multicall, all forbidden tokens must be disabled at the end
         /// otherwise, funds could be borrowed against forbidden token, which is prohibited
         if ((flags & INCREASE_DEBT_WAS_CALLED != 0) && (enabledTokensMask & forbiddenTokenMask != 0)) {
-            revert ForbiddenTokensException();
+            revert ForbiddenTokensException(); // U:[FA-27]
         }
 
         /// If the `externalCallCreditAccount` value was set to the current CA, it must be reset
@@ -870,12 +870,53 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     ///         that use on-demand price feeds
     /// @param callData Bytes calldata for parsing
     function _onDemandPriceUpdate(bytes calldata callData) internal {
-        (address token, bytes memory data) = abi.decode(callData, (address, bytes));
+        (address token, bytes memory data) = abi.decode(callData, (address, bytes)); // U:[FA-25]
 
-        address priceFeed = IPriceOracleV2(ICreditManagerV3(creditManager).priceOracle()).priceFeeds(token);
-        if (priceFeed == address(0)) revert PriceFeedNotExistsException();
+        address priceFeed = IPriceOracleV2(ICreditManagerV3(creditManager).priceOracle()).priceFeeds(token); // U:[FA-25]
+        if (priceFeed == address(0)) revert PriceFeedNotExistsException(); // U:[FA-25]
 
-        IPriceFeedOnDemand(priceFeed).updatePrice(data);
+        IPriceFeedOnDemand(priceFeed).updatePrice(data); // U:[FA-25]
+    }
+
+    /// @notice Requests the Credit Manager to change the CA's debt
+    /// @param creditAccount CA to change debt for
+    /// @param callData Bytes calldata for parsing
+    function _manageDebt(
+        address creditAccount,
+        bytes calldata callData,
+        uint256 enabledTokensMask,
+        ManageDebtAction action
+    ) internal returns (uint256 tokensToEnable, uint256 tokensToDisable) {
+        uint256 amount = abi.decode(callData, (uint256)); // U:[FA-27,31]
+
+        if (action == ManageDebtAction.INCREASE_DEBT) {
+            // Checks that the borrowed amount does not violate the per block limit
+            // This also ensures that increaseDebt can't be called when borrowing is forbidden
+            // (since the block limit will be 0)
+            _revertIfOutOfBorrowingLimit(amount); // U:[FA-28]
+        }
+
+        // Checks whether the total debt amount does not exceed the limit and updates
+        // the current total debt amount
+        // Only in `trackTotalDebt` mode
+        if (trackTotalDebt) {
+            _revertIfOutOfTotalDebtLimit(amount, action);
+        }
+
+        uint256 newDebt;
+        // Requests the Credit Manager to borrow additional funds from the pool
+        (newDebt, tokensToEnable, tokensToDisable) =
+            ICreditManagerV3(creditManager).manageDebt(creditAccount, amount, enabledTokensMask, action); // U:[FA-27,31]
+
+        // Checks that the new total borrowed amount is within bounds
+        _revertIfOutOfDebtLimits(newDebt); // U:[FA-28, 32]
+
+        // Emits event
+        if (action == ManageDebtAction.INCREASE_DEBT) {
+            emit IncreaseDebt(creditAccount, amount); // U:[FA-27]
+        } else {
+            emit DecreaseDebt(creditAccount, amount); // U:[FA-31]
+        }
     }
 
     /// @notice Requests Credit Manager to update a Credit Account's quota for a certain token
@@ -907,47 +948,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         address payer = _getBorrowerOrRevert(creditAccount);
 
         IBotList(botList).payBot(payer, creditAccount, msg.sender, paymentAmount);
-    }
-
-    /// @notice Requests the Credit Manager to change the CA's debt
-    /// @param creditAccount CA to change debt for
-    /// @param callData Bytes calldata for parsing
-    function _manageDebt(
-        address creditAccount,
-        bytes calldata callData,
-        uint256 enabledTokensMask,
-        ManageDebtAction action
-    ) internal returns (uint256 tokensToEnable, uint256 tokensToDisable) {
-        uint256 amount = abi.decode(callData, (uint256)); // F:[FA-26]
-
-        if (action == ManageDebtAction.INCREASE_DEBT) {
-            // Checks that the borrowed amount does not violate the per block limit
-            // This also ensures that increaseDebt can't be called when borrowing is forbidden
-            // (since the block limit will be 0)
-            _revertIfOutOfBorrowingLimit(amount); // F:[FA-18A]
-        }
-
-        // Checks whether the total debt amount does not exceed the limit and updates
-        // the current total debt amount
-        // Only in `trackTotalDebt` mode
-        if (trackTotalDebt) {
-            _revertIfOutOfTotalDebtLimit(amount, action);
-        }
-
-        uint256 newDebt;
-        // Requests the Credit Manager to borrow additional funds from the pool
-        (newDebt, tokensToEnable, tokensToDisable) =
-            ICreditManagerV3(creditManager).manageDebt(creditAccount, amount, enabledTokensMask, action); // F:[FA-17]
-
-        // Checks that the new total borrowed amount is within bounds
-        _revertIfOutOfDebtLimits(newDebt); // F:[FA-18B]
-
-        // Emits event
-        if (action == ManageDebtAction.INCREASE_DEBT) {
-            emit IncreaseDebt(creditAccount, amount); // F:[FA-17]
-        } else {
-            emit DecreaseDebt(creditAccount, amount); // F:[FA-19]
-        }
     }
 
     /// @notice Requests the Credit Manager to transfer collateral from the caller to the Credit Account
