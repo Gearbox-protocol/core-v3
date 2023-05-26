@@ -749,11 +749,11 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     /// the account owner can claim the withdrawal.
                     else if (method == ICreditFacadeMulticall.scheduleWithdrawal.selector) {
                         _revertIfNoPermission(flags, WITHDRAW_PERMISSION); // U:[FA-21]
-                        uint256 tokensToDisable = _scheduleWithdrawal(creditAccount, mcall.callData[4:]);
+                        uint256 tokensToDisable = _scheduleWithdrawal(creditAccount, mcall.callData[4:]); // U:[FA-34]
                         enabledTokensMask = enabledTokensMask.disable({
                             bitsToDisable: tokensToDisable,
                             invertedSkipMask: quotedTokensMaskInverted
-                        });
+                        }); // U:[FA-35]
                     }
                     //
                     // REVOKE ADAPTER ALLOWANCES
@@ -762,7 +762,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     /// to clean up leftover allowances from old contracts
                     else if (method == ICreditFacadeMulticall.revokeAdapterAllowances.selector) {
                         _revertIfNoPermission(flags, REVOKE_ALLOWANCES_PERMISSION); // U:[FA-21]
-                        _revokeAdapterAllowances(creditAccount, mcall.callData[4:]);
+                        _revokeAdapterAllowances(creditAccount, mcall.callData[4:]); // U:[FA-36]
                     }
                     //
                     // PAY BOT
@@ -771,8 +771,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     /// Only available in `botMulticall` and can only be called once
                     else if (method == ICreditFacadeMulticall.payBot.selector) {
                         _revertIfNoPermission(flags, PAY_BOT_CAN_BE_CALLED); // U:[FA-21]
-                        flags = flags.disable(PAY_BOT_CAN_BE_CALLED);
-                        _payBot(creditAccount, mcall.callData[4:]);
+                        flags = flags.disable(PAY_BOT_CAN_BE_CALLED); // U:[FA-37]
+                        _payBot(creditAccount, mcall.callData[4:]); // U:[FA-37]
                     }
                     //
                     // UNKNOWN METHOD
@@ -951,12 +951,23 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         emit UpdateQuota(creditAccount, token, quotaChange); // U:[FA-34]
     }
 
+    /// @notice Requests the Credit Manager to schedule a withdrawal
+    /// @param creditAccount Credit Account to schedule withdrawals for
+    /// @param callData Bytes calldata for parsing
+    function _scheduleWithdrawal(address creditAccount, bytes calldata callData)
+        internal
+        returns (uint256 tokensToDisable)
+    {
+        (address token, uint256 amount) = abi.decode(callData, (address, uint256)); // U:[FA-35]
+        tokensToDisable = ICreditManagerV3(creditManager).scheduleWithdrawal(creditAccount, token, amount); // U:[FA-35]
+    }
+
     /// @notice Requests Credit Manager to remove a set of existing allowances
     /// @param creditAccount Credit Account to revoke allowances for
     /// @param callData Bytes calldata for parsing
     function _revokeAdapterAllowances(address creditAccount, bytes calldata callData) internal {
-        (RevocationPair[] memory revocations) = abi.decode(callData, (RevocationPair[]));
-        ICreditManagerV3(creditManager).revokeAdapterAllowances(creditAccount, revocations);
+        (RevocationPair[] memory revocations) = abi.decode(callData, (RevocationPair[])); // U:[FA-36]
+        ICreditManagerV3(creditManager).revokeAdapterAllowances(creditAccount, revocations); // U:[FA-36]
     }
 
     /// @notice Requests the bot list to pay the bot for performed services
@@ -966,20 +977,14 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         uint72 paymentAmount = abi.decode(callData, (uint72));
 
         /// The current owner of the account always pays for bot services
-        address payer = _getBorrowerOrRevert(creditAccount);
+        address payer = _getBorrowerOrRevert(creditAccount); // U:[FA-37]
 
-        IBotList(botList).payBot(payer, creditAccount, msg.sender, paymentAmount);
-    }
-
-    /// @notice Requests the Credit Manager to schedule a withdrawal
-    /// @param creditAccount Credit Account to schedule withdrawals for
-    /// @param callData Bytes calldata for parsing
-    function _scheduleWithdrawal(address creditAccount, bytes calldata callData)
-        internal
-        returns (uint256 tokensToDisable)
-    {
-        (address token, uint256 amount) = abi.decode(callData, (address, uint256));
-        tokensToDisable = ICreditManagerV3(creditManager).scheduleWithdrawal(creditAccount, token, amount);
+        IBotList(botList).payBot({
+            payer: payer,
+            creditAccount: creditAccount,
+            bot: msg.sender,
+            paymentAmount: paymentAmount
+        }); // U:[FA-37]
     }
 
     /// @notice Claims all mature delayed withdrawals, transferring funds from

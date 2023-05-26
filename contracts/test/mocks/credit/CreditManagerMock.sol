@@ -81,6 +81,8 @@ contract CreditManagerMock {
     uint256 qu_tokensToEnable;
     uint256 qu_tokensToDisable;
 
+    uint256 sw_tokensToDisable;
+
     constructor(address _addressProvider, address _pool) {
         addressProvider = _addressProvider;
         weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // U:[CM-1]
@@ -295,10 +297,16 @@ contract CreditManagerMock {
         tokensToDisable = md_return_tokensToDisable;
     }
 
+    function setScheduleWithdrawal(uint256 tokensToDisable) external {
+        sw_tokensToDisable = tokensToDisable;
+    }
+
     function scheduleWithdrawal(address creditAccount, address token, uint256 amount)
         external
         returns (uint256 tokensToDisable)
-    {}
+    {
+        tokensToDisable = sw_tokensToDisable;
+    }
 
     function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external {}
 }
