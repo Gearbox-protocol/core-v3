@@ -76,6 +76,8 @@ contract CreditManagerMock {
     uint256 md_return_tokensToEnable;
     uint256 md_return_tokensToDisable;
 
+    uint256 ad_tokenMask;
+
     constructor(address _addressProvider, address _pool) {
         addressProvider = _addressProvider;
         weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // U:[CM-1]
@@ -260,10 +262,16 @@ contract CreditManagerMock {
         flags &= ~flag; // U:[CM-36]
     }
 
+    function setAddCollateral(uint256 tokenMask) external {
+        ad_tokenMask = tokenMask;
+    }
+
     function addCollateral(address payer, address creditAccount, address token, uint256 amount)
         external
         returns (uint256 tokenMask)
-    {}
+    {
+        tokenMask = ad_tokenMask;
+    }
 
     function setManageDebt(uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable) external {
         return_newDebt = newDebt;

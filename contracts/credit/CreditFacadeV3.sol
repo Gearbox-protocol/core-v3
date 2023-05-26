@@ -595,7 +595,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         /// Inverted mask of quoted tokens is pre-compute to avoid
         /// enabling or disabling them outside `updateQuota`
         uint256 quotedTokensMaskInverted =
-            supportsQuotas ? type(uint256).max : ~ICreditManagerV3(creditManager).quotedTokensMask();
+            supportsQuotas ? ~ICreditManagerV3(creditManager).quotedTokensMask() : type(uint256).max;
 
         // Emits event for multicall start - used in analytics to track actions within multicalls
         emit StartMultiCall(creditAccount); // U:[FA-18]
@@ -629,7 +629,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                         // Calling this function again could potentially override old values
                         // and cause confusion, especially if called later in the MultiCall
                         if (expectedBalances.length != 0) {
-                            revert ExpectedBalancesAlreadySetException();
+                            revert ExpectedBalancesAlreadySetException(); // U:[FA-23]
                         }
 
                         // Sets expected balances to currentBalance + delta
@@ -646,7 +646,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     /// is especially useful for bots.
                     else if (method == ICreditFacadeMulticall.setFullCheckParams.selector) {
                         (fullCheckParams.collateralHints, fullCheckParams.minHealthFactor) =
-                            abi.decode(mcall.callData[4:], (uint256[], uint16));
+                            abi.decode(mcall.callData[4:], (uint256[], uint16)); // U:[FA-24]
                     }
                     //
                     // ON DEMAND PRICE UPDATE
@@ -655,7 +655,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     /// price updates. This helps support tokens where there is no traditional price feeds,
                     /// but there is attested off-chain price data.
                     else if (method == ICreditFacadeMulticall.onDemandPriceUpdate.selector) {
-                        _onDemandPriceUpdate(mcall.callData[4:]);
+                        _onDemandPriceUpdate(mcall.callData[4:]); // U:[FA-25]
                     }
                     //
                     // ADD COLLATERAL
@@ -666,7 +666,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                         enabledTokensMask = enabledTokensMask.enable({
                             bitsToEnable: _addCollateral(creditAccount, mcall.callData[4:]),
                             invertedSkipMask: quotedTokensMaskInverted
-                        });
+                        }); // U:[FA-26]
                     }
                     //
                     // INCREASE DEBT

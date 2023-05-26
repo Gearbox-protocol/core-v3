@@ -9,6 +9,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IWETHGateway} from "../../../interfaces/IWETHGateway.sol";
 import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
+import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 
 /// LIBS
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -155,6 +156,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
             _addressProvider: address(addressProvider),
             _pool: address(poolMock)
         });
+
+        creditManagerMock.setSupportsQuotas(true);
     }
 
     function _withoutDegenNFT() internal {
@@ -1257,6 +1260,96 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
                 enabledTokensMask: 0,
                 flags: EXTERNAL_CALLS_PERMISSION
             });
+        }
+    }
+
+    /// @dev U:[FA-24]: multicall setFullCheckParams works properly
+    function test_U_FA_24_multicall_setFullCheckParams_works_properly() public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+
+        uint256[] memory collateralHints = new uint256[] (2);
+
+        collateralHints[0] = 2323;
+        collateralHints[1] = 8823;
+
+        uint16 hf = 12_320;
+
+        MultiCall[] memory calls = MultiCallBuilder.build(
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeMulticall.setFullCheckParams, (collateralHints, hf))
+            })
+        );
+
+        FullCheckParams memory fullCheckParams =
+            creditFacade.multicallInt({creditAccount: creditAccount, calls: calls, enabledTokensMask: 0, flags: 0});
+
+        assertEq(fullCheckParams.minHealthFactor, hf, "Incorrect hf");
+        assertEq(fullCheckParams.collateralHints, collateralHints, "Incorrect collateralHints");
+    }
+
+    /// @dev U:[FA-25]: multicall onDemandPriceUpdate works properly
+    function test_U_FA_25_multicall_onDemandPriceUpdate_works_properly() public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+        bytes memory cd = bytes("Hellew");
+
+        address token = tokenTestSuite.addressOf(Tokens.LINK);
+
+        creditManagerMock.setPriceOracle(address(priceOracleMock));
+
+        address priceFeedOnDemandMock = address(new PriceFeedOnDemandMock());
+
+        priceOracleMock.setPriceFeed(token, priceFeedOnDemandMock);
+
+        MultiCall[] memory calls = MultiCallBuilder.build(
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeMulticall.onDemandPriceUpdate, (token, cd))
+            })
+        );
+
+        vm.expectCall(address(priceOracleMock), abi.encodeCall(IPriceOracleV2.priceFeeds, (token)));
+        vm.expectCall(address(priceFeedOnDemandMock), abi.encodeCall(PriceFeedOnDemandMock.updatePrice, (cd)));
+
+        creditFacade.multicallInt({creditAccount: creditAccount, calls: calls, enabledTokensMask: 0, flags: 0});
+    }
+
+    /// @dev U:[FA-26]: multicall addCollateral works properly
+    function test_U_FA_26_multicall_addCollateral_works_properly() public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+
+        address token = tokenTestSuite.addressOf(Tokens.LINK);
+        uint256 amount = 12333345;
+        uint256 mask = 1 << 5;
+
+        creditManagerMock.setAddCollateral(mask);
+
+        MultiCall[] memory calls = MultiCallBuilder.build(
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (token, amount))
+            })
+        );
+
+        string memory caseNameBak = caseName;
+
+        for (uint256 testCase = 0; testCase < 2; ++testCase) {
+            caseName = string.concat(caseNameBak, testCase == 0 ? "not in quoted mask" : "in quoted mask");
+
+            creditManagerMock.setQuotedTokensMask(testCase == 0 ? 0 : mask);
+
+            FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
+                creditAccount: creditAccount,
+                calls: calls,
+                enabledTokensMask: UNDERLYING_TOKEN_MASK,
+                flags: ADD_COLLATERAL_PERMISSION
+            });
+
+            assertEq(
+                fullCheckParams.enabledTokensMaskAfter,
+                testCase == 0 ? (mask | UNDERLYING_TOKEN_MASK) : UNDERLYING_TOKEN_MASK,
+                _testCaseErr("Incorrect enabledTokenMask")
+            );
         }
     }
 }
