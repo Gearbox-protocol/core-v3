@@ -631,10 +631,12 @@ contract CreditFacadeIntegrationTest is
             MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
         );
 
+        address bot = address(new GeneralMock());
+
         vm.prank(USER);
         creditFacade.setBotPermissions({
             creditAccount: creditAccount,
-            bot: address(adapterMock),
+            bot: bot,
             permissions: uint192(ADD_COLLATERAL_PERMISSION),
             fundingAmount: 0,
             weeklyFundingAllowance: 0
