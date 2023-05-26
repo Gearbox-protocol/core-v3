@@ -1,771 +1,693 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Holdings, 2022
+// (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 pragma abicoder v1;
 
+import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
-import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-
+// INTERFACES
 import {IAddressProviderV3, AP_TREASURY, NO_VERSION_CONTROL} from "../interfaces/IAddressProviderV3.sol";
+import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
+import {IInterestRateModel} from "../interfaces/IInterestRateModel.sol";
+import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
+import {IPoolV3} from "../interfaces/IPoolV3.sol";
+import {IVersion} from "../interfaces/IVersion.sol";
 
-/// LIBS & TRAITS
+// LIBS & TRAITS
+import {CreditLogic} from "../libraries/CreditLogic.sol";
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
-import {CreditLogic} from "../libraries/CreditLogic.sol";
 
-import {IInterestRateModel} from "../interfaces/IInterestRateModel.sol";
-import {IPoolV3} from "../interfaces/IPoolV3.sol";
-import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
-import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
-
+// CONSTANTS
 import {RAY, MAX_WITHDRAW_FEE, SECONDS_PER_YEAR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
-import "forge-std/console.sol";
 
-struct CreditManagerDebt {
-    uint128 totalBorrowed;
+/// @dev Struct that holds borrowed amount and debt limit
+struct DebtParams {
+    uint128 borrowed;
     uint128 limit;
 }
 
-/// @title Core pool contract compatible with ERC4626
-/// @notice Implements pool & diesel token business logic
-contract PoolV3 is ERC4626, IPoolV3, ACLNonReentrantTrait, ContractsRegisterTrait {
-    using Math for uint256;
-    using EnumerableSet for EnumerableSet.AddressSet;
+/// @title Pool V3
+/// @notice Pool contract that implements lending and borrowing logic, compatible with ERC-4626 standard
+contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV3 {
     using SafeERC20 for IERC20;
+    using Math for uint256;
+    using SafeCast for int256;
+    using SafeCast for uint256;
     using CreditLogic for uint256;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
-    /// @dev Address provider
-    address public immutable override addressProvider;
-
-    /// @dev Address of the protocol treasury
-    address public immutable treasury;
-
-    /// @dev The pool's underlying asset
-    address public immutable override underlyingToken;
-
-    /// @dev True if pool supports assets with quotas and associated interest computations
-    bool public immutable supportsQuotas;
-
-    /// @dev Contract version
+    /// @inheritdoc IVersion
     uint256 public constant override version = 3_00;
 
-    // [SLOT #1]
+    /// @inheritdoc IPoolV3
+    address public immutable override addressProvider;
 
-    /// @dev Expected liquidity at last update (LU)
-    uint128 internal _expectedLiquidityLU;
+    /// @inheritdoc IPoolV3
+    address public immutable override underlyingToken;
 
-    /// @dev The current borrow rate
-    uint128 internal _borrowRate;
+    /// @inheritdoc IPoolV3
+    address public immutable override treasury;
 
-    // [SLOT #2]
+    /// @inheritdoc IPoolV3
+    bool public immutable override supportsQuotas;
 
-    /// @dev Total borrowed amount
-    uint128 internal _totalBorrowed;
-
-    /// @dev The cumulative interest index at last update
-    uint128 public cumulativeIndexLU_RAY;
-
-    // [SLOT #3]
-
-    /// @dev Timestamp of last update
-    uint64 public override timestampLU;
-
-    /// @dev Interest rate model
-    address public interestRateModel;
-
-    /// @dev Withdrawal fee in PERCENTAGE FORMAT
+    /// @inheritdoc IPoolV3
+    address public override interestRateModel;
+    /// @inheritdoc IPoolV3
+    uint40 public override lastBaseInterestUpdate;
+    /// @inheritdoc IPoolV3
+    uint40 public override lastQuotaRevenueUpdate;
+    /// @inheritdoc IPoolV3
     uint16 public override withdrawFee;
 
-    // [SLOT #4]: LIMITS
-
-    /// @dev Total borrowed amount
-    uint128 internal _totalBorrowedLimit;
-
-    /// @dev The limit on expected (total) liquidity
-    uint128 internal expectedLiquidityLimit128;
-
-    // [SLOT #5]: POOL QUOTA KEEPER
-
-    /// @dev Pool Quota Keeper updates quotaRevenue
+    /// @inheritdoc IPoolV3
     address public override poolQuotaKeeper;
+    /// @dev Current quota revenue
+    uint96 internal _quotaRevenue;
 
-    uint40 public lastQuotaRevenueUpdate;
+    /// @dev Current base interest rate in ray
+    uint128 internal _baseInterestRate;
+    /// @dev Cumulative base interest index stored as of last update in ray
+    uint128 internal _baseInterestIndexStored;
 
-    // [SLOT #6]: POOL QUOTA KEEPER (CNTD.)
+    /// @dev Expected liquidity stored as of last update
+    uint128 internal _expectedLiquidityStored;
 
-    uint128 public quotaRevenue;
+    /// @dev Aggregate debt params
+    DebtParams internal _totalDebt;
 
-    /// @dev Map from Credit Manager addresses to the status of their ability to borrow
-    mapping(address => CreditManagerDebt) internal creditManagersDebt;
+    /// @dev Mapping credit manager => debt params
+    mapping(address => DebtParams) internal _creditManagerDebt;
 
-    /// @dev The list of all Credit Managers
-    EnumerableSet.AddressSet internal creditManagerSet;
+    /// @dev List of all connected credit managers
+    EnumerableSet.AddressSet internal _creditManagerSet;
 
+    /// @dev Ensures that function can only be called by the pool quota keeper
     modifier poolQuotaKeeperOnly() {
-        if (msg.sender != poolQuotaKeeper) revert CallerNotPoolQuotaKeeperException(); // F:[P4-5]
+        if (msg.sender != poolQuotaKeeper) revert CallerNotPoolQuotaKeeperException(); // U:[P4-5]
         _;
     }
 
-    modifier creditManagerWithActiveDebtOnly() {
-        if (creditManagersDebt[msg.sender].totalBorrowed == 0) {
-            /// todo: add correct exception ??
-            revert CallerNotCreditManagerException();
-        }
-        _;
-    }
-
-    //
-    // CONSTRUCTOR
-    //
-
-    /// @dev Constructor
-
+    /// @notice Constructor
+    /// @param addressProvider_ Address provider contract address
+    /// @param underlyingToken_ Pool underlying token address
+    /// @param interestRateModel_ Interest rate model contract address
+    /// @param totalDebtLimit_ Initial total debt limit, `type(uint256).max` for no limit
+    /// @param supportsQuotas_ Whether pool should support quotas
     constructor(
-        address _addressProvider,
-        address _underlyingToken,
-        address _interestRateModel,
-        uint256 _expectedLiquidityLimit,
-        bool _supportsQuotas
+        address addressProvider_,
+        address underlyingToken_,
+        address interestRateModel_,
+        uint256 totalDebtLimit_,
+        bool supportsQuotas_
     )
-        ACLNonReentrantTrait(_addressProvider)
-        ContractsRegisterTrait(_addressProvider)
-        ERC4626(IERC20(_underlyingToken))
+        ACLNonReentrantTrait(addressProvider_)
+        ContractsRegisterTrait(addressProvider_)
+        ERC4626(IERC20(underlyingToken_))
         ERC20(
-            string(
-                abi.encodePacked("diesel ", _underlyingToken != address(0) ? IERC20Metadata(_underlyingToken).name() : "")
-            ),
-            string(abi.encodePacked("d", _underlyingToken != address(0) ? IERC20Metadata(_underlyingToken).symbol() : ""))
-        ) // F:[P4-01]
-        nonZeroAddress(_underlyingToken) // F:[P4-02]
-        nonZeroAddress(_interestRateModel) // F:[P4-02]
+            string(abi.encodePacked("diesel ", underlyingToken_ != address(0) ? ERC20(underlyingToken_).name() : "")),
+            string(abi.encodePacked("d", underlyingToken_ != address(0) ? ERC20(underlyingToken_).symbol() : ""))
+        ) // U:[P4-1]
+        nonZeroAddress(underlyingToken_) // U:[P4-2]
+        nonZeroAddress(interestRateModel_) // U:[P4-2]
     {
-        addressProvider = _addressProvider; // F:[P4-01]
-        underlyingToken = _underlyingToken; // F:[P4-01]
+        addressProvider = addressProvider_; // U:[P4-1]
+        underlyingToken = underlyingToken_; // U:[P4-1]
 
         treasury =
-            IAddressProviderV3(_addressProvider).getAddressOrRevert({key: AP_TREASURY, _version: NO_VERSION_CONTROL}); // F:[P4-01]
+            IAddressProviderV3(addressProvider_).getAddressOrRevert({key: AP_TREASURY, _version: NO_VERSION_CONTROL}); // U:[P4-1]
 
-        timestampLU = uint64(block.timestamp); // F:[P4-01]
-        cumulativeIndexLU_RAY = uint128(RAY); // F:[P4-01]
+        lastBaseInterestUpdate = uint40(block.timestamp); // U:[P4-1]
+        _baseInterestIndexStored = uint128(RAY); // U:[P4-1]
 
-        interestRateModel = _interestRateModel;
-        emit SetInterestRateModel(_interestRateModel); // F:[P4-03]
+        interestRateModel = interestRateModel_;
+        emit SetInterestRateModel(interestRateModel_); // U:[P4-3]
 
-        _setExpectedLiquidityLimit(_expectedLiquidityLimit); // F:[P4-01, 03]
-        _setTotalBorrowedLimit(_expectedLiquidityLimit); // F:[P4-03]
-        supportsQuotas = _supportsQuotas; // F:[P4-01]
+        _setTotalDebtLimit(totalDebtLimit_); // U:[P4-3]
+        supportsQuotas = supportsQuotas_; // U:[P4-1]
     }
 
-    //
-    // ERC-4626 LOGIC
-    //
+    /// @inheritdoc IPoolV3
+    function creditManagers() external view override returns (address[] memory) {
+        return _creditManagerSet.values();
+    }
 
-    //
-    // DEPOSIT/WITHDRAWAL LOGIC
-    //
+    /// @inheritdoc IPoolV3
+    function supplyRate() external view override returns (uint256) {
+        uint256 assets = expectedLiquidity();
+        uint256 baseInterestRate_ = baseInterestRate();
+        if (assets == 0) return baseInterestRate_;
+        return (baseInterestRate_ * _totalDebt.borrowed + quotaRevenue() * RAY) * (PERCENTAGE_FACTOR - withdrawFee)
+            / PERCENTAGE_FACTOR / assets; // U:[P4-28]
+    }
 
-    /// @dev See {IERC4626-deposit}.
+    /// @inheritdoc IPoolV3
+    function availableLiquidity() public view override returns (uint256) {
+        return IERC20(underlyingToken).balanceOf(address(this));
+    }
+
+    /// @inheritdoc IPoolV3
+    function expectedLiquidity() public view override returns (uint256) {
+        return _expectedLiquidityStored + _calcBaseInterestAccrued() + (supportsQuotas ? _calcQuotaRevenueAccrued() : 0);
+    }
+
+    /// @inheritdoc IPoolV3
+    function expectedLiquidityStored() public view override returns (uint256) {
+        return _expectedLiquidityStored;
+    }
+
+    // ---------------- //
+    // ERC-4626 LENDING //
+    // ---------------- //
+
+    /// @inheritdoc IPoolV3
+    function totalAssets() public view override(ERC4626, IPoolV3) returns (uint256 assets) {
+        return expectedLiquidity();
+    }
+
+    /// @inheritdoc IPoolV3
     function deposit(uint256 assets, address receiver)
         public
-        override(ERC4626, IERC4626)
-        whenNotPaused // F:[P4-4]
+        override(ERC4626, IPoolV3)
+        whenNotPaused // U:[P4-4]
         nonReentrant
         nonZeroAddress(receiver)
         returns (uint256 shares)
     {
-        uint256 assetsDelivered = _amountMinusFee(assets); // F:[P4-5,7]
-        shares = _convertToShares(assetsDelivered, Math.Rounding.Down); // F:[P4-5,7]
-        _deposit(receiver, assets, assetsDelivered, shares); // F:[P4-5]
+        uint256 assetsReceived = _amountMinusFee(assets); // U:[P4-5,7]
+        shares = _convertToShares(assetsReceived, Math.Rounding.Down); // U:[P4-5,7]
+        _deposit(receiver, assets, assetsReceived, shares); // U:[P4-5]
     }
 
-    /// @dev Deposit with emitting referral code
+    /// @inheritdoc IPoolV3
     function depositReferral(uint256 assets, address receiver, uint16 referralCode)
         external
         override
-        returns (
-            // nonReentrancy is set for deposit function
-            uint256 shares
-        )
+        returns (uint256 shares)
     {
-        shares = deposit(assets, receiver); // F:[P4-5]
-        emit DepositWithReferral(msg.sender, receiver, assets, referralCode); // F:[P4-5]
+        shares = deposit(assets, receiver); // U:[P4-5]
+        emit Refer(receiver, referralCode, assets); // U:[P4-5]
     }
 
-    /// @dev See {IERC4626-mint}.
-    ///
-    /// As opposed to {deposit}, minting is allowed even if the vault is in a state where the price of a share is zero.
-    /// In this case, the shares will be minted without requiring any assets to be deposited.
+    /// @inheritdoc IPoolV3
     function mint(uint256 shares, address receiver)
         public
-        override(ERC4626, IERC4626)
-        whenNotPaused // F:[P4-4]
+        override(ERC4626, IPoolV3)
+        whenNotPaused // U:[P4-4]
         nonReentrant
         nonZeroAddress(receiver)
         returns (uint256 assets)
     {
-        // No need to check for rounding error, previewMint rounds up.
-        assets = previewMint(shares); // F:[P4-6,7]
-
-        _deposit(receiver, assets, _amountMinusFee(assets), shares); // F:[P4-6,7]
+        uint256 assetsReceived = _convertToAssets(shares, Math.Rounding.Up); // U:[P4-6,7]
+        assets = _amountWithFee(assetsReceived); // U:[P4-6,7]
+        _deposit(receiver, assets, assetsReceived, shares); // U:[P4-6,7]
     }
 
-    function _deposit(address receiver, uint256 assetsSent, uint256 assetsDelivered, uint256 shares) internal {
-        /// Interst rate calculatiuon??
-        if (expectedLiquidity() + assetsDelivered > uint256(expectedLiquidityLimit128)) {
-            revert ExpectedLiquidityLimitException(); // F:[P4-7]
-        }
-
-        int256 assetsDeliveredSgn = int256(assetsDelivered); // F:[P4-5,6]
-
-        /// @dev available liquidity is 0, because assets are already transffered
-        /// It's updated after transfer to account real asset delivered to account
-        _updateBaseParameters(assetsDeliveredSgn, assetsDeliveredSgn, false); // F:[P4-5,6]
-
-        IERC20(underlyingToken).safeTransferFrom(msg.sender, address(this), assetsSent);
-
-        _mint(receiver, shares); // F:[P4-5,6]
-
-        emit Deposit(msg.sender, receiver, assetsSent, shares); // F:[P4-5,6]
-    }
-
-    /// @dev  See {IERC4626-withdraw}.
+    /// @inheritdoc IPoolV3
     function withdraw(uint256 assets, address receiver, address owner)
         public
-        override(ERC4626, IERC4626)
-        whenNotPaused // F:[P4-4]
+        override(ERC4626, IPoolV3)
+        whenNotPaused // U:[P4-4]
         nonReentrant
         nonZeroAddress(receiver)
         returns (uint256 shares)
     {
-        // @dev it returns share taking fee into account
-        shares = previewWithdraw(assets); // F:[P4-8]
-        _withdraw(assets, _convertToAssets(shares, Math.Rounding.Down), shares, receiver, owner); // F:[P4-8]
+        uint256 assetsSent = _amountWithWithdrawalFee(_amountWithFee(assets));
+        shares = _convertToShares(assetsSent, Math.Rounding.Up); // U:[P4-8]
+        _withdraw(receiver, owner, assetsSent, assets, shares); // U:[P4-8]
     }
 
-    /// @dev See {IERC4626-redeem}.
+    /// @inheritdoc IPoolV3
     function redeem(uint256 shares, address receiver, address owner)
         public
-        override(ERC4626, IERC4626)
-        whenNotPaused // F:[P4-4]
+        override(ERC4626, IPoolV3)
+        whenNotPaused // U:[P4-4]
         nonReentrant
         nonZeroAddress(receiver)
-        returns (uint256 assetsDelivered)
+        returns (uint256 assets)
     {
-        /// Note: Computes assets without fees
-        uint256 assetsSpent = _convertToAssets(shares, Math.Rounding.Down); // F:[P4-9]
-        assetsDelivered = _calcDeliveredAsstes(assetsSpent); // F:[P4-9]
-
-        _withdraw(assetsDelivered, assetsSpent, shares, receiver, owner); // F:[P4-9]
+        uint256 assetsSent = _convertToAssets(shares, Math.Rounding.Down); // U:[P4-9]
+        assets = _amountMinusFee(_amountMinusWithdrawalFee(assetsSent)); // U:[P4-9]
+        _withdraw(receiver, owner, assetsSent, assets, shares); // U:[P4-9]
     }
 
-    /// @dev Withdraw/redeem common workflow.
-    function _withdraw(uint256 assetsDelivered, uint256 assetsSpent, uint256 shares, address receiver, address owner)
-        internal
-    {
-        if (msg.sender != owner) {
-            _spendAllowance(owner, msg.sender, shares); // F:[P4-8,9]
-        }
-
-        _updateBaseParameters(-int256(assetsSpent), -int256(assetsSpent), false); // F:[P4-8,9]
-
-        _burn(owner, shares); // F:[P4-8,9]
-
-        uint256 amountToUser = _amountWithFee(assetsDelivered); // F:[P4-8,9]
-
-        IERC20(underlyingToken).safeTransfer(receiver, amountToUser); // F:[P4-8,9]
-
-        if (assetsSpent > amountToUser) {
-            unchecked {
-                IERC20(underlyingToken).safeTransfer(treasury, assetsSpent - amountToUser); // F:[P4-8,9]
-            }
-        }
-
-        emit Withdraw(msg.sender, receiver, owner, assetsDelivered, shares); // F:[P4-8, 9]
-    }
-
+    /// @inheritdoc IPoolV3
     function burn(uint256 shares)
         external
         override
-        whenNotPaused // TODO: Add test
+        whenNotPaused // U:[P4-4]
         nonReentrant
     {
-        _burn(msg.sender, shares); // F:[P4-10]
+        _burn(msg.sender, shares); // U:[P4-10]
     }
 
-    //
-    // FEE TOKEN SUPPORT
+    /// @inheritdoc IPoolV3
+    function previewDeposit(uint256 assets) public view override(ERC4626, IPoolV3) returns (uint256 shares) {
+        shares = _convertToShares(_amountMinusFee(assets), Math.Rounding.Down);
+    }
 
+    /// @inheritdoc IPoolV3
+    function previewMint(uint256 shares) public view override(ERC4626, IPoolV3) returns (uint256) {
+        return _amountWithFee(_convertToAssets(shares, Math.Rounding.Up));
+    }
+
+    /// @inheritdoc IPoolV3
+    function previewWithdraw(uint256 assets) public view override(ERC4626, IPoolV3) returns (uint256) {
+        return _convertToShares(_amountWithWithdrawalFee(_amountWithFee(assets)), Math.Rounding.Up);
+    }
+
+    /// @inheritdoc IPoolV3
+    function previewRedeem(uint256 shares) public view override(ERC4626, IPoolV3) returns (uint256) {
+        return _amountMinusFee(_amountMinusWithdrawalFee(_convertToAssets(shares, Math.Rounding.Down)));
+    }
+
+    /// @inheritdoc IPoolV3
+    function maxDeposit(address) public view override(ERC4626, IPoolV3) returns (uint256) {
+        return paused() ? 0 : type(uint256).max;
+    }
+
+    /// @inheritdoc IPoolV3
+    function maxMint(address) public view override(ERC4626, IPoolV3) returns (uint256) {
+        return paused() ? 0 : type(uint256).max;
+    }
+
+    /// @inheritdoc IPoolV3
+    function maxWithdraw(address owner) public view override(ERC4626, IPoolV3) returns (uint256) {
+        return paused() ? 0 : Math.min(availableLiquidity(), _convertToAssets(balanceOf(owner), Math.Rounding.Down));
+    }
+
+    /// @inheritdoc IPoolV3
+    function maxRedeem(address owner) public view override(ERC4626, IPoolV3) returns (uint256) {
+        return paused() ? 0 : Math.min(balanceOf(owner), _convertToShares(availableLiquidity(), Math.Rounding.Down));
+    }
+
+    /// @notice `deposit` / `mint` implementation
+    ///         - transfers underlying from the caller
+    ///         - updates base interest rate and index
+    ///         - mints pool shares to `receiver`
+    function _deposit(address receiver, uint256 assetsSent, uint256 assetsReceived, uint256 shares) internal {
+        IERC20(underlyingToken).safeTransferFrom(msg.sender, address(this), assetsSent); // U:[P4-5,6]
+
+        _updateBaseInterest({
+            expectedLiquidityDelta: assetsReceived.toInt256(),
+            availableLiquidityDelta: 0,
+            checkOptimalBorrowing: false
+        }); // U:[P4-5,6]
+
+        _mint(receiver, shares); // U:[P4-5,6]
+        emit Deposit(msg.sender, receiver, assetsSent, shares); // U:[P4-5,6]
+    }
+
+    /// @notice `withdraw` / `redeem` implementation
+    ///         - burns pool shares from `owner`
+    ///         - updates base interest rate and index
+    ///         - transfers underlying to `receiver` and, if withdrawal fee is activated, to the treasury
+    function _withdraw(address receiver, address owner, uint256 assetsSent, uint256 assetsReceived, uint256 shares)
+        internal
+    {
+        if (msg.sender != owner) _spendAllowance({owner: owner, spender: msg.sender, amount: shares}); // U:[P4-8,9]
+        _burn(owner, shares); // U:[P4-8,9]
+
+        _updateBaseInterest({
+            expectedLiquidityDelta: -assetsSent.toInt256(),
+            availableLiquidityDelta: -assetsSent.toInt256(),
+            checkOptimalBorrowing: false
+        }); // U:[P4-8,9]
+
+        uint256 amountToUser = _amountWithFee(assetsReceived);
+        IERC20(underlyingToken).safeTransfer(receiver, amountToUser); // U:[P4-8,9]
+        if (assetsSent > amountToUser) {
+            unchecked {
+                IERC20(underlyingToken).safeTransfer(treasury, assetsSent - amountToUser); // U:[P4-8,9]
+            }
+        }
+        emit Withdraw(msg.sender, receiver, owner, assetsReceived, shares); // U:[P4-8, 9]
+    }
+
+    // --------- //
+    // BORROWING //
+    // --------- //
+
+    /// @inheritdoc IPoolV3
+    function totalBorrowed() external view override returns (uint256) {
+        return _totalDebt.borrowed;
+    }
+
+    /// @inheritdoc IPoolV3
+    function totalDebtLimit() external view override returns (uint256) {
+        return _convertToU256(_totalDebt.limit);
+    }
+
+    /// @inheritdoc IPoolV3
+    function creditManagerBorrowed(address creditManager) external view override returns (uint256) {
+        return _creditManagerDebt[creditManager].borrowed;
+    }
+
+    /// @inheritdoc IPoolV3
+    function creditManagerDebtLimit(address creditManager) external view override returns (uint256) {
+        return _convertToU256(_creditManagerDebt[creditManager].limit); // U:[P4-21]
+    }
+
+    /// @inheritdoc IPoolV3
+    function creditManagerBorrowable(address creditManager) external view override returns (uint256 borrowable) {
+        borrowable = _borrowable(_totalDebt); // U:[P4-27]
+        if (borrowable == 0) return 0; // U:[P4-27]
+
+        borrowable = Math.min(borrowable, _borrowable(_creditManagerDebt[creditManager])); // U:[P4-27]
+        if (borrowable == 0) return 0; // U:[P4-27]
+
+        uint256 available = IInterestRateModel(interestRateModel).availableToBorrow({
+            expectedLiquidity: expectedLiquidity(),
+            availableLiquidity: availableLiquidity()
+        }); // U:[P4-27]
+
+        borrowable = Math.min(borrowable, available); // U:[P4-27]
+    }
+
+    /// @inheritdoc IPoolV3
+    function lendCreditAccount(uint256 borrowedAmount, address creditAccount)
+        external
+        override
+        whenNotPaused // U:[P4-4]
+        nonReentrant
+    {
+        uint128 borrowedAmountU128 = borrowedAmount.toUint128();
+
+        DebtParams storage cmDebt = _creditManagerDebt[msg.sender];
+        uint128 totalBorrowed_ = _totalDebt.borrowed + borrowedAmountU128;
+        uint128 cmBorrowed_ = cmDebt.borrowed + borrowedAmountU128;
+        if (borrowedAmount == 0 || cmBorrowed_ > cmDebt.limit || totalBorrowed_ > _totalDebt.limit) {
+            revert CreditManagerCantBorrowException(); // U:[P4-12]
+        }
+
+        _updateBaseInterest({
+            expectedLiquidityDelta: 0,
+            availableLiquidityDelta: -borrowedAmount.toInt256(),
+            checkOptimalBorrowing: true
+        }); // U:[P4-11]
+
+        cmDebt.borrowed = cmBorrowed_; // U:[P4-11]
+        _totalDebt.borrowed = totalBorrowed_; // U:[P4-11]
+
+        IERC20(underlyingToken).safeTransfer(creditAccount, borrowedAmount); // U:[P4-11]
+        emit Borrow(msg.sender, creditAccount, borrowedAmount); // U:[P4-11]
+    }
+
+    /// @inheritdoc IPoolV3
+    function repayCreditAccount(uint256 repaidAmount, uint256 profit, uint256 loss)
+        external
+        override
+        whenNotPaused // U:[P4-4]
+    {
+        uint128 repaidAmountU128 = repaidAmount.toUint128();
+
+        DebtParams storage cmDebt = _creditManagerDebt[msg.sender];
+        uint128 cmBorrowed = cmDebt.borrowed;
+        if (cmBorrowed == 0) {
+            revert CallerNotCreditManagerException(); // U:[P4-13]
+        }
+
+        if (profit > 0) {
+            _mint(treasury, convertToShares(profit)); // U:[P4-14]
+        } else if (loss > 0) {
+            address treasury_ = treasury;
+            uint256 sharesInTreasury = balanceOf(treasury_);
+            uint256 sharesToBurn = convertToShares(loss);
+            if (sharesToBurn > sharesInTreasury) {
+                unchecked {
+                    emit IncurUncoveredLoss({
+                        creditManager: msg.sender,
+                        loss: convertToAssets(sharesToBurn - sharesInTreasury)
+                    }); // U:[P4-14]
+                }
+                sharesToBurn = sharesInTreasury;
+            }
+            _burn(treasury_, sharesToBurn); // U:[P4-14]
+        }
+
+        _updateBaseInterest({
+            expectedLiquidityDelta: profit.toInt256() - loss.toInt256(),
+            availableLiquidityDelta: 0,
+            checkOptimalBorrowing: false
+        }); // U:[P4-14]
+
+        _totalDebt.borrowed -= repaidAmountU128; // U:[P4-14]
+        cmDebt.borrowed = cmBorrowed - repaidAmountU128; // U:[P4-14]
+
+        emit Repay(msg.sender, repaidAmount, profit, loss); // U:[P4-14]
+    }
+
+    /// @dev Returns borrowable amount based on debt limit and current borrowed amount
+    function _borrowable(DebtParams storage debt) internal view returns (uint256) {
+        uint256 limit = debt.limit;
+        if (limit == type(uint128).max) {
+            return type(uint256).max;
+        }
+        uint256 borrowed = debt.borrowed;
+        if (borrowed >= limit) return 0;
+        unchecked {
+            return limit - borrowed;
+        }
+    }
+
+    // ------------- //
+    // INTEREST RATE //
+    // ------------- //
+
+    /// @inheritdoc IPoolV3
+    function baseInterestRate() public view override returns (uint256) {
+        return _baseInterestRate;
+    }
+
+    /// @inheritdoc IPoolV3
+    function baseInterestIndex() public view override returns (uint256) {
+        uint256 timestampLU = lastBaseInterestUpdate;
+        if (block.timestamp == timestampLU) return _baseInterestIndexStored; // U:[P4-15]
+        return _calcBaseInterestIndex(timestampLU); // U:[P4-15]
+    }
+
+    /// @inheritdoc IPoolV3
+    function calcLinearCumulative_RAY() external view override returns (uint256) {
+        return baseInterestIndex(); // U:[P4-15]
+    }
+
+    /// @inheritdoc IPoolV3
+    function baseInterestIndexStored() external view override returns (uint256) {
+        return _baseInterestIndexStored;
+    }
+
+    /// @dev Computes base interest accrued since the last update
+    function _calcBaseInterestAccrued() internal view returns (uint256) {
+        uint256 timestampLU = lastBaseInterestUpdate;
+        if (block.timestamp == timestampLU) return 0;
+        return _calcBaseInterestAccrued(timestampLU);
+    }
+
+    /// @dev Adds accrued base interest to expected liquidity, then updates base interest rate and index
+    function _updateBaseInterest(
+        int256 expectedLiquidityDelta,
+        int256 availableLiquidityDelta,
+        bool checkOptimalBorrowing
+    ) internal {
+        uint256 expectedLiquidityStored_ = (expectedLiquidityStored().toInt256() + expectedLiquidityDelta).toUint256(); // U:[P4-16]
+        uint256 availableLiquidity_ = (availableLiquidity().toInt256() + availableLiquidityDelta).toUint256(); // U:[P4-16]
+
+        uint256 timestampLU = lastBaseInterestUpdate;
+        if (block.timestamp != timestampLU) {
+            expectedLiquidityStored_ += _calcBaseInterestAccrued(timestampLU); // U:[P4-16]
+            _baseInterestIndexStored = _calcBaseInterestIndex(timestampLU).toUint128(); // U:[P4-16]
+            lastBaseInterestUpdate = uint40(block.timestamp); // U:[P4-16]
+        }
+
+        _expectedLiquidityStored = expectedLiquidityStored_.toUint128(); // U:[P4-16]
+        _baseInterestRate = IInterestRateModel(interestRateModel).calcBorrowRate({
+            expectedLiquidity: expectedLiquidityStored_ + (supportsQuotas ? _calcQuotaRevenueAccrued() : 0),
+            availableLiquidity: availableLiquidity_,
+            checkOptimalBorrowing: checkOptimalBorrowing
+        }).toUint128(); // U:[P4-16]
+    }
+
+    /// @dev Computes base interest accrued since given timestamp
+    function _calcBaseInterestAccrued(uint256 timestamp) private view returns (uint256) {
+        return (baseInterestRate() * _totalDebt.borrowed / RAY).calcLinearGrowth(timestamp);
+    }
+
+    /// @dev Computes current value of base interest index
+    function _calcBaseInterestIndex(uint256 timestamp) private view returns (uint256) {
+        return _baseInterestIndexStored * (RAY + baseInterestRate().calcLinearGrowth(timestamp)) / RAY;
+    }
+
+    // ------ //
+    // QUOTAS //
+    // ------ //
+
+    /// @inheritdoc IPoolV3
+    function quotaRevenue() public view override returns (uint256) {
+        return _quotaRevenue;
+    }
+
+    /// @inheritdoc IPoolV3
+    function updateQuotaRevenue(int256 quotaRevenueDelta) external override poolQuotaKeeperOnly {
+        _setQuotaRevenue((quotaRevenue().toInt256() + quotaRevenueDelta).toUint256()); // U:[P4-17]
+    }
+
+    /// @inheritdoc IPoolV3
+    function setQuotaRevenue(uint256 newQuotaRevenue) external override poolQuotaKeeperOnly {
+        _setQuotaRevenue(newQuotaRevenue); // U:[P4-17]
+    }
+
+    /// @dev Computes quota revenue accrued since the last update
+    function _calcQuotaRevenueAccrued() internal view returns (uint256) {
+        uint256 timestampLU = lastQuotaRevenueUpdate;
+        if (block.timestamp == timestampLU) return 0; // U:[P4-17]
+        return _calcQuotaRevenueAccrued(timestampLU); // U:[P4-17]
+    }
+
+    /// @dev Adds accrued quota revenue to the expected liquidity, then sets new quota revenue
+    function _setQuotaRevenue(uint256 newQuotaRevenue) internal {
+        uint256 timestampLU = lastQuotaRevenueUpdate;
+        if (block.timestamp != timestampLU) {
+            _expectedLiquidityStored += _calcQuotaRevenueAccrued(timestampLU).toUint128(); // U:[P4-17]
+            lastQuotaRevenueUpdate = uint40(block.timestamp); // U:[P4-17]
+        }
+        _quotaRevenue = newQuotaRevenue.toUint96(); // U:[P4-17]
+    }
+
+    /// @dev Computes quota revenue accrued since given timestamp
+    function _calcQuotaRevenueAccrued(uint256 timestamp) private view returns (uint256) {
+        return quotaRevenue().calcLinearGrowth(timestamp);
+    }
+
+    // ------------- //
+    // CONFIGURATION //
+    // ------------- //
+
+    /// @inheritdoc IPoolV3
+    function setInterestRateModel(address newInterestRateModel)
+        external
+        override
+        configuratorOnly // U:[P4-18]
+        nonZeroAddress(newInterestRateModel)
+    {
+        interestRateModel = newInterestRateModel; // U:[P4-22]
+        _updateBaseInterest(0, 0, false); // U:[P4-22]
+        emit SetInterestRateModel(newInterestRateModel); // U:[P4-22]
+    }
+
+    /// @inheritdoc IPoolV3
+    function setPoolQuotaKeeper(address newPoolQuotaKeeper)
+        external
+        override
+        configuratorOnly // U:[P4-18]
+        nonZeroAddress(newPoolQuotaKeeper)
+    {
+        if (!supportsQuotas) {
+            revert QuotasNotSupportedException(); // U:[P4-23A]
+        }
+        if (IPoolQuotaKeeper(newPoolQuotaKeeper).pool() != address(this)) {
+            revert IncompatiblePoolQuotaKeeperException(); // U:[P4-23B]
+        }
+        if (poolQuotaKeeper != address(0)) {
+            _setQuotaRevenue(_quotaRevenue); // U:[P4-23C]
+        }
+        poolQuotaKeeper = newPoolQuotaKeeper; // U:[P4-23C]
+        emit SetPoolQuotaKeeper(newPoolQuotaKeeper); // U:[P4-23C]
+    }
+
+    /// @inheritdoc IPoolV3
+    function setTotalDebtLimit(uint256 newLimit)
+        external
+        override
+        controllerOnly // U:[P4-18]
+    {
+        _setTotalDebtLimit(newLimit); // U:[P4-25]
+    }
+
+    /// @inheritdoc IPoolV3
+    function setCreditManagerDebtLimit(address creditManager, uint256 newLimit)
+        external
+        override
+        controllerOnly // U:[P4-18]
+        nonZeroAddress(creditManager)
+        registeredCreditManagerOnly(creditManager)
+    {
+        if (!_creditManagerSet.contains(creditManager)) {
+            if (address(this) != ICreditManagerV3(creditManager).pool()) {
+                revert IncompatibleCreditManagerException(); // U:[P4-20]
+            }
+            _creditManagerSet.add(creditManager); // U:[P4-21]
+            emit AddCreditManager(creditManager); // U:[P4-21]
+        }
+        _creditManagerDebt[creditManager].limit = _convertToU128(newLimit); // U:[P4-21]
+        emit SetCreditManagerDebtLimit(creditManager, newLimit); // U:[P4-21]
+    }
+
+    /// @inheritdoc IPoolV3
+    function setWithdrawFee(uint256 newWithdrawFee)
+        external
+        override
+        controllerOnly // U:[P4-18]
+    {
+        if (newWithdrawFee > MAX_WITHDRAW_FEE) {
+            revert IncorrectParameterException(); // U:[P4-26]
+        }
+        withdrawFee = newWithdrawFee.toUint16(); // U:[P4-26]
+        emit SetWithdrawFee(newWithdrawFee); // U:[P4-26]
+    }
+
+    /// @dev Sets new total debt limit
+    function _setTotalDebtLimit(uint256 limit) internal {
+        _totalDebt.limit = _convertToU128(limit); // U:[P4-25]
+        emit SetTotalDebtLimit(limit); // U:[P4-3,25]
+    }
+
+    // --------- //
+    // INTERNALS //
+    // --------- //
+
+    /// @dev Returns amount of token that should be transferred to receive `amount`
+    ///      Pools with fee-on-transfer underlying should override this method
     function _amountWithFee(uint256 amount) internal view virtual returns (uint256) {
         return amount;
     }
 
+    /// @dev Returns amount of token that will be received if `amount` is transferred
+    ///      Pools with fee-on-transfer underlying should override this method
     function _amountMinusFee(uint256 amount) internal view virtual returns (uint256) {
         return amount;
     }
 
-    //
-    //  ACCOUNTING LOGIC
-    //
-
-    /**
-     * @dev Internal conversion function (from assets to shares) with support for rounding direction.
-     *
-     * Will revert if assets > 0, totalSupply > 0 and totalAssets = 0. That corresponds to a case where any asset
-     * would represent an infinite amount of shares.
-     */
-    function _convertToShares(uint256 assets, Math.Rounding rounding) internal view override returns (uint256 shares) {
-        uint256 supply = totalSupply();
-        return (assets == 0 || supply == 0) ? assets : assets.mulDiv(supply, expectedLiquidity(), rounding);
+    /// @dev Returns amount of token that should be withdrawn so that `amount` is actually sent to the receiver
+    function _amountWithWithdrawalFee(uint256 amount) internal view returns (uint256) {
+        return amount * PERCENTAGE_FACTOR / (PERCENTAGE_FACTOR - withdrawFee);
     }
 
-    /**
-     * @dev Internal conversion function (from shares to assets) with support for rounding direction.
-     */
-    function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view override returns (uint256 assets) {
-        uint256 supply = totalSupply();
-        return (supply == 0) ? shares : shares.mulDiv(expectedLiquidity(), supply, rounding);
+    /// @dev Returns amount of token that would actually be sent to the receiver when withdrawing `amount`
+    function _amountMinusWithdrawalFee(uint256 amount) internal view returns (uint256) {
+        return amount * (PERCENTAGE_FACTOR - withdrawFee) / PERCENTAGE_FACTOR;
     }
 
-    /// @dev See {IERC4626-totalAssets}.
-    function totalAssets() public view override(ERC4626, IERC4626) returns (uint256 assets) {
-        return expectedLiquidity();
-    }
-
-    /// @dev See {IERC4626-maxDeposit}.
-    /// TODO: add pause case (?)
-    function maxDeposit(address) public view override(ERC4626, IERC4626) returns (uint256) {
-        return (expectedLiquidityLimit128 == type(uint128).max)
-            ? type(uint256).max
-            : _amountWithFee(expectedLiquidityLimit128 - expectedLiquidity());
-    }
-
-    /// @dev See {IERC4626-previewDeposit}.
-    function previewDeposit(uint256 assets) public view override(ERC4626, IERC4626) returns (uint256) {
-        return _convertToShares(_amountMinusFee(assets), Math.Rounding.Down); // TODO: add fee parameter
-    }
-
-    /// @dev See {IERC4626-maxMint}.
-    function maxMint(address) public view override(ERC4626, IERC4626) returns (uint256) {
-        uint128 limit = expectedLiquidityLimit128;
-        return (limit == type(uint128).max) ? type(uint256).max : previewMint(limit - expectedLiquidity());
-    }
-
-    ///  @dev See {IERC4626-previewMint}.
-    function previewMint(uint256 shares) public view override(ERC4626, IERC4626) returns (uint256) {
-        return _amountWithFee(_convertToAssets(shares, Math.Rounding.Up)); // We need to round up shares.mulDivUp(totalAssets(), supply);
-    }
-
-    /// @dev See {IERC4626-maxWithdraw}.
-    function maxWithdraw(address owner) public view override(ERC4626, IERC4626) returns (uint256) {
-        return availableLiquidity().min(previewWithdraw(balanceOf(owner)));
-    }
-
-    /// @dev See {IERC4626-previewWithdraw}.
-    function previewWithdraw(uint256 assets) public view override(ERC4626, IERC4626) returns (uint256) {
-        return _convertToShares(
-            (_amountWithFee(assets) * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR - withdrawFee), Math.Rounding.Up
-        );
-    }
-
-    /// @dev See {IERC4626-maxRedeem}.
-    function maxRedeem(address owner) public view override(ERC4626, IERC4626) returns (uint256 shares) {
-        shares = balanceOf(owner);
-        uint256 assets = _convertToAssets(shares, Math.Rounding.Down);
-        uint256 assetsAvailable = availableLiquidity();
-        if (assets > assetsAvailable) {
-            shares = _convertToShares(assetsAvailable, Math.Rounding.Down);
-        }
-    }
-
-    /// @dev See {IERC4626-previewRedeem}.
-    function previewRedeem(uint256 shares) public view override(ERC4626, IERC4626) returns (uint256 assets) {
-        assets = _calcDeliveredAsstes(_convertToAssets(shares, Math.Rounding.Down)); // F:[P4-28]
-    }
-
-    /// @dev Computes how much assets will de delivered takling intio account token fees & withdraw fee
-    function _calcDeliveredAsstes(uint256 assetsSpent) internal view returns (uint256) {
-        uint256 assetsDelivered = assetsSpent; // F:[P4-28]
-
-        if (withdrawFee > 0) {
-            unchecked {
-                /// It's safe because we made a check that assetsDelivered < uint128, and withdrawFee is < 10K
-                uint256 withdrawFeeAmount = (assetsDelivered * withdrawFee) / PERCENTAGE_FACTOR; // F:[P4-28]
-                assetsDelivered -= withdrawFeeAmount; // F:[P4-28]
-            }
-        }
-
-        return _amountMinusFee(assetsDelivered); // F:[P4-28]
-    }
-
-    /// @return Amount of money that should be in the pool
-    /// after all users close their Credit accounts and fully repay debts
-    function expectedLiquidity() public view override returns (uint256) {
-        return _expectedLiquidityLU + _calcBaseInterestAccrued() + (supportsQuotas ? _calcOutstandingQuotaRevenue() : 0); //
-    }
-
-    /// @dev Computes interest rate accrued from last update (LU)
-    function _calcBaseInterestAccrued() internal view returns (uint256) {
-        // TODO: add comment why we divide by RAY
-        return (uint256(_totalBorrowed) * _borrowRate).calcLinearGrowth(timestampLU) / RAY;
-    }
-
-    function _calcOutstandingQuotaRevenue() internal view returns (uint128) {
-        return uint128(uint256(quotaRevenue).calcLinearGrowth(lastQuotaRevenueUpdate) / PERCENTAGE_FACTOR); // F:[P4-17]
-    }
-
-    /// @dev Returns available liquidity in the pool (pool balance)
-    function availableLiquidity() public view virtual override returns (uint256) {
-        return IERC20(underlyingToken).balanceOf(address(this));
-    }
-
-    //
-    // CREDIT ACCOUNT LENDING
-    //
-
-    /// @dev Lends funds to a Credit Account and updates the pool parameters
-    /// @param borrowedAmount Credit Account's debt principal
-    /// @param creditAccount Credit Account's address
-
-    function lendCreditAccount(uint256 borrowedAmount, address creditAccount)
-        external
-        override
-        whenNotPaused // F:[P4-4]
-    {
-        // Checks credit manager specific limi is not cross and udpate it
-        CreditManagerDebt storage cmDebt = creditManagersDebt[msg.sender];
-
-        if (cmDebt.totalBorrowed + borrowedAmount > cmDebt.limit || borrowedAmount == 0) {
-            revert CreditManagerCantBorrowException(); // F:[P4-12]
-        }
-        cmDebt.totalBorrowed += uint128(borrowedAmount); // F:[P4-11]
-
-        // Increase total borrowed amount
-        _totalBorrowed += uint128(borrowedAmount); // F:[P4-11]
-
-        // Reverts if total borrow more than limit
-        if (_totalBorrowed > _totalBorrowedLimit) {
-            revert CreditManagerCantBorrowException(); // F:[P4-12]
-        }
-
-        // Update borrow Rate, reverts of Uoptimal limit is set up
-        _updateBaseParameters(0, -int256(borrowedAmount), true); // F:[P4-11]
-
-        // Transfer funds to credit account
-        IERC20(underlyingToken).safeTransfer(creditAccount, borrowedAmount); // F:[P4-11]
-
-        emit Borrow(msg.sender, creditAccount, borrowedAmount); // F:[P4-11]
-    }
-
-    /// @dev Registers Credit Account's debt repayment and updates parameters.
-    /// Assumes that the underlying (including principal + interest + fees) was already transferred
-    /// @param borrowedAmount Amount of principal ro repay
-    /// @param profit The treasury profit from repayment
-    /// @param loss Amount of underlying that the CA wan't able to repay
-    function repayCreditAccount(uint256 borrowedAmount, uint256 profit, uint256 loss)
-        external
-        override
-        whenNotPaused // F:[P4-4]
-    {
-        // Updates credit manager specific totalBorrowed
-        CreditManagerDebt storage cmDebt = creditManagersDebt[msg.sender];
-
-        uint128 cmTotalBorrowed = cmDebt.totalBorrowed;
-        if (cmTotalBorrowed == 0) {
-            revert CallerNotCreditManagerException(); // F:[P4-13]
-        }
-
-        // For fee surplus we mint tokens for treasury
-        if (profit > 0) {
-            _mint(treasury, convertToShares(profit)); // F:[P4-14]
-        } else {
-            // If returned money < borrowed amount + interest accrued
-            // it tries to compensate loss by burning diesel (LP) tokens
-            // from treasury fund
-            uint256 sharesToBurn = convertToShares(loss); // F:[P4-14]
-            uint256 sharesInTreasury = balanceOf(treasury); // F:[P4-14]
-
-            if (sharesInTreasury < sharesToBurn) {
-                sharesToBurn = sharesInTreasury; // F:[P4-14]
-                emit ReceiveUncoveredLoss(msg.sender, loss - convertToAssets(sharesInTreasury)); // F:[P4-14]
-            }
-
-            // If treasury has enough funds, it just burns needed amount
-            // to keep diesel rate on the same level
-            _burn(treasury, sharesToBurn); // F:[P4-14]
-        }
-
-        // Updates borrow rate
-        _updateBaseParameters(int256(profit) - int256(loss), 0, false); // F:[P4-14]
-
-        // Updates total borrowed
-        _totalBorrowed -= uint128(borrowedAmount); // F:[P4-14]
-
-        cmDebt.totalBorrowed = cmTotalBorrowed - uint128(borrowedAmount); // F:[P4-14]
-
-        emit Repay(msg.sender, borrowedAmount, profit, loss); // F:[P4-14]
-    }
-
-    //
-    // INTEREST RATE MANAGEMENT
-    //
-
-    /// @dev Calculates the most current value of the cumulative interest index
-    ///
-    ///                              /     currentBorrowRate * timeDifference \
-    ///  newIndex  = currentIndex * | 1 + ------------------------------------ |
-    ///                              \              SECONDS_PER_YEAR          /
-    ///
-    /// @return Current cumulative index in RAY
-    function calcLinearCumulative_RAY() public view override returns (uint256) {
-        return cumulativeIndexLU_RAY * (RAY + uint256(_borrowRate).calcLinearGrowth(timestampLU)) / RAY; // F:[P4-15]
-    }
-
-    /// @dev Updates core popo when liquidity parameters are changed
-    function _updateBaseParameters(
-        int256 expectedLiquidityChanged,
-        int256 availableLiquidityChanged,
-        bool checkOptimalBorrowing
-    ) internal {
-        uint128 updatedExpectedLiquidityLU = uint128(
-            int128(_expectedLiquidityLU + uint128(_calcBaseInterestAccrued())) + int128(expectedLiquidityChanged)
-        ); // F:[P4-16]
-
-        _expectedLiquidityLU = updatedExpectedLiquidityLU; // F:[P4-16]
-
-        // Update cumulativeIndex
-        cumulativeIndexLU_RAY = uint128(calcLinearCumulative_RAY()); // TODO: add check
-
-        // update borrow APY
-        // TODO: add case to check with quotas
-        _borrowRate = uint128(
-            IInterestRateModel(interestRateModel).calcBorrowRate(
-                updatedExpectedLiquidityLU + (supportsQuotas ? _calcOutstandingQuotaRevenue() : 0),
-                availableLiquidityChanged == 0
-                    ? availableLiquidity()
-                    : uint256(int256(availableLiquidity()) + availableLiquidityChanged),
-                checkOptimalBorrowing
-            )
-        ); // F:[P4-16]
-        timestampLU = uint64(block.timestamp); // F:[P4-16]
-    }
-
-    /// POOL QUOTA KEEPER ONLY
-    function changeQuotaRevenue(int128 _quotaRevenueChange) external override poolQuotaKeeperOnly {
-        _updateQuotaRevenue(uint128(int128(quotaRevenue) + _quotaRevenueChange)); // F:[P4-17]
-    }
-
-    function updateQuotaRevenue(uint128 newQuotaRevenue) external override poolQuotaKeeperOnly {
-        _updateQuotaRevenue(newQuotaRevenue); // F:[P4-17]
-    }
-
-    function _updateQuotaRevenue(uint128 _newQuotaRevenue) internal {
-        _expectedLiquidityLU += _calcOutstandingQuotaRevenue(); // F:[P4-17]
-
-        lastQuotaRevenueUpdate = uint40(block.timestamp); // F:[P4-17]
-        quotaRevenue = _newQuotaRevenue; // F:[P4-17]
-    }
-
-    // GETTERS
-
-    /// @dev Calculates the current borrow rate, RAY format
-    function borrowRate() external view returns (uint256) {
-        return uint256(_borrowRate);
-    }
-
-    function supplyRate() external view returns (uint256) {
-        return totalSupply() == 0
-            ? uint256(_borrowRate)
-            : (
-                ((uint256(_borrowRate) * _totalBorrowed) + (quotaRevenue * RAY) / PERCENTAGE_FACTOR)
-                    * (PERCENTAGE_FACTOR - withdrawFee)
-            ) / totalSupply() / PERCENTAGE_FACTOR; // F:[P4-28]
-    }
-
-    ///  @dev Total borrowed amount (includes principal only)
-    function totalBorrowed() external view returns (uint256) {
-        return uint256(_totalBorrowed);
-    }
-
-    //
-    // CONFIGURATION
-    //
-
-    /// @dev Forbids a Credit Manager to borrow
-    /// @param _creditManager Address of the Credit Manager
-    function setCreditManagerLimit(address _creditManager, uint256 _limit)
-        external
-        controllerOnly // F:[P4-18]
-        nonZeroAddress(_creditManager)
-        registeredCreditManagerOnly(_creditManager)
-    {
-        /// Checks if creditManager is already in list
-        if (!creditManagerSet.contains(_creditManager)) {
-            /// Reverts if c redit manager has different underlying asset
-            if (address(this) != ICreditManagerV3(_creditManager).pool()) {
-                revert IncompatibleCreditManagerException(); // F:[P4-20]
-            }
-
-            creditManagerSet.add(_creditManager); // F:[P4-21]
-            emit AddCreditManager(_creditManager); // F:[P4-21]
-        }
-
-        CreditManagerDebt storage cmDebt = creditManagersDebt[_creditManager]; // F:[P4-21]
-        cmDebt.limit = _convertToU128(_limit); // F:[P4-21]
-        emit BorrowLimitChanged(_creditManager, _limit); // F:[P4-21]
-    }
-
-    /// @dev Sets the new interest rate model for the pool
-    /// @param _interestRateModel Address of the new interest rate model contract
-    function updateInterestRateModel(address _interestRateModel)
-        public
-        configuratorOnly // F:[P4-18]
-        nonZeroAddress(_interestRateModel)
-    {
-        interestRateModel = _interestRateModel; // F:[P4-22]
-
-        _updateBaseParameters(0, 0, false); // F:[P4-22]
-
-        emit SetInterestRateModel(_interestRateModel); // F:[P4-22]
-    }
-
-    /// @dev Sets the new pool quota keeper
-    /// @param _poolQuotaKeeper Address of the new poolQuotaKeeper copntract
-    function setPoolQuotaManager(address _poolQuotaKeeper)
-        external
-        override
-        configuratorOnly // F:[P4-18]
-        nonZeroAddress(_poolQuotaKeeper)
-    {
-        // TODO: add test
-        if (address(IPoolQuotaKeeper(_poolQuotaKeeper).pool()) != address(this)) {
-            revert IncompatiblePoolQuotaKeeper();
-        }
-
-        if (poolQuotaKeeper != address(0)) {
-            _updateQuotaRevenue(quotaRevenue); // F:[P4-23]
-        }
-
-        poolQuotaKeeper = _poolQuotaKeeper; // F:[P4-23]
-
-        emit SetPoolQuotaKeeper(_poolQuotaKeeper); // F:[P4-03,23]
-    }
-
-    /// @dev Sets a new expected liquidity limit
-    /// @param limit New expected liquidity limit
-    function setExpectedLiquidityLimit(uint256 limit)
-        external
-        controllerOnly // F:[P4-18]
-    {
-        _setExpectedLiquidityLimit(limit); // F:[P4-7,24]
-    }
-
-    function _setExpectedLiquidityLimit(uint256 limit) internal {
-        expectedLiquidityLimit128 = _convertToU128(limit); // F:[P4-24]
-        emit SetExpectedLiquidityLimit(limit); // F:[P4-03,24]
-    }
-
-    function setTotalBorrowedLimit(uint256 limit)
-        external
-        controllerOnly // F:[P4-18]
-    {
-        _setTotalBorrowedLimit(limit); // F:[P4-25]
-    }
-
-    function _setTotalBorrowedLimit(uint256 limit) internal {
-        _totalBorrowedLimit = _convertToU128(limit); // F:[P4-25]
-        emit SetTotalBorrowedLimit(limit); // F:[P4-03,25]
-    }
-
-    /// @dev Sets a new withdrawal fee
-    /// @param _withdrawFee The new fee amount, in bp
-    function setWithdrawFee(uint16 _withdrawFee)
-        public
-        controllerOnly // F:[P4-18]
-    {
-        if (_withdrawFee > MAX_WITHDRAW_FEE) {
-            revert IncorrectParameterException(); // F:[P4-26]
-        }
-        withdrawFee = _withdrawFee; // F:[P4-26]
-        emit SetWithdrawFee(_withdrawFee); // F:[P4-26]
-    }
-
-    //
-    // GETTERS
-    //
-    function creditManagers() external view returns (address[] memory) {
-        return creditManagerSet.values();
-    }
-
-    /// @dev Total borrowed for particular credit manager
-    function creditManagerBorrowed(address _creditManager) external view returns (uint256) {
-        CreditManagerDebt storage cmDebt = creditManagersDebt[_creditManager];
-        return cmDebt.totalBorrowed;
-    }
-
-    /// @dev Borrow limit for particular credit manager
-    function creditManagerLimit(address _creditManager) external view returns (uint256) {
-        CreditManagerDebt storage cmDebt = creditManagersDebt[_creditManager]; // F:[P4-21]
-        return _convertToU256(cmDebt.limit); // F:[P4-21]
-    }
-
-    /// @dev How much current credit manager can borrow
-    function creditManagerCanBorrow(address _creditManager) external view returns (uint256 canBorrow) {
-        if (_totalBorrowed > _totalBorrowedLimit) return 0; // F:[P4-27]
-        unchecked {
-            canBorrow =
-                _totalBorrowedLimit == type(uint128).max ? type(uint256).max : _totalBorrowedLimit - _totalBorrowed;
-        } // F:[P4-27]
-
-        uint256 available =
-            IInterestRateModel(interestRateModel).availableToBorrow(expectedLiquidity(), availableLiquidity()); // F:[P4-27]
-
-        canBorrow = Math.min(canBorrow, available); // F:[P4-27]
-
-        CreditManagerDebt memory cmDebt = creditManagersDebt[_creditManager];
-        if (cmDebt.totalBorrowed >= cmDebt.limit) {
-            return 0; // F:[P4-27]
-        }
-
-        unchecked {
-            uint256 cmLimit = cmDebt.limit - cmDebt.totalBorrowed;
-            canBorrow = Math.min(canBorrow, cmLimit); // F:[P4-27]
-        }
-    }
-
-    function expectedLiquidityLimit() external view override returns (uint256) {
-        return _convertToU256(expectedLiquidityLimit128);
-    }
-
-    function expectedLiquidityLU() external view returns (uint256) {
-        return _convertToU256(_expectedLiquidityLU);
-    }
-
-    function totalBorrowedLimit() external view override returns (uint256) {
-        return _convertToU256(_totalBorrowedLimit);
-    }
-
-    //
-    //  INTERNAL HELPERS
-    //
+    /// @dev Converts `uint128` to `uint256`, preserves maximum value
     function _convertToU256(uint128 limit) internal pure returns (uint256) {
         return (limit == type(uint128).max) ? type(uint256).max : limit;
     }
 
+    /// @dev Converts `uint256` to `uint128`, preserves maximum value
     function _convertToU128(uint256 limit) internal pure returns (uint128) {
-        return (limit == type(uint256).max) ? type(uint128).max : uint128(limit);
+        return (limit == type(uint256).max) ? type(uint128).max : limit.toUint128();
     }
 }

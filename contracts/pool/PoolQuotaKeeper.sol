@@ -101,7 +101,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         creditManagerOnly // F:[PQK-4]
         returns (uint256 caQuotaInterestChange, bool enableToken, bool disableToken)
     {
-        int128 quotaRevenueChange; // TODO: better naming(?)
+        int256 quotaRevenueChange; // TODO: better naming(?)
 
         AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
         TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
@@ -114,7 +114,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         });
 
         if (quotaRevenueChange != 0) {
-            IPoolV3(pool).changeQuotaRevenue(quotaRevenueChange);
+            IPoolV3(pool).updateQuotaRevenue(quotaRevenueChange);
         }
     }
 
@@ -126,7 +126,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         override
         creditManagerOnly // F:[PQK-4]
     {
-        int128 quotaRevenueChange;
+        int256 quotaRevenueChange;
 
         uint256 len = tokens.length;
 
@@ -150,7 +150,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         }
 
         if (quotaRevenueChange != 0) {
-            IPoolV3(pool).changeQuotaRevenue(quotaRevenueChange);
+            IPoolV3(pool).updateQuotaRevenue(quotaRevenueChange);
         }
     }
 
@@ -265,7 +265,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
 
         /// TODO: add check for equal length(?)
 
-        uint128 quotaRevenue;
+        uint256 quotaRevenue;
         uint256 timeFromLastUpdate = block.timestamp - lastQuotaRateUpdate;
         uint256 len = tokens.length;
 
@@ -283,7 +283,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
             }
         }
 
-        IPoolV3(pool).updateQuotaRevenue(quotaRevenue); // F:[PQK-7]
+        IPoolV3(pool).setQuotaRevenue(quotaRevenue); // F:[PQK-7]
         lastQuotaRateUpdate = uint40(block.timestamp); // F:[PQK-7]
     }
 

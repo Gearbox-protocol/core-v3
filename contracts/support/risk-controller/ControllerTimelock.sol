@@ -161,7 +161,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
     {
         IPoolV3 pool = IPoolV3(ICreditManagerV3(creditManager).pool());
 
-        uint256 debtLimitCurrent = pool.creditManagerLimit(address(creditManager));
+        uint256 debtLimitCurrent = pool.creditManagerDebtLimit(address(creditManager));
 
         if (!_checkPolicy(creditManager, "CREDIT_MANAGER_DEBT_LIMIT", uint256(debtLimitCurrent), uint256(debtLimit))) {
             revert ParameterChecksFailedException(); // F: [RCT-05]
@@ -169,7 +169,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
 
         _queueTransaction({
             target: address(pool),
-            signature: "setCreditManagerLimit(address,uint256)",
+            signature: "setCreditManagerDebtLimit(address,uint256)",
             data: abi.encode(address(creditManager), debtLimit)
         }); // F: [RCT-05]
     }

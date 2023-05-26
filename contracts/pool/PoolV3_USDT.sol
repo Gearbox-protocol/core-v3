@@ -12,14 +12,14 @@ import {IPoolV3} from "../interfaces/IPoolV3.sol";
 
 contract PoolV3_USDT is PoolV3, USDT_Transfer {
     constructor(
-        address _addressProvider,
-        address _underlyingToken,
-        address _interestRateModel,
-        uint256 _expectedLiquidityLimit,
-        bool _supportsQuotas
+        address addressProvider_,
+        address underlyingToken_,
+        address interestRateModel_,
+        uint256 totalDebtLimit_,
+        bool supportsQuotas_
     )
-        PoolV3(_addressProvider, _underlyingToken, _interestRateModel, _expectedLiquidityLimit, _supportsQuotas)
-        USDT_Transfer(_underlyingToken)
+        PoolV3(addressProvider_, underlyingToken_, interestRateModel_, totalDebtLimit_, supportsQuotas_)
+        USDT_Transfer(underlyingToken_)
     {
         // Additional check that receiver is not address(0)
     }
