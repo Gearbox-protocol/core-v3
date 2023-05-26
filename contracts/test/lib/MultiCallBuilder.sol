@@ -6,6 +6,8 @@ pragma solidity ^0.8.17;
 import {MultiCall} from "../../interfaces/ICreditFacade.sol";
 
 library MultiCallBuilder {
+    function build() internal pure returns (MultiCall[] memory calls) {}
+
     function build(MultiCall memory call1) internal pure returns (MultiCall[] memory calls) {
         calls = new MultiCall[](1);
         calls[0] = call1;

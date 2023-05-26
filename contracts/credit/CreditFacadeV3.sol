@@ -525,7 +525,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         whenNotExpired // U:[FA-3]
         nonReentrant // U:[FA-4]
     {
-        (uint256 botPermissions, bool forbidden) = IBotList(botList).getBotStatus(creditAccount, msg.sender);
+        (uint256 botPermissions, bool forbidden) =
+            IBotList(botList).getBotStatus({bot: msg.sender, creditAccount: creditAccount});
         // Checks that the bot is approved by the borrower and is not forbidden
         if (botPermissions == 0 || forbidden) {
             revert NotApprovedBotException(); // U:[FA-19]

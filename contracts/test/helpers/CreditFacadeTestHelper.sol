@@ -9,6 +9,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
 import {CreditConfigurator} from "../../credit/CreditConfiguratorV3.sol";
 import {MultiCall} from "../../interfaces/ICreditFacade.sol";
+import {MultiCallBuilder} from "../lib/MultiCallBuilder.sol";
 
 import {ICreditFacadeMulticall} from "../../interfaces/ICreditFacade.sol";
 import {ICreditManagerV3, ICreditManagerV3Events} from "../../interfaces/ICreditManagerV3.sol";
@@ -47,7 +48,7 @@ contract CreditFacadeTestHelper is TestHelper {
         return creditFacade.openCreditAccount(
             borrowedAmount,
             onBehalfOf,
-            multiCallBuilder(
+            MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, amount))
@@ -130,34 +131,6 @@ contract CreditFacadeTestHelper is TestHelper {
 
         // switch to new block to be able to close account
         vm.roll(block.number + 1);
-    }
-
-    function multiCallBuilder() internal pure returns (MultiCall[] memory calls) {}
-
-    function multiCallBuilder(MultiCall memory call1) internal pure returns (MultiCall[] memory calls) {
-        calls = new MultiCall[](1);
-        calls[0] = call1;
-    }
-
-    function multiCallBuilder(MultiCall memory call1, MultiCall memory call2)
-        internal
-        pure
-        returns (MultiCall[] memory calls)
-    {
-        calls = new MultiCall[](2);
-        calls[0] = call1;
-        calls[1] = call2;
-    }
-
-    function multiCallBuilder(MultiCall memory call1, MultiCall memory call2, MultiCall memory call3)
-        internal
-        pure
-        returns (MultiCall[] memory calls)
-    {
-        calls = new MultiCall[](3);
-        calls[0] = call1;
-        calls[1] = call2;
-        calls[2] = call3;
     }
 
     function expectSafeAllowance(address creditAccount, address target) internal {

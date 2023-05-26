@@ -225,7 +225,7 @@ contract CreditManagerMock {
         contractToAdapter[targetContract] = adapter; // U:[CM-45]
     }
 
-    function executeOrder(bytes calldata data) external returns (bytes memory) {}
+    function execute(bytes calldata data) external returns (bytes memory) {}
 
     /// FLAGS
 
