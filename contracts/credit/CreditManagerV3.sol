@@ -687,9 +687,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             revert NotEnoughCollateralException(); // U:[CM-18]
         }
 
-        /// During the debt and collateral computation, any encountered zero balance
-        /// tokens are deleted from the in-memory enabledTokensMask, so the final value
-        /// must be saved
+        /// During a multicall, all changes to enabledTokenMask are stored in-memory
+        /// to avoid redundant storage writes. Saving to storage is only done at the end
+        /// of a full collateral check, which is performed after every multicall
         _saveEnabledTokensMask(creditAccount, collateralDebtData.enabledTokensMask); // U:[CM-18]
     }
 

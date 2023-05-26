@@ -14,27 +14,24 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 
-uint256 constant INDEX_PRECISION = 10 ** 9;
-
-import "forge-std/console.sol";
-
-/// @title Credit Logic Library
+/// @title Balances logic library
+/// @notice Implements functions that used for before-and-after balance comparisons
 library BalancesLogic {
     using BitMask for uint256;
 
-    /// @param creditAccount Credit Account to compute balances for
-    function storeBalances(address creditAccount, Balance[] memory desired)
+    /// @dev Returns an array of balances that are expected after operations
+    /// @param creditAccount Credit Account to compute new balances for
+    /// @param deltas The array of (token, amount) objects that contain expected balance increases
+    function storeBalances(address creditAccount, Balance[] memory deltas)
         internal
         view
         returns (Balance[] memory expected)
     {
-        // Retrieves the balance list from calldata
-
-        expected = desired; // F:[FA-45]
-        uint256 len = expected.length; // F:[FA-45]
+        expected = deltas;
+        uint256 len = deltas.length;
 
         for (uint256 i = 0; i < len;) {
-            expected[i].balance += IERC20Helper.balanceOf(expected[i].token, creditAccount); // F:[FA-45]
+            expected[i].balance += IERC20Helper.balanceOf(expected[i].token, creditAccount);
             unchecked {
                 ++i;
             }
@@ -45,7 +42,6 @@ library BalancesLogic {
     /// Reverts if at least one balance is lower than expected
     /// @param creditAccount Credit Account to check
     /// @param expected Expected balances after all operations
-
     function compareBalances(address creditAccount, Balance[] memory expected) internal view {
         uint256 len = expected.length; // F:[FA-45]
         unchecked {
@@ -57,6 +53,11 @@ library BalancesLogic {
         }
     }
 
+    /// @dev Computes balances of forbidden tokens and returns them for later checks
+    /// @param creditAccount Credit Account to store balances for
+    /// @param enabledTokensMask Current mask of enabled tokens
+    /// @param forbiddenTokenMask Mask of forbidden tokens
+    /// @param getTokenByMaskFn A function that returns the token's address by its mask
     function storeForbiddenBalances(
         address creditAccount,
         uint256 enabledTokensMask,
@@ -80,6 +81,14 @@ library BalancesLogic {
         }
     }
 
+    /// @dev Checks that no new forbidden tokens were enabled and that balances of existing forbidden tokens
+    ///      were not increased
+    /// @param creditAccount Credit Account to check
+    /// @param enabledTokensMaskBefore Mask of enabled tokens on the account before operations
+    /// @param enabledTokensMaskAfter Mask of enabled tokens on the account after operations
+    /// @param forbiddenBalances Array of balances of forbidden tokens (received from `storeForbiddenBalances`)
+    /// @param forbiddenTokenMask Mask of forbidden tokens
+    /// @param getTokenByMaskFn A function that returns the token's address by its mask
     function checkForbiddenBalances(
         address creditAccount,
         uint256 enabledTokensMaskBefore,
@@ -91,6 +100,8 @@ library BalancesLogic {
         uint256 forbiddenTokensOnAccount = enabledTokensMaskAfter & forbiddenTokenMask;
         if (forbiddenTokensOnAccount == 0) return;
 
+        /// A diff between the forbidden tokens before and after is computed
+        /// If there are forbidden tokens enabled during operations, the function would revert
         uint256 forbiddenTokensOnAccountBefore = enabledTokensMaskBefore & forbiddenTokenMask;
         if (forbiddenTokensOnAccount & ~forbiddenTokensOnAccountBefore != 0) revert ForbiddenTokensException();
 
@@ -106,6 +117,10 @@ library BalancesLogic {
                         }
                     }
 
+                    /// Since the forbidden token balances were stored in the array
+                    /// in the order of forbidden tokens on the account before operations,
+                    /// the balances array index has to be incremented regardless of whether a token
+                    /// is enabled after
                     ++i;
                 }
             }

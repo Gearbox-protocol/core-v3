@@ -121,7 +121,7 @@ contract CreditLogicTest is TestHelper {
             + (debt * indexNow / indexOpen + quotaInterest - debt) * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR;
     }
 
-    /// @notice U:[CL-1]: `calcIndex` reverts for zero value
+    /// @notice U:[CL-1]: `calcAccruedInterest` computes interest correctly
     function test_U_CL_01_calcAccruedInterest_computes_interest_with_small_error(
         uint256 debt,
         uint256 cumulativeIndexAtOpen,
@@ -462,7 +462,7 @@ contract CreditLogicTest is TestHelper {
         uint16 expectedLT;
     }
 
-    /// @notice U:[CL-5]: `calcLiquidationThreshold` gives expected outputs
+    /// @notice U:[CL-5]: `getLiquidationThreshold` gives expected outputs
     function test_U_CL_05_getLiquidationThreshold_case_test() public {
         LiquidationThresholdTestCase[6] memory cases = [
             LiquidationThresholdTestCase({
