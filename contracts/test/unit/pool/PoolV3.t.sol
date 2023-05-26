@@ -217,7 +217,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
         return (amount * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR - _fee);
     }
 
-    function _updateBorrowrate() internal {
+    function _updateBaseInterest() internal {
         vm.prank(CONFIGURATOR);
         pool.setInterestRateModel(address(irm));
     }
@@ -1355,8 +1355,8 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
         assertEq(pool.calcLinearCumulative_RAY(), expectedLinearRate, "Index value was not updated correctly");
     }
 
-    // U:[P4-16]: updateBorrowRate correctly updates parameters
-    function test_U_P4_16_updateBorrowRate_correct() public {
+    // U:[P4-16]: _updateBaseInterest correctly updates parameters
+    function test_U_P4_16_updateBaseInterest_correct() public {
         uint256 quotaInterestPerYear = addLiquidity / 4;
         for (uint256 i; i < 2; ++i) {
             bool supportQuotas = i == 1;
@@ -1364,26 +1364,8 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
 
             _setUpTestCase(Tokens.DAI, 0, 50_00, addLiquidity, 2 * RAY, 0, supportQuotas);
 
-            if (supportQuotas) {
-                vm.startPrank(CONFIGURATOR);
-                gaugeMock.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 100_00);
-
-                pqk.addCreditManager(address(cmMock));
-
-                cmMock.addToken(tokenTestSuite.addressOf(Tokens.LINK), 2);
-
-                pqk.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), uint96(WAD * 100_000));
-
-                cmMock.updateQuota({
-                    _creditAccount: DUMB_ADDRESS,
-                    token: tokenTestSuite.addressOf(Tokens.LINK),
-                    quotaChange: int96(int256(quotaInterestPerYear))
-                });
-
-                gaugeMock.updateEpoch();
-
-                vm.stopPrank();
-            }
+            vm.prank(address(pqk));
+            pool.setQuotaRevenue(quotaInterestPerYear);
 
             uint256 baseInterestRate = pool.baseInterestRate();
             uint256 timeWarp = 365 days;
@@ -1395,7 +1377,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
 
             uint256 expectedBorrowRate = irm.calcBorrowRate(expectedLiquidity, addLiquidity / 2);
 
-            _updateBorrowrate();
+            _updateBaseInterest();
 
             assertEq(
                 pool.expectedLiquidity(),
