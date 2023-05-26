@@ -339,4 +339,11 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
             emit SetTokenLimit(token, limit);
         } // F:[PQK-12]
     }
+
+    function setTokenQuotaIncreaseFee(address token, uint16 fee) external controllerOnly {
+        TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
+        if (tokenQuotaParams.setQuotaIncreaseFee(fee)) {
+            emit SetQuotaIncreaseFee(token, fee);
+        }
+    }
 }
