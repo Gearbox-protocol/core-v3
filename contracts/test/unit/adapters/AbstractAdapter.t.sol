@@ -80,9 +80,9 @@ contract AbstractAdapterUnitTest is TestHelper, CreditManagerMockEvents {
 
     /// @notice U:[AA-6]: `_execute` works correctly
     function test_U_AA_06_execute_works_correctly(bytes memory data, bytes memory expectedResult) public {
-        creditManager.setExecuteOrderResult(expectedResult);
+        creditManager.setExecuteResult(expectedResult);
 
-        vm.expectCall(address(creditManager), abi.encodeCall(creditManager.executeOrder, (data)));
+        vm.expectCall(address(creditManager), abi.encodeCall(creditManager.execute, (data)));
         assertEq(abstractAdapter.execute(data), expectedResult, "Incorrect result");
     }
 
@@ -98,7 +98,7 @@ contract AbstractAdapterUnitTest is TestHelper, CreditManagerMockEvents {
         if (tokenIn == tokenOut) tokenOutIndex = tokenInIndex;
         creditManager.setMask(tokenIn, 1 << tokenInIndex);
         creditManager.setMask(tokenOut, 1 << tokenOutIndex);
-        creditManager.setExecuteOrderResult(expectedResult);
+        creditManager.setExecuteResult(expectedResult);
 
         uint256 snapshot = vm.snapshot();
         for (uint256 caseNumber; caseNumber < 2; ++caseNumber) {
@@ -135,7 +135,7 @@ contract AbstractAdapterUnitTest is TestHelper, CreditManagerMockEvents {
         if (tokenIn == tokenOut) tokenOutIndex = tokenInIndex;
         creditManager.setMask(tokenIn, 1 << tokenInIndex);
         creditManager.setMask(tokenOut, 1 << tokenOutIndex);
-        creditManager.setExecuteOrderResult(expectedResult);
+        creditManager.setExecuteResult(expectedResult);
 
         uint256 snapshot = vm.snapshot();
         for (uint256 caseNumber; caseNumber < 2; ++caseNumber) {
