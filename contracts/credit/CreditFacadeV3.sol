@@ -737,8 +737,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeMulticall.updateQuota.selector) {
                         _revertIfNoPermission(flags, UPDATE_QUOTA_PERMISSION); // U:[FA-21]
                         (uint256 tokensToEnable, uint256 tokensToDisable) =
-                            _updateQuota(creditAccount, mcall.callData[4:]);
-                        enabledTokensMask = enabledTokensMask.enableDisable(tokensToEnable, tokensToDisable);
+                            _updateQuota(creditAccount, mcall.callData[4:]); // U:[FA-34]
+                        enabledTokensMask = enabledTokensMask.enableDisable(tokensToEnable, tokensToDisable); // U:[FA-34]
                     }
                     //
                     // WITHDRAW
@@ -878,6 +878,24 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         IPriceFeedOnDemand(priceFeed).updatePrice(data); // U:[FA-25]
     }
 
+    /// @notice Requests the Credit Manager to transfer collateral from the caller to the Credit Account
+    /// @param creditAccount Credit Account to add collateral for
+    /// @param callData Bytes calldata for parsing
+    function _addCollateral(address creditAccount, bytes calldata callData) internal returns (uint256 tokenMaskAfter) {
+        (address token, uint256 amount) = abi.decode(callData, (address, uint256)); // U:[FA-26]
+        // Requests Credit Manager to transfer collateral to the Credit Account
+
+        tokenMaskAfter = ICreditManagerV3(creditManager).addCollateral({
+            payer: msg.sender,
+            creditAccount: creditAccount,
+            token: token,
+            amount: amount
+        }); // U:[FA-26]
+
+        // Emits event
+        emit AddCollateral(creditAccount, token, amount); // U:[FA-26]
+    }
+
     /// @notice Requests the Credit Manager to change the CA's debt
     /// @param creditAccount CA to change debt for
     /// @param callData Bytes calldata for parsing
@@ -926,8 +944,11 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         internal
         returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
-        (address token, int96 quotaChange) = abi.decode(callData, (address, int96));
-        return ICreditManagerV3(creditManager).updateQuota(creditAccount, token, quotaChange);
+        (address token, int96 quotaChange) = abi.decode(callData, (address, int96)); // U:[FA-34]
+        (tokensToEnable, tokensToDisable) =
+            ICreditManagerV3(creditManager).updateQuota(creditAccount, token, quotaChange); // U:[FA-34]
+
+        emit UpdateQuota(creditAccount, token, quotaChange); // U:[FA-34]
     }
 
     /// @notice Requests Credit Manager to remove a set of existing allowances
@@ -948,18 +969,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         address payer = _getBorrowerOrRevert(creditAccount);
 
         IBotList(botList).payBot(payer, creditAccount, msg.sender, paymentAmount);
-    }
-
-    /// @notice Requests the Credit Manager to transfer collateral from the caller to the Credit Account
-    /// @param creditAccount Credit Account to add collateral for
-    /// @param callData Bytes calldata for parsing
-    function _addCollateral(address creditAccount, bytes calldata callData) internal returns (uint256 tokenMaskAfter) {
-        (address token, uint256 amount) = abi.decode(callData, (address, uint256)); // F:[FA-26, 27]
-        // Requests Credit Manager to transfer collateral to the Credit Account
-        tokenMaskAfter = ICreditManagerV3(creditManager).addCollateral(msg.sender, creditAccount, token, amount); // F:[FA-21]
-
-        // Emits event
-        emit AddCollateral(creditAccount, token, amount); // F:[FA-21]
     }
 
     /// @notice Requests the Credit Manager to schedule a withdrawal

@@ -1349,6 +1349,14 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
 
             creditManagerMock.setQuotedTokensMask(testCase == 0 ? 0 : mask);
 
+            vm.expectCall(
+                address(creditManagerMock),
+                abi.encodeCall(ICreditManagerV3.addCollateral, (address(this), creditAccount, token, amount))
+            );
+
+            vm.expectEmit(true, true, true, true);
+            emit AddCollateral(creditAccount, token, amount);
+
             FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
                 creditAccount: creditAccount,
                 calls: calls,
@@ -1646,5 +1654,43 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
                 _testCaseErr("Incorrect enabledTokenMask for disableToken")
             );
         }
+    }
+
+    /// @dev U:[FA-34]: multicall updateQuota works properly
+    function test_U_FA_34_multicall_updateQuota_works_properly() public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+
+        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        uint256 maskToEnable = 1 << 4;
+        uint256 maskToDisable = 1 << 7;
+
+        int96 change = -990;
+
+        creditManagerMock.setUpdateQuota({tokensToEnable: maskToEnable, tokensToDisable: maskToDisable});
+
+        vm.expectCall(
+            address(creditManagerMock), abi.encodeCall(ICreditManagerV3.updateQuota, (creditAccount, link, change))
+        );
+
+        vm.expectEmit(true, true, false, false);
+        emit UpdateQuota(creditAccount, link, change);
+
+        FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeMulticall.updateQuota, (link, change))
+                })
+                ),
+            enabledTokensMask: maskToDisable | UNDERLYING_TOKEN_MASK,
+            flags: UPDATE_QUOTA_PERMISSION
+        });
+
+        assertEq(
+            fullCheckParams.enabledTokensMaskAfter,
+            maskToEnable | UNDERLYING_TOKEN_MASK,
+            _testCaseErr("Incorrect enabledTokenMask")
+        );
     }
 }

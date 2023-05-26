@@ -78,6 +78,9 @@ contract CreditManagerMock {
 
     uint256 ad_tokenMask;
 
+    uint256 qu_tokensToEnable;
+    uint256 qu_tokensToDisable;
+
     constructor(address _addressProvider, address _pool) {
         addressProvider = _addressProvider;
         weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // U:[CM-1]
@@ -119,13 +122,17 @@ contract CreditManagerMock {
         IPoolV3(poolService).repayCreditAccount(borrowedAmount, profit, loss);
     }
 
-    /// @notice Outdated
+    function setUpdateQuota(uint256 tokensToEnable, uint256 tokensToDisable) external {
+        qu_tokensToEnable = tokensToEnable;
+        qu_tokensToDisable = tokensToDisable;
+    }
+
     function updateQuota(address _creditAccount, address token, int96 quotaChange)
         external
-        returns (uint256 caQuotaInterestChange, bool tokensToEnable, uint256 tokensToDisable)
+        returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
-        //     (caQuotaInterestChange,,) =
-        //         IPoolQuotaKeeper(IPoolV3(pool).poolQuotaKeeper()).updateQuota(_creditAccount, token, quotaChange);
+        tokensToEnable = qu_tokensToEnable;
+        tokensToDisable = qu_tokensToDisable;
     }
 
     function addToken(address token, uint256 mask) external {
