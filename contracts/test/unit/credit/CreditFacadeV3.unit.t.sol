@@ -2013,6 +2013,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
             abi.encodeCall(ICreditManagerV3.claimWithdrawals, (creditAccount, to, ClaimAction.CLAIM))
         );
 
+        vm.prank(USER);
         creditFacade.claimWithdrawals(creditAccount, to);
     }
 
@@ -2197,5 +2198,150 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
         vm.prank(CONFIGURATOR);
         creditFacade.setTotalDebtParams(initialTD, limit);
         creditFacade.revertIfOutOfTotalDebtLimit(type(uint128).max, ManageDebtAction.DECREASE_DEBT);
+    }
+
+    /// @dev U:[FA-48]: rsetExpirationDate works properly
+    function test_U_FA_48_setExpirationDate_works_properly() public allExpirableCases {
+        assertEq(creditFacade.expirationDate(), 0, "SETUP: incorrect expiration date");
+
+        if (!expirable) {
+            vm.expectRevert(NotAllowedWhenNotExpirableException.selector);
+        }
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setExpirationDate(100);
+
+        assertEq(creditFacade.expirationDate(), expirable ? 100 : 0, "Incorrect expiration date");
+    }
+
+    /// @dev U:[FA-49]: setDebtLimits works properly
+    function test_U_FA_49_setDebtLimits_works_properly() public notExpirableCase {
+        uint8 maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
+        (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
+
+        assertEq(maxDebtPerBlockMultiplier, 0, "SETUP: incorrect maxDebtPerBlockMultiplier");
+        assertEq(minDebt, 0, "SETUP: incorrect minDebt");
+        assertEq(maxDebt, 0, "SETUP: incorrect maxDebt");
+
+        // Case: it reverts if _maxDebtPerBlockMultiplier) * _maxDebt >= type(uint128).max
+        vm.expectRevert(IncorrectParameterException.selector);
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setDebtLimits(1, type(uint128).max, 2);
+
+        // Case: it sets parameters properly
+        vm.prank(CONFIGURATOR);
+        creditFacade.setDebtLimits({_minDebt: 1, _maxDebt: 2, _maxDebtPerBlockMultiplier: 3});
+
+        maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
+        (minDebt, maxDebt) = creditFacade.debtLimits();
+
+        assertEq(maxDebtPerBlockMultiplier, 3, " incorrect maxDebtPerBlockMultiplier");
+        assertEq(minDebt, 1, " incorrect minDebt");
+        assertEq(maxDebt, 2, " incorrect maxDebt");
+    }
+
+    /// @dev U:[FA-50]: setBotList works properly
+    function test_U_FA_50_setBotList_works_properly() public notExpirableCase {
+        assertEq(creditFacade.botList(), address(botListMock), "SETUP: incorrect botList");
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setBotList(DUMB_ADDRESS);
+
+        assertEq(creditFacade.botList(), DUMB_ADDRESS, "incorrect botList");
+    }
+
+    /// @dev U:[FA-51]: setCumulativeLossParams works properly
+    function test_U_FA_51_setCumulativeLossParams_works_properly() public notExpirableCase {
+        (uint128 currentCumulativeLoss, uint128 maxCumulativeLoss) = creditFacade.lossParams();
+
+        assertEq(maxCumulativeLoss, 0, "SETUP: incorrect maxCumulativeLoss");
+        assertEq(currentCumulativeLoss, 0, "SETUP: incorrect currentCumulativeLoss");
+
+        creditFacade.setCurrentCumulativeLoss(500);
+        (currentCumulativeLoss,) = creditFacade.lossParams();
+
+        assertEq(currentCumulativeLoss, 500, "SETUP: incorrect currentCumulativeLoss");
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setCumulativeLossParams(200, false);
+
+        (currentCumulativeLoss, maxCumulativeLoss) = creditFacade.lossParams();
+
+        assertEq(maxCumulativeLoss, 200, "SETUP: incorrect maxCumulativeLoss");
+        assertEq(currentCumulativeLoss, 500, "SETUP: incorrect currentCumulativeLoss");
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setCumulativeLossParams(400, true);
+
+        (currentCumulativeLoss, maxCumulativeLoss) = creditFacade.lossParams();
+
+        assertEq(maxCumulativeLoss, 400, "SETUP: incorrect maxCumulativeLoss");
+        assertEq(currentCumulativeLoss, 0, "SETUP: incorrect currentCumulativeLoss");
+    }
+
+    /// @dev U:[FA-52]: setTokenAllowance works properly
+    function test_U_FA_52_setTokenAllowance_works_properly() public notExpirableCase {
+        assertEq(creditFacade.forbiddenTokenMask(), 0, "SETUP: incorrect forbiddenTokenMask");
+
+        vm.expectRevert(TokenNotAllowedException.selector);
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setTokenAllowance(DUMB_ADDRESS, AllowanceAction.ALLOW);
+
+        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        uint256 mask = 1 << 8;
+        creditManagerMock.addToken(link, mask);
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setTokenAllowance(link, AllowanceAction.FORBID);
+
+        assertEq(creditFacade.forbiddenTokenMask(), mask, "incorrect forbiddenTokenMask");
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setTokenAllowance(link, AllowanceAction.ALLOW);
+
+        assertEq(creditFacade.forbiddenTokenMask(), 0, "incorrect forbiddenTokenMask");
+    }
+
+    /// @dev U:[FA-53]: setEmergencyLiquidator works properly
+    function test_U_FA_53_setEmergencyLiquidator_works_properly() public notExpirableCase {
+        assertEq(
+            creditFacade.canLiquidateWhilePaused(LIQUIDATOR),
+            false,
+            "SETUP: incorrect canLiquidateWhilePaused for LIQUIDATOR"
+        );
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setEmergencyLiquidator(LIQUIDATOR, AllowanceAction.ALLOW);
+
+        assertEq(
+            creditFacade.canLiquidateWhilePaused(LIQUIDATOR),
+            true,
+            "incorrect canLiquidateWhilePaused for LIQUIDATOR after ALLOW"
+        );
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setEmergencyLiquidator(LIQUIDATOR, AllowanceAction.FORBID);
+
+        assertEq(
+            creditFacade.canLiquidateWhilePaused(LIQUIDATOR),
+            false,
+            "incorrect canLiquidateWhilePaused for LIQUIDATOR after ALLOW"
+        );
+    }
+
+    /// @dev U:[FA-54]: setTotalDebtParams works properly
+    function test_U_FA_54_setTotalDebtParams_works_properly() public notExpirableCase {
+        (uint128 currentTotalDebt, uint128 totalDebtLimit) = creditFacade.totalDebt();
+        assertEq(currentTotalDebt, 0, "SETUP: incorrect currentTotalDebt");
+        assertEq(totalDebtLimit, 0, "SETUP: incorrect totalDebtLimit");
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setTotalDebtParams(100, 200);
+
+        (currentTotalDebt, totalDebtLimit) = creditFacade.totalDebt();
+        assertEq(currentTotalDebt, 100, "incorrect currentTotalDebt");
+        assertEq(totalDebtLimit, 200, "incorrect totalDebtLimit");
     }
 }

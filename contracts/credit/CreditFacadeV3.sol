@@ -1244,9 +1244,9 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         creditConfiguratorOnly // U:[FA-6]
     {
         if (!expirable) {
-            revert NotAllowedWhenNotExpirableException();
+            revert NotAllowedWhenNotExpirableException(); // U:[FA-48]
         }
-        expirationDate = newExpirationDate;
+        expirationDate = newExpirationDate; // U:[FA-48]
     }
 
     /// @notice Sets borrowing debtLimits per single Credit Account
@@ -1259,12 +1259,12 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         creditConfiguratorOnly // U:[FA-6]
     {
         if ((uint256(_maxDebtPerBlockMultiplier) * _maxDebt) >= type(uint128).max) {
-            revert IncorrectParameterException();
+            revert IncorrectParameterException(); // U:[FA-49]
         }
 
-        debtLimits.minDebt = _minDebt;
-        debtLimits.maxDebt = _maxDebt;
-        maxDebtPerBlockMultiplier = _maxDebtPerBlockMultiplier;
+        debtLimits.minDebt = _minDebt; // U:[FA-49]
+        debtLimits.maxDebt = _maxDebt; // U:[FA-49]
+        maxDebtPerBlockMultiplier = _maxDebtPerBlockMultiplier; // U:[FA-49]
     }
 
     /// @notice Sets the bot list for this Credit Facade
@@ -1274,7 +1274,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         external
         creditConfiguratorOnly // U:[FA-6]
     {
-        botList = _botList;
+        botList = _botList; // U:[FA-50]
     }
 
     /// @notice Sets the max cumulative loss that can be accrued before pausing the Credit Manager
@@ -1284,9 +1284,9 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         external
         creditConfiguratorOnly // U:[FA-6]
     {
-        lossParams.maxCumulativeLoss = _maxCumulativeLoss;
+        lossParams.maxCumulativeLoss = _maxCumulativeLoss; // U:[FA-51]
         if (resetCumulativeLoss) {
-            lossParams.currentCumulativeLoss = 0;
+            lossParams.currentCumulativeLoss = 0; // U:[FA-51]
         }
     }
 
@@ -1297,11 +1297,11 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         external
         creditConfiguratorOnly // U:[FA-6]
     {
-        uint256 tokenMask = _getTokenMaskOrRevert(token);
+        uint256 tokenMask = _getTokenMaskOrRevert(token); // U:[FA-52]
 
         forbiddenTokenMask = (allowance == AllowanceAction.ALLOW)
             ? forbiddenTokenMask.disable(tokenMask)
-            : forbiddenTokenMask.enable(tokenMask);
+            : forbiddenTokenMask.enable(tokenMask); // U:[FA-52]
     }
 
     /// @notice Changes the status of an emergency liquidator
@@ -1311,7 +1311,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         external
         creditConfiguratorOnly // U:[FA-6]
     {
-        canLiquidateWhilePaused[liquidator] = allowanceAction == AllowanceAction.ALLOW;
+        canLiquidateWhilePaused[liquidator] = allowanceAction == AllowanceAction.ALLOW; // U:[FA-53]
     }
 
     /// @notice Sets the total debt limit and the current total debt value
