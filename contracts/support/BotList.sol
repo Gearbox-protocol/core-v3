@@ -18,7 +18,7 @@ import "../interfaces/IExceptions.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 /// @title BotList
-/// @dev Used to store a mapping of borrowers => bots. A separate contract is used for transferability when
+/// @notice Used to store a mapping of borrowers => bots. A separate contract is used for transferability when
 ///      changing Credit Facades
 contract BotList is ACLNonReentrantTrait, IBotList {
     using SafeCast for uint256;
@@ -26,39 +26,39 @@ contract BotList is ACLNonReentrantTrait, IBotList {
     using Address for address payable;
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    /// @dev Mapping from Credit Manager address to their status as an approved Credit Manager
+    /// @notice Mapping from Credit Manager address to their status as an approved Credit Manager
     ///      Only Credit Facades connected to approved Credit Managers can alter bot permissions
     mapping(address => bool) public approvedCreditManager;
 
-    /// @dev Mapping from (creditAccount, bot) to bit permissions
+    /// @notice Mapping from (creditAccount, bot) to bit permissions
     mapping(address => mapping(address => uint192)) public botPermissions;
 
-    /// @dev Mapping from credit account to the set of bots with non-zero permissions
+    /// @notice Mapping from credit account to the set of bots with non-zero permissions
     mapping(address => EnumerableSet.AddressSet) internal activeBots;
 
-    /// @dev Whether the bot is forbidden system-wide
+    /// @notice Whether the bot is forbidden system-wide
     mapping(address => bool) public forbiddenBot;
 
-    /// @dev Mapping from borrower to their bot funding balance
+    /// @notice Mapping from borrower to their bot funding balance
     mapping(address => uint256) public fundingBalances;
 
-    /// @dev Mapping of (creditAccount, bot) to bot funding parameters
+    /// @notice Mapping of (creditAccount, bot) to bot funding parameters
     mapping(address => mapping(address => BotFunding)) public botFunding;
 
-    /// @dev A fee (in PERCENTAGE_FACTOR format) charged by the DAO on bot payments
+    /// @notice A fee (in PERCENTAGE_FACTOR format) charged by the DAO on bot payments
     uint16 public daoFee = 0;
 
-    /// @dev Address of the DAO treasury
+    /// @notice Address of the DAO treasury
     address public immutable treasury;
 
-    /// @dev Contract version
+    /// @notice Contract version
     uint256 public constant override version = 3_00;
 
     constructor(address _addressProvider) ACLNonReentrantTrait(_addressProvider) {
         treasury = IAddressProvider(_addressProvider).getTreasuryContract();
     }
 
-    /// @dev Limits access to a function only to Credit Facades connected to approved CMs
+    /// @notice Limits access to a function only to Credit Facades connected to approved CMs
     modifier onlyValidCreditFacade() {
         address creditManager = ICreditFacade(msg.sender).creditManager();
         if (!approvedCreditManager[creditManager] || ICreditManagerV3(creditManager).creditFacade() != msg.sender) {
@@ -67,7 +67,7 @@ contract BotList is ACLNonReentrantTrait, IBotList {
         _;
     }
 
-    /// @dev Sets permissions and funding for (creditAccount, bot). Callable only through CreditFacade
+    /// @notice Sets permissions and funding for (creditAccount, bot). Callable only through CreditFacade
     /// @param creditAccount CA to set permissions for
     /// @param bot Bot to set permissions for
     /// @param permissions A bit mask of permissions
@@ -114,7 +114,7 @@ contract BotList is ACLNonReentrantTrait, IBotList {
         emit SetBotPermissions(creditAccount, bot, permissions, fundingAmount, weeklyFundingAllowance); // F: [BL-03]
     }
 
-    /// @dev Removes permissions and funding for all bots with non-zero permissions for a credit account
+    /// @notice Removes permissions and funding for all bots with non-zero permissions for a credit account
     /// @param creditAccount Credit Account to erase permissions for
     function eraseAllBotPermissions(address creditAccount)
         external
@@ -140,7 +140,7 @@ contract BotList is ACLNonReentrantTrait, IBotList {
         }
     }
 
-    /// @dev Takes payment for performed services from the user's balance and sends to the bot
+    /// @notice Takes payment for performed services from the user's balance and sends to the bot
     /// @param payer Address to charge
     /// @param creditAccount Address of the credit account paid for
     /// @param bot Address of the bot to pay
@@ -173,7 +173,7 @@ contract BotList is ACLNonReentrantTrait, IBotList {
         emit PayBot(payer, creditAccount, bot, paymentAmount, feeAmount); // F: [BL-05]
     }
 
-    /// @dev Adds funds to the borrower's bot payment wallet
+    /// @notice Adds funds to the borrower's bot payment wallet
     function addFunding() external payable nonReentrant {
         if (msg.value == 0) {
             revert AmountCantBeZeroException(); // F: [BL-04]
@@ -186,7 +186,7 @@ contract BotList is ACLNonReentrantTrait, IBotList {
         emit ChangeFunding(msg.sender, newFunds); // F: [BL-04]
     }
 
-    /// @dev Removes funds from the borrower's bot payment wallet
+    /// @notice Removes funds from the borrower's bot payment wallet
     function removeFunding(uint256 amount) external nonReentrant {
         uint256 newFunds = fundingBalances[msg.sender] - amount; // F: [BL-04]
 
@@ -196,12 +196,12 @@ contract BotList is ACLNonReentrantTrait, IBotList {
         emit ChangeFunding(msg.sender, newFunds); // F: [BL-04]
     }
 
-    /// @dev Returns all active bots currently on the account
+    /// @notice Returns all active bots currently on the account
     function getActiveBots(address creditAccount) external view returns (address[] memory) {
         return activeBots[creditAccount].values();
     }
 
-    /// @dev Returns information about bot permissions
+    /// @notice Returns information about bot permissions
     function getBotStatus(address bot, address creditAccount)
         external
         view
@@ -210,23 +210,17 @@ contract BotList is ACLNonReentrantTrait, IBotList {
         return (botPermissions[creditAccount][bot], forbiddenBot[bot]);
     }
 
-    /// @dev Internal function to retrieve the bot's owner
-    function _getCreditAccountOwner(address creditAccount) internal view returns (address owner) {
-        address creditManager = ICreditAccountBase(creditAccount).creditManager();
-        return ICreditManagerV3(creditManager).getBorrowerOrRevert(creditAccount);
-    }
-
     //
     // CONFIGURATION
     //
 
-    /// @dev Forbids the bot system-wide if it is known to be compromised
+    /// @notice Forbids the bot system-wide if it is known to be compromised
     function setBotForbiddenStatus(address bot, bool status) external configuratorOnly {
         forbiddenBot[bot] = status;
         emit BotForbiddenStatusChanged(bot, status);
     }
 
-    /// @dev Sets the DAO fee on bot payments
+    /// @notice Sets the DAO fee on bot payments
     /// @param newFee The new fee value
     function setDAOFee(uint16 newFee) external configuratorOnly {
         daoFee = newFee; // F: [BL-02]
@@ -234,7 +228,7 @@ contract BotList is ACLNonReentrantTrait, IBotList {
         emit SetBotDAOFee(newFee); // F: [BL-02]
     }
 
-    /// @dev Sets an address' status as an approved Credit Manager
+    /// @notice Sets an address' status as an approved Credit Manager
     /// @param creditManager Address of the Credit Manager to change status for
     /// @param status The new status
     function setApprovedCreditManagerStatus(address creditManager, bool status) external configuratorOnly {

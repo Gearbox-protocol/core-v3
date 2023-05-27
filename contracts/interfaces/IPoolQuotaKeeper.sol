@@ -11,6 +11,7 @@ struct TokenQuotaParams {
     uint96 limit;
     uint16 rate; // current rate update
     uint192 cumulativeIndexLU_RAY; // max 10^57
+    uint16 quotaIncreaseFee;
 }
 
 struct AccountQuota {
@@ -36,6 +37,9 @@ interface IPoolQuotaKeeperEvents {
 
     /// @dev Emits when a new limit is set for a token
     event SetTokenLimit(address indexed token, uint96 limit);
+
+    /// @dev Emits when a new one-time quota increase fee is set
+    event SetQuotaIncreaseFee(address indexed token, uint16 fee);
 }
 
 /// @title Pool Quotas Interface

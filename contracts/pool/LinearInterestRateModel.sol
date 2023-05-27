@@ -12,38 +12,49 @@ import {IInterestRateModel} from "../interfaces/IInterestRateModel.sol";
 import {IncorrectParameterException, BorrowingMoreU2ForbiddenException} from "../interfaces/IExceptions.sol";
 
 /// @title Linear Interest Rate Model
+/// @dev GearboxV3 uses a two-point linear model in its pools. Unlike
+///      previous single-point models, it has a new intermediate slope
+///      between the obtuse and steep regions, which serves to decrease
+///      interest rate jumps due to large withdrawals. Additionally, the model
+///      can be configured to prevent borrowing after entering the steep region
+///      (beyond the U2 point), in order to create a reserve for exits and make
+///      rates more stable
 contract LinearInterestRateModel is IInterestRateModel {
-    // reverts if borrow more than U2 if flag is set
+    /// @notice Whether to revert when borrowing beyond U2 utilization
     bool public immutable isBorrowingMoreU2Forbidden;
 
-    // Uoptimal[0;1] in Wad
+    /// @notice The first rate change point (obtuse -> intermediate region)
     uint256 public immutable U_1_WAD;
 
-    // Uoptimal[0;1] in Wad
+    /// @notice The second rate change point (intermediate -> steep region)
     uint256 public immutable U_2_WAD;
 
-    // R_base in Ray
+    /// @notice Base interest rate in WAD format
     uint256 public immutable R_base_RAY;
 
-    // R_Slope1 in Ray
+    /// @notice Slope of the first region. The rate at U1 is equal
+    ///         to R_base_RAY + R_slope1_RAY
     uint256 public immutable R_slope1_RAY;
 
-    // R_Slope2 in Ray
+    /// @notice Slope of the second region. The rate at U2 is equal
+    ///         to R_base_RAY + R_slope1_RAY + R_slope2_RAY
     uint256 public immutable R_slope2_RAY;
 
-    // R_Slope2 in Ray
+    /// @notice Slope of the third region. The rate at U = 100% is equal
+    ///         to R_base_RAY + R_slope1_RAY + R_slope2_RAY
     uint256 public immutable R_slope3_RAY;
 
-    // Contract version
+    /// @notice Contract version
     uint256 public constant version = 3_00;
 
     /// @dev Constructor
-    /// @param U_1 Optimal U in percentage format: x10.000 - percentage plus two decimals
-    /// @param U_2 Optimal U in percentage format: x10.000 - percentage plus two decimals
-    /// @param R_base R_base in percentage format: x10.000 - percentage plus two decimals
-    /// @param R_slope1 R_Slope1 in percentage format: x10.000 - percentage plus two decimals
-    /// @param R_slope2 R_Slope2 in percentage format: x10.000 - percentage plus two decimals
-    /// @param R_slope3 R_Slope3 in percentage format: x10.000 - percentage plus two decimals
+    /// @param U_1 U1 in basis points
+    /// @param U_2 U2 in basis points
+    /// @param R_base R_base in basis points
+    /// @param R_slope1 R_Slope1 in basis points
+    /// @param R_slope2 R_Slope2 in basis points
+    /// @param R_slope3 R_Slope3 in basis points
+    /// @param _isBorrowingMoreU2Forbidden Whether to prevent borrowing more than U2
     constructor(
         uint16 U_1,
         uint16 U_2,
@@ -61,12 +72,11 @@ contract LinearInterestRateModel is IInterestRateModel {
             revert IncorrectParameterException(); // U:[LIM-2]
         }
 
-        // Convert percetns to WAD
+        /// Critical utilization points are stored in WAD format
         U_1_WAD = (WAD * U_1) / PERCENTAGE_FACTOR; // U:[LIM-1]
-
-        // Convert percetns to WAD
         U_2_WAD = (WAD * U_2) / PERCENTAGE_FACTOR; // U:[LIM-1]
 
+        /// Slopes are stored in RAY format
         R_base_RAY = (RAY * R_base) / PERCENTAGE_FACTOR; // U:[LIM-1]
         R_slope1_RAY = (RAY * R_slope1) / PERCENTAGE_FACTOR; // U:[LIM-1]
         R_slope2_RAY = (RAY * R_slope2) / PERCENTAGE_FACTOR; // U:[LIM-1]
@@ -75,10 +85,10 @@ contract LinearInterestRateModel is IInterestRateModel {
         isBorrowingMoreU2Forbidden = _isBorrowingMoreU2Forbidden; // U:[LIM-1]
     }
 
-    /// @dev Returns the borrow rate calculated based on expectedLiquidity and availableLiquidity
+    /// @notice Returns the borrow rate calculated based on expectedLiquidity and availableLiquidity,
+    ///      without preventing borrowing over U2
     /// @param expectedLiquidity Expected liquidity in the pool
     /// @param availableLiquidity Available liquidity in the pool
-    /// @notice In RAY format
     function calcBorrowRate(uint256 expectedLiquidity, uint256 availableLiquidity)
         external
         view
@@ -88,10 +98,10 @@ contract LinearInterestRateModel is IInterestRateModel {
         return calcBorrowRate(expectedLiquidity, availableLiquidity, false);
     }
 
-    /// @dev Returns the borrow rate calculated based on expectedLiquidity and availableLiquidity
+    /// @notice Returns the borrow rate calculated based on expectedLiquidity and availableLiquidity
     /// @param expectedLiquidity Expected liquidity in the pool
     /// @param availableLiquidity Available liquidity in the pool
-    /// @notice In RAY format
+    /// @param checkOptimalBorrowing Whether utilization over U2 needs to be checked
     function calcBorrowRate(uint256 expectedLiquidity, uint256 availableLiquidity, bool checkOptimalBorrowing)
         public
         view
@@ -112,7 +122,7 @@ contract LinearInterestRateModel is IInterestRateModel {
         //
         //                                    U
         // borrowRate = Rbase + Rslope1 * ----------
-        //                                 U1
+        //                                    U1
         //
         if (U_WAD < U_1_WAD) {
             return R_base_RAY + ((R_slope1_RAY * U_WAD) / U_1_WAD); // U:[LIM-3]
@@ -120,15 +130,16 @@ contract LinearInterestRateModel is IInterestRateModel {
 
         // if U >= U1 & U < U2:
         //
-        //                                                      U - U1
-        // borrowRate = Rbase + Rslope1 + Rslope2  + Rslope * ---------
-        //                                                     U2 - U1
+        //                                           U  - U1
+        // borrowRate = Rbase + Rslope1 + Rslope2 * ---------
+        //                                           U2 - U1
 
         if (U_WAD >= U_1_WAD && U_WAD < U_2_WAD) {
             return R_base_RAY + R_slope1_RAY + (R_slope2_RAY * (U_WAD - U_1_WAD)) / (U_2_WAD - U_1_WAD); // U:[LIM-3]
         }
 
-        /// if U > U2 && checkOptimalBorrowing && isBorrowingMoreU2Forbidden
+        /// If U > U2 in `isBorrowingMoreU2Forbidden` and the utilization check requested
+        /// the function will revert to prevent raising utilization over the limit
         if (checkOptimalBorrowing && isBorrowingMoreU2Forbidden) {
             revert BorrowingMoreU2ForbiddenException(); // U:[LIM-3]
         }
@@ -136,17 +147,13 @@ contract LinearInterestRateModel is IInterestRateModel {
         // if U >= U2:
         //
         //                                                      U - U2
-        // borrowRate = Rbase + Rslope1 + Rslope2  + Rslope * ----------
+        // borrowRate = Rbase + Rslope1 + Rslope2  + Rslope3 * ----------
         //                                                      1 - U2
 
         return R_base_RAY + R_slope1_RAY + R_slope2_RAY + (R_slope3_RAY * (U_WAD - U_2_WAD)) / (WAD - U_2_WAD); // U:[LIM-3]
     }
 
-    /// @dev Returns the model's parameters
-    /// @param U_1 U_1 in percentage format: [0;10,000] - percentage plus two decimals
-    /// @param R_base R_base in RAY format
-    /// @param R_slope1 R_slope1 in RAY format
-    /// @param R_slope2 R_slope2 in RAY format
+    /// @notice Returns the model's parameters
     function getModelParameters()
         external
         view
@@ -160,6 +167,8 @@ contract LinearInterestRateModel is IInterestRateModel {
         R_slope3 = uint16(R_slope3_RAY * PERCENTAGE_FACTOR / RAY); // U:[LIM-1]
     }
 
+    /// @notice Returns the amount available to borrow until the U2 is reached if borrowing
+    ///         over U2 is prohibited
     function availableToBorrow(uint256 expectedLiquidity, uint256 availableLiquidity)
         external
         view

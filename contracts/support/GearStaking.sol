@@ -26,22 +26,22 @@ uint256 constant EPOCH_LENGTH = 7 days;
 contract GearStaking is ACLNonReentrantTrait, IGearStaking {
     using SafeCast for uint256;
 
-    /// @dev Address of the GEAR token
+    /// @notice Address of the GEAR token
     IERC20 public immutable gear;
 
-    /// @dev Mapping of user address to their total staked tokens and tokens available for voting
+    /// @notice Mapping of user address to their total staked tokens and tokens available for voting
     mapping(address => UserVoteLockData) internal voteLockData;
 
-    /// @dev Mapping of user address to their future withdrawal amounts
+    /// @notice Mapping of user address to their future withdrawal amounts
     mapping(address => WithdrawalData) internal withdrawalData;
 
-    /// @dev Mapping of address to their status as allowed voting contract
+    /// @notice Mapping of address to their status as allowed voting contract
     mapping(address => VotingContractStatus) public allowedVotingContract;
 
-    /// @dev Timestamp of the first epoch of voting
+    /// @notice Timestamp of the first epoch of voting
     uint256 immutable firstEpochTimestamp;
 
-    /// @dev Contract version
+    /// @notice Contract version
     uint256 public constant override version = 3_00;
 
     constructor(address _addressProvider, uint256 _firstEpochTimestamp) ACLNonReentrantTrait(_addressProvider) {
@@ -49,23 +49,23 @@ contract GearStaking is ACLNonReentrantTrait, IGearStaking {
         firstEpochTimestamp = _firstEpochTimestamp;
     }
 
-    /// @dev Returns the current global voting epoch
+    /// @notice Returns the current global voting epoch
     function getCurrentEpoch() public view returns (uint16) {
         if (block.timestamp < firstEpochTimestamp) return 0;
         return uint16((block.timestamp - firstEpochTimestamp) / EPOCH_LENGTH) + 1;
     }
 
-    /// @dev Returns the total amount of GEAR the user staked into staked GEAR
+    /// @notice Returns the total amount of GEAR the user staked into staked GEAR
     function balanceOf(address user) external view returns (uint256) {
         return uint256(voteLockData[user].totalStaked);
     }
 
-    /// @dev Returns the balance available for voting or withdrawal
+    /// @notice Returns the balance available for voting or withdrawal
     function availableBalance(address user) external view returns (uint256) {
         return uint256(voteLockData[user].available);
     }
 
-    /// @dev Returns the amounts withdrawable now and over the next 4 epochs
+    /// @notice Returns the amounts withdrawable now and over the next 4 epochs
     function getWithdrawableAmounts(address user)
         external
         view
@@ -109,8 +109,8 @@ contract GearStaking is ACLNonReentrantTrait, IGearStaking {
         }
     }
 
-    /// @dev Deposits an amount of GEAR into staked GEAR. Optionally, performs a sequence of vote changes according to
-    ///      the passed `votes` array
+    /// @notice Deposits an amount of GEAR into staked GEAR. Optionally, performs a sequence of vote changes according to
+    ///         the passed `votes` array
     /// @param amount Amount of GEAR to deposit into staked GEAR
     /// @param votes Array of MultVote structs:
     ///              * votingContract - contract to submit a vote to
@@ -138,7 +138,7 @@ contract GearStaking is ACLNonReentrantTrait, IGearStaking {
         }
     }
 
-    /// @dev Performs a sequence of vote changes according to the passed array
+    /// @notice Performs a sequence of vote changes according to the passed array
     /// @param votes Array of MultVote structs:
     ///              * votingContract - contract to submit a vote to
     ///              * voteAmount - amount of staked GEAR to add to or remove from a vote
@@ -148,10 +148,10 @@ contract GearStaking is ACLNonReentrantTrait, IGearStaking {
         _multivote(msg.sender, votes);
     }
 
-    /// @dev Schedules a withdrawal from staked GEAR into GEAR, which can be claimed in 4 epochs.
-    ///      If there are any withdrawals available to claim, they are also claimed.
-    ///      Optionally, performs a sequence of vote changes according to
-    ///      the passed `votes` array.
+    /// @notice Schedules a withdrawal from staked GEAR into GEAR, which can be claimed in 4 epochs.
+    ///         If there are any withdrawals available to claim, they are also claimed.
+    ///         Optionally, performs a sequence of vote changes according to
+    ///         the passed `votes` array.
     /// @param amount Amount of staked GEAR to withdraw into GEAR
     /// @param to Address to send claimable GEAR, if any
     /// @param votes Array of MultVote structs:
@@ -173,15 +173,15 @@ contract GearStaking is ACLNonReentrantTrait, IGearStaking {
         emit ScheduleGearWithdrawal(msg.sender, amount);
     }
 
-    /// @dev Claims all of the caller's withdrawals that are mature
+    /// @notice Claims all of the caller's withdrawals that are mature
     /// @param to Address to send claimable GEAR, if any
     function claimWithdrawals(address to) external nonReentrant {
         _processPendingWithdrawals(msg.sender, to);
     }
 
-    /// @dev Refreshes the user's withdrawal struct, shifting the withdrawal amounts based
-    ///      on the number of epochs that passed since the last update. If there are any mature withdrawals,
-    ///      sends the corresponding amounts to the user
+    /// @notice Refreshes the user's withdrawal struct, shifting the withdrawal amounts based
+    ///         on the number of epochs that passed since the last update. If there are any mature withdrawals,
+    ///         sends the corresponding amounts to the user
     function _processPendingWithdrawals(address user, address to) internal {
         uint16 epochNow = getCurrentEpoch();
 
@@ -266,7 +266,7 @@ contract GearStaking is ACLNonReentrantTrait, IGearStaking {
     // CONFIGURATION
     //
 
-    /// @dev Sets the status of contract as an allowed voting contract
+    /// @notice Sets the status of contract as an allowed voting contract
     /// @param votingContract Address to set the status for
     /// @param status The new status of the contract:
     ///               * NOT_ALLOWED - cannot vote or unvote
