@@ -96,7 +96,9 @@ interface IPoolV3 is IPoolV3Events, IPoolBase, IERC4626 {
     function deposit(uint256 assets, address receiver) external override returns (uint256 shares);
 
     /// @dev Same as `deposit`, but allows to specify the referral code
-    function depositReferral(uint256 assets, address receiver, uint16 referralCode) external returns (uint256 shares);
+    function depositWithReferral(uint256 assets, address receiver, uint16 referralCode)
+        external
+        returns (uint256 shares);
 
     /// @notice Deposits underlying tokens to the pool in exhcange for given number of pool shares
     /// @param shares Number of shares to mint
@@ -117,10 +119,6 @@ interface IPoolV3 is IPoolV3Events, IPoolBase, IERC4626 {
     /// @param owner Account to burn pool shares from
     /// @return assets Amount of underlying withdrawn
     function redeem(uint256 shares, address receiver, address owner) external override returns (uint256 assets);
-
-    /// @notice Burns caller's pool shares
-    /// @param shares Number of shares to burn
-    function burn(uint256 shares) external;
 
     /// @notice Number of pool shares that would be minted on depositing `assets`
     function previewDeposit(uint256 assets) external view override returns (uint256 shares);

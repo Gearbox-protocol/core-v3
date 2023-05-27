@@ -194,7 +194,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     }
 
     /// @inheritdoc IPoolV3
-    function depositReferral(uint256 assets, address receiver, uint16 referralCode)
+    function depositWithReferral(uint256 assets, address receiver, uint16 referralCode)
         external
         override
         returns (uint256 shares)
@@ -243,16 +243,6 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         uint256 assetsSent = _convertToAssets(shares, Math.Rounding.Down); // U:[P4-9]
         assets = _amountMinusFee(_amountMinusWithdrawalFee(assetsSent)); // U:[P4-9]
         _withdraw(receiver, owner, assetsSent, assets, shares); // U:[P4-9]
-    }
-
-    /// @inheritdoc IPoolV3
-    function burn(uint256 shares)
-        external
-        override
-        whenNotPaused // U:[P4-4]
-        nonReentrant
-    {
-        _burn(msg.sender, shares); // U:[P4-10]
     }
 
     /// @inheritdoc IPoolV3

@@ -232,8 +232,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
         vm.prank(INITIAL_LP);
         pool.mint(availableLiquidity, INITIAL_LP);
 
-        vm.prank(INITIAL_LP);
-        pool.burn((availableLiquidity * (dieselRate - RAY)) / dieselRate);
+        deal(address(pool), INITIAL_LP, availableLiquidity * RAY / dieselRate, true);
 
         // assertEq(pool.expectedLiquidityStored(), availableLiquidity * dieselRate / RAY, "ExpectedLU is not correct!");
         assertEq(pool.convertToAssets(RAY), dieselRate, "Incorrect diesel rate!");
@@ -336,7 +335,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
         pool.deposit(addLiquidity, FRIEND);
 
         vm.expectRevert(bytes(PAUSABLE_ERROR));
-        pool.depositReferral(addLiquidity, FRIEND, referral);
+        pool.depositWithReferral(addLiquidity, FRIEND, referral);
 
         vm.expectRevert(bytes(PAUSABLE_ERROR));
         pool.mint(addLiquidity, FRIEND);
@@ -346,9 +345,6 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
 
         vm.expectRevert(bytes(PAUSABLE_ERROR));
         pool.redeem(removeLiquidity, FRIEND, FRIEND);
-
-        vm.expectRevert(bytes(PAUSABLE_ERROR));
-        pool.burn(0);
 
         vm.expectRevert(bytes(PAUSABLE_ERROR));
         pool.lendCreditAccount(1, FRIEND);
@@ -451,7 +447,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
 
                 vm.prank(USER);
                 uint256 shares = withReferralCode
-                    ? pool.depositReferral(testCase.amountToDeposit, FRIEND, referral)
+                    ? pool.depositWithReferral(testCase.amountToDeposit, FRIEND, referral)
                     : pool.deposit(testCase.amountToDeposit, FRIEND);
 
                 expectBalance(
@@ -993,35 +989,6 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
                 );
             }
         }
-    }
-
-    // U:[P4-10]: burn works as expected
-    function test_U_P4_10_burn_works_as_expected() public {
-        _setUpTestCase(Tokens.DAI, 0, 50_00, addLiquidity, 2 * RAY, 0, false);
-
-        vm.prank(USER);
-        pool.mint(addLiquidity, USER);
-
-        expectBalance(address(pool), USER, addLiquidity, "SETUP: Incorrect USER balance");
-
-        /// Initial lp provided 1/2 AL + 1AL from USER
-        assertEq(pool.totalSupply(), (addLiquidity * 3) / 2, "SETUP: Incorrect total supply");
-
-        uint256 baseInterestRate = pool.baseInterestRate();
-        uint256 dieselRate = pool.convertToAssets(RAY);
-        uint256 availableLiquidity = pool.availableLiquidity();
-        uint256 expectedLiquidity = pool.expectedLiquidity();
-
-        vm.prank(USER);
-        pool.burn(addLiquidity / 4);
-
-        expectBalance(address(pool), USER, (addLiquidity * 3) / 4, "Incorrect USER balance");
-
-        assertEq(pool.baseInterestRate(), baseInterestRate, "Incorrect borrow rate");
-        /// Before burn totalSupply was 150% * AL, after 125% * LP
-        assertEq(pool.convertToAssets(RAY), (dieselRate * 150) / 125, "Incorrect diesel rate");
-        assertEq(pool.availableLiquidity(), availableLiquidity, "Incorrect available liquidity");
-        assertEq(pool.expectedLiquidity(), expectedLiquidity, "Incorrect expected liquidity");
     }
 
     ///
