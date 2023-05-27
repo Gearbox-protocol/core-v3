@@ -130,6 +130,7 @@ contract CreditManagerMock {
 
     function updateQuota(address _creditAccount, address token, int96 quotaChange)
         external
+        view
         returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
         tokensToEnable = qu_tokensToEnable;

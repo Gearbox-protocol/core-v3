@@ -43,6 +43,8 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
+import "forge-std/console.sol";
+
 uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS
     & ~(INCREASE_DEBT_PERMISSION | DECREASE_DEBT_PERMISSION | WITHDRAW_PERMISSION) | INCREASE_DEBT_WAS_CALLED;
 
@@ -236,7 +238,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         // the current total debt amount
         // Only in `trackTotalDebt` mode
         if (trackTotalDebt) {
-            _revertIfOutOfTotalDebtLimit(debt, ManageDebtAction.INCREASE_DEBT);
+            _revertIfOutOfTotalDebtLimit(debt, ManageDebtAction.INCREASE_DEBT); // U:[FA-8,10]
         }
 
         /// Attempts to burn the DegenNFT - if onBehalfOf has none, this will fail
@@ -350,7 +352,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         // Updates the current total debt amount
         // Only in `trackTotalDebt` mode
         if (trackTotalDebt) {
-            _revertIfOutOfTotalDebtLimit(debtData.debt, ManageDebtAction.DECREASE_DEBT);
+            _revertIfOutOfTotalDebtLimit(debtData.debt, ManageDebtAction.DECREASE_DEBT); // U:[FA-11]
         }
 
         // Emits an event
@@ -466,7 +468,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         // Updates the current total debt amount
         // Only in `trackTotalDebt` mode
         if (trackTotalDebt) {
-            _revertIfOutOfTotalDebtLimit(collateralDebtData.debt, ManageDebtAction.DECREASE_DEBT);
+            _revertIfOutOfTotalDebtLimit(collateralDebtData.debt, ManageDebtAction.DECREASE_DEBT); // U:[FA-16]
         }
 
         /// If there is non-zero loss, then borrowing is forbidden in
@@ -915,7 +917,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         // the current total debt amount
         // Only in `trackTotalDebt` mode
         if (trackTotalDebt) {
-            _revertIfOutOfTotalDebtLimit(amount, action);
+            _revertIfOutOfTotalDebtLimit(amount, action); // U:[FA-27, 31]
         }
 
         uint256 newDebt;
@@ -995,7 +997,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         whenNotPaused // U:[FA-2]
         nonReentrant // U:[FA-4]
     {
-        _claimWithdrawals(creditAccount, to, ClaimAction.CLAIM);
+        _claimWithdrawals(creditAccount, to, ClaimAction.CLAIM); // U:[FA-40]
     }
 
     /// @notice Sets permissions and funding parameters for a bot
@@ -1021,70 +1023,64 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         uint16 flags = _flagsOf(creditAccount);
 
         if (flags & BOT_PERMISSIONS_SET_FLAG == 0) {
-            _eraseAllBotPermissions({creditAccount: creditAccount});
+            _eraseAllBotPermissions({creditAccount: creditAccount}); // U:[FA-41]
 
             // If flag wasn't enabled before and bot has some permissions, it sets flag
             if (permissions != 0) {
-                _setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, true);
+                _setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: true}); // U:[FA-41]
             }
         }
 
-        uint256 remainingBots =
-            IBotList(botList).setBotPermissions(creditAccount, bot, permissions, fundingAmount, weeklyFundingAllowance);
+        uint256 remainingBots = IBotList(botList).setBotPermissions({
+            creditAccount: creditAccount,
+            bot: bot,
+            permissions: permissions,
+            fundingAmount: fundingAmount,
+            weeklyFundingAllowance: weeklyFundingAllowance
+        }); // U:[FA-41]
 
         if (remainingBots == 0) {
-            _setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, false);
+            _setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: false}); // U:[FA-41]
         }
     }
 
     /// @notice Convenience function to erase all bot permissions for a Credit Account upon closure
     function _eraseAllBotPermissionsAtClosure(address creditAccount) internal {
-        uint16 flags = _flagsOf(creditAccount);
+        uint16 flags = _flagsOf(creditAccount); // U:[FA-42]
 
         if (flags & BOT_PERMISSIONS_SET_FLAG != 0) {
-            _eraseAllBotPermissions(creditAccount);
+            _eraseAllBotPermissions(creditAccount); // U:[FA-42]
         }
     }
 
-    function _eraseAllBotPermissions(address creditAccount) internal {
-        IBotList(botList).eraseAllBotPermissions(creditAccount);
-    }
-
-    function _flagsOf(address creditAccount) internal view returns (uint16) {
-        return ICreditManagerV3(creditManager).flagsOf(creditAccount);
-    }
-
-    /// @notice Internal wrapper for `CreditManager.setFlagFor()`. The external call is wrapped
-    ///      to optimize contract size
-    function _setFlagFor(address creditAccount, uint16 flag, bool value) internal {
-        ICreditManagerV3(creditManager).setFlagFor(creditAccount, flag, value);
-    }
+    //
+    // CHECKS
+    //
 
     /// @notice Checks that the per-block borrow limit was not violated and updates the
     /// amount borrowed in current block
     function _revertIfOutOfBorrowingLimit(uint256 amount) internal {
-        uint8 _maxDebtPerBlockMultiplier = maxDebtPerBlockMultiplier; // F:[FA-18]
+        uint8 _maxDebtPerBlockMultiplier = maxDebtPerBlockMultiplier; // U:[FA-43]
 
-        if (_maxDebtPerBlockMultiplier == 0) {
-            revert BorrowedBlockLimitException();
-        }
-
-        if (_maxDebtPerBlockMultiplier == type(uint8).max) return;
+        if (_maxDebtPerBlockMultiplier == type(uint8).max) return; // U:[FA-43]
 
         uint256 newDebtInCurrentBlock;
 
         if (lastBlockBorrowed == block.number) {
-            newDebtInCurrentBlock = amount + totalBorrowedInBlock;
+            newDebtInCurrentBlock = amount + totalBorrowedInBlock; // U:[FA-43]
         } else {
             newDebtInCurrentBlock = amount;
-            lastBlockBorrowed = uint64(block.number);
+            lastBlockBorrowed = uint64(block.number); // U:[FA-43]
         }
 
         if (newDebtInCurrentBlock > uint256(_maxDebtPerBlockMultiplier) * debtLimits.maxDebt) {
-            revert BorrowedBlockLimitException();
-        } // F:[FA-18]
+            revert BorrowedBlockLimitException(); // U:[FA-43]
+        }
 
-        totalBorrowedInBlock = uint128(newDebtInCurrentBlock);
+        /// @dev It's safe covert because we control that
+        /// uint256(_maxDebtPerBlockMultiplier) * debtLimits.maxDebt < type(uint128).max
+
+        totalBorrowedInBlock = uint128(newDebtInCurrentBlock); // U:[FA-43]
     }
 
     /// @notice Checks that the borrowed principal is within borrowing debtLimits
@@ -1092,46 +1088,8 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     function _revertIfOutOfDebtLimits(uint256 debt) internal view {
         // Checks that amount is in debtLimits
         if (debt < uint256(debtLimits.minDebt) || debt > uint256(debtLimits.maxDebt)) {
-            revert BorrowAmountOutOfLimitsException();
-        } // F:
-    }
-
-    //
-    // HELPERS
-    //
-
-    /// @notice Internal wrapper for `creditManager.getBorrowerOrRevert()`
-    /// @dev The external call is wrapped to optimize contract size
-    function _getBorrowerOrRevert(address creditAccount) internal view returns (address) {
-        return ICreditManagerV3(creditManager).getBorrowerOrRevert({creditAccount: creditAccount});
-    }
-
-    /// @notice Internal wrapper for `creditManager.getTokenMaskOrRevert()`
-    /// @dev The external call is wrapped to optimize contract size
-    function _getTokenMaskOrRevert(address token) internal view returns (uint256 mask) {
-        mask = ICreditManagerV3(creditManager).getTokenMaskOrRevert(token);
-    }
-
-    /// @notice Internal wrapper for `creditManager.closeCreditAccount()`
-    /// @dev The external call is wrapped to optimize contract size
-    function _closeCreditAccount(
-        address creditAccount,
-        ClosureAction closureAction,
-        CollateralDebtData memory collateralDebtData,
-        address payer,
-        address to,
-        uint256 skipTokensMask,
-        bool convertToETH
-    ) internal returns (uint256 remainingFunds, uint256 reportedLoss) {
-        (remainingFunds, reportedLoss) = ICreditManagerV3(creditManager).closeCreditAccount({
-            creditAccount: creditAccount,
-            closureAction: closureAction,
-            collateralDebtData: collateralDebtData,
-            payer: payer,
-            to: to,
-            skipTokensMask: skipTokensMask,
-            convertToETH: convertToETH
-        }); // F:[FA-15,49]
+            revert BorrowAmountOutOfLimitsException(); // U:[FA-44]
+        }
     }
 
     /// @notice Internal wrapper for `creditManager.fullCollateralCheck()`
@@ -1162,32 +1120,81 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
     /// @notice Returns whether the Credit Facade is expired
     function _isExpired() internal view returns (bool isExpired) {
-        isExpired = (expirable) && (block.timestamp >= expirationDate); // F: [FA-46,47,48]
+        isExpired = (expirable) && (block.timestamp >= expirationDate); // U:[FA-46]
     }
 
     /// @notice Updates total debt and checks that it does not exceed the limit
     function _revertIfOutOfTotalDebtLimit(uint256 delta, ManageDebtAction action) internal {
-        if (delta > 0) {
-            TotalDebt storage td = totalDebt;
+        if (delta != 0) {
+            TotalDebt storage td = totalDebt; // U:[FA-47]
 
             if (action == ManageDebtAction.INCREASE_DEBT) {
-                td.currentTotalDebt += delta.toUint128();
+                td.currentTotalDebt += delta.toUint128(); // U:[FA-47]
                 if (td.currentTotalDebt > td.totalDebtLimit) {
-                    revert CreditManagerCantBorrowException();
+                    revert CreditManagerCantBorrowException(); // U:[FA-47]
                 }
             } else {
-                td.currentTotalDebt -= delta.toUint128();
+                uint128 delta128 = delta.toUint128();
+                td.currentTotalDebt = td.currentTotalDebt > delta128 ? td.currentTotalDebt - delta128 : 0; // U:[FA-47]
             }
         }
     }
 
+    //
+    // HELPERS
+    //
+
     /// @notice Wraps ETH into WETH and sends it back to msg.sender
     /// TODO: Check L2 networks for supporting native currencies
     function _wrapETH() internal {
-        if (msg.value > 0) {
+        if (msg.value != 0) {
             IWETH(weth).deposit{value: msg.value}(); // U:[FA-7]
             IWETH(weth).transfer(msg.sender, msg.value); // U:[FA-7]
         }
+    }
+
+    /// @notice Internal wrapper for `creditManager.getBorrowerOrRevert()`
+    /// @dev The external call is wrapped to optimize contract size
+    function _getBorrowerOrRevert(address creditAccount) internal view returns (address) {
+        return ICreditManagerV3(creditManager).getBorrowerOrRevert({creditAccount: creditAccount});
+    }
+
+    /// @notice Internal wrapper for `creditManager.getTokenMaskOrRevert()`
+    /// @dev The external call is wrapped to optimize contract size
+    function _getTokenMaskOrRevert(address token) internal view returns (uint256 mask) {
+        mask = ICreditManagerV3(creditManager).getTokenMaskOrRevert(token);
+    }
+
+    function _flagsOf(address creditAccount) internal view returns (uint16) {
+        return ICreditManagerV3(creditManager).flagsOf(creditAccount);
+    }
+
+    /// @notice Internal wrapper for `CreditManager.setFlagFor()`. The external call is wrapped
+    ///      to optimize contract size
+    function _setFlagFor(address creditAccount, uint16 flag, bool value) internal {
+        ICreditManagerV3(creditManager).setFlagFor(creditAccount, flag, value);
+    }
+
+    /// @notice Internal wrapper for `creditManager.closeCreditAccount()`
+    /// @dev The external call is wrapped to optimize contract size
+    function _closeCreditAccount(
+        address creditAccount,
+        ClosureAction closureAction,
+        CollateralDebtData memory collateralDebtData,
+        address payer,
+        address to,
+        uint256 skipTokensMask,
+        bool convertToETH
+    ) internal returns (uint256 remainingFunds, uint256 reportedLoss) {
+        (remainingFunds, reportedLoss) = ICreditManagerV3(creditManager).closeCreditAccount({
+            creditAccount: creditAccount,
+            closureAction: closureAction,
+            collateralDebtData: collateralDebtData,
+            payer: payer,
+            to: to,
+            skipTokensMask: skipTokensMask,
+            convertToETH: convertToETH
+        }); // F:[FA-15,49]
     }
 
     /// @notice Internal wrapper for `creditManager.calcDebtAndCollateral()`
@@ -1212,7 +1219,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         internal
         returns (uint256 tokensToEnable)
     {
-        tokensToEnable = ICreditManagerV3(creditManager).claimWithdrawals(creditAccount, to, action);
+        tokensToEnable = ICreditManagerV3(creditManager).claimWithdrawals(creditAccount, to, action); // U:[FA-16,37]
     }
 
     /// @notice Internal wrapper for `IWETHGateway.withdrawTo()`
@@ -1220,6 +1227,10 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @dev Used to convert WETH to ETH and send it to user
     function _wethWithdrawTo(address to) internal {
         IWETHGateway(wethGateway).withdrawTo(to);
+    }
+
+    function _eraseAllBotPermissions(address creditAccount) internal {
+        IBotList(botList).eraseAllBotPermissions(creditAccount);
     }
 
     //
@@ -1247,8 +1258,12 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         external
         creditConfiguratorOnly // U:[FA-6]
     {
-        debtLimits.minDebt = _minDebt; // F:
-        debtLimits.maxDebt = _maxDebt; // F:
+        if ((uint256(_maxDebtPerBlockMultiplier) * _maxDebt) >= type(uint128).max) {
+            revert IncorrectParameterException();
+        }
+
+        debtLimits.minDebt = _minDebt;
+        debtLimits.maxDebt = _maxDebt;
         maxDebtPerBlockMultiplier = _maxDebtPerBlockMultiplier;
     }
 
