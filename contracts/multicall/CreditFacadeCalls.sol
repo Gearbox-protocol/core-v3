@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
-import {Balance, BalanceOps} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
+import {Balance} from "../libraries/BalancesLogic.sol";
 import {ICreditFacade, ICreditFacadeMulticall} from "../interfaces/ICreditFacade.sol";
 
 interface CreditFacadeMulticaller {}
