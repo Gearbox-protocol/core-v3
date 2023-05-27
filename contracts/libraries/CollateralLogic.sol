@@ -11,8 +11,6 @@ import {BitMask} from "./BitMask.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
-import "forge-std/console.sol";
-
 /// @title Collateral logic Library
 library CollateralLogic {
     using BitMask for uint256;

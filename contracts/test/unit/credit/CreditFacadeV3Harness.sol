@@ -2,9 +2,6 @@ pragma solidity ^0.8.17;
 
 import "../../../interfaces/ICreditFacade.sol";
 import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
-import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
-import {MultiCall, MultiCallOps} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 
 contract CreditFacadeV3Harness is CreditFacadeV3 {
     constructor(address _creditManager, address _degenNFT, bool _expirable)

@@ -12,8 +12,6 @@ import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {BitMask, UNDERLYING_TOKEN_MASK} from "../libraries/BitMask.sol";
 
 //  DATA
-import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
-import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 
 /// INTERFACES
 import "../interfaces/ICreditFacade.sol";
@@ -39,12 +37,11 @@ import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
 import {IBotList} from "../interfaces/IBotList.sol";
 
 // CONSTANTS
-import {LEVERAGE_DECIMALS} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
-import "forge-std/console.sol";
 
 uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS
     & ~(INCREASE_DEBT_PERMISSION | DECREASE_DEBT_PERMISSION | WITHDRAW_PERMISSION) | INCREASE_DEBT_WAS_CALLED;

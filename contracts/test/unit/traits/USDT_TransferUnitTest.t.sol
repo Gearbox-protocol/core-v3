@@ -6,7 +6,6 @@ pragma solidity ^0.8.17;
 import {USDT_Transfer} from "../../../traits/USDT_Transfer.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {TestHelper} from "../../lib/helper.sol";
-import "forge-std/console.sol";
 
 contract USDT_TransferUnitTest is USDT_Transfer, TestHelper {
     using Math for uint256;

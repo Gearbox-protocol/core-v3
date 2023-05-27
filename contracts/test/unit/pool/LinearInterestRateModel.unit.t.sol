@@ -3,7 +3,6 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {IInterestRateModel} from "../../../interfaces/IInterestRateModel.sol";
 import {LinearInterestRateModel} from "../../../pool/LinearInterestRateModel.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -17,7 +16,6 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 import "../../../interfaces/IExceptions.sol";
 
 import {TestHelper} from "../../lib/helper.sol";
-import "forge-std/console.sol";
 
 contract LinearInterestRateModelUniTest is TestHelper {
     using Math for uint256;

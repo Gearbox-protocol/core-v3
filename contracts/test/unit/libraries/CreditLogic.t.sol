@@ -3,11 +3,6 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {IPoolQuotaKeeper} from "../../../interfaces/IPoolQuotaKeeper.sol";
-import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
-import {IncorrectParameterException} from "../../../interfaces/IExceptions.sol";
 import {CreditLogic} from "../../../libraries/CreditLogic.sol";
 import {ClosureAction, CollateralDebtData, CollateralTokenData} from "../../../interfaces/ICreditManagerV3.sol";
 import {TestHelper} from "../../lib/helper.sol";
@@ -15,8 +10,6 @@ import {GeneralMock} from "../../mocks/GeneralMock.sol";
 
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 import {RAY, WAD} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-
-import "forge-std/console.sol";
 
 /// @title BitMask logic test
 /// @notice [BM]: Unit tests for bit mask library

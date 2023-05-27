@@ -22,11 +22,8 @@ import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contr
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 import {UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
 
-import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
-
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
+
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 import {CreditLogic} from "../../../libraries/CreditLogic.sol";
 
@@ -36,23 +33,19 @@ import "../../lib/constants.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 
 // MOCKS
-import {PriceFeedMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/oracles/PriceFeedMock.sol";
+
 import {PoolMock} from "../../mocks//pool/PoolMock.sol";
 import {PoolQuotaKeeper} from "../../../pool/PoolQuotaKeeper.sol";
-import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";
 import {CreditManagerTestSuite} from "../../suites/CreditManagerTestSuite.sol";
-import {CreditManagerV3Harness} from "../../unit/credit/CreditManagerV3Harness.sol";
 
 import {CreditConfig} from "../../config/CreditConfig.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
-
-import {Test} from "forge-std/Test.sol";
 
 contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper {
     using CreditLogic for CollateralDebtData;

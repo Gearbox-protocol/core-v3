@@ -5,7 +5,6 @@ pragma solidity ^0.8.17;
 
 import {PoolV3} from "./PoolV3.sol";
 import {USDT_Transfer} from "../traits/USDT_Transfer.sol";
-import {IPoolV3} from "../interfaces/IPoolV3.sol";
 
 /// @title Core pool contract compatible with ERC4626
 /// @notice Implements pool & dieselUSDT_Transferogic

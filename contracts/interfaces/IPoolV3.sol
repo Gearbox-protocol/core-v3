@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 pragma abicoder v1;
 
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
+
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 interface IPoolV3Events {

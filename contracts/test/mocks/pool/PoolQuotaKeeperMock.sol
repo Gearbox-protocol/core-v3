@@ -4,7 +4,6 @@
 pragma solidity ^0.8.17;
 
 import {IPoolQuotaKeeper, TokenQuotaParams, AccountQuota} from "../../../interfaces/IPoolQuotaKeeper.sol";
-import "forge-std/console.sol";
 
 contract PoolQuotaKeeperMock is IPoolQuotaKeeper {
     uint256 public constant override version = 3_00;

@@ -5,8 +5,7 @@ pragma solidity ^0.8.17;
 
 import "../../../interfaces/IAddressProviderV3.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
+
 import {IWETHGateway} from "../../../interfaces/IWETHGateway.sol";
 import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
@@ -15,7 +14,7 @@ import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPr
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {CreditFacadeV3Harness} from "./CreditFacadeV3Harness.sol";
-import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
+
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 import {DegenNFTMock} from "../../mocks/token/DegenNFTMock.sol";
 import {AdapterMock} from "../../mocks/adapters/AdapterMock.sol";
@@ -40,15 +39,13 @@ import {
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {IBotList} from "../../../interfaces/IBotList.sol";
-import {ICreditFacadeEvents} from "../../../interfaces/ICreditFacade.sol";
-import {IDegenNFT, IDegenNFTExceptions} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
+
 import {ClaimAction} from "../../../interfaces/IWithdrawalManager.sol";
 import {BitMask, UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // DATA
-import {MultiCall, MultiCallOps} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
-import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
+
 import {CreditFacadeMulticaller, CreditFacadeCalls} from "../../../multicall/CreditFacadeCalls.sol";
 
 // CONSTANTS
@@ -58,7 +55,7 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 
 import "../../lib/constants.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
-import {CreditFacadeTestHelper} from "../../helpers/CreditFacadeTestHelper.sol";
+
 import {TestHelper} from "../../lib/helper.sol";
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
@@ -66,8 +63,6 @@ import "../../../interfaces/IExceptions.sol";
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";
-
-import "forge-std/console.sol";
 
 uint16 constant REFERRAL_CODE = 23;
 

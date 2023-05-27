@@ -4,7 +4,6 @@
 pragma solidity ^0.8.17;
 
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
-import {ICreditManagerV3} from "./ICreditManagerV3.sol";
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 import {ClosureAction} from "../interfaces/ICreditManagerV3.sol";

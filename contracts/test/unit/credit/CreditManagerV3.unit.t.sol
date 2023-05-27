@@ -7,9 +7,7 @@ pragma solidity ^0.8.17;
 import "../../../interfaces/IAddressProviderV3.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 import {AccountFactoryMock} from "../../mocks/core/AccountFactoryMock.sol";
-import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 
-import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 import {CreditManagerV3Harness} from "./CreditManagerV3Harness.sol";
 import {CreditManagerV3Harness_USDT} from "./CreditManagerV3Harness_USDT.sol";
 import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
@@ -22,7 +20,6 @@ import {USDTFees} from "../../../libraries/USDTFees.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
 /// INTERFACE
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {ENTERED} from "../../../traits/ReentrancyGuardTrait.sol";
 import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
@@ -38,20 +35,17 @@ import {
     ICreditManagerV3Events,
     WITHDRAWAL_FLAG
 } from "../../../interfaces/ICreditManagerV3.sol";
-import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IWETHGateway} from "../../../interfaces/IWETHGateway.sol";
 import {ClaimAction, IWithdrawalManager} from "../../../interfaces/IWithdrawalManager.sol";
 import {IPoolQuotaKeeper} from "../../../interfaces/IPoolQuotaKeeper.sol";
-import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
 
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // EXCEPTIONS
-import "../../../interfaces/IExceptions.sol";
 
 // MOCKS
 import {PriceOracleMock} from "../../mocks/oracles/PriceOracleMock.sol";
@@ -74,7 +68,6 @@ import "../../../interfaces/IExceptions.sol";
 import "../../lib/constants.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 import {TestHelper, Vars, VarU256} from "../../lib/helper.sol";
-import "forge-std/console.sol";
 
 uint16 constant LT_UNDERLYING = uint16(PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM - DEFAULT_FEE_LIQUIDATION);
 

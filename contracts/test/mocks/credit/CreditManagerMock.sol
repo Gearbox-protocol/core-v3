@@ -4,8 +4,7 @@
 pragma solidity ^0.8.17;
 
 import "../../../interfaces/IAddressProviderV3.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+
 import {
     ICreditManagerV3,
     ClosureAction,
@@ -15,7 +14,7 @@ import {
     RevocationPair
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
-import {IPoolQuotaKeeper} from "../../../interfaces/IPoolQuotaKeeper.sol";
+
 import {ClaimAction} from "../../../interfaces/IWithdrawalManager.sol";
 
 import "../../../interfaces/IExceptions.sol";

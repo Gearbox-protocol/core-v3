@@ -11,7 +11,6 @@ import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 
 // MOCKS
 import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
-import "../lib/constants.sol";
 
 import {Test} from "forge-std/Test.sol";
 

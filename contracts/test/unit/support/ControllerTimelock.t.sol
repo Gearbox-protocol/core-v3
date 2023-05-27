@@ -6,7 +6,6 @@ pragma solidity ^0.8.17;
 import {ControllerTimelock} from "../../../support/risk-controller/ControllerTimelock.sol";
 import {Policy} from "../../../support/risk-controller/PolicyManager.sol";
 import {GeneralMock} from "../../mocks/GeneralMock.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import {ICreditFacade} from "../../../interfaces/ICreditFacade.sol";
@@ -18,7 +17,6 @@ import {IControllerTimelockEvents, IControllerTimelockErrors} from "../../../int
 
 // TEST
 import "../../lib/constants.sol";
-import {Test} from "forge-std/Test.sol";
 
 // MOCKS
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";

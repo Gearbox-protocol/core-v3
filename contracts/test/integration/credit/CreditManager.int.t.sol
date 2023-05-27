@@ -38,7 +38,6 @@ import "../../lib/constants.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 
 // EXCEPTIONS
-import {TokenAlreadyAddedException} from "../../../interfaces/IExceptions.sol";
 
 // MOCKS
 import {PriceFeedMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/oracles/PriceFeedMock.sol";
@@ -58,9 +57,6 @@ import {CreditConfig} from "../../config/CreditConfig.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
-
-import {Test} from "forge-std/Test.sol";
-import "forge-std/console.sol";
 
 /// @title AddressRepository
 /// @notice Stores addresses of deployed contracts

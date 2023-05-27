@@ -3,20 +3,15 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {CollateralDebtData, CollateralTokenData} from "../interfaces/ICreditManagerV3.sol";
 import {IERC20Helper} from "./IERC20Helper.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
-import {SECONDS_PER_YEAR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+
 import "../interfaces/IExceptions.sol";
 
 import {BitMask} from "./BitMask.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+
 import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 
 uint256 constant INDEX_PRECISION = 10 ** 9;
-
-import "forge-std/console.sol";
 
 /// @title Credit Logic Library
 library BalancesLogic {
