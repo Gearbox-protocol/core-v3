@@ -12,7 +12,12 @@ import "../interfaces/IExceptions.sol";
 import {BitMask} from "./BitMask.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
+
+struct Balance {
+    address token;
+    uint256 tokenMask;
+    uint256 balance;
+}
 
 /// @title Balances logic library
 /// @notice Implements functions that used for before-and-after balance comparisons
@@ -63,17 +68,19 @@ library BalancesLogic {
         uint256 enabledTokensMask,
         uint256 forbiddenTokenMask,
         function (uint256) view returns (address) getTokenByMaskFn
-    ) internal view returns (uint256[] memory forbiddenBalances) {
+    ) internal view returns (Balance[] memory forbiddenBalances) {
         uint256 forbiddenTokensOnAccount = enabledTokensMask & forbiddenTokenMask;
 
         if (forbiddenTokensOnAccount != 0) {
-            forbiddenBalances = new uint256[](forbiddenTokensOnAccount.calcEnabledTokens());
+            forbiddenBalances = new Balance[](forbiddenTokensOnAccount.calcEnabledTokens());
             unchecked {
                 uint256 i;
                 for (uint256 tokenMask = 1; tokenMask < forbiddenTokensOnAccount; tokenMask <<= 1) {
                     if (forbiddenTokensOnAccount & tokenMask != 0) {
                         address token = getTokenByMaskFn(tokenMask);
-                        forbiddenBalances[i] = IERC20Helper.balanceOf(token, creditAccount);
+                        forbiddenBalances[i].token = token;
+                        forbiddenBalances[i].tokenMask = tokenMask;
+                        forbiddenBalances[i].balance = IERC20Helper.balanceOf(token, creditAccount);
                         ++i;
                     }
                 }
@@ -88,14 +95,12 @@ library BalancesLogic {
     /// @param enabledTokensMaskAfter Mask of enabled tokens on the account after operations
     /// @param forbiddenBalances Array of balances of forbidden tokens (received from `storeForbiddenBalances`)
     /// @param forbiddenTokenMask Mask of forbidden tokens
-    /// @param getTokenByMaskFn A function that returns the token's address by its mask
     function checkForbiddenBalances(
         address creditAccount,
         uint256 enabledTokensMaskBefore,
         uint256 enabledTokensMaskAfter,
-        uint256[] memory forbiddenBalances,
-        uint256 forbiddenTokenMask,
-        function (uint256) view returns (address) getTokenByMaskFn
+        Balance[] memory forbiddenBalances,
+        uint256 forbiddenTokenMask
     ) internal view {
         uint256 forbiddenTokensOnAccount = enabledTokensMaskAfter & forbiddenTokenMask;
         if (forbiddenTokensOnAccount == 0) return;
@@ -105,23 +110,15 @@ library BalancesLogic {
         uint256 forbiddenTokensOnAccountBefore = enabledTokensMaskBefore & forbiddenTokenMask;
         if (forbiddenTokensOnAccount & ~forbiddenTokensOnAccountBefore != 0) revert ForbiddenTokensException();
 
+        /// Then, the function checks that any remaining forbidden tokens didn't have their balances increased
         unchecked {
-            uint256 i;
-            for (uint256 tokenMask = 1; tokenMask < forbiddenTokensOnAccountBefore; tokenMask <<= 1) {
-                if (forbiddenTokensOnAccountBefore & tokenMask != 0) {
-                    if (forbiddenTokensOnAccount & tokenMask != 0) {
-                        address token = getTokenByMaskFn(tokenMask);
-                        uint256 balance = IERC20Helper.balanceOf(token, creditAccount);
-                        if (balance > forbiddenBalances[i]) {
-                            revert ForbiddenTokensException();
-                        }
+            uint256 len = forbiddenBalances.length;
+            for (uint256 i = 0; i < len; ++i) {
+                if (forbiddenTokensOnAccount & forbiddenBalances[i].tokenMask != 0) {
+                    uint256 currentBalance = IERC20Helper.balanceOf(forbiddenBalances[i].token, creditAccount);
+                    if (currentBalance > forbiddenBalances[i].balance) {
+                        revert ForbiddenTokensException();
                     }
-
-                    /// Since the forbidden token balances were stored in the array
-                    /// in the order of forbidden tokens on the account before operations,
-                    /// the balances array index has to be incremented regardless of whether a token
-                    /// is enabled after
-                    ++i;
                 }
             }
         }

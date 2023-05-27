@@ -46,7 +46,7 @@ import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // DATA
 import {MultiCall, MultiCallOps} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
-import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
+import {Balance} from "../../../libraries/BalancesLogic.sol";
 import {CreditFacadeMulticaller, CreditFacadeCalls} from "../../../multicall/CreditFacadeCalls.sol";
 
 // CONSTANTS
@@ -1209,7 +1209,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
             /// case 2: no reverty because expect 1 and it mints 1 duyring the call
             /// case 3: reverts because called twice
 
-            expectedBalance[0] = Balance({token: link, balance: testCase > 0 ? 1 : 0});
+            expectedBalance[0] = Balance({token: link, balance: testCase > 0 ? 1 : 0, tokenMask: 0});
 
             MultiCall[] memory calls = MultiCallBuilder.build(
                 MultiCall({
