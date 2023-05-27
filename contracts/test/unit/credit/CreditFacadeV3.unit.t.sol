@@ -989,9 +989,10 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
 
     //
     //
-    // Multicall
+    // MULTICALL
     //
     //
+
     /// @dev U:[FA-18]: multicall execute calls and call fullCollateralCheck
     function test_U_FA_18_multicall_and_botMulticall_execute_calls_and_call_fullCollateralCheck()
         public
@@ -1074,15 +1075,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
 
         /// Case: it works for bot multicall
         creditFacade.botMulticall(creditAccount, calls);
-    }
-
-    function _fullCheckParams() internal returns (FullCheckParams memory fullCheckParams) {
-        fullCheckParams.minHealthFactor = PERCENTAGE_FACTOR;
-    }
-
-    function _fullCheckParams(uint256 enabledTokensMask) internal returns (FullCheckParams memory fullCheckParams) {
-        fullCheckParams.minHealthFactor = PERCENTAGE_FACTOR;
-        fullCheckParams.enabledTokensMaskAfter = enabledTokensMask;
     }
 
     struct MultiCallPermissionTestCase {
@@ -1796,5 +1788,100 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
             enabledTokensMask: 0,
             flags: PAY_BOT_CAN_BE_CALLED
         });
+    }
+
+    struct ExternalCallTestCase {
+        string name;
+        uint256 quotedTokensMask;
+        uint256 tokenMaskBefore;
+        uint256 expectedTokensMaskAfter;
+    }
+
+    /// @dev U:[FA-38]: multicall external calls works properly
+    function test_U_FA_38_multicall_external_calls_properly() public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+
+        creditManagerMock.setBorrower(USER);
+
+        address adapter = address(new AdapterMock(address(creditManagerMock), DUMB_ADDRESS));
+
+        creditManagerMock.setContractAllowance({adapter: adapter, targetContract: DUMB_ADDRESS});
+
+        uint256 tokensToEnable = 1 << 4;
+        uint256 tokensToDisable = 1 << 7;
+
+        ExternalCallTestCase[3] memory cases = [
+            ExternalCallTestCase({
+                name: "not in quoted mask",
+                quotedTokensMask: 0,
+                tokenMaskBefore: UNDERLYING_TOKEN_MASK | tokensToDisable,
+                expectedTokensMaskAfter: UNDERLYING_TOKEN_MASK | tokensToEnable
+            }),
+            ExternalCallTestCase({
+                name: "in quoted mask, mask is tokensToEnable",
+                quotedTokensMask: tokensToEnable,
+                tokenMaskBefore: UNDERLYING_TOKEN_MASK | tokensToDisable,
+                expectedTokensMaskAfter: UNDERLYING_TOKEN_MASK
+            }),
+            ExternalCallTestCase({
+                name: "in quoted mask, mask is tokensToDisable",
+                quotedTokensMask: tokensToDisable,
+                tokenMaskBefore: UNDERLYING_TOKEN_MASK | tokensToDisable,
+                expectedTokensMaskAfter: UNDERLYING_TOKEN_MASK | tokensToEnable | tokensToDisable
+            })
+        ];
+
+        uint256 len = cases.length;
+
+        for (uint256 testCase = 0; testCase < len; ++testCase) {
+            uint256 snapshot = vm.snapshot();
+
+            ExternalCallTestCase memory _case = cases[testCase];
+
+            caseName = string.concat(caseName, _case.name);
+            creditManagerMock.setQuotedTokensMask(_case.quotedTokensMask);
+
+            vm.expectCall(adapter, abi.encodeCall(AdapterMock.dumbCall, (tokensToEnable, tokensToDisable)));
+
+            vm.expectCall(
+                address(creditManagerMock), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount))
+            );
+
+            vm.expectCall(
+                address(creditManagerMock), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (address(1)))
+            );
+
+            FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
+                creditAccount: creditAccount,
+                calls: MultiCallBuilder.build(
+                    MultiCall({
+                        target: adapter,
+                        callData: abi.encodeCall(AdapterMock.dumbCall, (tokensToEnable, tokensToDisable))
+                    })
+                    ),
+                enabledTokensMask: _case.tokenMaskBefore,
+                flags: EXTERNAL_CALLS_PERMISSION
+            });
+
+            assertEq(
+                fullCheckParams.enabledTokensMaskAfter,
+                _case.expectedTokensMaskAfter,
+                _testCaseErr("Incorrect enabledTokenMask")
+            );
+
+            vm.revertTo(snapshot);
+        }
+    }
+
+    /// @dev U:[FA-39]:  revertIfNoPermission calls works properly
+    function test_U_FA_39_revertIfNoPermission_calls_properly(uint256 mask) public notExpirableCase {
+        uint8 index = uint8(getHash(mask, 1));
+        uint256 permission = 1 << index;
+
+        creditFacade.revertIfNoPermission(mask | permission, permission);
+
+        vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, permission));
+
+        creditFacade.revertIfNoPermission(mask & ~(permission), permission);
     }
 }

@@ -14,6 +14,6 @@
   "files.eol": "\n",
   "solidity.packageDefaultDependenciesContractsDirectory": "contracts",
   "solidity.packageDefaultDependenciesDirectory": "node_modules",
-  "solidity.compileUsingRemoteVersion": "",
+  "solidity.compileUsingRemoteVersion": "v0.8.17",
   "solidity.formatter": "forge"
 }

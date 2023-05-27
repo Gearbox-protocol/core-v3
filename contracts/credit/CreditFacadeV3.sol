@@ -794,21 +794,21 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     /// After the multicall, the value is set back to address(1)
                     if (flags & EXTERNAL_CONTRACT_WAS_CALLED == 0) {
                         flags = flags.enable(EXTERNAL_CONTRACT_WAS_CALLED);
-                        _setActiveCreditAccount(creditAccount);
+                        _setActiveCreditAccount(creditAccount); // U:[FA-38]
                     }
 
                     /// Performs an adapter call. Each external adapter function returns
                     /// the masks of tokens to enable and disable, which are applied to the mask
                     /// on the stack; the net change in the enabled token set is saved to storage
                     /// only in fullCollateralCheck at the end of the multicall
-                    bytes memory result = mcall.target.functionCall(mcall.callData);
+                    bytes memory result = mcall.target.functionCall(mcall.callData); // U:[FA-38]
 
-                    (uint256 tokensToEnable, uint256 tokensToDisable) = abi.decode(result, (uint256, uint256));
+                    (uint256 tokensToEnable, uint256 tokensToDisable) = abi.decode(result, (uint256, uint256)); // U:[FA-38]
                     enabledTokensMask = enabledTokensMask.enableDisable({
                         bitsToEnable: tokensToEnable,
                         bitsToDisable: tokensToDisable,
                         invertedSkipMask: quotedTokensMaskInverted
-                    });
+                    }); // U:[FA-38]
                 }
             }
         }
@@ -827,7 +827,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
         /// If the `externalCallCreditAccount` value was set to the current CA, it must be reset
         if (flags & EXTERNAL_CONTRACT_WAS_CALLED != 0) {
-            _unsetActiveCreditAccount();
+            _unsetActiveCreditAccount(); // U:[FA-38]
         }
 
         /// Emits event for multicall end - used in analytics to track actions within multicalls
@@ -835,7 +835,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
 
         /// Saves the final enabledTokensMask to be later passed into the fullCollateralCheck,
         /// where it will be saved to storage
-        fullCheckParams.enabledTokensMaskAfter = enabledTokensMask;
+        fullCheckParams.enabledTokensMaskAfter = enabledTokensMask; // U:[FA-38]
     }
 
     /// @notice Sets the `activeCreditAccount` in Credit Manager
@@ -856,7 +856,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @param permission The flag of the permission to check
     function _revertIfNoPermission(uint256 flags, uint256 permission) internal pure {
         if (flags & permission == 0) {
-            revert NoPermissionException(permission);
+            revert NoPermissionException(permission); // F:[FA-39]
         }
     }
 
@@ -1063,7 +1063,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     /// @notice Checks that the per-block borrow limit was not violated and updates the
     /// amount borrowed in current block
     function _revertIfOutOfBorrowingLimit(uint256 amount) internal {
-        uint8 _maxDebtPerBlockMultiplier = maxDebtPerBlockMultiplier; // F:[FA-18]\
+        uint8 _maxDebtPerBlockMultiplier = maxDebtPerBlockMultiplier; // F:[FA-18]
 
         if (_maxDebtPerBlockMultiplier == 0) {
             revert BorrowedBlockLimitException();

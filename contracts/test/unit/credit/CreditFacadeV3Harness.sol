@@ -26,4 +26,8 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
     {
         return _multicall(creditAccount, calls, enabledTokensMask, flags);
     }
+
+    function revertIfNoPermission(uint256 flags, uint256 permission) external pure {
+        _revertIfNoPermission(flags, permission);
+    }
 }
