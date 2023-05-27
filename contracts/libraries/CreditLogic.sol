@@ -225,7 +225,6 @@ library CreditLogic {
     /// @param feeInterest Fee on accrued interest charged by the DAO
     /// @return newDebt Debt principal after repayment
     /// @return newCumulativeIndex The new recorded interest index of the Credit Account
-    /// @return amountToRepay Amount going towards principal repayment
     /// @return profit Amount going towards DAO fees
     /// @return newCumulativeQuotaInterest Quota interest of the Credit Account after repayment
     function calcDecrease(
@@ -238,15 +237,9 @@ library CreditLogic {
     )
         internal
         pure
-        returns (
-            uint256 newDebt,
-            uint256 newCumulativeIndex,
-            uint256 amountToRepay,
-            uint256 profit,
-            uint256 newCumulativeQuotaInterest
-        )
+        returns (uint256 newDebt, uint256 newCumulativeIndex, uint256 profit, uint256 newCumulativeQuotaInterest)
     {
-        amountToRepay = amount;
+        uint256 amountToRepay = amount;
 
         /// The debt is repaid in the order of: quota interest -> base interest -> debt
         /// I.e., if the repayment amount only partially covers quota interest, then that will be

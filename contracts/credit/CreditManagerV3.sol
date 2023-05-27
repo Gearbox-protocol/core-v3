@@ -481,8 +481,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 uint256 amountToRepay;
                 uint256 profit;
 
-                (newDebt, newCumulativeIndex, amountToRepay, profit, newCumulativeQuotaInterest) = CreditLogic
-                    .calcDecrease({
+                (newDebt, newCumulativeIndex, profit, newCumulativeQuotaInterest) = CreditLogic.calcDecrease({
                     amount: _amountMinusFee(amount),
                     debt: collateralDebtData.debt,
                     cumulativeIndexNow: collateralDebtData.cumulativeIndexNow,
@@ -491,8 +490,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     feeInterest: feeInterest
                 }); // U:[CM-11]
 
-                /// @dev amountToRepay is whatever is left after repaying quota and base interest + fees
-                _poolRepayCreditAccount(amountToRepay, profit, 0); // U:[CM-11]
+                /// @dev The amount of principal repaid is what is left after repaying all interest and fees
+                ///      and is the difference between newDebt and debt
+                _poolRepayCreditAccount(collateralDebtData.debt - newDebt, profit, 0); // U:[CM-11]
             }
 
             /// If quota logic is supported, we need to accrue quota interest in order to keep
