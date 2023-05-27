@@ -40,7 +40,7 @@ import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPr
 import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
 
 // CONSTANTS
-
+import "forge-std/console.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 import {
     DEFAULT_FEE_INTEREST,
@@ -113,6 +113,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// The liquidator takes the difference between the discounted and actual values as premium.
     uint16 internal liquidationDiscount;
 
+    /// @notice Total number of known collateral tokens.
+    uint8 public collateralTokensCount;
+
     /// @notice Liquidation fee charged by the protocol during liquidation by expiry. Typically lower than feeLiquidation.
     uint16 internal feeLiquidationExpired;
 
@@ -127,9 +130,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// CreditFacade is a trusted source, so it generally sends the CA as an input for account management functions
     /// _activeCreditAccount is used to avoid adapters having to manually pass the Credit Account
     address internal _activeCreditAccount;
-
-    /// @notice Total number of known collateral tokens.
-    uint8 public collateralTokensCount;
 
     /// @notice Mask of tokens to apply quota logic for
     uint256 public override quotedTokensMask;
@@ -254,6 +254,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         creditAccountInfo[creditAccount].debt = debt; // U:[CM-6]
         creditAccountInfo[creditAccount].cumulativeIndexLastUpdate = _poolCumulativeIndexNow(); // U:[CM-6]
+        creditAccountInfo[creditAccount].since = uint64(block.number); // U:[CM-6]
         creditAccountInfo[creditAccount].flags = 0; // U:[CM-6]
         creditAccountInfo[creditAccount].borrower = onBehalfOf; // U:[CM-6]
 
@@ -311,6 +312,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         // Checks that the Credit Account exists for the borrower
         address borrower = getBorrowerOrRevert(creditAccount); // U:[CM-7]
+
+        if (creditAccountInfo[creditAccount].since == block.number) revert OpenCloseAccountInOneBlockException();
 
         // Sets borrower's Credit Account to zero address
         delete creditAccountInfo[creditAccount].borrower; // U:[CM-8]
@@ -747,6 +750,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) {
             revert IncorrectParameterException(); // U:[CM-19]
         }
+
+        console.log(enabledTokensMaskOf(creditAccount));
 
         collateralDebtData = _calcDebtAndCollateral({
             creditAccount: creditAccount,
@@ -1244,12 +1249,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         if (borrower == address(0)) revert CreditAccountNotExistsException(); // U:[CM-35]
     }
 
-    /// @notice Returns the mask containing the account's enabled tokens
-    /// @param creditAccount Credit Account to get the mask for
-    function enabledTokensMaskOf(address creditAccount) public view override returns (uint256) {
-        return creditAccountInfo[creditAccount].enabledTokensMask; // U:[CM-35]
-    }
-
     /// @notice Returns the mask containing miscellaneous account flags
     /// @dev Currently, the following flags are supported:
     ///      * 1 - WITHDRAWALS_FLAG - whether the account has pending withdrawals
@@ -1291,12 +1290,27 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         return creditAccountInfo[creditAccount].flags & WITHDRAWAL_FLAG != 0; // U:[CM-36]
     }
 
+    /// @notice Returns the mask containing the account's enabled tokens
+    /// @param creditAccount Credit Account to get the mask for
+    function enabledTokensMaskOf(address creditAccount) public view override returns (uint256) {
+        if (collateralTokensCount <= 80) {
+            return creditAccountInfo[creditAccount].enabledTokensMask; // U:[CM-37]
+        } // U:[CM-35]
+        else {
+            return (uint256(creditAccountInfo[creditAccount].extraEnabledTokensMask) << 80)
+                | creditAccountInfo[creditAccount].enabledTokensMask; // U:[CM-37]
+        }
+    }
+
     /// @notice Checks quantity of enabled tokens and saves the mask to creditAccountInfo
     function _saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) internal {
         if (enabledTokensMask.calcEnabledTokens() > maxEnabledTokens) {
             revert TooManyEnabledTokensException(); // U:[CM-37]
         }
-        creditAccountInfo[creditAccount].enabledTokensMask = enabledTokensMask; // U:[CM-37]
+        creditAccountInfo[creditAccount].enabledTokensMask = uint80(enabledTokensMask & type(uint80).max); // U:[CM-37]
+        if (collateralTokensCount > 80) {
+            creditAccountInfo[creditAccount].extraEnabledTokensMask = uint176(enabledTokensMask >> 80); // U:[CM-37]
+        }
     }
 
     ///

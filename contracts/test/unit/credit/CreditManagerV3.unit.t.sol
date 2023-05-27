@@ -71,6 +71,8 @@ import {TestHelper, Vars, VarU256} from "../../lib/helper.sol";
 
 uint16 constant LT_UNDERLYING = uint16(PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM - DEFAULT_FEE_LIQUIDATION);
 
+import "forge-std/console.sol";
+
 contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceHelper, CreditAccountMockEvents {
     using BitMask for uint256;
     using CreditLogic for CollateralTokenData;
@@ -535,6 +537,10 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     /// @dev U:[CM-6]: open credit account works as expected
     function test_U_CM_06_open_credit_account_works_as_expected() public allQuotaCases {
         uint256 cumulativeIndexNow = RAY * 5;
+
+        vm.roll(892323);
+        creditManager.setCollateralTokensCount(255);
+
         poolMock.setCumulativeIndexNow(cumulativeIndexNow);
 
         tokenTestSuite.mint(Tokens.DAI, address(poolMock), DAI_ACCOUNT_AMOUNT);
@@ -565,7 +571,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             uint256 debt,
             uint256 cumulativeIndexLastUpdate,
             uint256 cumulativeQuotaInterest,
-            uint256 enabledTokensMask,
+            uint64 since,
+            ,
+            ,
             uint16 flags,
             address borrower
         ) = creditManager.creditAccountInfo(creditAccount);
@@ -577,7 +585,14 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             supportsQuotas ? 1 : cumulativeQuotaInterestBefore,
             _testCaseErr("Incorrect cumulativeQuotaInterest")
         );
-        assertEq(enabledTokensMask, enabledTokensMaskBefore, _testCaseErr("Incorrect enabledTokensMask"));
+        assertEq(
+            creditManager.enabledTokensMaskOf(creditAccount),
+            enabledTokensMaskBefore,
+            _testCaseErr("Incorrect enabledTokensMask")
+        );
+
+        assertEq(since, block.number, _testCaseErr("Incorrect since"));
+
         assertEq(flags, 0, _testCaseErr("Incorrect flags"));
         assertEq(borrower, USER, _testCaseErr("Incorrect borrower"));
 
@@ -599,10 +614,28 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     /// @dev U:[CM-7]: close credit account reverts if account not exists
     function test_U_CM_07_close_credit_account_reverts_if_account_not_exists() public allQuotaCases {
         CollateralDebtData memory collateralDebtData;
+        address creditAccount = DUMB_ADDRESS;
 
         vm.expectRevert(CreditAccountNotExistsException.selector);
         creditManager.closeCreditAccount({
-            creditAccount: USER,
+            creditAccount: creditAccount,
+            closureAction: ClosureAction.CLOSE_ACCOUNT,
+            collateralDebtData: collateralDebtData,
+            payer: DUMB_ADDRESS,
+            to: DUMB_ADDRESS,
+            skipTokensMask: 0,
+            convertToETH: false
+        });
+
+        uint64 newBlock = 12312312;
+
+        vm.roll(newBlock);
+        creditManager.setSince(creditAccount, newBlock);
+        creditManager.setBorrower(creditAccount, USER);
+
+        vm.expectRevert(OpenCloseAccountInOneBlockException.selector);
+        creditManager.closeCreditAccount({
+            creditAccount: creditAccount,
             closureAction: ClosureAction.CLOSE_ACCOUNT,
             collateralDebtData: collateralDebtData,
             payer: DUMB_ADDRESS,
@@ -865,7 +898,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 reason: "Pool balance invariant"
             });
 
-            (,,,,, address borrower) = creditManager.creditAccountInfo(creditAccount);
+            (,,,,,,, address borrower) = creditManager.creditAccountInfo(creditAccount);
             assertEq(borrower, address(0), "Borrowers wasn't cleared");
 
             assertEq(
@@ -1043,7 +1076,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         /// @notice checking creditAccountInf update
 
-        (uint256 debt, uint256 cumulativeIndexLastUpdate,,,,) = creditManager.creditAccountInfo(creditAccount);
+        (uint256 debt, uint256 cumulativeIndexLastUpdate,,,,,,) = creditManager.creditAccountInfo(creditAccount);
 
         assertEq(debt, expectedNewDebt, _testCaseErr("Incorrect debt update in creditAccountInfo"));
         assertEq(
@@ -1167,7 +1200,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         /// @notice checking creditAccountInf update
         {
-            (uint256 debt, uint256 cumulativeIndexLastUpdate, uint256 cumulativeQuotaInterest,,,) =
+            (uint256 debt, uint256 cumulativeIndexLastUpdate, uint256 cumulativeQuotaInterest,,,,,) =
                 creditManager.creditAccountInfo(creditAccount);
 
             assertEq(debt, expectedNewDebt, _testCaseErr("Incorrect debt update in creditAccountInfo"));
@@ -1244,7 +1277,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             );
             assertEq(tokensToDisable, 0, _testCaseErr("Incorrect tokensToDisable"));
 
-            (uint256 caiDebt, uint256 caiCumulativeIndexLastUpdate, uint256 caiCumulativeQuotaInterest,,,) =
+            (uint256 caiDebt, uint256 caiCumulativeIndexLastUpdate, uint256 caiCumulativeQuotaInterest,,,,,) =
                 creditManager.creditAccountInfo(creditAccount);
 
             assertEq(newDebt, debt, _testCaseErr("Incorrect debt update in creditAccountInfo"));
@@ -1474,6 +1507,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             borrower: USER
         });
 
+        console.log(enabledTokensMask);
+
         CollateralDebtData memory collateralDebtData =
             creditManager.calcDebtAndCollateralFC(creditAccount, CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS);
 
@@ -1534,7 +1569,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             minHealthFactor: PERCENTAGE_FACTOR
         });
 
-        (,,, uint256 enabledTokensMaskAfter,,) = creditManager.creditAccountInfo(creditAccount);
+        uint256 enabledTokensMaskAfter = creditManager.enabledTokensMaskOf(creditAccount);
 
         assertEq(enabledTokensMaskAfter, enabledTokenMaskWithDisableTokens, "enabledTokensMask wasn't set correctly");
     }
@@ -2161,7 +2196,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 quotaChange: 122
             });
 
-            (,, uint256 cumulativeQuotaInterest,,,) = creditManager.creditAccountInfo(creditAccount);
+            (,, uint256 cumulativeQuotaInterest,,,,,) = creditManager.creditAccountInfo(creditAccount);
 
             assertEq(tokensToEnable, expectedTokensToEnable, _testCaseErr("Incorrect tokensToEnable"));
             assertEq(tokensToDisable, expectedTokensToDisable, _testCaseErr("Incorrect tokensToDisable"));
@@ -2655,6 +2690,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     /// @dev U:[CM-37]: saveEnabledTokensMask works correctly
     function test_U_CM_37_saveEnabledTokensMask_correctly(uint256 mask) public withoutSupportQuotas {
         address creditAccount = DUMB_ADDRESS;
+
+        creditManager.setCollateralTokensCount(255);
+
         creditManager.setCreditAccountInfoMap({
             creditAccount: creditAccount,
             debt: 0,
@@ -2675,7 +2713,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             creditManager.saveEnabledTokensMask(creditAccount, mask);
         } else {
             creditManager.saveEnabledTokensMask(creditAccount, mask);
-            (,,, uint256 enabledTokensMask,,) = creditManager.creditAccountInfo(creditAccount);
+            uint256 enabledTokensMask = creditManager.enabledTokensMaskOf(creditAccount);
             assertEq(enabledTokensMask, mask);
         }
     }

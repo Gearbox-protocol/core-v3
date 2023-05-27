@@ -35,6 +35,10 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         creditAccountInfo[creditAccount].borrower = borrower;
     }
 
+    function setSince(address creditAccount, uint64 since) external {
+        creditAccountInfo[creditAccount].since = since;
+    }
+
     function setDebt(address creditAccount, uint256 debt) external {
         creditAccountInfo[creditAccount].debt = debt;
     }
@@ -51,7 +55,8 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         creditAccountInfo[creditAccount].debt = debt;
         creditAccountInfo[creditAccount].cumulativeIndexLastUpdate = cumulativeIndexLastUpdate;
         creditAccountInfo[creditAccount].cumulativeQuotaInterest = cumulativeQuotaInterest;
-        creditAccountInfo[creditAccount].enabledTokensMask = enabledTokensMask;
+        creditAccountInfo[creditAccount].enabledTokensMask = uint80(enabledTokensMask & type(uint80).max);
+        creditAccountInfo[creditAccount].extraEnabledTokensMask = uint176(enabledTokensMask >> 80);
         creditAccountInfo[creditAccount].flags = flags;
         creditAccountInfo[creditAccount].borrower = borrower;
     }
@@ -125,5 +130,9 @@ contract CreditManagerV3Harness is CreditManagerV3 {
 
     function getCollateralTokensData(uint256 tokenMask) external view returns (CollateralTokenData memory) {
         return collateralTokensData[tokenMask];
+    }
+
+    function setCollateralTokensCount(uint8 _collateralTokensCount) external {
+        collateralTokensCount = _collateralTokensCount;
     }
 }
