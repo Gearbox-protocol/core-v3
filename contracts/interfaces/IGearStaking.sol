@@ -18,7 +18,7 @@ struct UserVoteLockData {
 
 struct WithdrawalData {
     uint96[4] withdrawalsPerEpoch;
-    uint16 epochLU;
+    uint16 epochLastUpdate;
 }
 
 struct MultiVote {

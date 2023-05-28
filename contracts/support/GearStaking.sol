@@ -75,12 +75,12 @@ contract GearStaking is ACLNonReentrantTrait, IGearStaking {
 
         WithdrawalData memory wd = withdrawalData[user];
 
-        if (epochNow > wd.epochLU) {
+        if (epochNow > wd.epochLastUpdate) {
             if (
                 wd.withdrawalsPerEpoch[0] + wd.withdrawalsPerEpoch[1] + wd.withdrawalsPerEpoch[2]
                     + wd.withdrawalsPerEpoch[3] > 0
             ) {
-                uint16 epochDiff = epochNow - wd.epochLU;
+                uint16 epochDiff = epochNow - wd.epochLastUpdate;
 
                 for (uint256 i = 0; i < 4;) {
                     if (i < epochDiff) {
@@ -187,17 +187,17 @@ contract GearStaking is ACLNonReentrantTrait, IGearStaking {
 
         WithdrawalData memory wd = withdrawalData[user];
 
-        if (epochNow > wd.epochLU) {
+        if (epochNow > wd.epochLastUpdate) {
             if (
                 wd.withdrawalsPerEpoch[0] + wd.withdrawalsPerEpoch[1] + wd.withdrawalsPerEpoch[2]
                     + wd.withdrawalsPerEpoch[3] > 0
             ) {
-                uint16 epochDiff = epochNow - wd.epochLU;
+                uint16 epochDiff = epochNow - wd.epochLastUpdate;
                 uint256 totalClaimable = 0;
 
                 // Epochs one, two, three and four in the struct are always relative
-                // to epochLU, so the amounts are "shifted" by the number of epochs that passed
-                // since epochLU, on each update. If some amount shifts beyond epoch one, it is mature,
+                // to epochLastUpdate, so the amounts are "shifted" by the number of epochs that passed
+                // since epochLastUpdate, on each update. If some amount shifts beyond epoch one, it is mature,
                 // so GEAR is sent to the user.
 
                 for (uint256 i = 0; i < 4;) {
@@ -224,7 +224,7 @@ contract GearStaking is ACLNonReentrantTrait, IGearStaking {
                 voteLockData[user].totalStaked -= totalClaimable.toUint96();
             }
 
-            wd.epochLU = epochNow;
+            wd.epochLastUpdate = epochNow;
             withdrawalData[user] = wd;
         }
     }

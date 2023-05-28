@@ -19,7 +19,7 @@ import {IGearStaking} from "../interfaces/IGearStaking.sol";
 import {PoolV3} from "./PoolV3.sol";
 
 // EXCEPTIONS
-import "../interfaces/IExceptions.sol";
+import {CallerNotVoterException} from "../interfaces/IExceptions.sol";
 
 /// @title Gauge for quota interest rates
 /// @dev Quota interest rates in Gearbox V3 are determined
@@ -47,7 +47,7 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
     IGearStaking public voter;
 
     /// @notice Epoch when the rates were last recomputed
-    uint16 public epochLU;
+    uint16 public epochLastUpdate;
 
     /// @notice Contract version
     uint256 public constant version = 3_00;
@@ -67,7 +67,7 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
         addressProvider = address(PoolV3(_pool).addressProvider()); // F:[P4-01]
         pool = PoolV3(_pool); // F:[P4-01]
         voter = IGearStaking(_gearStaking);
-        epochLU = voter.getCurrentEpoch();
+        epochLastUpdate = voter.getCurrentEpoch();
     }
 
     /// @dev Reverts if the function is called by an address other than the voter
@@ -86,8 +86,8 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
     /// @dev IMPLEMENTATION: updateEpoch()
     function _checkAndUpdateEpoch() internal {
         uint16 epochNow = voter.getCurrentEpoch();
-        if (epochNow > epochLU) {
-            epochLU = epochNow;
+        if (epochNow > epochLastUpdate) {
+            epochLastUpdate = epochNow;
 
             /// The PQK retrieves all rates from the Gauge on its own and saves them
             /// Since this function is only callable by the Gauge, active rates can only
