@@ -17,7 +17,6 @@ import {ICreditManagerV3, ICreditManagerV3Events} from "../../interfaces/ICredit
 import {CreditFacadeTestSuite} from "../suites/CreditFacadeTestSuite.sol";
 // import { TokensTestSuite, Tokens } from "../suites/TokensTestSuite.sol";
 import {LEVERAGE_DECIMALS} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-import "../lib/constants.sol";
 
 import {TestHelper} from "../lib/helper.sol";
 

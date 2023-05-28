@@ -4,7 +4,6 @@
 pragma solidity ^0.8.17;
 
 import {IPoolQuotaKeeper, TokenQuotaParams, AccountQuota} from "../../../interfaces/IPoolQuotaKeeper.sol";
-import "forge-std/console.sol";
 
 contract PoolQuotaKeeperMock is IPoolQuotaKeeper {
     uint256 public constant override version = 3_00;
@@ -52,9 +51,10 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeper {
         underlying = _underlying;
     }
 
-    function updateQuota(address creditAccount, address token, int96 quotaChange)
+    function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota)
         external
         view
+
         returns (uint256 caQuotaInterestChange, int96 realQuotaChange, bool enableToken, bool disableToken)
     {
         caQuotaInterestChange = return_caQuotaInterestChange;

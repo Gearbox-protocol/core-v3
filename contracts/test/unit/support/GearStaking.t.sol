@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 import {GearStaking} from "../../../support/GearStaking.sol";
 import {IGearStakingEvents, MultiVote, VotingContractStatus} from "../../../interfaces/IGearStaking.sol";
 import {IVotingContract} from "../../../interfaces/IVotingContract.sol";
-import {CallerNotConfiguratorException} from "../../../interfaces/IExceptions.sol";
+
 import "../../../interfaces/IAddressProviderV3.sol";
 
 // TEST
@@ -14,7 +14,7 @@ import "../../lib/constants.sol";
 
 // MOCKS
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
-import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
+
 import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
 
 // SUITES
@@ -23,9 +23,6 @@ import {Tokens} from "../../config/Tokens.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
-
-import {Test} from "forge-std/Test.sol";
-import "forge-std/console.sol";
 
 uint256 constant EPOCH_LENGTH = 7 days;
 

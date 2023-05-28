@@ -3,8 +3,6 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {IPoolQuotaKeeper} from "./IPoolQuotaKeeper.sol";
 import {ClaimAction, IWithdrawalManager} from "./IWithdrawalManager.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
@@ -28,6 +26,7 @@ struct CreditAccountInfo {
     uint256 cumulativeQuotaInterest;
     uint256 enabledTokensMask;
     uint16 flags;
+    uint64 since;
     address borrower;
 }
 
@@ -75,9 +74,6 @@ struct RevocationPair {
 }
 
 interface ICreditManagerV3Events {
-    /// @dev Emits when a call to an external contract is made through the Credit Manager
-    event Execute(address indexed targetContract);
-
     /// @dev Emits when a configurator is upgraded
     event SetCreditConfigurator(address indexed newConfigurator);
 
@@ -95,7 +91,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     // CREDIT ACCOUNT MANAGEMENT
     //
 
-    ///  @dev Opens credit account and borrows funds from the pool.
+    /// @dev Opens credit account and borrows funds from the pool.
     /// @param debt Amount to be borrowed by the Credit Account
     /// @param onBehalfOf The owner of the newly opened Credit Account
     function openCreditAccount(uint256 debt, address onBehalfOf) external returns (address);
@@ -188,7 +184,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
         uint256 enabledTokensMaskBefore,
         uint256[] memory collateralHints,
         uint16 minHealthFactor
-    ) external;
+    ) external returns (uint256 updatedEnabledTokensMaskBefore);
 
     //
     // QUOTAS MANAGEMENT
@@ -196,8 +192,9 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
 
     /// @dev Updates credit account's quotas
     /// @param creditAccount Address of credit account
-    function updateQuota(address creditAccount, address token, int96 quotaChange)
+    function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota)
         external
+
         returns (int96 realQuotaChange, uint256 tokensToEnable, uint256 tokensToDisable);
 
     //

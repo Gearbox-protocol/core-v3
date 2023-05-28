@@ -10,7 +10,6 @@ import {CreditAccountMock} from "../credit/CreditAccountMock.sol";
 // EXCEPTIONS
 
 import {Test} from "forge-std/Test.sol";
-import "forge-std/console.sol";
 
 /// @title Disposable credit accounts factory
 contract AccountFactoryMock is Test, IAccountFactoryBase {

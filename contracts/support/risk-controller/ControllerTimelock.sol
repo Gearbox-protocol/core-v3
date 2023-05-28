@@ -8,7 +8,7 @@ import {PolicyManager} from "./PolicyManager.sol";
 import {IControllerTimelock, QueuedTransactionData} from "../../interfaces/IControllerTimelock.sol";
 
 import {ICreditManagerV3} from "../../interfaces/ICreditManagerV3.sol";
-import {ICreditConfigurator} from "../../interfaces/ICreditConfiguratorV3.sol";
+
 import {ICreditFacade} from "../../interfaces/ICreditFacade.sol";
 import {IPoolV3} from "../../interfaces/IPoolV3.sol";
 import {ILPPriceFeed} from "../../interfaces/ILPPriceFeed.sol";

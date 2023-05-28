@@ -4,7 +4,6 @@
 pragma solidity ^0.8.17;
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
-import {IPoolV3} from "./IPoolV3.sol";
 
 struct TokenQuotaParams {
     uint96 totalQuoted;
@@ -51,7 +50,7 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
     /// @param creditAccount Address of credit account
     /// @param token Address of the token to change the quota for
     /// @param quotaChange Requested quota change in pool's underlying asset units
-    function updateQuota(address creditAccount, address token, int96 quotaChange)
+    function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota)
         external
         returns (uint256 caQuotaInterestChange, int96 realQuotaChange, bool enableToken, bool disableToken);
 

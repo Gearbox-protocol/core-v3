@@ -5,9 +5,6 @@ pragma solidity ^0.8.17;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
-import {AbstractAdapter} from "../../../adapters/AbstractAdapter.sol";
-import {AdapterType} from "../../../interfaces/IAdapter.sol";
-
 contract AdapterCallMock {
     using Address for address;
 

@@ -22,11 +22,8 @@ import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contr
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 import {UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
 
-import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
-
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
+
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 import {CreditLogic} from "../../../libraries/CreditLogic.sol";
 
@@ -36,23 +33,19 @@ import "../../lib/constants.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 
 // MOCKS
-import {PriceFeedMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/oracles/PriceFeedMock.sol";
+
 import {PoolMock} from "../../mocks//pool/PoolMock.sol";
 import {PoolQuotaKeeper} from "../../../pool/PoolQuotaKeeper.sol";
-import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";
 import {CreditManagerTestSuite} from "../../suites/CreditManagerTestSuite.sol";
-import {CreditManagerV3Harness} from "../../unit/credit/CreditManagerV3Harness.sol";
 
 import {CreditConfig} from "../../config/CreditConfig.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
-
-import {Test} from "forge-std/Test.sol";
 
 contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper {
     using CreditLogic for CollateralDebtData;
@@ -162,7 +155,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         (,,, address creditAccount) = cms.openCreditAccount();
 
-        (,, uint256 cumulativeQuotaInterest,,,) = creditManager.creditAccountInfo(creditAccount);
+        (,, uint256 cumulativeQuotaInterest,,,,) = creditManager.creditAccountInfo(creditAccount);
 
         assertEq(cumulativeQuotaInterest, 1, "SETUP: Cumulative quota interest was not updated correctly");
 
@@ -170,13 +163,13 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
             address link = tokenTestSuite.addressOf(Tokens.LINK);
             vm.expectRevert(CallerNotCreditFacadeException.selector);
             vm.prank(FRIEND);
-            creditManager.updateQuota({creditAccount: creditAccount, token: link, quotaChange: 100_000});
+            creditManager.updateQuota({creditAccount: creditAccount, token: link, quotaChange: 100_000, minQuota: 0});
         }
 
         vm.expectCall(
             address(poolQuotaKeeper),
             abi.encodeCall(
-                IPoolQuotaKeeper.updateQuota, (creditAccount, tokenTestSuite.addressOf(Tokens.LINK), 100_000)
+                IPoolQuotaKeeper.updateQuota, (creditAccount, tokenTestSuite.addressOf(Tokens.LINK), 100_000, 0)
             )
         );
 
@@ -185,7 +178,8 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         (, uint256 tokensToEnable, uint256 tokensToDisable) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.LINK),
-            quotaChange: 100_000
+            quotaChange: 100_000,
+            minQuota: 0
         });
 
         assertEq(tokensToEnable, linkMask, "Incorrect tokensToEnble");
@@ -196,12 +190,13 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         (, tokensToEnable, tokensToDisable) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.LINK),
-            quotaChange: -100_000
+            quotaChange: -100_000,
+            minQuota: 0
         });
         assertEq(tokensToEnable, 0, "Incorrect tokensToEnable");
         assertEq(tokensToDisable, linkMask, "Incorrect tokensToDisable");
 
-        (,, cumulativeQuotaInterest,,,) = creditManager.creditAccountInfo(creditAccount);
+        (,, cumulativeQuotaInterest,,,,) = creditManager.creditAccountInfo(creditAccount);
 
         assertEq(
             cumulativeQuotaInterest,
@@ -212,7 +207,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         {
             address usdc = tokenTestSuite.addressOf(Tokens.USDC);
             vm.expectRevert(TokenIsNotQuotedException.selector);
-            creditManager.updateQuota({creditAccount: creditAccount, token: usdc, quotaChange: 100_000});
+            creditManager.updateQuota({creditAccount: creditAccount, token: usdc, quotaChange: 100_000, minQuota: 0});
         }
     }
 
@@ -229,7 +224,8 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         (, uint256 tokensToEnable,) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.LINK),
-            quotaChange: 100_000
+            quotaChange: 100_000,
+            minQuota: 0
         });
 
         enabledTokensMask |= tokensToEnable;
@@ -237,7 +233,8 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         (, tokensToEnable,) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.USDT),
-            quotaChange: 200_000
+            quotaChange: 200_000,
+            minQuota: 0
         });
 
         enabledTokensMask |= tokensToEnable;
@@ -282,7 +279,8 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         (, uint256 tokensToEnable,) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.LINK),
-            quotaChange: 100_000
+            quotaChange: 100_000,
+            minQuota: 0
         });
 
         enabledTokensMask |= tokensToEnable;
@@ -290,7 +288,8 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         (, tokensToEnable,) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.USDT),
-            quotaChange: 200_000
+            quotaChange: 200_000,
+            minQuota: 0
         });
 
         enabledTokensMask |= tokensToEnable;
@@ -332,14 +331,16 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         (, uint256 tokensToEnable,) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.LINK),
-            quotaChange: int96(uint96(100 * WAD))
+            quotaChange: int96(uint96(100 * WAD)),
+            minQuota: 0
         });
         enabledTokensMask |= tokensToEnable;
 
         (, tokensToEnable,) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.USDT),
-            quotaChange: int96(uint96(200 * WAD))
+            quotaChange: int96(uint96(200 * WAD)),
+            minQuota: 0
         });
         enabledTokensMask |= tokensToEnable;
 
@@ -408,14 +409,16 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         (, uint256 tokensToEnable,) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.LINK),
-            quotaChange: int96(quotaLink)
+            quotaChange: int96(quotaLink),
+            minQuota: 0
         });
         enabledTokensMask |= tokensToEnable;
 
         (, tokensToEnable,) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.USDT),
-            quotaChange: int96(quotaUsdt)
+            quotaChange: int96(quotaUsdt),
+            minQuota: 0
         });
         enabledTokensMask |= tokensToEnable;
 
@@ -460,14 +463,16 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         (, uint256 tokensToEnable,) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.LINK),
-            quotaChange: int96(uint96(100 * WAD))
+            quotaChange: int96(uint96(100 * WAD)),
+            minQuota: 0
         });
         enabledTokensMap |= tokensToEnable;
 
         (, tokensToEnable,) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.USDT),
-            quotaChange: int96(uint96(200 * WAD))
+            quotaChange: int96(uint96(200 * WAD)),
+            minQuota: 0
         });
         enabledTokensMap |= tokensToEnable;
 

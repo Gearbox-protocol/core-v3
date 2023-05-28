@@ -7,7 +7,6 @@ pragma solidity ^0.8.17;
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 // LIBS & TRAITS
 import {UNDERLYING_TOKEN_MASK, BitMask} from "../libraries/BitMask.sol";
@@ -39,10 +38,9 @@ import {
 import "../interfaces/IAddressProviderV3.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
 import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 // CONSTANTS
-import {RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import "forge-std/console.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 import {
     DEFAULT_FEE_INTEREST,
@@ -52,7 +50,6 @@ import {
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
-import "forge-std/console.sol";
 
 /// @title Credit Manager
 /// @dev Encapsulates the business logic for managing Credit Accounts
@@ -116,6 +113,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// The liquidator takes the difference between the discounted and actual values as premium.
     uint16 internal liquidationDiscount;
 
+    /// @notice Total number of known collateral tokens.
+    uint8 public collateralTokensCount;
+
     /// @notice Liquidation fee charged by the protocol during liquidation by expiry. Typically lower than feeLiquidation.
     uint16 internal feeLiquidationExpired;
 
@@ -130,9 +130,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// CreditFacade is a trusted source, so it generally sends the CA as an input for account management functions
     /// _activeCreditAccount is used to avoid adapters having to manually pass the Credit Account
     address internal _activeCreditAccount;
-
-    /// @notice Total number of known collateral tokens.
-    uint8 public collateralTokensCount;
 
     /// @notice Mask of tokens to apply quota logic for
     uint256 public override quotedTokensMask;
@@ -257,6 +254,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         creditAccountInfo[creditAccount].debt = debt; // U:[CM-6]
         creditAccountInfo[creditAccount].cumulativeIndexLastUpdate = _poolCumulativeIndexNow(); // U:[CM-6]
+        creditAccountInfo[creditAccount].since = uint64(block.number); // U:[CM-6]
         creditAccountInfo[creditAccount].flags = 0; // U:[CM-6]
         creditAccountInfo[creditAccount].borrower = onBehalfOf; // U:[CM-6]
 
@@ -314,6 +312,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         // Checks that the Credit Account exists for the borrower
         address borrower = getBorrowerOrRevert(creditAccount); // U:[CM-7]
+
+        if (creditAccountInfo[creditAccount].since == block.number) revert OpenCloseAccountInOneBlockException();
 
         // Sets borrower's Credit Account to zero address
         delete creditAccountInfo[creditAccount].borrower; // U:[CM-8]
@@ -610,8 +610,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (bytes memory)
     {
         address targetContract = _getTargetContractOrRevert(); // U:[CM-3]
-        // Emits an event
-        emit Execute(targetContract); // U:[CM-16]
 
         // Returned data is provided as-is to the caller;
         // It is expected that is is parsed and returned as a correct type
@@ -665,6 +663,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         external
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
+        returns (uint256)
     {
         if (minHealthFactor < PERCENTAGE_FACTOR) {
             revert CustomHealthFactorTooLowException(); // U:[CM-17]
@@ -692,9 +691,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         /// to avoid redundant storage writes. Saving to storage is only done at the end
         /// of a full collateral check, which is performed after every multicall
         _saveEnabledTokensMask(creditAccount, collateralDebtData.enabledTokensMask); // U:[CM-18]
+
+        return collateralDebtData.enabledTokensMask;
     }
 
-    /// TODO: Q: move to CF?
     /// @notice Returns whether the passed credit account is unhealthy given the provided minHealthFactor
     /// @param creditAccount Address of the credit account to check
     /// @param minHealthFactor The health factor below which the function would
@@ -805,6 +805,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             ) = _getQuotedTokensData({
                 creditAccount: creditAccount,
                 enabledTokensMask: enabledTokensMask,
+                collateralHints: collateralHints,
                 _poolQuotaKeeper: collateralDebtData._poolQuotaKeeper
             }); // U:[CM-21]
 
@@ -880,7 +881,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @return quotas Current quotas on quoted tokens, in the same order as quoted tokens
     /// @return lts Current lts of quoted tokens, in the same order as quoted tokens
     /// @return _quotedTokensMask The mask of enabled quoted tokens on the account
-    function _getQuotedTokensData(address creditAccount, uint256 enabledTokensMask, address _poolQuotaKeeper)
+    function _getQuotedTokensData(
+        address creditAccount,
+        uint256 enabledTokensMask,
+        uint256[] memory collateralHints,
+        address _poolQuotaKeeper
+    )
         internal
         view
         returns (
@@ -894,23 +900,33 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         uint256 _maxEnabledTokens = maxEnabledTokens; // U:[CM-24]
         _quotedTokensMask = quotedTokensMask; // U:[CM-24]
 
-        uint256 quotedMask = enabledTokensMask & _quotedTokensMask; // U:[CM-24]
+        uint256 tokensToCheckMask = enabledTokensMask & _quotedTokensMask; // U:[CM-24]
 
         // If there are not quoted tokens on the account, then zero-length arrays are returned
         // This is desirable, as it makes it simple to check whether there are any quoted tokens
-        if (quotedMask != 0) {
+        if (tokensToCheckMask != 0) {
             quotaTokens = new address[](_maxEnabledTokens); // U:[CM-24]
             quotas = new uint256[](_maxEnabledTokens); // U:[CM-24]
             lts = new uint16[](_maxEnabledTokens); // U:[CM-24]
 
             uint256 j;
-            unchecked {
-                for (uint256 tokenMask = 2; tokenMask <= quotedMask; tokenMask <<= 1) {
-                    if (j == _maxEnabledTokens) {
-                        revert TooManyEnabledTokensException(); // U:[CM-24]
-                    }
 
-                    if (quotedMask & tokenMask != 0) {
+            uint256 len = collateralHints.length;
+
+            address ca = creditAccount;
+            unchecked {
+                // TODO: add test that we check all values and it's always reachable
+                for (uint256 i; tokensToCheckMask != 0; ++i) {
+                    uint256 tokenMask;
+
+                    // TODO: add check for super long collateralnhints and for double masks
+                    tokenMask = (i < len) ? collateralHints[i] : 1 << (i - len);
+
+                    if (tokensToCheckMask & tokenMask != 0) {
+                        if (j == _maxEnabledTokens) {
+                            revert TooManyEnabledTokensException(); // U:[CM-24]
+                        }
+
                         address token; // U:[CM-24]
                         (token, lts[j]) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
 
@@ -918,13 +934,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
                         uint256 outstandingInterestDelta;
                         (quotas[j], outstandingInterestDelta) =
-                            IPoolQuotaKeeper(_poolQuotaKeeper).getQuotaAndOutstandingInterest(creditAccount, token); // U:[CM-24]
+                            IPoolQuotaKeeper(_poolQuotaKeeper).getQuotaAndOutstandingInterest(ca, token); // U:[CM-24]
 
                         /// Quota interest is equal to quota * APY * time. Since quota is a uint96, this is unlikely to overflow in any realistic scenario.
                         outstandingQuotaInterest += outstandingInterestDelta; // U:[CM-24]
 
                         ++j; // U:[CM-24]
                     }
+                    tokensToCheckMask = tokensToCheckMask.disable(tokenMask);
                 }
             }
         }
@@ -938,11 +955,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param creditAccount Address of credit account
     /// @param token Address of quoted token
     /// @param quotaChange Change in quota in SIGNED format
-    function updateQuota(address creditAccount, address token, int96 quotaChange)
+    function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota)
         external
         override
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
+
         returns (int96 realQuotaChange, uint256 tokensToEnable, uint256 tokensToDisable)
     {
         /// The PoolQuotaKeeper returns the interest to be cached (quota interest is computed dynamically,
@@ -952,10 +970,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         uint256 caInterestChange;
         bool enable;
         bool disable;
+
         (caInterestChange, realQuotaChange, enable, disable) = IPoolQuotaKeeper(poolQuotaKeeper()).updateQuota({
             creditAccount: creditAccount,
             token: token,
-            quotaChange: quotaChange
+            quotaChange: quotaChange,
+            minQuota: minQuota
         }); // U:[CM-25] // I: [CMQ-3]
 
         if (enable) {
@@ -1251,12 +1271,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         if (borrower == address(0)) revert CreditAccountNotExistsException(); // U:[CM-35]
     }
 
-    /// @notice Returns the mask containing the account's enabled tokens
-    /// @param creditAccount Credit Account to get the mask for
-    function enabledTokensMaskOf(address creditAccount) public view override returns (uint256) {
-        return creditAccountInfo[creditAccount].enabledTokensMask; // U:[CM-35]
-    }
-
     /// @notice Returns the mask containing miscellaneous account flags
     /// @dev Currently, the following flags are supported:
     ///      * 1 - WITHDRAWALS_FLAG - whether the account has pending withdrawals
@@ -1298,7 +1312,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         return creditAccountInfo[creditAccount].flags & WITHDRAWAL_FLAG != 0; // U:[CM-36]
     }
 
-    /// @notice Checks quantity of enabled tokens, saves the mask to creditAccountInfo and emits event
+
+    /// @notice Returns the mask containing the account's enabled tokens
+    /// @param creditAccount Credit Account to get the mask for
+    function enabledTokensMaskOf(address creditAccount) public view override returns (uint256) {
+        return creditAccountInfo[creditAccount].enabledTokensMask; // U:[CM-37]
+    }
+
+    /// @notice Checks quantity of enabled tokens and saves the mask to creditAccountInfo
+
     function _saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) internal {
         uint256 enabledTokensMaskOld = creditAccountInfo[creditAccount].enabledTokensMask;
 
@@ -1308,8 +1330,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             }
 
             creditAccountInfo[creditAccount].enabledTokensMask = enabledTokensMask; // U:[CM-37]
-            emit SaveNewEnabledTokensMask(creditAccount, enabledTokensMaskOld, enabledTokensMask);
-        }
+
+        
     }
 
     ///

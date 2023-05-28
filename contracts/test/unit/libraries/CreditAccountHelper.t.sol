@@ -3,7 +3,6 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {IncorrectParameterException} from "../../../interfaces/IExceptions.sol";
 import {CreditAccountHelper} from "../../../libraries/CreditAccountHelper.sol";
 import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
 import {CreditAccountV3} from "../../../credit/CreditAccountV3.sol";
@@ -19,7 +18,6 @@ import {TestHelper} from "../../lib/helper.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 
 import "../../lib/constants.sol";
-import "forge-std/console.sol";
 
 /// @title CreditAccountHelper logic test
 /// @notice [CAH]: Unit tests for credit account helper
