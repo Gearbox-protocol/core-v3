@@ -18,7 +18,7 @@ import {
 } from "../../../interfaces/ICreditManagerV3.sol";
 
 import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {IWETHGateway} from "../../../interfaces/IWETHGateway.sol";
+import {IWETHGatewayV3} from "../../../interfaces/IWETHGatewayV3.sol";
 import {IWithdrawalManager} from "../../../interfaces/IWithdrawalManager.sol";
 
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
@@ -72,7 +72,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
     CreditManagerV3 creditManager;
     PoolMock poolMock;
     IPriceOracleV2 priceOracle;
-    IWETHGateway wethGateway;
+    IWETHGatewayV3 wethGateway;
     IWithdrawalManager withdrawalManager;
     ACL acl;
     address underlying;
@@ -105,7 +105,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
 
         priceOracle = IPriceOracleV2(creditManager.priceOracle());
         underlying = creditManager.underlying();
-        wethGateway = IWETHGateway(creditManager.wethGateway());
+        wethGateway = IWETHGatewayV3(creditManager.wethGateway());
     }
 
     /// @dev Opens credit account for testing management functions

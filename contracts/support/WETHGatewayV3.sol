@@ -11,23 +11,23 @@ import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWE
 import {AP_WETH_TOKEN, IAddressProviderV3, NO_VERSION_CONTROL} from "../interfaces/IAddressProviderV3.sol";
 import {ReceiveIsNotAllowedException} from "../interfaces/IExceptions.sol";
 import {IVersion} from "../interfaces/IVersion.sol";
-import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
+import {IWETHGatewayV3} from "../interfaces/IWETHGatewayV3.sol";
 
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
 
-/// @title WETH gateway
+/// @title WETH gateway V3
 /// @notice Allows to unwrap WETH upon credit account closure/liquidation
-contract WETHGateway is IWETHGateway, ReentrancyGuardTrait, ContractsRegisterTrait {
+contract WETHGatewayV3 is IWETHGatewayV3, ReentrancyGuardTrait, ContractsRegisterTrait {
     using Address for address payable;
 
     /// @inheritdoc IVersion
     uint256 public constant override version = 3_00;
 
-    /// @inheritdoc IWETHGateway
+    /// @inheritdoc IWETHGatewayV3
     address public immutable weth;
 
-    /// @inheritdoc IWETHGateway
+    /// @inheritdoc IWETHGatewayV3
     mapping(address => uint256) public override balanceOf;
 
     /// @notice Constructor
@@ -43,7 +43,7 @@ contract WETHGateway is IWETHGateway, ReentrancyGuardTrait, ContractsRegisterTra
         if (msg.sender != address(weth)) revert ReceiveIsNotAllowedException(); // U:[WG-2]
     }
 
-    /// @inheritdoc IWETHGateway
+    /// @inheritdoc IWETHGatewayV3
     function deposit(address to, uint256 amount)
         external
         override
@@ -54,7 +54,7 @@ contract WETHGateway is IWETHGateway, ReentrancyGuardTrait, ContractsRegisterTra
         emit Deposit(to, amount); // U:[WG-3B]
     }
 
-    /// @inheritdoc IWETHGateway
+    /// @inheritdoc IWETHGatewayV3
     function claim(address owner)
         external
         override

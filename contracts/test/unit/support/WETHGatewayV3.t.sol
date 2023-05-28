@@ -8,22 +8,26 @@ import {Test} from "forge-std/Test.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {WETHMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/WETHMock.sol";
 
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+
 import {
     ReceiveIsNotAllowedException,
     RegisteredCreditManagerOnlyException,
     ZeroAddressException
 } from "../../../interfaces/IExceptions.sol";
-import {IWETHGatewayEvents} from "../../../interfaces/IWETHGateway.sol";
+import {IWETHGatewayV3Events} from "../../../interfaces/IWETHGatewayV3.sol";
 import {ENTERED} from "../../../traits/ReentrancyGuardTrait.sol";
 
 import {AP_WETH_TOKEN, AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
-import {WETHGatewayHarness} from "./WETHGatewayHarness.sol";
+import {WETHGatewayV3Harness} from "./WETHGatewayV3Harness.sol";
 
-/// @title WETH gateway unit test
+/// @title WETH gateway V3 unit test
 /// @notice U:[WG]: Unit tests for WETH gateway
-contract WETHGatewayUnitTest is Test, IWETHGatewayEvents {
+contract WETHGatewayV3UnitTest is Test, IWETHGatewayV3Events {
+    using Address for address payable;
+
     WETHMock weth;
-    WETHGatewayHarness gateway;
+    WETHGatewayV3Harness gateway;
     AddressProviderV3ACLMock addressProvider;
 
     address user;
@@ -42,14 +46,14 @@ contract WETHGatewayUnitTest is Test, IWETHGatewayEvents {
         addressProvider.addCreditManager(creditManager);
         addressProvider.setAddress(AP_WETH_TOKEN, address(weth), false);
 
-        gateway = new WETHGatewayHarness(address(addressProvider));
+        gateway = new WETHGatewayV3Harness(address(addressProvider));
         vm.stopPrank();
     }
 
     /// @notice U:[WG-1A]: Constructor reverts on zero address
     function test_U_WG_01A_constructor_reverts_on_zero_address() public {
         vm.expectRevert(ZeroAddressException.selector);
-        new WETHGatewayHarness(address(0));
+        new WETHGatewayV3Harness(address(0));
     }
 
     /// @notice U:[WG-1B]: Constructor sets correct values
@@ -59,13 +63,15 @@ contract WETHGatewayUnitTest is Test, IWETHGatewayEvents {
 
     /// @notice U:[WG-2]: `receive` works correctly
     function test_U_WG_02_receive_works_correctly() public {
+        deal(user, 1 ether);
         vm.expectRevert(ReceiveIsNotAllowedException.selector);
         vm.prank(user);
-        address(gateway).call{value: 1 ether}("");
+        (bool success, bytes memory returndata) = address(gateway).call{value: 1 ether}("");
+        Address.verifyCallResult(success, returndata, "");
 
         deal(address(weth), 1 ether);
         vm.prank(address(weth));
-        address(gateway).call{value: 1 ether}("");
+        payable(gateway).sendValue(1 ether);
         assertEq(address(gateway).balance, 1 ether, "Incorrect ETH balance");
     }
 

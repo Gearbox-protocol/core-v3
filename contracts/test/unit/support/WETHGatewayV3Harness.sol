@@ -3,10 +3,10 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {WETHGateway} from "../../../support/WETHGateway.sol";
+import {WETHGatewayV3} from "../../../support/WETHGatewayV3.sol";
 
-contract WETHGatewayHarness is WETHGateway {
-    constructor(address addressProvider_) WETHGateway(addressProvider_) {}
+contract WETHGatewayV3Harness is WETHGatewayV3 {
+    constructor(address addressProvider_) WETHGatewayV3(addressProvider_) {}
 
     function setReentrancyStatus(uint8 status) external {
         _reentrancyStatus = status;

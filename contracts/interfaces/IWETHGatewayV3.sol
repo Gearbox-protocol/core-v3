@@ -5,15 +5,15 @@ pragma solidity ^0.8.17;
 
 import {IVersion} from "./IVersion.sol";
 
-interface IWETHGatewayEvents {
+interface IWETHGatewayV3Events {
     /// @notice Emitted when WETH is deposited to the gateway
     event Deposit(address indexed to, uint256 amount);
     /// @notice Emitted when ETH is claimed from the gateway
     event Claim(address indexed to, uint256 amount);
 }
 
-/// @title WETH gateway interface
-interface IWETHGateway is IVersion, IWETHGatewayEvents {
+/// @title WETH gateway V3 interface
+interface IWETHGatewayV3 is IVersion, IWETHGatewayV3Events {
     /// @notice WETH contract address
     function weth() external view returns (address);
 

@@ -15,7 +15,7 @@ import "../../interfaces/IAddressProviderV3.sol";
 import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
 import {BotList} from "../../support/BotList.sol";
 
-import {WETHGateway} from "../../support/WETHGateway.sol";
+import {WETHGatewayV3} from "../../support/WETHGatewayV3.sol";
 import {PriceOracle, PriceFeedConfig} from "@gearbox-protocol/core-v2/contracts/oracles/PriceOracle.sol";
 import {GearToken} from "@gearbox-protocol/core-v2/contracts/tokens/GearToken.sol";
 
@@ -60,7 +60,7 @@ contract GenesisFactory is Ownable {
 
         addressProvider.setAddress(AP_ACCOUNT_FACTORY, accountFactory, false); // T:[GD-1]
 
-        WETHGateway wethGateway = new WETHGateway(address(addressProvider)); // T:[GD-1]
+        WETHGatewayV3 wethGateway = new WETHGatewayV3(address(addressProvider)); // T:[GD-1]
         addressProvider.setAddress(AP_WETH_GATEWAY, address(wethGateway), true); // T:[GD-1]
 
         WithdrawalManager wm = new WithdrawalManager(address(addressProvider), 1 days);
