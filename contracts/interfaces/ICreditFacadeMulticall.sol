@@ -74,7 +74,7 @@ interface ICreditFacadeMulticall {
     function decreaseDebt(uint256 amount) external;
 
     /// @dev Update msg.sender's Credit Account quota
-    function updateQuota(address token, int96 quotaChange) external;
+    function updateQuota(address token, int96 quotaChange, uint96 minQuota) external;
 
     /// @dev Set collateral hints for a full check
     /// @param collateralHints Array of token mask in the desired order of checking

@@ -187,7 +187,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
 
     /// @dev Updates credit account's quotas
     /// @param creditAccount Address of credit account
-    function updateQuota(address creditAccount, address token, int96 quotaChange)
+    function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota)
         external
         returns (int96 change, uint256 tokensToEnable, uint256 tokensToDisable);
 

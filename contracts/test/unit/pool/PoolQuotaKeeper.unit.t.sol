@@ -129,7 +129,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
         vm.startPrank(USER);
 
         vm.expectRevert(CallerNotCreditManagerException.selector);
-        pqk.updateQuota(DUMB_ADDRESS, address(1), 0);
+        pqk.updateQuota(DUMB_ADDRESS, address(1), 0, 0);
 
         vm.expectRevert(CallerNotCreditManagerException.selector);
         pqk.removeQuotas(DUMB_ADDRESS, new address[](1), false);
@@ -207,10 +207,10 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
                 usdcQuota = int96(uint96(200 * WAD));
 
                 vm.prank(address(cmMock));
-                pqk.updateQuota({creditAccount: DUMB_ADDRESS, token: DAI, quotaChange: daiQuota});
+                pqk.updateQuota({creditAccount: DUMB_ADDRESS, token: DAI, quotaChange: daiQuota, minQuota: 0});
 
                 vm.prank(address(cmMock));
-                pqk.updateQuota({creditAccount: DUMB_ADDRESS, token: USDC, quotaChange: usdcQuota});
+                pqk.updateQuota({creditAccount: DUMB_ADDRESS, token: USDC, quotaChange: usdcQuota, minQuota: 0});
             }
 
             vm.warp(block.timestamp + 365 days);
@@ -348,7 +348,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
         vm.expectRevert(TokenIsNotQuotedException.selector);
 
         vm.prank(address(cmMock));
-        pqk.updateQuota({creditAccount: DUMB_ADDRESS, token: link, quotaChange: int96(uint96(100 * WAD))});
+        pqk.updateQuota({creditAccount: DUMB_ADDRESS, token: link, quotaChange: int96(uint96(100 * WAD)), minQuota: 0});
     }
 
     struct QuotaTest {

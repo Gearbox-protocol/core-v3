@@ -939,7 +939,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param creditAccount Address of credit account
     /// @param token Address of quoted token
     /// @param quotaChange Change in quota in SIGNED format
-    function updateQuota(address creditAccount, address token, int96 quotaChange)
+    function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota)
         external
         override
         nonReentrant // U:[CM-5]
@@ -957,7 +957,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         (caInterestChange, change, enable, disable) = IPoolQuotaKeeper(poolQuotaKeeper()).updateQuota({
             creditAccount: creditAccount,
             token: token,
-            quotaChange: quotaChange
+            quotaChange: quotaChange,
+            minQuota: minQuota
         }); // U:[CM-25] // I: [CMQ-3]
 
         if (enable) {

@@ -1412,7 +1412,8 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
                 cmMock.updateQuota({
                     _creditAccount: DUMB_ADDRESS,
                     token: tokenTestSuite.addressOf(Tokens.LINK),
-                    quotaChange: int96(int256(quotaInterestPerYear))
+                    quotaChange: int96(int256(quotaInterestPerYear)),
+                    minQuota: 0
                 });
 
                 gaugeMock.updateEpoch();
