@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {MultiCall} from "../../interfaces/ICreditFacade.sol";
+import {MultiCall} from "../../interfaces/ICreditFacadeV3.sol";
 
 library MultiCallBuilder {
     function build() internal pure returns (MultiCall[] memory calls) {}

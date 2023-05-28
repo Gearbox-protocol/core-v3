@@ -14,7 +14,7 @@ import {
     CreditAccountIsInUseException,
     MasterCreditAccountAlreadyDeployedException
 } from "../interfaces/IExceptions.sol";
-import {IVersion} from "../interfaces/IVersion.sol";
+import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 

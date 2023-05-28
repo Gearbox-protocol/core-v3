@@ -3,9 +3,11 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
+import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
 
-import {ClaimAction, IWithdrawalManagerEvents, ScheduledWithdrawal} from "../../../interfaces/IWithdrawalManager.sol";
+import {
+    ClaimAction, IWithdrawalManagerV3Events, ScheduledWithdrawal
+} from "../../../interfaces/IWithdrawalManagerV3.sol";
 import {
     AmountCantBeZeroException,
     CallerNotConfiguratorException,
@@ -30,7 +32,7 @@ enum ScheduleTask {
 
 /// @title Withdrawal manager unit test
 /// @notice U:[WM]: Unit tests for withdrawal manager
-contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerEvents {
+contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerV3Events {
     WithdrawalManagerHarness manager;
     AddressProviderV3ACLMock acl;
     ERC20BlacklistableMock token0;

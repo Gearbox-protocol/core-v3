@@ -17,10 +17,10 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 // INTERFACES
 import {IAddressProviderV3, AP_TREASURY, NO_VERSION_CONTROL} from "../interfaces/IAddressProviderV3.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
-import {IInterestRateModel} from "../interfaces/IInterestRateModel.sol";
-import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
+import {IInterestRateModelV3} from "../interfaces/IInterestRateModelV3.sol";
+import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
-import {IVersion} from "../interfaces/IVersion.sol";
+import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 // LIBS & TRAITS
 import {CreditLogic} from "../libraries/CreditLogic.sol";
@@ -29,7 +29,7 @@ import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
 // CONSTANTS
 import {RAY, MAX_WITHDRAW_FEE, SECONDS_PER_YEAR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
@@ -364,7 +364,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         borrowable = Math.min(borrowable, _borrowable(_creditManagerDebt[creditManager])); // U:[P4-27]
         if (borrowable == 0) return 0; // U:[P4-27]
 
-        uint256 available = IInterestRateModel(interestRateModel).availableToBorrow({
+        uint256 available = IInterestRateModelV3(interestRateModel).availableToBorrow({
             expectedLiquidity: expectedLiquidity(),
             availableLiquidity: availableLiquidity()
         }); // U:[P4-27]
@@ -508,7 +508,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         }
 
         _expectedLiquidityLU = expectedLiquidity_.toUint128(); // U:[P4-16]
-        _baseInterestRate = IInterestRateModel(interestRateModel).calcBorrowRate({
+        _baseInterestRate = IInterestRateModelV3(interestRateModel).calcBorrowRate({
             expectedLiquidity: expectedLiquidity_ + (supportsQuotas ? _calcQuotaRevenueAccrued() : 0),
             availableLiquidity: availableLiquidity_,
             checkOptimalBorrowing: checkOptimalBorrowing
@@ -592,7 +592,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         if (!supportsQuotas) {
             revert QuotasNotSupportedException(); // U:[P4-23A]
         }
-        if (IPoolQuotaKeeper(newPoolQuotaKeeper).pool() != address(this)) {
+        if (IPoolQuotaKeeperV3(newPoolQuotaKeeper).pool() != address(this)) {
             revert IncompatiblePoolQuotaKeeperException(); // U:[P4-23B]
         }
         if (poolQuotaKeeper != address(0)) {

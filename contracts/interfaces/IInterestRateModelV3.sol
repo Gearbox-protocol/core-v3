@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
-interface IInterestRateModel is IVersion {
+interface IInterestRateModelV3 is IVersion {
     /// @dev Returns the borrow rate calculated based on expectedLiquidity and availableLiquidity
     /// @param expectedLiquidity Expected liquidity in the pool
     /// @param availableLiquidity Available liquidity in the pool

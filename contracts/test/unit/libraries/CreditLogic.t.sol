@@ -8,7 +8,7 @@ import {ClosureAction, CollateralDebtData, CollateralTokenData} from "../../../i
 import {TestHelper} from "../../lib/helper.sol";
 import {GeneralMock} from "../../mocks/GeneralMock.sol";
 
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {RAY, WAD} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 /// @title BitMask logic test

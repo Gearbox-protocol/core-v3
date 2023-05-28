@@ -18,7 +18,7 @@ import {
     WAD
 } from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {UNDERLYING_TOKEN_MASK} from "../libraries/BitMask.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // CONTRACTS
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
@@ -33,9 +33,9 @@ import {
     CreditManagerOpts,
     AllowanceAction
 } from "../interfaces/ICreditConfiguratorV3.sol";
-import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
+import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
-import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import "../interfaces/IAddressProviderV3.sol";
 
 // EXCEPTIONS
@@ -351,7 +351,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         // Verifies whether the quota keeper has a token registered as quotable
         address quotaKeeper = creditManager.poolQuotaKeeper();
 
-        if (!IPoolQuotaKeeper(quotaKeeper).isQuotedToken(token)) {
+        if (!IPoolQuotaKeeperV3(quotaKeeper).isQuotedToken(token)) {
             revert TokenIsNotQuotedException();
         }
 

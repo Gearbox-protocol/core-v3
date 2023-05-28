@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 pragma abicoder v1;
 
-import {ClaimAction} from "../../../interfaces/IWithdrawalManager.sol";
+import {ClaimAction} from "../../../interfaces/IWithdrawalManagerV3.sol";
 
 struct CancellableWithdrawals {
     address token;

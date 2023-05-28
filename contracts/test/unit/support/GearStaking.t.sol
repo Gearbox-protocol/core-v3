@@ -3,9 +3,9 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {GearStaking} from "../../../support/GearStaking.sol";
-import {IGearStakingEvents, MultiVote, VotingContractStatus} from "../../../interfaces/IGearStaking.sol";
-import {IVotingContract} from "../../../interfaces/IVotingContract.sol";
+import {GearStakingV3} from "../../../support/GearStakingV3.sol";
+import {IGearStakingV3Events, MultiVote, VotingContractStatus} from "../../../interfaces/IGearStakingV3.sol";
+import {IVotingContractV3} from "../../../interfaces/IVotingContractV3.sol";
 
 import "../../../interfaces/IAddressProviderV3.sol";
 
@@ -15,7 +15,7 @@ import "../../lib/constants.sol";
 // MOCKS
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
-import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
+import {TargetContractMock} from "../../mocks/adapters/TargetContractMock.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
@@ -26,12 +26,12 @@ import "../../../interfaces/IExceptions.sol";
 
 uint256 constant EPOCH_LENGTH = 7 days;
 
-contract GearStakingTest is Test, IGearStakingEvents {
+contract GearStakingTest is Test, IGearStakingV3Events {
     address gearToken;
 
     AddressProviderV3ACLMock public addressProvider;
 
-    GearStaking gearStaking;
+    GearStakingV3 gearStaking;
 
     TargetContractMock votingContract;
 
@@ -48,7 +48,7 @@ contract GearStakingTest is Test, IGearStakingEvents {
         vm.prank(CONFIGURATOR);
         addressProvider.setAddress(AP_GEAR_TOKEN, gearToken, false);
 
-        gearStaking = new GearStaking(address(addressProvider), block.timestamp + 1);
+        gearStaking = new GearStakingV3(address(addressProvider), block.timestamp + 1);
 
         votingContract = new TargetContractMock();
 
@@ -83,7 +83,7 @@ contract GearStakingTest is Test, IGearStakingEvents {
         vm.expectEmit(true, false, false, true);
         emit DepositGear(USER, WAD);
 
-        vm.expectCall(address(votingContract), abi.encodeCall(IVotingContract.vote, (USER, uint96(WAD / 2), "")));
+        vm.expectCall(address(votingContract), abi.encodeCall(IVotingContractV3.vote, (USER, uint96(WAD / 2), "")));
 
         vm.prank(USER);
         gearStaking.deposit(WAD, votes);
@@ -117,7 +117,7 @@ contract GearStakingTest is Test, IGearStakingEvents {
             extraData: ""
         });
 
-        vm.expectCall(address(votingContract), abi.encodeCall(IVotingContract.unvote, (USER, uint96(WAD / 2), "")));
+        vm.expectCall(address(votingContract), abi.encodeCall(IVotingContractV3.unvote, (USER, uint96(WAD / 2), "")));
 
         vm.expectEmit(true, false, false, true);
         emit ScheduleGearWithdrawal(USER, WAD);
@@ -173,12 +173,12 @@ contract GearStakingTest is Test, IGearStakingEvents {
             extraData: "foobar"
         });
 
-        vm.expectCall(address(votingContract), abi.encodeCall(IVotingContract.vote, (USER, uint96(WAD / 2), "foo")));
+        vm.expectCall(address(votingContract), abi.encodeCall(IVotingContractV3.vote, (USER, uint96(WAD / 2), "foo")));
 
-        vm.expectCall(address(votingContract2), abi.encodeCall(IVotingContract.vote, (USER, uint96(WAD / 3), "bar")));
+        vm.expectCall(address(votingContract2), abi.encodeCall(IVotingContractV3.vote, (USER, uint96(WAD / 3), "bar")));
 
         vm.expectCall(
-            address(votingContract2), abi.encodeCall(IVotingContract.unvote, (USER, uint96(WAD / 4), "foobar"))
+            address(votingContract2), abi.encodeCall(IVotingContractV3.unvote, (USER, uint96(WAD / 4), "foobar"))
         );
 
         vm.prank(USER);

@@ -14,17 +14,15 @@ import {CreditLogic} from "../libraries/CreditLogic.sol";
 import {QuotasLogic} from "../libraries/QuotasLogic.sol";
 
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
-import {IPoolQuotaKeeper, TokenQuotaParams, AccountQuota} from "../interfaces/IPoolQuotaKeeper.sol";
-import {IGauge} from "../interfaces/IGauge.sol";
+import {IPoolQuotaKeeperV3, TokenQuotaParams, AccountQuota} from "../interfaces/IPoolQuotaKeeperV3.sol";
+import {IGaugeV3} from "../interfaces/IGaugeV3.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 
 import {RAY, SECONDS_PER_YEAR, MAX_WITHDRAW_FEE} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
-
-uint192 constant RAY_DIVIDED_BY_PERCENTAGE = uint192(RAY / PERCENTAGE_FACTOR);
 
 /// @title Pool quota keeper
 /// @dev The PQK works as an intermediary between the Credit Manager and the pool with regards to quotas and quota interest.
@@ -33,7 +31,7 @@ uint192 constant RAY_DIVIDED_BY_PERCENTAGE = uint192(RAY / PERCENTAGE_FACTOR);
 /// @dev Account quotas are user-set values that limit the exposure of an account to a particular asset. The USD value of an asset
 ///      counted towards account's collateral cannot exceed the USD calue of the respective quota. Users pay interest on their quotas,
 ///      both as an anti-spam measure and a way to price-discriminate based on asset's risk
-contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsRegisterTrait {
+contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, ContractsRegisterTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using QuotasLogic for TokenQuotaParams;
 
@@ -100,14 +98,15 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
     /// @return caQuotaInterestChange Accrued quota interest since last interest update.
     ///                               It is expected that this value is stored/used by the caller,
     ///                               as PQK will update the interest index, which will set local accrued interest to 0
-    /// @return change Change what was made
+    /// @return realQuotaChange Actual quota change. Can be lower than requested on quota increase, it total quotas are
+    ///                         at capacity.
     /// @return enableToken Whether the token needs to be enabled
     /// @return disableToken Whether the token needs to be disabled
     function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota)
         external
         override
         creditManagerOnly // F:[PQK-4]
-        returns (uint256 caQuotaInterestChange, int96 change, bool enableToken, bool disableToken)
+        returns (uint256 caQuotaInterestChange, int96 realQuotaChange, bool enableToken, bool disableToken)
     {
         int256 quotaRevenueChange;
 
@@ -127,7 +126,8 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         /// * Decreases the account quota and total quota by the amount
         /// * Computes whether the token should be disabled (quota changed from non-zero to zero)
         /// * Computes the total quota revenue change
-        (caQuotaInterestChange, quotaRevenueChange, enableToken, disableToken) = QuotasLogic.changeQuota({
+        (caQuotaInterestChange, quotaRevenueChange, realQuotaChange, enableToken, disableToken) = QuotasLogic
+            .changeQuota({
             tokenQuotaParams: tokenQuotaParams,
             accountQuota: accountQuota,
             lastQuotaRateUpdate: lastQuotaRateUpdate,
@@ -229,15 +229,12 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         returns (uint256 quoted, uint256 interest)
     {
         AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
+        TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
 
         quoted = accountQuota.quota;
 
         if (quoted > 1) {
-            interest = CreditLogic.calcAccruedInterest({
-                amount: quoted,
-                cumulativeIndexLastUpdate: accountQuota.cumulativeIndexLU,
-                cumulativeIndexNow: cumulativeIndex(token)
-            }); // F:[CMQ-8]
+            interest = QuotasLogic.calcOutstandingQuotaInterest(tokenQuotaParams, accountQuota, lastQuotaRateUpdate);
         }
     }
 
@@ -305,7 +302,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         gaugeOnly // F:[PQK-3]
     {
         address[] memory tokens = quotaTokensSet.values();
-        uint16[] memory rates = IGauge(gauge).getRates(tokens); // F:[PQK-7]
+        uint16[] memory rates = IGaugeV3(gauge).getRates(tokens); // F:[PQK-7]
 
         uint256 quotaRevenue;
         uint256 timeFromLastUpdate = block.timestamp - lastQuotaRateUpdate;

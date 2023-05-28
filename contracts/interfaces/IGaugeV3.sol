@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {IGearStaking} from "./IGearStaking.sol";
+import {IGearStakingV3} from "./IGearStakingV3.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 struct QuotaRateParams {
@@ -18,7 +18,7 @@ struct UserVotes {
     uint96 votesCaSide;
 }
 
-interface IGaugeEvents {
+interface IGaugeV3Events {
     /// @dev Emits when a user submits a vote
     event Vote(address indexed user, address indexed token, uint96 votes, bool lpSide);
 
@@ -35,11 +35,11 @@ interface IGaugeEvents {
     event SetQuotaTokenParams(address indexed token, uint16 minRate, uint16 maxRate);
 }
 
-/// @title IGauge
+/// @title IGaugeV3
 
-interface IGauge is IGaugeEvents, IVersion {
+interface IGaugeV3 is IGaugeV3Events, IVersion {
     /// @dev Returns the main voting contract
-    function voter() external view returns (IGearStaking);
+    function voter() external view returns (IGearStakingV3);
 
     /// @dev Rolls the new epoch and updates all quota rates
     function updateEpoch() external;

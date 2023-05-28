@@ -47,7 +47,7 @@ contract BotListMock {
         uint192 permissions,
         uint72 fundingAmount,
         uint72 weeklyFundingAllowance
-    ) external returns (uint256 activeBotsRemaining) {
+    ) external view returns (uint256 activeBotsRemaining) {
         activeBotsRemaining = return_activeBotsRemaining;
     }
 }

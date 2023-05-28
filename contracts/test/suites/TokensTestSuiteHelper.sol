@@ -10,7 +10,7 @@ import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWE
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 
 // MOCKS
-import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
+import {ERC20Mock} from "../mocks/token/ERC20Mock.sol";
 
 import {Test} from "forge-std/Test.sol";
 

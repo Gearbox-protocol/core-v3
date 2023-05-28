@@ -3,15 +3,15 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {PolicyManager} from "./PolicyManager.sol";
+import {PolicyManagerV3} from "./PolicyManagerV3.sol";
 
-import {IControllerTimelock, QueuedTransactionData} from "../../interfaces/IControllerTimelock.sol";
+import {IControllerTimelockV3, QueuedTransactionData} from "../../interfaces/IControllerTimelockV3.sol";
 
 import {ICreditManagerV3} from "../../interfaces/ICreditManagerV3.sol";
 
-import {ICreditFacade} from "../../interfaces/ICreditFacade.sol";
+import {ICreditFacadeV3} from "../../interfaces/ICreditFacadeV3.sol";
 import {IPoolV3} from "../../interfaces/IPoolV3.sol";
-import {ILPPriceFeed} from "../../interfaces/ILPPriceFeed.sol";
+import {ILPPriceFeedV2} from "@gearbox-protocol/core-v2/contracts/interfaces/ILPPriceFeedV2.sol";
 
 /// @notice ControllerTimelock contract
 /// @dev ControllerTimelock is a governance contract that allows
@@ -24,7 +24,7 @@ import {ILPPriceFeed} from "../../interfaces/ILPPriceFeed.sol";
 ///      to set parameter change boundaries and conditions. In order to
 ///      schedule a change for a particular contract / function combination
 ///      a policy needs to be defined for it. See more in `PolicyManager`
-contract ControllerTimelock is PolicyManager, IControllerTimelock {
+contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @notice Period before a mature transaction becomes stale
     uint256 public constant GRACE_PERIOD = 14 days;
 
@@ -44,7 +44,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
     /// @param _addressProvider Address of the contract address repository
     /// @param _admin Admin of the controller contract that can schedule transactions
     /// @param _vetoAdmin Admin that can cancel transactions
-    constructor(address _addressProvider, address _admin, address _vetoAdmin) PolicyManager(_addressProvider) {
+    constructor(address _addressProvider, address _admin, address _vetoAdmin) PolicyManagerV3(_addressProvider) {
         admin = _admin;
         vetoAdmin = _vetoAdmin;
     }
@@ -73,7 +73,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
         external
         adminOnly // F: [RCT-01]
     {
-        ICreditFacade creditFacade = ICreditFacade(ICreditManagerV3(creditManager).creditFacade());
+        ICreditFacadeV3 creditFacade = ICreditFacadeV3(ICreditManagerV3(creditManager).creditFacade());
         address creditConfigurator = ICreditManagerV3(creditManager).creditConfigurator();
         IPoolV3 pool = IPoolV3(ICreditManagerV3(creditManager).pool());
 
@@ -102,7 +102,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
         external
         adminOnly // F: [RCT-02]
     {
-        uint256 currentLowerBound = ILPPriceFeed(priceFeed).lowerBound();
+        uint256 currentLowerBound = ILPPriceFeedV2(priceFeed).lowerBound();
 
         if (!_checkPolicy(priceFeed, "LP_PRICE_FEED_LIMITER", currentLowerBound, lowerBound)) {
             revert ParameterChecksFailedException(); // F: [RCT-02]
@@ -119,7 +119,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
         external
         adminOnly // F: [RCT-03]
     {
-        ICreditFacade creditFacade = ICreditFacade(ICreditManagerV3(creditManager).creditFacade());
+        ICreditFacadeV3 creditFacade = ICreditFacadeV3(ICreditManagerV3(creditManager).creditFacade());
         address creditConfigurator = ICreditManagerV3(creditManager).creditConfigurator();
 
         uint8 currentMultiplier = creditFacade.maxDebtPerBlockMultiplier();
@@ -148,7 +148,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
         external
         adminOnly // F: [RCT-04]
     {
-        ICreditFacade creditFacade = ICreditFacade(ICreditManagerV3(creditManager).creditFacade());
+        ICreditFacadeV3 creditFacade = ICreditFacadeV3(ICreditManagerV3(creditManager).creditFacade());
         address creditConfigurator = ICreditManagerV3(creditManager).creditConfigurator();
 
         (uint128 minDebtCurrent, uint128 maxDebtCurrent) = creditFacade.debtLimits();
