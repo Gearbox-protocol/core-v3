@@ -113,6 +113,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         returns (uint256 caQuotaInterestChange, bool enableToken, bool disableToken)
     {
         int128 quotaRevenueChange;
+        int96 realQuotaChange;
 
         AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
         TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
@@ -130,12 +131,15 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         /// * Decreases the account quota and total quota by the amount
         /// * Computes whether the token should be disabled (quota changed from non-zero to zero)
         /// * Computes the total quota revenue change
-        (caQuotaInterestChange, quotaRevenueChange, enableToken, disableToken) = QuotasLogic.changeQuota({
+        (caQuotaInterestChange, quotaRevenueChange, realQuotaChange, enableToken, disableToken) = QuotasLogic
+            .changeQuota({
             tokenQuotaParams: tokenQuotaParams,
             accountQuota: accountQuota,
             lastQuotaRateUpdate: lastQuotaRateUpdate,
             quotaChange: quotaChange
         });
+
+        emit ChangeAccountQuota(creditAccount, token, realQuotaChange);
 
         /// Quota revenue must be changed on each quota updated, so that the
         /// pool can correctly compute its liquidity metrics in the future
@@ -178,6 +182,8 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
             if (setLimitsToZero) {
                 _setTokenLimit({tokenQuotaParams: tokenQuotaParams, token: token, limit: 1});
             }
+
+            emit RemoveAccountQuota(creditAccount, token);
 
             unchecked {
                 ++i;

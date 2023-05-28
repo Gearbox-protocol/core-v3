@@ -80,6 +80,11 @@ interface ICreditManagerV3Events {
 
     /// @dev Emits when a configurator is upgraded
     event SetCreditConfigurator(address indexed newConfigurator);
+
+    /// @dev Emits when a new enabled tokens mask is set for a Credit Account
+    event SaveNewEnabledTokensMask(
+        address indexed creditAccount, uint256 enabledTokensMaskOld, uint256 enabledTokensMaskNew
+    );
 }
 
 /// @notice All Credit Manager functions are access-restricted and can only be called

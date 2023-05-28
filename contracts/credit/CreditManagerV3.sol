@@ -1294,12 +1294,18 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         return creditAccountInfo[creditAccount].flags & WITHDRAWAL_FLAG != 0; // U:[CM-36]
     }
 
-    /// @notice Checks quantity of enabled tokens and saves the mask to creditAccountInfo
+    /// @notice Checks quantity of enabled tokens, saves the mask to creditAccountInfo and emits event
     function _saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) internal {
-        if (enabledTokensMask.calcEnabledTokens() > maxEnabledTokens) {
-            revert TooManyEnabledTokensException(); // U:[CM-37]
+        uint256 enabledTokensMaskOld = creditAccountInfo[creditAccount].enabledTokensMask;
+
+        if (enabledTokensMask != enabledTokensMaskOld) {
+            if (enabledTokensMask.calcEnabledTokens() > maxEnabledTokens) {
+                revert TooManyEnabledTokensException(); // U:[CM-37]
+            }
+
+            creditAccountInfo[creditAccount].enabledTokensMask = enabledTokensMask; // U:[CM-37]
+            emit SaveNewEnabledTokensMask(creditAccount, enabledTokensMaskOld, enabledTokensMask);
         }
-        creditAccountInfo[creditAccount].enabledTokensMask = enabledTokensMask; // U:[CM-37]
     }
 
     ///

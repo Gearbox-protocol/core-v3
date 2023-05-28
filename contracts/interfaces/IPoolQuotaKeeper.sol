@@ -20,8 +20,11 @@ struct AccountQuota {
 }
 
 interface IPoolQuotaKeeperEvents {
-    /// @dev Emits when CA's quota for token is changed
-    event ChangeAccountQuota(address creditAccount, address token, uint96 oldQuota, uint96 newQuota);
+    /// @dev Emits when CA's quota for a token is changed
+    event ChangeAccountQuota(address indexed creditAccount, address indexed token, int96 quotaChange);
+
+    /// @dev Emits when CA's quota for a token is removed
+    event RemoveAccountQuota(address indexed creditAccount, address indexed token);
 
     /// @dev Emits when the quota rate is updated
     event UpdateTokenQuotaRate(address indexed token, uint16 rate);

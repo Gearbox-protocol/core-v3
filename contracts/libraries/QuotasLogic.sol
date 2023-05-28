@@ -95,6 +95,8 @@ library QuotasLogic {
     ///                               value is cached somewhere else (e.g., in Credit Manager), otherwise it
     ///                               will be lost.
     /// @return quotaRevenueChange Amount to update quota revenue by.
+    /// @return realQuotaChange Amount the quota actually changed by after taking
+    ///                         capacity into account
     /// @return enableToken Whether to enable the quoted token.
     /// @return disableToken Whether to disable the quoted token
     function changeQuota(
@@ -105,7 +107,13 @@ library QuotasLogic {
     )
         internal
         initializedQuotasOnly(tokenQuotaParams)
-        returns (uint256 caQuotaInterestChange, int128 quotaRevenueChange, bool enableToken, bool disableToken)
+        returns (
+            uint256 caQuotaInterestChange,
+            int128 quotaRevenueChange,
+            int96 realQuotaChange,
+            bool enableToken,
+            bool disableToken
+        )
     {
         /// Since interest is computed dynamically as a multiplier of current quota amount,
         /// the outstanding interest has to be saved beforehand so that interest doesn't change
@@ -129,11 +137,12 @@ library QuotasLogic {
             uint96 maxQuotaAllowed = tokenQuotaParams.limit - tokenQuotaParams.totalQuoted;
 
             if (maxQuotaAllowed == 0) {
-                return (caQuotaInterestChange, 0, false, false);
+                return (caQuotaInterestChange, 0, 0, false, false);
             }
 
             change = uint96(quotaChange);
             change = change > maxQuotaAllowed ? maxQuotaAllowed : change; // F:[CMQ-08,10]
+            realQuotaChange = int96(change);
 
             // Quoted tokens are only enabled in the CM when their quotas are changed
             // from zero to non-zero. This is done to correctly
@@ -160,6 +169,7 @@ library QuotasLogic {
             // DECREASE QUOTA
             //
             change = uint96(-quotaChange);
+            realQuotaChange = quotaChange;
 
             tokenQuotaParams.totalQuoted -= change;
             accountQuota.quota -= change; // F:[CMQ-03]
