@@ -5,18 +5,17 @@ pragma solidity ^0.8.17;
 pragma abicoder v1;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
-
-// interfaces
+// INTERFACES
 import {IGaugeV3, QuotaRateParams, UserVotes} from "../interfaces/IGaugeV3.sol";
-import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IGearStakingV3} from "../interfaces/IGearStakingV3.sol";
+import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
+import {IPoolV3} from "../interfaces/IPoolV3.sol";
 
-import {PoolV3} from "./PoolV3.sol";
+// TRAITS
+import {ACLTrait} from "../traits/ACLTrait.sol";
 
 // EXCEPTIONS
 import {CallerNotVoterException} from "../interfaces/IExceptions.sol";
@@ -27,7 +26,7 @@ import {CallerNotVoterException} from "../interfaces/IExceptions.sol";
 ///      interval. While there are notable mechanic differences, the overall
 ///      dynamic of token holders controlling strategy yields is similar to
 ///      Curve's gauge system, and thus the contract carries the same name
-contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
+contract GaugeV3 is IGaugeV3, ACLTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
 
@@ -35,7 +34,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     address public immutable addressProvider;
 
     /// @notice Address of the pool
-    PoolV3 public immutable pool;
+    address public immutable override pool;
 
     /// @notice Mapping from token address to its rate parameters
     mapping(address => QuotaRateParams) public quotaRateParams;
@@ -44,7 +43,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     mapping(address => mapping(address => UserVotes)) userTokenVotes;
 
     /// @notice GEAR locking and voting contract
-    IGearStakingV3 public voter;
+    address public override voter;
 
     /// @notice Epoch when the rates were last recomputed
     uint16 public epochLastUpdate;
@@ -60,14 +59,14 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     /// @param _pool Address of the borrowing pool
     /// @param _gearStaking Address of the GEAR staking contract
     constructor(address _pool, address _gearStaking)
-        ACLNonReentrantTrait(address(PoolV3(_pool).addressProvider()))
+        ACLTrait(IPoolV3(_pool).addressProvider())
         nonZeroAddress(_pool)
         nonZeroAddress(_gearStaking)
     {
-        addressProvider = address(PoolV3(_pool).addressProvider()); // F:[P4-01]
-        pool = PoolV3(_pool); // F:[P4-01]
-        voter = IGearStakingV3(_gearStaking);
-        epochLastUpdate = voter.getCurrentEpoch();
+        addressProvider = IPoolV3(_pool).addressProvider(); // F:[P4-01]
+        pool = _pool; // F:[P4-01]
+        voter = _gearStaking;
+        epochLastUpdate = IGearStakingV3(voter).getCurrentEpoch();
     }
 
     /// @dev Reverts if the function is called by an address other than the voter
@@ -85,14 +84,14 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
 
     /// @dev IMPLEMENTATION: updateEpoch()
     function _checkAndUpdateEpoch() internal {
-        uint16 epochNow = voter.getCurrentEpoch();
+        uint16 epochNow = IGearStakingV3(voter).getCurrentEpoch();
         if (epochNow > epochLastUpdate) {
             epochLastUpdate = epochNow;
 
             /// The PQK retrieves all rates from the Gauge on its own and saves them
             /// Since this function is only callable by the Gauge, active rates can only
             /// be updated once per epoch at most
-            IPoolQuotaKeeperV3(pool.poolQuotaKeeper()).updateRates();
+            _poolQuotaKeeper().updateRates();
         }
     }
 
@@ -208,7 +207,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     /// @notice Sets the GEAR staking contract, which is the only entity allowed to vote/unvote directly
     /// @param newVoter The new voter contract
     function setVoter(address newVoter) external configuratorOnly {
-        voter = IGearStakingV3(newVoter);
+        voter = newVoter;
 
         emit SetVoter(newVoter);
     }
@@ -221,8 +220,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
         quotaRateParams[token] =
             QuotaRateParams({minRiskRate: _minRiskRate, maxRate: _maxRate, totalVotesLpSide: 0, totalVotesCaSide: 0});
 
-        IPoolQuotaKeeperV3 keeper = IPoolQuotaKeeperV3(pool.poolQuotaKeeper());
-        keeper.addQuotaToken(token);
+        _poolQuotaKeeper().addQuotaToken(token);
 
         emit AddQuotaToken(token, _minRiskRate, _maxRate);
     }
@@ -240,5 +238,10 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
         quotaRateParams[token] = qrp;
 
         emit SetQuotaTokenParams(token, _minRiskRate, _maxRate);
+    }
+
+    /// @dev Returns quota keeper connected to the pool
+    function _poolQuotaKeeper() private view returns (IPoolQuotaKeeperV3) {
+        return IPoolQuotaKeeperV3(IPoolV3(pool).poolQuotaKeeper());
     }
 }
