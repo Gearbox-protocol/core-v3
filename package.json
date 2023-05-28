@@ -23,11 +23,11 @@
   },
   "devDependencies": {
     "@chainlink/contracts": "^0.6.1",
-    "@commitlint/cli": "^17.1.2",
-    "@commitlint/config-conventional": "^17.1.0",
+    "@commitlint/cli": "^17.6.3",
+    "@commitlint/config-conventional": "^17.6.3",
     "@gearbox-protocol/prettier-config": "^1.5.0",
     "@openzeppelin/contracts": "^4.8.1",
-    "husky": "^8.0.1",
+    "husky": "^8.0.3",
     "lint-staged": "^13.0.3",
     "prettier": "^2.7.1",
     "prettier-plugin-solidity": "^1.0.0-beta.24"
