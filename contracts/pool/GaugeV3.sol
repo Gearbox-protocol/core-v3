@@ -12,14 +12,14 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 
 // interfaces
-import {IGauge, QuotaRateParams, UserVotes} from "../interfaces/IGauge.sol";
-import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
-import {IGearStaking} from "../interfaces/IGearStaking.sol";
+import {IGaugeV3, QuotaRateParams, UserVotes} from "../interfaces/IGaugeV3.sol";
+import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
+import {IGearStakingV3} from "../interfaces/IGearStakingV3.sol";
 
 import {PoolV3} from "./PoolV3.sol";
 
 // EXCEPTIONS
-import "../interfaces/IExceptions.sol";
+import {CallerNotVoterException} from "../interfaces/IExceptions.sol";
 
 /// @title Gauge for quota interest rates
 /// @dev Quota interest rates in Gearbox V3 are determined
@@ -27,7 +27,7 @@ import "../interfaces/IExceptions.sol";
 ///      interval. While there are notable mechanic differences, the overall
 ///      dynamic of token holders controlling strategy yields is similar to
 ///      Curve's gauge system, and thus the contract carries the same name
-contract Gauge is IGauge, ACLNonReentrantTrait {
+contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
 
@@ -44,10 +44,10 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
     mapping(address => mapping(address => UserVotes)) userTokenVotes;
 
     /// @notice GEAR locking and voting contract
-    IGearStaking public voter;
+    IGearStakingV3 public voter;
 
     /// @notice Epoch when the rates were last recomputed
-    uint16 public epochLU;
+    uint16 public epochLastUpdate;
 
     /// @notice Contract version
     uint256 public constant version = 3_00;
@@ -66,8 +66,8 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
     {
         addressProvider = address(PoolV3(_pool).addressProvider()); // F:[P4-01]
         pool = PoolV3(_pool); // F:[P4-01]
-        voter = IGearStaking(_gearStaking);
-        epochLU = voter.getCurrentEpoch();
+        voter = IGearStakingV3(_gearStaking);
+        epochLastUpdate = voter.getCurrentEpoch();
     }
 
     /// @dev Reverts if the function is called by an address other than the voter
@@ -86,13 +86,13 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
     /// @dev IMPLEMENTATION: updateEpoch()
     function _checkAndUpdateEpoch() internal {
         uint16 epochNow = voter.getCurrentEpoch();
-        if (epochNow > epochLU) {
-            epochLU = epochNow;
+        if (epochNow > epochLastUpdate) {
+            epochLastUpdate = epochNow;
 
             /// The PQK retrieves all rates from the Gauge on its own and saves them
             /// Since this function is only callable by the Gauge, active rates can only
             /// be updated once per epoch at most
-            IPoolQuotaKeeper(pool.poolQuotaKeeper()).updateRates();
+            IPoolQuotaKeeperV3(pool.poolQuotaKeeper()).updateRates();
         }
     }
 
@@ -208,7 +208,7 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
     /// @notice Sets the GEAR staking contract, which is the only entity allowed to vote/unvote directly
     /// @param newVoter The new voter contract
     function setVoter(address newVoter) external configuratorOnly {
-        voter = IGearStaking(newVoter);
+        voter = IGearStakingV3(newVoter);
 
         emit SetVoter(newVoter);
     }
@@ -221,7 +221,7 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
         quotaRateParams[token] =
             QuotaRateParams({minRiskRate: _minRiskRate, maxRate: _maxRate, totalVotesLpSide: 0, totalVotesCaSide: 0});
 
-        IPoolQuotaKeeper keeper = IPoolQuotaKeeper(pool.poolQuotaKeeper());
+        IPoolQuotaKeeperV3 keeper = IPoolQuotaKeeperV3(pool.poolQuotaKeeper());
         keeper.addQuotaToken(token);
 
         emit AddQuotaToken(token, _minRiskRate, _maxRate);

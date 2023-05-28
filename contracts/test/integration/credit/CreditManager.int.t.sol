@@ -17,9 +17,9 @@ import {
     CollateralDebtData
 } from "../../../interfaces/ICreditManagerV3.sol";
 
-import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
+import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
 import {IWETHGatewayV3} from "../../../interfaces/IWETHGatewayV3.sol";
-import {IWithdrawalManager} from "../../../interfaces/IWithdrawalManager.sol";
+import {IWithdrawalManagerV3} from "../../../interfaces/IWithdrawalManagerV3.sol";
 
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 
@@ -27,8 +27,8 @@ import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPool
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // LIBS & TRAITS
 import {BitMask, UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
@@ -40,13 +40,10 @@ import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 // EXCEPTIONS
 
 // MOCKS
-import {PriceFeedMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/oracles/PriceFeedMock.sol";
-import {PoolMock} from "../../mocks//pool/PoolMock.sol";
-import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
-import {
-    ERC20ApproveRestrictedRevert,
-    ERC20ApproveRestrictedFalse
-} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20ApproveRestricted.sol";
+import {PriceFeedMock} from "../../mocks/oracles/PriceFeedMock.sol";
+import {PoolMock} from "../../mocks/pool/PoolMock.sol";
+import {TargetContractMock} from "../../mocks/adapters/TargetContractMock.sol";
+import {ERC20ApproveRestrictedRevert, ERC20ApproveRestrictedFalse} from "../../mocks/token/ERC20ApproveRestricted.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
@@ -73,7 +70,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
     PoolMock poolMock;
     IPriceOracleV2 priceOracle;
     IWETHGatewayV3 wethGateway;
-    IWithdrawalManager withdrawalManager;
+    IWithdrawalManagerV3 withdrawalManager;
     ACL acl;
     address underlying;
 

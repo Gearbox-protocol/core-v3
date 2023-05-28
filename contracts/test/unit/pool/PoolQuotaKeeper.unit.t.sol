@@ -7,8 +7,10 @@ import "../../../interfaces/IAddressProviderV3.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 
-import {IPoolQuotaKeeper, IPoolQuotaKeeperEvents, TokenQuotaParams} from "../../../interfaces/IPoolQuotaKeeper.sol";
-import {IGauge} from "../../../interfaces/IGauge.sol";
+import {
+    IPoolQuotaKeeperV3, IPoolQuotaKeeperV3Events, TokenQuotaParams
+} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
+import {IGaugeV3} from "../../../interfaces/IGaugeV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -21,25 +23,25 @@ import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 
-import {PoolQuotaKeeper} from "../../../pool/PoolQuotaKeeper.sol";
+import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
 import {GaugeMock} from "../../mocks/pool/GaugeMock.sol";
 
 // TEST
 import "../../lib/constants.sol";
 
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
 import {TestHelper} from "../../lib/helper.sol";
 
-contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperEvents {
+contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV3Events {
     using Math for uint256;
 
     ContractsRegister public cr;
 
-    PoolQuotaKeeper pqk;
+    PoolQuotaKeeperV3 pqk;
     GaugeMock gaugeMock;
 
     PoolMock pool;
@@ -63,7 +65,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
 
         pool = new PoolMock(address(addressProvider), underlying);
 
-        pqk = new PoolQuotaKeeper(address(pool));
+        pqk = new PoolQuotaKeeperV3(address(pool));
 
         pool.setPoolQuotaKeeper(address(pqk));
 
@@ -217,7 +219,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
             address[] memory tokens = new address[](2);
             tokens[0] = DAI;
             tokens[1] = USDC;
-            vm.expectCall(address(gaugeMock), abi.encodeCall(IGauge.getRates, tokens));
+            vm.expectCall(address(gaugeMock), abi.encodeCall(IGaugeV3.getRates, tokens));
 
             vm.expectEmit(true, true, false, true);
             emit UpdateTokenQuotaRate(DAI, DAI_QUOTA_RATE);
@@ -258,7 +260,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
 
     // U:[PQK-8]: setGauge works as expected
     function test_U_PQK_08_setGauge_works_as_expected() public {
-        pqk = new PoolQuotaKeeper(address(pool));
+        pqk = new PoolQuotaKeeperV3(address(pool));
 
         assertEq(pqk.gauge(), address(0), "SETUP: incorrect address at start");
 
@@ -295,7 +297,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
 
     // U:[PQK-10]: addCreditManager works as expected
     function test_U_PQK_10_addCreditManager_works_as_expected() public {
-        pqk = new PoolQuotaKeeper(address(pool));
+        pqk = new PoolQuotaKeeperV3(address(pool));
 
         address[] memory managers = pqk.creditManagers();
 

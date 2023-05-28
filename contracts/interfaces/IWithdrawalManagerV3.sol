@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {IVersion} from "./IVersion.sol";
+import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 /// @notice Withdrawal claim type
 ///         - `CLAIM` only claims mature withdrawals to specified address
@@ -29,7 +29,7 @@ struct ScheduledWithdrawal {
     uint256 amount;
 }
 
-interface IWithdrawalManagerEvents {
+interface IWithdrawalManagerV3Events {
     /// @notice Emitted when new immediate withdrawal is added
     /// @param account Account immediate withdrawal was added for
     /// @param token Token to withdraw
@@ -69,7 +69,7 @@ interface IWithdrawalManagerEvents {
 }
 
 /// @title Withdrawal manager interface
-interface IWithdrawalManager is IWithdrawalManagerEvents, IVersion {
+interface IWithdrawalManagerV3 is IWithdrawalManagerV3Events, IVersion {
     // --------------------- //
     // IMMEDIATE WITHDRAWALS //
     // --------------------- //

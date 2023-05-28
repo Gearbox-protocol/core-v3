@@ -22,12 +22,12 @@
     "forge-install": "forge install --no-commit foundry-rs/forge-std"
   },
   "devDependencies": {
-    "@chainlink/contracts": "^0.4.0",
-    "@commitlint/cli": "^17.1.2",
-    "@commitlint/config-conventional": "^17.1.0",
+    "@chainlink/contracts": "^0.6.1",
+    "@commitlint/cli": "^17.6.3",
+    "@commitlint/config-conventional": "17.6.0",
     "@gearbox-protocol/prettier-config": "^1.5.0",
     "@openzeppelin/contracts": "^4.8.1",
-    "husky": "^8.0.1",
+    "husky": "^8.0.3",
     "lint-staged": "^13.0.3",
     "prettier": "^2.7.1",
     "prettier-plugin-solidity": "^1.0.0-beta.24"
@@ -38,6 +38,7 @@
     "*.{json,md}": "prettier --write"
   },
   "dependencies": {
-    "@gearbox-protocol/core-v2": "^1.16.2"
+    "@gearbox-protocol/core-v2": "https://github.com/gearbox-protocol/core-v2#base",
+    "@gearbox-protocol/integration-types": "^1.2.0"
   }
 }

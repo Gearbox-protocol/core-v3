@@ -28,7 +28,7 @@ struct CreditManagerOpts {
     uint128 maxBorrowedAmount;
     /// @dev The initial list of collateral tokens to allow
     CollateralToken[] collateralTokens;
-    /// @dev Address of DegenNFT, address(0) if whitelisted mode is not used
+    /// @dev Address of IDegenNFTV2, address(0) if whitelisted mode is not used
     address degenNFT;
     /// @dev Address of BlacklistHelper, address(0) if the underlying is not blacklistable
     address withdrawalManager;

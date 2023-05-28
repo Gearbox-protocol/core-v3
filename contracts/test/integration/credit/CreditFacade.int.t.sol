@@ -8,7 +8,7 @@ import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWE
 
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 
-import {BotList} from "../../../support/BotList.sol";
+import {BotListV3} from "../../../support/BotListV3.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 
 import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
@@ -21,8 +21,8 @@ import {
     BOT_PERMISSIONS_SET_FLAG
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
-import "../../../interfaces/ICreditFacade.sol";
-import {IDegenNFT, IDegenNFTExceptions} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
+import "../../../interfaces/ICreditFacadeV3.sol";
+import {IDegenNFTV2, IDegenNFTV2Exceptions} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFTV2.sol";
 
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
@@ -31,11 +31,9 @@ import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 import {MultiCall, MultiCallOps} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 import {Balance} from "../../../libraries/BalancesLogic.sol";
 
-import {CreditFacadeMulticaller, CreditFacadeCalls} from "../../../multicall/CreditFacadeCalls.sol";
-
 // CONSTANTS
 
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // TESTS
 
@@ -48,7 +46,7 @@ import "../../../interfaces/IExceptions.sol";
 
 // MOCKS
 import {AdapterMock} from "../../mocks//adapters/AdapterMock.sol";
-import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
+import {TargetContractMock} from "../../mocks/adapters/TargetContractMock.sol";
 
 import {GeneralMock} from "../../mocks//GeneralMock.sol";
 
@@ -70,16 +68,14 @@ contract CreditFacadeIntegrationTest is
     BalanceHelper,
     CreditFacadeTestHelper,
     ICreditManagerV3Events,
-    ICreditFacadeEvents
+    ICreditFacadeV3Events
 {
-    using CreditFacadeCalls for CreditFacadeMulticaller;
-
     AccountFactory accountFactory;
 
     TargetContractMock targetMock;
     AdapterMock adapterMock;
 
-    BotList botList;
+    BotListV3 botList;
 
     function setUp() public {
         _setUp(Tokens.DAI);
@@ -233,7 +229,7 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
                 })
             )
         );
@@ -249,7 +245,7 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
                 })
             )
         );
@@ -273,7 +269,7 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
                 })
             ),
             0
@@ -306,7 +302,7 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
                 })
             )
         );
@@ -329,7 +325,7 @@ contract CreditFacadeIntegrationTest is
 
         (uint256 minBorrowedAmount,) = creditFacade.debtLimits();
 
-        vm.expectRevert(IDegenNFTExceptions.InsufficientBalanceException.selector);
+        vm.expectRevert(IDegenNFTV2Exceptions.InsufficientBalanceException.selector);
 
         vm.prank(FRIEND);
         creditFacade.openCreditAccount(
@@ -338,7 +334,7 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
                 })
             ),
             0
@@ -355,7 +351,7 @@ contract CreditFacadeIntegrationTest is
             accountFactoryVer: 1
         });
 
-        IDegenNFT degenNFT = IDegenNFT(creditFacade.degenNFT());
+        IDegenNFTV2 degenNFT = IDegenNFTV2(creditFacade.degenNFT());
 
         vm.prank(CONFIGURATOR);
         degenNFT.mint(USER, 2);
@@ -416,7 +412,7 @@ contract CreditFacadeIntegrationTest is
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
             })
         );
 
@@ -439,11 +435,11 @@ contract CreditFacadeIntegrationTest is
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT))
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT))
             }),
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeMulticall.revokeAdapterAllowances, (revocations))
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.revokeAdapterAllowances, (revocations))
             })
         );
 
@@ -534,7 +530,7 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (collateral, amount))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (collateral, amount))
                 })
             ),
             REFERRAL_CODE
@@ -553,7 +549,7 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.decreaseDebt, 812)
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, 812)
                 })
             ),
             REFERRAL_CODE
@@ -580,7 +576,7 @@ contract CreditFacadeIntegrationTest is
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT))
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT))
             })
         );
 
@@ -602,7 +598,7 @@ contract CreditFacadeIntegrationTest is
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
             })
         );
 
@@ -661,7 +657,7 @@ contract CreditFacadeIntegrationTest is
         vm.expectEmit(false, false, false, true);
         emit FinishMultiCall();
 
-        vm.expectCall(address(botList), abi.encodeCall(BotList.eraseAllBotPermissions, (creditAccount)));
+        vm.expectCall(address(botList), abi.encodeCall(BotListV3.eraseAllBotPermissions, (creditAccount)));
 
         // todo: add withdrawal manager call
 
@@ -758,7 +754,7 @@ contract CreditFacadeIntegrationTest is
         vm.expectEmit(false, false, false, false);
         emit FinishMultiCall();
 
-        vm.expectCall(address(botList), abi.encodeCall(BotList.eraseAllBotPermissions, (creditAccount)));
+        vm.expectCall(address(botList), abi.encodeCall(BotListV3.eraseAllBotPermissions, (creditAccount)));
 
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (address(1))));
 
@@ -842,7 +838,7 @@ contract CreditFacadeIntegrationTest is
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
             })
         );
 
@@ -886,7 +882,7 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.increaseDebt, (512))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (512))
                 })
             )
         );
@@ -907,7 +903,9 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.increaseDebt, (maxDebt * maxDebtPerBlockMultiplier + 1))
+                    callData: abi.encodeCall(
+                        ICreditFacadeV3Multicall.increaseDebt, (maxDebt * maxDebtPerBlockMultiplier + 1)
+                        )
                 })
             )
         );
@@ -931,7 +929,7 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.increaseDebt, (amount))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (amount))
                 })
             )
         );
@@ -952,7 +950,7 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.increaseDebt, (1))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (1))
                 })
             )
         );
@@ -970,7 +968,7 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.enableToken, (link))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (link))
                 })
             )
         );
@@ -986,7 +984,7 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.increaseDebt, (1))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (1))
                 })
             )
         );
@@ -1017,7 +1015,7 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.decreaseDebt, (512))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (512))
                 })
             )
         );
@@ -1041,7 +1039,7 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.decreaseDebt, (amount))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (amount))
                 })
             )
         );
@@ -1075,7 +1073,7 @@ contract CreditFacadeIntegrationTest is
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (usdcToken, 512))
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (usdcToken, 512))
             })
         );
 
@@ -1198,11 +1196,11 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (usdcToken, USDC_EXCHANGE_AMOUNT))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (usdcToken, USDC_EXCHANGE_AMOUNT))
                 }),
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.increaseDebt, (256))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (256))
                 })
             )
         );
@@ -1255,11 +1253,11 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (usdcToken, USDC_EXCHANGE_AMOUNT))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (usdcToken, USDC_EXCHANGE_AMOUNT))
                 }),
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.decreaseDebt, 256)
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, 256)
                 })
             )
         );
@@ -1277,11 +1275,11 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.increaseDebt, 256)
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, 256)
                 }),
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.decreaseDebt, 256)
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, 256)
                 })
             )
         );
@@ -1364,7 +1362,7 @@ contract CreditFacadeIntegrationTest is
         //     MultiCallBuilder.build(
         //         MultiCall({
         //             target: address(creditFacade),
-        //             callData: abi.encodeCall(ICreditFacadeMulticall.increaseDebt, (DAI_EXCHANGE_AMOUNT))
+        //             callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_EXCHANGE_AMOUNT))
         //         })
         //     )
         // );
@@ -1382,7 +1380,7 @@ contract CreditFacadeIntegrationTest is
         //     MultiCallBuilder.build(
         //         MultiCall({
         //             target: address(creditFacade),
-        //             callData: abi.encodeCall(ICreditFacadeMulticall.increaseDebt, (DAI_EXCHANGE_AMOUNT))
+        //             callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_EXCHANGE_AMOUNT))
         //         })
         //     )
         // );
@@ -1412,7 +1410,7 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.enableToken, (usdcToken))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (usdcToken))
                 })
             )
         );
@@ -1457,7 +1455,7 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.enableToken, (usdcToken))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (usdcToken))
                 })
             )
         );
@@ -1550,9 +1548,9 @@ contract CreditFacadeIntegrationTest is
         address tokenLINK = tokenTestSuite.addressOf(Tokens.LINK);
 
         Balance[] memory expectedBalances = new Balance[](2);
-        expectedBalances[0] = Balance({token: underlying, balance: expectedDAI, tokenMask: 0});
+        expectedBalances[0] = Balance({token: underlying, balance: expectedDAI});
 
-        expectedBalances[1] = Balance({token: tokenLINK, balance: expectedLINK, tokenMask: 0});
+        expectedBalances[1] = Balance({token: tokenLINK, balance: expectedLINK});
 
         // TOKEN PREPARATION
         tokenTestSuite.mint(Tokens.DAI, USER, expectedDAI * 3);
@@ -1565,9 +1563,18 @@ contract CreditFacadeIntegrationTest is
         creditFacade.multicall(
             creditAccount,
             MultiCallBuilder.build(
-                CreditFacadeMulticaller(address(creditFacade)).revertIfReceivedLessThan(expectedBalances),
-                CreditFacadeMulticaller(address(creditFacade)).addCollateral(underlying, expectedDAI),
-                CreditFacadeMulticaller(address(creditFacade)).addCollateral(tokenLINK, expectedLINK)
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.revertIfReceivedLessThan, (expectedBalances))
+                }),
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, expectedDAI))
+                }),
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (tokenLINK, expectedLINK))
+                })
             )
         );
 
@@ -1584,18 +1591,18 @@ contract CreditFacadeIntegrationTest is
                 MultiCallBuilder.build(
                     MultiCall({
                         target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeMulticall.revertIfReceivedLessThan, (expectedBalances))
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.revertIfReceivedLessThan, (expectedBalances))
                     }),
                     MultiCall({
                         target: address(creditFacade),
                         callData: abi.encodeCall(
-                            ICreditFacadeMulticall.addCollateral, (underlying, (i == 0) ? expectedDAI - 1 : expectedDAI)
+                            ICreditFacadeV3Multicall.addCollateral, (underlying, (i == 0) ? expectedDAI - 1 : expectedDAI)
                             )
                     }),
                     MultiCall({
                         target: address(creditFacade),
                         callData: abi.encodeCall(
-                            ICreditFacadeMulticall.addCollateral, (tokenLINK, (i == 0) ? expectedLINK : expectedLINK - 1)
+                            ICreditFacadeV3Multicall.addCollateral, (tokenLINK, (i == 0) ? expectedLINK : expectedLINK - 1)
                             )
                     })
                 )
@@ -1608,7 +1615,7 @@ contract CreditFacadeIntegrationTest is
         uint256 expectedDAI = 1000;
 
         Balance[] memory expectedBalances = new Balance[](1);
-        expectedBalances[0] = Balance({token: underlying, balance: expectedDAI, tokenMask: 0});
+        expectedBalances[0] = Balance({token: underlying, balance: expectedDAI});
 
         (address creditAccount,) = _openTestCreditAccount();
         vm.prank(USER);
@@ -1619,11 +1626,11 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.revertIfReceivedLessThan, (expectedBalances))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.revertIfReceivedLessThan, (expectedBalances))
                 }),
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.revertIfReceivedLessThan, (expectedBalances))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.revertIfReceivedLessThan, (expectedBalances))
                 })
             )
         );
@@ -1652,7 +1659,7 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
                 })
             ),
             0
@@ -1784,7 +1791,7 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.enableToken, (token))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (token))
                 })
             )
         );
@@ -1804,7 +1811,7 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.enableToken, (token))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (token))
                 })
             )
         );
@@ -1817,7 +1824,7 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.disableToken, (token))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.disableToken, (token))
                 })
             )
         );
@@ -1850,13 +1857,13 @@ contract CreditFacadeIntegrationTest is
 
     //     ERC20BlacklistableMock(usdc).setBlacklisted(USER, true);
 
-    //     vm.expectCall(blacklistHelper, abi.encodeCall(IWithdrawalManager.isBlacklisted, (usdc, USER)));
+    //     vm.expectCall(blacklistHelper, abi.encodeCall(IWithdrawalManagerV3.isBlacklisted, (usdc, USER)));
 
     //     vm.expectCall(
     //         address(creditManager), abi.encodeCall(ICreditManagerV3.transferAccountOwnership, (USER, blacklistHelper))
     //     );
 
-    //     vm.expectCall(blacklistHelper, abi.encodeCall(IWithdrawalManager.addWithdrawal, (usdc, USER, expectedAmount)));
+    //     vm.expectCall(blacklistHelper, abi.encodeCall(IWithdrawalManagerV3.addWithdrawal, (usdc, USER, expectedAmount)));
 
     //     vm.expectEmit(true, false, false, true);
     //     emit UnderlyingSentToBlacklistHelper(USER, expectedAmount);
@@ -1864,10 +1871,10 @@ contract CreditFacadeIntegrationTest is
     //     vm.prank(LIQUIDATOR);
     //     creditFacade.liquidateCreditAccount(USER, FRIEND, 0, true, MultiCallBuilder.build());
 
-    //     assertEq(IWithdrawalManager(blacklistHelper).claimable(usdc, USER), expectedAmount, "Incorrect claimable amount");
+    //     assertEq(IWithdrawalManagerV3(blacklistHelper).claimable(usdc, USER), expectedAmount, "Incorrect claimable amount");
 
     //     vm.prank(USER);
-    //     IWithdrawalManager(blacklistHelper).claim(usdc, FRIEND2);
+    //     IWithdrawalManagerV3(blacklistHelper).claim(usdc, FRIEND2);
 
     //     assertEq(tokenTestSuite.balanceOf(Tokens.USDC, FRIEND2), expectedAmount, "Transferred amount incorrect");
     // }
@@ -1893,7 +1900,7 @@ contract CreditFacadeIntegrationTest is
     //         MultiCallBuilder.build(
     //             MultiCall({
     //                 target: address(creditFacade),
-    //                 callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
+    //                 callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
     //             })
     //         ),
     //         0
@@ -1973,7 +1980,7 @@ contract CreditFacadeIntegrationTest is
         vm.prank(FRIEND);
         creditFacade.setBotPermissions(creditAccount, bot, type(uint192).max, uint72(1 ether), uint72(1 ether / 10));
 
-        vm.expectCall(address(botList), abi.encodeCall(BotList.eraseAllBotPermissions, (creditAccount)));
+        vm.expectCall(address(botList), abi.encodeCall(BotListV3.eraseAllBotPermissions, (creditAccount)));
 
         vm.expectCall(
             address(creditManager),
@@ -2022,7 +2029,7 @@ contract CreditFacadeIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.setFullCheckParams, (collateralHints, 10001))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, 10001))
                 })
             )
         );

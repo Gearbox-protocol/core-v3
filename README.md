@@ -84,7 +84,7 @@ Contains the base contracts Gearbox uses to evaluate assets and convert them to 
 Contains contracts related to passive LP side.
 
 1. `PoolService.sol` implements a borrowing pool that loans assets to Credit Managers to be used in Credit Accounts.
-2. `LinearInterestRateModel.sol` implements a function of interest rate from utilization.
+2. `LinearInterestRateModelV3.sol` implements a function of interest rate from utilization.
 
 ### Support
 
@@ -99,7 +99,7 @@ Contains contracts that assist data retrieval and configuration.
 Contains contracts for special tokens used by the system.
 
 1. `DieselToken` implements an LP token for Gearbox borrowing pools.
-2. `DegenNFT` is a special non-transferrable NFT required to open a Credit Account if the system is in Leverage Ninja mode.
+2. `IDegenNFTV2` is a special non-transferrable NFT required to open a Credit Account if the system is in Leverage Ninja mode.
 3. `GearToken` is the contract for the Gearbox DAO GEAR token.
 4. `PhantomERC20` is a special pseudo-ERC20 used to collateralize positions that are not represented as ERC20 on the third-party protocol side. Its `balanceOf` function is customized in concrete implementations to report, e.g., an amount staked in a particular farming pool.
 
@@ -108,10 +108,10 @@ Contains contracts for special tokens used by the system.
 Source contracts and their respective interfaces can be imported from an npm package `@gearbox-protocol/core-v2`, e.g.:
 
 ```=solidity
-import {ICreditFacade, MultiCall} from '@gearbox-protocol/core-v2/contracts/interfaces/ICreditFacade.sol';
+import {ICreditFacadeV3, MultiCall} from '@gearbox-protocol/core-v2/contracts/interfaces/ICreditFacadeV3.sol';
 
 contract MyContract {
-  ICreditFacade creditFacade;
+  ICreditFacadeV3 creditFacade;
 
   function foo(MultiCall[] memory calls) {
     creditFacade.multicall(calls);

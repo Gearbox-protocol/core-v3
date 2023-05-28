@@ -4,15 +4,13 @@
 pragma solidity ^0.8.17;
 
 import {IERC20Helper} from "./IERC20Helper.sol";
-
 import "../interfaces/IExceptions.sol";
-
 import {BitMask} from "./BitMask.sol";
-
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 
-struct Balance {
+struct BalanceWithMask {
     address token;
     uint256 tokenMask;
     uint256 balance;
@@ -68,11 +66,11 @@ library BalancesLogic {
         uint256 enabledTokensMask,
         uint256 forbiddenTokenMask,
         function (uint256) view returns (address) getTokenByMaskFn
-    ) internal view returns (Balance[] memory forbiddenBalances) {
+    ) internal view returns (BalanceWithMask[] memory forbiddenBalances) {
         uint256 forbiddenTokensOnAccount = enabledTokensMask & forbiddenTokenMask;
 
         if (forbiddenTokensOnAccount != 0) {
-            forbiddenBalances = new Balance[](forbiddenTokensOnAccount.calcEnabledTokens());
+            forbiddenBalances = new  BalanceWithMask[](forbiddenTokensOnAccount.calcEnabledTokens());
             unchecked {
                 uint256 i;
                 for (uint256 tokenMask = 1; tokenMask < forbiddenTokensOnAccount; tokenMask <<= 1) {
@@ -99,7 +97,7 @@ library BalancesLogic {
         address creditAccount,
         uint256 enabledTokensMaskBefore,
         uint256 enabledTokensMaskAfter,
-        Balance[] memory forbiddenBalances,
+        BalanceWithMask[] memory forbiddenBalances,
         uint256 forbiddenTokenMask
     ) internal view {
         uint256 forbiddenTokensOnAccount = enabledTokensMaskAfter & forbiddenTokenMask;

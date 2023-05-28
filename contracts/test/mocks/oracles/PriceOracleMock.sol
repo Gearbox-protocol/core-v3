@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 //pragma abicoder v1;
 
-import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
+import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
 
 // EXCEPTIONS
 

@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 /// @title USDT fees Library
 /// @dev Computes amounts to send / receive with USDT fees accounted for

@@ -3,17 +3,17 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {ControllerTimelock} from "../../../support/risk-controller/ControllerTimelock.sol";
-import {Policy} from "../../../support/risk-controller/PolicyManager.sol";
+import {ControllerTimelockV3} from "../../../support/risk-controller/ControllerTimelockV3.sol";
+import {Policy} from "../../../support/risk-controller/PolicyManagerV3.sol";
 import {GeneralMock} from "../../mocks/GeneralMock.sol";
 
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
-import {ICreditFacade} from "../../../interfaces/ICreditFacade.sol";
+import {ICreditFacadeV3} from "../../../interfaces/ICreditFacadeV3.sol";
 import {ICreditConfigurator} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 import {PoolV3} from "../../../pool/PoolV3.sol";
-import {ILPPriceFeed} from "../../../interfaces/ILPPriceFeed.sol";
-import {IControllerTimelockEvents, IControllerTimelockErrors} from "../../../interfaces/IControllerTimelock.sol";
+import {ILPPriceFeedV2} from "@gearbox-protocol/core-v2/contracts/interfaces/ILPPriceFeedV2.sol";
+import {IControllerTimelockV3Events, IControllerTimelockV3Errors} from "../../../interfaces/IControllerTimelockV3.sol";
 
 // TEST
 import "../../lib/constants.sol";
@@ -24,10 +24,10 @@ import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMoc
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
-contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerTimelockErrors {
+contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControllerTimelockV3Errors {
     AddressProviderV3ACLMock public addressProvider;
 
-    ControllerTimelock public controllerTimelock;
+    ControllerTimelockV3 public controllerTimelock;
 
     address admin;
     address vetoAdmin;
@@ -38,7 +38,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
 
         vm.prank(CONFIGURATOR);
         addressProvider = new AddressProviderV3ACLMock();
-        controllerTimelock = new ControllerTimelock(address(addressProvider), admin, vetoAdmin);
+        controllerTimelock = new ControllerTimelockV3(address(addressProvider), admin, vetoAdmin);
     }
 
     function _makeMocks()
@@ -84,7 +84,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "EXPIRATION_DATE"));
 
         vm.mockCall(
-            creditFacade, abi.encodeWithSelector(ICreditFacade.expirationDate.selector), abi.encode(block.timestamp)
+            creditFacade, abi.encodeWithSelector(ICreditFacadeV3.expirationDate.selector), abi.encode(block.timestamp)
         );
 
         vm.mockCall(
@@ -170,7 +170,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         vm.prank(CONFIGURATOR);
         controllerTimelock.setGroup(lpPriceFeed, "LP_PRICE_FEED");
 
-        vm.mockCall(lpPriceFeed, abi.encodeWithSelector(ILPPriceFeed.lowerBound.selector), abi.encode(5));
+        vm.mockCall(lpPriceFeed, abi.encodeWithSelector(ILPPriceFeedV2.lowerBound.selector), abi.encode(5));
 
         bytes32 POLICY_CODE = keccak256(abi.encode("LP_PRICE_FEED", "LP_PRICE_FEED_LIMITER"));
 
@@ -214,7 +214,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         vm.prank(admin);
         controllerTimelock.setLPPriceFeedLimiter(lpPriceFeed, 7);
 
-        vm.expectCall(lpPriceFeed, abi.encodeWithSelector(ILPPriceFeed.setLimiter.selector, 7));
+        vm.expectCall(lpPriceFeed, abi.encodeWithSelector(ILPPriceFeedV2.setLimiter.selector, 7));
 
         vm.warp(block.timestamp + 1 days);
 
@@ -233,7 +233,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "MAX_DEBT_PER_BLOCK_MULTIPLIER"));
 
         vm.mockCall(
-            creditFacade, abi.encodeWithSelector(ICreditFacade.maxDebtPerBlockMultiplier.selector), abi.encode(3)
+            creditFacade, abi.encodeWithSelector(ICreditFacadeV3.maxDebtPerBlockMultiplier.selector), abi.encode(3)
         );
 
         Policy memory policy = Policy({
@@ -304,7 +304,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         bytes32 POLICY_CODE_1 = keccak256(abi.encode("CM", "MIN_DEBT"));
         bytes32 POLICY_CODE_2 = keccak256(abi.encode("CM", "MAX_DEBT"));
 
-        vm.mockCall(creditFacade, abi.encodeWithSelector(ICreditFacade.debtLimits.selector), abi.encode(10, 20));
+        vm.mockCall(creditFacade, abi.encodeWithSelector(ICreditFacadeV3.debtLimits.selector), abi.encode(10, 20));
 
         Policy memory policy = Policy({
             enabled: false,
@@ -569,7 +569,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "EXPIRATION_DATE"));
 
         vm.mockCall(
-            creditFacade, abi.encodeWithSelector(ICreditFacade.expirationDate.selector), abi.encode(block.timestamp)
+            creditFacade, abi.encodeWithSelector(ICreditFacadeV3.expirationDate.selector), abi.encode(block.timestamp)
         );
 
         vm.mockCall(pool, abi.encodeWithSelector(IPoolV3.creditManagerBorrowed.selector, creditManager), abi.encode(0));
@@ -671,7 +671,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "EXPIRATION_DATE"));
 
         vm.mockCall(
-            creditFacade, abi.encodeWithSelector(ICreditFacade.expirationDate.selector), abi.encode(block.timestamp)
+            creditFacade, abi.encodeWithSelector(ICreditFacadeV3.expirationDate.selector), abi.encode(block.timestamp)
         );
 
         vm.mockCall(pool, abi.encodeWithSelector(IPoolV3.creditManagerBorrowed.selector, creditManager), abi.encode(0));

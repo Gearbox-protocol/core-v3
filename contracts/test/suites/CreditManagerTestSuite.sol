@@ -10,7 +10,7 @@ import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWE
 
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
 
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 

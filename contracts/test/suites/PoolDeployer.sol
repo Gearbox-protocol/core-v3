@@ -4,24 +4,34 @@
 pragma solidity ^0.8.17;
 
 import "../../interfaces/IAddressProviderV3.sol";
-import {IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {PriceFeedConfig} from "@gearbox-protocol/core-v2/contracts/oracles/PriceOracle.sol";
+import {IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
+import {PriceFeedConfig} from "@gearbox-protocol/core-v2/contracts/oracles/PriceOracleV2.sol";
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 import {GenesisFactory} from "./GenesisFactory.sol";
-import {PoolFactory, PoolOpts} from "@gearbox-protocol/core-v2/contracts/factories/PoolFactory.sol";
-import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
-import {BotList} from "../../support/BotList.sol";
+import {WithdrawalManagerV3} from "../../support/WithdrawalManagerV3.sol";
+import {BotListV3} from "../../support/BotListV3.sol";
 
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 import {PoolMock} from "../mocks//pool/PoolMock.sol";
 import {GaugeMock} from "../mocks//pool/GaugeMock.sol";
-import {PoolQuotaKeeper} from "../../pool/PoolQuotaKeeper.sol";
+import {PoolQuotaKeeperV3} from "../../pool/PoolQuotaKeeperV3.sol";
 
 import "../lib/constants.sol";
 
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
+
+struct PoolOpts {
+    address addressProvider; // address of addressProvider contract
+    address underlying; // address of underlying token for pool and creditManager
+    uint256 U_optimal; // linear interest model parameter
+    uint256 R_base; // linear interest model parameter
+    uint256 R_slope1; // linear interest model parameter
+    uint256 R_slope2; // linear interest model parameter
+    uint256 expectedLiquidityLimit; // linear interest model parameter
+    uint256 withdrawFee; // withdrawFee
+}
 
 struct PoolCreditOpts {
     PoolOpts poolOpts;
@@ -35,11 +45,11 @@ contract PoolDeployer is Test {
     GenesisFactory public gp;
     AccountFactory public af;
     PoolMock public poolMock;
-    PoolQuotaKeeper public poolQuotaKeeper;
+    PoolQuotaKeeperV3 public poolQuotaKeeper;
     GaugeMock public gaugeMock;
     ContractsRegister public cr;
-    WithdrawalManager public withdrawalManager;
-    BotList public botList;
+    WithdrawalManagerV3 public withdrawalManager;
+    BotListV3 public botList;
     ACL public acl;
 
     IPriceOracleV2Ext public priceOracle;
@@ -78,9 +88,9 @@ contract PoolDeployer is Test {
 
         cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
 
-        withdrawalManager = WithdrawalManager(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00));
+        withdrawalManager = WithdrawalManagerV3(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00));
 
-        botList = BotList(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00));
+        botList = BotListV3(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00));
 
         underlying = _underlying;
 
@@ -93,7 +103,7 @@ contract PoolDeployer is Test {
 
         cr.addPool(address(poolMock));
 
-        poolQuotaKeeper = new PoolQuotaKeeper(payable(address(poolMock)));
+        poolQuotaKeeper = new PoolQuotaKeeperV3(payable(address(poolMock)));
 
         gaugeMock = new GaugeMock(address(poolMock));
 
