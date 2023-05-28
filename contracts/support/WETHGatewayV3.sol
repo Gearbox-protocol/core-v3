@@ -6,11 +6,11 @@ pragma abicoder v1;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
+import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 
 import {AP_WETH_TOKEN, IAddressProviderV3, NO_VERSION_CONTROL} from "../interfaces/IAddressProviderV3.sol";
 import {ReceiveIsNotAllowedException} from "../interfaces/IExceptions.sol";
-import {IVersion} from "../interfaces/IVersion.sol";
 import {IWETHGatewayV3} from "../interfaces/IWETHGatewayV3.sol";
 
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";

@@ -6,7 +6,6 @@ pragma solidity ^0.8.17;
 import {Test} from "forge-std/Test.sol";
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
-import {WETHMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/WETHMock.sol";
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
@@ -19,6 +18,7 @@ import {IWETHGatewayV3Events} from "../../../interfaces/IWETHGatewayV3.sol";
 import {ENTERED} from "../../../traits/ReentrancyGuardTrait.sol";
 
 import {AP_WETH_TOKEN, AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
+import {WETHMock} from "../../mocks/token/WETHMock.sol";
 import {WETHGatewayV3Harness} from "./WETHGatewayV3Harness.sol";
 
 /// @title WETH gateway V3 unit test
