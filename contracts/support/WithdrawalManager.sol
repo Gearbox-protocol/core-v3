@@ -12,7 +12,7 @@ import {
     NoFreeWithdrawalSlotsException,
     NothingToClaimException
 } from "../interfaces/IExceptions.sol";
-import {IVersion} from "../interfaces/IVersion.sol";
+import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 import {ClaimAction, IWithdrawalManagerV3, ScheduledWithdrawal} from "../interfaces/IWithdrawalManagerV3.sol";
 import {IERC20Helper} from "../libraries/IERC20Helper.sol";
 import {WithdrawalsLogic} from "../libraries/WithdrawalsLogic.sol";

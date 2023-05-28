@@ -9,7 +9,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 import {ICreditAccountV3} from "../interfaces/ICreditAccountV3.sol";
-import {IVersion} from "../interfaces/IVersion.sol";
+import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 import {CallerNotAccountFactoryException, CallerNotCreditManagerException} from "../interfaces/IExceptions.sol";
 
 /// @title Credit account V3

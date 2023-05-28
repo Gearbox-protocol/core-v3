@@ -6,7 +6,7 @@ pragma abicoder v1;
 
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
-import {IVersion} from "./IVersion.sol";
+import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 /// @title Pool base interface
 /// @notice Functions shared accross newer and older versions

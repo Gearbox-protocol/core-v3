@@ -12,7 +12,7 @@ import {ICreditFacadeV3} from "../../../interfaces/ICreditFacadeV3.sol";
 import {ICreditConfigurator} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 import {PoolV3} from "../../../pool/PoolV3.sol";
-import {ILPPriceFeed} from "../../../interfaces/ILPPriceFeed.sol";
+import {ILPPriceFeedV2} from "@gearbox-protocol/core-v2/contracts/interfaces/ILPPriceFeedV2.sol";
 import {IControllerTimelockEvents, IControllerTimelockErrors} from "../../../interfaces/IControllerTimelock.sol";
 
 // TEST
@@ -170,7 +170,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         vm.prank(CONFIGURATOR);
         controllerTimelock.setGroup(lpPriceFeed, "LP_PRICE_FEED");
 
-        vm.mockCall(lpPriceFeed, abi.encodeWithSelector(ILPPriceFeed.lowerBound.selector), abi.encode(5));
+        vm.mockCall(lpPriceFeed, abi.encodeWithSelector(ILPPriceFeedV2.lowerBound.selector), abi.encode(5));
 
         bytes32 POLICY_CODE = keccak256(abi.encode("LP_PRICE_FEED", "LP_PRICE_FEED_LIMITER"));
 
@@ -214,7 +214,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         vm.prank(admin);
         controllerTimelock.setLPPriceFeedLimiter(lpPriceFeed, 7);
 
-        vm.expectCall(lpPriceFeed, abi.encodeWithSelector(ILPPriceFeed.setLimiter.selector, 7));
+        vm.expectCall(lpPriceFeed, abi.encodeWithSelector(ILPPriceFeedV2.setLimiter.selector, 7));
 
         vm.warp(block.timestamp + 1 days);
 

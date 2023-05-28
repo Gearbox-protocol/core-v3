@@ -20,7 +20,7 @@ import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {IInterestRateModelV3} from "../interfaces/IInterestRateModelV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
-import {IVersion} from "../interfaces/IVersion.sol";
+import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 // LIBS & TRAITS
 import {CreditLogic} from "../libraries/CreditLogic.sol";

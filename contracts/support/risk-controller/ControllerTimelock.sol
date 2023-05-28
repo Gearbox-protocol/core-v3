@@ -11,7 +11,7 @@ import {ICreditManagerV3} from "../../interfaces/ICreditManagerV3.sol";
 
 import {ICreditFacadeV3} from "../../interfaces/ICreditFacadeV3.sol";
 import {IPoolV3} from "../../interfaces/IPoolV3.sol";
-import {ILPPriceFeed} from "../../interfaces/ILPPriceFeed.sol";
+import {ILPPriceFeedV2} from "@gearbox-protocol/core-v2/contracts/interfaces/ILPPriceFeedV2.sol";
 
 /// @notice ControllerTimelock contract
 /// @dev ControllerTimelock is a governance contract that allows
@@ -102,7 +102,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
         external
         adminOnly // F: [RCT-02]
     {
-        uint256 currentLowerBound = ILPPriceFeed(priceFeed).lowerBound();
+        uint256 currentLowerBound = ILPPriceFeedV2(priceFeed).lowerBound();
 
         if (!_checkPolicy(priceFeed, "LP_PRICE_FEED_LIMITER", currentLowerBound, lowerBound)) {
             revert ParameterChecksFailedException(); // F: [RCT-02]

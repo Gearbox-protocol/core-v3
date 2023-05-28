@@ -476,6 +476,12 @@
     "@ethersproject/properties" "^5.7.0"
     "@ethersproject/strings" "^5.7.0"
 
+"@gearbox-protocol/core-v2@https://github.com/gearbox-protocol/core-v2#base":
+  version "1.0.1"
+  resolved "https://github.com/gearbox-protocol/core-v2#128f0b5e68e58d294b2afb8924b42a9e691f7204"
+  dependencies:
+    "@typechain/ethers-v5" "^10.2.1"
+
 "@gearbox-protocol/core-v2@https://github.com/gearbox-protocol/core-v2.git#base":
   version "1.0.1"
   resolved "https://github.com/gearbox-protocol/core-v2.git#e37aab85e4db49a9511c4b2eaa0b0d623fc10d3c"

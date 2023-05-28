@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {IVersion} from "./IVersion.sol";
+import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 /// @notice Withdrawal claim type
 ///         - `CLAIM` only claims mature withdrawals to specified address
