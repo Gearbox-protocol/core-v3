@@ -1039,8 +1039,8 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
     // EXECUTE ORDER
     //
 
-    /// @dev I:[CM-29]: executeOrder calls credit account method and emit event
-    function test_I_CM_29_executeOrder_calls_credit_account_method_and_emit_event() public {
+    /// @dev I:[CM-29]: execute calls credit account method and emit event
+    function test_I_CM_29_execute_calls_credit_account_method_and_emit_event() public {
         (,,, address creditAccount) = _openCreditAccount();
         creditManager.setActiveCreditAccount(creditAccount);
 
@@ -1053,14 +1053,14 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
 
         // we emit the event we expect to see.
         vm.expectEmit(true, false, false, false);
-        emit ExecuteOrder(address(targetMock));
+        emit Execute(address(targetMock));
 
         // stack trace check
         vm.expectCall(creditAccount, abi.encodeWithSignature("execute(address,bytes)", address(targetMock), callData));
         vm.expectCall(address(targetMock), callData);
 
         vm.prank(ADAPTER);
-        creditManager.executeOrder(callData);
+        creditManager.execute(callData);
 
         assertEq0(targetMock.callData(), callData, "Incorrect calldata");
     }

@@ -7,7 +7,7 @@ interface IWETHGateway {
     /// @dev POOL V3:
     function deposit(address pool, address receiver) external payable returns (uint256 shares);
 
-    function depositReferral(address pool, address receiver, uint16 referralCode)
+    function depositWithReferral(address pool, address receiver, uint16 referralCode)
         external
         payable
         returns (uint256 shares);

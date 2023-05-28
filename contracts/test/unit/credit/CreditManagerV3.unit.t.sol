@@ -441,7 +441,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.approveCreditAccount(DUMB_ADDRESS, 100);
 
         vm.expectRevert(CallerNotAdapterException.selector);
-        creditManager.executeOrder(bytes("0"));
+        creditManager.execute(bytes("0"));
 
         vm.stopPrank();
     }
@@ -530,7 +530,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.approveCreditAccount(DUMB_ADDRESS, 100);
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditManager.executeOrder(bytes("0"));
+        creditManager.execute(bytes("0"));
     }
 
     //
@@ -1399,8 +1399,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     //  EXECUTE
     //
 
-    /// @dev U:[CM-16]: executeOrder works as expected
-    function test_U_CM_16_executeOrder_works_as_expected() public withoutSupportQuotas {
+    /// @dev U:[CM-16]: execute works as expected
+    function test_U_CM_16_execute_works_as_expected() public withoutSupportQuotas {
         address creditAccount = address(new CreditAccountMock());
 
         creditManager.setActiveCreditAccount(address(creditAccount));
@@ -1414,7 +1414,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         CreditAccountMock(creditAccount).setReturnExecuteResult(expectedReturnValue);
 
         vm.expectEmit(true, false, false, false);
-        emit ExecuteOrder(DUMB_ADDRESS);
+        emit Execute(DUMB_ADDRESS);
 
         vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountBase.execute, (DUMB_ADDRESS, dumbCallData)));
 
@@ -1422,7 +1422,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         emit ExecuteCall(DUMB_ADDRESS, dumbCallData);
 
         vm.prank(ADAPTER);
-        bytes memory returnValue = creditManager.executeOrder(dumbCallData);
+        bytes memory returnValue = creditManager.execute(dumbCallData);
 
         assertEq(returnValue, expectedReturnValue, "Incorrect return value");
     }

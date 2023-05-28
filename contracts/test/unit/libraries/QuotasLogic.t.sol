@@ -122,7 +122,7 @@ contract QuotasLogicTest is TestHelper {
         uint96 quotaLimit;
         uint96 totalQuoted;
         uint256 caQuotaInterestChangeExpected;
-        int128 quotaRevenueChangeExpected;
+        int256 quotaRevenueChangeExpected;
         int96 realQuotaChangeExpected;
         bool enableTokenExpected;
         bool disableTokenExpected;
@@ -143,7 +143,7 @@ contract QuotasLogicTest is TestHelper {
                 quotaLimit: uint96(2 * WAD),
                 totalQuoted: uint96(WAD / 2),
                 caQuotaInterestChangeExpected: 0,
-                quotaRevenueChangeExpected: int128(int96(int256(WAD)) * 1000),
+                quotaRevenueChangeExpected: int256(int96(int256(WAD)) / 10),
                 realQuotaChangeExpected: int96(int256(WAD)),
                 enableTokenExpected: true,
                 disableTokenExpected: false
@@ -162,7 +162,7 @@ contract QuotasLogicTest is TestHelper {
 
             (
                 uint256 caQuotaInterestChange,
-                int128 quotaRevenueChange,
+                int256 quotaRevenueChange,
                 int96 realQuotaChange,
                 bool enableToken,
                 bool disableToken

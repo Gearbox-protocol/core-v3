@@ -603,7 +603,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Requests a Credit Account to make a low-level call with provided data
     /// This is the intended pathway for state-changing interactions with 3rd-party protocols
     /// @param data Data to pass with the call
-    function executeOrder(bytes calldata data)
+    function execute(bytes calldata data)
         external
         override
         nonReentrant // U:[CM-5]
@@ -611,7 +611,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         address targetContract = _getTargetContractOrRevert(); // U:[CM-3]
         // Emits an event
-        emit ExecuteOrder(targetContract); // U:[CM-16]
+        emit Execute(targetContract); // U:[CM-16]
 
         // Returned data is provided as-is to the caller;
         // It is expected that is is parsed and returned as a correct type

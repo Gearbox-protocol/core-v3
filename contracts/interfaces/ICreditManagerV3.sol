@@ -76,7 +76,7 @@ struct RevocationPair {
 
 interface ICreditManagerV3Events {
     /// @dev Emits when a call to an external contract is made through the Credit Manager
-    event ExecuteOrder(address indexed targetContract);
+    event Execute(address indexed targetContract);
 
     /// @dev Emits when a configurator is upgraded
     event SetCreditConfigurator(address indexed newConfigurator);
@@ -172,7 +172,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @dev Requests a Credit Account to make a low-level call with provided data
     /// This is the intended pathway for state-changing interactions with 3rd-party protocols
     /// @param callData Data to pass with the call
-    function executeOrder(bytes memory callData) external returns (bytes memory);
+    function execute(bytes memory callData) external returns (bytes memory);
 
     //
     // COLLATERAL VALIDITY AND ACCOUNT HEALTH CHECKS

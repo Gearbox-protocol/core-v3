@@ -69,7 +69,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
 
         pqk = new PoolQuotaKeeper(address(pool));
 
-        pool.setPoolQuotaManager(address(pqk));
+        pool.setPoolQuotaKeeper(address(pqk));
 
         gaugeMock = new GaugeMock(address(pool));
 
@@ -229,10 +229,10 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
             vm.expectEmit(true, true, false, true);
             emit UpdateTokenQuotaRate(USDC, USDC_QUOTA_RATE);
 
-            uint96 expectedQuotaRevenue =
-                uint96(DAI_QUOTA_RATE * uint96(daiQuota) + USDC_QUOTA_RATE * uint96(usdcQuota));
+            uint256 expectedQuotaRevenue =
+                (DAI_QUOTA_RATE * uint96(daiQuota) + USDC_QUOTA_RATE * uint96(usdcQuota)) / PERCENTAGE_FACTOR;
 
-            vm.expectCall(address(pool), abi.encodeCall(IPoolV3.updateQuotaRevenue, expectedQuotaRevenue));
+            vm.expectCall(address(pool), abi.encodeCall(IPoolV3.setQuotaRevenue, expectedQuotaRevenue));
 
             gaugeMock.updateEpoch();
 

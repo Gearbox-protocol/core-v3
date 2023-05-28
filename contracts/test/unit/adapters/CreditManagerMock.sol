@@ -26,7 +26,7 @@ contract CreditManagerMock is CreditManagerMockEvents {
         emit Approve(token, amount);
     }
 
-    function executeOrder(bytes memory) external returns (bytes memory result) {
+    function execute(bytes memory) external returns (bytes memory result) {
         emit Execute();
         return _result;
     }
@@ -39,7 +39,7 @@ contract CreditManagerMock is CreditManagerMockEvents {
         getTokenMaskOrRevert[token] = mask;
     }
 
-    function setExecuteOrderResult(bytes memory result) external {
+    function setExecuteResult(bytes memory result) external {
         _result = result;
     }
 }
