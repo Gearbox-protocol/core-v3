@@ -98,14 +98,15 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @return caQuotaInterestChange Accrued quota interest since last interest update.
     ///                               It is expected that this value is stored/used by the caller,
     ///                               as PQK will update the interest index, which will set local accrued interest to 0
-    /// @return change Change what was made
+    /// @return realQuotaChange Actual quota change. Can be lower than requested on quota increase, it total quotas are
+    ///                         at capacity.
     /// @return enableToken Whether the token needs to be enabled
     /// @return disableToken Whether the token needs to be disabled
     function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota)
         external
         override
         creditManagerOnly // F:[PQK-4]
-        returns (uint256 caQuotaInterestChange, int96 change, bool enableToken, bool disableToken)
+        returns (uint256 caQuotaInterestChange, int96 realQuotaChange, bool enableToken, bool disableToken)
     {
         int256 quotaRevenueChange;
 
@@ -125,7 +126,8 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         /// * Decreases the account quota and total quota by the amount
         /// * Computes whether the token should be disabled (quota changed from non-zero to zero)
         /// * Computes the total quota revenue change
-        (caQuotaInterestChange, quotaRevenueChange, enableToken, disableToken) = QuotasLogic.changeQuota({
+        (caQuotaInterestChange, quotaRevenueChange, realQuotaChange, enableToken, disableToken) = QuotasLogic
+            .changeQuota({
             tokenQuotaParams: tokenQuotaParams,
             accountQuota: accountQuota,
             lastQuotaRateUpdate: lastQuotaRateUpdate,
@@ -227,15 +229,12 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         returns (uint256 quoted, uint256 interest)
     {
         AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
+        TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
 
         quoted = accountQuota.quota;
 
         if (quoted > 1) {
-            interest = CreditLogic.calcAccruedInterest({
-                amount: quoted,
-                cumulativeIndexLastUpdate: accountQuota.cumulativeIndexLU,
-                cumulativeIndexNow: cumulativeIndex(token)
-            }); // F:[CMQ-8]
+            interest = QuotasLogic.calcOutstandingQuotaInterest(tokenQuotaParams, accountQuota, lastQuotaRateUpdate);
         }
     }
 

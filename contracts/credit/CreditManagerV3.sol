@@ -503,6 +503,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     creditAccount: creditAccount,
                     tokens: collateralDebtData.quotedTokens
                 });
+                console.log(newCumulativeQuotaInterest);
                 creditAccountInfo[creditAccount].cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // U:[CM-11]
             }
 
@@ -959,7 +960,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         override
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
-        returns (int96 change, uint256 tokensToEnable, uint256 tokensToDisable)
+        returns (int96 realQuotaChange, uint256 tokensToEnable, uint256 tokensToDisable)
     {
         /// The PoolQuotaKeeper returns the interest to be cached (quota interest is computed dynamically,
         /// so the cumulative index inside PQK needs to be updated before setting the new quota value).
@@ -969,7 +970,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         bool enable;
         bool disable;
 
-        (caInterestChange, change, enable, disable) = IPoolQuotaKeeperV3(poolQuotaKeeper()).updateQuota({
+        (caInterestChange, realQuotaChange, enable, disable) = IPoolQuotaKeeper(poolQuotaKeeper()).updateQuota({
             creditAccount: creditAccount,
             token: token,
             quotaChange: quotaChange,
@@ -1317,12 +1318,17 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     /// @notice Checks quantity of enabled tokens and saves the mask to creditAccountInfo
-    function _saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) internal {
-        if (enabledTokensMask.calcEnabledTokens() > maxEnabledTokens) {
-            revert TooManyEnabledTokensException(); // U:[CM-37]
-        }
 
-        creditAccountInfo[creditAccount].enabledTokensMask = enabledTokensMask; // U:[CM-37]
+    function _saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) internal {
+        uint256 enabledTokensMaskOld = creditAccountInfo[creditAccount].enabledTokensMask;
+
+        if (enabledTokensMask != enabledTokensMaskOld) {
+            if (enabledTokensMask.calcEnabledTokens() > maxEnabledTokens) {
+                revert TooManyEnabledTokensException(); // U:[CM-37]
+            }
+
+            creditAccountInfo[creditAccount].enabledTokensMask = enabledTokensMask; // U:[CM-37]
+        }
     }
 
     ///
