@@ -3,6 +3,8 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+
 import {TokenQuotaParams, AccountQuota} from "../interfaces/IPoolQuotaKeeper.sol";
 import {CreditLogic} from "./CreditLogic.sol";
 
@@ -15,6 +17,8 @@ uint192 constant RAY_DIVIDED_BY_PERCENTAGE = uint192(RAY / PERCENTAGE_FACTOR);
 
 /// @title Quota Library
 library QuotasLogic {
+    using SafeCast for uint256;
+
     /// @dev Only allows quoted tokens (with initialized data) to be passed to a function
     modifier initializedQuotasOnly(TokenQuotaParams storage tokenQuotaParams) {
         if (!isInitialised(tokenQuotaParams)) {
@@ -105,7 +109,7 @@ library QuotasLogic {
     )
         internal
         initializedQuotasOnly(tokenQuotaParams)
-        returns (uint256 caQuotaInterestChange, int128 quotaRevenueChange, bool enableToken, bool disableToken)
+        returns (uint256 caQuotaInterestChange, int256 quotaRevenueChange, bool enableToken, bool disableToken)
     {
         /// Since interest is computed dynamically as a multiplier of current quota amount,
         /// the outstanding interest has to be saved beforehand so that interest doesn't change
@@ -154,7 +158,7 @@ library QuotasLogic {
 
             // Quota revenue is a global sum of all quota interest received from all tokens and accounts
             // per year. It is used by the pool to effectively compute expected quota revenue with just one value
-            quotaRevenueChange = int128(int16(tokenQuotaParams.rate)) * int96(change);
+            quotaRevenueChange = (uint256(change) * tokenQuotaParams.rate / PERCENTAGE_FACTOR).toInt256();
         } else {
             //
             // DECREASE QUOTA
@@ -173,7 +177,7 @@ library QuotasLogic {
                 disableToken = true;
             }
 
-            quotaRevenueChange = -int128(int16(tokenQuotaParams.rate)) * int96(change);
+            quotaRevenueChange = -(uint256(change) * tokenQuotaParams.rate / PERCENTAGE_FACTOR).toInt256();
         }
     }
 
@@ -211,7 +215,7 @@ library QuotasLogic {
     function removeQuota(TokenQuotaParams storage tokenQuotaParams, AccountQuota storage accountQuota)
         internal
         initializedQuotasOnly(tokenQuotaParams)
-        returns (int128 quotaRevenueChange)
+        returns (int256 quotaRevenueChange)
     {
         uint96 quoted = accountQuota.quota;
 
@@ -223,7 +227,7 @@ library QuotasLogic {
 
             tokenQuotaParams.totalQuoted -= quoted;
             accountQuota.quota = 1;
-            quotaRevenueChange = -int128(int16(tokenQuotaParams.rate)) * int96(quoted);
+            quotaRevenueChange = -(uint256(quoted) * tokenQuotaParams.rate / PERCENTAGE_FACTOR).toInt256();
         }
     }
 
@@ -262,11 +266,11 @@ library QuotasLogic {
     /// @return quotaRevenue The new annual quota revenue for the token. Used to recompute quote revenue for the pool
     function updateRate(TokenQuotaParams storage tokenQuotaParams, uint256 timeFromLastUpdate, uint16 rate)
         internal
-        returns (uint128 quotaRevenue)
+        returns (uint256 quotaRevenue)
     {
         tokenQuotaParams.cumulativeIndexLU_RAY = calcLinearCumulativeIndex(tokenQuotaParams, rate, timeFromLastUpdate); // F:[PQK-7]
         tokenQuotaParams.rate = rate;
 
-        return rate * tokenQuotaParams.totalQuoted;
+        return uint256(tokenQuotaParams.totalQuoted) * rate / PERCENTAGE_FACTOR;
     }
 }

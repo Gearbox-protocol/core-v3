@@ -201,12 +201,11 @@ error BorrowingMoreU2ForbiddenException();
 /// @dev Thrown on returning a value that violates the current bounds
 error ValueOutOfRangeException();
 
-// interface IPoolV3Exceptions {
-error ExpectedLiquidityLimitException();
-
 error CreditManagerCantBorrowException();
 
-error IncompatiblePoolQuotaKeeper();
+error QuotasNotSupportedException();
+
+error IncompatiblePoolQuotaKeeperException();
 
 /// @dev Thrown when attempting to pass a zero amount to a funding-related operation
 error AmountCantBeZeroException();
