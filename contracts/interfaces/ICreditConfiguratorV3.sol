@@ -124,9 +124,9 @@ interface ICreditConfiguratorEvents {
     event SetTotalDebtLimit(uint128);
 }
 
-/// @dev CreditConfigurator Exceptions
+/// @dev CreditConfiguratorV3 Exceptions
 
-interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
+interface ICreditConfiguratorV3 is ICreditConfiguratorEvents, IVersion {
     //
     // STATE-CHANGING FUNCTIONS
     //

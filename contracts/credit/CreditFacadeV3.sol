@@ -38,13 +38,10 @@ import {IWETHGatewayV3} from "../interfaces/IWETHGatewayV3.sol";
 import {IBotListV3} from "../interfaces/IBotListV3.sol";
 
 // CONSTANTS
-
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
-
-import "forge-std/console.sol";
 
 uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS
     & ~(INCREASE_DEBT_PERMISSION | DECREASE_DEBT_PERMISSION | WITHDRAW_PERMISSION) | INCREASE_DEBT_WAS_CALLED;

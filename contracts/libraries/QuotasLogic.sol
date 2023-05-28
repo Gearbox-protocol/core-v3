@@ -8,8 +8,7 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {TokenQuotaParams, AccountQuota} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {CreditLogic} from "./CreditLogic.sol";
 
-import {RAY, SECONDS_PER_YEAR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {RAY, SECONDS_PER_YEAR, PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 import "../interfaces/IExceptions.sol";
 

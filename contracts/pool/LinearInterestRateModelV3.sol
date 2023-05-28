@@ -4,8 +4,7 @@
 pragma solidity ^0.8.17;
 pragma abicoder v1;
 
-import {WAD, RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {WAD, RAY, PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {IInterestRateModelV3} from "../interfaces/IInterestRateModelV3.sol";
 
 // EXCEPTIONS

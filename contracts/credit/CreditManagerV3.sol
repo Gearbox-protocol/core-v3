@@ -40,12 +40,11 @@ import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPr
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 
 // CONSTANTS
-import "forge-std/console.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {
     DEFAULT_FEE_INTEREST,
     DEFAULT_FEE_LIQUIDATION,
-    DEFAULT_LIQUIDATION_PREMIUM
+    DEFAULT_LIQUIDATION_PREMIUM,
+    PERCENTAGE_FACTOR
 } from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // EXCEPTIONS
@@ -502,7 +501,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     creditAccount: creditAccount,
                     tokens: collateralDebtData.quotedTokens
                 });
-                console.log(newCumulativeQuotaInterest);
                 creditAccountInfo[creditAccount].cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // U:[CM-11]
             }
 

@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
-import {CreditConfigurator} from "../../credit/CreditConfiguratorV3.sol";
+import {CreditConfiguratorV3} from "../../credit/CreditConfiguratorV3.sol";
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
@@ -27,7 +27,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
 
     CreditManagerV3 public creditManager;
     CreditFacadeV3 public creditFacade;
-    CreditConfigurator public creditConfigurator;
+    CreditConfiguratorV3 public creditConfigurator;
     DegenNFTV2 public degenNFT;
 
     uint128 public minBorrowedAmount;
@@ -120,7 +120,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
         vm.label(address(poolMock), "Pool");
         vm.label(address(creditFacade), "CreditFacadeV3");
         vm.label(address(creditManager), "CreditManagerV3");
-        vm.label(address(creditConfigurator), "CreditConfigurator");
+        vm.label(address(creditConfigurator), "CreditConfiguratorV3");
 
         tokenTestSuite.mint(underlying, USER, creditAccountAmount);
         tokenTestSuite.mint(underlying, FRIEND, creditAccountAmount);

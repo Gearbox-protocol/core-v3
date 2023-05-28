@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/utils/Create2.sol";
 
 import {CreditManagerV3} from "../credit/CreditManagerV3.sol";
 import {CreditFacadeV3} from "../credit/CreditFacadeV3.sol";
-import {CreditConfigurator, CreditManagerOpts} from "../credit/CreditConfiguratorV3.sol";
+import {CreditConfiguratorV3, CreditManagerOpts} from "../credit/CreditConfiguratorV3.sol";
 
 /// @title CreditManagerFactory
 /// @notice Deploys 3 core interdependent contracts: CreditManage, CreditFacadeV3 and CredigConfigurator
@@ -15,7 +15,7 @@ import {CreditConfigurator, CreditManagerOpts} from "../credit/CreditConfigurato
 contract CreditManagerFactory {
     CreditManagerV3 public creditManager;
     CreditFacadeV3 public creditFacade;
-    CreditConfigurator public creditConfigurator;
+    CreditConfiguratorV3 public creditConfigurator;
 
     constructor(address _ap, address _pool, CreditManagerOpts memory opts, bytes32 salt) {
         creditManager = new CreditManagerV3(_ap, _pool);
@@ -26,9 +26,9 @@ contract CreditManagerFactory {
         );
 
         bytes memory configuratorByteCode =
-            abi.encodePacked(type(CreditConfigurator).creationCode, abi.encode(creditManager, creditFacade, opts));
+            abi.encodePacked(type(CreditConfiguratorV3).creationCode, abi.encode(creditManager, creditFacade, opts));
 
-        creditConfigurator = CreditConfigurator(Create2.computeAddress(salt, keccak256(configuratorByteCode)));
+        creditConfigurator = CreditConfiguratorV3(Create2.computeAddress(salt, keccak256(configuratorByteCode)));
 
         creditManager.setCreditConfigurator(address(creditConfigurator));
 

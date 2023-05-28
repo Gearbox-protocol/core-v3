@@ -9,7 +9,7 @@ import {GeneralMock} from "../../mocks/GeneralMock.sol";
 
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import {ICreditFacadeV3} from "../../../interfaces/ICreditFacadeV3.sol";
-import {ICreditConfigurator} from "../../../interfaces/ICreditConfiguratorV3.sol";
+import {ICreditConfiguratorV3} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 import {PoolV3} from "../../../pool/PoolV3.sol";
 import {ILPPriceFeedV2} from "@gearbox-protocol/core-v2/contracts/interfaces/ILPPriceFeedV2.sol";
@@ -150,7 +150,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         vm.expectCall(
             creditConfigurator,
-            abi.encodeWithSelector(ICreditConfigurator.setExpirationDate.selector, block.timestamp + 5)
+            abi.encodeWithSelector(ICreditConfiguratorV3.setExpirationDate.selector, block.timestamp + 5)
         );
 
         vm.warp(block.timestamp + 1 days);
@@ -284,7 +284,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         controllerTimelock.setMaxDebtPerBlockMultiplier(creditManager, 4);
 
         vm.expectCall(
-            creditConfigurator, abi.encodeWithSelector(ICreditConfigurator.setMaxDebtPerBlockMultiplier.selector, 4)
+            creditConfigurator, abi.encodeWithSelector(ICreditConfiguratorV3.setMaxDebtPerBlockMultiplier.selector, 4)
         );
 
         vm.warp(block.timestamp + 1 days);
@@ -373,7 +373,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.prank(admin);
         controllerTimelock.setDebtLimits(creditManager, 15, 16);
 
-        vm.expectCall(creditConfigurator, abi.encodeWithSelector(ICreditConfigurator.setLimits.selector, 15, 16));
+        vm.expectCall(creditConfigurator, abi.encodeWithSelector(ICreditConfiguratorV3.setLimits.selector, 15, 16));
 
         vm.warp(block.timestamp + 1 days);
 
@@ -544,7 +544,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.expectCall(
             creditConfigurator,
             abi.encodeWithSelector(
-                ICreditConfigurator.rampLiquidationThreshold.selector,
+                ICreditConfiguratorV3.rampLiquidationThreshold.selector,
                 token,
                 6000,
                 uint40(block.timestamp + 14 days),
@@ -725,7 +725,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         vm.mockCallRevert(
             creditConfigurator,
-            abi.encodeWithSelector(ICreditConfigurator.setExpirationDate.selector, expirationDate),
+            abi.encodeWithSelector(ICreditConfiguratorV3.setExpirationDate.selector, expirationDate),
             abi.encode("error")
         );
 
@@ -794,7 +794,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         controllerTimelock.forbidAdapter(creditManager, DUMB_ADDRESS);
 
         vm.expectCall(
-            creditConfigurator, abi.encodeWithSelector(ICreditConfigurator.forbidAdapter.selector, DUMB_ADDRESS)
+            creditConfigurator, abi.encodeWithSelector(ICreditConfiguratorV3.forbidAdapter.selector, DUMB_ADDRESS)
         );
 
         vm.warp(block.timestamp + 1 days);

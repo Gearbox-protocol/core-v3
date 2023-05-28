@@ -7,7 +7,7 @@ import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
-import {CreditConfigurator} from "../../credit/CreditConfiguratorV3.sol";
+import {CreditConfiguratorV3} from "../../credit/CreditConfiguratorV3.sol";
 import {MultiCall} from "../../interfaces/ICreditFacadeV3.sol";
 import {MultiCallBuilder} from "../lib/MultiCallBuilder.sol";
 
@@ -28,7 +28,7 @@ import {Tokens} from "../config/Tokens.sol";
 contract CreditFacadeTestHelper is TestHelper {
     ICreditManagerV3 public creditManager;
     CreditFacadeV3 public creditFacade;
-    CreditConfigurator public creditConfigurator;
+    CreditConfiguratorV3 public creditConfigurator;
 
     CreditFacadeTestSuite public cft;
 

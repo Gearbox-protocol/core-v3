@@ -15,10 +15,10 @@ import {
     DEFAULT_FEE_LIQUIDATION_EXPIRED,
     DEFAULT_LIQUIDATION_PREMIUM_EXPIRED,
     DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER,
+    PERCENTAGE_FACTOR,
     WAD
 } from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {UNDERLYING_TOKEN_MASK} from "../libraries/BitMask.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // CONTRACTS
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
@@ -28,7 +28,7 @@ import {CreditManagerV3} from "./CreditManagerV3.sol";
 // INTERFACES
 import {IAdapter} from "../interfaces/IAdapter.sol";
 import {
-    ICreditConfigurator,
+    ICreditConfiguratorV3,
     CollateralToken,
     CreditManagerOpts,
     AllowanceAction
@@ -41,13 +41,13 @@ import "../interfaces/IAddressProviderV3.sol";
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
-/// @title CreditConfigurator
+/// @title CreditConfiguratorV3
 /// @notice This contract is used to configure CreditManagers and is the only one with the priviledge
 /// to call access-restricted functions
 /// @dev All functions can only by called by the Configurator as per ACL.
-/// CreditManagerV3 blindly executes all requests (in nearly all cases) from CreditConfigurator, so most sanity checks
+/// CreditManagerV3 blindly executes all requests (in nearly all cases) from CreditConfiguratorV3, so most sanity checks
 /// are performed here.
-contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
+contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using Address for address;
 
@@ -103,7 +103,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
             /// 2. Emergency liquidator set stores all emergency liquidators - used for parameter migration when changing the Credit Facade
             /// 3. Forbidden token set stores all forbidden tokens - used for parameter migration when changing the Credit Facade
             {
-                address[] memory allowedContractsPrev = CreditConfigurator(currentConfigurator).allowedAdapters(); // I:[CC-29]
+                address[] memory allowedContractsPrev = CreditConfiguratorV3(currentConfigurator).allowedAdapters(); // I:[CC-29]
 
                 uint256 allowedContractsLen = allowedContractsPrev.length;
                 for (uint256 i = 0; i < allowedContractsLen;) {
@@ -116,7 +116,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
             }
             {
                 address[] memory emergencyLiquidatorsPrev =
-                    CreditConfigurator(currentConfigurator).emergencyLiquidators(); // I:[CC-29]
+                    CreditConfiguratorV3(currentConfigurator).emergencyLiquidators(); // I:[CC-29]
 
                 uint256 emergencyLiquidatorsLen = emergencyLiquidatorsPrev.length;
                 for (uint256 i = 0; i < emergencyLiquidatorsLen;) {

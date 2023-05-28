@@ -9,7 +9,7 @@ import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 import {WithdrawalManagerV3} from "../../../support/WithdrawalManagerV3.sol";
 import {
-    CreditConfigurator,
+    CreditConfiguratorV3,
     CreditManagerOpts,
     CollateralToken,
     AllowanceAction,
@@ -52,7 +52,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
 
     CreditManagerV3 public creditManager;
     CreditFacadeV3 public creditFacade;
-    CreditConfigurator public creditConfigurator;
+    CreditConfiguratorV3 public creditConfigurator;
     WithdrawalManagerV3 public withdrawalManager;
     address underlying;
 
@@ -268,8 +268,9 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         address priceOracleAddress = address(creditManager.priceOracle());
         address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
 
-        bytes memory configuratorByteCode =
-            abi.encodePacked(type(CreditConfigurator).creationCode, abi.encode(creditManager, creditFacade, creditOpts));
+        bytes memory configuratorByteCode = abi.encodePacked(
+            type(CreditConfiguratorV3).creationCode, abi.encode(creditManager, creditFacade, creditOpts)
+        );
 
         address creditConfiguratorAddr = _getAddress(configuratorByteCode, 0);
 
@@ -1210,7 +1211,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
             expirable: false
         });
 
-        CreditConfigurator newCC = new CreditConfigurator(
+        CreditConfiguratorV3 newCC = new CreditConfiguratorV3(
             creditManager,
             creditFacade,
             creditOpts
