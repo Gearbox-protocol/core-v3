@@ -20,7 +20,7 @@ import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
 import {IERC4626Events} from "../../interfaces/IERC4626.sol";
 
 import {IInterestRateModel} from "../../../interfaces/IInterestRateModel.sol";
-
+import {IPoolQuotaKeeper} from "../../../interfaces/IPoolQuotaKeeper.sol";
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 
@@ -1342,7 +1342,6 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
 
             vm.prank(address(pqk));
             pool.setQuotaRevenue(quotaInterestPerYear);
-
 
             uint256 baseInterestRate = pool.baseInterestRate();
             uint256 timeWarp = 365 days;

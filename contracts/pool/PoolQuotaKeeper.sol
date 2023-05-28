@@ -94,12 +94,13 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
 
     /// @notice Updates a Credit Account's quota amount for a token
     /// @param creditAccount Address of credit account
-
     /// @param token Address of the token
     /// @param quotaChange Signed quota change amount
+    /// @param minQuota Minimum deisred quota amount
     /// @return caQuotaInterestChange Accrued quota interest since last interest update.
     ///                               It is expected that this value is stored/used by the caller,
     ///                               as PQK will update the interest index, which will set local accrued interest to 0
+    /// @return change Change what was made
     /// @return enableToken Whether the token needs to be enabled
     /// @return disableToken Whether the token needs to be disabled
     function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota)
