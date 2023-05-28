@@ -609,8 +609,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (bytes memory)
     {
         address targetContract = _getTargetContractOrRevert(); // U:[CM-3]
-        // Emits an event
-        emit Execute(targetContract); // U:[CM-16]
 
         // Returned data is provided as-is to the caller;
         // It is expected that is is parsed and returned as a correct type
@@ -664,6 +662,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         external
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
+        returns (uint256 _enabledTOkensMaskUpdated)
     {
         if (minHealthFactor < PERCENTAGE_FACTOR) {
             revert CustomHealthFactorTooLowException(); // U:[CM-17]
@@ -691,9 +690,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         /// tokens are deleted from the in-memory enabledTokensMask, so the final value
         /// must be saved
         _saveEnabledTokensMask(creditAccount, collateralDebtData.enabledTokensMask); // U:[CM-18]
+
+        return collateralDebtData.enabledTokensMask;
     }
 
-    /// TODO: Q: move to CF?
     /// @notice Returns whether the passed credit account is unhealthy given the provided minHealthFactor
     /// @param creditAccount Address of the credit account to check
     /// @param minHealthFactor The health factor below which the function would
@@ -944,13 +944,17 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         override
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
-        returns (uint256 tokensToEnable, uint256 tokensToDisable)
+        returns (int96 change, uint256 tokensToEnable, uint256 tokensToDisable)
     {
         /// The PoolQuotaKeeper returns the interest to be cached (quota interest is computed dynamically,
         /// so the cumulative index inside PQK needs to be updated before setting the new quota value).
         /// PQK also reports whether the quota was changed from zero to non-zero and vice versa, in order to
         /// safely enable and disable quoted tokens
-        (uint256 caInterestChange, bool enable, bool disable) = IPoolQuotaKeeper(poolQuotaKeeper()).updateQuota({
+        uint256 caInterestChange;
+        bool enable;
+        bool disable;
+
+        (caInterestChange, change, enable, disable) = IPoolQuotaKeeper(poolQuotaKeeper()).updateQuota({
             creditAccount: creditAccount,
             token: token,
             quotaChange: quotaChange
@@ -1293,13 +1297,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Returns the mask containing the account's enabled tokens
     /// @param creditAccount Credit Account to get the mask for
     function enabledTokensMaskOf(address creditAccount) public view override returns (uint256) {
-        if (collateralTokensCount <= 80) {
-            return creditAccountInfo[creditAccount].enabledTokensMask; // U:[CM-37]
-        } // U:[CM-35]
-        else {
-            return (uint256(creditAccountInfo[creditAccount].extraEnabledTokensMask) << 80)
-                | creditAccountInfo[creditAccount].enabledTokensMask; // U:[CM-37]
-        }
+        return creditAccountInfo[creditAccount].enabledTokensMask; // U:[CM-37]
     }
 
     /// @notice Checks quantity of enabled tokens and saves the mask to creditAccountInfo
@@ -1307,10 +1305,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         if (enabledTokensMask.calcEnabledTokens() > maxEnabledTokens) {
             revert TooManyEnabledTokensException(); // U:[CM-37]
         }
-        creditAccountInfo[creditAccount].enabledTokensMask = uint80(enabledTokensMask & type(uint80).max); // U:[CM-37]
-        if (collateralTokensCount > 80) {
-            creditAccountInfo[creditAccount].extraEnabledTokensMask = uint176(enabledTokensMask >> 80); // U:[CM-37]
-        }
+
+        creditAccountInfo[creditAccount].enabledTokensMask = enabledTokensMask; // U:[CM-37]
     }
 
     ///

@@ -786,8 +786,10 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     _revertIfNoPermission(flags, EXTERNAL_CALLS_PERMISSION);
                     // U:[FA-21]
 
+                    address targetContract = ICreditManagerV3(creditManager).adapterToContract(mcall.target);
+
                     // Checks that the target is an allowed adapter in Credit Manager
-                    if (ICreditManagerV3(creditManager).adapterToContract(mcall.target) == address(0)) {
+                    if (targetContract == address(0)) {
                         revert TargetContractNotAllowedException();
                     }
 
@@ -804,6 +806,9 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
                     /// on the stack; the net change in the enabled token set is saved to storage
                     /// only in fullCollateralCheck at the end of the multicall
                     bytes memory result = mcall.target.functionCall(mcall.callData); // U:[FA-38]
+
+                    // Emits an event
+                    emit Execute({creditAccount: creditAccount, targetContract: targetContract}); // todo: add check
 
                     (uint256 tokensToEnable, uint256 tokensToDisable) = abi.decode(result, (uint256, uint256)); // U:[FA-38]
                     enabledTokensMask = enabledTokensMask.enableDisable({
@@ -943,11 +948,12 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         internal
         returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
+        int96 change;
         (address token, int96 quotaChange) = abi.decode(callData, (address, int96)); // U:[FA-34]
-        (tokensToEnable, tokensToDisable) =
+        (change, tokensToEnable, tokensToDisable) =
             ICreditManagerV3(creditManager).updateQuota(creditAccount, token, quotaChange); // U:[FA-34]
 
-        emit UpdateQuota(creditAccount, token, quotaChange); // U:[FA-34]
+        emit UpdateQuota({creditAccount: creditAccount, token: token, quotaChange: change}); // U:[FA-34]
     }
 
     /// @notice Requests the Credit Manager to schedule a withdrawal
@@ -1101,7 +1107,7 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         uint256[] memory forbiddenBalances,
         uint256 _forbiddenTokenMask
     ) internal {
-        ICreditManagerV3(creditManager).fullCollateralCheck(
+        uint256 enabledTokensMaskUpdated = ICreditManagerV3(creditManager).fullCollateralCheck(
             creditAccount,
             fullCheckParams.enabledTokensMaskAfter,
             fullCheckParams.collateralHints,
@@ -1111,11 +1117,13 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         BalancesLogic.checkForbiddenBalances({
             creditAccount: creditAccount,
             enabledTokensMaskBefore: enabledTokensMaskBefore,
-            enabledTokensMaskAfter: fullCheckParams.enabledTokensMaskAfter,
+            enabledTokensMaskAfter: enabledTokensMaskUpdated,
             forbiddenBalances: forbiddenBalances,
             forbiddenTokenMask: _forbiddenTokenMask,
             getTokenByMaskFn: _getTokenByMask
         });
+
+        emit SetEnabledTokensMask(creditAccount, enabledTokensMaskUpdated);
     }
 
     /// @notice Returns whether the Credit Facade is expired

@@ -571,10 +571,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             uint256 debt,
             uint256 cumulativeIndexLastUpdate,
             uint256 cumulativeQuotaInterest,
-            uint64 since,
-            ,
-            ,
+            uint256 enabledTokensMask,
             uint16 flags,
+            uint64 since,
             address borrower
         ) = creditManager.creditAccountInfo(creditAccount);
 
@@ -585,11 +584,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             supportsQuotas ? 1 : cumulativeQuotaInterestBefore,
             _testCaseErr("Incorrect cumulativeQuotaInterest")
         );
-        assertEq(
-            creditManager.enabledTokensMaskOf(creditAccount),
-            enabledTokensMaskBefore,
-            _testCaseErr("Incorrect enabledTokensMask")
-        );
+        assertEq(enabledTokensMask, enabledTokensMaskBefore, _testCaseErr("Incorrect enabledTokensMask"));
 
         assertEq(since, block.number, _testCaseErr("Incorrect since"));
 
@@ -898,7 +893,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 reason: "Pool balance invariant"
             });
 
-            (,,,,,,, address borrower) = creditManager.creditAccountInfo(creditAccount);
+            (,,,,,, address borrower) = creditManager.creditAccountInfo(creditAccount);
             assertEq(borrower, address(0), "Borrowers wasn't cleared");
 
             assertEq(
@@ -1076,7 +1071,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         /// @notice checking creditAccountInf update
 
-        (uint256 debt, uint256 cumulativeIndexLastUpdate,,,,,,) = creditManager.creditAccountInfo(creditAccount);
+        (uint256 debt, uint256 cumulativeIndexLastUpdate,,,,,) = creditManager.creditAccountInfo(creditAccount);
 
         assertEq(debt, expectedNewDebt, _testCaseErr("Incorrect debt update in creditAccountInfo"));
         assertEq(
@@ -1200,7 +1195,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         /// @notice checking creditAccountInf update
         {
-            (uint256 debt, uint256 cumulativeIndexLastUpdate, uint256 cumulativeQuotaInterest,,,,,) =
+            (uint256 debt, uint256 cumulativeIndexLastUpdate, uint256 cumulativeQuotaInterest,,,,) =
                 creditManager.creditAccountInfo(creditAccount);
 
             assertEq(debt, expectedNewDebt, _testCaseErr("Incorrect debt update in creditAccountInfo"));
@@ -1277,7 +1272,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             );
             assertEq(tokensToDisable, 0, _testCaseErr("Incorrect tokensToDisable"));
 
-            (uint256 caiDebt, uint256 caiCumulativeIndexLastUpdate, uint256 caiCumulativeQuotaInterest,,,,,) =
+            (uint256 caiDebt, uint256 caiCumulativeIndexLastUpdate, uint256 caiCumulativeQuotaInterest,,,,) =
                 creditManager.creditAccountInfo(creditAccount);
 
             assertEq(newDebt, debt, _testCaseErr("Incorrect debt update in creditAccountInfo"));
@@ -1439,9 +1434,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         bytes memory expectedReturnValue = bytes("Yes,sir!");
 
         CreditAccountMock(creditAccount).setReturnExecuteResult(expectedReturnValue);
-
-        vm.expectEmit(true, false, false, false);
-        emit Execute(DUMB_ADDRESS);
 
         vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountBase.execute, (DUMB_ADDRESS, dumbCallData)));
 
@@ -2190,13 +2182,14 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             poolQuotaKeeperMock.setUpdateQuotaReturns(caInterestChange, enable, disable);
 
             /// @notice mock returns predefined values which do not depend on params
-            (uint256 tokensToEnable, uint256 tokensToDisable) = creditManager.updateQuota({
+            // todo: add check
+            (int96 change, uint256 tokensToEnable, uint256 tokensToDisable) = creditManager.updateQuota({
                 creditAccount: creditAccount,
                 token: tokenTestSuite.addressOf(Tokens.LINK),
                 quotaChange: 122
             });
 
-            (,, uint256 cumulativeQuotaInterest,,,,,) = creditManager.creditAccountInfo(creditAccount);
+            (,, uint256 cumulativeQuotaInterest,,,,) = creditManager.creditAccountInfo(creditAccount);
 
             assertEq(tokensToEnable, expectedTokensToEnable, _testCaseErr("Incorrect tokensToEnable"));
             assertEq(tokensToDisable, expectedTokensToDisable, _testCaseErr("Incorrect tokensToDisable"));

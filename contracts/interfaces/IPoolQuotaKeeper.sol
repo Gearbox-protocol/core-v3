@@ -45,7 +45,7 @@ interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
     /// @param quotaChange Requested quota change in pool's underlying asset units
     function updateQuota(address creditAccount, address token, int96 quotaChange)
         external
-        returns (uint256 caQuotaInterestChange, bool enableToken, bool disableToken);
+        returns (uint256 caQuotaInterestChange, int96 change, bool enableToken, bool disableToken);
 
     /// @dev Updates all quotas to zero when closing a credit account, and computes the final quota interest change
     /// @param creditAccount Address of the Credit Account being closed

@@ -55,8 +55,7 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         creditAccountInfo[creditAccount].debt = debt;
         creditAccountInfo[creditAccount].cumulativeIndexLastUpdate = cumulativeIndexLastUpdate;
         creditAccountInfo[creditAccount].cumulativeQuotaInterest = cumulativeQuotaInterest;
-        creditAccountInfo[creditAccount].enabledTokensMask = uint80(enabledTokensMask & type(uint80).max);
-        creditAccountInfo[creditAccount].extraEnabledTokensMask = uint176(enabledTokensMask >> 80);
+        creditAccountInfo[creditAccount].enabledTokensMask = enabledTokensMask;
         creditAccountInfo[creditAccount].flags = flags;
         creditAccountInfo[creditAccount].borrower = borrower;
     }

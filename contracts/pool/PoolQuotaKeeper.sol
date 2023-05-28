@@ -92,7 +92,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         external
         override
         creditManagerOnly // F:[PQK-4]
-        returns (uint256 caQuotaInterestChange, bool enableToken, bool disableToken)
+        returns (uint256 caQuotaInterestChange, int96 change, bool enableToken, bool disableToken)
     {
         int128 quotaRevenueChange; // TODO: better naming(?)
 

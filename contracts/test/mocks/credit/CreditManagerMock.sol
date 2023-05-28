@@ -77,6 +77,7 @@ contract CreditManagerMock {
 
     uint256 ad_tokenMask;
 
+    int96 qu_change;
     uint256 qu_tokensToEnable;
     uint256 qu_tokensToDisable;
 
@@ -123,7 +124,8 @@ contract CreditManagerMock {
         IPoolV3(poolService).repayCreditAccount(borrowedAmount, profit, loss);
     }
 
-    function setUpdateQuota(uint256 tokensToEnable, uint256 tokensToDisable) external {
+    function setUpdateQuota(int96 change, uint256 tokensToEnable, uint256 tokensToDisable) external {
+        qu_change = change;
         qu_tokensToEnable = tokensToEnable;
         qu_tokensToDisable = tokensToDisable;
     }
@@ -131,8 +133,9 @@ contract CreditManagerMock {
     function updateQuota(address _creditAccount, address token, int96 quotaChange)
         external
         view
-        returns (uint256 tokensToEnable, uint256 tokensToDisable)
+        returns (int96 change, uint256 tokensToEnable, uint256 tokensToDisable)
     {
+        change = qu_change;
         tokensToEnable = qu_tokensToEnable;
         tokensToDisable = qu_tokensToDisable;
     }
@@ -182,7 +185,9 @@ contract CreditManagerMock {
         uint256 enabledTokensMask,
         uint256[] memory collateralHints,
         uint16 minHealthFactor
-    ) external {}
+    ) external returns (uint256 _enabledTokensMask) {
+        return enabledTokensMask;
+    }
 
     function setRevertOnActiveAccount(bool _value) external {
         revertOnSetActiveAccount = _value;
