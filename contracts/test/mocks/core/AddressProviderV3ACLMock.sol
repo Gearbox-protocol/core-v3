@@ -9,7 +9,7 @@ import {PriceOracleMock} from "../oracles/PriceOracleMock.sol";
 import {WETHGatewayMock} from "../support/WETHGatewayMock.sol";
 import {WithdrawalManagerMock} from "../support/WithdrawalManagerMock.sol";
 import {BotListMock} from "../support/BotListMock.sol";
-import "../../lib/constants.sol";
+
 import {Test} from "forge-std/Test.sol";
 
 import "forge-std/console.sol";

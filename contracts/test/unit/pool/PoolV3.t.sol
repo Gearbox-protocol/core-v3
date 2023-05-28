@@ -3,14 +3,12 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import "../../../interfaces/IAddressProviderV3.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import {IPoolQuotaKeeper} from "../../../interfaces/IPoolQuotaKeeper.sol";
+
 import {LinearInterestRateModel} from "../../../pool/LinearInterestRateModel.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -22,7 +20,7 @@ import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
 import {IERC4626Events} from "../../interfaces/IERC4626.sol";
 
 import {IInterestRateModel} from "../../../interfaces/IInterestRateModel.sol";
-
+import {IPoolQuotaKeeper} from "../../../interfaces/IPoolQuotaKeeper.sol";
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 
@@ -35,7 +33,6 @@ import {GaugeMock} from "../../mocks//pool/GaugeMock.sol";
 
 // TEST
 import {TestHelper} from "../../lib/helper.sol";
-import "forge-std/console.sol";
 
 import "../../lib/constants.sol";
 

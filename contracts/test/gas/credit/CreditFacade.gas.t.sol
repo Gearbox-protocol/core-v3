@@ -3,24 +3,14 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
-
-import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
-
-import {BotList} from "../../../support/BotList.sol";
 
 import {ICreditFacade, ICreditFacadeMulticall, ICreditFacadeEvents} from "../../../interfaces/ICreditFacade.sol";
 import {ICreditManagerV3, ICreditManagerV3Events, ClosureAction} from "../../../interfaces/ICreditManagerV3.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 
-import {IDegenNFT, IDegenNFTExceptions} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
-import {IWithdrawalManager} from "../../../interfaces/IWithdrawalManager.sol";
-
 // DATA
 import {MultiCall, MultiCallOps} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
-import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 
 import {
     CreditFacadeMulticaller,
@@ -29,9 +19,6 @@ import {
 
 // CONSTANTS
 
-import {LEVERAGE_DECIMALS} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
-
 // TESTS
 
 import "../../lib/constants.sol";
@@ -39,19 +26,16 @@ import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 import {CreditFacadeTestHelper} from "../../helpers/CreditFacadeTestHelper.sol";
 
 // EXCEPTIONS
-import "../../../interfaces/IExceptions.sol";
 
 // MOCKS
 import {AdapterMock} from "../../mocks//adapters/AdapterMock.sol";
 import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
-import {ERC20BlacklistableMock} from "../../mocks//token/ERC20Blacklistable.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";
 import {CreditFacadeTestSuite} from "../../suites/CreditFacadeTestSuite.sol";
 import {CreditConfig} from "../../config/CreditConfig.sol";
-import {Test} from "forge-std/Test.sol";
 
 uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
 uint16 constant REFERRAL_CODE = 23;
@@ -265,7 +249,7 @@ contract CreditFacadeGasTest is
             target: address(creditFacade),
             callData: abi.encodeCall(
                 ICreditFacadeMulticall.updateQuota,
-                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)))
+                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
         });
 
@@ -273,7 +257,7 @@ contract CreditFacadeGasTest is
             target: address(creditFacade),
             callData: abi.encodeCall(
                 ICreditFacadeMulticall.updateQuota,
-                (tokenTestSuite.addressOf(Tokens.WETH), int96(int256(LINK_ACCOUNT_AMOUNT)))
+                (tokenTestSuite.addressOf(Tokens.WETH), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
         });
 
@@ -281,7 +265,7 @@ contract CreditFacadeGasTest is
             target: address(creditFacade),
             callData: abi.encodeCall(
                 ICreditFacadeMulticall.updateQuota,
-                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)))
+                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
         });
 
@@ -321,7 +305,7 @@ contract CreditFacadeGasTest is
             target: address(creditFacade),
             callData: abi.encodeCall(
                 ICreditFacadeMulticall.updateQuota,
-                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)))
+                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
         });
 
@@ -435,7 +419,7 @@ contract CreditFacadeGasTest is
             target: address(creditFacade),
             callData: abi.encodeCall(
                 ICreditFacadeMulticall.updateQuota,
-                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)))
+                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
         });
 
@@ -649,7 +633,7 @@ contract CreditFacadeGasTest is
             target: address(creditFacade),
             callData: abi.encodeCall(
                 ICreditFacadeMulticall.updateQuota,
-                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT * 3)))
+                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT * 3)), 0)
                 )
         });
 
@@ -766,7 +750,7 @@ contract CreditFacadeGasTest is
             target: address(creditFacade),
             callData: abi.encodeCall(
                 ICreditFacadeMulticall.updateQuota,
-                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)))
+                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
         });
 
@@ -933,7 +917,7 @@ contract CreditFacadeGasTest is
             target: address(creditFacade),
             callData: abi.encodeCall(
                 ICreditFacadeMulticall.updateQuota,
-                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)))
+                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
         });
 

@@ -7,7 +7,7 @@ import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
-import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
+
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
 
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
@@ -19,8 +19,6 @@ import {CreditManagerV3Harness} from "../unit/credit/CreditManagerV3Harness.sol"
 import {PoolDeployer} from "./PoolDeployer.sol";
 import {ICreditConfig} from "../interfaces/ICreditConfig.sol";
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
-
-import "forge-std/console.sol";
 
 /// @title CreditManagerTestSuite
 /// @notice Deploys contract for unit testing of CreditManagerV3.sol

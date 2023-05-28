@@ -4,7 +4,6 @@
 pragma solidity ^0.8.17;
 
 import {USDTFees} from "../libraries/USDTFees.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 interface IUSDT {
     function basisPointsRate() external view returns (uint256);

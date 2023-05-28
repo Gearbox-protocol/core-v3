@@ -7,7 +7,6 @@ import {IncorrectParameterException} from "../../../interfaces/IExceptions.sol";
 import {BitMask} from "../../../libraries/BitMask.sol";
 
 import {TestHelper} from "../../lib/helper.sol";
-import "forge-std/console.sol";
 
 /// @title BitMask logic test
 /// @notice [BM]: Unit tests for bit mask library

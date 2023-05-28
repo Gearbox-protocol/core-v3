@@ -4,7 +4,6 @@
 pragma solidity ^0.8.17;
 
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
-import {ICreditManagerV3} from "./ICreditManagerV3.sol";
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 import {ClosureAction} from "../interfaces/ICreditManagerV3.sol";
@@ -75,8 +74,14 @@ interface ICreditFacadeEvents {
     /// @dev Emits when a multicall is started
     event StartMultiCall(address indexed creditAccount);
 
+    /// @dev Emits when a call to an external contract is made through the Credit Manager
+    event Execute(address indexed creditAccount, address indexed targetContract);
+
     /// @dev Emits when a multicall is finished
     event FinishMultiCall();
+
+    /// @dev Emits when enabledTokensMask is updated
+    event SetEnabledTokensMask(address indexed creditAccount, uint256 enabledTokensMask);
 }
 
 interface ICreditFacade is ICreditFacadeEvents, IVersion {

@@ -6,14 +6,13 @@ pragma solidity ^0.8.17;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 
-import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 
 import {BotList} from "../../../support/BotList.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 
 import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
-import "../../../interfaces/ICreditFacade.sol";
+
 import {
     ICreditManagerV3,
     ICreditManagerV3Events,
@@ -24,10 +23,11 @@ import {
 import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import "../../../interfaces/ICreditFacade.sol";
 import {IDegenNFT, IDegenNFTExceptions} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFT.sol";
-import {IWithdrawalManager} from "../../../interfaces/IWithdrawalManager.sol";
+
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // DATA
+
 import {MultiCall, MultiCallOps} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 import {Balance} from "../../../libraries/BalancesLogic.sol";
 
@@ -35,7 +35,6 @@ import {CreditFacadeMulticaller, CreditFacadeCalls} from "../../../multicall/Cre
 
 // CONSTANTS
 
-import {LEVERAGE_DECIMALS} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 // TESTS
@@ -50,7 +49,7 @@ import "../../../interfaces/IExceptions.sol";
 // MOCKS
 import {AdapterMock} from "../../mocks//adapters/AdapterMock.sol";
 import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
-import {ERC20BlacklistableMock} from "../../mocks//token/ERC20Blacklistable.sol";
+
 import {GeneralMock} from "../../mocks//GeneralMock.sol";
 
 // SUITES
@@ -59,7 +58,6 @@ import {Tokens} from "../../config/Tokens.sol";
 import {CreditFacadeTestSuite} from "../../suites/CreditFacadeTestSuite.sol";
 import {CreditConfig} from "../../config/CreditConfig.sol";
 
-import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
@@ -652,7 +650,7 @@ contract CreditFacadeIntegrationTest is
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.execute, (DUMB_CALLDATA)));
 
         vm.expectEmit(true, false, false, true);
-        emit Execute(address(targetMock));
+        emit Execute(creditAccount, address(targetMock));
 
         vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountBase.execute, (address(targetMock), DUMB_CALLDATA)));
 
@@ -751,7 +749,7 @@ contract CreditFacadeIntegrationTest is
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.execute, (DUMB_CALLDATA)));
 
         vm.expectEmit(true, false, false, false);
-        emit Execute(address(targetMock));
+        emit Execute(creditAccount, address(targetMock));
 
         vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountBase.execute, (address(targetMock), DUMB_CALLDATA)));
 
@@ -1309,7 +1307,7 @@ contract CreditFacadeIntegrationTest is
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.execute, (DUMB_CALLDATA)));
 
         vm.expectEmit(true, false, false, true);
-        emit Execute(address(targetMock));
+        emit Execute(creditAccount, address(targetMock));
 
         vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountBase.execute, (address(targetMock), DUMB_CALLDATA)));
 
@@ -1936,7 +1934,7 @@ contract CreditFacadeIntegrationTest is
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.execute, (DUMB_CALLDATA)));
 
         vm.expectEmit(true, false, false, true);
-        emit Execute(address(targetMock));
+        emit Execute(creditAccount, address(targetMock));
 
         vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountBase.execute, (address(targetMock), DUMB_CALLDATA)));
 

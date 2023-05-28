@@ -4,12 +4,7 @@
 pragma solidity ^0.8.17;
 pragma abicoder v1;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-
-import {AddressProvider} from "@gearbox-protocol/core-v2/contracts/core/AddressProvider.sol";
 
 /// LIBS & TRAITS
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
@@ -101,16 +96,18 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
     /// @param creditAccount Address of credit account
     /// @param token Address of the token
     /// @param quotaChange Signed quota change amount
+    /// @param minQuota Minimum deisred quota amount
     /// @return caQuotaInterestChange Accrued quota interest since last interest update.
     ///                               It is expected that this value is stored/used by the caller,
     ///                               as PQK will update the interest index, which will set local accrued interest to 0
+    /// @return change Change what was made
     /// @return enableToken Whether the token needs to be enabled
     /// @return disableToken Whether the token needs to be disabled
-    function updateQuota(address creditAccount, address token, int96 quotaChange)
+    function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota)
         external
         override
         creditManagerOnly // F:[PQK-4]
-        returns (uint256 caQuotaInterestChange, bool enableToken, bool disableToken)
+        returns (uint256 caQuotaInterestChange, int96 change, bool enableToken, bool disableToken)
     {
         int256 quotaRevenueChange;
 

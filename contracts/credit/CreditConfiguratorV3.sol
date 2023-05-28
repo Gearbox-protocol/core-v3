@@ -40,7 +40,6 @@ import "../interfaces/IAddressProviderV3.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
-import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 
 /// @title CreditConfigurator
 /// @notice This contract is used to configure CreditManagers and is the only one with the priviledge
