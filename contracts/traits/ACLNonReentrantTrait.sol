@@ -7,9 +7,9 @@ import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 
 import {IACL} from "@gearbox-protocol/core-v2/contracts/interfaces/IACL.sol";
 import {
+    CallerNotControllerException,
     CallerNotPausableAdminException,
-    CallerNotUnpausableAdminException,
-    CallerNotControllerException
+    CallerNotUnpausableAdminException
 } from "../interfaces/IExceptions.sol";
 
 import {ACLTrait} from "./ACLTrait.sol";

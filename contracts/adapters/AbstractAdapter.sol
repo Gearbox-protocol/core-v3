@@ -46,7 +46,7 @@ abstract contract AbstractAdapter is IAdapter, ACLTrait {
         }
     }
 
-    /// @dev Ensures that external call credit account is set and returns its address
+    /// @dev Ensures that active credit account is set and returns its address
     function _creditAccount() internal view returns (address) {
         return ICreditManagerV3(creditManager).getActiveCreditAccountOrRevert(); // U:[AA-3]
     }
@@ -56,16 +56,16 @@ abstract contract AbstractAdapter is IAdapter, ACLTrait {
         tokenMask = ICreditManagerV3(creditManager).getTokenMaskOrRevert(token); // U:[AA-4]
     }
 
-    /// @dev Approves target contract to spend given token from the credit account
-    ///      Reverts if external call credit account is not set or token is not registered as collateral
+    /// @dev Approves target contract to spend given token from the active credit account
+    ///      Reverts if active credit account is not set or token is not registered as collateral
     /// @param token Token to approve
     /// @param amount Amount to approve
     function _approveToken(address token, uint256 amount) internal {
         ICreditManagerV3(creditManager).approveCreditAccount(token, amount); // U:[AA-5]
     }
 
-    /// @dev Executes an external call from the credit account to the target contract
-    ///      Reverts if external call credit account is not set
+    /// @dev Executes an external call from the active credit account to the target contract
+    ///      Reverts if active credit account is not set
     /// @param callData Data to call the target contract with
     /// @return result Call result
     function _execute(bytes memory callData) internal returns (bytes memory result) {
@@ -73,7 +73,7 @@ abstract contract AbstractAdapter is IAdapter, ACLTrait {
     }
 
     /// @dev Executes a swap operation without input token approval
-    ///      Reverts if external call credit account is not set or any of passed tokens is not registered as collateral
+    ///      Reverts if active credit account is not set or any of passed tokens is not registered as collateral
     /// @param tokenIn Input token that credit account spends in the call
     /// @param tokenOut Output token that credit account receives after the call
     /// @param callData Data to call the target contract with
@@ -93,7 +93,7 @@ abstract contract AbstractAdapter is IAdapter, ACLTrait {
     }
 
     /// @dev Executes a swap operation with maximum input token approval, and revokes approval after the call
-    ///      Reverts if external call credit account is not set or any of passed tokens is not registered as collateral
+    ///      Reverts if active credit account is not set or any of passed tokens is not registered as collateral
     /// @param tokenIn Input token that credit account spends in the call
     /// @param tokenOut Output token that credit account receives after the call
     /// @param callData Data to call the target contract with
