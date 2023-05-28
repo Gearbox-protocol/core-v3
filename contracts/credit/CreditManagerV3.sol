@@ -22,7 +22,7 @@ import {IERC20Helper} from "../libraries/IERC20Helper.sol";
 import {IAccountFactoryBase} from "../interfaces/IAccountFactoryV3.sol";
 import {ICreditAccountBase} from "../interfaces/ICreditAccountV3.sol";
 import {IPoolBase, IPoolV3} from "../interfaces/IPoolV3.sol";
-import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
+import {IWETHGatewayV3} from "../interfaces/IWETHGatewayV3.sol";
 import {ClaimAction, IWithdrawalManagerV3} from "../interfaces/IWithdrawalManagerV3.sol";
 import {
     ICreditManagerV3,
@@ -1139,7 +1139,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         if (convertToETH && token == weth) {
             ICreditAccountBase(creditAccount).transfer({token: token, to: wethGateway, amount: amount}); // U:[CM-31, 32]
-            IWETHGateway(wethGateway).depositFor({to: to, amount: amount}); // U:[CM-31, 32]
+            IWETHGatewayV3(wethGateway).deposit({to: to, amount: amount}); // U:[CM-31, 32]
         } else {
             // In case a token transfer fails (e.g., borrower getting blacklisted by USDC), the token will be sent
             // to WithdrawalManagerV3

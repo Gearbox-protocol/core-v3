@@ -15,7 +15,7 @@ interface IPoolBase is IVersion {
     function underlyingToken() external view returns (address);
     function calcLinearCumulative_RAY() external view returns (uint256);
     function lendCreditAccount(uint256 borrowedAmount, address creditAccount) external;
-    function repayCreditAccount(uint256 borrowedAmount, uint256 profit, uint256 loss) external;
+    function repayCreditAccount(uint256 repaidAmount, uint256 profit, uint256 loss) external;
 }
 
 interface IPoolV3Events {

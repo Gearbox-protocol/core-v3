@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 import "../../../interfaces/IAddressProviderV3.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
-import {IWETHGateway} from "../../../interfaces/IWETHGateway.sol";
+import {IWETHGatewayV3} from "../../../interfaces/IWETHGatewayV3.sol";
 import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
 
@@ -77,7 +77,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     PriceOracleMock priceOracleMock;
     PoolMock poolMock;
 
-    IWETHGateway wethGateway;
+    IWETHGatewayV3 wethGateway;
     BotListMock botListMock;
 
     DegenNFTMock degenNFTMock;
@@ -146,7 +146,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
 
-        wethGateway = IWETHGateway(addressProvider.getAddressOrRevert(AP_WETH_GATEWAY, 3_00));
+        wethGateway = IWETHGatewayV3(addressProvider.getAddressOrRevert(AP_WETH_GATEWAY, 3_00));
 
         botListMock = BotListMock(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00));
 
@@ -627,7 +627,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         );
 
         if (convertToETH) {
-            vm.expectCall(address(wethGateway), abi.encodeCall(IWETHGateway.withdrawTo, (FRIEND)));
+            vm.expectCall(address(wethGateway), abi.encodeCall(IWETHGatewayV3.claim, (FRIEND)));
         }
 
         if (hasBotPermissions) {
@@ -964,7 +964,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         );
 
         if (convertToETH) {
-            vm.expectCall(address(wethGateway), abi.encodeCall(IWETHGateway.withdrawTo, (FRIEND)));
+            vm.expectCall(address(wethGateway), abi.encodeCall(IWETHGatewayV3.claim, (FRIEND)));
         }
 
         if (hasBotPermissions) {

@@ -34,7 +34,7 @@ import {IPriceFeedOnDemand} from "../interfaces/IPriceFeedOnDemand.sol";
 import {IPoolV3, IPoolBase} from "../interfaces/IPoolV3.sol";
 import {IDegenNFTV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFTV2.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
-import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
+import {IWETHGatewayV3} from "../interfaces/IWETHGatewayV3.sol";
 import {IBotListV3} from "../interfaces/IBotListV3.sol";
 
 // CONSTANTS
@@ -1230,11 +1230,11 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         tokensToEnable = ICreditManagerV3(creditManager).claimWithdrawals(creditAccount, to, action); // U:[FA-16,37]
     }
 
-    /// @notice Internal wrapper for `IWETHGateway.withdrawTo()`
+    /// @notice Internal wrapper for `IWETHGatewayV3.claim()`
     /// @dev The external call is wrapped to optimize contract size
     /// @dev Used to convert WETH to ETH and send it to user
     function _wethWithdrawTo(address to) internal {
-        IWETHGateway(wethGateway).withdrawTo(to);
+        IWETHGatewayV3(wethGateway).claim(to);
     }
 
     function _eraseAllBotPermissions(address creditAccount) internal {

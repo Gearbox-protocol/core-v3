@@ -39,7 +39,7 @@ import {
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {IWETHGateway} from "../../../interfaces/IWETHGateway.sol";
+import {IWETHGatewayV3} from "../../../interfaces/IWETHGatewayV3.sol";
 import {ClaimAction, IWithdrawalManagerV3} from "../../../interfaces/IWithdrawalManagerV3.sol";
 import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 
@@ -2545,7 +2545,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             });
 
             if (convertToEth) {
-                vm.expectCall(address(wethGateway), abi.encodeCall(IWETHGateway.depositFor, (FRIEND, amount)));
+                vm.expectCall(address(wethGateway), abi.encodeCall(IWETHGatewayV3.deposit, (FRIEND, amount)));
             }
 
             creditManager.safeTokenTransfer({

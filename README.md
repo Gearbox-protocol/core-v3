@@ -47,7 +47,7 @@ This directory contains protocol contracts related to access, contract discovery
 3. `AddressProvider.sol` is used by other contracts in the system to determine the up-to-date addresses of core contracts, such as `ACL`, `PriceOracle`, `GearToken`, etc.
 4. `ContractsRegister.sol` contains a list of legitimate Gearbox Credit Managers and pools connected to the system.
 5. `DataCompressor.sol` is used to retrieve detailed data on particular Credit Managers and Credit Accounts.
-6. `WETHGateway.sol` is used to convert native ETH into WETH and vice versa.
+6. `WETHGatewayV3.sol` is used to convert native ETH into WETH and vice versa.
 
 ### Credit
 
