@@ -475,7 +475,7 @@
 
 "@gearbox-protocol/core-v2@https://github.com/gearbox-protocol/core-v2#base":
   version "1.0.1"
-  resolved "https://github.com/gearbox-protocol/core-v2#c119962e7d5b40aa6dd83e89fff622bf5ba07db0"
+  resolved "https://github.com/gearbox-protocol/core-v2#e37aab85e4db49a9511c4b2eaa0b0d623fc10d3c"
   dependencies:
     "@typechain/ethers-v5" "^10.2.1"
 
