@@ -76,14 +76,14 @@ library CreditFacadeCalls {
         });
     }
 
-    function updateQuota(CreditFacadeMulticaller creditFacade, address token, int96 quotaChange)
+    function updateQuota(CreditFacadeMulticaller creditFacade, address token, int96 quotaChange, uint96 minQuota)
         internal
         pure
         returns (MultiCall memory)
     {
         return MultiCall({
             target: address(creditFacade),
-            callData: abi.encodeCall(ICreditFacadeMulticall.updateQuota, (token, quotaChange))
+            callData: abi.encodeCall(ICreditFacadeMulticall.updateQuota, (token, quotaChange, minQuota))
         });
     }
 

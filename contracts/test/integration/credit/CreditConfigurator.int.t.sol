@@ -19,8 +19,6 @@ import {ICreditManagerV3, ICreditManagerV3Events} from "../../../interfaces/ICre
 import {ICreditConfiguratorEvents} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {IAdapter} from "@gearbox-protocol/core-v2/contracts/interfaces/adapters/IAdapter.sol";
 
-import {BotList} from "../../../support/BotList.sol";
-
 //
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
@@ -45,8 +43,6 @@ import {CreditFacadeTestSuite} from "../../suites/CreditFacadeTestSuite.sol";
 import {CreditConfig} from "../../config/CreditConfig.sol";
 
 import {CollateralTokensItem} from "../../config/CreditConfig.sol";
-
-import {Test} from "forge-std/Test.sol";
 
 contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICreditConfiguratorEvents {
     using AddressList for address[];

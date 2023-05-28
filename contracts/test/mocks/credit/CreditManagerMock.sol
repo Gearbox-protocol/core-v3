@@ -4,8 +4,7 @@
 pragma solidity ^0.8.17;
 
 import "../../../interfaces/IAddressProviderV3.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+
 import {
     ICreditManagerV3,
     ClosureAction,
@@ -15,7 +14,7 @@ import {
     RevocationPair
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
-import {IPoolQuotaKeeper} from "../../../interfaces/IPoolQuotaKeeper.sol";
+
 import {ClaimAction} from "../../../interfaces/IWithdrawalManager.sol";
 
 import "../../../interfaces/IExceptions.sol";
@@ -78,8 +77,11 @@ contract CreditManagerMock {
 
     uint256 ad_tokenMask;
 
+    int96 qu_change;
     uint256 qu_tokensToEnable;
     uint256 qu_tokensToDisable;
+
+    uint256 sw_tokensToDisable;
 
     constructor(address _addressProvider, address _pool) {
         addressProvider = _addressProvider;
@@ -122,15 +124,18 @@ contract CreditManagerMock {
         IPoolV3(poolService).repayCreditAccount(borrowedAmount, profit, loss);
     }
 
-    function setUpdateQuota(uint256 tokensToEnable, uint256 tokensToDisable) external {
+    function setUpdateQuota(int96 change, uint256 tokensToEnable, uint256 tokensToDisable) external {
+        qu_change = change;
         qu_tokensToEnable = tokensToEnable;
         qu_tokensToDisable = tokensToDisable;
     }
 
-    function updateQuota(address _creditAccount, address token, int96 quotaChange)
+    function updateQuota(address _creditAccount, address token, int96 quotaChange, uint96 minQuota)
         external
-        returns (uint256 tokensToEnable, uint256 tokensToDisable)
+        view
+        returns (int96 change, uint256 tokensToEnable, uint256 tokensToDisable)
     {
+        change = qu_change;
         tokensToEnable = qu_tokensToEnable;
         tokensToDisable = qu_tokensToDisable;
     }
@@ -180,7 +185,9 @@ contract CreditManagerMock {
         uint256 enabledTokensMask,
         uint256[] memory collateralHints,
         uint16 minHealthFactor
-    ) external {}
+    ) external returns (uint256 _enabledTokensMask) {
+        return enabledTokensMask;
+    }
 
     function setRevertOnActiveAccount(bool _value) external {
         revertOnSetActiveAccount = _value;
@@ -295,10 +302,16 @@ contract CreditManagerMock {
         tokensToDisable = md_return_tokensToDisable;
     }
 
+    function setScheduleWithdrawal(uint256 tokensToDisable) external {
+        sw_tokensToDisable = tokensToDisable;
+    }
+
     function scheduleWithdrawal(address creditAccount, address token, uint256 amount)
         external
         returns (uint256 tokensToDisable)
-    {}
+    {
+        tokensToDisable = sw_tokensToDisable;
+    }
 
     function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external {}
 }

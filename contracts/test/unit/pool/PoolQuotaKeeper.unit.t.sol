@@ -3,8 +3,6 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
 import "../../../interfaces/IAddressProviderV3.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
@@ -17,7 +15,6 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {PoolMock} from "../../mocks/pool/PoolMock.sol";
 
-import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
@@ -36,7 +33,6 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/P
 import "../../../interfaces/IExceptions.sol";
 
 import {TestHelper} from "../../lib/helper.sol";
-import "forge-std/console.sol";
 
 contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperEvents {
     using Math for uint256;
@@ -133,7 +129,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
         vm.startPrank(USER);
 
         vm.expectRevert(CallerNotCreditManagerException.selector);
-        pqk.updateQuota(DUMB_ADDRESS, address(1), 0);
+        pqk.updateQuota(DUMB_ADDRESS, address(1), 0, 0);
 
         vm.expectRevert(CallerNotCreditManagerException.selector);
         pqk.removeQuotas(DUMB_ADDRESS, new address[](1), false);
@@ -211,10 +207,10 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
                 usdcQuota = int96(uint96(200 * WAD));
 
                 vm.prank(address(cmMock));
-                pqk.updateQuota({creditAccount: DUMB_ADDRESS, token: DAI, quotaChange: daiQuota});
+                pqk.updateQuota({creditAccount: DUMB_ADDRESS, token: DAI, quotaChange: daiQuota, minQuota: 0});
 
                 vm.prank(address(cmMock));
-                pqk.updateQuota({creditAccount: DUMB_ADDRESS, token: USDC, quotaChange: usdcQuota});
+                pqk.updateQuota({creditAccount: DUMB_ADDRESS, token: USDC, quotaChange: usdcQuota, minQuota: 0});
             }
 
             vm.warp(block.timestamp + 365 days);
@@ -352,7 +348,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
         vm.expectRevert(TokenIsNotQuotedException.selector);
 
         vm.prank(address(cmMock));
-        pqk.updateQuota({creditAccount: DUMB_ADDRESS, token: link, quotaChange: int96(uint96(100 * WAD))});
+        pqk.updateQuota({creditAccount: DUMB_ADDRESS, token: link, quotaChange: int96(uint96(100 * WAD)), minQuota: 0});
     }
 
     struct QuotaTest {

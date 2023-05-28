@@ -6,7 +6,6 @@ pragma solidity ^0.8.17;
 import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
 import {CreditConfigurator} from "../../credit/CreditConfiguratorV3.sol";
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
-import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
 
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
 import {CreditManagerFactory} from "../../factories/CreditManagerFactory.sol";
@@ -20,8 +19,6 @@ import "../lib/constants.sol";
 import {PoolDeployer} from "./PoolDeployer.sol";
 import {ICreditConfig, CreditManagerOpts} from "../interfaces/ICreditConfig.sol";
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
-
-import "forge-std/console.sol";
 
 /// @title CreditManagerTestSuite
 /// @notice Deploys contract for unit testing of CreditManagerV3.sol

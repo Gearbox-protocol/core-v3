@@ -38,7 +38,6 @@ import "../../lib/constants.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 
 // EXCEPTIONS
-import {TokenAlreadyAddedException} from "../../../interfaces/IExceptions.sol";
 
 // MOCKS
 import {PriceFeedMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/oracles/PriceFeedMock.sol";
@@ -58,9 +57,6 @@ import {CreditConfig} from "../../config/CreditConfig.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
-
-import {Test} from "forge-std/Test.sol";
-import "forge-std/console.sol";
 
 /// @title AddressRepository
 /// @notice Stores addresses of deployed contracts
@@ -217,7 +213,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         address creditAccount = creditManager.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER);
         assertEq(creditAccount, expectedCreditAccount, "Incorrecct credit account address");
 
-        (uint256 debt, uint256 cumulativeIndexLastUpdate,,,,) = creditManager.creditAccountInfo(creditAccount);
+        (uint256 debt, uint256 cumulativeIndexLastUpdate,,,,,) = creditManager.creditAccountInfo(creditAccount);
 
         assertEq(debt, DAI_ACCOUNT_AMOUNT, "Incorrect borrowed amount set in CA");
         assertEq(cumulativeIndexLastUpdate, cumulativeAtOpen, "Incorrect cumulativeIndexLastUpdate set in CA");
@@ -873,7 +869,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         //     "Incorrect cumulative index"
         // );
 
-        (uint256 debt,,,,,) = creditManager.creditAccountInfo(creditAccount);
+        (uint256 debt,,,,,,) = creditManager.creditAccountInfo(creditAccount);
         assertEq(debt, newBorrowedAmount, "Incorrect borrowedAmount");
 
         expectBalance(Tokens.DAI, creditAccount, newBorrowedAmount, "Incorrect balance on credit account");
@@ -1050,10 +1046,6 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         creditManager.setContractAllowance(ADAPTER, address(targetMock));
 
         bytes memory callData = bytes("Hello, world!");
-
-        // we emit the event we expect to see.
-        vm.expectEmit(true, false, false, false);
-        emit Execute(address(targetMock));
 
         // stack trace check
         vm.expectCall(creditAccount, abi.encodeWithSignature("execute(address,bytes)", address(targetMock), callData));

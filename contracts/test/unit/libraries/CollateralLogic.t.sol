@@ -4,20 +4,16 @@
 pragma solidity ^0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IncorrectParameterException} from "../../../interfaces/IExceptions.sol";
+
 import {CollateralLogic} from "../../../libraries/CollateralLogic.sol";
 import {CollateralDebtData} from "../../../interfaces/ICreditManagerV3.sol";
 import {TestHelper} from "../../lib/helper.sol";
-import {GeneralMock} from "../../mocks/GeneralMock.sol";
 
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
-import {RAY, WAD} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 import "../../lib/constants.sol";
 import {Tokens} from "../../config/Tokens.sol";
 import {CollateralLogicHelper, PRICE_ORACLE, B, Q} from "./CollateralLogicHelper.sol";
-
-import "forge-std/console.sol";
 
 /// @title CollateralLogic unit test
 contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {

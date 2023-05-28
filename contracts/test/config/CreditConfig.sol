@@ -13,7 +13,6 @@ import {ICreditConfig} from "../interfaces/ICreditConfig.sol";
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 
 import "../lib/constants.sol";
-import {Test} from "forge-std/Test.sol";
 
 struct CollateralTokensItem {
     Tokens token;
