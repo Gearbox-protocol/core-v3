@@ -16,7 +16,7 @@ import {BotRegister} from "../../support/BotRegister.sol";
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 import {PoolMock} from "../mocks//pool/PoolMock.sol";
 import {GaugeMock} from "../mocks//pool/GaugeMock.sol";
-import {PoolQuotaKeeper} from "../../pool/PoolQuotaKeeper.sol";
+import {PoolQuotaKeeperV3} from "../../pool/PoolQuotaKeeperV3.sol";
 
 import "../lib/constants.sol";
 
@@ -45,7 +45,7 @@ contract PoolDeployer is Test {
     GenesisFactory public gp;
     AccountFactory public af;
     PoolMock public poolMock;
-    PoolQuotaKeeper public poolQuotaKeeper;
+    PoolQuotaKeeperV3 public poolQuotaKeeper;
     GaugeMock public gaugeMock;
     ContractsRegister public cr;
     WithdrawalManager public withdrawalManager;
@@ -103,7 +103,7 @@ contract PoolDeployer is Test {
 
         cr.addPool(address(poolMock));
 
-        poolQuotaKeeper = new PoolQuotaKeeper(payable(address(poolMock)));
+        poolQuotaKeeper = new PoolQuotaKeeperV3(payable(address(poolMock)));
 
         gaugeMock = new GaugeMock(address(poolMock));
 

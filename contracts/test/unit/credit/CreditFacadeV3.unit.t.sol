@@ -37,7 +37,7 @@ import {
     BOT_PERMISSIONS_SET_FLAG
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
-import {IBotRegister} from "../../../interfaces/IBotRegister.sol";
+import {IBotRegisterV3} from "../../../interfaces/IBotRegisterV3.sol";
 
 import {ClaimAction} from "../../../interfaces/IWithdrawalManagerV3.sol";
 import {BitMask, UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
@@ -631,7 +631,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         }
 
         if (hasBotPermissions) {
-            vm.expectCall(address(botListMock), abi.encodeCall(IBotRegister.eraseAllBotPermissions, (creditAccount)));
+            vm.expectCall(address(botListMock), abi.encodeCall(IBotRegisterV3.eraseAllBotPermissions, (creditAccount)));
         } else {
             botListMock.setRevertOnErase(true);
         }
@@ -968,7 +968,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         }
 
         if (hasBotPermissions) {
-            vm.expectCall(address(botListMock), abi.encodeCall(IBotRegister.eraseAllBotPermissions, (creditAccount)));
+            vm.expectCall(address(botListMock), abi.encodeCall(IBotRegisterV3.eraseAllBotPermissions, (creditAccount)));
         } else {
             botListMock.setRevertOnErase(true);
         }
@@ -1873,7 +1873,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         address bot = makeAddr("BOT");
         vm.expectCall(
-            address(botListMock), abi.encodeCall(IBotRegister.payBot, (USER, creditAccount, bot, paymentAmount))
+            address(botListMock), abi.encodeCall(IBotRegisterV3.payBot, (USER, creditAccount, bot, paymentAmount))
         );
 
         vm.prank(bot);
@@ -2033,7 +2033,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         /// It erases all previious bot permission and set flag if flag was false before
 
         vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.flagsOf, (creditAccount)));
-        vm.expectCall(address(botListMock), abi.encodeCall(IBotRegister.eraseAllBotPermissions, (creditAccount)));
+        vm.expectCall(address(botListMock), abi.encodeCall(IBotRegisterV3.eraseAllBotPermissions, (creditAccount)));
 
         vm.expectCall(
             address(creditManagerMock),
@@ -2041,7 +2041,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         );
 
         vm.expectCall(
-            address(botListMock), abi.encodeCall(IBotRegister.setBotPermissions, (creditAccount, bot, 1, 2, 3))
+            address(botListMock), abi.encodeCall(IBotRegisterV3.setBotPermissions, (creditAccount, bot, 1, 2, 3))
         );
 
         vm.prank(USER);
@@ -2056,7 +2056,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         /// It doesn't erase permission is bot already set
         botListMock.setRevertOnErase(true);
         vm.expectCall(
-            address(botListMock), abi.encodeCall(IBotRegister.setBotPermissions, (creditAccount, bot, 1, 2, 3))
+            address(botListMock), abi.encodeCall(IBotRegisterV3.setBotPermissions, (creditAccount, bot, 1, 2, 3))
         );
 
         vm.prank(USER);
@@ -2071,7 +2071,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         /// It removes flag if no bots left
         botListMock.setBotPermissionsReturn(0);
         vm.expectCall(
-            address(botListMock), abi.encodeCall(IBotRegister.setBotPermissions, (creditAccount, bot, 1, 2, 3))
+            address(botListMock), abi.encodeCall(IBotRegisterV3.setBotPermissions, (creditAccount, bot, 1, 2, 3))
         );
 
         vm.expectCall(
@@ -2098,7 +2098,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         botListMock.setRevertOnErase(false);
         creditManagerMock.setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: true});
-        vm.expectCall(address(botListMock), abi.encodeCall(IBotRegister.eraseAllBotPermissions, (creditAccount)));
+        vm.expectCall(address(botListMock), abi.encodeCall(IBotRegisterV3.eraseAllBotPermissions, (creditAccount)));
         creditFacade.eraseAllBotPermissionsAtClosure(creditAccount);
     }
 

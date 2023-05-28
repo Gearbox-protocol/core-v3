@@ -35,7 +35,7 @@ import {IPoolV3, IPoolBase} from "../interfaces/IPoolV3.sol";
 import {IDegenNFTV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFTV2.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
-import {IBotRegister} from "../interfaces/IBotRegister.sol";
+import {IBotRegisterV3} from "../interfaces/IBotRegisterV3.sol";
 
 // CONSTANTS
 
@@ -526,7 +526,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         nonReentrant // U:[FA-4]
     {
         (uint256 botPermissions, bool forbidden) =
-            IBotRegister(botList).getBotStatus({bot: msg.sender, creditAccount: creditAccount});
+            IBotRegisterV3(botList).getBotStatus({bot: msg.sender, creditAccount: creditAccount});
         // Checks that the bot is approved by the borrower and is not forbidden
         if (botPermissions == 0 || forbidden) {
             revert NotApprovedBotException(); // U:[FA-19]
@@ -985,7 +985,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         /// The current owner of the account always pays for bot services
         address payer = _getBorrowerOrRevert(creditAccount); // U:[FA-37]
 
-        IBotRegister(botList).payBot({
+        IBotRegisterV3(botList).payBot({
             payer: payer,
             creditAccount: creditAccount,
             bot: msg.sender,
@@ -1038,7 +1038,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             }
         }
 
-        uint256 remainingBots = IBotRegister(botList).setBotPermissions({
+        uint256 remainingBots = IBotRegisterV3(botList).setBotPermissions({
             creditAccount: creditAccount,
             bot: bot,
             permissions: permissions,
@@ -1238,7 +1238,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     }
 
     function _eraseAllBotPermissions(address creditAccount) internal {
-        IBotRegister(botList).eraseAllBotPermissions(creditAccount);
+        IBotRegisterV3(botList).eraseAllBotPermissions(creditAccount);
     }
 
     //

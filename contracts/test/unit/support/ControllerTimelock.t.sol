@@ -13,7 +13,7 @@ import {ICreditConfigurator} from "../../../interfaces/ICreditConfiguratorV3.sol
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 import {PoolV3} from "../../../pool/PoolV3.sol";
 import {ILPPriceFeedV2} from "@gearbox-protocol/core-v2/contracts/interfaces/ILPPriceFeedV2.sol";
-import {IControllerTimelockEvents, IControllerTimelockErrors} from "../../../interfaces/IControllerTimelock.sol";
+import {IControllerTimelockV3Events, IControllerTimelockV3Errors} from "../../../interfaces/IControllerTimelockV3.sol";
 
 // TEST
 import "../../lib/constants.sol";
@@ -24,7 +24,7 @@ import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMoc
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
-contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerTimelockErrors {
+contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControllerTimelockV3Errors {
     AddressProviderV3ACLMock public addressProvider;
 
     ControllerTimelock public controllerTimelock;

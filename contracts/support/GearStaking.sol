@@ -7,14 +7,14 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
-import {IVotingContract} from "../interfaces/IVotingContract.sol";
+import {IVotingContractV3} from "../interfaces/IVotingContractV3.sol";
 import {
-    IGearStaking,
+    IGearStakingV3,
     UserVoteLockData,
     WithdrawalData,
     MultiVote,
     VotingContractStatus
-} from "../interfaces/IGearStaking.sol";
+} from "../interfaces/IGearStakingV3.sol";
 
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 
@@ -23,7 +23,7 @@ import "../interfaces/IExceptions.sol";
 
 uint256 constant EPOCH_LENGTH = 7 days;
 
-contract GearStaking is ACLNonReentrantTrait, IGearStaking {
+contract GearStaking is ACLNonReentrantTrait, IGearStakingV3 {
     using SafeCast for uint256;
 
     /// @notice Address of the GEAR token
@@ -243,14 +243,16 @@ contract GearStaking is ACLNonReentrantTrait, IGearStaking {
                     revert VotingContractNotAllowedException();
                 }
 
-                IVotingContract(currentVote.votingContract).vote(user, currentVote.voteAmount, currentVote.extraData);
+                IVotingContractV3(currentVote.votingContract).vote(user, currentVote.voteAmount, currentVote.extraData);
                 vld.available -= currentVote.voteAmount;
             } else {
                 if (allowedVotingContract[currentVote.votingContract] == VotingContractStatus.NOT_ALLOWED) {
                     revert VotingContractNotAllowedException();
                 }
 
-                IVotingContract(currentVote.votingContract).unvote(user, currentVote.voteAmount, currentVote.extraData);
+                IVotingContractV3(currentVote.votingContract).unvote(
+                    user, currentVote.voteAmount, currentVote.extraData
+                );
                 vld.available += currentVote.voteAmount;
             }
 

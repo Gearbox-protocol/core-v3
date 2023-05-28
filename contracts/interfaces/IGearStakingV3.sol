@@ -28,7 +28,7 @@ struct MultiVote {
     bytes extraData;
 }
 
-interface IGearStakingEvents {
+interface IGearStakingV3Events {
     /// @dev Emits when the user deposits GEAR into staked GEAR
     event DepositGear(address indexed user, uint256 amount);
 
@@ -42,7 +42,7 @@ interface IGearStakingEvents {
     event SetVotingContractStatus(address indexed votingContract, VotingContractStatus status);
 }
 
-interface IGearStaking is IGearStakingEvents, IVersion {
+interface IGearStakingV3 is IGearStakingV3Events, IVersion {
     /// @dev Returns the current global voting epoch
     function getCurrentEpoch() external view returns (uint16);
 

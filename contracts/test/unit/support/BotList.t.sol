@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {BotRegister} from "../../../support/BotRegister.sol";
-import {IBotRegisterEvents, BotFunding} from "../../../interfaces/IBotRegister.sol";
+import {IBotRegisterV3Events, BotFunding} from "../../../interfaces/IBotRegisterV3.sol";
 import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import {ICreditFacadeV3} from "../../../interfaces/ICreditFacadeV3.sol";
@@ -33,7 +33,7 @@ contract InvalidCFMock {
 
 /// @title LPPriceFeedTest
 /// @notice Designed for unit test purposes only
-contract BotRegisterTest is Test, IBotRegisterEvents {
+contract BotRegisterTest is Test, IBotRegisterV3Events {
     AddressProviderV3ACLMock public addressProvider;
 
     BotRegister botList;

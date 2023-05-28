@@ -19,7 +19,7 @@ import {IncorrectParameterException, BorrowingMoreU2ForbiddenException} from "..
 ///      can be configured to prevent borrowing after entering the steep region
 ///      (beyond the U2 point), in order to create a reserve for exits and make
 ///      rates more stable
-contract LinearInterestRateModel is IInterestRateModelV3 {
+contract LinearInterestRateModelV3 is IInterestRateModelV3 {
     /// @notice Whether to revert when borrowing beyond U2 utilization
     bool public immutable isBorrowingMoreU2Forbidden;
 

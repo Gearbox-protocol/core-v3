@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {LinearInterestRateModel} from "../../../pool/LinearInterestRateModel.sol";
+import {LinearInterestRateModelV3} from "../../../pool/LinearInterestRateModelV3.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -17,13 +17,13 @@ import "../../../interfaces/IExceptions.sol";
 
 import {TestHelper} from "../../lib/helper.sol";
 
-contract LinearInterestRateModelUniTest is TestHelper {
+contract LinearInterestRateModelV3UniTest is TestHelper {
     using Math for uint256;
 
-    LinearInterestRateModel irm;
+    LinearInterestRateModelV3 irm;
 
     function setUp() public {
-        irm = new LinearInterestRateModel(
+        irm = new LinearInterestRateModelV3(
             80_00,
             95_00,
             10_00,
@@ -154,7 +154,7 @@ contract LinearInterestRateModelUniTest is TestHelper {
             IncorrectParamCase memory testCase = cases[i];
 
             vm.expectRevert(IncorrectParameterException.selector);
-            irm = new LinearInterestRateModel(
+            irm = new LinearInterestRateModelV3(
             testCase.U_1,
              testCase.U_2,
              testCase.R_base,
@@ -438,7 +438,7 @@ contract LinearInterestRateModelUniTest is TestHelper {
         for (uint256 i; i < cases.length; ++i) {
             LinearCalculationsCase memory testCase = cases[i];
 
-            irm = new LinearInterestRateModel(
+            irm = new LinearInterestRateModelV3(
             testCase.U_1,
              testCase.U_2,
              testCase.R_base,

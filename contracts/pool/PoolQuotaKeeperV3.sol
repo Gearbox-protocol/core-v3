@@ -15,7 +15,7 @@ import {QuotasLogic} from "../libraries/QuotasLogic.sol";
 
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IPoolQuotaKeeperV3, TokenQuotaParams, AccountQuota} from "../interfaces/IPoolQuotaKeeperV3.sol";
-import {IGauge} from "../interfaces/IGauge.sol";
+import {IGaugeV3} from "../interfaces/IGaugeV3.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 
 import {RAY, SECONDS_PER_YEAR, MAX_WITHDRAW_FEE} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
@@ -31,7 +31,7 @@ import "../interfaces/IExceptions.sol";
 /// @dev Account quotas are user-set values that limit the exposure of an account to a particular asset. The USD value of an asset
 ///      counted towards account's collateral cannot exceed the USD calue of the respective quota. Users pay interest on their quotas,
 ///      both as an anti-spam measure and a way to price-discriminate based on asset's risk
-contract PoolQuotaKeeper is IPoolQuotaKeeperV3, ACLNonReentrantTrait, ContractsRegisterTrait {
+contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, ContractsRegisterTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using QuotasLogic for TokenQuotaParams;
 
@@ -303,7 +303,7 @@ contract PoolQuotaKeeper is IPoolQuotaKeeperV3, ACLNonReentrantTrait, ContractsR
         gaugeOnly // F:[PQK-3]
     {
         address[] memory tokens = quotaTokensSet.values();
-        uint16[] memory rates = IGauge(gauge).getRates(tokens); // F:[PQK-7]
+        uint16[] memory rates = IGaugeV3(gauge).getRates(tokens); // F:[PQK-7]
 
         uint256 quotaRevenue;
         uint256 timeFromLastUpdate = block.timestamp - lastQuotaRateUpdate;

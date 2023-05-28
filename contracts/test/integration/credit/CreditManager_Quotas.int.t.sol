@@ -35,7 +35,7 @@ import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 // MOCKS
 
 import {PoolMock} from "../../mocks//pool/PoolMock.sol";
-import {PoolQuotaKeeper} from "../../../pool/PoolQuotaKeeper.sol";
+import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
@@ -58,7 +58,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
     AccountFactory af;
     CreditManagerV3 creditManager;
     PoolMock poolMock;
-    PoolQuotaKeeper poolQuotaKeeper;
+    PoolQuotaKeeperV3 poolQuotaKeeper;
     IPriceOracleV2 priceOracle;
     ACL acl;
     address underlying;

@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {PolicyManager} from "./PolicyManager.sol";
 
-import {IControllerTimelock, QueuedTransactionData} from "../../interfaces/IControllerTimelock.sol";
+import {IControllerTimelockV3, QueuedTransactionData} from "../../interfaces/IControllerTimelockV3.sol";
 
 import {ICreditManagerV3} from "../../interfaces/ICreditManagerV3.sol";
 
@@ -24,7 +24,7 @@ import {ILPPriceFeedV2} from "@gearbox-protocol/core-v2/contracts/interfaces/ILP
 ///      to set parameter change boundaries and conditions. In order to
 ///      schedule a change for a particular contract / function combination
 ///      a policy needs to be defined for it. See more in `PolicyManager`
-contract ControllerTimelock is PolicyManager, IControllerTimelock {
+contract ControllerTimelock is PolicyManager, IControllerTimelockV3 {
     /// @notice Period before a mature transaction becomes stale
     uint256 public constant GRACE_PERIOD = 14 days;
 

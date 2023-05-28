@@ -84,7 +84,7 @@ Contains the base contracts Gearbox uses to evaluate assets and convert them to 
 Contains contracts related to passive LP side.
 
 1. `PoolService.sol` implements a borrowing pool that loans assets to Credit Managers to be used in Credit Accounts.
-2. `LinearInterestRateModel.sol` implements a function of interest rate from utilization.
+2. `LinearInterestRateModelV3.sol` implements a function of interest rate from utilization.
 
 ### Support
 

@@ -11,7 +11,7 @@ struct QueuedTransactionData {
     bytes data;
 }
 
-interface IControllerTimelockEvents {
+interface IControllerTimelockV3Events {
     /// @dev Emits when the admin of the controller is updated
     event SetAdmin(address indexed newAdmin);
 
@@ -31,7 +31,7 @@ interface IControllerTimelockEvents {
     event CancelTransaction(bytes32 indexed txHash);
 }
 
-interface IControllerTimelockErrors {
+interface IControllerTimelockV3Errors {
     /// @dev Thrown when the access-restricted function is called by other than the admin
     error CallerNotAdminException();
 
@@ -51,7 +51,7 @@ interface IControllerTimelockErrors {
     error TxExecutionRevertedException();
 }
 
-interface IControllerTimelock is IControllerTimelockErrors, IControllerTimelockEvents {
+interface IControllerTimelockV3 is IControllerTimelockV3Errors, IControllerTimelockV3Events {
     /// @dev Queues a transaction to set a new expiration date in the Credit Facade
     /// @param creditManager Adress of CM to update the expiration date for
     /// @param expirationDate The new expiration date

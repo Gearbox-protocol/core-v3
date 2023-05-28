@@ -9,7 +9,7 @@ import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/Contra
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {LinearInterestRateModel} from "../../../pool/LinearInterestRateModel.sol";
+import {LinearInterestRateModelV3} from "../../../pool/LinearInterestRateModelV3.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -28,7 +28,7 @@ import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 import {ERC20FeeMock} from "../../mocks/token/ERC20FeeMock.sol";
-import {PoolQuotaKeeper} from "../../../pool/PoolQuotaKeeper.sol";
+import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
 import {GaugeMock} from "../../mocks//pool/GaugeMock.sol";
 
 // TEST
@@ -53,7 +53,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
     AddressProviderV3ACLMock addressProvider;
     ContractsRegister public cr;
 
-    PoolQuotaKeeper public pqk;
+    PoolQuotaKeeperV3 public pqk;
     GaugeMock public gaugeMock;
 
     ACL acl;
@@ -78,7 +78,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
 
     function _setUp(Tokens t, bool supportQuotas) public {
         tokenTestSuite = new TokensTestSuite();
-        irm = new LinearInterestRateModel(
+        irm = new LinearInterestRateModelV3(
             80_00,
             90_00,
             2_00,
@@ -160,7 +160,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
     }
 
     function _deployAndConnectPoolQuotaKeeper() internal {
-        pqk = new PoolQuotaKeeper(address(pool));
+        pqk = new PoolQuotaKeeperV3(address(pool));
 
         // vm.prank(CONFIGURATOR);
         pool.setPoolQuotaKeeper(address(pqk));
@@ -1520,7 +1520,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
         uint256 expectedLiquidity = pool.expectedLiquidity();
         uint256 availableLiquidity = pool.availableLiquidity();
 
-        LinearInterestRateModel newIR = new LinearInterestRateModel(
+        LinearInterestRateModelV3 newIR = new LinearInterestRateModelV3(
             8000,
             9000,
             200,
@@ -1590,7 +1590,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
             symbolPrefix_: "d"
         });
 
-        pqk = new PoolQuotaKeeper(address(pool));
+        pqk = new PoolQuotaKeeperV3(address(pool));
 
         address POOL_QUOTA_KEEPER = address(pqk);
 
@@ -1611,7 +1611,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
 
         vm.warp(block.timestamp + year);
 
-        PoolQuotaKeeper pqk2 = new PoolQuotaKeeper(address(pool));
+        PoolQuotaKeeperV3 pqk2 = new PoolQuotaKeeperV3(address(pool));
 
         address POOL_QUOTA_KEEPER2 = address(pqk2);
 
@@ -1741,7 +1741,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
 
             _initPoolLiquidity(initialLiquidity, RAY);
 
-            LinearInterestRateModel newIR = new LinearInterestRateModel(
+            LinearInterestRateModelV3 newIR = new LinearInterestRateModelV3(
                 5000,
                 testCase.u2,
                 200,
