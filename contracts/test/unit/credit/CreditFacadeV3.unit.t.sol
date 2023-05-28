@@ -18,7 +18,7 @@ import {CreditFacadeV3Harness} from "./CreditFacadeV3Harness.sol";
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 import {DegenNFTMock} from "../../mocks/token/DegenNFTMock.sol";
 import {AdapterMock} from "../../mocks/adapters/AdapterMock.sol";
-import {BotRegisterMock} from "../../mocks/support/BotRegisterMock.sol";
+import {BotListMock} from "../../mocks/support/BotListMock.sol";
 import {WithdrawalManagerMock} from "../../mocks/support/WithdrawalManagerMock.sol";
 import {PriceOracleMock} from "../../mocks/oracles/PriceOracleMock.sol";
 import {PriceFeedOnDemandMock} from "../../mocks/oracles/PriceFeedOnDemandMock.sol";
@@ -37,7 +37,7 @@ import {
     BOT_PERMISSIONS_SET_FLAG
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
-import {IBotRegisterV3} from "../../../interfaces/IBotRegisterV3.sol";
+import {IBotListV3} from "../../../interfaces/IBotListV3.sol";
 
 import {ClaimAction} from "../../../interfaces/IWithdrawalManagerV3.sol";
 import {BitMask, UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
@@ -78,7 +78,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     PoolMock poolMock;
 
     IWETHGateway wethGateway;
-    BotRegisterMock botListMock;
+    BotListMock botListMock;
 
     DegenNFTMock degenNFTMock;
     bool whitelisted;
@@ -148,7 +148,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         wethGateway = IWETHGateway(addressProvider.getAddressOrRevert(AP_WETH_GATEWAY, 3_00));
 
-        botListMock = BotRegisterMock(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00));
+        botListMock = BotListMock(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00));
 
         withdrawalManagerMock = WithdrawalManagerMock(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00));
 
@@ -357,7 +357,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.setDebtLimits(0, 0, 0);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditFacade.setBotRegister(address(1));
+        creditFacade.setBotList(address(1));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditFacade.setCumulativeLossParams(0, false);
@@ -631,7 +631,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         }
 
         if (hasBotPermissions) {
-            vm.expectCall(address(botListMock), abi.encodeCall(IBotRegisterV3.eraseAllBotPermissions, (creditAccount)));
+            vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.eraseAllBotPermissions, (creditAccount)));
         } else {
             botListMock.setRevertOnErase(true);
         }
@@ -968,7 +968,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         }
 
         if (hasBotPermissions) {
-            vm.expectCall(address(botListMock), abi.encodeCall(IBotRegisterV3.eraseAllBotPermissions, (creditAccount)));
+            vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.eraseAllBotPermissions, (creditAccount)));
         } else {
             botListMock.setRevertOnErase(true);
         }
@@ -1873,7 +1873,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         address bot = makeAddr("BOT");
         vm.expectCall(
-            address(botListMock), abi.encodeCall(IBotRegisterV3.payBot, (USER, creditAccount, bot, paymentAmount))
+            address(botListMock), abi.encodeCall(IBotListV3.payBot, (USER, creditAccount, bot, paymentAmount))
         );
 
         vm.prank(bot);
@@ -2033,16 +2033,14 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         /// It erases all previious bot permission and set flag if flag was false before
 
         vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.flagsOf, (creditAccount)));
-        vm.expectCall(address(botListMock), abi.encodeCall(IBotRegisterV3.eraseAllBotPermissions, (creditAccount)));
+        vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.eraseAllBotPermissions, (creditAccount)));
 
         vm.expectCall(
             address(creditManagerMock),
             abi.encodeCall(ICreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, true))
         );
 
-        vm.expectCall(
-            address(botListMock), abi.encodeCall(IBotRegisterV3.setBotPermissions, (creditAccount, bot, 1, 2, 3))
-        );
+        vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.setBotPermissions, (creditAccount, bot, 1, 2, 3)));
 
         vm.prank(USER);
         creditFacade.setBotPermissions({
@@ -2055,9 +2053,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         /// It doesn't erase permission is bot already set
         botListMock.setRevertOnErase(true);
-        vm.expectCall(
-            address(botListMock), abi.encodeCall(IBotRegisterV3.setBotPermissions, (creditAccount, bot, 1, 2, 3))
-        );
+        vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.setBotPermissions, (creditAccount, bot, 1, 2, 3)));
 
         vm.prank(USER);
         creditFacade.setBotPermissions({
@@ -2070,9 +2066,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         /// It removes flag if no bots left
         botListMock.setBotPermissionsReturn(0);
-        vm.expectCall(
-            address(botListMock), abi.encodeCall(IBotRegisterV3.setBotPermissions, (creditAccount, bot, 1, 2, 3))
-        );
+        vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.setBotPermissions, (creditAccount, bot, 1, 2, 3)));
 
         vm.expectCall(
             address(creditManagerMock),
@@ -2098,7 +2092,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         botListMock.setRevertOnErase(false);
         creditManagerMock.setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: true});
-        vm.expectCall(address(botListMock), abi.encodeCall(IBotRegisterV3.eraseAllBotPermissions, (creditAccount)));
+        vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.eraseAllBotPermissions, (creditAccount)));
         creditFacade.eraseAllBotPermissionsAtClosure(creditAccount);
     }
 
@@ -2249,12 +2243,12 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         assertEq(maxDebt, 2, " incorrect maxDebt");
     }
 
-    /// @dev U:[FA-50]: setBotRegister works properly
-    function test_U_FA_50_setBotRegister_works_properly() public notExpirableCase {
+    /// @dev U:[FA-50]: setBotList works properly
+    function test_U_FA_50_setBotList_works_properly() public notExpirableCase {
         assertEq(creditFacade.botList(), address(botListMock), "SETUP: incorrect botList");
 
         vm.prank(CONFIGURATOR);
-        creditFacade.setBotRegister(DUMB_ADDRESS);
+        creditFacade.setBotList(DUMB_ADDRESS);
 
         assertEq(creditFacade.botList(), DUMB_ADDRESS, "incorrect botList");
     }

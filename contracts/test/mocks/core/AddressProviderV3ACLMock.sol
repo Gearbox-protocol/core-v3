@@ -8,7 +8,7 @@ import {AccountFactoryMock} from "../core/AccountFactoryMock.sol";
 import {PriceOracleMock} from "../oracles/PriceOracleMock.sol";
 import {WETHGatewayMock} from "../support/WETHGatewayMock.sol";
 import {WithdrawalManagerMock} from "../support/WithdrawalManagerMock.sol";
-import {BotRegisterMock} from "../support/BotRegisterMock.sol";
+import {BotListMock} from "../support/BotListMock.sol";
 
 import {Test} from "forge-std/Test.sol";
 
@@ -40,7 +40,7 @@ contract AddressProviderV3ACLMock is Test, AddressProviderV3 {
         AccountFactoryMock accountFactoryMock = new AccountFactoryMock(3_00);
         _setAddress(AP_ACCOUNT_FACTORY, address(accountFactoryMock), NO_VERSION_CONTROL);
 
-        BotRegisterMock botListMock = new BotRegisterMock();
+        BotListMock botListMock = new BotListMock();
         _setAddress(AP_BOT_LIST, address(botListMock), 3_00);
 
         _setAddress(AP_CONTRACTS_REGISTER, address(this), 1);

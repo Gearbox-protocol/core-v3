@@ -3,8 +3,8 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {BotRegister} from "../../../support/BotRegister.sol";
-import {IBotRegisterV3Events, BotFunding} from "../../../interfaces/IBotRegisterV3.sol";
+import {BotListV3} from "../../../support/BotListV3.sol";
+import {IBotListV3Events, BotFunding} from "../../../interfaces/IBotListV3.sol";
 import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import {ICreditFacadeV3} from "../../../interfaces/ICreditFacadeV3.sol";
@@ -33,10 +33,10 @@ contract InvalidCFMock {
 
 /// @title LPPriceFeedTest
 /// @notice Designed for unit test purposes only
-contract BotRegisterTest is Test, IBotRegisterV3Events {
+contract BotListTest is Test, IBotListV3Events {
     AddressProviderV3ACLMock public addressProvider;
 
-    BotRegister botList;
+    BotListV3 botList;
 
     TokensTestSuite tokenTestSuite;
 
@@ -53,7 +53,7 @@ contract BotRegisterTest is Test, IBotRegisterV3Events {
 
         tokenTestSuite = new TokensTestSuite();
 
-        botList = new BotRegister(address(addressProvider));
+        botList = new BotListV3(address(addressProvider));
 
         bot = new GeneralMock();
         creditManager = new GeneralMock();

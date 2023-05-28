@@ -482,12 +482,6 @@
   dependencies:
     "@typechain/ethers-v5" "^10.2.1"
 
-"@gearbox-protocol/core-v2@https://github.com/gearbox-protocol/core-v2.git#base":
-  version "1.0.1"
-  resolved "https://github.com/gearbox-protocol/core-v2.git#e37aab85e4db49a9511c4b2eaa0b0d623fc10d3c"
-  dependencies:
-    "@typechain/ethers-v5" "^10.2.1"
-
 "@gearbox-protocol/integration-types@^1.2.0":
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/@gearbox-protocol/integration-types/-/integration-types-1.2.0.tgz#865cde63923c5e0e61575b9b808b3f4ec266ebb4"

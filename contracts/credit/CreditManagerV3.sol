@@ -990,7 +990,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     ///
 
     /// @notice Schedules a delayed withdrawal of an asset from the account.
-    /// @dev Withdrawals in Gearbox V3 are generally delayed for safety, and an intermediate WithdrawalManager contract
+    /// @dev Withdrawals in Gearbox V3 are generally delayed for safety, and an intermediate WithdrawalManagerV3 contract
     ///      is used to store funds pending a withdrawal. When the withdrawal matures, a corresponding `claimWithdrawals` function
     ///      can be used to receive them outside the Gearbox system.
     /// @param creditAccount Credit Account to schedule a withdrawal for
@@ -1005,7 +1005,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         uint256 tokenMask = getTokenMaskOrRevert({token: token}); // U:[CM-26]
 
-        // If the configured delay is zero, then sending funds to the WithdrawalManager can be skipped
+        // If the configured delay is zero, then sending funds to the WithdrawalManagerV3 can be skipped
         // and they can be sent directly to the user
         if (IWithdrawalManagerV3(withdrawalManager).delay() == 0) {
             address borrower = getBorrowerOrRevert({creditAccount: creditAccount});
@@ -1128,7 +1128,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     /// @notice Requests the Credit Account to transfer a token to another address. If a token transfer
-    ///         fails, the token will be transferred to WithdrawalManager, where the `to` address can
+    ///         fails, the token will be transferred to WithdrawalManagerV3, where the `to` address can
     ///         withdraw it from to any address.
     /// @param creditAccount Address of the sender Credit Account
     /// @param token Address of the token
@@ -1142,7 +1142,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             IWETHGateway(wethGateway).depositFor({to: to, amount: amount}); // U:[CM-31, 32]
         } else {
             // In case a token transfer fails (e.g., borrower getting blacklisted by USDC), the token will be sent
-            // to WithdrawalManager
+            // to WithdrawalManagerV3
             try ICreditAccountBase(creditAccount).safeTransfer({token: token, to: to, amount: amount}) {
                 // U:[CM-31, 32, 33]
             } catch {

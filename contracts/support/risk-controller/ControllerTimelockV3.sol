@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {PolicyManager} from "./PolicyManager.sol";
+import {PolicyManagerV3} from "./PolicyManagerV3.sol";
 
 import {IControllerTimelockV3, QueuedTransactionData} from "../../interfaces/IControllerTimelockV3.sol";
 
@@ -24,7 +24,7 @@ import {ILPPriceFeedV2} from "@gearbox-protocol/core-v2/contracts/interfaces/ILP
 ///      to set parameter change boundaries and conditions. In order to
 ///      schedule a change for a particular contract / function combination
 ///      a policy needs to be defined for it. See more in `PolicyManager`
-contract ControllerTimelock is PolicyManager, IControllerTimelockV3 {
+contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @notice Period before a mature transaction becomes stale
     uint256 public constant GRACE_PERIOD = 14 days;
 
@@ -44,7 +44,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelockV3 {
     /// @param _addressProvider Address of the contract address repository
     /// @param _admin Admin of the controller contract that can schedule transactions
     /// @param _vetoAdmin Admin that can cancel transactions
-    constructor(address _addressProvider, address _admin, address _vetoAdmin) PolicyManager(_addressProvider) {
+    constructor(address _addressProvider, address _admin, address _vetoAdmin) PolicyManagerV3(_addressProvider) {
         admin = _admin;
         vetoAdmin = _vetoAdmin;
     }

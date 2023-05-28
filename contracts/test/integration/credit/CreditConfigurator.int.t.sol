@@ -7,7 +7,7 @@ import "../../../interfaces/IAddressProviderV3.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
-import {WithdrawalManager} from "../../../support/WithdrawalManager.sol";
+import {WithdrawalManagerV3} from "../../../support/WithdrawalManagerV3.sol";
 import {
     CreditConfigurator,
     CreditManagerOpts,
@@ -53,7 +53,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
     CreditManagerV3 public creditManager;
     CreditFacadeV3 public creditFacade;
     CreditConfigurator public creditConfigurator;
-    WithdrawalManager public withdrawalManager;
+    WithdrawalManagerV3 public withdrawalManager;
     address underlying;
 
     AdapterMock adapter1;
@@ -338,7 +338,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         creditConfigurator.upgradeCreditConfigurator(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.setBotRegister(0);
+        creditConfigurator.setBotList(0);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.setMaxEnabledTokens(1);
@@ -958,7 +958,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
 
             vm.startPrank(CONFIGURATOR);
             cct.addressProvider().setAddress(AP_BOT_LIST, DUMB_ADDRESS, true);
-            creditConfigurator.setBotRegister(301);
+            creditConfigurator.setBotList(301);
             vm.stopPrank();
 
             address botList = creditFacade.botList();
@@ -1335,17 +1335,17 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         assertEq(loss, 0, "Cumulative loss was not reset");
     }
 
-    /// @dev I:[CC-33]: setBotRegister upgrades the bot list correctly
-    function test_I_CC_33_setBotRegister_upgrades_priceOracle_correctly() public {
+    /// @dev I:[CC-33]: setBotList upgrades the bot list correctly
+    function test_I_CC_33_setBotList_upgrades_priceOracle_correctly() public {
         vm.mockCall(DUMB_ADDRESS, abi.encodeCall(IVersion.version, ()), abi.encode(301));
 
         vm.startPrank(CONFIGURATOR);
         cct.addressProvider().setAddress(AP_BOT_LIST, DUMB_ADDRESS, true);
 
         vm.expectEmit(true, false, false, false);
-        emit SetBotRegister(DUMB_ADDRESS);
+        emit SetBotList(DUMB_ADDRESS);
 
-        creditConfigurator.setBotRegister(301);
+        creditConfigurator.setBotList(301);
 
         assertEq(creditFacade.botList(), DUMB_ADDRESS);
         vm.stopPrank();

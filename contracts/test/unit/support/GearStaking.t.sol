@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {GearStaking} from "../../../support/GearStaking.sol";
+import {GearStakingV3} from "../../../support/GearStakingV3.sol";
 import {IGearStakingV3Events, MultiVote, VotingContractStatus} from "../../../interfaces/IGearStakingV3.sol";
 import {IVotingContractV3} from "../../../interfaces/IVotingContractV3.sol";
 
@@ -31,7 +31,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
 
     AddressProviderV3ACLMock public addressProvider;
 
-    GearStaking gearStaking;
+    GearStakingV3 gearStaking;
 
     TargetContractMock votingContract;
 
@@ -48,7 +48,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         vm.prank(CONFIGURATOR);
         addressProvider.setAddress(AP_GEAR_TOKEN, gearToken, false);
 
-        gearStaking = new GearStaking(address(addressProvider), block.timestamp + 1);
+        gearStaking = new GearStakingV3(address(addressProvider), block.timestamp + 1);
 
         votingContract = new TargetContractMock();
 

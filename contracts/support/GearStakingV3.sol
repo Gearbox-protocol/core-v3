@@ -23,7 +23,7 @@ import "../interfaces/IExceptions.sol";
 
 uint256 constant EPOCH_LENGTH = 7 days;
 
-contract GearStaking is ACLNonReentrantTrait, IGearStakingV3 {
+contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     using SafeCast for uint256;
 
     /// @notice Address of the GEAR token

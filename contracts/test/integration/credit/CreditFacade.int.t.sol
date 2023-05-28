@@ -8,7 +8,7 @@ import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWE
 
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 
-import {BotRegister} from "../../../support/BotRegister.sol";
+import {BotListV3} from "../../../support/BotListV3.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 
 import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
@@ -75,7 +75,7 @@ contract CreditFacadeIntegrationTest is
     TargetContractMock targetMock;
     AdapterMock adapterMock;
 
-    BotRegister botList;
+    BotListV3 botList;
 
     function setUp() public {
         _setUp(Tokens.DAI);
@@ -657,7 +657,7 @@ contract CreditFacadeIntegrationTest is
         vm.expectEmit(false, false, false, true);
         emit FinishMultiCall();
 
-        vm.expectCall(address(botList), abi.encodeCall(BotRegister.eraseAllBotPermissions, (creditAccount)));
+        vm.expectCall(address(botList), abi.encodeCall(BotListV3.eraseAllBotPermissions, (creditAccount)));
 
         // todo: add withdrawal manager call
 
@@ -754,7 +754,7 @@ contract CreditFacadeIntegrationTest is
         vm.expectEmit(false, false, false, false);
         emit FinishMultiCall();
 
-        vm.expectCall(address(botList), abi.encodeCall(BotRegister.eraseAllBotPermissions, (creditAccount)));
+        vm.expectCall(address(botList), abi.encodeCall(BotListV3.eraseAllBotPermissions, (creditAccount)));
 
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (address(1))));
 
@@ -1527,7 +1527,7 @@ contract CreditFacadeIntegrationTest is
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         vm.prank(USER);
-        creditFacade.setBotRegister(FRIEND);
+        creditFacade.setBotList(FRIEND);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         vm.prank(USER);
@@ -1980,7 +1980,7 @@ contract CreditFacadeIntegrationTest is
         vm.prank(FRIEND);
         creditFacade.setBotPermissions(creditAccount, bot, type(uint192).max, uint72(1 ether), uint72(1 ether / 10));
 
-        vm.expectCall(address(botList), abi.encodeCall(BotRegister.eraseAllBotPermissions, (creditAccount)));
+        vm.expectCall(address(botList), abi.encodeCall(BotListV3.eraseAllBotPermissions, (creditAccount)));
 
         vm.expectCall(
             address(creditManager),

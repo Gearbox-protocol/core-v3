@@ -11,8 +11,8 @@ import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
 import "../../interfaces/IAddressProviderV3.sol";
-import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
-import {BotRegister} from "../../support/BotRegister.sol";
+import {WithdrawalManagerV3} from "../../support/WithdrawalManagerV3.sol";
+import {BotListV3} from "../../support/BotListV3.sol";
 import {WETHGateway} from "../../support/WETHGateway.sol";
 import {PriceOracleV2, PriceFeedConfig} from "@gearbox-protocol/core-v2/contracts/oracles/PriceOracleV2.sol";
 import {GearToken} from "@gearbox-protocol/core-v2/contracts/tokens/GearToken.sol";
@@ -56,10 +56,10 @@ contract GenesisFactory is Ownable {
         WETHGateway wethGateway = new WETHGateway(address(addressProvider)); // T:[GD-1]
         addressProvider.setAddress(AP_WETH_GATEWAY, address(wethGateway), true); // T:[GD-1]
 
-        WithdrawalManager wm = new WithdrawalManager(address(addressProvider), 1 days);
+        WithdrawalManagerV3 wm = new WithdrawalManagerV3(address(addressProvider), 1 days);
         addressProvider.setAddress(AP_WITHDRAWAL_MANAGER, address(wm), true);
 
-        BotRegister botList = new BotRegister(address(addressProvider));
+        BotListV3 botList = new BotListV3(address(addressProvider));
         addressProvider.setAddress(AP_BOT_LIST, address(botList), true);
 
         GearToken gearToken = new GearToken(address(this)); // T:[GD-1]

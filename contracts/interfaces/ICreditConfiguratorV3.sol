@@ -109,7 +109,7 @@ interface ICreditConfiguratorEvents {
     event RemoveEmergencyLiquidator(address);
 
     /// @dev Emits when the bot list is updated in Credit Facade
-    event SetBotRegister(address);
+    event SetBotList(address);
 
     /// @dev Emits when the token is set as limited
     event QuoteToken(address);
@@ -243,7 +243,7 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
     /// @dev Sets the bot list contract
     /// @param version The version of the new bot list contract
     ///                The contract address is retrieved from addressProvider
-    function setBotRegister(uint256 version) external;
+    function setBotList(uint256 version) external;
 
     /// @notice Sets a new total debt limit
     /// @dev Only works for Credit Facades that track total debt limit

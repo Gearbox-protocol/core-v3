@@ -3,8 +3,8 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {ControllerTimelock} from "../../../support/risk-controller/ControllerTimelock.sol";
-import {Policy} from "../../../support/risk-controller/PolicyManager.sol";
+import {ControllerTimelockV3} from "../../../support/risk-controller/ControllerTimelockV3.sol";
+import {Policy} from "../../../support/risk-controller/PolicyManagerV3.sol";
 import {GeneralMock} from "../../mocks/GeneralMock.sol";
 
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
@@ -27,7 +27,7 @@ import "../../../interfaces/IExceptions.sol";
 contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControllerTimelockV3Errors {
     AddressProviderV3ACLMock public addressProvider;
 
-    ControllerTimelock public controllerTimelock;
+    ControllerTimelockV3 public controllerTimelock;
 
     address admin;
     address vetoAdmin;
@@ -38,7 +38,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         vm.prank(CONFIGURATOR);
         addressProvider = new AddressProviderV3ACLMock();
-        controllerTimelock = new ControllerTimelock(address(addressProvider), admin, vetoAdmin);
+        controllerTimelock = new ControllerTimelockV3(address(addressProvider), admin, vetoAdmin);
     }
 
     function _makeMocks()

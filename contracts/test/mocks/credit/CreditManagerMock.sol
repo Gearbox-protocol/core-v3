@@ -213,7 +213,7 @@ contract CreditManagerMock {
         return_collateralDebtData = _collateralDebtData;
     }
 
-    function closeCollateralDebtData() external returns (CollateralDebtData memory) {
+    function closeCollateralDebtData() external view returns (CollateralDebtData memory) {
         return _closeCollateralDebtData;
     }
 
@@ -223,6 +223,7 @@ contract CreditManagerMock {
 
     function claimWithdrawals(address creditAccount, address to, ClaimAction action)
         external
+        view
         returns (uint256 tokensToEnable)
     {
         tokensToEnable = cw_return_tokensToEnable;
@@ -282,6 +283,7 @@ contract CreditManagerMock {
 
     function addCollateral(address payer, address creditAccount, address token, uint256 amount)
         external
+        view
         returns (uint256 tokenMask)
     {
         tokenMask = ad_tokenMask;
@@ -295,6 +297,7 @@ contract CreditManagerMock {
 
     function manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)
         external
+        view
         returns (uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable)
     {
         newDebt = return_newDebt;
@@ -308,6 +311,7 @@ contract CreditManagerMock {
 
     function scheduleWithdrawal(address creditAccount, address token, uint256 amount)
         external
+        view
         returns (uint256 tokensToDisable)
     {
         tokensToDisable = sw_tokensToDisable;

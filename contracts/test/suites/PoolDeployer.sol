@@ -10,8 +10,8 @@ import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 import {GenesisFactory} from "./GenesisFactory.sol";
-import {WithdrawalManager} from "../../support/WithdrawalManager.sol";
-import {BotRegister} from "../../support/BotRegister.sol";
+import {WithdrawalManagerV3} from "../../support/WithdrawalManagerV3.sol";
+import {BotListV3} from "../../support/BotListV3.sol";
 
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 import {PoolMock} from "../mocks//pool/PoolMock.sol";
@@ -48,8 +48,8 @@ contract PoolDeployer is Test {
     PoolQuotaKeeperV3 public poolQuotaKeeper;
     GaugeMock public gaugeMock;
     ContractsRegister public cr;
-    WithdrawalManager public withdrawalManager;
-    BotRegister public botList;
+    WithdrawalManagerV3 public withdrawalManager;
+    BotListV3 public botList;
     ACL public acl;
 
     IPriceOracleV2Ext public priceOracle;
@@ -88,9 +88,9 @@ contract PoolDeployer is Test {
 
         cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
 
-        withdrawalManager = WithdrawalManager(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00));
+        withdrawalManager = WithdrawalManagerV3(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00));
 
-        botList = BotRegister(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00));
+        botList = BotListV3(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00));
 
         underlying = _underlying;
 

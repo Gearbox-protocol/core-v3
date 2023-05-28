@@ -47,7 +47,7 @@ struct Policy {
 }
 
 /// @dev A contract for managing bounds and conditions for mission-critical protocol params
-contract PolicyManager is ACLNonReentrantTrait {
+contract PolicyManagerV3 is ACLNonReentrantTrait {
     uint256 public constant CHECK_EXACT_VALUE_FLAG = 1;
     uint256 public constant CHECK_MIN_VALUE_FLAG = 1 << 1;
     uint256 public constant CHECK_MAX_VALUE_FLAG = 1 << 2;

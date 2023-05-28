@@ -25,7 +25,7 @@ import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 ///         - Immediate withdrawals can be claimed, well, immediately, and exist to support blacklistable tokens.
 ///         - Scheduled withdrawals can be claimed after a certain delay, and exist to support partial withdrawals
 ///           from credit accounts. One credit account can have up to two scheduled withdrawals at the same time.
-contract WithdrawalManager is IWithdrawalManagerV3, ACLTrait, ContractsRegisterTrait {
+contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegisterTrait {
     using SafeERC20 for IERC20;
     using IERC20Helper for IERC20;
     using WithdrawalsLogic for ClaimAction;

@@ -8,7 +8,7 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
-import {IBotRegisterV3, BotFunding} from "../interfaces/IBotRegisterV3.sol";
+import {IBotListV3, BotFunding} from "../interfaces/IBotListV3.sol";
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {ICreditFacadeV3} from "../interfaces/ICreditFacadeV3.sol";
@@ -17,10 +17,10 @@ import {ICreditAccountBase} from "../interfaces/ICreditAccountV3.sol";
 import "../interfaces/IExceptions.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
-/// @title BotRegister
+/// @title BotList
 /// @notice Used to store a mapping of borrowers => bots. A separate contract is used for transferability when
 ///      changing Credit Facades
-contract BotRegister is ACLNonReentrantTrait, IBotRegisterV3 {
+contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     using SafeCast for uint256;
     using Address for address;
     using Address for address payable;
