@@ -1209,7 +1209,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
                 permissionRquired: DECREASE_DEBT_PERMISSION
             }),
             MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeMulticall.updateQuota, (token, 0)),
+                callData: abi.encodeCall(ICreditFacadeMulticall.updateQuota, (token, 0, 0)),
                 permissionRquired: UPDATE_QUOTA_PERMISSION
             }),
             MultiCallPermissionTestCase({
@@ -1778,10 +1778,10 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
 
         int96 change = -990;
 
-        creditManagerMock.setUpdateQuota({tokensToEnable: maskToEnable, tokensToDisable: maskToDisable});
+        creditManagerMock.setUpdateQuota({change: change, tokensToEnable: maskToEnable, tokensToDisable: maskToDisable});
 
         vm.expectCall(
-            address(creditManagerMock), abi.encodeCall(ICreditManagerV3.updateQuota, (creditAccount, link, change))
+            address(creditManagerMock), abi.encodeCall(ICreditManagerV3.updateQuota, (creditAccount, link, change, 0))
         );
 
         vm.expectEmit(true, true, false, false);
@@ -1792,7 +1792,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.updateQuota, (link, change))
+                    callData: abi.encodeCall(ICreditFacadeMulticall.updateQuota, (link, change, 0))
                 })
                 ),
             enabledTokensMask: maskToDisable | UNDERLYING_TOKEN_MASK,

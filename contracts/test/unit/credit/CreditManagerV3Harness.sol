@@ -35,6 +35,10 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         creditAccountInfo[creditAccount].borrower = borrower;
     }
 
+    function setSince(address creditAccount, uint64 since) external {
+        creditAccountInfo[creditAccount].since = since;
+    }
+
     function setDebt(address creditAccount, uint256 debt) external {
         creditAccountInfo[creditAccount].debt = debt;
     }
@@ -101,7 +105,12 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         _saveEnabledTokensMask(creditAccount, enabledTokensMask);
     }
 
-    function getQuotedTokensData(address creditAccount, uint256 enabledTokensMask, address _poolQuotaKeeper)
+    function getQuotedTokensData(
+        address creditAccount,
+        uint256 enabledTokensMask,
+        uint256[] memory collateralHints,
+        address _poolQuotaKeeper
+    )
         external
         view
         returns (
@@ -112,7 +121,7 @@ contract CreditManagerV3Harness is CreditManagerV3 {
             uint256 quotedMask
         )
     {
-        return _getQuotedTokensData(creditAccount, enabledTokensMask, _poolQuotaKeeper);
+        return _getQuotedTokensData(creditAccount, enabledTokensMask, collateralHints, _poolQuotaKeeper);
     }
 
     function getCancellableWithdrawalsValue(address _priceOracle, address creditAccount, bool isForceCancel)
@@ -125,5 +134,9 @@ contract CreditManagerV3Harness is CreditManagerV3 {
 
     function getCollateralTokensData(uint256 tokenMask) external view returns (CollateralTokenData memory) {
         return collateralTokensData[tokenMask];
+    }
+
+    function setCollateralTokensCount(uint8 _collateralTokensCount) external {
+        collateralTokensCount = _collateralTokensCount;
     }
 }

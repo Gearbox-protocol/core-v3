@@ -249,7 +249,7 @@ contract CreditFacadeGasTest is
             target: address(creditFacade),
             callData: abi.encodeCall(
                 ICreditFacadeMulticall.updateQuota,
-                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)))
+                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
         });
 
@@ -257,7 +257,7 @@ contract CreditFacadeGasTest is
             target: address(creditFacade),
             callData: abi.encodeCall(
                 ICreditFacadeMulticall.updateQuota,
-                (tokenTestSuite.addressOf(Tokens.WETH), int96(int256(LINK_ACCOUNT_AMOUNT)))
+                (tokenTestSuite.addressOf(Tokens.WETH), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
         });
 
@@ -265,7 +265,7 @@ contract CreditFacadeGasTest is
             target: address(creditFacade),
             callData: abi.encodeCall(
                 ICreditFacadeMulticall.updateQuota,
-                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)))
+                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
         });
 
@@ -305,7 +305,7 @@ contract CreditFacadeGasTest is
             target: address(creditFacade),
             callData: abi.encodeCall(
                 ICreditFacadeMulticall.updateQuota,
-                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)))
+                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
         });
 
@@ -419,7 +419,7 @@ contract CreditFacadeGasTest is
             target: address(creditFacade),
             callData: abi.encodeCall(
                 ICreditFacadeMulticall.updateQuota,
-                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)))
+                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
         });
 
@@ -633,7 +633,7 @@ contract CreditFacadeGasTest is
             target: address(creditFacade),
             callData: abi.encodeCall(
                 ICreditFacadeMulticall.updateQuota,
-                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT * 3)))
+                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT * 3)), 0)
                 )
         });
 
@@ -750,7 +750,7 @@ contract CreditFacadeGasTest is
             target: address(creditFacade),
             callData: abi.encodeCall(
                 ICreditFacadeMulticall.updateQuota,
-                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)))
+                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
         });
 
@@ -917,7 +917,7 @@ contract CreditFacadeGasTest is
             target: address(creditFacade),
             callData: abi.encodeCall(
                 ICreditFacadeMulticall.updateQuota,
-                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)))
+                (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
         });
 

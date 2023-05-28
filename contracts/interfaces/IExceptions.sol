@@ -242,3 +242,5 @@ error CreditAccountIsInUseException();
 error TotalDebtNotTrackedException();
 
 error InsufficientBalanceException();
+
+error OpenCloseAccountInOneBlockException();

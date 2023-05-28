@@ -74,8 +74,14 @@ interface ICreditFacadeEvents {
     /// @dev Emits when a multicall is started
     event StartMultiCall(address indexed creditAccount);
 
+    /// @dev Emits when a call to an external contract is made through the Credit Manager
+    event Execute(address indexed creditAccount, address indexed targetContract);
+
     /// @dev Emits when a multicall is finished
     event FinishMultiCall();
+
+    /// notice Emits when enabledTokensMask is updated
+    event SetEnabledTokensMask(address indexed creditAccount, uint256 enabledTokensMask);
 }
 
 interface ICreditFacade is ICreditFacadeEvents, IVersion {

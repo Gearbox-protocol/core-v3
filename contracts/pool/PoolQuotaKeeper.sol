@@ -88,11 +88,11 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
 
     /// @dev Updates credit account's accountQuotas for multiple tokens
     /// @param creditAccount Address of credit account
-    function updateQuota(address creditAccount, address token, int96 quotaChange)
+    function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota)
         external
         override
         creditManagerOnly // F:[PQK-4]
-        returns (uint256 caQuotaInterestChange, bool enableToken, bool disableToken)
+        returns (uint256 caQuotaInterestChange, int96 change, bool enableToken, bool disableToken)
     {
         int128 quotaRevenueChange; // TODO: better naming(?)
 
