@@ -884,7 +884,9 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
         (address token, int96 quotaChange) = abi.decode(callData, (address, int96));
-        return ICreditManagerV3(creditManager).updateQuota(creditAccount, token, quotaChange);
+        int96 realQuotaChange;
+        (realQuotaChange, tokensToEnable, tokensToDisable) =
+            ICreditManagerV3(creditManager).updateQuota(creditAccount, token, quotaChange);
     }
 
     /// @notice Requests Credit Manager to remove a set of existing allowances

@@ -104,16 +104,17 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
     /// @return caQuotaInterestChange Accrued quota interest since last interest update.
     ///                               It is expected that this value is stored/used by the caller,
     ///                               as PQK will update the interest index, which will set local accrued interest to 0
+    /// @return realQuotaChange Actual quota change. Can be lower than requested on quota increase, it total quotas are
+    ///                         at capacity.
     /// @return enableToken Whether the token needs to be enabled
     /// @return disableToken Whether the token needs to be disabled
     function updateQuota(address creditAccount, address token, int96 quotaChange)
         external
         override
         creditManagerOnly // F:[PQK-4]
-        returns (uint256 caQuotaInterestChange, bool enableToken, bool disableToken)
+        returns (uint256 caQuotaInterestChange, int96 realQuotaChange, bool enableToken, bool disableToken)
     {
         int128 quotaRevenueChange;
-        int96 realQuotaChange;
 
         AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
         TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
@@ -138,8 +139,6 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
             lastQuotaRateUpdate: lastQuotaRateUpdate,
             quotaChange: quotaChange
         });
-
-        emit ChangeAccountQuota(creditAccount, token, realQuotaChange);
 
         /// Quota revenue must be changed on each quota updated, so that the
         /// pool can correctly compute its liquidity metrics in the future
@@ -182,8 +181,6 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
             if (setLimitsToZero) {
                 _setTokenLimit({tokenQuotaParams: tokenQuotaParams, token: token, limit: 1});
             }
-
-            emit RemoveAccountQuota(creditAccount, token);
 
             unchecked {
                 ++i;
@@ -238,15 +235,12 @@ contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsReg
         returns (uint256 quoted, uint256 interest)
     {
         AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
+        TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
 
         quoted = accountQuota.quota;
 
         if (quoted > 1) {
-            interest = CreditLogic.calcAccruedInterest({
-                amount: quoted,
-                cumulativeIndexLastUpdate: accountQuota.cumulativeIndexLU,
-                cumulativeIndexNow: cumulativeIndex(token)
-            }); // F:[CMQ-8]
+            interest = QuotasLogic.calcOutstandingQuotaInterest(tokenQuotaParams, accountQuota, lastQuotaRateUpdate);
         }
     }
 

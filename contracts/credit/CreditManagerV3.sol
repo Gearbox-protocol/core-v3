@@ -503,6 +503,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     creditAccount: creditAccount,
                     tokens: collateralDebtData.quotedTokens
                 });
+                console.log(newCumulativeQuotaInterest);
                 creditAccountInfo[creditAccount].cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // U:[CM-11]
             }
 
@@ -942,13 +943,16 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         override
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
-        returns (uint256 tokensToEnable, uint256 tokensToDisable)
+        returns (int96 realQuotaChange, uint256 tokensToEnable, uint256 tokensToDisable)
     {
         /// The PoolQuotaKeeper returns the interest to be cached (quota interest is computed dynamically,
         /// so the cumulative index inside PQK needs to be updated before setting the new quota value).
         /// PQK also reports whether the quota was changed from zero to non-zero and vice versa, in order to
         /// safely enable and disable quoted tokens
-        (uint256 caInterestChange, bool enable, bool disable) = IPoolQuotaKeeper(poolQuotaKeeper()).updateQuota({
+        uint256 caInterestChange;
+        bool enable;
+        bool disable;
+        (caInterestChange, realQuotaChange, enable, disable) = IPoolQuotaKeeper(poolQuotaKeeper()).updateQuota({
             creditAccount: creditAccount,
             token: token,
             quotaChange: quotaChange

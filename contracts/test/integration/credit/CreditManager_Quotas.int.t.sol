@@ -182,7 +182,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         uint256 linkMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.LINK));
 
-        (uint256 tokensToEnable, uint256 tokensToDisable) = creditManager.updateQuota({
+        (, uint256 tokensToEnable, uint256 tokensToDisable) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.LINK),
             quotaChange: 100_000
@@ -193,7 +193,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         vm.warp(block.timestamp + 365 days);
 
-        (tokensToEnable, tokensToDisable) = creditManager.updateQuota({
+        (, tokensToEnable, tokensToDisable) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.LINK),
             quotaChange: -100_000
@@ -226,7 +226,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         uint256 enabledTokensMask = UNDERLYING_TOKEN_MASK;
 
-        (uint256 tokensToEnable,) = creditManager.updateQuota({
+        (, uint256 tokensToEnable,) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.LINK),
             quotaChange: 100_000
@@ -234,7 +234,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         enabledTokensMask |= tokensToEnable;
 
-        (tokensToEnable,) = creditManager.updateQuota({
+        (, tokensToEnable,) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.USDT),
             quotaChange: 200_000
@@ -279,7 +279,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         uint256 enabledTokensMask = UNDERLYING_TOKEN_MASK;
 
-        (uint256 tokensToEnable,) = creditManager.updateQuota({
+        (, uint256 tokensToEnable,) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.LINK),
             quotaChange: 100_000
@@ -287,7 +287,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         enabledTokensMask |= tokensToEnable;
 
-        (tokensToEnable,) = creditManager.updateQuota({
+        (, tokensToEnable,) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.USDT),
             quotaChange: 200_000
@@ -329,14 +329,14 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         tokenTestSuite.mint(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT * 2);
 
         uint256 enabledTokensMask = UNDERLYING_TOKEN_MASK;
-        (uint256 tokensToEnable,) = creditManager.updateQuota({
+        (, uint256 tokensToEnable,) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.LINK),
             quotaChange: int96(uint96(100 * WAD))
         });
         enabledTokensMask |= tokensToEnable;
 
-        (tokensToEnable,) = creditManager.updateQuota({
+        (, tokensToEnable,) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.USDT),
             quotaChange: int96(uint96(200 * WAD))
@@ -405,14 +405,14 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         tokenTestSuite.mint(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT * 2);
 
         uint256 enabledTokensMask = UNDERLYING_TOKEN_MASK;
-        (uint256 tokensToEnable,) = creditManager.updateQuota({
+        (, uint256 tokensToEnable,) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.LINK),
             quotaChange: int96(quotaLink)
         });
         enabledTokensMask |= tokensToEnable;
 
-        (tokensToEnable,) = creditManager.updateQuota({
+        (, tokensToEnable,) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.USDT),
             quotaChange: int96(quotaUsdt)
@@ -457,14 +457,14 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         uint256 enabledTokensMap = UNDERLYING_TOKEN_MASK;
 
-        (uint256 tokensToEnable,) = creditManager.updateQuota({
+        (, uint256 tokensToEnable,) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.LINK),
             quotaChange: int96(uint96(100 * WAD))
         });
         enabledTokensMap |= tokensToEnable;
 
-        (tokensToEnable,) = creditManager.updateQuota({
+        (, tokensToEnable,) = creditManager.updateQuota({
             creditAccount: creditAccount,
             token: tokenTestSuite.addressOf(Tokens.USDT),
             quotaChange: int96(uint96(200 * WAD))
