@@ -7,6 +7,8 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 /// @title USDT fees Library
+/// @dev Computes amounts to send / receive with USDT fees accounted for
+///      Required to handle USDT in case tether even enables fees
 library USDTFees {
     function amountUSDTWithFee(uint256 amount, uint256 basisPointsRate, uint256 maximumFee)
         internal

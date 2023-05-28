@@ -21,30 +21,35 @@ import {PoolV3} from "./PoolV3.sol";
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
-/// @title Gauge fore new 4626 pools
+/// @title Gauge for quota interest rates
+/// @dev Quota interest rates in Gearbox V3 are determined
+///      by GEAR holders voting to shift the rate within a predetermined
+///      interval. While there are notable mechanic differences, the overall
+///      dynamic of token holders controlling strategy yields is similar to
+///      Curve's gauge system, and thus the contract carries the same name
 contract Gauge is IGauge, ACLNonReentrantTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
 
-    /// @dev Address provider
+    /// @notice Address of the address provider
     address public immutable addressProvider;
 
-    /// @dev Address of the pool
+    /// @notice Address of the pool
     PoolV3 public immutable pool;
 
-    /// @dev Mapping from token address to its rate parameters
+    /// @notice Mapping from token address to its rate parameters
     mapping(address => QuotaRateParams) public quotaRateParams;
 
-    /// @dev Mapping from (user, token) to vote amounts committed by user to each side
+    /// @notice Mapping from (user, token) to vote amounts committed by user to each side
     mapping(address => mapping(address => UserVotes)) userTokenVotes;
 
-    /// @dev GEAR locking and voting contract
+    /// @notice GEAR locking and voting contract
     IGearStaking public voter;
 
-    /// @dev Epoch when the gauge was last updated
+    /// @notice Epoch when the rates were last recomputed
     uint16 public epochLU;
 
-    /// @dev Contract version
+    /// @notice Contract version
     uint256 public constant version = 3_00;
 
     //
@@ -52,14 +57,13 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
     //
 
     /// @dev Constructor
-
+    /// @param _pool Address of the borrowing pool
+    /// @param _gearStaking Address of the GEAR staking contract
     constructor(address _pool, address _gearStaking)
         ACLNonReentrantTrait(address(PoolV3(_pool).addressProvider()))
         nonZeroAddress(_pool)
         nonZeroAddress(_gearStaking)
     {
-        // Additional check that receiver is not address(0)
-
         addressProvider = address(PoolV3(_pool).addressProvider()); // F:[P4-01]
         pool = PoolV3(_pool); // F:[P4-01]
         voter = IGearStaking(_gearStaking);
@@ -74,7 +78,7 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
         _;
     }
 
-    /// @dev Rolls the new epoch and updates all quota rates
+    /// @notice Rolls the new epoch and updates all quota rates
     function updateEpoch() external {
         _checkAndUpdateEpoch();
     }
@@ -85,12 +89,19 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
         if (epochNow > epochLU) {
             epochLU = epochNow;
 
-            /// compute all compounded rates
-
+            /// The PQK retrieves all rates from the Gauge on its own and saves them
+            /// Since this function is only callable by the Gauge, active rates can only
+            /// be updated once per epoch at most
             IPoolQuotaKeeper(pool.poolQuotaKeeper()).updateRates();
         }
     }
 
+    /// @notice Computes rates for a set of tokens
+    /// @dev While this will compute rates based on current votes,
+    ///      the actual rates can differ, since they are only updates
+    ///      once per epoch
+    /// @param tokens Array of tokens to computes rates for
+    /// @return rates Array of rates, in the same order as passed tokens
     function getRates(address[] memory tokens) external view override returns (uint16[] memory rates) {
         uint256 len = tokens.length;
         rates = new uint16[](len);
@@ -105,6 +116,15 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
 
             uint96 totalVotes = votesLpSide + votesCaSide;
 
+            /// Quota interest rates are determined by GEAR holders through voting
+            /// for one of two sides (for each token) - CA side or LP side.
+            /// There are two parameters for each token determined by the governance -
+            /// Min risk rate and max rate, and the actual rate fluctuates between
+            /// those two extremes based on votes. Voting for CA side reduces the rate
+            /// towards minRiskRate, while voting for LP side increases it towards maxRate.
+            /// Rates are only updated once per epoch (1 week), to avoid manipulation and
+            /// make strategies more predictable.
+
             rates[i] = uint16(
                 totalVotes == 0
                     ? qrp.minRiskRate
@@ -117,7 +137,7 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
         }
     }
 
-    /// @dev Submits a vote to move the quota rate for a token
+    /// @notice Submits a vote to move the quota rate for a token
     /// @param user The user that submitted a vote
     /// @param votes Amount of staked GEAR the user voted with
     /// @param extraData Gauge specific parameters (encoded into extraData to adhere to a general VotingContract interface)
@@ -129,6 +149,10 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
     }
 
     /// @dev IMPLEMENTATION: vote
+    /// @param user User to assign votes to
+    /// @param votes Amount of votes to add
+    /// @param token Token to add votes to
+    /// @param lpSide Side to add votes to: `true` for LP side, `false` for CA side
     function _vote(address user, uint96 votes, address token, bool lpSide) internal {
         _checkAndUpdateEpoch();
 
@@ -145,7 +169,7 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
         emit Vote(user, token, votes, lpSide);
     }
 
-    /// @dev Removes the user's existing vote from the provided token and side
+    /// @notice Removes the user's existing vote from the provided token and side
     /// @param user The user that submitted a vote
     /// @param votes Amount of staked GEAR to remove
     /// @param extraData Gauge specific parameters (encoded into extraData to adhere to a general VotingContract interface)
@@ -157,6 +181,10 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
     }
 
     /// @dev IMPLEMENTATION: unvote
+    /// @param user User to assign votes to
+    /// @param votes Amount of votes to add
+    /// @param token Token to remove votes from
+    /// @param lpSide Side to remove votes from: `true` for LP side, `false` for CA side
     function _unvote(address user, uint96 votes, address token, bool lpSide) internal {
         _checkAndUpdateEpoch();
 
@@ -177,7 +205,8 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
     // CONFIGURATION
     //
 
-    /// @dev Sets the GEAR staking contract, which is the only entity allowed to vote/unvote
+    /// @notice Sets the GEAR staking contract, which is the only entity allowed to vote/unvote directly
+    /// @param newVoter The new voter contract
     function setVoter(address newVoter) external configuratorOnly {
         voter = IGearStaking(newVoter);
 

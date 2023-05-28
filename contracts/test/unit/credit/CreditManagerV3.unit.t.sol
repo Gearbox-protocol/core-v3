@@ -1132,7 +1132,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         (
             uint256 expectedNewDebt,
             uint256 expectedCumulativeIndex,
-            uint256 expectedAmountToRepay,
             uint256 expectedProfit,
             uint256 expectedCumulativeQuotaInterest
         ) = CreditLogic.calcDecrease({
@@ -1189,7 +1188,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         assertEq(newDebt, expectedNewDebt, _testCaseErr("Incorrect new debt"));
 
-        assertEq(poolMock.repayAmount(), expectedAmountToRepay, _testCaseErr("Incorrect repay amount"));
+        assertEq(poolMock.repayAmount(), collateralDebtData.debt - newDebt, _testCaseErr("Incorrect repay amount"));
         assertEq(poolMock.repayProfit(), expectedProfit, _testCaseErr("Incorrect repay profit"));
         assertEq(poolMock.repayLoss(), 0, _testCaseErr("Incorrect repay loss"));
 

@@ -86,7 +86,7 @@ contract WETHGateway is IWETHGateway, ReentrancyGuard, ContractsRegisterTrait {
         return IPoolV3(pool).deposit(msg.value, receiver);
     }
 
-    function depositReferral(address pool, address receiver, uint16 referralCode)
+    function depositWithReferral(address pool, address receiver, uint16 referralCode)
         external
         payable
         override
@@ -96,7 +96,7 @@ contract WETHGateway is IWETHGateway, ReentrancyGuard, ContractsRegisterTrait {
         IWETH(weth).deposit{value: msg.value}();
 
         _checkAllowance(pool, msg.value);
-        return IPoolV3(pool).depositReferral(msg.value, receiver, referralCode);
+        return IPoolV3(pool).depositWithReferral(msg.value, receiver, referralCode);
     }
 
     function mint(address pool, uint256 shares, address receiver)

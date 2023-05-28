@@ -67,7 +67,7 @@ contract PoolMock is IPoolService {
     // Contract version
     uint256 public override version = 3_00;
 
-    uint128 public quotaRevenue;
+    uint96 public quotaRevenue;
 
     // Paused flag
     bool public paused = false;
@@ -108,10 +108,10 @@ contract PoolMock is IPoolService {
         return _cumulativeIndex_RAY;
     }
 
-    function changeQuotaRevenue(int128) external {}
+    function updateQuotaRevenue(int256) external {}
 
-    function updateQuotaRevenue(uint128 _quotaRevenue) external {
-        quotaRevenue = _quotaRevenue;
+    function setQuotaRevenue(uint256 _quotaRevenue) external {
+        quotaRevenue = uint96(_quotaRevenue);
     }
 
     function lendCreditAccount(uint256 borrowedAmount, address creditAccount) external override {
@@ -221,10 +221,6 @@ contract PoolMock is IPoolService {
     function setExpectedLiquidityLimit(uint256 num) external {}
 
     function setWithdrawFee(uint256 num) external {}
-
-    function setPoolQuotaManager(address _poolQuotaKeeper) external {
-        poolQuotaKeeper = _poolQuotaKeeper;
-    }
 
     //    function calcCumulativeIndexAtBorrowMore(
     //        uint256 amount,

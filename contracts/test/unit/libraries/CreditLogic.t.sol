@@ -114,7 +114,7 @@ contract CreditLogicTest is TestHelper {
             + (debt * indexNow / indexOpen + quotaInterest - debt) * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR;
     }
 
-    /// @notice U:[CL-1]: `calcIndex` reverts for zero value
+    /// @notice U:[CL-1]: `calcAccruedInterest` computes interest correctly
     function test_U_CL_01_calcAccruedInterest_computes_interest_with_small_error(
         uint256 debt,
         uint256 cumulativeIndexAtOpen,
@@ -206,7 +206,7 @@ contract CreditLogicTest is TestHelper {
 
         if (delta > debt + interest + quotaInterest) delta %= debt + interest + quotaInterest;
 
-        (uint256 newDebt, uint256 newCumulativeIndex,,, uint256 cumulativeQuotaInterest) =
+        (uint256 newDebt, uint256 newCumulativeIndex,, uint256 cumulativeQuotaInterest) =
             CreditLogic.calcDecrease(delta, debt, indexNow, indexAtOpen, quotaInterest, feeInterest);
 
         uint256 oldTotalDebt = _calcTotalDebt(debt, indexNow, indexAtOpen, quotaInterest, feeInterest);
@@ -221,8 +221,8 @@ contract CreditLogicTest is TestHelper {
         assertLe((RAY * debtError) / rel, 10 ** 5, "Error is larger than 10 ** -22");
     }
 
-    /// @notice U:[CL-3B]: `calcDecrease` correctly outputs amountToRepay and profit
-    function test_U_CL_03B_calcDecrease_outputs_correct_amountToRepay_profit(
+    /// @notice U:[CL-3B]: `calcDecrease` correctly outputs newDebt and profit
+    function test_U_CL_03B_calcDecrease_outputs_correct_newDebt_profit(
         uint256 debt,
         uint256 indexNow,
         uint256 indexAtOpen,
@@ -252,10 +252,8 @@ contract CreditLogicTest is TestHelper {
 
         if (delta > debt + interest + quotaInterest) delta %= debt + interest + quotaInterest;
 
-        (uint256 newDebt,, uint256 amountToRepay, uint256 profit,) =
+        (uint256 newDebt,, uint256 profit,) =
             CreditLogic.calcDecrease(delta, debt, indexNow, indexAtOpen, quotaInterest, feeInterest);
-
-        assertEq(amountToRepay, debt - newDebt, "Amount to repay incorrect");
 
         uint256 expectedProfit = delta
             > (interest + quotaInterest) * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR
@@ -265,6 +263,13 @@ contract CreditLogicTest is TestHelper {
         uint256 profitError = _calcDiff(expectedProfit, profit);
 
         assertLe(profitError, 100, "Profit error too large");
+
+        uint256 expectedRepaid =
+            delta > interest + quotaInterest + expectedProfit ? delta - interest - quotaInterest - expectedProfit : 0;
+
+        uint256 newDebtError = _calcDiff(expectedRepaid, debt - newDebt);
+
+        assertLe(newDebtError, 100, "New debt error too large");
     }
 
     struct CalcLiquidationPaymentsTestCase {
@@ -455,7 +460,7 @@ contract CreditLogicTest is TestHelper {
         uint16 expectedLT;
     }
 
-    /// @notice U:[CL-5]: `calcLiquidationThreshold` gives expected outputs
+    /// @notice U:[CL-5]: `getLiquidationThreshold` gives expected outputs
     function test_U_CL_05_getLiquidationThreshold_case_test() public {
         LiquidationThresholdTestCase[6] memory cases = [
             LiquidationThresholdTestCase({

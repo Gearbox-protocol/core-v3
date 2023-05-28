@@ -65,7 +65,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
 
         pqk = new PoolQuotaKeeper(address(pool));
 
-        pool.setPoolQuotaManager(address(pqk));
+        pool.setPoolQuotaKeeper(address(pqk));
 
         gaugeMock = new GaugeMock(address(pool));
 
@@ -157,7 +157,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
         assertEq(tokens[0], DUMB_ADDRESS, "Incorrect address was added to quotaTokenSet");
         assertEq(tokens.length, 1, "token wasn't added to quotaTokenSet");
 
-        (uint96 totalQuoted, uint96 limit, uint16 rate, uint192 cumulativeIndexLU_RAY) =
+        (uint96 totalQuoted, uint96 limit, uint16 rate, uint192 cumulativeIndexLU_RAY,) =
             pqk.totalQuotaParams(DUMB_ADDRESS);
 
         assertEq(totalQuoted, 0, "totalQuoted !=0");
@@ -225,14 +225,14 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
             vm.expectEmit(true, true, false, true);
             emit UpdateTokenQuotaRate(USDC, USDC_QUOTA_RATE);
 
-            uint96 expectedQuotaRevenue =
-                uint96(DAI_QUOTA_RATE * uint96(daiQuota) + USDC_QUOTA_RATE * uint96(usdcQuota));
+            uint256 expectedQuotaRevenue =
+                (DAI_QUOTA_RATE * uint96(daiQuota) + USDC_QUOTA_RATE * uint96(usdcQuota)) / PERCENTAGE_FACTOR;
 
-            vm.expectCall(address(pool), abi.encodeCall(IPoolV3.updateQuotaRevenue, expectedQuotaRevenue));
+            vm.expectCall(address(pool), abi.encodeCall(IPoolV3.setQuotaRevenue, expectedQuotaRevenue));
 
             gaugeMock.updateEpoch();
 
-            (uint96 totalQuoted, uint96 limit, uint16 rate, uint192 cumulativeIndexLU_RAY) = pqk.totalQuotaParams(DAI);
+            (uint96 totalQuoted, uint96 limit, uint16 rate, uint192 cumulativeIndexLU_RAY,) = pqk.totalQuotaParams(DAI);
 
             assertEq(rate, DAI_QUOTA_RATE, _testCaseErr("Incorrect DAI rate"));
             assertEq(
@@ -241,7 +241,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
                 _testCaseErr("Incorrect DAI cumulativeIndexLU")
             );
 
-            (totalQuoted, limit, rate, cumulativeIndexLU_RAY) = pqk.totalQuotaParams(USDC);
+            (totalQuoted, limit, rate, cumulativeIndexLU_RAY,) = pqk.totalQuotaParams(USDC);
 
             assertEq(rate, USDC_QUOTA_RATE, _testCaseErr("Incorrect USDC rate"));
             assertEq(
@@ -335,7 +335,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperE
 
         pqk.setTokenLimit(DUMB_ADDRESS, limit);
 
-        (, uint96 limitSet,,) = pqk.totalQuotaParams(DUMB_ADDRESS);
+        (, uint96 limitSet,,,) = pqk.totalQuotaParams(DUMB_ADDRESS);
 
         assertEq(limitSet, limit, "Incorrect limit was set");
     }

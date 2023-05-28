@@ -391,7 +391,9 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
 
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "CREDIT_MANAGER_DEBT_LIMIT"));
 
-        vm.mockCall(pool, abi.encodeWithSelector(IPoolV3.creditManagerLimit.selector, creditManager), abi.encode(1e18));
+        vm.mockCall(
+            pool, abi.encodeWithSelector(IPoolV3.creditManagerDebtLimit.selector, creditManager), abi.encode(1e18)
+        );
 
         Policy memory policy = Policy({
             enabled: false,
@@ -425,7 +427,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         bytes32 txHash = keccak256(
             abi.encode(
                 pool,
-                "setCreditManagerLimit(address,uint256)",
+                "setCreditManagerDebtLimit(address,uint256)",
                 abi.encode(creditManager, 2e18),
                 block.timestamp + 1 days
             )
@@ -435,7 +437,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         emit QueueTransaction(
             txHash,
             pool,
-            "setCreditManagerLimit(address,uint256)",
+            "setCreditManagerDebtLimit(address,uint256)",
             abi.encode(creditManager, 2e18),
             uint40(block.timestamp + 1 days)
         );
@@ -443,7 +445,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         vm.prank(admin);
         controllerTimelock.setCreditManagerDebtLimit(creditManager, 2e18);
 
-        vm.expectCall(pool, abi.encodeWithSelector(PoolV3.setCreditManagerLimit.selector, creditManager, 2e18));
+        vm.expectCall(pool, abi.encodeWithSelector(PoolV3.setCreditManagerDebtLimit.selector, creditManager, 2e18));
 
         vm.warp(block.timestamp + 1 days);
 

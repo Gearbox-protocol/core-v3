@@ -13,28 +13,43 @@ import {ICreditFacade} from "../../interfaces/ICreditFacade.sol";
 import {IPoolV3} from "../../interfaces/IPoolV3.sol";
 import {ILPPriceFeed} from "../../interfaces/ILPPriceFeed.sol";
 
-/// @dev
+/// @notice ControllerTimelock contract
+/// @dev ControllerTimelock is a governance contract that allows
+///      special actors less trusted than Gearbox Governance to
+///      manipulate system parameters, within set boundaries.
+///      This is mostly related to risk parameters that should ideally
+///      be adjusted frequently, or periodic tasks (e.g., updating price feed limiters)
+///      that are too trivial to employ full governance
+/// @dev The contract uses PolicyManager as its underlying engine
+///      to set parameter change boundaries and conditions. In order to
+///      schedule a change for a particular contract / function combination
+///      a policy needs to be defined for it. See more in `PolicyManager`
 contract ControllerTimelock is PolicyManager, IControllerTimelock {
-    /// @dev Period before a mature transaction becomes stale
+    /// @notice Period before a mature transaction becomes stale
     uint256 public constant GRACE_PERIOD = 14 days;
 
-    /// @dev Admin address that can schedule controller transactions
+    /// @notice Admin address that can schedule controller transactions
     address public admin;
 
-    /// @dev Admin address that can cancel transactions
+    /// @notice Admin address that can cancel transactions
     address public vetoAdmin;
 
-    /// @dev Delay before a risk-related transaction can be executed
+    /// @notice Delay before a risk-related transaction can be executed
     uint256 public delay = 1 days;
 
-    /// @dev Mapping of transaction hashes to their data
+    /// @notice Mapping of transaction hashes to their data
     mapping(bytes32 => QueuedTransactionData) public queuedTransactions;
 
+    /// @dev Constructor
+    /// @param _addressProvider Address of the contract address repository
+    /// @param _admin Admin of the controller contract that can schedule transactions
+    /// @param _vetoAdmin Admin that can cancel transactions
     constructor(address _addressProvider, address _admin, address _vetoAdmin) PolicyManager(_addressProvider) {
         admin = _admin;
         vetoAdmin = _vetoAdmin;
     }
 
+    /// @dev Allows access to functions only to the controller admin
     modifier adminOnly() {
         if (msg.sender != admin) {
             revert CallerNotAdminException();
@@ -42,6 +57,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
         _;
     }
 
+    /// @dev Allows access to function only to veto admin
     modifier vetoAdminOnly() {
         if (msg.sender != vetoAdmin) {
             revert CallerNotVetoAdminException();
@@ -161,7 +177,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
     {
         IPoolV3 pool = IPoolV3(ICreditManagerV3(creditManager).pool());
 
-        uint256 debtLimitCurrent = pool.creditManagerLimit(address(creditManager));
+        uint256 debtLimitCurrent = pool.creditManagerDebtLimit(address(creditManager));
 
         if (!_checkPolicy(creditManager, "CREDIT_MANAGER_DEBT_LIMIT", uint256(debtLimitCurrent), uint256(debtLimit))) {
             revert ParameterChecksFailedException(); // F: [RCT-05]
@@ -169,7 +185,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
 
         _queueTransaction({
             target: address(pool),
-            signature: "setCreditManagerLimit(address,uint256)",
+            signature: "setCreditManagerDebtLimit(address,uint256)",
             data: abi.encode(address(creditManager), debtLimit)
         }); // F: [RCT-05]
     }
@@ -290,7 +306,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
         (bool success,) = target.call(callData);
 
         if (!success) {
-            revert TxExecutionRevertedException(); // F: [RCT-09] - TODO: Uncomment test after updating forge-std
+            revert TxExecutionRevertedException(); // F: [RCT-09]
         }
 
         emit ExecuteTransaction(txHash); // F: [RCT-09]

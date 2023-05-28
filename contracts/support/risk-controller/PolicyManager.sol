@@ -7,7 +7,8 @@ import {ACLNonReentrantTrait} from "../../traits/ACLNonReentrantTrait.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 
 /// @dev Policy that determines checks performed on a parameter
-///      Each policy is defined for a contract group
+///      Each policy is defined for a contract group, which is a string
+///      identifier for a set of contracts
 struct Policy {
     /// @dev Determines whether the policy is enabled
     ///      A disabled policy will auto-fail the policy check
@@ -63,7 +64,7 @@ contract PolicyManager is ACLNonReentrantTrait {
 
     constructor(address _addressProvider) ACLNonReentrantTrait(_addressProvider) {}
 
-    /// @dev Sets the policy, using policy UID as key
+    /// @notice Sets the policy, using policy UID as key
     /// @param policyHash A unique identifier for a policy
     ///                   Generally, this should be a hash of (PARAMETER_NAME, GROUP_NAME)
     /// @param initialPolicy The initial policy values
@@ -75,7 +76,7 @@ contract PolicyManager is ACLNonReentrantTrait {
         _policies[policyHash] = initialPolicy; // F: [PM-01]
     }
 
-    /// @dev Disables the policy which makes all requested checks for the passed policy hash to auto-fail
+    /// @notice Disables the policy which makes all requested checks for the passed policy hash to auto-fail
     /// @param policyHash A unique identifier for a policy
     function disablePolicy(bytes32 policyHash)
         public
@@ -84,17 +85,17 @@ contract PolicyManager is ACLNonReentrantTrait {
         _policies[policyHash].enabled = false; // F: [PM-02]
     }
 
-    /// @dev Retrieves policy from policy UID
+    /// @notice Retrieves policy from policy UID
     function getPolicy(bytes32 policyHash) external view returns (Policy memory) {
         return _policies[policyHash]; // F: [PM-01]
     }
 
-    /// @dev Sets the policy group of the address
+    /// @notice Sets the policy group of the address
     function setGroup(address contractAddress, string memory group) external configuratorOnly {
         _group[contractAddress] = group;
     }
 
-    /// @dev Retrieves the group associated with a contract
+    /// @notice Retrieves the group associated with a contract
     function getGroup(address contractAddress) external view returns (string memory) {
         return _group[contractAddress];
     }
@@ -129,6 +130,10 @@ contract PolicyManager is ACLNonReentrantTrait {
         }
 
         uint256 rp;
+
+        /// The policy uses a reference point to gauge relative parameter changes. A reference point
+        /// is a value that is set to current value on updating a parameter. All future values for a period
+        /// will be rubber-banded to the reference point, until the refresh period elapses and it is updated again.
 
         if (
             flags
