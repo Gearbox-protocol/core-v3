@@ -76,11 +76,6 @@ struct RevocationPair {
 interface ICreditManagerV3Events {
     /// @dev Emits when a configurator is upgraded
     event SetCreditConfigurator(address indexed newConfigurator);
-
-    /// @dev Emits when a new enabled tokens mask is set for a Credit Account
-    event SaveNewEnabledTokensMask(
-        address indexed creditAccount, uint256 enabledTokensMaskOld, uint256 enabledTokensMaskNew
-    );
 }
 
 /// @notice All Credit Manager functions are access-restricted and can only be called
@@ -194,7 +189,6 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @param creditAccount Address of credit account
     function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota)
         external
-
         returns (int96 realQuotaChange, uint256 tokensToEnable, uint256 tokensToDisable);
 
     //

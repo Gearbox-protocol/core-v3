@@ -960,7 +960,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         override
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
-
         returns (int96 realQuotaChange, uint256 tokensToEnable, uint256 tokensToDisable)
     {
         /// The PoolQuotaKeeper returns the interest to be cached (quota interest is computed dynamically,
@@ -1312,7 +1311,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         return creditAccountInfo[creditAccount].flags & WITHDRAWAL_FLAG != 0; // U:[CM-36]
     }
 
-
     /// @notice Returns the mask containing the account's enabled tokens
     /// @param creditAccount Credit Account to get the mask for
     function enabledTokensMaskOf(address creditAccount) public view override returns (uint256) {
@@ -1330,8 +1328,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             }
 
             creditAccountInfo[creditAccount].enabledTokensMask = enabledTokensMask; // U:[CM-37]
-
-        
+        }
     }
 
     ///

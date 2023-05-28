@@ -949,13 +949,12 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         internal
         returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
-
-        int96 change;
+        int96 realQuotaChange;
         (address token, int96 quotaChange, uint96 minQuota) = abi.decode(callData, (address, int96, uint96)); // U:[FA-34]
-        (change, tokensToEnable, tokensToDisable) =
+        (realQuotaChange, tokensToEnable, tokensToDisable) =
             ICreditManagerV3(creditManager).updateQuota(creditAccount, token, quotaChange, minQuota); // U:[FA-34]
 
-        emit UpdateQuota({creditAccount: creditAccount, token: token, quotaChange: change}); // U:[FA-34]
+        emit UpdateQuota({creditAccount: creditAccount, token: token, quotaChange: realQuotaChange}); // U:[FA-34]
     }
 
     /// @notice Requests the Credit Manager to schedule a withdrawal
@@ -967,7 +966,6 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
     {
         (address token, uint256 amount) = abi.decode(callData, (address, uint256)); // U:[FA-35]
         tokensToDisable = ICreditManagerV3(creditManager).scheduleWithdrawal(creditAccount, token, amount); // U:[FA-35]
-
     }
 
     /// @notice Requests Credit Manager to remove a set of existing allowances
