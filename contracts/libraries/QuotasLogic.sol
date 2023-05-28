@@ -47,25 +47,36 @@ library QuotasLogic {
         view
         returns (uint192)
     {
-        return calcLinearCumulativeIndex(tq, tq.rate, (block.timestamp - lastQuotaRateUpdate));
+        return calcAdditiveCumulativeIndex(tq, tq.rate, (block.timestamp - lastQuotaRateUpdate));
     }
 
     /// @dev Computes the new interest index value, given the previous value, the interest rate, and time delta
+    /// @dev Unlike base pool interest, the interest on quotas is not compounding, so an additive index is used
     /// @param tokenQuotaParams Quota parameters for a token
     /// @param rate The current interest rate on the token's quota
     /// @param deltaTimestamp Time period that interest was accruing for
-    function calcLinearCumulativeIndex(TokenQuotaParams storage tokenQuotaParams, uint16 rate, uint256 deltaTimestamp)
+    function calcAdditiveCumulativeIndex(TokenQuotaParams storage tokenQuotaParams, uint16 rate, uint256 deltaTimestamp)
         internal
         view
         returns (uint192)
     {
         /// The interest rate is always stored in PERCENTAGE_FACTOR format as APY, so the increase needs to be divided by 1 year
         return uint192(
-            (
-                uint256(tokenQuotaParams.cumulativeIndexLU_RAY)
-                    * (RAY + (RAY_DIVIDED_BY_PERCENTAGE * (deltaTimestamp) * rate) / SECONDS_PER_YEAR) / RAY
-            )
+            uint256(tokenQuotaParams.cumulativeIndexLU_RAY)
+                + (RAY_DIVIDED_BY_PERCENTAGE * (deltaTimestamp) * rate) / SECONDS_PER_YEAR
         );
+    }
+
+    /// @dev Computes the accrued quota interest based on the additive index
+    /// @param quoted The quota amount
+    /// @param cumulativeIndexNow The current value of the index
+    /// @param cumulativeIndexLU Value of the index on last update
+    function calcAccruedQuotaInterest(uint96 quoted, uint192 cumulativeIndexNow, uint192 cumulativeIndexLU)
+        internal
+        view
+        returns (uint256)
+    {
+        return quoted * (cumulativeIndexNow - cumulativeIndexLU) / RAY;
     }
 
     /// @dev Calculates interest accrued on quota since last update
@@ -80,13 +91,9 @@ library QuotasLogic {
     ) internal view returns (uint256 caQuotaInterestChange) {
         uint96 quoted = accountQuota.quota;
         if (quoted > 1) {
-            uint192 cumulativeIndexNow = cumulativeIndexSince(tokenQuotaParams, lastQuotaRateUpdate);
-
-            return CreditLogic.calcAccruedInterest({
-                amount: quoted,
-                cumulativeIndexLastUpdate: accountQuota.cumulativeIndexLU,
-                cumulativeIndexNow: cumulativeIndexNow
-            });
+            return calcAccruedQuotaInterest(
+                quoted, cumulativeIndexSince(tokenQuotaParams, lastQuotaRateUpdate), accountQuota.cumulativeIndexLU
+            );
         }
     }
 
@@ -99,6 +106,8 @@ library QuotasLogic {
     ///                               value is cached somewhere else (e.g., in Credit Manager), otherwise it
     ///                               will be lost.
     /// @return quotaRevenueChange Amount to update quota revenue by.
+    /// @return realQuotaChange Amount the quota actually changed by after taking
+    ///                         capacity into account
     /// @return enableToken Whether to enable the quoted token.
     /// @return disableToken Whether to disable the quoted token
     function changeQuota(
@@ -109,7 +118,13 @@ library QuotasLogic {
     )
         internal
         initializedQuotasOnly(tokenQuotaParams)
-        returns (uint256 caQuotaInterestChange, int256 quotaRevenueChange, bool enableToken, bool disableToken)
+        returns (
+            uint256 caQuotaInterestChange,
+            int256 quotaRevenueChange,
+            int96 realQuotaChange,
+            bool enableToken,
+            bool disableToken
+        )
     {
         /// Since interest is computed dynamically as a multiplier of current quota amount,
         /// the outstanding interest has to be saved beforehand so that interest doesn't change
@@ -133,11 +148,12 @@ library QuotasLogic {
             uint96 maxQuotaAllowed = tokenQuotaParams.limit - tokenQuotaParams.totalQuoted;
 
             if (maxQuotaAllowed == 0) {
-                return (caQuotaInterestChange, 0, false, false);
+                return (caQuotaInterestChange, 0, 0, false, false);
             }
 
             change = uint96(quotaChange);
             change = change > maxQuotaAllowed ? maxQuotaAllowed : change; // F:[CMQ-08,10]
+            realQuotaChange = int96(change);
 
             // Quoted tokens are only enabled in the CM when their quotas are changed
             // from zero to non-zero. This is done to correctly
@@ -164,6 +180,7 @@ library QuotasLogic {
             // DECREASE QUOTA
             //
             change = uint96(-quotaChange);
+            realQuotaChange = quotaChange;
 
             tokenQuotaParams.totalQuoted -= change;
             accountQuota.quota -= change; // F:[CMQ-03]
@@ -194,17 +211,11 @@ library QuotasLogic {
         AccountQuota storage accountQuota,
         uint256 lastQuotaRateUpdate
     ) internal initializedQuotasOnly(tokenQuotaParams) returns (uint256 caQuotaInterestChange) {
-        uint192 cumulativeIndexNow = cumulativeIndexSince(tokenQuotaParams, lastQuotaRateUpdate); // F:[CMQ-03]
-
         uint96 quoted = accountQuota.quota;
+        uint192 cumulativeIndexNow = cumulativeIndexSince(tokenQuotaParams, lastQuotaRateUpdate);
         if (quoted > 1) {
-            caQuotaInterestChange = CreditLogic.calcAccruedInterest({
-                amount: quoted,
-                cumulativeIndexLastUpdate: accountQuota.cumulativeIndexLU,
-                cumulativeIndexNow: cumulativeIndexNow
-            });
+            caQuotaInterestChange = calcAccruedQuotaInterest(quoted, cumulativeIndexNow, accountQuota.cumulativeIndexLU);
         }
-
         accountQuota.cumulativeIndexLU = cumulativeIndexNow;
     }
 
@@ -268,7 +279,7 @@ library QuotasLogic {
         internal
         returns (uint256 quotaRevenue)
     {
-        tokenQuotaParams.cumulativeIndexLU_RAY = calcLinearCumulativeIndex(tokenQuotaParams, rate, timeFromLastUpdate); // F:[PQK-7]
+        tokenQuotaParams.cumulativeIndexLU_RAY = calcAdditiveCumulativeIndex(tokenQuotaParams, rate, timeFromLastUpdate); // F:[PQK-7]
         tokenQuotaParams.rate = rate;
 
         return uint256(tokenQuotaParams.totalQuoted) * rate / PERCENTAGE_FACTOR;
