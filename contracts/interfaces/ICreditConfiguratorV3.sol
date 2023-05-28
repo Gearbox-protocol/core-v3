@@ -263,10 +263,10 @@ interface ICreditConfiguratorV3 is ICreditConfiguratorEvents, IVersion {
     function addressProvider() external view returns (address);
 
     /// @dev Returns the Credit Facade currently connected to the Credit Manager
-    function creditFacade() external view returns (CreditFacadeV3);
+    function creditFacade() external view returns (address);
 
     /// @dev Address of the Credit Manager
-    function creditManager() external view returns (CreditManagerV3);
+    function creditManager() external view returns (address);
 
     /// @dev Address of the Credit Manager's underlying asset
     function underlying() external view returns (address);

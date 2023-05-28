@@ -4,9 +4,7 @@
 pragma solidity ^0.8.17;
 
 import "../interfaces/IAddressProviderV3.sol";
-
 import {IACL} from "@gearbox-protocol/core-v2/contracts/interfaces/IACL.sol";
-
 import {AddressNotFoundException, CallerNotConfiguratorException} from "../interfaces/IExceptions.sol";
 
 /// @title AddressRepository
