@@ -912,13 +912,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
             uint256 len = collateralHints.length;
 
+            //  Picks creditAccount on top of stack to remove stack to deep error
             address ca = creditAccount;
             unchecked {
-                // TODO: add test that we check all values and it's always reachable
                 for (uint256 i; tokensToCheckMask != 0; ++i) {
                     uint256 tokenMask;
 
-                    // TODO: add check for super long collateralnhints and for double masks
                     tokenMask = (i < len) ? collateralHints[i] : 1 << (i - len);
 
                     if (tokensToCheckMask & tokenMask != 0) {

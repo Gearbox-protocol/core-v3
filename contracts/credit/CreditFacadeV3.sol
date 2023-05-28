@@ -1153,7 +1153,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     //
 
     /// @notice Wraps ETH into WETH and sends it back to msg.sender
-    /// TODO: Check L2 networks for supporting native currencies
     function _wrapETH() internal {
         if (msg.value != 0) {
             IWETH(weth).deposit{value: msg.value}(); // U:[FA-7]
