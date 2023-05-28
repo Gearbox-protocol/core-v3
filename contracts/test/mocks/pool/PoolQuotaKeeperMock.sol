@@ -51,7 +51,7 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
         underlying = _underlying;
     }
 
-    function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota)
+    function updateQuota(address, address, int96, uint96)
         external
         view
         returns (uint256 caQuotaInterestChange, int96 realQuotaChange, bool enableToken, bool disableToken)
@@ -102,7 +102,7 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     }
 
     /// GETTERS
-    function getQuotaAndOutstandingInterest(address creditAccount, address token)
+    function getQuotaAndOutstandingInterest(address, address token)
         external
         view
         override
@@ -118,7 +118,7 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     }
 
     /// @dev Returns quota rate in PERCENTAGE FORMAT
-    function getQuotaRate(address token) external view override returns (uint16) {
+    function getQuotaRate(address) external view override returns (uint16) {
         return totalQuotaParam.rate;
     }
 
@@ -128,16 +128,12 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     }
 
     /// @dev Returns whether a token is quoted
-    function isQuotedToken(address token) external view override returns (bool) {
+    function isQuotedToken(address) external view override returns (bool) {
         return return_isQuotedToken;
     }
 
     /// @dev Returns quota parameters for a single (account, token) pair
-    function getQuota(address creditAccount, address token)
-        external
-        view
-        returns (uint96 quota, uint192 cumulativeIndexLU)
-    {
+    function getQuota(address, address) external view returns (uint96 quota, uint192 cumulativeIndexLU) {
         AccountQuota storage aq = accountQuota;
         return (aq.quota, aq.cumulativeIndexLU);
     }

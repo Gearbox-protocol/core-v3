@@ -112,18 +112,6 @@ contract CreditFacadeTestHelper is TestHelper {
         );
     }
 
-    function addCollateral(address token, uint256 amount) internal {
-        // tokenTestSuite.mint(t, USER, amount);
-
-        vm.startPrank(USER);
-        IERC20(token).approve(address(creditManager), type(uint256).max);
-
-        // TODO: rewrite as collateral
-        // creditFacade.addCollateral(USER, token, amount);
-
-        vm.stopPrank();
-    }
-
     function _makeAccountsLiquitable() internal {
         vm.prank(CONFIGURATOR);
         creditConfigurator.setFees(1000, 200, 9000, 100, 9500);

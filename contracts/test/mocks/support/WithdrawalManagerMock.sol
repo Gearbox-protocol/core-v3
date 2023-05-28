@@ -49,7 +49,7 @@ contract WithdrawalManagerMock {
 
     function addScheduledWithdrawal(address creditAccount, address token, uint256 amount, uint8 tokenIndex) external {}
 
-    function claimScheduledWithdrawals(address creditAccount, address to, ClaimAction action)
+    function claimScheduledWithdrawals(address, address, ClaimAction)
         external
         returns (bool hasScheduled, uint256 tokensToEnable)
     {

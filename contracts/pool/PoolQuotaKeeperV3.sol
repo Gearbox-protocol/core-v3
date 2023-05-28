@@ -134,6 +134,8 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             quotaChange: quotaChange
         });
 
+        if (accountQuota.quota < minQuota) revert QuotaLessThanMinialException();
+
         /// Quota revenue must be changed on each quota updated, so that the
         /// pool can correctly compute its liquidity metrics in the future
         if (quotaRevenueChange != 0) {

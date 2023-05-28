@@ -118,13 +118,6 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         return cms.openCreditAccount();
     }
 
-    function mintBalance(address creditAccount, Tokens t, uint256 amount, bool enable) internal {
-        tokenTestSuite.mint(t, creditAccount, amount);
-        // if (enable) {
-        //     creditManager.checkAndEnableToken(tokenTestSuite.addressOf(t));
-        // }
-    }
-
     function _addAndEnableTokens(address creditAccount, uint256 numTokens, uint256 balance) internal {
         for (uint256 i = 0; i < numTokens; i++) {
             ERC20Mock t = new ERC20Mock("new token", "nt", 18);
@@ -265,7 +258,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         );
 
         vm.expectRevert(CreditAccountNotExistsException.selector);
-        address b = creditManager.getBorrowerOrRevert(creditAccount);
+        creditManager.getBorrowerOrRevert(creditAccount);
     }
 
     /// @dev I:[CM-10]: closeCreditAccount returns undelying tokens if credit account balance > amounToPool
@@ -445,7 +438,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
                 );
             }
 
-            (uint256 remainingFunds, uint256 loss) = creditManager.closeCreditAccount({
+            (uint256 remainingFunds,) = creditManager.closeCreditAccount({
                 creditAccount: creditAccount,
                 closureAction: action,
                 collateralDebtData: collateralDebtData,
@@ -628,7 +621,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         collateralDebtData.accruedFees = 0;
         collateralDebtData.enabledTokensMask = wethTokenMask | usdcTokenMask | linkTokenMask;
 
-        (uint256 remainingFunds, uint256 loss) = creditManager.closeCreditAccount({
+        creditManager.closeCreditAccount({
             creditAccount: creditAccount,
             closureAction: ClosureAction.CLOSE_ACCOUNT,
             collateralDebtData: collateralDebtData,
@@ -683,7 +676,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         collateralDebtData.accruedFees = profit;
         collateralDebtData.enabledTokensMask = UNDERLYING_TOKEN_MASK;
 
-        (uint256 remainingFunds, uint256 loss) = creditManager.closeCreditAccount({
+        creditManager.closeCreditAccount({
             creditAccount: creditAccount,
             closureAction: ClosureAction.CLOSE_ACCOUNT,
             collateralDebtData: collateralDebtData,
@@ -726,7 +719,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         collateralDebtData.accruedFees = 0;
         collateralDebtData.enabledTokensMask = wethTokenMask | daiTokenMask;
 
-        (uint256 remainingFunds, uint256 loss) = creditManager.closeCreditAccount({
+        creditManager.closeCreditAccount({
             creditAccount: creditAccount,
             closureAction: ClosureAction.CLOSE_ACCOUNT,
             collateralDebtData: collateralDebtData,
@@ -746,7 +739,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
     function test_I_CM_18_close_credit_account_sends_eth_to_liquidator_and_weth_to_borrower() public {
         /// Store USER ETH balance
 
-        uint256 userBalanceBefore = tokenTestSuite.balanceOf(Tokens.WETH, USER);
+        // uint256 userBalanceBefore = tokenTestSuite.balanceOf(Tokens.WETH, USER);
 
         (,, uint16 liquidationDiscount,,) = creditManager.fees();
 
@@ -772,7 +765,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         collateralDebtData.totalValue = totalValue;
         collateralDebtData.enabledTokensMask = wethTokenMask | daiTokenMask;
 
-        (uint256 remainingFunds, uint256 loss) = creditManager.closeCreditAccount({
+        creditManager.closeCreditAccount({
             creditAccount: creditAccount,
             closureAction: ClosureAction.LIQUIDATE_ACCOUNT,
             collateralDebtData: collateralDebtData,
@@ -821,7 +814,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         collateralDebtData.totalValue = borrowedAmount;
         collateralDebtData.enabledTokensMask = wethTokenMask | daiTokenMask;
 
-        (uint256 remainingFunds, uint256 loss) = creditManager.closeCreditAccount({
+        creditManager.closeCreditAccount({
             creditAccount: creditAccount,
             closureAction: ClosureAction.LIQUIDATE_ACCOUNT,
             collateralDebtData: collateralDebtData,
@@ -852,8 +845,8 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
 
         poolMock.setCumulativeIndexNow(cumulativeIndexLastUpdate * 2);
 
-        uint256 expectedNewCulumativeIndex =
-            (2 * cumulativeIndexLastUpdate * (borrowedAmount + amount)) / (2 * borrowedAmount + amount);
+        // uint256 expectedNewCulumativeIndex =
+        //     (2 * cumulativeIndexLastUpdate * (borrowedAmount + amount)) / (2 * borrowedAmount + amount);
 
         (uint256 newBorrowedAmount,,) =
             creditManager.manageDebt(creditAccount, amount, 1, ManageDebtAction.INCREASE_DEBT);

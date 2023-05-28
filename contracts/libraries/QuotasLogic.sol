@@ -73,7 +73,7 @@ library QuotasLogic {
     /// @param cumulativeIndexLU Value of the index on last update
     function calcAccruedQuotaInterest(uint96 quoted, uint192 cumulativeIndexNow, uint192 cumulativeIndexLU)
         internal
-        view
+        pure
         returns (uint256)
     {
         return quoted * (cumulativeIndexNow - cumulativeIndexLU) / RAY;

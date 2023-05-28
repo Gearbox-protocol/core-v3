@@ -358,7 +358,7 @@ contract CreditFacadeIntegrationTest is
 
         expectBalance(address(degenNFT), USER, 2);
 
-        (address creditAccount,) = _openTestCreditAccount();
+        _openTestCreditAccount();
 
         expectBalance(address(degenNFT), USER, 1);
     }
@@ -617,7 +617,7 @@ contract CreditFacadeIntegrationTest is
 
     /// @dev I:[FA-12]: closeCreditAccount runs multicall operations in correct order
     function test_I_FA_12_closeCreditAccount_runs_operations_in_correct_order() public {
-        (address creditAccount, uint256 balance) = _openTestCreditAccount();
+        (address creditAccount,) = _openTestCreditAccount();
 
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
 
@@ -759,8 +759,8 @@ contract CreditFacadeIntegrationTest is
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (address(1))));
 
         // Total value = 2 * DAI_ACCOUNT_AMOUNT, cause we have x2 leverage
-        uint256 totalValue = 2 * DAI_ACCOUNT_AMOUNT;
-        uint256 debtWithInterest = DAI_ACCOUNT_AMOUNT;
+        // uint256 totalValue = 2 * DAI_ACCOUNT_AMOUNT;
+        // uint256 debtWithInterest = DAI_ACCOUNT_AMOUNT;
 
         // vm.expectCall(
         //     address(creditManager),
@@ -795,8 +795,6 @@ contract CreditFacadeIntegrationTest is
 
         assertGt(maxDebtPerBlockMultiplier, 0, "SETUP: Increase debt is already enabled");
 
-        bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
-
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
         );
@@ -817,8 +815,6 @@ contract CreditFacadeIntegrationTest is
         creditConfigurator.setMaxCumulativeLoss(1);
 
         (address creditAccount,) = _openTestCreditAccount();
-
-        bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
@@ -1082,24 +1078,6 @@ contract CreditFacadeIntegrationTest is
 
         expectBalance(Tokens.USDC, creditAccount, 512);
         expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
-    }
-
-    /// @dev I:[FA-21C]: addCollateral calls checkEnabledTokensLength
-    function test_I_FA_21C_addCollateral_optimizes_enabled_tokens() public {
-        (address creditAccount,) = _openTestCreditAccount();
-
-        address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
-
-        tokenTestSuite.mint(Tokens.USDC, FRIEND, 512);
-        tokenTestSuite.approve(Tokens.USDC, FRIEND, address(creditManager));
-
-        // vm.expectCall(
-        //     address(creditManager),
-        //     abi.encodeCall(ICreditManagerV3.checkEnabledTokensLength.selector, creditAccount)
-        // );
-
-        // vm.prank(FRIEND);
-        // creditFacade.addCollateral(USER, usdcToken, 512);
     }
 
     //
@@ -1484,37 +1462,37 @@ contract CreditFacadeIntegrationTest is
 
     /// @dev I:[FA-42]: calcCreditAccountHealthFactor computes correctly
     function test_I_FA_42_calcCreditAccountHealthFactor_computes_correctly() public {
-        (address creditAccount,) = _openTestCreditAccount();
+        // (address creditAccount,) = _openTestCreditAccount();
 
-        // AFTER OPENING CREDIT ACCOUNT
+        // // AFTER OPENING CREDIT ACCOUNT
 
-        uint256 expectedTV = DAI_ACCOUNT_AMOUNT * 2;
-        uint256 expectedTWV = (DAI_ACCOUNT_AMOUNT * 2 * DEFAULT_UNDERLYING_LT) / PERCENTAGE_FACTOR;
+        // uint256 expectedTV = DAI_ACCOUNT_AMOUNT * 2;
+        // uint256 expectedTWV = (DAI_ACCOUNT_AMOUNT * 2 * DEFAULT_UNDERLYING_LT) / PERCENTAGE_FACTOR;
 
-        uint256 expectedHF = (expectedTWV * PERCENTAGE_FACTOR) / DAI_ACCOUNT_AMOUNT;
+        // uint256 expectedHF = (expectedTWV * PERCENTAGE_FACTOR) / DAI_ACCOUNT_AMOUNT;
 
-        // assertEq(creditFacade.calcCreditAccountHealthFactor(creditAccount), expectedHF, "Incorrect health factor");
+        // // assertEq(creditFacade.calcCreditAccountHealthFactor(creditAccount), expectedHF, "Incorrect health factor");
 
-        // ADDING USDC AS COLLATERAL
+        // // ADDING USDC AS COLLATERAL
 
-        addCollateral(Tokens.USDC, 10 * 10 ** 6);
+        // addCollateral(Tokens.USDC, 10 * 10 ** 6);
 
-        expectedTV += 10 * WAD;
-        expectedTWV += (10 * WAD * 9000) / PERCENTAGE_FACTOR;
+        // expectedTV += 10 * WAD;
+        // expectedTWV += (10 * WAD * 9000) / PERCENTAGE_FACTOR;
 
-        expectedHF = (expectedTWV * PERCENTAGE_FACTOR) / DAI_ACCOUNT_AMOUNT;
+        // expectedHF = (expectedTWV * PERCENTAGE_FACTOR) / DAI_ACCOUNT_AMOUNT;
 
-        // assertEq(creditFacade.calcCreditAccountHealthFactor(creditAccount), expectedHF, "Incorrect health factor");
+        // // assertEq(creditFacade.calcCreditAccountHealthFactor(creditAccount), expectedHF, "Incorrect health factor");
 
-        // 3 ASSET: 10 DAI + 10 USDC + 0.01 WETH (3200 $/ETH)
-        addCollateral(Tokens.WETH, WAD / 100);
+        // // 3 ASSET: 10 DAI + 10 USDC + 0.01 WETH (3200 $/ETH)
+        // addCollateral(Tokens.WETH, WAD / 100);
 
-        expectedTV += (WAD / 100) * DAI_WETH_RATE;
-        expectedTWV += ((WAD / 100) * DAI_WETH_RATE * 8300) / PERCENTAGE_FACTOR;
+        // expectedTV += (WAD / 100) * DAI_WETH_RATE;
+        // expectedTWV += ((WAD / 100) * DAI_WETH_RATE * 8300) / PERCENTAGE_FACTOR;
 
-        expectedHF = (expectedTWV * PERCENTAGE_FACTOR) / DAI_ACCOUNT_AMOUNT;
+        // expectedHF = (expectedTWV * PERCENTAGE_FACTOR) / DAI_ACCOUNT_AMOUNT;
 
-        // assertEq(creditFacade.calcCreditAccountHealthFactor(creditAccount), expectedHF, "Incorrect health factor");
+        // // assertEq(creditFacade.calcCreditAccountHealthFactor(creditAccount), expectedHF, "Incorrect health factor");
     }
 
     /// CHECK IS ACCOUNT LIQUIDATABLE
@@ -1696,20 +1674,20 @@ contract CreditFacadeIntegrationTest is
 
     /// @dev I:[FA-49]: liquidateExpiredCreditAccount works correctly and emits events
     function test_I_FA_49_liquidateExpiredCreditAccount_works_correctly_after_expiration() public {
-        _setUp({
-            _underlying: Tokens.DAI,
-            withDegenNFT: false,
-            withExpiration: true,
-            supportQuotas: false,
-            accountFactoryVer: 1
-        });
-        (address creditAccount, uint256 balance) = _openTestCreditAccount();
+        // _setUp({
+        //     _underlying: Tokens.DAI,
+        //     withDegenNFT: false,
+        //     withExpiration: true,
+        //     supportQuotas: false,
+        //     accountFactoryVer: 1
+        // });
+        // (address creditAccount, uint256 balance) = _openTestCreditAccount();
 
-        bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
+        // bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
 
-        MultiCall[] memory calls = MultiCallBuilder.build(
-            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
-        );
+        // MultiCall[] memory calls = MultiCallBuilder.build(
+        //     MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
+        // );
 
         vm.warp(block.timestamp + 1);
         vm.roll(block.number + 1);

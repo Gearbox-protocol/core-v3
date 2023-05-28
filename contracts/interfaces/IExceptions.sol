@@ -217,3 +217,5 @@ error TotalDebtNotTrackedException();
 error InsufficientBalanceException();
 
 error OpenCloseAccountInOneBlockException();
+
+error QuotaLessThanMinialException();

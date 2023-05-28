@@ -1236,7 +1236,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         uint256 len = cases.length;
         for (uint256 i = 0; i < len; ++i) {
-            uint256 flags = type(uint256).max.disable(cases[i].permissionRquired);
+            uint256 cur_flags = type(uint256).max.disable(cases[i].permissionRquired);
             for (uint256 j = 0; j < len; ++j) {
                 if (i == j && cases[i].permissionRquired != 0) {
                     vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, cases[i].permissionRquired));
@@ -1245,7 +1245,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     creditAccount: creditAccount,
                     calls: MultiCallBuilder.build(MultiCall({target: address(creditFacade), callData: cases[j].callData})),
                     enabledTokensMask: 0,
-                    flags: flags
+                    flags: cur_flags
                 });
             }
         }

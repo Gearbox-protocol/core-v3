@@ -9,7 +9,7 @@ import "../../../interfaces/IExceptions.sol";
 contract DegenNFTMock {
     bool revertOnBurn;
 
-    function burn(address, uint256 balance) external view {
+    function burn(address, uint256) external view {
         if (revertOnBurn) revert InsufficientBalanceException();
     }
 

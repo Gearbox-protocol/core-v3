@@ -478,7 +478,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             // Pays the entire amount back to the pool
             ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amount}); // U:[CM-11]
             {
-                uint256 amountToRepay;
                 uint256 profit;
 
                 (newDebt, newCumulativeIndex, profit, newCumulativeQuotaInterest) = CreditLogic.calcDecrease({

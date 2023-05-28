@@ -733,10 +733,10 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     /// @dev Needs to be done on changing a Credit Facade without migrating parameters,
     ///      in order to keep these parameters consistent between the CC and the CF
     function _clearArrayCreditFacadeParams() internal {
-        address[] memory emergencyLiquidators = emergencyLiquidatorsSet.values();
-        uint256 len = emergencyLiquidators.length;
+        address[] memory emergencyLiquidatorsList = emergencyLiquidatorsSet.values();
+        uint256 len = emergencyLiquidatorsList.length;
         for (uint256 i; i < len;) {
-            emergencyLiquidatorsSet.remove(emergencyLiquidators[i]);
+            emergencyLiquidatorsSet.remove(emergencyLiquidatorsList[i]);
             unchecked {
                 ++i;
             }
@@ -885,20 +885,20 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     }
 
     /// @notice Sets the bot list contract
-    /// @param version The version of the new bot list contract
+    /// @param _version The version of the new bot list contract
     ///                The contract address is retrieved from addressProvider
     /// @notice The bot list determines the permissions for actions
     ///         that bots can perform on Credit Accounts
-    function setBotList(uint256 version)
+    function setBotList(uint256 _version)
         external
         configuratorOnly // I: [CC-2]
     {
-        _setBotList(version); // I: [CC-33]
+        _setBotList(_version); // I: [CC-33]
     }
 
     /// @notice IMPLEMENTATION: setBotList
-    function _setBotList(uint256 version) internal {
-        address botList = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_BOT_LIST, version); // I: [CC-33]
+    function _setBotList(uint256 _version) internal {
+        address botList = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_BOT_LIST, _version); // I: [CC-33]
         address currentBotList = creditFacade().botList();
 
         if (botList != currentBotList) {

@@ -347,7 +347,7 @@ contract OrderToken {
         orderChecker = msg.sender;
     }
 
-    function balanceOf(address holder) external view returns (uint256 amount) {
+    function balanceOf(address) external view returns (uint256 amount) {
         CollateralLogicHelper(orderChecker).saveCallOrder();
         amount = returnBalance;
     }

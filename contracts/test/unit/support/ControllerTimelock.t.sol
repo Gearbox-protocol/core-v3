@@ -228,7 +228,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
     /// @dev [RCT-3]: setMaxDebtPerBlockMultiplier works correctly
     function test_RCT_03_setMaxDebtPerBlockMultiplier_works_correctly() public {
-        (address creditManager, address creditFacade, address creditConfigurator, address pool) = _makeMocks();
+        (address creditManager, address creditFacade, address creditConfigurator,) = _makeMocks();
 
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "MAX_DEBT_PER_BLOCK_MULTIPLIER"));
 
@@ -299,7 +299,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
     /// @dev [RCT-4]: setDebtLimits works correctly
     function test_RCT_04_setDebtLimits_works_correctly() public {
-        (address creditManager, address creditFacade, address creditConfigurator, address pool) = _makeMocks();
+        (address creditManager, address creditFacade, address creditConfigurator,) = _makeMocks();
 
         bytes32 POLICY_CODE_1 = keccak256(abi.encode("CM", "MIN_DEBT"));
         bytes32 POLICY_CODE_2 = keccak256(abi.encode("CM", "MAX_DEBT"));
@@ -387,7 +387,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
     /// @dev [RCT-5]: setCreditManagerDebtLimit works correctly
     function test_RCT_05_setCreditManagerDebtLimit_works_correctly() public {
-        (address creditManager, address creditFacade, address creditConfigurator, address pool) = _makeMocks();
+        (address creditManager,,, address pool) = _makeMocks();
 
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "CREDIT_MANAGER_DEBT_LIMIT"));
 
@@ -459,7 +459,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
     /// @dev [RCT-6]: rampLiquidationThreshold works correctly
     function test_RCT_06_rampLiquidationThreshold_works_correctly() public {
-        (address creditManager, address creditFacade, address creditConfigurator, address pool) = _makeMocks();
+        (address creditManager,, address creditConfigurator,) = _makeMocks();
 
         address token = makeAddr("TOKEN");
 
@@ -744,7 +744,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
     /// @dev [RCT-10]: forbidAdapter works correctly
     function test_RCT_10_forbidAdapter_works_correctly() public {
-        (address creditManager, address creditFacade, address creditConfigurator, address pool) = _makeMocks();
+        (address creditManager,, address creditConfigurator,) = _makeMocks();
 
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "FORBID_ADAPTER"));
 

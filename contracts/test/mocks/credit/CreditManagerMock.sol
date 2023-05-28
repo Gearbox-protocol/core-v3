@@ -130,7 +130,7 @@ contract CreditManagerMock {
         qu_tokensToDisable = tokensToDisable;
     }
 
-    function updateQuota(address _creditAccount, address token, int96 quotaChange, uint96 minQuota)
+    function updateQuota(address, address, int96, uint96)
         external
         view
         returns (int96 change, uint256 tokensToEnable, uint256 tokensToDisable)
@@ -148,7 +148,7 @@ contract CreditManagerMock {
         borrower = _borrower;
     }
 
-    function getBorrowerOrRevert(address creditAccount) external view returns (address) {
+    function getBorrowerOrRevert(address) external view returns (address) {
         if (borrower == address(0)) revert CreditAccountNotExistsException();
         return borrower;
     }
@@ -157,7 +157,7 @@ contract CreditManagerMock {
         nextCreditAccount = _nextCreditAccount;
     }
 
-    function openCreditAccount(uint256 debt, address onBehalfOf) external returns (address creditAccount) {
+    function openCreditAccount(uint256, address) external view returns (address creditAccount) {
         return nextCreditAccount;
     }
 
@@ -167,25 +167,24 @@ contract CreditManagerMock {
     }
 
     function closeCreditAccount(
-        address creditAccount,
-        ClosureAction closureAction,
+        address,
+        ClosureAction,
         CollateralDebtData memory collateralDebtData,
-        address payer,
-        address to,
-        uint256 skipTokensMask,
-        bool convertToETH
+        address,
+        address,
+        uint256,
+        bool
     ) external returns (uint256 remainingFunds, uint256 loss) {
         _closeCollateralDebtData = collateralDebtData;
         remainingFunds = return_remainingFunds;
         loss = return_loss;
     }
 
-    function fullCollateralCheck(
-        address creditAccount,
-        uint256 enabledTokensMask,
-        uint256[] memory collateralHints,
-        uint16 minHealthFactor
-    ) external returns (uint256 _enabledTokensMask) {
+    function fullCollateralCheck(address, uint256 enabledTokensMask, uint256[] memory, uint16)
+        external
+        pure
+        returns (uint256)
+    {
         return enabledTokensMask;
     }
 
@@ -201,11 +200,7 @@ contract CreditManagerMock {
         quotedTokensMask = _quotedTokensMask;
     }
 
-    function calcDebtAndCollateral(address creditAccount, CollateralCalcTask task)
-        external
-        view
-        returns (CollateralDebtData memory)
-    {
+    function calcDebtAndCollateral(address, CollateralCalcTask) external view returns (CollateralDebtData memory) {
         return return_collateralDebtData;
     }
 
@@ -221,15 +216,11 @@ contract CreditManagerMock {
         cw_return_tokensToEnable = tokensToEnable;
     }
 
-    function claimWithdrawals(address creditAccount, address to, ClaimAction action)
-        external
-        view
-        returns (uint256 tokensToEnable)
-    {
+    function claimWithdrawals(address, address, ClaimAction) external view returns (uint256 tokensToEnable) {
         tokensToEnable = cw_return_tokensToEnable;
     }
 
-    function enabledTokensMaskOf(address creditAccount) external view returns (uint256) {
+    function enabledTokensMaskOf(address) external view returns (uint256) {
         return _enabledTokensMask;
     }
 
@@ -250,8 +241,7 @@ contract CreditManagerMock {
     /// @dev Currently, the following flags are supported:
     ///      * 1 - WITHDRAWALS_FLAG - whether the account has pending withdrawals
     ///      * 2 - BOT_PERMISSIONS_FLAG - whether the account has non-zero permissions for at least one bot
-    /// @param creditAccount Account to get the mask for
-    function flagsOf(address creditAccount) external view returns (uint16) {
+    function flagsOf(address) external view returns (uint16) {
         return flags; // U:[CM-35]
     }
 
@@ -268,12 +258,12 @@ contract CreditManagerMock {
     }
 
     /// @notice Sets the flag in the CA's flag mask to 1
-    function _enableFlag(address creditAccount, uint16 flag) internal {
+    function _enableFlag(address, uint16 flag) internal {
         flags |= flag; // U:[CM-36]
     }
 
     /// @notice Sets the flag in the CA's flag mask to 0
-    function _disableFlag(address creditAccount, uint16 flag) internal {
+    function _disableFlag(address, uint16 flag) internal {
         flags &= ~flag; // U:[CM-36]
     }
 
@@ -281,11 +271,7 @@ contract CreditManagerMock {
         ad_tokenMask = tokenMask;
     }
 
-    function addCollateral(address payer, address creditAccount, address token, uint256 amount)
-        external
-        view
-        returns (uint256 tokenMask)
-    {
+    function addCollateral(address, address, address, uint256) external view returns (uint256 tokenMask) {
         tokenMask = ad_tokenMask;
     }
 
@@ -295,7 +281,7 @@ contract CreditManagerMock {
         md_return_tokensToDisable = tokensToDisable;
     }
 
-    function manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)
+    function manageDebt(address, uint256, uint256, ManageDebtAction)
         external
         view
         returns (uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable)
@@ -309,11 +295,7 @@ contract CreditManagerMock {
         sw_tokensToDisable = tokensToDisable;
     }
 
-    function scheduleWithdrawal(address creditAccount, address token, uint256 amount)
-        external
-        view
-        returns (uint256 tokensToDisable)
-    {
+    function scheduleWithdrawal(address, address, uint256) external view returns (uint256 tokensToDisable) {
         tokensToDisable = sw_tokensToDisable;
     }
 

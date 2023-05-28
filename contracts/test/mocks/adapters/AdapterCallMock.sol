@@ -10,5 +10,6 @@ contract AdapterCallMock {
 
     function makeCall(address target, bytes memory data) external returns (uint256, uint256) {
         target.functionCall(data);
+        return (0, 0);
     }
 }

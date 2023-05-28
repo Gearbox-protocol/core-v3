@@ -17,7 +17,7 @@ library BitMask {
     /// @dev Calculates an index of an item based on its mask
     /// @dev Essentially, performs a binary search, which seems to be the most
     ///      efficient way to take log2 in Solidity
-    function calcIndex(uint256 mask) internal pure returns (uint8) {
+    function calcIndex(uint256 mask) internal pure returns (uint8 index) {
         if (mask == 0) revert IncorrectParameterException(); // U:[BM-1]
         uint16 lb = 0; // U:[BM-2]
         uint16 ub = 256; // U:[BM-2]
@@ -27,7 +27,8 @@ library BitMask {
             while (true) {
                 uint256 newMask = 1 << mid;
                 if (newMask & mask != 0) return uint8(mid); // U:[BM-2]
-                if (1 << mid > mask) ub = mid; // U:[BM-2]
+
+                if (newMask > mask) ub = mid; // U:[BM-2]
 
                 else lb = mid; // U:[BM-2]
                 mid = (lb + ub) >> 1; // U:[BM-2]

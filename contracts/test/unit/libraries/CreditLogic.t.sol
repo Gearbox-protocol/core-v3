@@ -77,11 +77,11 @@ contract CreditLogicTest is TestHelper {
         }
     }
 
-    function _getCollateralHintsIdx(uint256 rand) internal returns (uint256[] memory collateralHints) {
+    function _getCollateralHintsIdx(uint256 rand) internal pure returns (uint256[] memory collateralHints) {
         uint256 len = uint256(keccak256(abi.encode(rand))) % 9;
 
         uint256[] memory nums = new uint256[](8);
-        uint256[] memory collateralHints = new uint256[](len);
+        collateralHints = new uint256[](len);
 
         for (uint256 i = 0; i < 8; ++i) {
             nums[i] = i;
@@ -95,7 +95,7 @@ contract CreditLogicTest is TestHelper {
         }
     }
 
-    function _getMasksFromIdx(uint256[] memory idxArray) internal view returns (uint256[] memory masksArray) {
+    function _getMasksFromIdx(uint256[] memory idxArray) internal pure returns (uint256[] memory masksArray) {
         masksArray = new uint256[](idxArray.length);
 
         for (uint256 i = 0; i < idxArray.length; ++i) {
@@ -109,7 +109,7 @@ contract CreditLogicTest is TestHelper {
         uint256 indexOpen,
         uint256 quotaInterest,
         uint16 feeInterest
-    ) internal view returns (uint256) {
+    ) internal pure returns (uint256) {
         return debt
             + (debt * indexNow / indexOpen + quotaInterest - debt) * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR;
     }
@@ -540,7 +540,7 @@ contract CreditLogicTest is TestHelper {
         }
     }
 
-    function _convertToUSD(address, uint256 amount, address token) internal view returns (uint256) {
+    function _convertToUSD(address, address token) internal view returns (uint256) {
         uint256 tokenIdx;
         for (uint256 i = 0; i < 8; ++i) {
             if (tokens[i] == token) tokenIdx = i;

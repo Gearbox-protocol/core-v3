@@ -99,7 +99,7 @@ contract TestHelper is Test {
 
     function _copyU16toU256(uint16[] memory a16) internal pure returns (uint256[] memory a256) {
         uint256 len = a16.length;
-        uint256[] memory a256 = new uint256[](len);
+        a256 = new uint256[](len);
 
         unchecked {
             for (uint256 i; i < len; ++i) {
@@ -170,7 +170,7 @@ contract TestHelper is Test {
         return uint256(keccak256(abi.encode(value, seed)));
     }
 
-    function boolToStr(bool value) internal returns (string memory) {
+    function boolToStr(bool value) internal pure returns (string memory) {
         return value ? "true" : "false";
     }
 }
