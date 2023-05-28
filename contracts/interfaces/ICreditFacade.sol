@@ -80,7 +80,7 @@ interface ICreditFacadeEvents {
     /// @dev Emits when a multicall is finished
     event FinishMultiCall();
 
-    /// notice Emits when enabledTokensMask is updated
+    /// @dev Emits when enabledTokensMask is updated
     event SetEnabledTokensMask(address indexed creditAccount, uint256 enabledTokensMask);
 }
 

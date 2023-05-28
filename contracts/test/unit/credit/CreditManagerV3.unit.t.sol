@@ -1498,8 +1498,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             borrower: USER
         });
 
-        console.log(enabledTokensMask);
-
         CollateralDebtData memory collateralDebtData =
             creditManager.calcDebtAndCollateralFC(creditAccount, CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS);
 

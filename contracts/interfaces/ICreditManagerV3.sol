@@ -179,7 +179,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
         uint256 enabledTokensMaskBefore,
         uint256[] memory collateralHints,
         uint16 minHealthFactor
-    ) external returns (uint256 tokensToDisable);
+    ) external returns (uint256 updatedEnabledTokensMaskBefore);
 
     //
     // QUOTAS MANAGEMENT

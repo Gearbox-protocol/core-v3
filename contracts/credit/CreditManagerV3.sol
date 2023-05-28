@@ -662,7 +662,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         external
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
-        returns (uint256 _enabledTOkensMaskUpdated)
+        returns (uint256)
     {
         if (minHealthFactor < PERCENTAGE_FACTOR) {
             revert CustomHealthFactorTooLowException(); // U:[CM-17]
@@ -750,8 +750,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) {
             revert IncorrectParameterException(); // U:[CM-19]
         }
-
-        console.log(enabledTokensMaskOf(creditAccount));
 
         collateralDebtData = _calcDebtAndCollateral({
             creditAccount: creditAccount,
