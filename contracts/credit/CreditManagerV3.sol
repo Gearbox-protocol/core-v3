@@ -1117,7 +1117,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         if (convertToETH && token == weth) {
             ICreditAccountBase(creditAccount).transfer({token: token, to: wethGateway, amount: amount}); // U:[CM-31, 32]
-            IWETHGateway(wethGateway).depositFor({to: to, amount: amount}); // U:[CM-31, 32]
+            IWETHGateway(wethGateway).deposit({to: to, amount: amount}); // U:[CM-31, 32]
         } else {
             // In case a token transfer fails (e.g., borrower getting blacklisted by USDC), the token will be sent
             // to WithdrawalManager

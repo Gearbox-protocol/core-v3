@@ -1211,11 +1211,11 @@ contract CreditFacadeV3 is ICreditFacade, ACLNonReentrantTrait {
         tokensToEnable = ICreditManagerV3(creditManager).claimWithdrawals(creditAccount, to, action);
     }
 
-    /// @notice Internal wrapper for `IWETHGateway.withdrawTo()`
+    /// @notice Internal wrapper for `IWETHGateway.claim()`
     /// @dev The external call is wrapped to optimize contract size
     /// @dev Used to convert WETH to ETH and send it to user
     function _wethWithdrawTo(address to) internal {
-        IWETHGateway(wethGateway).withdrawTo(to);
+        IWETHGateway(wethGateway).claim(to);
     }
 
     //

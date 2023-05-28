@@ -1,28 +1,29 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Holdings, 2022
+// (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-interface IWETHGateway {
-    /// @dev POOL V3:
-    function deposit(address pool, address receiver) external payable returns (uint256 shares);
+import {IVersion} from "./IVersion.sol";
 
-    function depositWithReferral(address pool, address receiver, uint16 referralCode)
-        external
-        payable
-        returns (uint256 shares);
+interface IWETHGatewayEvents {
+    /// @notice Emitted when WETH is deposited to the gateway
+    event Deposit(address indexed to, uint256 amount);
+    /// @notice Emitted when ETH is claimed from the gateway
+    event Claim(address indexed to, uint256 amount);
+}
 
-    function mint(address pool, uint256 shares, address receiver) external payable returns (uint256 assets);
+/// @title WETH gateway interface
+interface IWETHGateway is IVersion, IWETHGatewayEvents {
+    /// @notice WETH contract address
+    function weth() external view returns (address);
 
-    function withdraw(address pool, uint256 assets, address receiver, address owner)
-        external
-        returns (uint256 shares);
+    /// @notice Returns `owner`'s balance of withdrawable WETH
+    function balanceOf(address owner) external view returns (uint256);
 
-    function redeem(address pool, uint256 shares, address receiver, address owner) external returns (uint256 assets);
+    /// @notice Increases `to`'s withdrawable WETH balance by `amount`, can only be called by credit managers
+    /// @custom:expects Credit manager transferred `amount` of WETH to this contract prior to calling this function
+    function deposit(address to, uint256 amount) external;
 
-    function depositFor(address to, uint256 amount) external;
-
-    function withdrawTo(address owner) external;
-
-    function balanceOf(address holder) external view returns (uint256);
+    /// @notice Unwraps and claims all `owner`'s balance of withdrawable WETH
+    function claim(address owner) external;
 }

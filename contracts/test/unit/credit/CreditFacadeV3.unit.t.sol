@@ -571,7 +571,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
             )
         );
 
-        if (convertToETH) vm.expectCall(address(wethGateway), abi.encodeCall(IWETHGateway.withdrawTo, (FRIEND)));
+        if (convertToETH) vm.expectCall(address(wethGateway), abi.encodeCall(IWETHGateway.claim, (FRIEND)));
 
         if (hasBotPermissions) {
             vm.expectCall(address(botListMock), abi.encodeCall(IBotList.eraseAllBotPermissions, (creditAccount)));
@@ -886,7 +886,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
             )
         );
 
-        if (convertToETH) vm.expectCall(address(wethGateway), abi.encodeCall(IWETHGateway.withdrawTo, (FRIEND)));
+        if (convertToETH) vm.expectCall(address(wethGateway), abi.encodeCall(IWETHGateway.claim, (FRIEND)));
 
         if (hasBotPermissions) {
             vm.expectCall(address(botListMock), abi.encodeCall(IBotList.eraseAllBotPermissions, (creditAccount)));

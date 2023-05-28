@@ -2523,7 +2523,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             });
 
             if (convertToEth) {
-                vm.expectCall(address(wethGateway), abi.encodeCall(IWETHGateway.depositFor, (FRIEND, amount)));
+                vm.expectCall(address(wethGateway), abi.encodeCall(IWETHGateway.deposit, (FRIEND, amount)));
             }
 
             creditManager.safeTokenTransfer({
