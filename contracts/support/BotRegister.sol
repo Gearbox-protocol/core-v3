@@ -8,19 +8,19 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
-import {IBotList, BotFunding} from "../interfaces/IBotList.sol";
+import {IBotRegister, BotFunding} from "../interfaces/IBotRegister.sol";
 import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
-import {ICreditFacade} from "../interfaces/ICreditFacade.sol";
+import {ICreditFacadeV3} from "../interfaces/ICreditFacadeV3.sol";
 import {ICreditAccountBase} from "../interfaces/ICreditAccountV3.sol";
 
 import "../interfaces/IExceptions.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
-/// @title BotList
+/// @title BotRegister
 /// @notice Used to store a mapping of borrowers => bots. A separate contract is used for transferability when
 ///      changing Credit Facades
-contract BotList is ACLNonReentrantTrait, IBotList {
+contract BotRegister is ACLNonReentrantTrait, IBotRegister {
     using SafeCast for uint256;
     using Address for address;
     using Address for address payable;
@@ -60,7 +60,7 @@ contract BotList is ACLNonReentrantTrait, IBotList {
 
     /// @notice Limits access to a function only to Credit Facades connected to approved CMs
     modifier onlyValidCreditFacade() {
-        address creditManager = ICreditFacade(msg.sender).creditManager();
+        address creditManager = ICreditFacadeV3(msg.sender).creditManager();
         if (!approvedCreditManager[creditManager] || ICreditManagerV3(creditManager).creditFacade() != msg.sender) {
             revert CallerNotCreditFacadeException();
         }

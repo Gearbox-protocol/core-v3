@@ -3,13 +3,8 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-/// @dev Common contract exceptions
-
 /// @dev Thrown on attempting to set an important address to zero address
 error ZeroAddressException();
-
-/// @dev Thrown on attempting to call a non-implemented function
-error NotImplementedException();
 
 /// @dev Thrown on incorrect input parameter
 error IncorrectParameterException();
@@ -105,7 +100,6 @@ error IncorrectLimitsException();
 error IncorrectExpirationDateException();
 
 /// @dev Thrown if an adapter that is already linked to a contract is being connected to another
-error AdapterUsedTwiceException();
 
 /// @dev Thrown if a contract (adapter or Credit Facade) set in a Credit Configurator returns a wrong Credit Manager
 ///      or retrieving the Credit Manager from it fails
@@ -117,7 +111,7 @@ error ContractIsNotAnAllowedAdapterException();
 /// @dev Thrown when attempting to limit a token that is not quotable in PoolQuotaKeeper
 error TokenIsNotQuotedException();
 
-// interface ICreditFacadeExceptions is ICreditManagerV3Exceptions {
+// interface ICreditFacadeV3Exceptions is ICreditManagerV3Exceptions {
 /// @dev Thrown if the CreditFacadeV3 is not expirable, and an aciton is attempted that
 ///      requires expirability
 error NotAllowedWhenNotExpirableException();
@@ -125,19 +119,9 @@ error NotAllowedWhenNotExpirableException();
 /// @dev Thrown if a liquidator tries to liquidate an account with a health factor above 1
 error CreditAccountNotLiquidatableException();
 
-/// @dev Thrown inside account closure multicall if the borrower attempts an action that is forbidden on closing
-///      an account
-error ForbiddenDuringClosureException();
-
-/// @dev Thrown if debt increase and decrease are subsequently attempted in one multicall
-error IncreaseAndDecreaseForbiddenInOneCallException();
-
 /// @dev Thrown if a selector that doesn't match any allowed function is passed to the Credit Facade
 ///      during a multicall
 error UnknownMethodException();
-
-/// @dev Thrown if a user tries to open an account or increase debt with increaseDebtForbidden mode on
-error BorrowingForbiddenException();
 
 /// @dev Thrown if too much new debt was taken within a single block
 error BorrowedBlockLimitException();
@@ -160,7 +144,6 @@ error ExpectedBalancesAlreadySetException();
 error ForbiddenTokensException();
 
 /// @dev Thrown when attempting to perform an action on behalf of a borrower that is blacklisted in the underlying token
-error NotAllowedForBlacklistedAddressException();
 
 /// @dev Thrown if botMulticall is called by an address that is not a bot for a specified borrower
 error NotApprovedBotException();
@@ -187,9 +170,6 @@ error TooManyTokensException();
 ///      and there are not enough unused token to disable
 error TooManyEnabledTokensException();
 
-/// @dev Thrown when attempting to ramp LT for underlying
-error CannotRampLTForUnderlyingException();
-
 /// @dev Thrown when a custom HF parameter lower than 10000 is passed into a full collateral check
 error CustomHealthFactorTooLowException();
 
@@ -197,9 +177,6 @@ error CustomHealthFactorTooLowException();
 error VotingContractNotAllowedException();
 
 error BorrowingMoreU2ForbiddenException();
-
-/// @dev Thrown on returning a value that violates the current bounds
-error ValueOutOfRangeException();
 
 error CreditManagerCantBorrowException();
 
@@ -214,12 +191,9 @@ error AmountCantBeZeroException();
 error InvalidBotException();
 
 /// @dev Thrown when attempting to add a Credit Facade that has non-blacklistable underlying
-error CreditFacadeNonBlacklistable();
 
 /// @dev Thrown when attempting to claim funds without having anything claimable
 error NothingToClaimException();
-
-error LiquiditySanityCheckException();
 
 /// @dev Thrown when attempting to schedule withdrawal from a credit account that has no free withdrawal slots
 error NoFreeWithdrawalSlotsException();

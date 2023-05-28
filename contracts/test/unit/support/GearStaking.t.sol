@@ -15,7 +15,7 @@ import "../../lib/constants.sol";
 // MOCKS
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
-import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
+import {TargetContractMock} from "../../mocks/adapters/TargetContractMock.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";

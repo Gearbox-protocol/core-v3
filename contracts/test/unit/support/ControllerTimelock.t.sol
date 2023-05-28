@@ -8,7 +8,7 @@ import {Policy} from "../../../support/risk-controller/PolicyManager.sol";
 import {GeneralMock} from "../../mocks/GeneralMock.sol";
 
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
-import {ICreditFacade} from "../../../interfaces/ICreditFacade.sol";
+import {ICreditFacadeV3} from "../../../interfaces/ICreditFacadeV3.sol";
 import {ICreditConfigurator} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 import {PoolV3} from "../../../pool/PoolV3.sol";
@@ -84,7 +84,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "EXPIRATION_DATE"));
 
         vm.mockCall(
-            creditFacade, abi.encodeWithSelector(ICreditFacade.expirationDate.selector), abi.encode(block.timestamp)
+            creditFacade, abi.encodeWithSelector(ICreditFacadeV3.expirationDate.selector), abi.encode(block.timestamp)
         );
 
         vm.mockCall(
@@ -233,7 +233,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "MAX_DEBT_PER_BLOCK_MULTIPLIER"));
 
         vm.mockCall(
-            creditFacade, abi.encodeWithSelector(ICreditFacade.maxDebtPerBlockMultiplier.selector), abi.encode(3)
+            creditFacade, abi.encodeWithSelector(ICreditFacadeV3.maxDebtPerBlockMultiplier.selector), abi.encode(3)
         );
 
         Policy memory policy = Policy({
@@ -304,7 +304,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         bytes32 POLICY_CODE_1 = keccak256(abi.encode("CM", "MIN_DEBT"));
         bytes32 POLICY_CODE_2 = keccak256(abi.encode("CM", "MAX_DEBT"));
 
-        vm.mockCall(creditFacade, abi.encodeWithSelector(ICreditFacade.debtLimits.selector), abi.encode(10, 20));
+        vm.mockCall(creditFacade, abi.encodeWithSelector(ICreditFacadeV3.debtLimits.selector), abi.encode(10, 20));
 
         Policy memory policy = Policy({
             enabled: false,
@@ -569,7 +569,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "EXPIRATION_DATE"));
 
         vm.mockCall(
-            creditFacade, abi.encodeWithSelector(ICreditFacade.expirationDate.selector), abi.encode(block.timestamp)
+            creditFacade, abi.encodeWithSelector(ICreditFacadeV3.expirationDate.selector), abi.encode(block.timestamp)
         );
 
         vm.mockCall(pool, abi.encodeWithSelector(IPoolV3.creditManagerBorrowed.selector, creditManager), abi.encode(0));
@@ -671,7 +671,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockEvents, IControllerT
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "EXPIRATION_DATE"));
 
         vm.mockCall(
-            creditFacade, abi.encodeWithSelector(ICreditFacade.expirationDate.selector), abi.encode(block.timestamp)
+            creditFacade, abi.encodeWithSelector(ICreditFacadeV3.expirationDate.selector), abi.encode(block.timestamp)
         );
 
         vm.mockCall(pool, abi.encodeWithSelector(IPoolV3.creditManagerBorrowed.selector, creditManager), abi.encode(0));

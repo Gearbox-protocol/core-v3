@@ -1,6 +1,6 @@
 pragma solidity ^0.8.17;
 
-import "../../../interfaces/ICreditFacade.sol";
+import "../../../interfaces/ICreditFacadeV3.sol";
 import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 import {ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
 

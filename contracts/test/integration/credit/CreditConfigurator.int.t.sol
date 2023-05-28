@@ -20,9 +20,9 @@ import {ICreditConfiguratorEvents} from "../../../interfaces/ICreditConfigurator
 import {IAdapter} from "@gearbox-protocol/core-v2/contracts/interfaces/adapters/IAdapter.sol";
 
 //
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-import {AddressList} from "@gearbox-protocol/core-v2/contracts/libraries/AddressList.sol";
+import {AddressList} from "../../lib/AddressList.sol";
 
 // EXCEPTIONS
 
@@ -33,7 +33,7 @@ import "../../lib/constants.sol";
 
 // MOCKS
 import {AdapterMock} from "../../mocks//adapters/AdapterMock.sol";
-import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
+import {TargetContractMock} from "../../mocks/adapters/TargetContractMock.sol";
 import {CreditFacadeV3Harness} from "../../unit/credit/CreditFacadeV3Harness.sol";
 
 // SUITES
@@ -338,7 +338,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         creditConfigurator.upgradeCreditConfigurator(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.setBotList(0);
+        creditConfigurator.setBotRegister(0);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.setMaxEnabledTokens(1);
@@ -958,7 +958,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
 
             vm.startPrank(CONFIGURATOR);
             cct.addressProvider().setAddress(AP_BOT_LIST, DUMB_ADDRESS, true);
-            creditConfigurator.setBotList(301);
+            creditConfigurator.setBotRegister(301);
             vm.stopPrank();
 
             address botList = creditFacade.botList();
@@ -1335,17 +1335,17 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         assertEq(loss, 0, "Cumulative loss was not reset");
     }
 
-    /// @dev I:[CC-33]: setBotList upgrades the bot list correctly
-    function test_I_CC_33_setBotList_upgrades_priceOracle_correctly() public {
+    /// @dev I:[CC-33]: setBotRegister upgrades the bot list correctly
+    function test_I_CC_33_setBotRegister_upgrades_priceOracle_correctly() public {
         vm.mockCall(DUMB_ADDRESS, abi.encodeCall(IVersion.version, ()), abi.encode(301));
 
         vm.startPrank(CONFIGURATOR);
         cct.addressProvider().setAddress(AP_BOT_LIST, DUMB_ADDRESS, true);
 
         vm.expectEmit(true, false, false, false);
-        emit SetBotList(DUMB_ADDRESS);
+        emit SetBotRegister(DUMB_ADDRESS);
 
-        creditConfigurator.setBotList(301);
+        creditConfigurator.setBotRegister(301);
 
         assertEq(creditFacade.botList(), DUMB_ADDRESS);
         vm.stopPrank();

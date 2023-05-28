@@ -19,8 +19,8 @@ import {PoolV3_USDT} from "../../../pool/PoolV3_USDT.sol";
 import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
 import {IERC4626Events} from "../../interfaces/IERC4626.sol";
 
-import {IInterestRateModel} from "../../../interfaces/IInterestRateModel.sol";
-import {IPoolQuotaKeeper} from "../../../interfaces/IPoolQuotaKeeper.sol";
+import {IInterestRateModelV3} from "../../../interfaces/IInterestRateModelV3.sol";
+import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 
@@ -36,7 +36,7 @@ import {TestHelper} from "../../lib/helper.sol";
 
 import "../../lib/constants.sol";
 
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
@@ -60,7 +60,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
     PoolV3 pool;
     address underlying;
     CreditManagerMock cmMock;
-    IInterestRateModel irm;
+    IInterestRateModelV3 irm;
 
     address treasury;
     /*
@@ -1571,7 +1571,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
         });
 
         address keeper = makeAddr("POOL_QUOTA_KEEPER");
-        vm.mockCall(keeper, abi.encodeCall(IPoolQuotaKeeper.pool, ()), abi.encode(DUMB_ADDRESS));
+        vm.mockCall(keeper, abi.encodeCall(IPoolQuotaKeeperV3.pool, ()), abi.encode(DUMB_ADDRESS));
 
         vm.expectRevert(IncompatiblePoolQuotaKeeperException.selector);
         vm.prank(CONFIGURATOR);

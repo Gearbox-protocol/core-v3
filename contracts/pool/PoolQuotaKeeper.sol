@@ -14,12 +14,12 @@ import {CreditLogic} from "../libraries/CreditLogic.sol";
 import {QuotasLogic} from "../libraries/QuotasLogic.sol";
 
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
-import {IPoolQuotaKeeper, TokenQuotaParams, AccountQuota} from "../interfaces/IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeperV3, TokenQuotaParams, AccountQuota} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IGauge} from "../interfaces/IGauge.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 
 import {RAY, SECONDS_PER_YEAR, MAX_WITHDRAW_FEE} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
@@ -33,7 +33,7 @@ uint192 constant RAY_DIVIDED_BY_PERCENTAGE = uint192(RAY / PERCENTAGE_FACTOR);
 /// @dev Account quotas are user-set values that limit the exposure of an account to a particular asset. The USD value of an asset
 ///      counted towards account's collateral cannot exceed the USD calue of the respective quota. Users pay interest on their quotas,
 ///      both as an anti-spam measure and a way to price-discriminate based on asset's risk
-contract PoolQuotaKeeper is IPoolQuotaKeeper, ACLNonReentrantTrait, ContractsRegisterTrait {
+contract PoolQuotaKeeper is IPoolQuotaKeeperV3, ACLNonReentrantTrait, ContractsRegisterTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using QuotasLogic for TokenQuotaParams;
 

@@ -7,7 +7,9 @@ import "../../../interfaces/IAddressProviderV3.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 
-import {IPoolQuotaKeeper, IPoolQuotaKeeperEvents, TokenQuotaParams} from "../../../interfaces/IPoolQuotaKeeper.sol";
+import {
+    IPoolQuotaKeeperV3, IPoolQuotaKeeperV3Events, TokenQuotaParams
+} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {IGauge} from "../../../interfaces/IGauge.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 
@@ -27,14 +29,14 @@ import {GaugeMock} from "../../mocks/pool/GaugeMock.sol";
 // TEST
 import "../../lib/constants.sol";
 
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
 import {TestHelper} from "../../lib/helper.sol";
 
-contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperEvents {
+contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV3Events {
     using Math for uint256;
 
     ContractsRegister public cr;

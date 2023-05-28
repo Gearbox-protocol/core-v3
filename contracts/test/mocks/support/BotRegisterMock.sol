@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-contract BotListMock {
+contract BotRegisterMock {
     bool revertOnErase;
 
     uint256 return_botPermissions;

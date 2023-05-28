@@ -11,7 +11,7 @@ import {ACLNonReentrantTrait} from "../../../traits/ACLNonReentrantTrait.sol";
 
 // interfaces
 
-import {IPoolQuotaKeeper} from "../../../interfaces/IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 
 import {PoolV3} from "../../../pool/PoolV3.sol";
 
@@ -43,7 +43,7 @@ contract GaugeMock is ACLNonReentrantTrait {
     /// @dev Rolls the new epoch and updates all quota rates
     function updateEpoch() external {
         /// compute all compounded rates
-        IPoolQuotaKeeper keeper = IPoolQuotaKeeper(pool.poolQuotaKeeper());
+        IPoolQuotaKeeperV3 keeper = IPoolQuotaKeeperV3(pool.poolQuotaKeeper());
 
         // /// update rates & cumulative indexes
         // address[] memory tokens = keeper.quotedTokens();
@@ -62,7 +62,7 @@ contract GaugeMock is ACLNonReentrantTrait {
 
     function addQuotaToken(address token, uint16 _rate) external configuratorOnly {
         rates[token] = _rate;
-        IPoolQuotaKeeper keeper = IPoolQuotaKeeper(pool.poolQuotaKeeper());
+        IPoolQuotaKeeperV3 keeper = IPoolQuotaKeeperV3(pool.poolQuotaKeeper());
         keeper.addQuotaToken(token);
     }
 

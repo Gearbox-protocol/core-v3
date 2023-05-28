@@ -13,7 +13,7 @@ import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 
 // interfaces
 import {IGauge, QuotaRateParams, UserVotes} from "../interfaces/IGauge.sol";
-import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IGearStaking} from "../interfaces/IGearStaking.sol";
 
 import {PoolV3} from "./PoolV3.sol";
@@ -92,7 +92,7 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
             /// The PQK retrieves all rates from the Gauge on its own and saves them
             /// Since this function is only callable by the Gauge, active rates can only
             /// be updated once per epoch at most
-            IPoolQuotaKeeper(pool.poolQuotaKeeper()).updateRates();
+            IPoolQuotaKeeperV3(pool.poolQuotaKeeper()).updateRates();
         }
     }
 
@@ -221,7 +221,7 @@ contract Gauge is IGauge, ACLNonReentrantTrait {
         quotaRateParams[token] =
             QuotaRateParams({minRiskRate: _minRiskRate, maxRate: _maxRate, totalVotesLpSide: 0, totalVotesCaSide: 0});
 
-        IPoolQuotaKeeper keeper = IPoolQuotaKeeper(pool.poolQuotaKeeper());
+        IPoolQuotaKeeperV3 keeper = IPoolQuotaKeeperV3(pool.poolQuotaKeeper());
         keeper.addQuotaToken(token);
 
         emit AddQuotaToken(token, _minRiskRate, _maxRate);

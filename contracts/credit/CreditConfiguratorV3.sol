@@ -18,7 +18,7 @@ import {
     WAD
 } from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {UNDERLYING_TOKEN_MASK} from "../libraries/BitMask.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // CONTRACTS
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
@@ -33,9 +33,9 @@ import {
     CreditManagerOpts,
     AllowanceAction
 } from "../interfaces/ICreditConfiguratorV3.sol";
-import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
+import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
 import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
-import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import "../interfaces/IAddressProviderV3.sol";
 
 // EXCEPTIONS
@@ -351,7 +351,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
         // Verifies whether the quota keeper has a token registered as quotable
         address quotaKeeper = creditManager.poolQuotaKeeper();
 
-        if (!IPoolQuotaKeeper(quotaKeeper).isQuotedToken(token)) {
+        if (!IPoolQuotaKeeperV3(quotaKeeper).isQuotedToken(token)) {
             revert TokenIsNotQuotedException();
         }
 
@@ -695,7 +695,7 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
             // Copies the expiration date if the contract is expirable
             if (expirable) _setExpirationDate(expirationDate); // I:[CC-22]
 
-            if (botListVersion != 0) _setBotList(botListVersion); // I:[CC-22A]
+            if (botListVersion != 0) _setBotRegister(botListVersion); // I:[CC-22A]
         } else {
             if (setTotalDebtParams) {
                 _setTotalDebtParams(totalDebtCurrent, 0); // I:[CC-22B]
@@ -889,21 +889,21 @@ contract CreditConfigurator is ICreditConfigurator, ACLNonReentrantTrait {
     ///                The contract address is retrieved from addressProvider
     /// @notice The bot list determines the permissions for actions
     ///         that bots can perform on Credit Accounts
-    function setBotList(uint256 version)
+    function setBotRegister(uint256 version)
         external
         configuratorOnly // I: [CC-2]
     {
-        _setBotList(version); // I: [CC-33]
+        _setBotRegister(version); // I: [CC-33]
     }
 
-    /// @notice IMPLEMENTATION: setBotList
-    function _setBotList(uint256 version) internal {
+    /// @notice IMPLEMENTATION: setBotRegister
+    function _setBotRegister(uint256 version) internal {
         address botList = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_BOT_LIST, version); // I: [CC-33]
-        address currentBotList = creditFacade().botList();
+        address currentBotRegister = creditFacade().botList();
 
-        if (botList != currentBotList) {
-            creditFacade().setBotList(botList); // I: [CC-33]
-            emit SetBotList(botList); // I: [CC-33]
+        if (botList != currentBotRegister) {
+            creditFacade().setBotRegister(botList); // I: [CC-33]
+            emit SetBotRegister(botList); // I: [CC-33]
         }
     }
 

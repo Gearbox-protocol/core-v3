@@ -9,7 +9,7 @@ import {IControllerTimelock, QueuedTransactionData} from "../../interfaces/ICont
 
 import {ICreditManagerV3} from "../../interfaces/ICreditManagerV3.sol";
 
-import {ICreditFacade} from "../../interfaces/ICreditFacade.sol";
+import {ICreditFacadeV3} from "../../interfaces/ICreditFacadeV3.sol";
 import {IPoolV3} from "../../interfaces/IPoolV3.sol";
 import {ILPPriceFeed} from "../../interfaces/ILPPriceFeed.sol";
 
@@ -73,7 +73,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
         external
         adminOnly // F: [RCT-01]
     {
-        ICreditFacade creditFacade = ICreditFacade(ICreditManagerV3(creditManager).creditFacade());
+        ICreditFacadeV3 creditFacade = ICreditFacadeV3(ICreditManagerV3(creditManager).creditFacade());
         address creditConfigurator = ICreditManagerV3(creditManager).creditConfigurator();
         IPoolV3 pool = IPoolV3(ICreditManagerV3(creditManager).pool());
 
@@ -119,7 +119,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
         external
         adminOnly // F: [RCT-03]
     {
-        ICreditFacade creditFacade = ICreditFacade(ICreditManagerV3(creditManager).creditFacade());
+        ICreditFacadeV3 creditFacade = ICreditFacadeV3(ICreditManagerV3(creditManager).creditFacade());
         address creditConfigurator = ICreditManagerV3(creditManager).creditConfigurator();
 
         uint8 currentMultiplier = creditFacade.maxDebtPerBlockMultiplier();
@@ -148,7 +148,7 @@ contract ControllerTimelock is PolicyManager, IControllerTimelock {
         external
         adminOnly // F: [RCT-04]
     {
-        ICreditFacade creditFacade = ICreditFacade(ICreditManagerV3(creditManager).creditFacade());
+        ICreditFacadeV3 creditFacade = ICreditFacadeV3(ICreditManagerV3(creditManager).creditFacade());
         address creditConfigurator = ICreditManagerV3(creditManager).creditConfigurator();
 
         (uint128 minDebtCurrent, uint128 maxDebtCurrent) = creditFacade.debtLimits();

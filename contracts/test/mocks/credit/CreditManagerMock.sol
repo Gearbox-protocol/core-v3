@@ -15,7 +15,7 @@ import {
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 
-import {ClaimAction} from "../../../interfaces/IWithdrawalManager.sol";
+import {ClaimAction} from "../../../interfaces/IWithdrawalManagerV3.sol";
 
 import "../../../interfaces/IExceptions.sol";
 

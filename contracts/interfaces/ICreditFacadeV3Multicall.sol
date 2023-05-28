@@ -30,7 +30,7 @@ uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 2 ** 194;
 // pay bot is a flag which is enabled in botMulticall function only to allow one payment operation
 uint256 constant PAY_BOT_CAN_BE_CALLED = 2 ** 195;
 
-interface ICreditFacadeMulticall {
+interface ICreditFacadeV3Multicall {
     /// @dev Instructs CreditFacadeV3 to check token balances at the end
     /// Used to control slippage after the entire sequence of operations, since tracking slippage
     /// On each operation is not ideal. Stores expected balances (computed as current balance + passed delta)

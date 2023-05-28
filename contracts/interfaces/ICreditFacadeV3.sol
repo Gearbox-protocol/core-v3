@@ -7,7 +7,7 @@ import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 import {ClosureAction} from "../interfaces/ICreditManagerV3.sol";
-import "./ICreditFacadeMulticall.sol";
+import "./ICreditFacadeV3Multicall.sol";
 
 struct DebtLimits {
     /// @dev Minimal borrowed amount per credit account
@@ -36,7 +36,7 @@ struct TotalDebt {
     uint128 totalDebtLimit;
 }
 
-interface ICreditFacadeEvents {
+interface ICreditFacadeV3Events {
     /// @dev Emits when a new Credit Account is opened through the Credit Facade
     event OpenCreditAccount(
         address indexed creditAccount,
@@ -84,7 +84,7 @@ interface ICreditFacadeEvents {
     event SetEnabledTokensMask(address indexed creditAccount, uint256 enabledTokensMask);
 }
 
-interface ICreditFacade is ICreditFacadeEvents, IVersion {
+interface ICreditFacadeV3 is ICreditFacadeV3Events, IVersion {
     //
     // CREDIT ACCOUNT MANAGEMENT
     //
@@ -214,7 +214,7 @@ interface ICreditFacade is ICreditFacadeEvents, IVersion {
     /// @return maxCumulativeLoss The maximal amount of loss accumulated before the Credit Manager is paused
     function lossParams() external view returns (uint128 currentCumulativeLoss, uint128 maxCumulativeLoss);
 
-    /// @dev Address of the DegenNFT that gatekeeps account openings in whitelisted mode
+    /// @dev Address of the IDegenNFTV2 that gatekeeps account openings in whitelisted mode
     function degenNFT() external view returns (address);
 
     /// @dev Maps addresses to their status as emergency liquidator.

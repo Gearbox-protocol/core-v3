@@ -28,7 +28,7 @@ struct CreditManagerOpts {
     uint128 maxBorrowedAmount;
     /// @dev The initial list of collateral tokens to allow
     CollateralToken[] collateralTokens;
-    /// @dev Address of DegenNFT, address(0) if whitelisted mode is not used
+    /// @dev Address of IDegenNFTV2, address(0) if whitelisted mode is not used
     address degenNFT;
     /// @dev Address of BlacklistHelper, address(0) if the underlying is not blacklistable
     address withdrawalManager;
@@ -109,7 +109,7 @@ interface ICreditConfiguratorEvents {
     event RemoveEmergencyLiquidator(address);
 
     /// @dev Emits when the bot list is updated in Credit Facade
-    event SetBotList(address);
+    event SetBotRegister(address);
 
     /// @dev Emits when the token is set as limited
     event QuoteToken(address);
@@ -243,7 +243,7 @@ interface ICreditConfigurator is ICreditConfiguratorEvents, IVersion {
     /// @dev Sets the bot list contract
     /// @param version The version of the new bot list contract
     ///                The contract address is retrieved from addressProvider
-    function setBotList(uint256 version) external;
+    function setBotRegister(uint256 version) external;
 
     /// @notice Sets a new total debt limit
     /// @dev Only works for Credit Facades that track total debt limit

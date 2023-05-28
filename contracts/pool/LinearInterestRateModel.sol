@@ -5,8 +5,8 @@ pragma solidity ^0.8.17;
 pragma abicoder v1;
 
 import {WAD, RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
-import {IInterestRateModel} from "../interfaces/IInterestRateModel.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {IInterestRateModelV3} from "../interfaces/IInterestRateModelV3.sol";
 
 // EXCEPTIONS
 import {IncorrectParameterException, BorrowingMoreU2ForbiddenException} from "../interfaces/IExceptions.sol";
@@ -19,7 +19,7 @@ import {IncorrectParameterException, BorrowingMoreU2ForbiddenException} from "..
 ///      can be configured to prevent borrowing after entering the steep region
 ///      (beyond the U2 point), in order to create a reserve for exits and make
 ///      rates more stable
-contract LinearInterestRateModel is IInterestRateModel {
+contract LinearInterestRateModel is IInterestRateModelV3 {
     /// @notice Whether to revert when borrowing beyond U2 utilization
     bool public immutable isBorrowingMoreU2Forbidden;
 

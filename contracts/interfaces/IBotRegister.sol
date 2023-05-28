@@ -12,7 +12,7 @@ struct BotFunding {
     uint40 allowanceLU;
 }
 
-interface IBotListEvents {
+interface IBotRegisterEvents {
     /// @dev Emits when a borrower enables or disables a bot for their account
     event SetBotPermissions(
         address indexed creditAccount,
@@ -46,15 +46,15 @@ interface IBotListEvents {
     /// @dev Emits when all bot permissions for a Credit Account are erased
     event EraseBots(address creditAccount);
 
-    /// @dev Emits when a new Credit Manager is approved in BotList
+    /// @dev Emits when a new Credit Manager is approved in BotRegister
     event CreditManagerAdded(address indexed creditManager);
 
-    /// @dev Emits when a Credit Manager is removed from BotList
+    /// @dev Emits when a Credit Manager is removed from BotRegister
     event CreditManagerRemoved(address indexed creditManager);
 }
 
-/// @title IBotList
-interface IBotList is IBotListEvents, IVersion {
+/// @title IBotRegister
+interface IBotRegister is IBotRegisterEvents, IVersion {
     /// @dev Sets approval from msg.sender to bot
     function setBotPermissions(
         address creditAccount,

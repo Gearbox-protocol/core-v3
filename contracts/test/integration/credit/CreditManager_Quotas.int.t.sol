@@ -16,15 +16,15 @@ import {
     CollateralCalcTask,
     CollateralDebtData
 } from "../../../interfaces/ICreditManagerV3.sol";
-import {IPoolQuotaKeeper, AccountQuota} from "../../../interfaces/IPoolQuotaKeeper.sol";
-import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
+import {IPoolQuotaKeeperV3, AccountQuota} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
+import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
 
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 import {UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {CreditLogic} from "../../../libraries/CreditLogic.sol";
 
 // TESTS
@@ -169,7 +169,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         vm.expectCall(
             address(poolQuotaKeeper),
             abi.encodeCall(
-                IPoolQuotaKeeper.updateQuota, (creditAccount, tokenTestSuite.addressOf(Tokens.LINK), 100_000, 0)
+                IPoolQuotaKeeperV3.updateQuota, (creditAccount, tokenTestSuite.addressOf(Tokens.LINK), 100_000, 0)
             )
         );
 
@@ -488,7 +488,8 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         cdd.totalValue = 0;
 
         vm.expectCall(
-            address(poolQuotaKeeper), abi.encodeCall(IPoolQuotaKeeper.removeQuotas, (creditAccount, quotedTokens, true))
+            address(poolQuotaKeeper),
+            abi.encodeCall(IPoolQuotaKeeperV3.removeQuotas, (creditAccount, quotedTokens, true))
         );
 
         creditManager.closeCreditAccount(creditAccount, ClosureAction.LIQUIDATE_ACCOUNT, cdd, USER, USER, 0, false);

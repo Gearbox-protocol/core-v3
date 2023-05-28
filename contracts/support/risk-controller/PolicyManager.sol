@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {ACLNonReentrantTrait} from "../../traits/ACLNonReentrantTrait.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 /// @dev Policy that determines checks performed on a parameter
 ///      Each policy is defined for a contract group, which is a string

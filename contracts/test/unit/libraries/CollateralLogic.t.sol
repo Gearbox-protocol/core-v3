@@ -9,7 +9,7 @@ import {CollateralLogic} from "../../../libraries/CollateralLogic.sol";
 import {CollateralDebtData} from "../../../interfaces/ICreditManagerV3.sol";
 import {TestHelper} from "../../lib/helper.sol";
 
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 import "../../lib/constants.sol";
 import {Tokens} from "../../config/Tokens.sol";

@@ -23,7 +23,7 @@ import {IAccountFactoryBase} from "../interfaces/IAccountFactoryV3.sol";
 import {ICreditAccountBase} from "../interfaces/ICreditAccountV3.sol";
 import {IPoolBase, IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
-import {ClaimAction, IWithdrawalManager} from "../interfaces/IWithdrawalManager.sol";
+import {ClaimAction, IWithdrawalManagerV3} from "../interfaces/IWithdrawalManagerV3.sol";
 import {
     ICreditManagerV3,
     ClosureAction,
@@ -36,12 +36,12 @@ import {
     WITHDRAWAL_FLAG
 } from "../interfaces/ICreditManagerV3.sol";
 import "../interfaces/IAddressProviderV3.sol";
-import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
-import {IPoolQuotaKeeper} from "../interfaces/IPoolQuotaKeeper.sol";
+import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
+import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 
 // CONSTANTS
 import "forge-std/console.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {
     DEFAULT_FEE_INTEREST,
     DEFAULT_FEE_LIQUIDATION,
@@ -386,7 +386,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             /// In case of any loss, PQK sets limits to zero for all quoted tokens
             bool setLimitsToZero = loss > 0; // U:[CM-8] // I:[CMQ-8]
 
-            IPoolQuotaKeeper(collateralDebtData._poolQuotaKeeper).removeQuotas({
+            IPoolQuotaKeeperV3(collateralDebtData._poolQuotaKeeper).removeQuotas({
                 creditAccount: creditAccount,
                 tokens: collateralDebtData.quotedTokens,
                 setLimitsToZero: setLimitsToZero
@@ -499,7 +499,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             /// quota interest indexes in PQK and cumulativeQuotaInterest in Credit Manager consistent
             /// with each other, since this action caches all quota interest in Credit Manager
             if (supportsQuotas) {
-                IPoolQuotaKeeper(collateralDebtData._poolQuotaKeeper).accrueQuotaInterest({
+                IPoolQuotaKeeperV3(collateralDebtData._poolQuotaKeeper).accrueQuotaInterest({
                     creditAccount: creditAccount,
                     tokens: collateralDebtData.quotedTokens
                 });
@@ -933,7 +933,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
                         uint256 outstandingInterestDelta;
                         (quotas[j], outstandingInterestDelta) =
-                            IPoolQuotaKeeper(_poolQuotaKeeper).getQuotaAndOutstandingInterest(ca, token); // U:[CM-24]
+                            IPoolQuotaKeeperV3(_poolQuotaKeeper).getQuotaAndOutstandingInterest(ca, token); // U:[CM-24]
 
                         /// Quota interest is equal to quota * APY * time. Since quota is a uint96, this is unlikely to overflow in any realistic scenario.
                         outstandingQuotaInterest += outstandingInterestDelta; // U:[CM-24]
@@ -969,7 +969,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         bool enable;
         bool disable;
 
-        (caInterestChange, change, enable, disable) = IPoolQuotaKeeper(poolQuotaKeeper()).updateQuota({
+        (caInterestChange, change, enable, disable) = IPoolQuotaKeeperV3(poolQuotaKeeper()).updateQuota({
             creditAccount: creditAccount,
             token: token,
             quotaChange: quotaChange,
@@ -1007,7 +1007,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         // If the configured delay is zero, then sending funds to the WithdrawalManager can be skipped
         // and they can be sent directly to the user
-        if (IWithdrawalManager(withdrawalManager).delay() == 0) {
+        if (IWithdrawalManagerV3(withdrawalManager).delay() == 0) {
             address borrower = getBorrowerOrRevert({creditAccount: creditAccount});
             _safeTokenTransfer({
                 creditAccount: creditAccount,
@@ -1023,7 +1023,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 amount: amount
             }); // U:[CM-28]
 
-            IWithdrawalManager(withdrawalManager).addScheduledWithdrawal({
+            IWithdrawalManagerV3(withdrawalManager).addScheduledWithdrawal({
                 creditAccount: creditAccount,
                 token: token,
                 amount: delivered,
@@ -1059,7 +1059,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             bool hasScheduled;
 
             (hasScheduled, tokensToEnable) =
-                IWithdrawalManager(withdrawalManager).claimScheduledWithdrawals(creditAccount, to, action); // U:[CM-29]
+                IWithdrawalManagerV3(withdrawalManager).claimScheduledWithdrawals(creditAccount, to, action); // U:[CM-29]
             if (!hasScheduled) {
                 // WITHDRAWAL_FLAG is disabled when there are no more pending withdrawals
                 _disableFlag(creditAccount, WITHDRAWAL_FLAG); // U:[CM-29]
@@ -1077,7 +1077,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (uint256 totalValueUSD)
     {
         (address token1, uint256 amount1, address token2, uint256 amount2) =
-            IWithdrawalManager(withdrawalManager).cancellableScheduledWithdrawals(creditAccount, isForceCancel); // U:[CM-30]
+            IWithdrawalManagerV3(withdrawalManager).cancellableScheduledWithdrawals(creditAccount, isForceCancel); // U:[CM-30]
 
         if (amount1 != 0) {
             totalValueUSD = _convertToUSD({_priceOracle: _priceOracle, amountInToken: amount1, token: token1}); // U:[CM-30]
@@ -1151,7 +1151,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     to: withdrawalManager,
                     amount: amount
                 }); // U:[CM-33]
-                IWithdrawalManager(withdrawalManager).addImmediateWithdrawal({token: token, to: to, amount: delivered}); // U:[CM-33]
+                IWithdrawalManagerV3(withdrawalManager).addImmediateWithdrawal({token: token, to: to, amount: delivered}); // U:[CM-33]
             }
         }
     }

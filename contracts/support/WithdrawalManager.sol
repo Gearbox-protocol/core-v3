@@ -13,7 +13,7 @@ import {
     NothingToClaimException
 } from "../interfaces/IExceptions.sol";
 import {IVersion} from "../interfaces/IVersion.sol";
-import {ClaimAction, IWithdrawalManager, ScheduledWithdrawal} from "../interfaces/IWithdrawalManager.sol";
+import {ClaimAction, IWithdrawalManagerV3, ScheduledWithdrawal} from "../interfaces/IWithdrawalManagerV3.sol";
 import {IERC20Helper} from "../libraries/IERC20Helper.sol";
 import {WithdrawalsLogic} from "../libraries/WithdrawalsLogic.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
@@ -25,7 +25,7 @@ import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 ///         - Immediate withdrawals can be claimed, well, immediately, and exist to support blacklistable tokens.
 ///         - Scheduled withdrawals can be claimed after a certain delay, and exist to support partial withdrawals
 ///           from credit accounts. One credit account can have up to two scheduled withdrawals at the same time.
-contract WithdrawalManager is IWithdrawalManager, ACLTrait, ContractsRegisterTrait {
+contract WithdrawalManager is IWithdrawalManagerV3, ACLTrait, ContractsRegisterTrait {
     using SafeERC20 for IERC20;
     using IERC20Helper for IERC20;
     using WithdrawalsLogic for ClaimAction;
@@ -35,10 +35,10 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait, ContractsRegisterTra
     /// @inheritdoc IVersion
     uint256 public constant override version = 3_00;
 
-    /// @inheritdoc IWithdrawalManager
+    /// @inheritdoc IWithdrawalManagerV3
     mapping(address => mapping(address => uint256)) public override immediateWithdrawals;
 
-    /// @inheritdoc IWithdrawalManager
+    /// @inheritdoc IWithdrawalManagerV3
     uint40 public override delay;
 
     /// @dev Mapping credit account => scheduled withdrawals
@@ -61,7 +61,7 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait, ContractsRegisterTra
     // IMMEDIATE WITHDRAWALS //
     // --------------------- //
 
-    /// @inheritdoc IWithdrawalManager
+    /// @inheritdoc IWithdrawalManagerV3
     function addImmediateWithdrawal(address token, address to, uint256 amount)
         external
         override
@@ -70,7 +70,7 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait, ContractsRegisterTra
         _addImmediateWithdrawal({account: to, token: token, amount: amount});
     }
 
-    /// @inheritdoc IWithdrawalManager
+    /// @inheritdoc IWithdrawalManagerV3
     function claimImmediateWithdrawal(address token, address to)
         external
         override
@@ -103,7 +103,7 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait, ContractsRegisterTra
     // SCHEDULED WITHDRAWALS //
     // --------------------- //
 
-    /// @inheritdoc IWithdrawalManager
+    /// @inheritdoc IWithdrawalManagerV3
     function scheduledWithdrawals(address creditAccount)
         external
         view
@@ -113,7 +113,7 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait, ContractsRegisterTra
         return _scheduled[creditAccount];
     }
 
-    /// @inheritdoc IWithdrawalManager
+    /// @inheritdoc IWithdrawalManagerV3
     function addScheduledWithdrawal(address creditAccount, address token, uint256 amount, uint8 tokenIndex)
         external
         override
@@ -132,7 +132,7 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait, ContractsRegisterTra
         emit AddScheduledWithdrawal(creditAccount, token, amount, maturity); // U:[WM-5B]
     }
 
-    /// @inheritdoc IWithdrawalManager
+    /// @inheritdoc IWithdrawalManagerV3
     function claimScheduledWithdrawals(address creditAccount, address to, ClaimAction action)
         external
         override
@@ -154,7 +154,7 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait, ContractsRegisterTra
         tokensToEnable = tokensToEnable0 | tokensToEnable1; // U:[WM-6B]
     }
 
-    /// @inheritdoc IWithdrawalManager
+    /// @inheritdoc IWithdrawalManagerV3
     function cancellableScheduledWithdrawals(address creditAccount, bool isForceCancel)
         external
         view
@@ -219,7 +219,7 @@ contract WithdrawalManager is IWithdrawalManager, ACLTrait, ContractsRegisterTra
     // CONFIGURATION //
     // ------------- //
 
-    /// @inheritdoc IWithdrawalManager
+    /// @inheritdoc IWithdrawalManagerV3
     function setWithdrawalDelay(uint40 _delay)
         external
         override

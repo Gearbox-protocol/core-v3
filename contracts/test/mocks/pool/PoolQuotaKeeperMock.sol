@@ -3,9 +3,9 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {IPoolQuotaKeeper, TokenQuotaParams, AccountQuota} from "../../../interfaces/IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeperV3, TokenQuotaParams, AccountQuota} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 
-contract PoolQuotaKeeperMock is IPoolQuotaKeeper {
+contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     uint256 public constant override version = 3_00;
 
     /// @dev Address provider

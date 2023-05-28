@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {IERC20Helper} from "./IERC20Helper.sol";
 import {CollateralDebtData} from "../interfaces/ICreditManagerV3.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 import {BitMask} from "./BitMask.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";

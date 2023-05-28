@@ -40,10 +40,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {IWETHGateway} from "../../../interfaces/IWETHGateway.sol";
-import {ClaimAction, IWithdrawalManager} from "../../../interfaces/IWithdrawalManager.sol";
-import {IPoolQuotaKeeper} from "../../../interfaces/IPoolQuotaKeeper.sol";
+import {ClaimAction, IWithdrawalManagerV3} from "../../../interfaces/IWithdrawalManagerV3.sol";
+import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // EXCEPTIONS
 
@@ -52,7 +52,7 @@ import {PriceOracleMock} from "../../mocks/oracles/PriceOracleMock.sol";
 import {PoolMock} from "../../mocks/pool/PoolMock.sol";
 import {PoolQuotaKeeperMock} from "../../mocks/pool/PoolQuotaKeeperMock.sol";
 import {ERC20FeeMock} from "../../mocks/token/ERC20FeeMock.sol";
-import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
+import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
 import {WETHGatewayMock} from "../../mocks/support/WETHGatewayMock.sol";
 import {CreditAccountMock, CreditAccountMockEvents} from "../../mocks/credit/CreditAccountMock.sol";
 import {WithdrawalManagerMock} from "../../mocks/support/WithdrawalManagerMock.sol";
@@ -1172,7 +1172,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         if (supportsQuotas) {
             vm.expectCall(
                 address(poolQuotaKeeperMock),
-                abi.encodeCall(IPoolQuotaKeeper.accrueQuotaInterest, (creditAccount, collateralDebtData.quotedTokens))
+                abi.encodeCall(IPoolQuotaKeeperV3.accrueQuotaInterest, (creditAccount, collateralDebtData.quotedTokens))
             );
         }
 
@@ -2309,7 +2309,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         vm.expectCall(
             address(withdrawalManagerMock),
-            abi.encodeCall(IWithdrawalManager.addScheduledWithdrawal, (creditAccount, underlying, amountDelivered, 0))
+            abi.encodeCall(IWithdrawalManagerV3.addScheduledWithdrawal, (creditAccount, underlying, amountDelivered, 0))
         );
 
         (uint256 tokensToDisable) =
@@ -2428,7 +2428,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
                 vm.expectCall(
                     address(withdrawalManagerMock),
-                    abi.encodeCall(IWithdrawalManager.cancellableScheduledWithdrawals, (creditAccount, isForceCancel))
+                    abi.encodeCall(IWithdrawalManagerV3.cancellableScheduledWithdrawals, (creditAccount, isForceCancel))
                 );
 
                 uint256 totalValueUSD =
@@ -2581,7 +2581,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         vm.expectCall(
             address(withdrawalManagerMock),
-            abi.encodeCall(IWithdrawalManager.addImmediateWithdrawal, (underlying, FRIEND, _amountMinusFee(amount)))
+            abi.encodeCall(IWithdrawalManagerV3.addImmediateWithdrawal, (underlying, FRIEND, _amountMinusFee(amount)))
         );
 
         creditManager.safeTokenTransfer({

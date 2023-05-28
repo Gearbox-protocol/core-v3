@@ -10,7 +10,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 // TEST
 import "../../lib/constants.sol";
 
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";

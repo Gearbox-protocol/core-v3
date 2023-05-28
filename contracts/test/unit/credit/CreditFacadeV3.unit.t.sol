@@ -7,8 +7,8 @@ import "../../../interfaces/IAddressProviderV3.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
 import {IWETHGateway} from "../../../interfaces/IWETHGateway.sol";
-import {ERC20Mock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20Mock.sol";
-import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracle.sol";
+import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
+import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
 
 /// LIBS
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -18,7 +18,7 @@ import {CreditFacadeV3Harness} from "./CreditFacadeV3Harness.sol";
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 import {DegenNFTMock} from "../../mocks/token/DegenNFTMock.sol";
 import {AdapterMock} from "../../mocks/adapters/AdapterMock.sol";
-import {BotListMock} from "../../mocks/support/BotListMock.sol";
+import {BotRegisterMock} from "../../mocks/support/BotRegisterMock.sol";
 import {WithdrawalManagerMock} from "../../mocks/support/WithdrawalManagerMock.sol";
 import {PriceOracleMock} from "../../mocks/oracles/PriceOracleMock.sol";
 import {PriceFeedOnDemandMock} from "../../mocks/oracles/PriceFeedOnDemandMock.sol";
@@ -27,7 +27,7 @@ import {PoolMock} from "../../mocks/pool/PoolMock.sol";
 
 import {ENTERED} from "../../../traits/ReentrancyGuardTrait.sol";
 
-import "../../../interfaces/ICreditFacade.sol";
+import "../../../interfaces/ICreditFacadeV3.sol";
 import {
     ICreditManagerV3,
     ClosureAction,
@@ -37,9 +37,9 @@ import {
     BOT_PERMISSIONS_SET_FLAG
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
-import {IBotList} from "../../../interfaces/IBotList.sol";
+import {IBotRegister} from "../../../interfaces/IBotRegister.sol";
 
-import {ClaimAction} from "../../../interfaces/IWithdrawalManager.sol";
+import {ClaimAction} from "../../../interfaces/IWithdrawalManagerV3.sol";
 import {BitMask, UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
@@ -47,10 +47,9 @@ import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 import {MultiCall, MultiCallOps} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 import {Balance} from "../../../libraries/BalancesLogic.sol";
-import {CreditFacadeMulticaller, CreditFacadeCalls} from "../../../multicall/CreditFacadeCalls.sol";
 
 // CONSTANTS
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // TESTS
 
@@ -67,8 +66,7 @@ import {Tokens} from "../../config/Tokens.sol";
 
 uint16 constant REFERRAL_CODE = 23;
 
-contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvents {
-    using CreditFacadeCalls for CreditFacadeMulticaller;
+contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Events {
     using BitMask for uint256;
 
     IAddressProviderV3 addressProvider;
@@ -80,7 +78,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
     PoolMock poolMock;
 
     IWETHGateway wethGateway;
-    BotListMock botListMock;
+    BotRegisterMock botListMock;
 
     DegenNFTMock degenNFTMock;
     bool whitelisted;
@@ -150,7 +148,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
 
         wethGateway = IWETHGateway(addressProvider.getAddressOrRevert(AP_WETH_GATEWAY, 3_00));
 
-        botListMock = BotListMock(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00));
+        botListMock = BotRegisterMock(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00));
 
         withdrawalManagerMock = WithdrawalManagerMock(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00));
 
@@ -359,7 +357,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
         creditFacade.setDebtLimits(0, 0, 0);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditFacade.setBotList(address(1));
+        creditFacade.setBotRegister(address(1));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditFacade.setCumulativeLossParams(0, false);
@@ -633,7 +631,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
         }
 
         if (hasBotPermissions) {
-            vm.expectCall(address(botListMock), abi.encodeCall(IBotList.eraseAllBotPermissions, (creditAccount)));
+            vm.expectCall(address(botListMock), abi.encodeCall(IBotRegister.eraseAllBotPermissions, (creditAccount)));
         } else {
             botListMock.setRevertOnErase(true);
         }
@@ -970,7 +968,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
         }
 
         if (hasBotPermissions) {
-            vm.expectCall(address(botListMock), abi.encodeCall(IBotList.eraseAllBotPermissions, (creditAccount)));
+            vm.expectCall(address(botListMock), abi.encodeCall(IBotRegister.eraseAllBotPermissions, (creditAccount)));
         } else {
             botListMock.setRevertOnErase(true);
         }
@@ -1146,7 +1144,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
         botListMock.setBotStatusReturns(ALL_PERMISSIONS, false);
 
         MultiCall[] memory calls = MultiCallBuilder.build(
-            MultiCall({target: address(creditFacade), callData: abi.encodeCall(ICreditFacadeMulticall.payBot, (1))})
+            MultiCall({target: address(creditFacade), callData: abi.encodeCall(ICreditFacadeV3Multicall.payBot, (1))})
         );
 
         vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, PAY_BOT_CAN_BE_CALLED));
@@ -1187,51 +1185,51 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
 
         MultiCallPermissionTestCase[12] memory cases = [
             MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeMulticall.revertIfReceivedLessThan, (new Balance[](0))),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.revertIfReceivedLessThan, (new Balance[](0))),
                 permissionRquired: 0
             }),
             MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeMulticall.enableToken, (token)),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (token)),
                 permissionRquired: ENABLE_TOKEN_PERMISSION
             }),
             MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeMulticall.disableToken, (token)),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.disableToken, (token)),
                 permissionRquired: DISABLE_TOKEN_PERMISSION
             }),
             MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (token, 0)),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (token, 0)),
                 permissionRquired: ADD_COLLATERAL_PERMISSION
             }),
             MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeMulticall.increaseDebt, (1)),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (1)),
                 permissionRquired: INCREASE_DEBT_PERMISSION
             }),
             MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeMulticall.decreaseDebt, (0)),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (0)),
                 permissionRquired: DECREASE_DEBT_PERMISSION
             }),
             MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeMulticall.updateQuota, (token, 0, 0)),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (token, 0, 0)),
                 permissionRquired: UPDATE_QUOTA_PERMISSION
             }),
             MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeMulticall.setFullCheckParams, (new uint256[](0), 10_001)),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (new uint256[](0), 10_001)),
                 permissionRquired: 0
             }),
             MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeMulticall.scheduleWithdrawal, (token, 0)),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.scheduleWithdrawal, (token, 0)),
                 permissionRquired: WITHDRAW_PERMISSION
             }),
             MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeMulticall.revokeAdapterAllowances, (new RevocationPair[](0))),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.revokeAdapterAllowances, (new RevocationPair[](0))),
                 permissionRquired: REVOKE_ALLOWANCES_PERMISSION
             }),
             MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeMulticall.onDemandPriceUpdate, (token, bytes(""))),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.onDemandPriceUpdate, (token, bytes(""))),
                 permissionRquired: 0
             }),
             MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeMulticall.payBot, (0)),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.payBot, (0)),
                 permissionRquired: PAY_BOT_CAN_BE_CALLED
             })
         ];
@@ -1297,7 +1295,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
             MultiCall[] memory calls = MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.revertIfReceivedLessThan, (expectedBalance))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.revertIfReceivedLessThan, (expectedBalance))
                 })
             );
 
@@ -1309,7 +1307,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
                 calls = MultiCallBuilder.build(
                     MultiCall({
                         target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeMulticall.revertIfReceivedLessThan, (expectedBalance))
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.revertIfReceivedLessThan, (expectedBalance))
                     }),
                     MultiCall({
                         target: acm,
@@ -1324,11 +1322,11 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
                 calls = MultiCallBuilder.build(
                     MultiCall({
                         target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeMulticall.revertIfReceivedLessThan, (expectedBalance))
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.revertIfReceivedLessThan, (expectedBalance))
                     }),
                     MultiCall({
                         target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeMulticall.revertIfReceivedLessThan, (expectedBalance))
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.revertIfReceivedLessThan, (expectedBalance))
                     })
                 );
                 vm.expectRevert(ExpectedBalancesAlreadySetException.selector);
@@ -1357,7 +1355,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeMulticall.setFullCheckParams, (collateralHints, hf))
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, hf))
             })
         );
 
@@ -1384,7 +1382,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeMulticall.onDemandPriceUpdate, (token, cd))
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.onDemandPriceUpdate, (token, cd))
             })
         );
 
@@ -1396,7 +1394,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
         calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeMulticall.onDemandPriceUpdate, (DUMB_ADDRESS, cd))
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.onDemandPriceUpdate, (DUMB_ADDRESS, cd))
             })
         );
 
@@ -1417,7 +1415,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (token, amount))
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (token, amount))
             })
         );
 
@@ -1483,7 +1481,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeMulticall.increaseDebt, (amount))
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (amount))
             })
         );
 
@@ -1536,7 +1534,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.increaseDebt, (maxDebt + 1))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (maxDebt + 1))
                 })
                 ),
             enabledTokensMask: mask,
@@ -1555,7 +1553,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.increaseDebt, (1))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (1))
                 })
                 ),
             enabledTokensMask: mask,
@@ -1579,11 +1577,11 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.increaseDebt, (10))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (10))
                 }),
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.decreaseDebt, (1))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (1))
                 })
                 ),
             enabledTokensMask: 0,
@@ -1622,7 +1620,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.increaseDebt, (10))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (10))
                 })
                 ),
             enabledTokensMask: linkMask,
@@ -1665,7 +1663,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.decreaseDebt, (amount))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (amount))
                 })
                 ),
             enabledTokensMask: mask,
@@ -1708,7 +1706,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.decreaseDebt, (1))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (1))
                 })
                 ),
             enabledTokensMask: mask,
@@ -1737,7 +1735,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
                 calls: MultiCallBuilder.build(
                     MultiCall({
                         target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeMulticall.enableToken, (link))
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (link))
                     })
                     ),
                 enabledTokensMask: UNDERLYING_TOKEN_MASK,
@@ -1755,7 +1753,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
                 calls: MultiCallBuilder.build(
                     MultiCall({
                         target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeMulticall.disableToken, (link))
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.disableToken, (link))
                     })
                     ),
                 enabledTokensMask: UNDERLYING_TOKEN_MASK | mask,
@@ -1794,7 +1792,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.updateQuota, (link, change, 0))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (link, change, 0))
                 })
                 ),
             enabledTokensMask: maskToDisable | UNDERLYING_TOKEN_MASK,
@@ -1828,7 +1826,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.scheduleWithdrawal, (link, amount))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.scheduleWithdrawal, (link, amount))
                 })
                 ),
             enabledTokensMask: maskToDisable | UNDERLYING_TOKEN_MASK,
@@ -1857,7 +1855,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.revokeAdapterAllowances, (rp))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.revokeAdapterAllowances, (rp))
                 })
                 ),
             enabledTokensMask: 0,
@@ -1874,7 +1872,9 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
         uint72 paymentAmount = 100_000;
 
         address bot = makeAddr("BOT");
-        vm.expectCall(address(botListMock), abi.encodeCall(IBotList.payBot, (USER, creditAccount, bot, paymentAmount)));
+        vm.expectCall(
+            address(botListMock), abi.encodeCall(IBotRegister.payBot, (USER, creditAccount, bot, paymentAmount))
+        );
 
         vm.prank(bot);
         creditFacade.multicallInt({
@@ -1882,7 +1882,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.payBot, (paymentAmount))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.payBot, (paymentAmount))
                 })
                 ),
             enabledTokensMask: 0,
@@ -1896,11 +1896,11 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.payBot, (paymentAmount))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.payBot, (paymentAmount))
                 }),
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.payBot, (paymentAmount))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.payBot, (paymentAmount))
                 })
                 ),
             enabledTokensMask: 0,
@@ -2033,14 +2033,16 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
         /// It erases all previious bot permission and set flag if flag was false before
 
         vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.flagsOf, (creditAccount)));
-        vm.expectCall(address(botListMock), abi.encodeCall(IBotList.eraseAllBotPermissions, (creditAccount)));
+        vm.expectCall(address(botListMock), abi.encodeCall(IBotRegister.eraseAllBotPermissions, (creditAccount)));
 
         vm.expectCall(
             address(creditManagerMock),
             abi.encodeCall(ICreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, true))
         );
 
-        vm.expectCall(address(botListMock), abi.encodeCall(IBotList.setBotPermissions, (creditAccount, bot, 1, 2, 3)));
+        vm.expectCall(
+            address(botListMock), abi.encodeCall(IBotRegister.setBotPermissions, (creditAccount, bot, 1, 2, 3))
+        );
 
         vm.prank(USER);
         creditFacade.setBotPermissions({
@@ -2053,7 +2055,9 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
 
         /// It doesn't erase permission is bot already set
         botListMock.setRevertOnErase(true);
-        vm.expectCall(address(botListMock), abi.encodeCall(IBotList.setBotPermissions, (creditAccount, bot, 1, 2, 3)));
+        vm.expectCall(
+            address(botListMock), abi.encodeCall(IBotRegister.setBotPermissions, (creditAccount, bot, 1, 2, 3))
+        );
 
         vm.prank(USER);
         creditFacade.setBotPermissions({
@@ -2066,7 +2070,9 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
 
         /// It removes flag if no bots left
         botListMock.setBotPermissionsReturn(0);
-        vm.expectCall(address(botListMock), abi.encodeCall(IBotList.setBotPermissions, (creditAccount, bot, 1, 2, 3)));
+        vm.expectCall(
+            address(botListMock), abi.encodeCall(IBotRegister.setBotPermissions, (creditAccount, bot, 1, 2, 3))
+        );
 
         vm.expectCall(
             address(creditManagerMock),
@@ -2092,7 +2098,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
 
         botListMock.setRevertOnErase(false);
         creditManagerMock.setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: true});
-        vm.expectCall(address(botListMock), abi.encodeCall(IBotList.eraseAllBotPermissions, (creditAccount)));
+        vm.expectCall(address(botListMock), abi.encodeCall(IBotRegister.eraseAllBotPermissions, (creditAccount)));
         creditFacade.eraseAllBotPermissionsAtClosure(creditAccount);
     }
 
@@ -2243,12 +2249,12 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeEvent
         assertEq(maxDebt, 2, " incorrect maxDebt");
     }
 
-    /// @dev U:[FA-50]: setBotList works properly
-    function test_U_FA_50_setBotList_works_properly() public notExpirableCase {
+    /// @dev U:[FA-50]: setBotRegister works properly
+    function test_U_FA_50_setBotRegister_works_properly() public notExpirableCase {
         assertEq(creditFacade.botList(), address(botListMock), "SETUP: incorrect botList");
 
         vm.prank(CONFIGURATOR);
-        creditFacade.setBotList(DUMB_ADDRESS);
+        creditFacade.setBotRegister(DUMB_ADDRESS);
 
         assertEq(creditFacade.botList(), DUMB_ADDRESS, "incorrect botList");
     }

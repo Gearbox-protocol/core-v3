@@ -18,7 +18,7 @@ struct AccountQuota {
     uint192 cumulativeIndexLU;
 }
 
-interface IPoolQuotaKeeperEvents {
+interface IPoolQuotaKeeperV3Events {
     /// @dev Emits when CA's quota for token is changed
     event ChangeAccountQuota(address creditAccount, address token, uint96 oldQuota, uint96 newQuota);
 
@@ -42,7 +42,7 @@ interface IPoolQuotaKeeperEvents {
 }
 
 /// @title Pool Quotas Interface
-interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
+interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion {
     /// @dev Updates credit account's quotas for multiple tokens
     /// @param creditAccount Address of credit account
     /// @param token Address of the token to change the quota for
