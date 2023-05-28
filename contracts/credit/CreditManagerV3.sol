@@ -806,6 +806,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             ) = _getQuotedTokensData({
                 creditAccount: creditAccount,
                 enabledTokensMask: enabledTokensMask,
+                collateralHints: collateralHints,
                 _poolQuotaKeeper: collateralDebtData._poolQuotaKeeper
             }); // U:[CM-21]
 
@@ -881,7 +882,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @return quotas Current quotas on quoted tokens, in the same order as quoted tokens
     /// @return lts Current lts of quoted tokens, in the same order as quoted tokens
     /// @return _quotedTokensMask The mask of enabled quoted tokens on the account
-    function _getQuotedTokensData(address creditAccount, uint256 enabledTokensMask, address _poolQuotaKeeper)
+    function _getQuotedTokensData(
+        address creditAccount,
+        uint256 enabledTokensMask,
+        uint256[] memory collateralHints,
+        address _poolQuotaKeeper
+    )
         internal
         view
         returns (
@@ -895,23 +901,33 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         uint256 _maxEnabledTokens = maxEnabledTokens; // U:[CM-24]
         _quotedTokensMask = quotedTokensMask; // U:[CM-24]
 
-        uint256 quotedMask = enabledTokensMask & _quotedTokensMask; // U:[CM-24]
+        uint256 tokensToCheckMask = enabledTokensMask & _quotedTokensMask; // U:[CM-24]
 
         // If there are not quoted tokens on the account, then zero-length arrays are returned
         // This is desirable, as it makes it simple to check whether there are any quoted tokens
-        if (quotedMask != 0) {
+        if (tokensToCheckMask != 0) {
             quotaTokens = new address[](_maxEnabledTokens); // U:[CM-24]
             quotas = new uint256[](_maxEnabledTokens); // U:[CM-24]
             lts = new uint16[](_maxEnabledTokens); // U:[CM-24]
 
             uint256 j;
-            unchecked {
-                for (uint256 tokenMask = 2; tokenMask <= quotedMask; tokenMask <<= 1) {
-                    if (j == _maxEnabledTokens) {
-                        revert TooManyEnabledTokensException(); // U:[CM-24]
-                    }
 
-                    if (quotedMask & tokenMask != 0) {
+            uint256 len = collateralHints.length;
+
+            address ca = creditAccount;
+            unchecked {
+                // TODO: add test that we check all values and it's always reachable
+                for (uint256 i; tokensToCheckMask != 0; ++i) {
+                    uint256 tokenMask;
+
+                    // TODO: add check for super long collateralnhints and for double masks
+                    tokenMask = (i < len) ? collateralHints[i] : 1 << (i - len);
+
+                    if (tokensToCheckMask & tokenMask != 0) {
+                        if (j == _maxEnabledTokens) {
+                            revert TooManyEnabledTokensException(); // U:[CM-24]
+                        }
+
                         address token; // U:[CM-24]
                         (token, lts[j]) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
 
@@ -919,13 +935,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
                         uint256 outstandingInterestDelta;
                         (quotas[j], outstandingInterestDelta) =
-                            IPoolQuotaKeeper(_poolQuotaKeeper).getQuotaAndOutstandingInterest(creditAccount, token); // U:[CM-24]
+                            IPoolQuotaKeeper(_poolQuotaKeeper).getQuotaAndOutstandingInterest(ca, token); // U:[CM-24]
 
                         /// Quota interest is equal to quota * APY * time. Since quota is a uint96, this is unlikely to overflow in any realistic scenario.
                         outstandingQuotaInterest += outstandingInterestDelta; // U:[CM-24]
 
                         ++j; // U:[CM-24]
                     }
+                    tokensToCheckMask = tokensToCheckMask.disable(tokenMask);
                 }
             }
         }

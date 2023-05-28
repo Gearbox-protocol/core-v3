@@ -105,7 +105,12 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         _saveEnabledTokensMask(creditAccount, enabledTokensMask);
     }
 
-    function getQuotedTokensData(address creditAccount, uint256 enabledTokensMask, address _poolQuotaKeeper)
+    function getQuotedTokensData(
+        address creditAccount,
+        uint256 enabledTokensMask,
+        uint256[] memory collateralHints,
+        address _poolQuotaKeeper
+    )
         external
         view
         returns (
@@ -116,7 +121,7 @@ contract CreditManagerV3Harness is CreditManagerV3 {
             uint256 quotedMask
         )
     {
-        return _getQuotedTokensData(creditAccount, enabledTokensMask, _poolQuotaKeeper);
+        return _getQuotedTokensData(creditAccount, enabledTokensMask, collateralHints, _poolQuotaKeeper);
     }
 
     function getCancellableWithdrawalsValue(address _priceOracle, address creditAccount, bool isForceCancel)

@@ -2122,6 +2122,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             ) = creditManager.getQuotedTokensData({
                 creditAccount: DUMB_ADDRESS,
                 enabledTokensMask: _case.enabledTokensMask,
+                collateralHints: new uint256[](0),
                 _poolQuotaKeeper: address(poolQuotaKeeperMock)
             });
 
