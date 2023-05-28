@@ -8,10 +8,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
 import {CreditConfigurator} from "../../credit/CreditConfiguratorV3.sol";
-import {MultiCall} from "../../interfaces/ICreditFacade.sol";
+import {MultiCall} from "../../interfaces/ICreditFacadeV3.sol";
 import {MultiCallBuilder} from "../lib/MultiCallBuilder.sol";
 
-import {ICreditFacadeMulticall} from "../../interfaces/ICreditFacade.sol";
+import {ICreditFacadeV3Multicall} from "../../interfaces/ICreditFacadeV3.sol";
 import {ICreditManagerV3, ICreditManagerV3Events} from "../../interfaces/ICreditManagerV3.sol";
 
 import {CreditFacadeTestSuite} from "../suites/CreditFacadeTestSuite.sol";
@@ -50,7 +50,7 @@ contract CreditFacadeTestHelper is TestHelper {
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeMulticall.addCollateral, (underlying, amount))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, amount))
                 })
             ),
             referralCode

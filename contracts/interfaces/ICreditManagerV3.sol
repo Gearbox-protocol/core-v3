@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {ClaimAction, IWithdrawalManager} from "./IWithdrawalManager.sol";
+import {ClaimAction, IWithdrawalManagerV3} from "./IWithdrawalManagerV3.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 enum ClosureAction {

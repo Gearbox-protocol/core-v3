@@ -18,12 +18,9 @@ struct AccountQuota {
     uint192 cumulativeIndexLU;
 }
 
-interface IPoolQuotaKeeperEvents {
-    /// @dev Emits when CA's quota for a token is changed
-    event ChangeAccountQuota(address indexed creditAccount, address indexed token, int96 quotaChange);
-
-    /// @dev Emits when CA's quota for a token is removed
-    event RemoveAccountQuota(address indexed creditAccount, address indexed token);
+interface IPoolQuotaKeeperV3Events {
+    /// @dev Emits when CA's quota for token is changed
+    event ChangeAccountQuota(address creditAccount, address token, uint96 oldQuota, uint96 newQuota);
 
     /// @dev Emits when the quota rate is updated
     event UpdateTokenQuotaRate(address indexed token, uint16 rate);
@@ -45,14 +42,14 @@ interface IPoolQuotaKeeperEvents {
 }
 
 /// @title Pool Quotas Interface
-interface IPoolQuotaKeeper is IPoolQuotaKeeperEvents, IVersion {
+interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion {
     /// @dev Updates credit account's quotas for multiple tokens
     /// @param creditAccount Address of credit account
     /// @param token Address of the token to change the quota for
     /// @param quotaChange Requested quota change in pool's underlying asset units
     function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota)
         external
-        returns (uint256 caQuotaInterestChange, int96 realQuotaChange, bool enableToken, bool disableToken);
+        returns (uint256 caQuotaInterestChange, int96 change, bool enableToken, bool disableToken);
 
     /// @dev Updates all quotas to zero when closing a credit account, and computes the final quota interest change
     /// @param creditAccount Address of the Credit Account being closed

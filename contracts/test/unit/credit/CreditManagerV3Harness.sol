@@ -4,7 +4,7 @@ import {CreditManagerV3, CreditAccountInfo} from "../../../credit/CreditManagerV
 
 import {CollateralDebtData, CollateralCalcTask, CollateralTokenData} from "../../../interfaces/ICreditManagerV3.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 contract CreditManagerV3Harness is CreditManagerV3 {
     using EnumerableSet for EnumerableSet.AddressSet;

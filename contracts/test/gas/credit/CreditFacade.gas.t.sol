@@ -5,17 +5,14 @@ pragma solidity ^0.8.17;
 
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 
-import {ICreditFacade, ICreditFacadeMulticall, ICreditFacadeEvents} from "../../../interfaces/ICreditFacade.sol";
+import {
+    ICreditFacadeV3, ICreditFacadeV3Multicall, ICreditFacadeV3Events
+} from "../../../interfaces/ICreditFacadeV3.sol";
 import {ICreditManagerV3, ICreditManagerV3Events, ClosureAction} from "../../../interfaces/ICreditManagerV3.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 
 // DATA
 import {MultiCall, MultiCallOps} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
-
-import {
-    CreditFacadeMulticaller,
-    CreditFacadeCalls
-} from "@gearbox-protocol/core-v2/contracts/multicall/CreditFacadeCalls.sol";
 
 // CONSTANTS
 
@@ -29,7 +26,7 @@ import {CreditFacadeTestHelper} from "../../helpers/CreditFacadeTestHelper.sol";
 
 // MOCKS
 import {AdapterMock} from "../../mocks//adapters/AdapterMock.sol";
-import {TargetContractMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/adapters/TargetContractMock.sol";
+import {TargetContractMock} from "../../mocks/adapters/TargetContractMock.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
@@ -47,10 +44,8 @@ contract CreditFacadeGasTest is
     BalanceHelper,
     CreditFacadeTestHelper,
     ICreditManagerV3Events,
-    ICreditFacadeEvents
+    ICreditFacadeV3Events
 {
-    using CreditFacadeCalls for CreditFacadeMulticaller;
-
     AccountFactory accountFactory;
 
     TargetContractMock targetMock;
@@ -123,7 +118,7 @@ contract CreditFacadeGasTest is
         calls[0] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
                 )
         });
 
@@ -147,7 +142,7 @@ contract CreditFacadeGasTest is
         calls[0] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
                 )
         });
 
@@ -181,7 +176,7 @@ contract CreditFacadeGasTest is
         calls[0] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
                 )
         });
 
@@ -241,14 +236,14 @@ contract CreditFacadeGasTest is
         calls[0] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
                 )
         });
 
         calls[1] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.updateQuota,
+                ICreditFacadeV3Multicall.updateQuota,
                 (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
         });
@@ -256,7 +251,7 @@ contract CreditFacadeGasTest is
         calls[2] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.updateQuota,
+                ICreditFacadeV3Multicall.updateQuota,
                 (tokenTestSuite.addressOf(Tokens.WETH), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
         });
@@ -264,7 +259,7 @@ contract CreditFacadeGasTest is
         calls[3] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.updateQuota,
+                ICreditFacadeV3Multicall.updateQuota,
                 (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
         });
@@ -297,14 +292,14 @@ contract CreditFacadeGasTest is
         calls[0] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
                 )
         });
 
         calls[1] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.updateQuota,
+                ICreditFacadeV3Multicall.updateQuota,
                 (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
         });
@@ -339,7 +334,7 @@ contract CreditFacadeGasTest is
         calls[0] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
                 )
         });
 
@@ -348,7 +343,7 @@ contract CreditFacadeGasTest is
 
         calls[0] = MultiCall({
             target: address(creditFacade),
-            callData: abi.encodeCall(ICreditFacadeMulticall.increaseDebt, (DAI_ACCOUNT_AMOUNT))
+            callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_ACCOUNT_AMOUNT))
         });
 
         uint256 gasBefore = gasleft();
@@ -371,7 +366,7 @@ contract CreditFacadeGasTest is
         calls[0] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
                 )
         });
 
@@ -380,7 +375,7 @@ contract CreditFacadeGasTest is
 
         calls[0] = MultiCall({
             target: address(creditFacade),
-            callData: abi.encodeCall(ICreditFacadeMulticall.decreaseDebt, (DAI_ACCOUNT_AMOUNT / 2))
+            callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (DAI_ACCOUNT_AMOUNT / 2))
         });
 
         uint256 gasBefore = gasleft();
@@ -411,14 +406,14 @@ contract CreditFacadeGasTest is
         calls[0] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
                 )
         });
 
         calls[1] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.updateQuota,
+                ICreditFacadeV3Multicall.updateQuota,
                 (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
         });
@@ -430,7 +425,7 @@ contract CreditFacadeGasTest is
 
         calls[0] = MultiCall({
             target: address(creditFacade),
-            callData: abi.encodeCall(ICreditFacadeMulticall.decreaseDebt, (DAI_ACCOUNT_AMOUNT / 2))
+            callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (DAI_ACCOUNT_AMOUNT / 2))
         });
 
         uint256 gasBefore = gasleft();
@@ -453,7 +448,7 @@ contract CreditFacadeGasTest is
         calls[0] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
                 )
         });
 
@@ -462,7 +457,7 @@ contract CreditFacadeGasTest is
 
         calls[0] = MultiCall({
             target: address(creditFacade),
-            callData: abi.encodeCall(ICreditFacadeMulticall.enableToken, (tokenTestSuite.addressOf(Tokens.LINK)))
+            callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (tokenTestSuite.addressOf(Tokens.LINK)))
         });
 
         uint256 gasBefore = gasleft();
@@ -485,13 +480,13 @@ contract CreditFacadeGasTest is
         calls[0] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
                 )
         });
 
         calls[1] = MultiCall({
             target: address(creditFacade),
-            callData: abi.encodeCall(ICreditFacadeMulticall.enableToken, (tokenTestSuite.addressOf(Tokens.LINK)))
+            callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (tokenTestSuite.addressOf(Tokens.LINK)))
         });
 
         vm.prank(USER);
@@ -499,7 +494,7 @@ contract CreditFacadeGasTest is
 
         calls[0] = MultiCall({
             target: address(creditFacade),
-            callData: abi.encodeCall(ICreditFacadeMulticall.disableToken, (tokenTestSuite.addressOf(Tokens.LINK)))
+            callData: abi.encodeCall(ICreditFacadeV3Multicall.disableToken, (tokenTestSuite.addressOf(Tokens.LINK)))
         });
 
         uint256 gasBefore = gasleft();
@@ -522,7 +517,7 @@ contract CreditFacadeGasTest is
         calls[0] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
                 )
         });
 
@@ -557,7 +552,7 @@ contract CreditFacadeGasTest is
         calls[0] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
                 )
         });
 
@@ -609,7 +604,7 @@ contract CreditFacadeGasTest is
         calls[0] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
                 )
         });
 
@@ -632,7 +627,7 @@ contract CreditFacadeGasTest is
         calls[1] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.updateQuota,
+                ICreditFacadeV3Multicall.updateQuota,
                 (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT * 3)), 0)
                 )
         });
@@ -663,7 +658,7 @@ contract CreditFacadeGasTest is
         calls[0] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
                 )
         });
 
@@ -696,14 +691,14 @@ contract CreditFacadeGasTest is
         calls[0] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
                 )
         });
 
         calls[1] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
                 )
         });
 
@@ -742,14 +737,14 @@ contract CreditFacadeGasTest is
         calls[0] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
                 )
         });
 
         calls[1] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.updateQuota,
+                ICreditFacadeV3Multicall.updateQuota,
                 (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
         });
@@ -783,7 +778,7 @@ contract CreditFacadeGasTest is
         calls[0] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
                 )
         });
 
@@ -820,7 +815,7 @@ contract CreditFacadeGasTest is
         calls[0] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
                 )
         });
 
@@ -858,14 +853,14 @@ contract CreditFacadeGasTest is
         calls[0] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
                 )
         });
 
         calls[1] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
                 )
         });
 
@@ -909,14 +904,14 @@ contract CreditFacadeGasTest is
         calls[0] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
+                ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
                 )
         });
 
         calls[1] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
-                ICreditFacadeMulticall.updateQuota,
+                ICreditFacadeV3Multicall.updateQuota,
                 (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
         });

@@ -3,11 +3,11 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {ClaimAction, ScheduledWithdrawal} from "../../../interfaces/IWithdrawalManager.sol";
-import {WithdrawalManager} from "../../../support/WithdrawalManager.sol";
+import {ClaimAction, ScheduledWithdrawal} from "../../../interfaces/IWithdrawalManagerV3.sol";
+import {WithdrawalManagerV3} from "../../../support/WithdrawalManagerV3.sol";
 
-contract WithdrawalManagerHarness is WithdrawalManager {
-    constructor(address _addressProvider, uint40 _delay) WithdrawalManager(_addressProvider, _delay) {}
+contract WithdrawalManagerHarness is WithdrawalManagerV3 {
+    constructor(address _addressProvider, uint40 _delay) WithdrawalManagerV3(_addressProvider, _delay) {}
 
     function setWithdrawalSlot(address creditAccount, uint8 slot, ScheduledWithdrawal memory w) external {
         _scheduled[creditAccount][slot] = w;

@@ -12,7 +12,7 @@ import {CreditManagerFactory} from "../../factories/CreditManagerFactory.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {DegenNFT} from "@gearbox-protocol/core-v2/contracts/tokens/DegenNFT.sol";
+import {DegenNFTV2} from "@gearbox-protocol/core-v2/contracts/tokens/DegenNFTV2.sol";
 
 import "../lib/constants.sol";
 
@@ -28,7 +28,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
     CreditManagerV3 public creditManager;
     CreditFacadeV3 public creditFacade;
     CreditConfigurator public creditConfigurator;
-    DegenNFT public degenNFT;
+    DegenNFTV2 public degenNFT;
 
     uint128 public minBorrowedAmount;
     uint128 public maxBorrowedAmount;
@@ -68,9 +68,9 @@ contract CreditFacadeTestSuite is PoolDeployer {
         cmOpts.expirable = withExpiration;
 
         if (withDegenNFT) {
-            degenNFT = new DegenNFT(
+            degenNFT = new DegenNFTV2(
             address(addressProvider),
-            "DegenNFT",
+            "DegenNFTV2",
             "Gear-Degen"
         );
 

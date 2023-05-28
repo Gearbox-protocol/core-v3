@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {QuotasLogic} from "../../../libraries/QuotasLogic.sol";
-import {AccountQuota, TokenQuotaParams} from "../../../interfaces/IPoolQuotaKeeper.sol";
+import {AccountQuota, TokenQuotaParams} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {TestHelper} from "../../lib/helper.sol";
 
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";

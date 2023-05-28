@@ -7,10 +7,7 @@ import {CreditAccountHelper} from "../../../libraries/CreditAccountHelper.sol";
 import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
 import {CreditAccountV3} from "../../../credit/CreditAccountV3.sol";
 
-import {
-    ERC20ApproveRestrictedRevert,
-    ERC20ApproveRestrictedFalse
-} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/ERC20ApproveRestricted.sol";
+import {ERC20ApproveRestrictedRevert, ERC20ApproveRestrictedFalse} from "../../mocks/token/ERC20ApproveRestricted.sol";
 
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";

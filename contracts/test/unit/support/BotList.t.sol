@@ -3,11 +3,11 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {BotList} from "../../../support/BotList.sol";
-import {IBotListEvents, BotFunding} from "../../../interfaces/IBotList.sol";
+import {BotListV3} from "../../../support/BotListV3.sol";
+import {IBotListV3Events, BotFunding} from "../../../interfaces/IBotListV3.sol";
 import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
-import {ICreditFacade} from "../../../interfaces/ICreditFacade.sol";
+import {ICreditFacadeV3} from "../../../interfaces/ICreditFacadeV3.sol";
 
 // TEST
 import "../../lib/constants.sol";
@@ -33,10 +33,10 @@ contract InvalidCFMock {
 
 /// @title LPPriceFeedTest
 /// @notice Designed for unit test purposes only
-contract BotListTest is Test, IBotListEvents {
+contract BotListTest is Test, IBotListV3Events {
     AddressProviderV3ACLMock public addressProvider;
 
-    BotList botList;
+    BotListV3 botList;
 
     TokensTestSuite tokenTestSuite;
 
@@ -53,7 +53,7 @@ contract BotListTest is Test, IBotListEvents {
 
         tokenTestSuite = new TokensTestSuite();
 
-        botList = new BotList(address(addressProvider));
+        botList = new BotListV3(address(addressProvider));
 
         bot = new GeneralMock();
         creditManager = new GeneralMock();
@@ -70,7 +70,7 @@ contract BotListTest is Test, IBotListEvents {
 
         vm.mockCall(
             address(creditFacade),
-            abi.encodeWithSelector(ICreditFacade.creditManager.selector),
+            abi.encodeWithSelector(ICreditFacadeV3.creditManager.selector),
             abi.encode(address(creditManager))
         );
 

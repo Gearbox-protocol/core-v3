@@ -3,9 +3,9 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {PolicyManager, Policy} from "../../../support/risk-controller/PolicyManager.sol";
+import {PolicyManagerV3, Policy} from "../../../support/risk-controller/PolicyManagerV3.sol";
 import {PolicyManagerInternal} from "../../mocks/support/PolicyManagerInternal.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // TEST
 import "../../lib/constants.sol";

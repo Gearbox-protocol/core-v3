@@ -6,8 +6,7 @@ pragma abicoder v1;
 
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
-
-import {IVersion} from "./IVersion.sol";
+import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 /// @title Pool base interface
 /// @notice Functions shared accross newer and older versions
@@ -18,7 +17,6 @@ interface IPoolBase is IVersion {
     function lendCreditAccount(uint256 borrowedAmount, address creditAccount) external;
     function repayCreditAccount(uint256 borrowedAmount, uint256 profit, uint256 loss) external;
 }
-
 
 interface IPoolV3Events {
     /// @notice Emitted when depositing liquidity with referral code

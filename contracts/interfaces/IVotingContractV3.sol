@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-interface IVotingContract {
+interface IVotingContractV3 {
     function vote(address user, uint96 votes, bytes memory extraData) external;
     function unvote(address user, uint96 votes, bytes memory extraData) external;
 }

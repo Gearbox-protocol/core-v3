@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {ClaimAction, ScheduledWithdrawal} from "../../../interfaces/IWithdrawalManager.sol";
+import {ClaimAction, ScheduledWithdrawal} from "../../../interfaces/IWithdrawalManagerV3.sol";
 import {WithdrawalsLogic} from "../../../libraries/WithdrawalsLogic.sol";
 
 import {TestHelper} from "../../lib/helper.sol";

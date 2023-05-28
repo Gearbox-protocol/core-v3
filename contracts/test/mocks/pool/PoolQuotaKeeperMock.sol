@@ -3,9 +3,9 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {IPoolQuotaKeeper, TokenQuotaParams, AccountQuota} from "../../../interfaces/IPoolQuotaKeeper.sol";
+import {IPoolQuotaKeeperV3, TokenQuotaParams, AccountQuota} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 
-contract PoolQuotaKeeperMock is IPoolQuotaKeeper {
+contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     uint256 public constant override version = 3_00;
 
     /// @dev Address provider
@@ -54,7 +54,6 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeper {
     function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota)
         external
         view
-
         returns (uint256 caQuotaInterestChange, int96 realQuotaChange, bool enableToken, bool disableToken)
     {
         caQuotaInterestChange = return_caQuotaInterestChange;
