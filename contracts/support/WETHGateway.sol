@@ -9,7 +9,7 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 
 import {AP_WETH_TOKEN, IAddressProviderV3, NO_VERSION_CONTROL} from "../interfaces/IAddressProviderV3.sol";
-import {NothingToClaimException, ReceiveIsNotAllowedException} from "../interfaces/IExceptions.sol";
+import {ReceiveIsNotAllowedException} from "../interfaces/IExceptions.sol";
 import {IVersion} from "../interfaces/IVersion.sol";
 import {IWETHGateway} from "../interfaces/IWETHGateway.sol";
 
@@ -61,14 +61,14 @@ contract WETHGateway is IWETHGateway, ReentrancyGuardTrait, ContractsRegisterTra
         nonReentrant // U:[WG-4A]
     {
         uint256 balance = balanceOf[owner];
-        if (balance <= 1) revert NothingToClaimException(); // U:[WG-4B]
+        if (balance <= 1) return;
 
         unchecked {
             --balance;
         }
-        balanceOf[owner] = 1; // U:[WG-4C]
-        IWETH(weth).withdraw(balance); // U:[WG-4C]
-        payable(owner).sendValue(balance); // U:[WG-4C]
-        emit Claim(owner, balance); // U:[WG-4C]
+        balanceOf[owner] = 1; // U:[WG-4B]
+        IWETH(weth).withdraw(balance); // U:[WG-4B]
+        payable(owner).sendValue(balance); // U:[WG-4B]
+        emit Claim(owner, balance); // U:[WG-4B]
     }
 }

@@ -9,7 +9,6 @@ import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWE
 import {WETHMock} from "@gearbox-protocol/core-v2/contracts/test/mocks/token/WETHMock.sol";
 
 import {
-    NothingToClaimException,
     ReceiveIsNotAllowedException,
     RegisteredCreditManagerOnlyException,
     ZeroAddressException
@@ -97,14 +96,8 @@ contract WETHGatewayUnitTest is Test, IWETHGatewayEvents {
         gateway.claim(address(0));
     }
 
-    /// @notice U:[WG-4B]: `claim` reverts on nothing to claim
-    function test_U_WG_04B_claim_reverts_on_nothing_to_claim() public {
-        vm.expectRevert(NothingToClaimException.selector);
-        gateway.claim(address(0));
-    }
-
-    /// @notice U:[WG-4C]: `claim` works correctly
-    function test_U_WG_04C_claim_works_correctly(uint256 amount) public {
+    /// @notice U:[WG-4B]: `claim` works correctly
+    function test_U_WG_04B_claim_works_correctly(uint256 amount) public {
         vm.assume(amount > 1);
 
         deal(address(weth), amount);
