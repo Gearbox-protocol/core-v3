@@ -55,7 +55,7 @@ contract PoolMock is IPoolService {
     uint256 public withdrawMultiplier;
 
     uint256 public override withdrawFee;
-    uint256 public _expectedLiquidityStored;
+    uint256 public _expectedLiquidityLU;
     uint256 public calcLinearIndex_RAY;
     address public interestRateModel;
     address public treasuryAddress;

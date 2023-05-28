@@ -79,7 +79,7 @@ interface IPoolV3 is IPoolV3Events, IPoolBase, IERC4626 {
     function expectedLiquidity() external view returns (uint256);
 
     /// @notice Expected liquidity stored as of last update
-    function expectedLiquidityStored() external view returns (uint256);
+    function expectedLiquidityLU() external view returns (uint256);
 
     // ---------------- //
     // ERC-4626 LENDING //
@@ -200,7 +200,7 @@ interface IPoolV3 is IPoolV3Events, IPoolBase, IERC4626 {
     function calcLinearCumulative_RAY() external view override returns (uint256);
 
     /// @notice Cumulative base interest index stored as of last update in ray
-    function baseInterestIndexStored() external view returns (uint256);
+    function baseInterestIndexLU() external view returns (uint256);
 
     /// @notice Timestamp of the last base interest rate and index update
     function lastBaseInterestUpdate() external view returns (uint40);

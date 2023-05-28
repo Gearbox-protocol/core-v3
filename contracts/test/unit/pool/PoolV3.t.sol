@@ -119,7 +119,9 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
                 underlyingToken_: underlying,
                 interestRateModel_: address(irm),
                 totalDebtLimit_: type(uint256).max,
-                supportsQuotas_: supportQuotas
+                supportsQuotas_: supportQuotas,
+                namePrefix_: "diesel ",
+                symbolPrefix_: "d"
             });
         } else {
             pool = new PoolV3({
@@ -127,7 +129,9 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
                 underlyingToken_: underlying,
                 interestRateModel_: address(irm),
                 totalDebtLimit_: type(uint256).max,
-                supportsQuotas_: supportQuotas
+                supportsQuotas_: supportQuotas,
+                namePrefix_: "diesel ",
+                symbolPrefix_: "d"
             });
         }
         newPool = address(pool);
@@ -234,7 +238,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
 
         deal(address(pool), INITIAL_LP, availableLiquidity * RAY / dieselRate, true);
 
-        // assertEq(pool.expectedLiquidityStored(), availableLiquidity * dieselRate / RAY, "ExpectedLU is not correct!");
+        // assertEq(pool.expectedLiquidityLU(), availableLiquidity * dieselRate / RAY, "ExpectedLU is not correct!");
         assertEq(pool.convertToAssets(RAY), dieselRate, "Incorrect diesel rate!");
     }
 
@@ -275,7 +279,9 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
             underlyingToken_: underlying,
             interestRateModel_: irmodel,
             totalDebtLimit_: type(uint128).max,
-            supportsQuotas_: false
+            supportsQuotas_: false,
+            namePrefix_: "diesel ",
+            symbolPrefix_: "d"
         });
 
         // opts.addressProvider = address(addressProvider);
@@ -287,7 +293,9 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
             underlyingToken_: underlying,
             interestRateModel_: address(0),
             totalDebtLimit_: type(uint128).max,
-            supportsQuotas_: false
+            supportsQuotas_: false,
+            namePrefix_: "diesel ",
+            symbolPrefix_: "d"
         });
 
         // opts.interestRateModel = address(irm);
@@ -299,7 +307,9 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
             underlyingToken_: address(0),
             interestRateModel_: irmodel,
             totalDebtLimit_: type(uint128).max,
-            supportsQuotas_: false
+            supportsQuotas_: false,
+            namePrefix_: "diesel ",
+            symbolPrefix_: "d"
         });
     }
 
@@ -318,7 +328,9 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
             underlyingToken_: underlying,
             interestRateModel_: address(irm),
             totalDebtLimit_: limit,
-            supportsQuotas_: false
+            supportsQuotas_: false,
+            namePrefix_: "diesel ",
+            symbolPrefix_: "d"
         });
     }
 
@@ -1355,7 +1367,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
             // should not take quota interest
 
             assertEq(
-                pool.expectedLiquidityStored(),
+                pool.expectedLiquidityLU(),
                 addLiquidity + expectedInterest,
                 _testCaseErr(testName, "ExpectedLU liquidity was not updated correctly")
             );
@@ -1374,7 +1386,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
 
             assertEq(
                 pool.calcLinearCumulative_RAY(),
-                pool.baseInterestIndexStored(),
+                pool.baseInterestIndexLU(),
                 _testCaseErr(testName, "Index value was not updated correctly")
             );
         }
@@ -1390,7 +1402,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
         assertEq(pool.lastQuotaRevenueUpdate(), 0, "SETUP: Incorrect lastQuotaRevenuUpdate");
 
         assertEq(pool.quotaRevenue(), 0, "SETUP: Incorrect quotaRevenue");
-        assertEq(pool.expectedLiquidityStored(), 0, "SETUP: Incorrect expectedLiquidityStored");
+        assertEq(pool.expectedLiquidityLU(), 0, "SETUP: Incorrect expectedLiquidityLU");
 
         vm.prank(POOL_QUOTA_KEEPER);
         pool.setQuotaRevenue(qu1);
@@ -1398,7 +1410,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
         assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "#1: Incorrect lastQuotaRevenuUpdate");
         assertEq(pool.quotaRevenue(), qu1, "#1: Incorrect quotaRevenue");
 
-        assertEq(pool.expectedLiquidityStored(), 0, "#1: Incorrect expectedLiquidityStored");
+        assertEq(pool.expectedLiquidityLU(), 0, "#1: Incorrect expectedLiquidityLU");
 
         uint256 year = 365 days;
 
@@ -1412,7 +1424,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
         assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "#2: Incorrect lastQuotaRevenuUpdate");
         assertEq(pool.quotaRevenue(), qu2, "#2: Incorrect quotaRevenue");
 
-        assertEq(pool.expectedLiquidityStored(), qu1, "#2: Incorrect expectedLiquidityStored");
+        assertEq(pool.expectedLiquidityLU(), qu1, "#2: Incorrect expectedLiquidityLU");
 
         vm.warp(block.timestamp + year);
 
@@ -1424,7 +1436,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
         assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "#3: Incorrect lastQuotaRevenuUpdate");
         assertEq(pool.quotaRevenue(), qu2 - dqu, "#3: Incorrect quotaRevenue");
 
-        assertEq(pool.expectedLiquidityStored(), (qu1 + qu2), "#3: Incorrect expectedLiquidityStored");
+        assertEq(pool.expectedLiquidityLU(), (qu1 + qu2), "#3: Incorrect expectedLiquidityLU");
     }
 
     // U:[P4-18]: connectCreditManager, forbidCreditManagerToBorrow, newInterestRateModel, setExpecetedLiquidityLimit reverts if called with non-configurator
@@ -1556,7 +1568,9 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
             underlyingToken_: tokenTestSuite.addressOf(Tokens.DAI),
             interestRateModel_: address(irm),
             totalDebtLimit_: type(uint256).max,
-            supportsQuotas_: true
+            supportsQuotas_: true,
+            namePrefix_: "diesel ",
+            symbolPrefix_: "d"
         });
 
         address keeper = makeAddr("POOL_QUOTA_KEEPER");
@@ -1574,7 +1588,9 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
             underlyingToken_: tokenTestSuite.addressOf(Tokens.DAI),
             interestRateModel_: address(irm),
             totalDebtLimit_: type(uint256).max,
-            supportsQuotas_: true
+            supportsQuotas_: true,
+            namePrefix_: "diesel ",
+            symbolPrefix_: "d"
         });
 
         pqk = new PoolQuotaKeeper(address(pool));
@@ -1611,7 +1627,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
         assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "Incorrect lastQuotaRevenuUpdate");
         assertEq(pool.quotaRevenue(), qu, "#1: Incorrect quotaRevenue");
 
-        assertEq(pool.expectedLiquidityStored(), qu, "Incorrect expectedLiquidityStored");
+        assertEq(pool.expectedLiquidityLU(), qu, "Incorrect expectedLiquidityLU");
     }
 
     // U:[P4-25]: setTotalDebtLimit sets limit & emits event
@@ -1895,7 +1911,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
     //     vm.warp(block.timestamp + timeWarp);
 
     //     uint256 expectedInterest = ((addLiquidity / 2) * baseInterestRate) / RAY;
-    //     uint256 expectedLiquidity = pool.expectedLiquidityStored() + expectedInterest;
+    //     uint256 expectedLiquidity = pool.expectedLiquidityLU() + expectedInterest;
 
     //     assertEq(pool.expectedLiquidity(), expectedLiquidity, "Index value was not updated correctly");
     // }

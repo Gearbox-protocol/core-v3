@@ -82,10 +82,10 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     /// @dev Current base interest rate in ray
     uint128 internal _baseInterestRate;
     /// @dev Cumulative base interest index stored as of last update in ray
-    uint128 internal _baseInterestIndexStored;
+    uint128 internal _baseInterestIndexLU;
 
     /// @dev Expected liquidity stored as of last update
-    uint128 internal _expectedLiquidityStored;
+    uint128 internal _expectedLiquidityLU;
 
     /// @dev Aggregate debt params
     DebtParams internal _totalDebt;
@@ -108,19 +108,23 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     /// @param interestRateModel_ Interest rate model contract address
     /// @param totalDebtLimit_ Initial total debt limit, `type(uint256).max` for no limit
     /// @param supportsQuotas_ Whether pool should support quotas
+    /// @param namePrefix_ String to prefix underlying token name with to form pool token name
+    /// @param symbolPrefix_ String to prefix underlying token symbol with to form pool token symbol
     constructor(
         address addressProvider_,
         address underlyingToken_,
         address interestRateModel_,
         uint256 totalDebtLimit_,
-        bool supportsQuotas_
+        bool supportsQuotas_,
+        string memory namePrefix_,
+        string memory symbolPrefix_
     )
         ACLNonReentrantTrait(addressProvider_)
         ContractsRegisterTrait(addressProvider_)
         ERC4626(IERC20(underlyingToken_))
         ERC20(
-            string(abi.encodePacked("diesel ", underlyingToken_ != address(0) ? ERC20(underlyingToken_).name() : "")),
-            string(abi.encodePacked("d", underlyingToken_ != address(0) ? ERC20(underlyingToken_).symbol() : ""))
+            string(abi.encodePacked(namePrefix_, underlyingToken_ != address(0) ? ERC20(underlyingToken_).name() : "")),
+            string(abi.encodePacked(symbolPrefix_, underlyingToken_ != address(0) ? ERC20(underlyingToken_).symbol() : ""))
         ) // U:[P4-1]
         nonZeroAddress(underlyingToken_) // U:[P4-2]
         nonZeroAddress(interestRateModel_) // U:[P4-2]
@@ -132,7 +136,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
             IAddressProviderV3(addressProvider_).getAddressOrRevert({key: AP_TREASURY, _version: NO_VERSION_CONTROL}); // U:[P4-1]
 
         lastBaseInterestUpdate = uint40(block.timestamp); // U:[P4-1]
-        _baseInterestIndexStored = uint128(RAY); // U:[P4-1]
+        _baseInterestIndexLU = uint128(RAY); // U:[P4-1]
 
         interestRateModel = interestRateModel_;
         emit SetInterestRateModel(interestRateModel_); // U:[P4-3]
@@ -162,12 +166,12 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
 
     /// @inheritdoc IPoolV3
     function expectedLiquidity() public view override returns (uint256) {
-        return _expectedLiquidityStored + _calcBaseInterestAccrued() + (supportsQuotas ? _calcQuotaRevenueAccrued() : 0);
+        return _expectedLiquidityLU + _calcBaseInterestAccrued() + (supportsQuotas ? _calcQuotaRevenueAccrued() : 0);
     }
 
     /// @inheritdoc IPoolV3
-    function expectedLiquidityStored() public view override returns (uint256) {
-        return _expectedLiquidityStored;
+    function expectedLiquidityLU() public view override returns (uint256) {
+        return _expectedLiquidityLU;
     }
 
     // ---------------- //
@@ -466,7 +470,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     /// @inheritdoc IPoolV3
     function baseInterestIndex() public view override returns (uint256) {
         uint256 timestampLU = lastBaseInterestUpdate;
-        if (block.timestamp == timestampLU) return _baseInterestIndexStored; // U:[P4-15]
+        if (block.timestamp == timestampLU) return _baseInterestIndexLU; // U:[P4-15]
         return _calcBaseInterestIndex(timestampLU); // U:[P4-15]
     }
 
@@ -476,8 +480,8 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     }
 
     /// @inheritdoc IPoolV3
-    function baseInterestIndexStored() external view override returns (uint256) {
-        return _baseInterestIndexStored;
+    function baseInterestIndexLU() external view override returns (uint256) {
+        return _baseInterestIndexLU;
     }
 
     /// @dev Computes base interest accrued since the last update
@@ -493,19 +497,19 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         int256 availableLiquidityDelta,
         bool checkOptimalBorrowing
     ) internal {
-        uint256 expectedLiquidityStored_ = (expectedLiquidityStored().toInt256() + expectedLiquidityDelta).toUint256(); // U:[P4-16]
+        uint256 expectedLiquidity_ = (expectedLiquidityLU().toInt256() + expectedLiquidityDelta).toUint256(); // U:[P4-16]
         uint256 availableLiquidity_ = (availableLiquidity().toInt256() + availableLiquidityDelta).toUint256(); // U:[P4-16]
 
         uint256 timestampLU = lastBaseInterestUpdate;
         if (block.timestamp != timestampLU) {
-            expectedLiquidityStored_ += _calcBaseInterestAccrued(timestampLU); // U:[P4-16]
-            _baseInterestIndexStored = _calcBaseInterestIndex(timestampLU).toUint128(); // U:[P4-16]
+            expectedLiquidity_ += _calcBaseInterestAccrued(timestampLU); // U:[P4-16]
+            _baseInterestIndexLU = _calcBaseInterestIndex(timestampLU).toUint128(); // U:[P4-16]
             lastBaseInterestUpdate = uint40(block.timestamp); // U:[P4-16]
         }
 
-        _expectedLiquidityStored = expectedLiquidityStored_.toUint128(); // U:[P4-16]
+        _expectedLiquidityLU = expectedLiquidity_.toUint128(); // U:[P4-16]
         _baseInterestRate = IInterestRateModel(interestRateModel).calcBorrowRate({
-            expectedLiquidity: expectedLiquidityStored_ + (supportsQuotas ? _calcQuotaRevenueAccrued() : 0),
+            expectedLiquidity: expectedLiquidity_ + (supportsQuotas ? _calcQuotaRevenueAccrued() : 0),
             availableLiquidity: availableLiquidity_,
             checkOptimalBorrowing: checkOptimalBorrowing
         }).toUint128(); // U:[P4-16]
@@ -518,7 +522,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
 
     /// @dev Computes current value of base interest index
     function _calcBaseInterestIndex(uint256 timestamp) private view returns (uint256) {
-        return _baseInterestIndexStored * (RAY + baseInterestRate().calcLinearGrowth(timestamp)) / RAY;
+        return _baseInterestIndexLU * (RAY + baseInterestRate().calcLinearGrowth(timestamp)) / RAY;
     }
 
     // ------ //
@@ -551,7 +555,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     function _setQuotaRevenue(uint256 newQuotaRevenue) internal {
         uint256 timestampLU = lastQuotaRevenueUpdate;
         if (block.timestamp != timestampLU) {
-            _expectedLiquidityStored += _calcQuotaRevenueAccrued(timestampLU).toUint128(); // U:[P4-17]
+            _expectedLiquidityLU += _calcQuotaRevenueAccrued(timestampLU).toUint128(); // U:[P4-17]
             lastQuotaRevenueUpdate = uint40(block.timestamp); // U:[P4-17]
         }
         _quotaRevenue = newQuotaRevenue.toUint96(); // U:[P4-17]
