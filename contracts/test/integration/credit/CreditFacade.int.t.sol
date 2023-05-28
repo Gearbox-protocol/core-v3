@@ -1548,9 +1548,9 @@ contract CreditFacadeIntegrationTest is
         address tokenLINK = tokenTestSuite.addressOf(Tokens.LINK);
 
         Balance[] memory expectedBalances = new Balance[](2);
-        expectedBalances[0] = Balance({token: underlying, balance: expectedDAI, tokenMask: 0});
+        expectedBalances[0] = Balance({token: underlying, balance: expectedDAI});
 
-        expectedBalances[1] = Balance({token: tokenLINK, balance: expectedLINK, tokenMask: 0});
+        expectedBalances[1] = Balance({token: tokenLINK, balance: expectedLINK});
 
         // TOKEN PREPARATION
         tokenTestSuite.mint(Tokens.DAI, USER, expectedDAI * 3);
@@ -1615,7 +1615,7 @@ contract CreditFacadeIntegrationTest is
         uint256 expectedDAI = 1000;
 
         Balance[] memory expectedBalances = new Balance[](1);
-        expectedBalances[0] = Balance({token: underlying, balance: expectedDAI, tokenMask: 0});
+        expectedBalances[0] = Balance({token: underlying, balance: expectedDAI});
 
         (address creditAccount,) = _openTestCreditAccount();
         vm.prank(USER);

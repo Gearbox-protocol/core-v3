@@ -7,7 +7,7 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 // LIBS & TRAITS
-import {BalancesLogic, Balance} from "../libraries/BalancesLogic.sol";
+import {BalancesLogic, Balance, BalanceWithMask} from "../libraries/BalancesLogic.sol";
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {BitMask, UNDERLYING_TOKEN_MASK} from "../libraries/BitMask.sol";
 
@@ -267,7 +267,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         // Since it's not possible to enable any forbidden tokens on a new account,
         // this array is empty
-        Balance[] memory forbiddenBalances;
+        BalanceWithMask[] memory forbiddenBalances;
 
         // Checks that the new credit account has enough collateral to cover the debt
         _fullCollateralCheck({
@@ -550,7 +550,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         uint256 _forbiddenTokenMask = forbiddenTokenMask;
         uint256 enabledTokensMaskBefore = ICreditManagerV3(creditManager).enabledTokensMaskOf(creditAccount); // U:[FA-18]
 
-        Balance[] memory forbiddenBalances = BalancesLogic.storeForbiddenBalances({
+        BalanceWithMask[] memory forbiddenBalances = BalancesLogic.storeForbiddenBalances({
             creditAccount: creditAccount,
             forbiddenTokenMask: _forbiddenTokenMask,
             enabledTokensMask: enabledTokensMaskBefore,
@@ -1105,7 +1105,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         address creditAccount,
         uint256 enabledTokensMaskBefore,
         FullCheckParams memory fullCheckParams,
-        Balance[] memory forbiddenBalances,
+        BalanceWithMask[] memory forbiddenBalances,
         uint256 _forbiddenTokenMask
     ) internal {
         uint256 enabledTokensMaskUpdated = ICreditManagerV3(creditManager).fullCollateralCheck(

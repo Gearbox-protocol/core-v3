@@ -24,8 +24,6 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/C
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
-uint192 constant RAY_DIVIDED_BY_PERCENTAGE = uint192(RAY / PERCENTAGE_FACTOR);
-
 /// @title Pool quota keeper
 /// @dev The PQK works as an intermediary between the Credit Manager and the pool with regards to quotas and quota interest.
 ///      The PQK stores all of the quotas and related parameters, and computes and updates the quota revenue value used by

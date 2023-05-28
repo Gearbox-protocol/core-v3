@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {Balance} from "../libraries/BalancesLogic.sol";
+import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 import {RevocationPair} from "./ICreditManagerV3.sol";
 
 uint192 constant ADD_COLLATERAL_PERMISSION = 1;
