@@ -168,7 +168,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
                 token: link,
                 quotaChange: 100_000,
                 minQuota: 0,
-                maxQuota: type(uint128).max
+                maxQuota: type(uint96).max
             });
         }
 
@@ -176,7 +176,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
             address(poolQuotaKeeper),
             abi.encodeCall(
                 IPoolQuotaKeeperV3.updateQuota,
-                (creditAccount, tokenTestSuite.addressOf(Tokens.LINK), 100_000, 0, type(uint128).max)
+                (creditAccount, tokenTestSuite.addressOf(Tokens.LINK), 100_000, 0, type(uint96).max)
             )
         );
 
@@ -187,7 +187,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
             token: tokenTestSuite.addressOf(Tokens.LINK),
             quotaChange: 100_000,
             minQuota: 0,
-            maxQuota: type(uint128).max
+            maxQuota: type(uint96).max
         });
 
         assertEq(tokensToEnable, linkMask, "Incorrect tokensToEnble");
@@ -200,7 +200,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
             token: tokenTestSuite.addressOf(Tokens.LINK),
             quotaChange: -100_000,
             minQuota: 0,
-            maxQuota: type(uint128).max
+            maxQuota: type(uint96).max
         });
         assertEq(tokensToEnable, 0, "Incorrect tokensToEnable");
         assertEq(tokensToDisable, linkMask, "Incorrect tokensToDisable");
@@ -221,7 +221,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
                 token: usdc,
                 quotaChange: 100_000,
                 minQuota: 0,
-                maxQuota: type(uint128).max
+                maxQuota: type(uint96).max
             });
         }
     }
@@ -241,7 +241,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
             token: tokenTestSuite.addressOf(Tokens.LINK),
             quotaChange: 100_000,
             minQuota: 0,
-            maxQuota: type(uint128).max
+            maxQuota: type(uint96).max
         });
 
         enabledTokensMask |= tokensToEnable;
@@ -251,7 +251,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
             token: tokenTestSuite.addressOf(Tokens.USDT),
             quotaChange: 200_000,
             minQuota: 0,
-            maxQuota: type(uint128).max
+            maxQuota: type(uint96).max
         });
 
         enabledTokensMask |= tokensToEnable;
@@ -298,7 +298,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
             token: tokenTestSuite.addressOf(Tokens.LINK),
             quotaChange: 100_000,
             minQuota: 0,
-            maxQuota: type(uint128).max
+            maxQuota: type(uint96).max
         });
 
         enabledTokensMask |= tokensToEnable;
@@ -308,7 +308,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
             token: tokenTestSuite.addressOf(Tokens.USDT),
             quotaChange: 200_000,
             minQuota: 0,
-            maxQuota: type(uint128).max
+            maxQuota: type(uint96).max
         });
 
         enabledTokensMask |= tokensToEnable;
@@ -352,7 +352,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
             token: tokenTestSuite.addressOf(Tokens.LINK),
             quotaChange: int96(uint96(100 * WAD)),
             minQuota: 0,
-            maxQuota: type(uint128).max
+            maxQuota: type(uint96).max
         });
         enabledTokensMask |= tokensToEnable;
 
@@ -361,7 +361,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
             token: tokenTestSuite.addressOf(Tokens.USDT),
             quotaChange: int96(uint96(200 * WAD)),
             minQuota: 0,
-            maxQuota: type(uint128).max
+            maxQuota: type(uint96).max
         });
         enabledTokensMask |= tokensToEnable;
 
@@ -432,7 +432,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
             token: tokenTestSuite.addressOf(Tokens.LINK),
             quotaChange: int96(quotaLink),
             minQuota: 0,
-            maxQuota: type(uint128).max
+            maxQuota: type(uint96).max
         });
         enabledTokensMask |= tokensToEnable;
 
@@ -441,7 +441,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
             token: tokenTestSuite.addressOf(Tokens.USDT),
             quotaChange: int96(quotaUsdt),
             minQuota: 0,
-            maxQuota: type(uint128).max
+            maxQuota: type(uint96).max
         });
         enabledTokensMask |= tokensToEnable;
 
@@ -488,7 +488,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
             token: tokenTestSuite.addressOf(Tokens.LINK),
             quotaChange: int96(uint96(100 * WAD)),
             minQuota: 0,
-            maxQuota: type(uint128).max
+            maxQuota: type(uint96).max
         });
         enabledTokensMap |= tokensToEnable;
 
@@ -497,7 +497,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
             token: tokenTestSuite.addressOf(Tokens.USDT),
             quotaChange: int96(uint96(200 * WAD)),
             minQuota: 0,
-            maxQuota: type(uint128).max
+            maxQuota: type(uint96).max
         });
         enabledTokensMap |= tokensToEnable;
 

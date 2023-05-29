@@ -100,7 +100,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     ///                         at capacity.
     /// @return enableToken Whether the token needs to be enabled
     /// @return disableToken Whether the token needs to be disabled
-    function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota, uint128 maxQuota)
+    function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota, uint96 maxQuota)
         external
         override
         creditManagerOnly // U:[PQK-4]
@@ -316,7 +316,6 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             /// saved, to ensure that further calculations with the new rates are correct
             TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token]; // U:[PQK-7]
             quotaRevenue += tokenQuotaParams.updateRate(timestampLU, rate); // U:[PQK-7]
-
 
             emit UpdateTokenQuotaRate(token, rate); // U:[PQK-7]
 

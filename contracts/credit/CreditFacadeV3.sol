@@ -10,6 +10,7 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {BalancesLogic, Balance, BalanceWithMask} from "../libraries/BalancesLogic.sol";
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {BitMask, UNDERLYING_TOKEN_MASK} from "../libraries/BitMask.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 //  DATA
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
@@ -953,7 +954,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             token: token,
             quotaChange: quotaChange,
             minQuota: minQuota,
-            maxQuota: debtLimits.maxDebt
+            maxQuota: uint96(Math.min(type(uint96).max, debtLimits.maxDebt))
         }); // U:[FA-34]
 
         emit UpdateQuota({creditAccount: creditAccount, token: token, quotaChange: realQuotaChange}); // U:[FA-34]

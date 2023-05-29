@@ -130,7 +130,7 @@ contract CreditManagerMock {
         qu_tokensToDisable = tokensToDisable;
     }
 
-    function updateQuota(address, address, int96, uint96, uint128)
+    function updateQuota(address, address, int96, uint96, uint96)
         external
         view
         returns (int96 change, uint256 tokensToEnable, uint256 tokensToDisable)

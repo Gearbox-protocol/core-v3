@@ -1772,7 +1772,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     function test_U_FA_34_multicall_updateQuota_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
-        uint128 maxDebt = 443330;
+        uint96 maxDebt = 443330;
 
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(0, maxDebt, type(uint8).max);

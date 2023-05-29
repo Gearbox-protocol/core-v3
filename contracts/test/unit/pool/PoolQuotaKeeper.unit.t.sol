@@ -220,7 +220,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                     token: DAI,
                     quotaChange: daiQuota,
                     minQuota: 0,
-                    maxQuota: type(uint128).max
+                    maxQuota: type(uint96).max
                 });
 
                 vm.prank(address(creditManagerMock));
@@ -229,7 +229,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                     token: USDC,
                     quotaChange: usdcQuota,
                     minQuota: 0,
-                    maxQuota: type(uint128).max
+                    maxQuota: type(uint96).max
                 });
             }
 
@@ -402,7 +402,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
         uint256 period;
         int96 change;
         uint96 minQuota;
-        uint128 maxQuota;
+        uint96 maxQuota;
         /// expected
         uint256 expectedCaQuotaInterestChange;
         int96 expectedRealQuotaChange;

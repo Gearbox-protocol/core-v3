@@ -51,7 +51,7 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
         underlying = _underlying;
     }
 
-    function updateQuota(address, address, int96, uint96, uint128)
+    function updateQuota(address, address, int96, uint96, uint96)
         external
         view
         returns (uint256 caQuotaInterestChange, int96 realQuotaChange, bool enableToken, bool disableToken)

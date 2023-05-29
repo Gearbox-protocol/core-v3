@@ -2186,7 +2186,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 token: tokenTestSuite.addressOf(Tokens.LINK),
                 quotaChange: 122,
                 minQuota: 122,
-                maxQuota: type(uint128).max
+                maxQuota: type(uint96).max
             });
 
             (,, uint256 cumulativeQuotaInterest,,,,) = creditManager.creditAccountInfo(creditAccount);
