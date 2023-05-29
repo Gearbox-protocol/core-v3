@@ -148,12 +148,14 @@ library QuotasLogic {
             uint96 totalQuoted = tokenQuotaParams.totalQuoted;
             uint96 limit = tokenQuotaParams.limit;
 
-            if (totalQuoted >= limit) {
+            uint96 maxQuotaCapacity = limit > totalQuoted ? limit - totalQuoted : 0;
+
+            if (maxQuotaCapacity == 0) {
                 return (caQuotaInterestChange, 0, 0, false, false); // U: [QL-3]
             }
 
             change = uint96(quotaChange);
-            change = change > limit - totalQuoted ? limit - totalQuoted : change; // I:[CMQ-08,10] U: [QL-3]
+            change = change > maxQuotaCapacity ? maxQuotaCapacity : change; // I:[CMQ-08,10] U: [QL-3]
             realQuotaChange = int96(change); // U: [QL-3]
 
             // Quoted tokens are only enabled in the CM when their quotas are changed
