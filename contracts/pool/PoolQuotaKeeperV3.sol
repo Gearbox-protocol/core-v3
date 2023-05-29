@@ -100,7 +100,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     ///                         at capacity.
     /// @return enableToken Whether the token needs to be enabled
     /// @return disableToken Whether the token needs to be disabled
-    function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota)
+    function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota, uint128 maxQuota)
         external
         override
         creditManagerOnly // U:[PQK-4]
@@ -132,7 +132,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             quotaChange: quotaChange
         }); // U:[PQK-14]
 
-        if (accountQuota.quota < minQuota) revert QuotaLessThanMinimalException();
+        if (accountQuota.quota < minQuota || accountQuota.quota > maxQuota) revert QuotaIsOutOfBoundsException();
 
         /// Quota revenue must be changed on each quota updated, so that the
         /// pool can correctly compute its liquidity metrics in the future
@@ -301,12 +301,12 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         override
         gaugeOnly // U:[PQK-3]
     {
-        address[] memory tokens = quotaTokensSet.values(); // U:[PQK-7]
+        address[] memory tokens = quotaTokensSet.values();
         uint16[] memory rates = IGaugeV3(gauge).getRates(tokens); // U:[PQK-7]
 
-        uint256 quotaRevenue; // U:[PQK-7]
-        uint256 timeFromLastUpdate = block.timestamp - lastQuotaRateUpdate; // U:[PQK-7]
-        uint256 len = tokens.length; // U:[PQK-7]
+        uint256 quotaRevenue;
+        uint256 timestampLU = lastQuotaRateUpdate;
+        uint256 len = tokens.length;
 
         for (uint256 i; i < len;) {
             address token = tokens[i];
@@ -315,9 +315,9 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             /// Before writing a new rate, the token's interest index current value is also
             /// saved, to ensure that further calculations with the new rates are correct
             TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token]; // U:[PQK-7]
-            quotaRevenue += tokenQuotaParams.updateRate(timeFromLastUpdate, rate); // U:[PQK-7]
+            quotaRevenue += tokenQuotaParams.updateRate(timestampLU, rate); // U:[PQK-7]
 
-            emit UpdateTokenQuotaRate(token, rate); // F:[PQK-7] // U:[PQK-7]
+            emit UpdateTokenQuotaRate(token, rate); // U:[PQK-7]
 
             unchecked {
                 ++i;

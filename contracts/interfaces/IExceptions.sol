@@ -213,4 +213,4 @@ error InsufficientBalanceException();
 
 error OpenCloseAccountInOneBlockException();
 
-error QuotaLessThanMinimalException();
+error QuotaIsOutOfBoundsException();
