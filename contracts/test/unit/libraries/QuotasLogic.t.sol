@@ -210,7 +210,7 @@ contract QuotasLogicTest is TestHelper {
                 oneTimeFee: 100,
                 previousQuota: uint96(WAD),
                 quotaChange: int96(int256(2 * WAD)),
-                quotaLimit: uint96(15 * WAD / 10),
+                quotaLimit: uint96(14 * WAD / 10),
                 totalQuoted: uint96(15 * WAD / 10),
                 caQuotaInterestChangeExpected: WAD + WAD / 1000,
                 quotaRevenueChangeExpected: 0,

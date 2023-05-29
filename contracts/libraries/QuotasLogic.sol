@@ -142,16 +142,18 @@ library QuotasLogic {
             //
 
             // When the quota is increased, the new amount is checked against the global limit on quotas
-            // If the amount is larger than the existing capacity, then only the quota is only increased
+            // If the amount is larger than the existing capacity, then the quota is only increased
             // by capacity. This is done instead of reverting to avoid unexpected reverts due to race conditions
-            uint96 maxQuotaAllowed = tokenQuotaParams.limit - tokenQuotaParams.totalQuoted;
 
-            if (maxQuotaAllowed == 0) {
+            uint96 totalQuoted = tokenQuotaParams.totalQuoted;
+            uint96 limit = tokenQuotaParams.limit;
+
+            if (totalQuoted >= limit) {
                 return (caQuotaInterestChange, 0, 0, false, false); // U: [QL-3]
             }
 
             change = uint96(quotaChange);
-            change = change > maxQuotaAllowed ? maxQuotaAllowed : change; // I:[CMQ-08,10] U: [QL-3]
+            change = change > limit - totalQuoted ? limit - totalQuoted : change; // I:[CMQ-08,10] U: [QL-3]
             realQuotaChange = int96(change); // U: [QL-3]
 
             // Quoted tokens are only enabled in the CM when their quotas are changed
