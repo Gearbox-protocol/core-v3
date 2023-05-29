@@ -472,7 +472,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         /// If there is non-zero loss, then borrowing is forbidden in
         /// case this is an attack and there is risk of copycats afterwards
         /// If cumulative loss exceeds maxCumulativeLoss, the CF is paused,
-        /// which ensures that the attacker can create at most maxCumulativeLoss + maxBorrowedAmount of bad debt
+        /// which ensures that the attacker can create at most maxCumulativeLoss + maxDebt of bad debt
         if (reportedLoss > 0) {
             maxDebtPerBlockMultiplier = 0; // U:[FA-17]
 

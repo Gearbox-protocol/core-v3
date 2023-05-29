@@ -30,8 +30,8 @@ contract CreditFacadeTestSuite is PoolDeployer {
     CreditConfiguratorV3 public creditConfigurator;
     DegenNFTV2 public degenNFT;
 
-    uint128 public minBorrowedAmount;
-    uint128 public maxBorrowedAmount;
+    uint128 public minDebt;
+    uint128 public maxDebt;
 
     uint256 public creditAccountAmount;
 
@@ -56,8 +56,8 @@ contract CreditFacadeTestSuite is PoolDeployer {
         poolMock.setSupportsQuotas(supportQuotas);
         creditConfig = _creditConfig;
 
-        minBorrowedAmount = creditConfig.minBorrowedAmount();
-        maxBorrowedAmount = creditConfig.maxBorrowedAmount();
+        minDebt = creditConfig.minDebt();
+        maxDebt = creditConfig.maxDebt();
 
         tokenTestSuite = creditConfig.tokenTestSuite();
 

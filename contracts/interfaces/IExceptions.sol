@@ -85,11 +85,6 @@ error CallerNotVoterException();
 ///      the connected Credit Facade, or an allowed adapter
 error CallerNotAdapterException();
 
-/// @dev Thrown if the underlying's LT is set directly
-/// @notice Underlying LT is derived from fee parameters and is set automatically
-///         on updating fees
-error SetLTForUnderlyingException();
-
 /// @dev Thrown if the newly set LT if zero or greater than the underlying's LT
 error IncorrectLiquidationThresholdException();
 
@@ -106,7 +101,7 @@ error IncorrectExpirationDateException();
 error IncompatibleContractException();
 
 /// @dev Thrown if attempting to forbid an adapter that is not allowed for the Credit Manager
-error ContractIsNotAnAllowedAdapterException();
+error AdapterIsNotRegisteredException();
 
 /// @dev Thrown when attempting to limit a token that is not quotable in PoolQuotaKeeper
 error TokenIsNotQuotedException();

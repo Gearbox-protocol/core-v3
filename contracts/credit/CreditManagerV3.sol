@@ -1443,7 +1443,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         if (token == underlying) {
             ltUnderlying = ltInitial; // U:[CM-42]
         } else {
-            uint256 tokenMask = getTokenMaskOrRevert(token); // U:[CM-41]
+            uint256 tokenMask = getTokenMaskOrRevert({token: token}); // U:[CM-41]
             CollateralTokenData storage tokenData = collateralTokensData[tokenMask];
 
             tokenData.ltInitial = ltInitial; // U:[CM-42]
@@ -1462,7 +1462,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         external
         creditConfiguratorOnly // U:[CM-4]
     {
-        quotedTokensMask = _quotedTokensMask; // U:[CM-43]
+        quotedTokensMask = _quotedTokensMask & (type(uint256).max - 1); // U:[CM-43]
     }
 
     /// @notice Sets the maximal number of enabled tokens on a single Credit Account.

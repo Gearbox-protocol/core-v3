@@ -22,7 +22,7 @@ interface ICreditConfig {
 
     function tokenTestSuite() external view returns (ITokenTestSuite);
 
-    function minBorrowedAmount() external view returns (uint128);
+    function minDebt() external view returns (uint128);
 
-    function maxBorrowedAmount() external view returns (uint128);
+    function maxDebt() external view returns (uint128);
 }

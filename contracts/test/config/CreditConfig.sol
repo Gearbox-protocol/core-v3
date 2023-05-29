@@ -22,8 +22,8 @@ struct CollateralTokensItem {
 /// @title CreditManagerTestSuite
 /// @notice Deploys contract for unit testing of CreditManagerV3.sol
 contract CreditConfig is Test, ICreditConfig {
-    uint128 public minBorrowedAmount;
-    uint128 public maxBorrowedAmount;
+    uint128 public minDebt;
+    uint128 public maxDebt;
 
     TokensTestSuite public _tokenTestSuite;
 
@@ -41,8 +41,8 @@ contract CreditConfig is Test, ICreditConfig {
 
         uint256 accountAmount = getAccountAmount();
 
-        minBorrowedAmount = getMinBorrowAmount();
-        maxBorrowedAmount = uint128(10 * accountAmount);
+        minDebt = getMinBorrowAmount();
+        maxDebt = uint128(10 * accountAmount);
 
         _tokenTestSuite = tokenTestSuite_;
 
@@ -52,8 +52,8 @@ contract CreditConfig is Test, ICreditConfig {
 
     function getCreditOpts() external override returns (CreditManagerOpts memory) {
         return CreditManagerOpts({
-            minBorrowedAmount: minBorrowedAmount,
-            maxBorrowedAmount: maxBorrowedAmount,
+            minDebt: minDebt,
+            maxDebt: maxDebt,
             collateralTokens: getCollateralTokens(),
             degenNFT: address(0),
             withdrawalManager: address(0),

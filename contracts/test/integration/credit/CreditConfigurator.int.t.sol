@@ -227,17 +227,17 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         assertEq(address(creditManager.priceOracle()), address(cct.priceOracle()), "Incorrect creditFacade");
 
         // CREDIT FACADE PARAMS
-        (uint128 minBorrowedAmount, uint128 maxBorrowedAmount) = creditFacade.debtLimits();
+        (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
 
-        assertEq(minBorrowedAmount, cct.minBorrowedAmount(), "Incorrect minBorrowedAmount");
+        assertEq(minDebt, cct.minDebt(), "Incorrect minDebt");
 
-        assertEq(maxBorrowedAmount, cct.maxBorrowedAmount(), "Incorrect maxBorrowedAmount");
+        assertEq(maxDebt, cct.maxDebt(), "Incorrect maxDebt");
 
-        uint8 maxBorrowedAmountPerBlock = creditFacade.maxDebtPerBlockMultiplier();
+        uint8 maxDebtPerBlock = creditFacade.maxDebtPerBlockMultiplier();
 
         uint40 expirationDate = creditFacade.expirationDate();
 
-        assertEq(maxBorrowedAmountPerBlock, DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER, "Incorrect  maxBorrowedAmountPerBlock");
+        assertEq(maxDebtPerBlock, DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER, "Incorrect  maxDebtPerBlock");
 
         assertEq(expirationDate, 0, "Incorrect expiration date");
     }
@@ -249,8 +249,8 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         cTokens[0] = CollateralToken({token: tokenTestSuite.addressOf(Tokens.USDC), liquidationThreshold: 6000});
 
         CreditManagerOpts memory creditOpts = CreditManagerOpts({
-            minBorrowedAmount: uint128(50 * WAD),
-            maxBorrowedAmount: uint128(150000 * WAD),
+            minDebt: uint128(50 * WAD),
+            maxDebt: uint128(150000 * WAD),
             collateralTokens: cTokens,
             degenNFT: address(0),
             withdrawalManager: address(0),
@@ -280,7 +280,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         emit SetTokenLiquidationThreshold(underlying, DEFAULT_UNDERLYING_LT);
 
         vm.expectEmit(false, false, false, false);
-        emit FeesUpdated(
+        emit UpdateFees(
             DEFAULT_FEE_INTEREST,
             DEFAULT_FEE_LIQUIDATION,
             DEFAULT_LIQUIDATION_PREMIUM,
@@ -444,7 +444,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
     function test_I_CC_05_setLiquidationThreshold_reverts_for_underling_token_and_incorrect_values() public {
         vm.startPrank(CONFIGURATOR);
 
-        vm.expectRevert(SetLTForUnderlyingException.selector);
+        vm.expectRevert(TokenNotAllowedException.selector);
         creditConfigurator.setLiquidationThreshold(underlying, 1);
 
         address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
@@ -543,13 +543,13 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
 
         vm.mockCall(address(adapter1), abi.encodeCall(IAdapter.targetContract, ()), abi.encode(address(0)));
 
-        vm.expectRevert(ZeroAddressException.selector);
+        vm.expectRevert(TargetContractNotAllowedException.selector);
         creditConfigurator.allowAdapter(address(adapter1));
 
         vm.expectRevert(ZeroAddressException.selector);
         creditConfigurator.forbidAdapter(address(0));
 
-        vm.expectRevert(ZeroAddressException.selector);
+        vm.expectRevert(TargetContractNotAllowedException.selector);
         creditConfigurator.forbidAdapter(address(adapter1));
 
         vm.stopPrank();
@@ -657,7 +657,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         vm.prank(CONFIGURATOR);
         creditConfigurator.allowAdapter(address(adapter1));
 
-        vm.expectRevert(ContractIsNotAnAllowedAdapterException.selector);
+        vm.expectRevert(AdapterIsNotRegisteredException.selector);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.forbidAdapter(address(adapter2));
@@ -699,27 +699,27 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
 
     /// @dev I:[CC-15]: setLimits reverts if minAmount > maxAmount
     function test_I_CC_15_setLimits_reverts_if_minAmount_gt_maxAmount() public {
-        (uint128 minBorrowedAmount, uint128 maxBorrowedAmount) = creditFacade.debtLimits();
+        (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
 
         vm.expectRevert(IncorrectLimitsException.selector);
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.setLimits(maxBorrowedAmount, minBorrowedAmount);
+        creditConfigurator.setLimits(maxDebt, minDebt);
     }
 
     /// @dev I:[CC-16]: setLimits sets limits
     function test_I_CC_16_setLimits_sets_limits() public {
-        (uint128 minBorrowedAmount, uint128 maxBorrowedAmount) = creditFacade.debtLimits();
-        uint128 newMinBorrowedAmount = minBorrowedAmount + 1000;
-        uint128 newMaxBorrowedAmount = maxBorrowedAmount + 1000;
+        (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
+        uint128 newminDebt = minDebt + 1000;
+        uint128 newmaxDebt = maxDebt + 1000;
 
         vm.expectEmit(false, false, false, true);
-        emit SetBorrowingLimits(newMinBorrowedAmount, newMaxBorrowedAmount);
+        emit SetBorrowingLimits(newminDebt, newmaxDebt);
         vm.prank(CONFIGURATOR);
-        creditConfigurator.setLimits(newMinBorrowedAmount, newMaxBorrowedAmount);
-        (minBorrowedAmount, maxBorrowedAmount) = creditFacade.debtLimits();
-        assertEq(minBorrowedAmount, newMinBorrowedAmount, "Incorrect minBorrowedAmount");
-        assertEq(maxBorrowedAmount, newMaxBorrowedAmount, "Incorrect maxBorrowedAmount");
+        creditConfigurator.setLimits(newminDebt, newmaxDebt);
+        (minDebt, maxDebt) = creditFacade.debtLimits();
+        assertEq(minDebt, newminDebt, "Incorrect minDebt");
+        assertEq(maxDebt, newmaxDebt, "Incorrect maxDebt");
     }
 
     /// @dev I:[CC-17]: setFees reverts for incorrect fees
@@ -800,7 +800,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         uint16 newLiquidationPremiumExpired = (PERCENTAGE_FACTOR - liquidationDiscountExpired) * 2;
 
         vm.expectEmit(false, false, false, true);
-        emit FeesUpdated(
+        emit UpdateFees(
             newFeeInterest,
             newFeeLiquidation,
             newLiquidationPremium,
@@ -908,7 +908,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
                 uint8 maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
 
                 uint40 expirationDate = creditFacade.expirationDate();
-                (uint128 minBorrowedAmount, uint128 maxBorrowedAmount) = creditFacade.debtLimits();
+                (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
 
                 (, uint128 maxCumulativeLoss) = creditFacade.lossParams();
 
@@ -929,7 +929,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
 
                 uint40 expirationDate2 = cf.expirationDate();
 
-                (uint128 minBorrowedAmount2, uint128 maxBorrowedAmount2) = cf.debtLimits();
+                (uint128 minDebt2, uint128 maxDebt2) = cf.debtLimits();
 
                 (, uint128 maxCumulativeLoss2) = cf.lossParams();
 
@@ -938,8 +938,8 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
                     migrateSettings ? maxDebtPerBlockMultiplier : 0,
                     "Incorrwect limitPerBlock"
                 );
-                assertEq(minBorrowedAmount2, migrateSettings ? minBorrowedAmount : 0, "Incorrwect minBorrowedAmount");
-                assertEq(maxBorrowedAmount2, migrateSettings ? maxBorrowedAmount : 0, "Incorrwect maxBorrowedAmount");
+                assertEq(minDebt2, migrateSettings ? minDebt : 0, "Incorrwect minDebt");
+                assertEq(maxDebt2, migrateSettings ? maxDebt : 0, "Incorrwect maxDebt");
 
                 assertEq(expirationDate2, migrateSettings ? expirationDate : 0, "Incorrect expirationDate");
 
@@ -1203,8 +1203,8 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         CollateralToken[] memory cTokens;
 
         CreditManagerOpts memory creditOpts = CreditManagerOpts({
-            minBorrowedAmount: uint128(50 * WAD),
-            maxBorrowedAmount: uint128(150000 * WAD),
+            minDebt: uint128(50 * WAD),
+            maxDebt: uint128(150000 * WAD),
             collateralTokens: cTokens,
             degenNFT: address(0),
             withdrawalManager: address(0),
@@ -1263,7 +1263,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         address dai = tokenTestSuite.addressOf(Tokens.DAI);
         address usdc = tokenTestSuite.addressOf(Tokens.USDC);
 
-        vm.expectRevert(SetLTForUnderlyingException.selector);
+        vm.expectRevert(TokenNotAllowedException.selector);
         vm.prank(CONFIGURATOR);
         creditConfigurator.rampLiquidationThreshold(dai, 9000, uint40(block.timestamp), 1);
 

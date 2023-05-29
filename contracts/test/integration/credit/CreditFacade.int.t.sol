@@ -323,13 +323,13 @@ contract CreditFacadeIntegrationTest is
             accountFactoryVer: 1
         });
 
-        (uint256 minBorrowedAmount,) = creditFacade.debtLimits();
+        (uint256 minDebt,) = creditFacade.debtLimits();
 
         vm.expectRevert(IDegenNFTV2Exceptions.InsufficientBalanceException.selector);
 
         vm.prank(FRIEND);
         creditFacade.openCreditAccount(
-            minBorrowedAmount,
+            minDebt,
             FRIEND,
             MultiCallBuilder.build(
                 MultiCall({
@@ -404,7 +404,7 @@ contract CreditFacadeIntegrationTest is
 
     /// @dev I:[FA-7]: openCreditAccount and openCreditAccount reverts when debt increase is forbidden
     function test_I_FA_07_openCreditAccountMulticall_reverts_if_borrowing_forbidden() public {
-        (uint256 minBorrowedAmount,) = creditFacade.debtLimits();
+        (uint256 minDebt,) = creditFacade.debtLimits();
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.forbidBorrowing();
@@ -418,7 +418,7 @@ contract CreditFacadeIntegrationTest is
 
         vm.expectRevert(BorrowedBlockLimitException.selector);
         vm.prank(USER);
-        creditFacade.openCreditAccount(minBorrowedAmount, USER, calls, 0);
+        creditFacade.openCreditAccount(minDebt, USER, calls, 0);
     }
 
     /// @dev I:[FA-8]: openCreditAccount runs operations in correct order
@@ -590,10 +590,8 @@ contract CreditFacadeIntegrationTest is
     }
 
     /// @dev I:[FA-11B]: openCreditAccount reverts if amount < minAmount or amount > maxAmount
-    function test_I_FA_11B_openCreditAccount_reverts_if_amount_less_minBorrowedAmount_or_bigger_than_maxBorrowedAmount()
-        public
-    {
-        (uint128 minBorrowedAmount, uint128 maxBorrowedAmount) = creditFacade.debtLimits();
+    function test_I_FA_11B_openCreditAccount_reverts_if_amount_less_minDebt_or_bigger_than_maxDebt() public {
+        (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
@@ -604,11 +602,11 @@ contract CreditFacadeIntegrationTest is
 
         vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
         vm.prank(USER);
-        creditFacade.openCreditAccount(minBorrowedAmount - 1, USER, calls, 0);
+        creditFacade.openCreditAccount(minDebt - 1, USER, calls, 0);
 
         vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
         vm.prank(USER);
-        creditFacade.openCreditAccount(maxBorrowedAmount + 1, USER, calls, 0);
+        creditFacade.openCreditAccount(maxDebt + 1, USER, calls, 0);
     }
 
     //
@@ -907,13 +905,13 @@ contract CreditFacadeIntegrationTest is
         );
     }
 
-    /// @dev I:[FA-18B]: increaseDebt revets if more than maxBorrowedAmount
+    /// @dev I:[FA-18B]: increaseDebt revets if more than maxDebt
     function test_I_FA_18B_increaseDebt_revets_if_more_than_block_limit() public {
         (address creditAccount,) = _openTestCreditAccount();
 
-        (, uint128 maxBorrowedAmount) = creditFacade.debtLimits();
+        (, uint128 maxDebt) = creditFacade.debtLimits();
 
-        uint256 amount = maxBorrowedAmount - DAI_ACCOUNT_AMOUNT + 1;
+        uint256 amount = maxDebt - DAI_ACCOUNT_AMOUNT + 1;
 
         tokenTestSuite.mint(Tokens.DAI, address(cft.poolMock()), amount);
 
@@ -1017,13 +1015,13 @@ contract CreditFacadeIntegrationTest is
         );
     }
 
-    /// @dev I:[FA-20]:decreaseDebt revets if less than minBorrowedAmount
-    function test_I_FA_20_decreaseDebt_revets_if_less_than_minBorrowedAmount() public {
+    /// @dev I:[FA-20]:decreaseDebt revets if less than minDebt
+    function test_I_FA_20_decreaseDebt_revets_if_less_than_minDebt() public {
         (address creditAccount,) = _openTestCreditAccount();
 
-        (uint128 minBorrowedAmount,) = creditFacade.debtLimits();
+        (uint128 minDebt,) = creditFacade.debtLimits();
 
-        uint256 amount = DAI_ACCOUNT_AMOUNT - minBorrowedAmount + 1;
+        uint256 amount = DAI_ACCOUNT_AMOUNT - minDebt + 1;
 
         tokenTestSuite.mint(Tokens.DAI, address(cft.poolMock()), amount);
 
@@ -1305,7 +1303,7 @@ contract CreditFacadeIntegrationTest is
         creditFacade.multicall(creditAccount, calls);
     }
 
-    /// @dev I:[FA-36]: checkAndUpdateBorrowedBlockLimit doesn't change block limit if maxBorrowedAmountPerBlock = type(uint128).max
+    /// @dev I:[FA-36]: checkAndUpdateBorrowedBlockLimit doesn't change block limit if maxDebtPerBlock = type(uint128).max
     function test_I_FA_36_checkAndUpdateBorrowedBlockLimit_doesnt_change_block_limit_if_set_to_max() public {
         // vm.prank(CONFIGURATOR);
         // creditConfigurator.setMaxDebtLimitPerBlock(type(uint128).max);
@@ -1321,7 +1319,7 @@ contract CreditFacadeIntegrationTest is
         // assertEq(borrowedInBlock, 0, "Incorrect currentBlockLimit");
     }
 
-    /// @dev I:[FA-37]: checkAndUpdateBorrowedBlockLimit doesn't change block limit if maxBorrowedAmountPerBlock = type(uint128).max
+    /// @dev I:[FA-37]: checkAndUpdateBorrowedBlockLimit doesn't change block limit if maxDebtPerBlock = type(uint128).max
     function test_I_FA_37_checkAndUpdateBorrowedBlockLimit_updates_block_limit_properly() public {
         // (uint64 blockLastUpdate, uint128 borrowedInBlock) = creditFacade.getTotalBorrowedInBlock();
 

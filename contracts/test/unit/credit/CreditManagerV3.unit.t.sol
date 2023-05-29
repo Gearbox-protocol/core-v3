@@ -2862,11 +2862,11 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     }
 
     /// @dev U:[CM-43]: setQuotedMask correctly sets value
-    function test_U_CM_43_setQuotedMask_works_correctly() public withoutSupportQuotas {
+    function test_U_CM_43_setQuotedMask_works_correctly() public withSupportQuotas {
         vm.prank(CONFIGURATOR);
-        creditManager.setQuotedMask(23232255);
+        creditManager.setQuotedMask(23232256);
 
-        assertEq(creditManager.quotedTokensMask(), 23232255, "Incorrect quotedTokensMask");
+        assertEq(creditManager.quotedTokensMask(), 23232256, "Incorrect quotedTokensMask");
     }
 
     /// @dev U:[CM-44]: setMaxEnabledToken correctly sets value

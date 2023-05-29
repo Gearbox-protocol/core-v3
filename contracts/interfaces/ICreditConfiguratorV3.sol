@@ -23,9 +23,9 @@ struct CollateralToken {
 /// @dev A struct representing the initial Credit Manager configuration parameters
 struct CreditManagerOpts {
     /// @dev The minimal debt principal amount
-    uint128 minBorrowedAmount;
+    uint128 minDebt;
     /// @dev The maximal debt principal amount
-    uint128 maxBorrowedAmount;
+    uint128 maxDebt;
     /// @dev The initial list of collateral tokens to allow
     CollateralToken[] collateralTokens;
     /// @dev Address of IDegenNFTV2, address(0) if whitelisted mode is not used
@@ -38,7 +38,7 @@ struct CreditManagerOpts {
 
 interface ICreditConfiguratorEvents {
     /// @dev Emits when a collateral token's liquidation threshold is changed
-    event SetTokenLiquidationThreshold(address indexed token, uint16 liquidityThreshold);
+    event SetTokenLiquidationThreshold(address indexed token, uint16 liquidationThreshold);
 
     event ScheduleTokenLiquidationThresholdRamp(
         address indexed token,
@@ -55,16 +55,16 @@ interface ICreditConfiguratorEvents {
     event ForbidToken(address indexed token);
 
     /// @dev Emits when a contract <> adapter pair is linked for a Credit Manager
-    event AllowAdapter(address indexed protocol, address indexed adapter);
+    event AllowAdapter(address indexed targetContract, address indexed adapter);
 
     /// @dev Emits when an adapter is forbidden
-    event ForbidAdapter(address indexed protocol, address indexed adapter);
+    event ForbidAdapter(address indexed targetContract, address indexed adapter);
 
     /// @dev Emits when debt principal limits are changed
-    event SetBorrowingLimits(uint256 minBorrowedAmount, uint256 maxBorrowedAmount);
+    event SetBorrowingLimits(uint256 minDebt, uint256 maxDebt);
 
     /// @dev Emits when Credit Manager's fee parameters are updated
-    event FeesUpdated(
+    event UpdateFees(
         uint16 feeInterest,
         uint16 feeLiquidation,
         uint16 liquidationPremium,
@@ -89,12 +89,6 @@ interface ICreditConfiguratorEvents {
 
     /// @dev Emits when the borrowing limit per block is changed
     event SetMaxDebtPerBlockMultiplier(uint8);
-
-    /// @dev Emits when an address is added to the upgradeable contract list
-    event AddedToUpgradeable(address);
-
-    /// @dev Emits when an address is removed from the upgradeable contract list
-    event RemovedFromUpgradeable(address);
 
     /// @dev Emits when the expiration date is updated in an expirable Credit Facade
     event SetExpirationDate(uint40);
@@ -174,22 +168,22 @@ interface ICreditConfiguratorV3 is ICreditConfiguratorEvents, IVersion {
     function forbidAdapter(address targetContract) external;
 
     /// @dev Sets borrowed amount limits in Credit Facade
-    /// @param _minBorrowedAmount Minimum borrowed amount
-    /// @param _maxBorrowedAmount Maximum borrowed amount
-    function setLimits(uint128 _minBorrowedAmount, uint128 _maxBorrowedAmount) external;
+    /// @param minDebt Minimum borrowed amount
+    /// @param maxDebt Maximum borrowed amount
+    function setLimits(uint128 minDebt, uint128 maxDebt) external;
 
     /// @dev Sets fees for creditManager
-    /// @param _feeInterest Percent which protocol charges additionally for interest rate
-    /// @param _feeLiquidation The fee that is paid to the pool from liquidation
-    /// @param _liquidationPremium Discount for totalValue which is given to liquidator
-    /// @param _feeLiquidationExpired The fee that is paid to the pool from liquidation when liquidating an expired account
-    /// @param _liquidationPremiumExpired Discount for totalValue which is given to liquidator when liquidating an expired account
+    /// @param feeInterest Percent which protocol charges additionally for interest rate
+    /// @param feeLiquidation The fee that is paid to the pool from liquidation
+    /// @param liquidationPremium Discount for totalValue which is given to liquidator
+    /// @param feeLiquidationExpired The fee that is paid to the pool from liquidation when liquidating an expired account
+    /// @param liquidationPremiumExpired Discount for totalValue which is given to liquidator when liquidating an expired account
     function setFees(
-        uint16 _feeInterest,
-        uint16 _feeLiquidation,
-        uint16 _liquidationPremium,
-        uint16 _feeLiquidationExpired,
-        uint16 _liquidationPremiumExpired
+        uint16 feeInterest,
+        uint16 feeLiquidation,
+        uint16 liquidationPremium,
+        uint16 feeLiquidationExpired,
+        uint16 liquidationPremiumExpired
     ) external;
 
     /// @dev Upgrades the price oracle in the Credit Manager, taking the address
@@ -197,13 +191,13 @@ interface ICreditConfiguratorV3 is ICreditConfiguratorEvents, IVersion {
     function setPriceOracle(uint256 version) external;
 
     /// @dev Upgrades the Credit Facade corresponding to the Credit Manager
-    /// @param _creditFacade address of the new CreditFacadeV3
+    /// @param creditFacade address of the new CreditFacadeV3
     /// @param migrateParams Whether the previous CreditFacadeV3's parameter need to be copied
-    function setCreditFacade(address _creditFacade, bool migrateParams) external;
+    function setCreditFacade(address creditFacade, bool migrateParams) external;
 
     /// @dev Upgrades the Credit Configurator for a connected Credit Manager
-    /// @param _creditConfigurator New Credit Configurator's address
-    function upgradeCreditConfigurator(address _creditConfigurator) external;
+    /// @param creditConfigurator New Credit Configurator's address
+    function upgradeCreditConfigurator(address creditConfigurator) external;
 
     /// @dev Sets the maximal borrowed amount per block as multiplier to maxDebt
     function setMaxDebtPerBlockMultiplier(uint8 newMaxDebtLimitPerBlockMultiplier) external;
