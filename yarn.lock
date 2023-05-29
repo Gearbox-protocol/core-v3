@@ -476,9 +476,10 @@
     "@ethersproject/properties" "^5.7.0"
     "@ethersproject/strings" "^5.7.0"
 
-"@gearbox-protocol/core-v2@https://github.com/gearbox-protocol/core-v2#base":
-  version "1.0.1"
-  resolved "https://github.com/gearbox-protocol/core-v2#128f0b5e68e58d294b2afb8924b42a9e691f7204"
+"@gearbox-protocol/core-v2@^1.19.0-base.3":
+  version "1.19.0-base.3"
+  resolved "https://registry.yarnpkg.com/@gearbox-protocol/core-v2/-/core-v2-1.19.0-base.3.tgz#df94ad2978d20630d39b46f653f0ced88ba8c805"
+  integrity sha512-AQLyerVwgD0FiiL4ynENm79KY315obN2U2HawZTZ34Z+oZjzKrPSjJnIOQhBXAydsN2zk7++KLyWH/CG3k3ctg==
   dependencies:
     "@typechain/ethers-v5" "^10.2.1"
 

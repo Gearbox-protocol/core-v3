@@ -317,6 +317,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token]; // U:[PQK-7]
             quotaRevenue += tokenQuotaParams.updateRate(timestampLU, rate); // U:[PQK-7]
 
+
             emit UpdateTokenQuotaRate(token, rate); // U:[PQK-7]
 
             unchecked {
