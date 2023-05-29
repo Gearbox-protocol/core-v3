@@ -38,7 +38,7 @@
     "*.{json,md}": "prettier --write"
   },
   "dependencies": {
-    "@gearbox-protocol/core-v2": "https://github.com/gearbox-protocol/core-v2#base",
+    "@gearbox-protocol/core-v2": "^1.19.0-base.3",
     "@gearbox-protocol/integration-types": "^1.2.0"
   }
 }
