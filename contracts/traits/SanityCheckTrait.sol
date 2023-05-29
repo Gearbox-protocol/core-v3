@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Holdings, 2022
+// (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
 import {ZeroAddressException} from "../interfaces/IExceptions.sol";
 
-/// @title ACL Trait
-/// @notice Utility class for ACL consumers
+/// @title Sanity check trait
 abstract contract SanityCheckTrait {
+    /// @dev Ensures that passed address is non-zero
     modifier nonZeroAddress(address addr) {
-        _nonZeroCheck(addr);
+        _revertIfZeroAddress(addr);
         _;
     }
 
-    function _nonZeroCheck(address addr) private pure {
-        if (addr == address(0)) revert ZeroAddressException(); // F:[P4-2]
+    /// @dev Reverts if address is zero
+    function _revertIfZeroAddress(address addr) private pure {
+        if (addr == address(0)) revert ZeroAddressException();
     }
 }

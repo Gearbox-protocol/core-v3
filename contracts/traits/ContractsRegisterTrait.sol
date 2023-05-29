@@ -1,54 +1,56 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Holdings, 2022
+// (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import "../interfaces/IAddressProviderV3.sol";
-import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
+import {IContractsRegister} from "@gearbox-protocol/core-v2/contracts/interfaces/IContractsRegister.sol";
 
-import {
-    ZeroAddressException,
-    RegisteredCreditManagerOnlyException,
-    RegisteredPoolOnlyException
-} from "../interfaces/IExceptions.sol";
+import {AP_CONTRACTS_REGISTER, IAddressProviderV3} from "../interfaces/IAddressProviderV3.sol";
+import {RegisteredCreditManagerOnlyException, RegisteredPoolOnlyException} from "../interfaces/IExceptions.sol";
 
 import {SanityCheckTrait} from "./SanityCheckTrait.sol";
 
-/// @title ContractsRegister Trait
-/// @notice Trait enables checks for registered pools & creditManagers
+/// @title Contracts register trait
+/// @notice Trait that simplifies validation of pools and credit managers
 abstract contract ContractsRegisterTrait is SanityCheckTrait {
-    // ACL contract to check rights
-    ContractsRegister immutable _cr;
+    /// @notice Contracts register contract address
+    address public immutable cr;
 
-    /// @dev Checks that credit manager is registered
-    modifier registeredCreditManagerOnly(address addr) {
-        _checkRegisteredCreditManagerOnly(addr);
-        _;
-    }
-
-    /// @dev Checks that credit manager is registered
+    /// @dev Ensures that given address is a registered credit manager
     modifier registeredPoolOnly(address addr) {
-        _checkRegisteredPoolOnly(addr);
+        _ensureRegisteredPool(addr);
         _;
     }
 
+    /// @dev Ensures that given address is a registered pool
+    modifier registeredCreditManagerOnly(address addr) {
+        _ensureRegisteredCreditManager(addr);
+        _;
+    }
+
+    /// @notice Constructor
+    /// @param addressProvider Address provider contract address
     constructor(address addressProvider) nonZeroAddress(addressProvider) {
-        _cr = ContractsRegister(IAddressProviderV3(addressProvider).getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
+        cr = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_CONTRACTS_REGISTER, 1);
     }
 
-    function isRegisteredPool(address _pool) internal view returns (bool) {
-        return _cr.isPool(_pool);
+    /// @dev Ensures that given address is a registered pool
+    function _ensureRegisteredPool(address addr) internal view {
+        if (!_isRegisteredPool(addr)) revert RegisteredPoolOnlyException();
     }
 
-    function isRegisteredCreditManager(address _creditManager) internal view returns (bool) {
-        return _cr.isCreditManager(_creditManager);
+    /// @dev Ensures that given address is a registered credit manager
+    function _ensureRegisteredCreditManager(address addr) internal view {
+        if (!_isRegisteredCreditManager(addr)) revert RegisteredCreditManagerOnlyException();
     }
 
-    function _checkRegisteredCreditManagerOnly(address addr) internal view {
-        if (!isRegisteredCreditManager(addr)) revert RegisteredCreditManagerOnlyException();
+    /// @dev Whether given address is a registered pool
+    function _isRegisteredPool(address addr) internal view returns (bool) {
+        return IContractsRegister(cr).isPool(addr);
     }
 
-    function _checkRegisteredPoolOnly(address addr) internal view {
-        if (!isRegisteredPool(addr)) revert RegisteredPoolOnlyException();
+    /// @dev Whether given address is a registered credit manager
+    function _isRegisteredCreditManager(address addr) internal view returns (bool) {
+        return IContractsRegister(cr).isCreditManager(addr);
     }
 }

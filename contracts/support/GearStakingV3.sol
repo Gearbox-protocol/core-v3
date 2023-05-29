@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
-import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
+import {AP_GEAR_TOKEN, IAddressProviderV3, NO_VERSION_CONTROL} from "../interfaces/IAddressProviderV3.sol";
 import {IVotingContractV3} from "../interfaces/IVotingContractV3.sol";
 import {
     IGearStakingV3,
@@ -27,7 +27,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     using SafeCast for uint256;
 
     /// @notice Address of the GEAR token
-    IERC20 public immutable gear;
+    address public immutable override gear;
 
     /// @notice Mapping of user address to their total staked tokens and tokens available for voting
     mapping(address => UserVoteLockData) internal voteLockData;
@@ -45,7 +45,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     uint256 public constant override version = 3_00;
 
     constructor(address _addressProvider, uint256 _firstEpochTimestamp) ACLNonReentrantTrait(_addressProvider) {
-        gear = IERC20(IAddressProvider(_addressProvider).getGearToken());
+        gear = IAddressProviderV3(_addressProvider).getAddressOrRevert(AP_GEAR_TOKEN, NO_VERSION_CONTROL);
         firstEpochTimestamp = _firstEpochTimestamp;
     }
 
@@ -118,7 +118,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     ///              * isIncrease - whether to add or remove votes
     ///              * extraData - data specific to the voting contract that is decoded on recipient side
     function deposit(uint256 amount, MultiVote[] memory votes) external nonReentrant {
-        gear.transferFrom(msg.sender, address(this), amount);
+        IERC20(gear).transferFrom(msg.sender, address(this), amount);
 
         {
             uint96 amount96 = amount.toUint96();
@@ -217,7 +217,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
                 }
 
                 if (totalClaimable > 0) {
-                    gear.transfer(to, totalClaimable);
+                    IERC20(gear).transfer(to, totalClaimable);
                     emit ClaimGearWithdrawal(user, to, totalClaimable);
                 }
 

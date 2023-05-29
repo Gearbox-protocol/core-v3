@@ -125,7 +125,7 @@ contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait
         configuratorOnly // U:[AF-1]
     {
         address creditManager = CreditAccountV3(creditAccount).creditManager();
-        _checkRegisteredCreditManagerOnly(creditManager); // U:[AF-5A]
+        _ensureRegisteredCreditManager(creditManager); // U:[AF-5A]
 
         (,,,,,, address borrower) = CreditManagerV3(creditManager).creditAccountInfo(creditAccount);
         if (borrower != address(0)) {

@@ -85,6 +85,9 @@ interface IGearStakingV3 is IGearStakingV3Events, IVersion {
     // GETTER
     //
 
+    /// @dev GEAR token address
+    function gear() external view returns (address);
+
     /// @dev The total amount staked by the user in staked GEAR
     function balanceOf(address user) external view returns (uint256);
 

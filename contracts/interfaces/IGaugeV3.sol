@@ -36,10 +36,12 @@ interface IGaugeV3Events {
 }
 
 /// @title IGaugeV3
-
 interface IGaugeV3 is IGaugeV3Events, IVersion {
+    /// @dev Returns pool gauge is connected to
+    function pool() external view returns (address);
+
     /// @dev Returns the main voting contract
-    function voter() external view returns (IGearStakingV3);
+    function voter() external view returns (address);
 
     /// @dev Rolls the new epoch and updates all quota rates
     function updateEpoch() external;
