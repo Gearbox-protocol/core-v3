@@ -84,8 +84,8 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         ACLNonReentrantTrait(IPoolV3(_pool).addressProvider())
         ContractsRegisterTrait(IPoolV3(_pool).addressProvider())
     {
-        pool = _pool; // F:[PQK-1]
-        underlying = IPoolV3(_pool).asset(); // F:[PQK-1]
+        pool = _pool; // U:[PQK-1]
+        underlying = IPoolV3(_pool).asset(); // U:[PQK-1]
     }
 
     /// @notice Updates a Credit Account's quota amount for a token
@@ -103,7 +103,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota)
         external
         override
-        creditManagerOnly // F:[PQK-4]
+        creditManagerOnly // U:[PQK-4]
         returns (uint256 caQuotaInterestChange, int96 realQuotaChange, bool enableToken, bool disableToken)
     {
         int256 quotaRevenueChange;
@@ -130,9 +130,9 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             accountQuota: accountQuota,
             lastQuotaRateUpdate: lastQuotaRateUpdate,
             quotaChange: quotaChange
-        });
+        }); // U:[PQK-14]
 
-        if (accountQuota.quota < minQuota) revert QuotaLessThanMinialException();
+        if (accountQuota.quota < minQuota) revert QuotaLessThanMinimalException();
 
         /// Quota revenue must be changed on each quota updated, so that the
         /// pool can correctly compute its liquidity metrics in the future
@@ -148,7 +148,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     function removeQuotas(address creditAccount, address[] memory tokens, bool setLimitsToZero)
         external
         override
-        creditManagerOnly // F:[PQK-4]
+        creditManagerOnly // U:[PQK-4]
     {
         int256 quotaRevenueChange;
 
@@ -195,7 +195,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     function accrueQuotaInterest(address creditAccount, address[] memory tokens)
         external
         override
-        creditManagerOnly // F:[PQK-4]
+        creditManagerOnly // U:[PQK-4]
     {
         uint256 len = tokens.length;
         uint40 _lastQuotaRateUpdate = lastQuotaRateUpdate;
@@ -281,32 +281,32 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @param token Address of the token
     function addQuotaToken(address token)
         external
-        gaugeOnly // F:[PQK-3]
+        gaugeOnly // U:[PQK-3]
     {
         if (quotaTokensSet.contains(token)) {
-            revert TokenAlreadyAddedException(); // F:[PQK-6]
+            revert TokenAlreadyAddedException(); // U:[PQK-6]
         }
 
         /// The interest rate is not set immediately on adding a quoted token,
         /// since all rates are updated during a general epoch update in the Gauge
-        quotaTokensSet.add(token); // F:[PQK-5]
-        totalQuotaParams[token].initialise(); // F:[PQK-5]
+        quotaTokensSet.add(token); // U:[PQK-5]
+        totalQuotaParams[token].initialise(); // U:[PQK-5]
 
-        emit NewQuotaTokenAdded(token); // F:[PQK-5]
+        emit NewQuotaTokenAdded(token); // U:[PQK-5]
     }
 
     /// @notice Batch updates the quota rates and changes the combined quota revenue
     function updateRates()
         external
         override
-        gaugeOnly // F:[PQK-3]
+        gaugeOnly // U:[PQK-3]
     {
-        address[] memory tokens = quotaTokensSet.values();
-        uint16[] memory rates = IGaugeV3(gauge).getRates(tokens); // F:[PQK-7]
+        address[] memory tokens = quotaTokensSet.values(); // U:[PQK-7]
+        uint16[] memory rates = IGaugeV3(gauge).getRates(tokens); // U:[PQK-7]
 
-        uint256 quotaRevenue;
-        uint256 timeFromLastUpdate = block.timestamp - lastQuotaRateUpdate;
-        uint256 len = tokens.length;
+        uint256 quotaRevenue; // U:[PQK-7]
+        uint256 timeFromLastUpdate = block.timestamp - lastQuotaRateUpdate; // U:[PQK-7]
+        uint256 len = tokens.length; // U:[PQK-7]
 
         for (uint256 i; i < len;) {
             address token = tokens[i];
@@ -314,18 +314,18 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
             /// Before writing a new rate, the token's interest index current value is also
             /// saved, to ensure that further calculations with the new rates are correct
-            TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
-            quotaRevenue += tokenQuotaParams.updateRate(timeFromLastUpdate, rate);
+            TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token]; // U:[PQK-7]
+            quotaRevenue += tokenQuotaParams.updateRate(timeFromLastUpdate, rate); // U:[PQK-7]
 
-            emit UpdateTokenQuotaRate(token, rate); // F:[PQK-7]
+            emit UpdateTokenQuotaRate(token, rate); // F:[PQK-7] // U:[PQK-7]
 
             unchecked {
                 ++i;
             }
         }
 
-        IPoolV3(pool).setQuotaRevenue(quotaRevenue); // F:[PQK-7]
-        lastQuotaRateUpdate = uint40(block.timestamp); // F:[PQK-7]
+        IPoolV3(pool).setQuotaRevenue(quotaRevenue); // U:[PQK-7]
+        lastQuotaRateUpdate = uint40(block.timestamp); // U:[PQK-7]
     }
 
     //
@@ -336,12 +336,12 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @param _gauge The new contract's address
     function setGauge(address _gauge)
         external
-        configuratorOnly // F:[PQK-2]
+        configuratorOnly // U:[PQK-2]
     {
         if (gauge != _gauge) {
-            gauge = _gauge; // F:[PQK-8]
-            lastQuotaRateUpdate = uint40(block.timestamp); // F:[PQK-8]
-            emit SetGauge(_gauge); // F:[PQK-8]
+            gauge = _gauge; // U:[PQK-8]
+            lastQuotaRateUpdate = uint40(block.timestamp); // U:[PQK-8]
+            emit SetGauge(_gauge); // U:[PQK-8]
         }
     }
 
@@ -349,18 +349,18 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @param _creditManager Address of the new Credit Manager
     function addCreditManager(address _creditManager)
         external
-        configuratorOnly // F:[PQK-2]
+        configuratorOnly // U:[PQK-2]
         nonZeroAddress(_creditManager)
-        registeredCreditManagerOnly(_creditManager) // F:[PQK-9]
+        registeredCreditManagerOnly(_creditManager) // U:[PQK-9]
     {
-        if (ICreditManagerV3(_creditManager).pool() != address(pool)) {
-            revert IncompatibleCreditManagerException(); // F:[PQK-9]
+        if (ICreditManagerV3(_creditManager).pool() != pool) {
+            revert IncompatibleCreditManagerException(); // U:[PQK-9]
         }
 
         /// Checks if creditManager is already in list
         if (!creditManagerSet.contains(_creditManager)) {
-            creditManagerSet.add(_creditManager); // F:[PQK-10]
-            emit AddCreditManager(_creditManager); // F:[PQK-10]
+            creditManagerSet.add(_creditManager); // U:[PQK-10]
+            emit AddCreditManager(_creditManager); // U:[PQK-10]
         }
     }
 
@@ -369,7 +369,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @param limit The limit to set
     function setTokenLimit(address token, uint96 limit)
         external
-        controllerOnly // F:[PQK-2]
+        controllerOnly // U:[PQK-2]
     {
         TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
         _setTokenLimit(tokenQuotaParams, token, limit);
@@ -377,18 +377,23 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
     /// @dev IMPLEMENTATION: setTokenLimit
     function _setTokenLimit(TokenQuotaParams storage tokenQuotaParams, address token, uint96 limit) internal {
+        /// @dev setLimit checks that token is initialize, otherwise it reverts
+        // F:[PQK-11]
         if (tokenQuotaParams.setLimit(limit)) {
-            emit SetTokenLimit(token, limit);
-        } // F:[PQK-12]
+            emit SetTokenLimit(token, limit); // U:[PQK-12]
+        }
     }
 
     /// @notice Sets the one-time fee paid on each quota increase
     /// @param token Token to set the fee for
     /// @param fee The new fee value in PERCENTAGE_FACTOR format
-    function setTokenQuotaIncreaseFee(address token, uint16 fee) external controllerOnly {
-        TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
+    function setTokenQuotaIncreaseFee(address token, uint16 fee)
+        external
+        controllerOnly // U:[PQK-2]
+    {
+        TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token]; // U:[PQK-13]
         if (tokenQuotaParams.setQuotaIncreaseFee(fee)) {
-            emit SetQuotaIncreaseFee(token, fee);
+            emit SetQuotaIncreaseFee(token, fee); // U:[PQK-13]
         }
     }
 }
