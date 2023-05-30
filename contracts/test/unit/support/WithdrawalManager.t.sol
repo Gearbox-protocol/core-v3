@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 import {
     ClaimAction, IWithdrawalManagerV3Events, ScheduledWithdrawal
@@ -13,14 +13,18 @@ import {
     CallerNotConfiguratorException,
     NoFreeWithdrawalSlotsException,
     NothingToClaimException,
+    ReceiveIsNotAllowedException,
     RegisteredCreditManagerOnlyException,
     ZeroAddressException
 } from "../../../interfaces/IExceptions.sol";
 
+import {Tokens} from "../../config/Tokens.sol";
 import {USER} from "../../lib/constants.sol";
 import {TestHelper} from "../../lib/helper.sol";
-import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
+import {AddressProviderV3ACLMock, AP_WETH_TOKEN} from "../../mocks/core/AddressProviderV3ACLMock.sol";
+import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
 import {ERC20BlacklistableMock} from "../../mocks/token/ERC20Blacklistable.sol";
+import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 
 import {WithdrawalManagerHarness} from "./WithdrawalManagerHarness.sol";
 
@@ -35,6 +39,7 @@ enum ScheduleTask {
 contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerV3Events {
     WithdrawalManagerHarness manager;
     AddressProviderV3ACLMock acl;
+    TokensTestSuite ts;
     ERC20BlacklistableMock token0;
     ERC20Mock token1;
 
@@ -46,23 +51,25 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerV3Events {
     uint256 constant AMOUNT = 10 ether;
     uint8 constant TOKEN0_INDEX = 0;
     uint256 constant TOKEN0_MASK = 1;
-
     uint8 constant TOKEN1_INDEX = 1;
-    uint8 constant TOKEN1_MASK = 2;
+    uint256 constant TOKEN1_MASK = 2;
 
     function setUp() public {
         configurator = makeAddr("CONFIGURATOR");
         creditAccount = makeAddr("CREDIT_ACCOUNT");
         creditManager = makeAddr("CREDIT_MANAGER");
 
+        ts = new TokensTestSuite();
+        ts.topUpWETH{value: AMOUNT}();
+        token0 = ERC20BlacklistableMock(ts.addressOf(Tokens.USDC));
+        token1 = ERC20Mock(ts.addressOf(Tokens.WETH));
+
         vm.startPrank(configurator);
         acl = new AddressProviderV3ACLMock();
+        acl.setAddress(AP_WETH_TOKEN, address(token1), false);
         acl.addCreditManager(creditManager);
         manager = new WithdrawalManagerHarness(address(acl), DELAY);
         vm.stopPrank();
-
-        token0 = new ERC20BlacklistableMock("Test token 1", "TEST1", 18);
-        token1 = new ERC20Mock("Test token 2", "TEST2", 18);
     }
 
     // ------------- //
@@ -77,6 +84,11 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerV3Events {
     /// @notice U:[WM-2]: External functions have correct access
     function test_U_WM_02_external_functions_have_correct_access() public {
         vm.startPrank(USER);
+
+        deal(USER, 1 ether);
+        vm.expectRevert(ReceiveIsNotAllowedException.selector);
+        (bool success, bytes memory returndata) = address(manager).call{value: 1 ether}("");
+        Address.verifyCallResult(success, returndata, "");
 
         vm.expectRevert(RegisteredCreditManagerOnlyException.selector);
         manager.addImmediateWithdrawal(address(0), address(0), 0);
@@ -136,14 +148,14 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerV3Events {
     function test_U_WM_04A_claimImmediateWithdrawal_reverts_on_zero_recipient() public {
         vm.expectRevert(ZeroAddressException.selector);
         vm.prank(USER);
-        manager.claimImmediateWithdrawal(address(token0), address(0));
+        manager.claimImmediateWithdrawal(address(token0), address(0), false);
     }
 
     /// @notice U:[WM-4B]: `claimImmediateWithdrawal` reverts on nothing to claim
     function test_U_WM_04B_claimImmediateWithdrawal_reverts_on_nothing_to_claim() public {
         vm.expectRevert(NothingToClaimException.selector);
         vm.prank(USER);
-        manager.claimImmediateWithdrawal(address(token0), address(USER));
+        manager.claimImmediateWithdrawal(address(token0), address(USER), false);
     }
 
     /// @notice U:[WM-4C]: `claimImmediateWithdrawal` works correctly
@@ -151,16 +163,33 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerV3Events {
         deal(address(token0), address(manager), AMOUNT);
 
         vm.prank(creditManager);
-        manager.addImmediateWithdrawal(address(token0), USER, 10 ether);
+        manager.addImmediateWithdrawal(address(token0), USER, AMOUNT);
 
         vm.expectEmit(true, true, false, true);
         emit ClaimImmediateWithdrawal(USER, address(token0), USER, AMOUNT - 1);
 
         vm.prank(USER);
-        manager.claimImmediateWithdrawal(address(token0), USER);
+        manager.claimImmediateWithdrawal(address(token0), USER, false);
 
         assertEq(manager.immediateWithdrawals(USER, address(token0)), 1, "Incorrect claimable balance");
-        assertEq(token0.balanceOf(USER), AMOUNT - 1, "Incorrect claimed amount");
+        assertEq(ts.balanceOf(Tokens.USDC, USER), AMOUNT - 1, "Incorrect claimed amount");
+    }
+
+    /// @notice U:[WM-4D]: `claimImmediateWithdrawal` works correctly with unwrap WETH
+    function test_U_WM_04D_claimImmediateWithdrawal_works_correctly_with_unwrap_weth() public {
+        deal(address(token1), address(manager), AMOUNT);
+
+        vm.prank(creditManager);
+        manager.addImmediateWithdrawal(address(token1), USER, AMOUNT);
+
+        vm.expectEmit(true, true, false, true);
+        emit ClaimImmediateWithdrawal(USER, address(token1), USER, AMOUNT - 1);
+
+        vm.prank(USER);
+        manager.claimImmediateWithdrawal(address(token1), USER, true);
+
+        assertEq(manager.immediateWithdrawals(USER, address(token1)), 1, "Incorrect claimable balance");
+        assertEq(address(USER).balance, AMOUNT - 1, "Incorrect claimed amount");
     }
 
     // ----------------------------------------------- //

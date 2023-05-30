@@ -5,14 +5,19 @@ pragma solidity ^0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
+import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
+
+import {AP_WETH_TOKEN, IAddressProviderV3, NO_VERSION_CONTROL} from "../interfaces/IAddressProviderV3.sol";
 import {
     AmountCantBeZeroException,
     CallerNotCreditManagerException,
     NoFreeWithdrawalSlotsException,
-    NothingToClaimException
+    NothingToClaimException,
+    ReceiveIsNotAllowedException
 } from "../interfaces/IExceptions.sol";
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 import {ClaimAction, IWithdrawalManagerV3, ScheduledWithdrawal} from "../interfaces/IWithdrawalManagerV3.sol";
 import {IERC20Helper} from "../libraries/IERC20Helper.sol";
 import {WithdrawalsLogic} from "../libraries/WithdrawalsLogic.sol";
@@ -22,18 +27,23 @@ import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 /// @title Withdrawal manager
 /// @notice Contract that handles withdrawals from credit accounts.
 ///         There are two kinds of withdrawals: immediate and scheduled.
-///         - Immediate withdrawals can be claimed, well, immediately, and exist to support blacklistable tokens.
+///         - Immediate withdrawals can be claimed, well, immediately, and exist to support blacklistable tokens
+///           and WETH unwrapping upon credit account closure/liquidation.
 ///         - Scheduled withdrawals can be claimed after a certain delay, and exist to support partial withdrawals
 ///           from credit accounts. One credit account can have up to two scheduled withdrawals at the same time.
 contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegisterTrait {
     using SafeERC20 for IERC20;
     using IERC20Helper for IERC20;
+    using Address for address payable;
     using WithdrawalsLogic for ClaimAction;
     using WithdrawalsLogic for ScheduledWithdrawal;
     using WithdrawalsLogic for ScheduledWithdrawal[2];
 
     /// @inheritdoc IVersion
     uint256 public constant override version = 3_00;
+
+    /// @inheritdoc IWithdrawalManagerV3
+    address public immutable override weth;
 
     /// @inheritdoc IWithdrawalManagerV3
     mapping(address => mapping(address => uint256)) public override immediateWithdrawals;
@@ -51,10 +61,17 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
         ACLTrait(_addressProvider)
         ContractsRegisterTrait(_addressProvider)
     {
+        weth = IAddressProviderV3(_addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // U:[WM-1]
+
         if (_delay != 0) {
             delay = _delay; // U:[WM-1]
         }
         emit SetWithdrawalDelay(_delay);
+    }
+
+    /// @notice Allows this contract to unwrap WETH and forbids receiving ETH another way
+    receive() external payable {
+        if (msg.sender != weth) revert ReceiveIsNotAllowedException(); // U:[WM-2]
     }
 
     // --------------------- //
@@ -71,12 +88,12 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
     }
 
     /// @inheritdoc IWithdrawalManagerV3
-    function claimImmediateWithdrawal(address token, address to)
+    function claimImmediateWithdrawal(address token, address to, bool unwrapWETH)
         external
         override
         nonZeroAddress(to) // U:[WM-4A]
     {
-        _claimImmediateWithdrawal(msg.sender, token, to);
+        _claimImmediateWithdrawal({account: msg.sender, token: token, to: to, unwrapWETH: unwrapWETH});
     }
 
     /// @dev Increases `account`'s immediately withdrawable balance of `token` by `amount`
@@ -88,15 +105,25 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
     }
 
     /// @dev Sends all `account`'s immediately withdrawable balance of `token` to `to`
-    function _claimImmediateWithdrawal(address account, address token, address to) internal {
+    function _claimImmediateWithdrawal(address account, address token, address to, bool unwrapWETH) internal {
         uint256 amount = immediateWithdrawals[account][token];
         if (amount < 2) revert NothingToClaimException(); // U:[WM-4B]
         unchecked {
-            --amount; // U:[WM-4C]
+            --amount; // U:[WM-4C,4D]
         }
-        immediateWithdrawals[account][token] = 1; // U:[WM-4C]
-        IERC20(token).safeTransfer(to, amount); // U:[WM-4C]
-        emit ClaimImmediateWithdrawal(account, token, to, amount); // U:[WM-4C]
+        immediateWithdrawals[account][token] = 1; // U:[WM-4C,4D]
+        _safeTransfer(token, to, amount, unwrapWETH); // U:[WM-4C,4D]
+        emit ClaimImmediateWithdrawal(account, token, to, amount); // U:[WM-4C,4D]
+    }
+
+    /// @dev Transfers token, optionally unwraps WETH before sending
+    function _safeTransfer(address token, address to, uint256 amount, bool unwrapWETH) internal {
+        if (unwrapWETH && token == weth) {
+            IWETH(weth).withdraw(amount); // U:[WM-4D]
+            payable(to).sendValue(amount); // U:[WM-4D]
+        } else {
+            IERC20(token).safeTransfer(to, amount); // U:[WM-4C]
+        }
     }
 
     // --------------------- //

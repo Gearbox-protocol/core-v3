@@ -74,6 +74,9 @@ interface IWithdrawalManagerV3 is IWithdrawalManagerV3Events, IVersion {
     // IMMEDIATE WITHDRAWALS //
     // --------------------- //
 
+    /// @notice WETH token address
+    function weth() external view returns (address);
+
     /// @notice Returns amount of token claimable by the account
     function immediateWithdrawals(address account, address token) external view returns (uint256);
 
@@ -87,7 +90,8 @@ interface IWithdrawalManagerV3 is IWithdrawalManagerV3Events, IVersion {
     /// @notice Claims caller's immediate withdrawal
     /// @param token Token to claim
     /// @param to Token recipient
-    function claimImmediateWithdrawal(address token, address to) external;
+    /// @param unwrapWETH Whether to unwrap WETH before sending (ignored if `token` is not WETH)
+    function claimImmediateWithdrawal(address token, address to, bool unwrapWETH) external;
 
     // --------------------- //
     // SCHEDULED WITHDRAWALS //
