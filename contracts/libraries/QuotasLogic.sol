@@ -63,7 +63,7 @@ library QuotasLogic {
         return uint192(
             uint256(tokenQuotaParams.cumulativeIndexLU_RAY)
                 + (RAY_DIVIDED_BY_PERCENTAGE * (deltaTimestamp) * rate) / SECONDS_PER_YEAR
-        );
+        ); // U: [QL-1]
     }
 
     /// @dev Computes the accrued quota interest based on the additive index
@@ -75,7 +75,7 @@ library QuotasLogic {
         pure
         returns (uint256)
     {
-        return quoted * (cumulativeIndexNow - cumulativeIndexLU) / RAY;
+        return uint256(quoted) * (cumulativeIndexNow - cumulativeIndexLU) / RAY; // U: [QL-2]
     }
 
     /// @dev Calculates interest accrued on quota since last update
@@ -116,7 +116,7 @@ library QuotasLogic {
         int96 quotaChange
     )
         internal
-        initializedQuotasOnly(tokenQuotaParams)
+        initializedQuotasOnly(tokenQuotaParams) // U: [QL-9]
         returns (
             uint256 caQuotaInterestChange,
             int256 quotaRevenueChange,
@@ -142,17 +142,21 @@ library QuotasLogic {
             //
 
             // When the quota is increased, the new amount is checked against the global limit on quotas
-            // If the amount is larger than the existing capacity, then only the quota is only increased
+            // If the amount is larger than the existing capacity, then the quota is only increased
             // by capacity. This is done instead of reverting to avoid unexpected reverts due to race conditions
-            uint96 maxQuotaAllowed = tokenQuotaParams.limit - tokenQuotaParams.totalQuoted;
 
-            if (maxQuotaAllowed == 0) {
-                return (caQuotaInterestChange, 0, 0, false, false);
+            uint96 totalQuoted = tokenQuotaParams.totalQuoted;
+            uint96 limit = tokenQuotaParams.limit;
+
+            uint96 maxQuotaCapacity = limit > totalQuoted ? limit - totalQuoted : 0;
+
+            if (maxQuotaCapacity == 0) {
+                return (caQuotaInterestChange, 0, 0, false, false); // U: [QL-3]
             }
 
             change = uint96(quotaChange);
-            change = change > maxQuotaAllowed ? maxQuotaAllowed : change; // F:[CMQ-08,10]
-            realQuotaChange = int96(change);
+            change = change > maxQuotaCapacity ? maxQuotaCapacity : change; // I:[CMQ-08,10] U: [QL-3]
+            realQuotaChange = int96(change); // U: [QL-3]
 
             // Quoted tokens are only enabled in the CM when their quotas are changed
             // from zero to non-zero. This is done to correctly
@@ -160,29 +164,29 @@ library QuotasLogic {
             // the CM will fail to zero it on closing an account, which will break quota interest computations.
             // This value is returned in order for Credit Manager to update enabled tokens locally.
             if (accountQuota.quota <= 1) {
-                enableToken = true;
+                enableToken = true; // U: [QL-3]
             }
 
-            accountQuota.quota += change;
-            tokenQuotaParams.totalQuoted += change;
+            accountQuota.quota += change; // U: [QL-3]
+            tokenQuotaParams.totalQuoted += change; // U: [QL-3]
 
             // For some tokens, a one-time quota increase fee may be charged. This is a proxy for
             // trading fees for tokens with high volume but short position duration, in which
             // case trading fees are a more effective pricing policy than charging interest over time
-            caQuotaInterestChange += change * tokenQuotaParams.quotaIncreaseFee / PERCENTAGE_FACTOR;
+            caQuotaInterestChange += uint256(change) * tokenQuotaParams.quotaIncreaseFee / PERCENTAGE_FACTOR; // U: [QL-3]
 
             // Quota revenue is a global sum of all quota interest received from all tokens and accounts
             // per year. It is used by the pool to effectively compute expected quota revenue with just one value
-            quotaRevenueChange = (uint256(change) * tokenQuotaParams.rate / PERCENTAGE_FACTOR).toInt256();
+            quotaRevenueChange = (uint256(change) * tokenQuotaParams.rate / PERCENTAGE_FACTOR).toInt256(); // U: [QL-3]
         } else {
             //
             // DECREASE QUOTA
             //
             change = uint96(-quotaChange);
-            realQuotaChange = quotaChange;
+            realQuotaChange = quotaChange; // U: [QL-3]
 
-            tokenQuotaParams.totalQuoted -= change;
-            accountQuota.quota -= change; // F:[CMQ-03]
+            tokenQuotaParams.totalQuoted -= change; // U: [QL-3]
+            accountQuota.quota -= change; // I:[CMQ-03] U: [QL-3]
 
             // Quoted tokens are only disabled in the CM when their quotas are changed
             // from non-zero to zero. This is done to correctly
@@ -190,10 +194,10 @@ library QuotasLogic {
             // the CM will fail to zero it on closing an account, which will break quota interest computations.
             // This value is returned in order for Credit Manager to update enabled tokens locally.
             if (accountQuota.quota <= 1) {
-                disableToken = true;
+                disableToken = true; // U: [QL-3]
             }
 
-            quotaRevenueChange = -(uint256(change) * tokenQuotaParams.rate / PERCENTAGE_FACTOR).toInt256();
+            quotaRevenueChange = -(uint256(change) * tokenQuotaParams.rate / PERCENTAGE_FACTOR).toInt256(); // U: [QL-3]
         }
     }
 
@@ -209,13 +213,17 @@ library QuotasLogic {
         TokenQuotaParams storage tokenQuotaParams,
         AccountQuota storage accountQuota,
         uint256 lastQuotaRateUpdate
-    ) internal initializedQuotasOnly(tokenQuotaParams) returns (uint256 caQuotaInterestChange) {
+    )
+        internal
+        initializedQuotasOnly(tokenQuotaParams) // U: [QL-9]
+        returns (uint256 caQuotaInterestChange)
+    {
         uint96 quoted = accountQuota.quota;
         uint192 cumulativeIndexNow = cumulativeIndexSince(tokenQuotaParams, lastQuotaRateUpdate);
         if (quoted > 1) {
-            caQuotaInterestChange = calcAccruedQuotaInterest(quoted, cumulativeIndexNow, accountQuota.cumulativeIndexLU);
+            caQuotaInterestChange = calcAccruedQuotaInterest(quoted, cumulativeIndexNow, accountQuota.cumulativeIndexLU); // U: [QL-4]
         }
-        accountQuota.cumulativeIndexLU = cumulativeIndexNow;
+        accountQuota.cumulativeIndexLU = cumulativeIndexNow; // U: [QL-4]
     }
 
     /// @dev Internal function to zero the quota for a single quoted token
@@ -224,7 +232,7 @@ library QuotasLogic {
     /// @return quotaRevenueChange Amount to update quota revenue by.
     function removeQuota(TokenQuotaParams storage tokenQuotaParams, AccountQuota storage accountQuota)
         internal
-        initializedQuotasOnly(tokenQuotaParams)
+        initializedQuotasOnly(tokenQuotaParams) // U: [QL-9]
         returns (int256 quotaRevenueChange)
     {
         uint96 quoted = accountQuota.quota;
@@ -235,9 +243,9 @@ library QuotasLogic {
         if (quoted > 1) {
             quoted--;
 
-            tokenQuotaParams.totalQuoted -= quoted;
-            accountQuota.quota = 1;
-            quotaRevenueChange = -(uint256(quoted) * tokenQuotaParams.rate / PERCENTAGE_FACTOR).toInt256();
+            tokenQuotaParams.totalQuoted -= quoted; // U: [QL-5]
+            accountQuota.quota = 1; // U: [QL-5]
+            quotaRevenueChange = -(uint256(quoted) * tokenQuotaParams.rate / PERCENTAGE_FACTOR).toInt256(); // U: [QL-5]
         }
     }
 
@@ -246,12 +254,12 @@ library QuotasLogic {
     /// @param limit The new limit on total quotas for a token
     function setLimit(TokenQuotaParams storage tokenQuotaParams, uint96 limit)
         internal
-        initializedQuotasOnly(tokenQuotaParams)
+        initializedQuotasOnly(tokenQuotaParams) // U: [QL-9]
         returns (bool changed)
     {
         if (tokenQuotaParams.limit != limit) {
-            tokenQuotaParams.limit = limit; // F:[PQK-12]
-            changed = true;
+            tokenQuotaParams.limit = limit; // U: [QL-6]
+            changed = true; // U: [QL-6]
         }
     }
 
@@ -260,27 +268,28 @@ library QuotasLogic {
     /// @param fee The new fee
     function setQuotaIncreaseFee(TokenQuotaParams storage tokenQuotaParams, uint16 fee)
         internal
-        initializedQuotasOnly(tokenQuotaParams)
+        initializedQuotasOnly(tokenQuotaParams) // U: [QL-9]
         returns (bool changed)
     {
         if (tokenQuotaParams.quotaIncreaseFee != fee) {
-            tokenQuotaParams.quotaIncreaseFee = fee;
-            changed = true;
+            tokenQuotaParams.quotaIncreaseFee = fee; // U: [QL-7]
+            changed = true; // U: [QL-7]
         }
     }
 
     /// @dev Saves the current quota interest on a token and updates the interest rate
     /// @param tokenQuotaParams Quota parameters for a token
-    /// @param timeFromLastUpdate Time since the last rate update
+    /// @param lastQuotaRateUpdate Timestamp of the last quota rate update
     /// @param rate The new interest rate for a token
     /// @return quotaRevenue The new annual quota revenue for the token. Used to recompute quote revenue for the pool
-    function updateRate(TokenQuotaParams storage tokenQuotaParams, uint256 timeFromLastUpdate, uint16 rate)
+    function updateRate(TokenQuotaParams storage tokenQuotaParams, uint256 lastQuotaRateUpdate, uint16 rate)
         internal
+        initializedQuotasOnly(tokenQuotaParams) // U: [QL-9]
         returns (uint256 quotaRevenue)
     {
-        tokenQuotaParams.cumulativeIndexLU_RAY = calcAdditiveCumulativeIndex(tokenQuotaParams, rate, timeFromLastUpdate); // F:[PQK-7]
-        tokenQuotaParams.rate = rate;
+        tokenQuotaParams.cumulativeIndexLU_RAY = cumulativeIndexSince(tokenQuotaParams, lastQuotaRateUpdate); // U: [QL-8]
+        tokenQuotaParams.rate = rate; // U: [QL-8]
 
-        return uint256(tokenQuotaParams.totalQuoted) * rate / PERCENTAGE_FACTOR;
+        return uint256(tokenQuotaParams.totalQuoted) * rate / PERCENTAGE_FACTOR; // U: [QL-8]
     }
 }
