@@ -3,6 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
@@ -24,6 +25,7 @@ import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import "../interfaces/IExceptions.sol";
 
 contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
+    using SafeERC20 for IERC20;
     using SafeCast for uint256;
 
     /// @notice Contract version
@@ -58,7 +60,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     ///              * isIncrease - whether to add or remove votes
     ///              * extraData - data specific to the voting contract that is decoded on recipient side
     function deposit(uint96 amount, MultiVote[] calldata votes) external nonReentrant {
-        IERC20(gear).transferFrom(msg.sender, address(this), amount);
+        IERC20(gear).safeTransferFrom(msg.sender, address(this), amount);
 
         UserVoteLockData storage vld = voteLockData[msg.sender];
 
@@ -67,7 +69,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
 
         emit DepositGear(msg.sender, amount);
 
-        if (votes.length > 0) {
+        if (votes.length != 0) {
             _multivote(msg.sender, votes);
         }
     }
@@ -139,9 +141,10 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
                 }
             }
 
-            if (totalClaimable > 0) {
-                IERC20(gear).transfer(to, totalClaimable);
+            if (totalClaimable != 0) {
+                IERC20(gear).safeTransfer(to, totalClaimable);
                 voteLockData[user].totalStaked -= totalClaimable.toUint96();
+
                 emit ClaimGearWithdrawal(user, to, totalClaimable);
             }
 

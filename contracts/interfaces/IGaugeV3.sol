@@ -7,7 +7,7 @@ import {IGearStakingV3} from "./IGearStakingV3.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 struct QuotaRateParams {
-    uint16 minRiskRate;
+    uint16 minRate;
     uint16 maxRate;
     uint96 totalVotesLpSide;
     uint96 totalVotesCaSide;
@@ -19,6 +19,9 @@ struct UserVotes {
 }
 
 interface IGaugeV3Events {
+    /// @dev Emits when epoch is updated
+    event UpdateEpoch(uint16 epochNow);
+
     /// @dev Emits when a user submits a vote
     event Vote(address indexed user, address indexed token, uint96 votes, bool lpSide);
 
@@ -37,12 +40,6 @@ interface IGaugeV3Events {
 
 /// @title IGaugeV3
 interface IGaugeV3 is IGaugeV3Events, IVersion {
-    /// @dev Returns pool gauge is connected to
-    function pool() external view returns (address);
-
-    /// @dev Returns the main voting contract
-    function voter() external view returns (address);
-
     /// @dev Rolls the new epoch and updates all quota rates
     function updateEpoch() external;
 
@@ -66,4 +63,22 @@ interface IGaugeV3 is IGaugeV3Events, IVersion {
     // GETTERS
     //
     function getRates(address[] memory tokens) external view returns (uint16[] memory rates);
+
+    function epochLastUpdate() external view returns (uint16);
+
+    /// @dev Returns pool gauge is connected to
+    function pool() external view returns (address);
+
+    /// @dev Returns the main voting contract
+    function voter() external view returns (address);
+
+    function userTokenVotes(address user, address token)
+        external
+        view
+        returns (uint96 votesLpSide, uint96 votesCaSide);
+
+    function quotaRateParams(address token)
+        external
+        view
+        returns (uint16 minRate, uint16 maxRate, uint96 totalVotesLpSide, uint96 totalVotesCaSide);
 }

@@ -4,12 +4,9 @@
 pragma solidity ^0.8.17;
 pragma abicoder v1;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-
 // INTERFACES
 import {IGaugeV3, QuotaRateParams, UserVotes} from "../interfaces/IGaugeV3.sol";
+import {IVotingContractV3} from "../interfaces/IVotingContractV3.sol";
 import {IGearStakingV3} from "../interfaces/IGearStakingV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
@@ -18,7 +15,11 @@ import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
 
 // EXCEPTIONS
-import {CallerNotVoterException} from "../interfaces/IExceptions.sol";
+import {
+    CallerNotVoterException,
+    IncorrectParameterException,
+    TokenNotAllowedException
+} from "../interfaces/IExceptions.sol";
 
 /// @title Gauge for quota interest rates
 /// @dev Quota interest rates in Gearbox V3 are determined
@@ -26,9 +27,9 @@ import {CallerNotVoterException} from "../interfaces/IExceptions.sol";
 ///      interval. While there are notable mechanic differences, the overall
 ///      dynamic of token holders controlling strategy yields is similar to
 ///      Curve's gauge system, and thus the contract carries the same name
-contract GaugeV3 is IGaugeV3, ACLTrait {
-    using EnumerableSet for EnumerableSet.AddressSet;
-    using SafeERC20 for IERC20;
+contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLTrait {
+    /// @notice Contract version
+    uint256 public constant version = 3_00;
 
     /// @notice Address of the address provider
     address public immutable addressProvider;
@@ -37,19 +38,16 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
     address public immutable override pool;
 
     /// @notice Mapping from token address to its rate parameters
-    mapping(address => QuotaRateParams) public quotaRateParams;
+    mapping(address => QuotaRateParams) public override quotaRateParams;
 
     /// @notice Mapping from (user, token) to vote amounts committed by user to each side
-    mapping(address => mapping(address => UserVotes)) userTokenVotes;
+    mapping(address => mapping(address => UserVotes)) public override userTokenVotes;
 
     /// @notice GEAR locking and voting contract
     address public override voter;
 
     /// @notice Epoch when the rates were last recomputed
-    uint16 public epochLastUpdate;
-
-    /// @notice Contract version
-    uint256 public constant version = 3_00;
+    uint16 public override epochLastUpdate;
 
     //
     // CONSTRUCTOR
@@ -71,7 +69,7 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
 
     /// @dev Reverts if the function is called by an address other than the voter
     modifier onlyVoter() {
-        if (msg.sender != address(voter)) {
+        if (msg.sender != voter) {
             revert CallerNotVoterException();
         }
         _;
@@ -85,6 +83,7 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
     /// @dev IMPLEMENTATION: updateEpoch()
     function _checkAndUpdateEpoch() internal {
         uint16 epochNow = IGearStakingV3(voter).getCurrentEpoch();
+
         if (epochNow > epochLastUpdate) {
             epochLastUpdate = epochNow;
 
@@ -92,6 +91,8 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
             /// Since this function is only callable by the Gauge, active rates can only
             /// be updated once per epoch at most
             _poolQuotaKeeper().updateRates();
+
+            emit UpdateEpoch(epochNow);
         }
     }
 
@@ -101,37 +102,34 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
     ///      once per epoch
     /// @param tokens Array of tokens to computes rates for
     /// @return rates Array of rates, in the same order as passed tokens
-    function getRates(address[] memory tokens) external view override returns (uint16[] memory rates) {
+    function getRates(address[] calldata tokens) external view override returns (uint16[] memory rates) {
         uint256 len = tokens.length;
         rates = new uint16[](len);
 
-        for (uint256 i; i < len;) {
-            address token = tokens[i];
+        unchecked {
+            for (uint256 i; i < len; ++i) {
+                address token = tokens[i];
 
-            QuotaRateParams storage qrp = quotaRateParams[token];
+                if (!isTokenAdded(token)) revert TokenNotAllowedException();
 
-            uint96 votesLpSide = qrp.totalVotesLpSide;
-            uint96 votesCaSide = qrp.totalVotesCaSide;
+                QuotaRateParams memory qrp = quotaRateParams[token];
 
-            uint96 totalVotes = votesLpSide + votesCaSide;
+                uint96 votesLpSide = qrp.totalVotesLpSide;
+                uint96 votesCaSide = qrp.totalVotesCaSide;
+                uint256 totalVotes = votesLpSide + votesCaSide;
 
-            /// Quota interest rates are determined by GEAR holders through voting
-            /// for one of two sides (for each token) - CA side or LP side.
-            /// There are two parameters for each token determined by the governance -
-            /// Min risk rate and max rate, and the actual rate fluctuates between
-            /// those two extremes based on votes. Voting for CA side reduces the rate
-            /// towards minRiskRate, while voting for LP side increases it towards maxRate.
-            /// Rates are only updated once per epoch (1 week), to avoid manipulation and
-            /// make strategies more predictable.
+                /// Quota interest rates are determined by GEAR holders through voting
+                /// for one of two sides (for each token) - CA side or LP side.
+                /// There are two parameters for each token determined by the governance -
+                /// Min risk rate and max rate, and the actual rate fluctuates between
+                /// those two extremes based on votes. Voting for CA side reduces the rate
+                /// towards minRate, while voting for LP side increases it towards maxRate.
+                /// Rates are only updated once per epoch (1 week), to avoid manipulation and
+                /// make strategies more predictable.
 
-            rates[i] = uint16(
-                totalVotes == 0
-                    ? qrp.minRiskRate
-                    : (qrp.minRiskRate * votesCaSide + qrp.maxRate * votesLpSide) / totalVotes
-            );
-
-            unchecked {
-                ++i;
+                rates[i] = totalVotes == 0
+                    ? qrp.minRate
+                    : uint16((uint256(qrp.minRate) * votesCaSide + uint256(qrp.maxRate) * votesLpSide) / totalVotes);
             }
         }
     }
@@ -142,9 +140,13 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
     /// @param extraData Gauge specific parameters (encoded into extraData to adhere to a general VotingContract interface)
     ///                  * token - address of the token to vote for
     ///                  * lpSide - votes in favor of LPs (increasing rate) if true, or in favor of CAs (decreasing rate) if false
-    function vote(address user, uint96 votes, bytes memory extraData) external onlyVoter {
+    function vote(address user, uint96 votes, bytes calldata extraData)
+        external
+        override(IGaugeV3, IVotingContractV3)
+        onlyVoter
+    {
         (address token, bool lpSide) = abi.decode(extraData, (address, bool));
-        _vote(user, votes, token, lpSide);
+        _vote({user: user, token: token, votes: votes, lpSide: lpSide});
     }
 
     /// @dev IMPLEMENTATION: vote
@@ -154,6 +156,8 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
     /// @param lpSide Side to add votes to: `true` for LP side, `false` for CA side
     function _vote(address user, uint96 votes, address token, bool lpSide) internal {
         _checkAndUpdateEpoch();
+
+        if (!isTokenAdded(token)) revert TokenNotAllowedException();
 
         QuotaRateParams storage qp = quotaRateParams[token];
         UserVotes storage uv = userTokenVotes[user][token];
@@ -165,7 +169,7 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
             uv.votesCaSide += votes;
         }
 
-        emit Vote(user, token, votes, lpSide);
+        emit Vote({user: user, token: token, votes: votes, lpSide: lpSide});
     }
 
     /// @notice Removes the user's existing vote from the provided token and side
@@ -174,9 +178,13 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
     /// @param extraData Gauge specific parameters (encoded into extraData to adhere to a general VotingContract interface)
     ///                  * token - address of the token to unvote from
     ///                  * lpSide - whether the side unvoted from is LP side
-    function unvote(address user, uint96 votes, bytes memory extraData) external onlyVoter {
+    function unvote(address user, uint96 votes, bytes calldata extraData)
+        external
+        override(IGaugeV3, IVotingContractV3)
+        onlyVoter
+    {
         (address token, bool lpSide) = abi.decode(extraData, (address, bool));
-        _unvote(user, votes, token, lpSide);
+        _unvote({user: user, token: token, votes: votes, lpSide: lpSide});
     }
 
     /// @dev IMPLEMENTATION: unvote
@@ -187,8 +195,11 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
     function _unvote(address user, uint96 votes, address token, bool lpSide) internal {
         _checkAndUpdateEpoch();
 
+        if (!isTokenAdded(token)) revert TokenNotAllowedException();
+
         QuotaRateParams storage qp = quotaRateParams[token];
         UserVotes storage uv = userTokenVotes[user][token];
+
         if (lpSide) {
             qp.totalVotesLpSide -= votes;
             uv.votesLpSide -= votes;
@@ -197,7 +208,7 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
             uv.votesCaSide -= votes;
         }
 
-        emit Unvote(user, token, votes, lpSide);
+        emit Unvote({user: user, token: token, votes: votes, lpSide: lpSide});
     }
 
     //
@@ -206,38 +217,52 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
 
     /// @notice Sets the GEAR staking contract, which is the only entity allowed to vote/unvote directly
     /// @param newVoter The new voter contract
-    function setVoter(address newVoter) external configuratorOnly {
+    function setVoter(address newVoter) external nonZeroAddress(newVoter) configuratorOnly {
         voter = newVoter;
 
-        emit SetVoter(newVoter);
+        emit SetVoter({newVoter: newVoter});
     }
 
     /// @dev Adds a new quoted token to the Gauge and PoolQuotaKeeper, and sets the initial rate params
     /// @param token Address of the token to add
-    /// @param _minRiskRate The minimal interest rate paid on token's quotas
-    /// @param _maxRate The maximal interest rate paid on token's quotas
-    function addQuotaToken(address token, uint16 _minRiskRate, uint16 _maxRate) external configuratorOnly {
+    /// @param minRate The minimal interest rate paid on token's quotas
+    /// @param maxRate The maximal interest rate paid on token's quotas
+    function addQuotaToken(address token, uint16 minRate, uint16 maxRate) external configuratorOnly {
+        _checkParams({minRate: minRate, maxRate: maxRate});
+
         quotaRateParams[token] =
-            QuotaRateParams({minRiskRate: _minRiskRate, maxRate: _maxRate, totalVotesLpSide: 0, totalVotesCaSide: 0});
+            QuotaRateParams({minRate: minRate, maxRate: maxRate, totalVotesLpSide: 0, totalVotesCaSide: 0});
 
-        _poolQuotaKeeper().addQuotaToken(token);
+        _poolQuotaKeeper().addQuotaToken({token: token});
 
-        emit AddQuotaToken(token, _minRiskRate, _maxRate);
+        emit AddQuotaToken({token: token, minRate: minRate, maxRate: maxRate});
     }
 
     /// @dev Changes the rate params for a quoted token
-    /// @param _minRiskRate The minimal interest rate paid on token's quotas
-    /// @param _maxRate The maximal interest rate paid on token's quotas
-    function changeQuotaTokenRateParams(address token, uint16 _minRiskRate, uint16 _maxRate)
+    /// @param minRate The minimal interest rate paid on token's quotas
+    /// @param maxRate The maximal interest rate paid on token's quotas
+    function changeQuotaTokenRateParams(address token, uint16 minRate, uint16 maxRate)
         external
+        nonZeroAddress(token)
         configuratorOnly
     {
-        QuotaRateParams memory qrp = quotaRateParams[token];
-        qrp.minRiskRate = _minRiskRate;
-        qrp.maxRate = _maxRate;
-        quotaRateParams[token] = qrp;
+        _checkParams(minRate, maxRate);
 
-        emit SetQuotaTokenParams(token, _minRiskRate, _maxRate);
+        QuotaRateParams storage qrp = quotaRateParams[token];
+        qrp.minRate = minRate;
+        qrp.maxRate = maxRate;
+
+        emit SetQuotaTokenParams({token: token, minRate: minRate, maxRate: maxRate});
+    }
+
+    function _checkParams(uint16 minRate, uint16 maxRate) internal pure {
+        if (minRate == 0 || minRate > maxRate) {
+            revert IncorrectParameterException();
+        }
+    }
+
+    function isTokenAdded(address token) public view returns (bool) {
+        return quotaRateParams[token].minRate != 0;
     }
 
     /// @dev Returns quota keeper connected to the pool
