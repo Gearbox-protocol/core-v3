@@ -224,9 +224,10 @@ interface IPoolV3 is IPoolV3Events, IPoolBase, IERC4626 {
     /// @param quotaRevenueDelta Quota revenue delta
     function updateQuotaRevenue(int256 quotaRevenueDelta) external;
 
-    /// @notice Sets new quota revenue value
+    /// @notice Sets new quota revenue value and accrues extra fees
     /// @param newQuotaRevenue New quota revenue value
-    function setQuotaRevenue(uint256 newQuotaRevenue) external;
+    /// @param extraFees Amount of extra fees to accrue as profit
+    function setQuotaRevenueAndExtraFees(uint256 newQuotaRevenue, uint256 extraFees) external;
 
     // ------------- //
     // CONFIGURATION //

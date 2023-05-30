@@ -544,8 +544,15 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     }
 
     /// @inheritdoc IPoolV3
-    function setQuotaRevenue(uint256 newQuotaRevenue) external override poolQuotaKeeperOnly {
+    function setQuotaRevenueAndExtraFees(uint256 newQuotaRevenue, uint256 extraFees)
+        external
+        override
+        poolQuotaKeeperOnly
+    {
         _setQuotaRevenue(newQuotaRevenue); // U:[P4-17]
+        if (extraFees > 0) {
+            _mintExtraFeesProfit(extraFees);
+        }
     }
 
     /// @dev Computes quota revenue accrued since the last update
@@ -568,6 +575,18 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     /// @dev Computes quota revenue accrued since given timestamp
     function _calcQuotaRevenueAccrued(uint256 timestamp) private view returns (uint256) {
         return quotaRevenue().calcLinearGrowth(timestamp);
+    }
+
+    /// @dev Adds extra fees to expected liquidity and mints corresponding shares
+    ///      to the treasury
+    function _mintExtraFeesProfit(uint256 extraFees) internal {
+        _mint(treasury, convertToShares(extraFees));
+
+        _updateBaseInterest({
+            expectedLiquidityDelta: extraFees.toInt256(),
+            availableLiquidityDelta: 0,
+            checkOptimalBorrowing: false
+        });
     }
 
     // ------------- //

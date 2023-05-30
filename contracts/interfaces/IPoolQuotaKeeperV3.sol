@@ -11,6 +11,7 @@ struct TokenQuotaParams {
     uint16 rate; // current rate update
     uint192 cumulativeIndexLU_RAY; // max 10^57
     uint16 quotaIncreaseFee;
+    uint96 extraFeesAccrued;
 }
 
 struct AccountQuota {

@@ -305,6 +305,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         uint16[] memory rates = IGaugeV3(gauge).getRates(tokens); // F:[PQK-7]
 
         uint256 quotaRevenue;
+        uint256 extraFees;
         uint256 timestampLU = lastQuotaRateUpdate;
         uint256 len = tokens.length;
 
@@ -317,6 +318,11 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
             quotaRevenue += tokenQuotaParams.updateRate(timestampLU, rate);
 
+            /// The function also aggregates accrued extra trading fees from all tokens
+            /// to notify the pool of all of them at once
+            extraFees += tokenQuotaParams.extraFeesAccrued;
+            tokenQuotaParams.extraFeesAccrued = 0;
+
             emit UpdateTokenQuotaRate(token, rate); // F:[PQK-7]
 
             unchecked {
@@ -324,7 +330,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             }
         }
 
-        IPoolV3(pool).setQuotaRevenue(quotaRevenue); // F:[PQK-7]
+        IPoolV3(pool).setQuotaRevenueAndExtraFees(quotaRevenue, extraFees); // F:[PQK-7]
         lastQuotaRateUpdate = uint40(block.timestamp); // F:[PQK-7]
     }
 

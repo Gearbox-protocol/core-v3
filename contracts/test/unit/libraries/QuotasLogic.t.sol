@@ -178,7 +178,7 @@ contract QuotasLogicTest is TestHelper {
                 quotaChange: int96(int256(2 * WAD)),
                 quotaLimit: uint96(5 * WAD),
                 totalQuoted: uint96(15 * WAD / 10),
-                caQuotaInterestChangeExpected: WAD + WAD / 1000 + 2 * WAD / 100,
+                caQuotaInterestChangeExpected: WAD + WAD / 1000,
                 quotaRevenueChangeExpected: int256(int96(int256(2 * WAD)) * 365 / 1000),
                 realQuotaChangeExpected: int96(int256(2 * WAD)),
                 enableTokenExpected: false,
@@ -195,7 +195,7 @@ contract QuotasLogicTest is TestHelper {
                 quotaChange: int96(int256(2 * WAD)),
                 quotaLimit: uint96(3 * WAD),
                 totalQuoted: uint96(15 * WAD / 10),
-                caQuotaInterestChangeExpected: WAD + WAD / 1000 + 15 * WAD / 1000,
+                caQuotaInterestChangeExpected: WAD + WAD / 1000,
                 quotaRevenueChangeExpected: int256(int96(int256(15 * WAD / 10)) * 365 / 1000),
                 realQuotaChangeExpected: int96(int256(15 * WAD / 10)),
                 enableTokenExpected: false,
@@ -260,6 +260,7 @@ contract QuotasLogicTest is TestHelper {
             params.limit = cases[i].quotaLimit;
             params.totalQuoted = cases[i].totalQuoted;
             params.quotaIncreaseFee = cases[i].oneTimeFee;
+            params.extraFeesAccrued = 0;
 
             accountQuota.quota = cases[i].previousQuota;
             accountQuota.cumulativeIndexLU = cases[i].cumulativeIndexAccountLU;
@@ -304,6 +305,14 @@ contract QuotasLogicTest is TestHelper {
                 params.totalQuoted,
                 uint96(int96(cases[i].totalQuoted) + cases[i].realQuotaChangeExpected),
                 "Total quoted updated incorrectly"
+            );
+
+            assertEq(
+                params.extraFeesAccrued,
+                cases[i].realQuotaChangeExpected > 0
+                    ? uint96(int96(cases[i].realQuotaChangeExpected)) * cases[i].oneTimeFee / PERCENTAGE_FACTOR
+                    : 0,
+                "Extra fees updated incorrectly"
             );
         }
     }

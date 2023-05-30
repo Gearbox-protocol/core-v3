@@ -1341,7 +1341,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
             _setUpTestCase(Tokens.DAI, 0, 50_00, addLiquidity, 2 * RAY, 0, supportQuotas);
 
             vm.prank(address(pqk));
-            pool.setQuotaRevenue(quotaInterestPerYear);
+            pool.setQuotaRevenueAndExtraFees(quotaInterestPerYear, 0);
 
             uint256 baseInterestRate = pool.baseInterestRate();
             uint256 timeWarp = 365 days;
@@ -1402,7 +1402,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
         assertEq(pool.expectedLiquidityLU(), 0, "SETUP: Incorrect expectedLiquidityLU");
 
         vm.prank(POOL_QUOTA_KEEPER);
-        pool.setQuotaRevenue(qu1);
+        pool.setQuotaRevenueAndExtraFees(qu1, 0);
 
         assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "#1: Incorrect lastQuotaRevenuUpdate");
         assertEq(pool.quotaRevenue(), qu1, "#1: Incorrect quotaRevenue");
@@ -1416,7 +1416,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
         uint96 qu2 = uint96(WAD * 15);
 
         vm.prank(POOL_QUOTA_KEEPER);
-        pool.setQuotaRevenue(qu2);
+        pool.setQuotaRevenueAndExtraFees(qu2, 0);
 
         assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "#2: Incorrect lastQuotaRevenuUpdate");
         assertEq(pool.quotaRevenue(), qu2, "#2: Incorrect quotaRevenue");
@@ -1605,7 +1605,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
         assertEq(pool.poolQuotaKeeper(), POOL_QUOTA_KEEPER, "Incorrect Pool QuotaKeeper");
 
         vm.prank(POOL_QUOTA_KEEPER);
-        pool.setQuotaRevenue(qu);
+        pool.setQuotaRevenueAndExtraFees(qu, 0);
 
         uint256 year = 365 days;
 
@@ -1860,7 +1860,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
                 pool.setPoolQuotaKeeper(POOL_QUOTA_KEEPER);
 
                 vm.prank(POOL_QUOTA_KEEPER);
-                pool.setQuotaRevenue(testCase.quotaRevenue);
+                pool.setQuotaRevenueAndExtraFees(testCase.quotaRevenue, 0);
             }
 
             assertEq(

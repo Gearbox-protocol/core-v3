@@ -68,6 +68,7 @@ contract PoolMock is IPoolService {
     uint256 public override version = 3_00;
 
     uint96 public quotaRevenue;
+    uint96 public extraFees;
 
     // Paused flag
     bool public paused = false;
@@ -110,8 +111,9 @@ contract PoolMock is IPoolService {
 
     function updateQuotaRevenue(int256) external {}
 
-    function setQuotaRevenue(uint256 _quotaRevenue) external {
+    function setQuotaRevenueAndExtraFees(uint256 _quotaRevenue, uint256 _extraFees) external {
         quotaRevenue = uint96(_quotaRevenue);
+        extraFees = uint96(_extraFees);
     }
 
     function lendCreditAccount(uint256 borrowedAmount, address creditAccount) external override {
