@@ -174,7 +174,7 @@ library QuotasLogic {
             // trading fees for tokens with high volume but short position duration, in which
             // case trading fees are a more effective pricing policy than charging interest over time
             // These fees go to the DAO.
-            tokenQuotaParams.extraFeesAccrued = change * tokenQuotaParams.quotaIncreaseFee / PERCENTAGE_FACTOR;
+            tokenQuotaParams.extraFeesAccrued += change * tokenQuotaParams.quotaIncreaseFee / PERCENTAGE_FACTOR;
 
             // Quota revenue is a global sum of all quota interest received from all tokens and accounts
             // per year. It is used by the pool to effectively compute expected quota revenue with just one value
