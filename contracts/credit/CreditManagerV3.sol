@@ -22,7 +22,6 @@ import {IERC20Helper} from "../libraries/IERC20Helper.sol";
 import {IAccountFactoryBase} from "../interfaces/IAccountFactoryV3.sol";
 import {ICreditAccountBase} from "../interfaces/ICreditAccountV3.sol";
 import {IPoolBase, IPoolV3} from "../interfaces/IPoolV3.sol";
-import {IWETHGatewayV3} from "../interfaces/IWETHGatewayV3.sol";
 import {ClaimAction, IWithdrawalManagerV3} from "../interfaces/IWithdrawalManagerV3.sol";
 import {
     ICreditManagerV3,
@@ -85,9 +84,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     /// @notice Address of WETH
     address public immutable override weth;
-
-    /// @notice Address of WETH Gateway
-    address public immutable wethGateway;
 
     /// @notice Whether the CM supports quota-related logic
     bool public immutable override supportsQuotas;
@@ -216,14 +212,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         weth =
             IAddressProviderV3(addressProvider).getAddressOrRevert({key: AP_WETH_TOKEN, _version: NO_VERSION_CONTROL}); // U:[CM-1]
-        wethGateway = IAddressProviderV3(addressProvider).getAddressOrRevert({key: AP_WETH_GATEWAY, _version: 3_00}); // U:[CM-1]
         priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert({key: AP_PRICE_ORACLE, _version: 2}); // U:[CM-1]
         accountFactory = IAddressProviderV3(addressProvider).getAddressOrRevert({
             key: AP_ACCOUNT_FACTORY,
             _version: NO_VERSION_CONTROL
         }); // U:[CM-1]
         withdrawalManager =
-            IAddressProviderV3(addressProvider).getAddressOrRevert({key: AP_WITHDRAWAL_MANAGER, _version: 3_00});
+            IAddressProviderV3(addressProvider).getAddressOrRevert({key: AP_WITHDRAWAL_MANAGER, _version: 3_00}); // U:[CM-1]
 
         creditConfigurator = msg.sender; // U:[CM-1]
 
@@ -1124,22 +1119,26 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
     }
 
-    /// @notice Requests the Credit Account to transfer a token to another address. If a token transfer
-    ///         fails, the token will be transferred to WithdrawalManagerV3, where the `to` address can
-    ///         withdraw it from to any address.
+    /// @notice Requests the Credit Account to transfer a token to another address
+    ///         If transfer fails (e.g., `to` gets blacklisted in the token), the token will be transferred
+    ///         to withdrawal manager from which `to` can later claim it to an arbitrary address.
     /// @param creditAccount Address of the sender Credit Account
     /// @param token Address of the token
     /// @param to Recipient address
     /// @param amount Amount to transfer
+    /// @param convertToETH If true, WETH will be transferred to withdrawal manager, from which Credit Facade can
+    ///        claim it as ETH later in the transaction (ignored if token is not WETH)
     function _safeTokenTransfer(address creditAccount, address token, address to, uint256 amount, bool convertToETH)
         internal
     {
         if (convertToETH && token == weth) {
-            ICreditAccountBase(creditAccount).transfer({token: token, to: wethGateway, amount: amount}); // U:[CM-31, 32]
-            IWETHGatewayV3(wethGateway).deposit({to: to, amount: amount}); // U:[CM-31, 32]
+            ICreditAccountBase(creditAccount).transfer({token: token, to: withdrawalManager, amount: amount}); // U:[CM-31, 32]
+            IWithdrawalManagerV3(withdrawalManager).addImmediateWithdrawal({
+                token: token,
+                to: msg.sender,
+                amount: amount
+            }); // U:[CM-31, 32]
         } else {
-            // In case a token transfer fails (e.g., borrower getting blacklisted by USDC), the token will be sent
-            // to WithdrawalManagerV3
             try ICreditAccountBase(creditAccount).safeTransfer({token: token, to: to, amount: amount}) {
                 // U:[CM-31, 32, 33]
             } catch {
