@@ -555,8 +555,13 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
             }
 
             vm.prank(address(creditManagerMock));
-            (uint256 caQuotaInterestChange, int96 realQuotaChange, bool enableToken, bool disableToken) =
-                pqk.updateQuota(creditAccount, token, _case.change, _case.minQuota, _case.maxQuota);
+            (
+                uint256 caQuotaInterestChange,
+                uint256 tradingFees,
+                int96 realQuotaChange,
+                bool enableToken,
+                bool disableToken
+            ) = pqk.updateQuota(creditAccount, token, _case.change, _case.minQuota, _case.maxQuota);
 
             if (!_case.expectRevert) {
                 assertEq(

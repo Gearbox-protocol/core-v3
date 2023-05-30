@@ -54,7 +54,13 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     function updateQuota(address, address, int96, uint96, uint96)
         external
         view
-        returns (uint256 caQuotaInterestChange, int96 realQuotaChange, bool enableToken, bool disableToken)
+        returns (
+            uint256 caQuotaInterestChange,
+            uint256 tradingFees,
+            int96 realQuotaChange,
+            bool enableToken,
+            bool disableToken
+        )
     {
         caQuotaInterestChange = return_caQuotaInterestChange;
         realQuotaChange = return_realQuotaChange;

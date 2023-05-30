@@ -965,8 +965,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         uint256 caInterestChange;
         bool enable;
         bool disable;
+        uint256 tradingFees;
 
-        (caInterestChange, realQuotaChange, enable, disable) = IPoolQuotaKeeperV3(poolQuotaKeeper()).updateQuota({
+        (caInterestChange, tradingFees, realQuotaChange, enable, disable) = IPoolQuotaKeeperV3(poolQuotaKeeper())
+            .updateQuota({
             creditAccount: creditAccount,
             token: token,
             quotaChange: quotaChange,

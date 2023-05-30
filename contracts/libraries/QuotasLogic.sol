@@ -105,6 +105,7 @@ library QuotasLogic {
     /// @return caQuotaInterestChange Outstanding quota interest before the update. It is expected that this
     ///                               value is cached somewhere else (e.g., in Credit Manager), otherwise it
     ///                               will be lost.
+    /// @return tradingFees Trading fees computed during increasing quota
     /// @return quotaRevenueChange Amount to update quota revenue by.
     /// @return realQuotaChange Amount the quota actually changed by after taking
     ///                         capacity into account
@@ -120,6 +121,7 @@ library QuotasLogic {
         initializedQuotasOnly(tokenQuotaParams) // U: [QL-9]
         returns (
             uint256 caQuotaInterestChange,
+            uint256 tradingFees,
             int256 quotaRevenueChange,
             int96 realQuotaChange,
             bool enableToken,
@@ -146,18 +148,21 @@ library QuotasLogic {
             // If the amount is larger than the existing capacity, then the quota is only increased
             // by capacity. This is done instead of reverting to avoid unexpected reverts due to race conditions
 
-            uint96 totalQuoted = tokenQuotaParams.totalQuoted;
-            uint96 limit = tokenQuotaParams.limit;
+            {
+                uint96 totalQuoted = tokenQuotaParams.totalQuoted;
+                uint96 limit = tokenQuotaParams.limit;
 
-            uint96 maxQuotaCapacity = limit > totalQuoted ? limit - totalQuoted : 0;
+                if (totalQuoted >= limit) {
+                    return (caQuotaInterestChange, 0, 0, 0, false, false); // U: [QL-3]
+                }
+                unchecked {
+                    uint96 maxQuotaCapacity = limit - totalQuoted;
 
-            if (maxQuotaCapacity == 0) {
-                return (caQuotaInterestChange, 0, 0, false, false); // U: [QL-3]
+                    change = uint96(quotaChange);
+                    change = change > maxQuotaCapacity ? maxQuotaCapacity : change; // I:[CMQ-08,10] U: [QL-3]
+                    realQuotaChange = int96(change); // U: [QL-3]
+                }
             }
-
-            change = uint96(quotaChange);
-            change = change > maxQuotaCapacity ? maxQuotaCapacity : change; // I:[CMQ-08,10] U: [QL-3]
-            realQuotaChange = int96(change); // U: [QL-3]
 
             // Quoted tokens are only enabled in the CM when their quotas are changed
             // from zero to non-zero. This is done to correctly
@@ -174,7 +179,8 @@ library QuotasLogic {
             // For some tokens, a one-time quota increase fee may be charged. This is a proxy for
             // trading fees for tokens with high volume but short position duration, in which
             // case trading fees are a more effective pricing policy than charging interest over time
-            caQuotaInterestChange += uint256(change) * tokenQuotaParams.quotaIncreaseFee / PERCENTAGE_FACTOR; // U: [QL-3]
+            tradingFees = uint256(change) * tokenQuotaParams.quotaIncreaseFee / PERCENTAGE_FACTOR; // U: [QL-3]
+            caQuotaInterestChange += tradingFees;
 
             // Quota revenue is a global sum of all quota interest received from all tokens and accounts
             // per year. It is used by the pool to effectively compute expected quota revenue with just one value
