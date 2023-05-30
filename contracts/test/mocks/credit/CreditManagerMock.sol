@@ -35,8 +35,8 @@ contract CreditManagerMock {
     /// @dev Address of WETH
     address public weth;
 
-    /// @dev Address of WETH Gateway
-    address public wethGateway;
+    /// @dev Address of withdrawal manager
+    address public withdrawalManager;
 
     mapping(address => uint256) public tokenMasksMap;
 
@@ -86,7 +86,7 @@ contract CreditManagerMock {
     constructor(address _addressProvider, address _pool) {
         addressProvider = _addressProvider;
         weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // U:[CM-1]
-        wethGateway = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_GATEWAY, 3_00); // U:[CM-1]
+        withdrawalManager = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00);
         setPoolService(_pool);
         creditConfigurator = CONFIGURATOR;
         supportsQuotas = true;

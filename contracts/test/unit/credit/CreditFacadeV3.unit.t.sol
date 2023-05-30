@@ -6,7 +6,6 @@ pragma solidity ^0.8.17;
 import "../../../interfaces/IAddressProviderV3.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
-import {IWETHGatewayV3} from "../../../interfaces/IWETHGatewayV3.sol";
 import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
 
@@ -39,7 +38,7 @@ import {
 import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {IBotListV3} from "../../../interfaces/IBotListV3.sol";
 
-import {ClaimAction} from "../../../interfaces/IWithdrawalManagerV3.sol";
+import {ClaimAction, IWithdrawalManagerV3} from "../../../interfaces/IWithdrawalManagerV3.sol";
 import {BitMask, UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
@@ -77,7 +76,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     PriceOracleMock priceOracleMock;
     PoolMock poolMock;
 
-    IWETHGatewayV3 wethGateway;
     BotListMock botListMock;
 
     DegenNFTMock degenNFTMock;
@@ -146,8 +144,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
 
-        wethGateway = IWETHGatewayV3(addressProvider.getAddressOrRevert(AP_WETH_GATEWAY, 3_00));
-
         botListMock = BotListMock(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00));
 
         withdrawalManagerMock = WithdrawalManagerMock(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00));
@@ -205,9 +201,9 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         assertEq(creditFacade.weth(), creditManagerMock.weth(), "Incorrect weth token");
 
-        assertEq(creditFacade.wethGateway(), creditManagerMock.wethGateway(), "Incorrect weth gateway");
+        assertEq(creditFacade.withdrawalManager(), address(withdrawalManagerMock), "Incorrect withdrawalManager");
 
-        assertEq(creditFacade.degenNFT(), address(degenNFTMock), "Incorrect degenNFTMock");
+        assertEq(creditFacade.degenNFT(), address(degenNFTMock), "Incorrect degen NFT");
     }
 
     /// @dev U:[FA-2]: user functions revert if called on pause
@@ -594,6 +590,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditManagerMock.setDebtAndCollateralData(collateralDebtData);
 
         bool convertToETH = (getHash({value: enabledTokensMask, seed: 1}) % 2) == 1;
+        address weth = creditFacade.weth();
 
         caseName =
             string.concat(caseName, "convertToETH = ", boolToStr(convertToETH), ", hasCalls = ", boolToStr(hasCalls));
@@ -627,7 +624,10 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         );
 
         if (convertToETH) {
-            vm.expectCall(address(wethGateway), abi.encodeCall(IWETHGatewayV3.claim, (FRIEND)));
+            vm.expectCall(
+                address(withdrawalManagerMock),
+                abi.encodeCall(IWithdrawalManagerV3.claimImmediateWithdrawal, (weth, FRIEND, true))
+            );
         }
 
         if (hasBotPermissions) {
@@ -928,6 +928,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         }
 
         bool convertToETH = (getHash({value: enabledTokensMask, seed: 1}) % 2) == 1;
+        address weth = creditFacade.weth();
 
         caseName =
             string.concat(caseName, "convertToETH = ", boolToStr(convertToETH), ", hasCalls = ", boolToStr(hasCalls));
@@ -964,7 +965,10 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         );
 
         if (convertToETH) {
-            vm.expectCall(address(wethGateway), abi.encodeCall(IWETHGatewayV3.claim, (FRIEND)));
+            vm.expectCall(
+                address(withdrawalManagerMock),
+                abi.encodeCall(IWithdrawalManagerV3.claimImmediateWithdrawal, (weth, FRIEND, true))
+            );
         }
 
         if (hasBotPermissions) {

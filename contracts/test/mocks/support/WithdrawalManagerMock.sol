@@ -63,5 +63,7 @@ contract WithdrawalManagerMock {
         return_tokensToEnable = tokensToEnable;
     }
 
-    function addImmediateWithdrawal(address creditAccount, address to, uint256 amount) external {}
+    function addImmediateWithdrawal(address token, address to, uint256 amount) external {}
+
+    function claimImmediateWithdrawal(address token, address to, bool unwrapETH) external {}
 }
