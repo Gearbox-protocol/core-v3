@@ -44,6 +44,8 @@ struct DebtParams {
     uint128 limit;
 }
 
+uint256 constant SECONDS_PER_WEEK = 7 days;
+
 /// @title Pool V3
 /// @notice Pool contract that implements lending and borrowing logic, compatible with ERC-4626 standard
 contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV3 {
@@ -82,6 +84,11 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     address public override poolQuotaKeeper;
     /// @dev Current quota revenue
     uint96 internal _quotaRevenue;
+
+    /// @dev Extra fee revenue;
+    uint96 internal _extraFeeRevenue;
+    /// @dev Extra fee last update timestamp;
+    uint40 internal _lastExtraFeeRevenueUpdate;
 
     /// @dev Current base interest rate in ray
     uint128 internal _baseInterestRate;
@@ -159,8 +166,8 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         uint256 assets = expectedLiquidity();
         uint256 baseInterestRate_ = baseInterestRate();
         if (assets == 0) return baseInterestRate_;
-        return (baseInterestRate_ * _totalDebt.borrowed + quotaRevenue() * RAY) * (PERCENTAGE_FACTOR - withdrawFee)
-            / PERCENTAGE_FACTOR / assets; // U:[P4-28]
+        return (baseInterestRate_ * _totalDebt.borrowed + quotaRevenue() * RAY + _calcAnnualizedExtraFeeRevenue() * RAY)
+            * (PERCENTAGE_FACTOR - withdrawFee) / PERCENTAGE_FACTOR / assets; // U:[P4-28]
     }
 
     /// @inheritdoc IPoolV3
@@ -170,7 +177,8 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
 
     /// @inheritdoc IPoolV3
     function expectedLiquidity() public view override returns (uint256) {
-        return _expectedLiquidityLU + _calcBaseInterestAccrued() + (supportsQuotas ? _calcQuotaRevenueAccrued() : 0);
+        return _expectedLiquidityLU + _calcBaseInterestAccrued()
+            + (supportsQuotas ? _calcQuotaRevenueAccrued() + _calcExtraFeeRevenueAccrued() : 0);
     }
 
     /// @inheritdoc IPoolV3
@@ -513,7 +521,8 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
 
         _expectedLiquidityLU = expectedLiquidity_.toUint128(); // U:[P4-16]
         _baseInterestRate = IInterestRateModelV3(interestRateModel).calcBorrowRate({
-            expectedLiquidity: expectedLiquidity_ + (supportsQuotas ? _calcQuotaRevenueAccrued() : 0),
+            expectedLiquidity: expectedLiquidity_
+                + (supportsQuotas ? _calcQuotaRevenueAccrued() + _calcExtraFeeRevenueAccrued() : 0),
             availableLiquidity: availableLiquidity_,
             checkOptimalBorrowing: checkOptimalBorrowing
         }).toUint128(); // U:[P4-16]
@@ -540,7 +549,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
 
     /// @inheritdoc IPoolV3
     function updateQuotaRevenue(int256 quotaRevenueDelta) external override poolQuotaKeeperOnly {
-        _setQuotaRevenue((quotaRevenue().toInt256() + quotaRevenueDelta).toUint256()); // U:[P4-17]
+        _setQuotaRevenueAndExtraFees((quotaRevenue().toInt256() + quotaRevenueDelta).toUint256(), 0); // U:[P4-17]
     }
 
     /// @inheritdoc IPoolV3
@@ -549,10 +558,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         override
         poolQuotaKeeperOnly
     {
-        _setQuotaRevenue(newQuotaRevenue); // U:[P4-17]
-        if (extraFees > 0) {
-            _mintExtraFeesProfit(extraFees);
-        }
+        _setQuotaRevenueAndExtraFees(newQuotaRevenue, extraFees); // U:[P4-17]
     }
 
     /// @dev Computes quota revenue accrued since the last update
@@ -562,31 +568,51 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         return _calcQuotaRevenueAccrued(timestampLU); // U:[P4-17]
     }
 
-    /// @dev Adds accrued quota revenue to the expected liquidity, then sets new quota revenue
-    function _setQuotaRevenue(uint256 newQuotaRevenue) internal {
+    /// @dev Computes extra fee revenue accrued since last update
+    /// @dev Extra fee revenue is distributed over a fixed period,
+    ///      and will start accruing afterwards
+    function _calcExtraFeeRevenueAccrued() private view returns (uint256) {
+        uint256 timestampLU = _lastExtraFeeRevenueUpdate;
+        if (block.timestamp == timestampLU) return 0;
+        uint256 extraFeeRevenueCurrent = _extraFeeRevenue;
+        return extraFeeRevenueCurrent.calcBoundedLinearGrowth(timestampLU, SECONDS_PER_WEEK);
+    }
+
+    /// @dev Extrapolates remaining extra fee revenue to annualized revenue if it remained unchanged
+    function _calcAnnualizedExtraFeeRevenue() private view returns (uint256) {
+        uint256 timestampLU = _lastExtraFeeRevenueUpdate;
+        if (block.timestamp - timestampLU > SECONDS_PER_WEEK) return 0;
+
+        uint256 currentExtraFeeRevenue = _extraFeeRevenue;
+        uint256 remainder = currentExtraFeeRevenue
+            - currentExtraFeeRevenue.calcBoundedLinearGrowth(_lastExtraFeeRevenueUpdate, SECONDS_PER_WEEK);
+
+        return remainder * SECONDS_PER_YEAR / (timestampLU + SECONDS_PER_WEEK - block.timestamp);
+    }
+
+    /// @dev Sets new quota revenue and extra fee revenue
+    function _setQuotaRevenueAndExtraFees(uint256 newQuotaRevenue, uint256 newExtraFees) internal {
         uint256 timestampLU = lastQuotaRevenueUpdate;
         if (block.timestamp != timestampLU) {
             _expectedLiquidityLU += _calcQuotaRevenueAccrued(timestampLU).toUint128(); // U:[P4-17]
             lastQuotaRevenueUpdate = uint40(block.timestamp); // U:[P4-17]
         }
+
         _quotaRevenue = newQuotaRevenue.toUint96(); // U:[P4-17]
+
+        if (newExtraFees > 0) {
+            uint256 currentExtraFeeRevenue = _extraFeeRevenue;
+            uint256 remainder = currentExtraFeeRevenue
+                - currentExtraFeeRevenue.calcBoundedLinearGrowth(_lastExtraFeeRevenueUpdate, SECONDS_PER_WEEK);
+
+            _extraFeeRevenue = (remainder + newExtraFees).toUint96();
+            _lastExtraFeeRevenueUpdate = uint40(block.timestamp);
+        }
     }
 
     /// @dev Computes quota revenue accrued since given timestamp
     function _calcQuotaRevenueAccrued(uint256 timestamp) private view returns (uint256) {
         return quotaRevenue().calcLinearGrowth(timestamp);
-    }
-
-    /// @dev Adds extra fees to expected liquidity and mints corresponding shares
-    ///      to the treasury
-    function _mintExtraFeesProfit(uint256 extraFees) internal {
-        _mint(treasury, convertToShares(extraFees));
-
-        _updateBaseInterest({
-            expectedLiquidityDelta: extraFees.toInt256(),
-            availableLiquidityDelta: 0,
-            checkOptimalBorrowing: false
-        });
     }
 
     // ------------- //
@@ -619,7 +645,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
             revert IncompatiblePoolQuotaKeeperException(); // U:[P4-23B]
         }
         if (poolQuotaKeeper != address(0)) {
-            _setQuotaRevenue(_quotaRevenue); // U:[P4-23C]
+            _setQuotaRevenueAndExtraFees(_quotaRevenue, 0); // U:[P4-23C]
         }
         poolQuotaKeeper = newPoolQuotaKeeper; // U:[P4-23C]
         emit SetPoolQuotaKeeper(newPoolQuotaKeeper); // U:[P4-23C]

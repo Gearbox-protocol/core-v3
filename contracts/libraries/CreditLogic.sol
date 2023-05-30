@@ -20,19 +20,42 @@ library CreditLogic {
     // DEBT AND REPAYMENT CALCULATIONS
     //
 
-    /// @dev Computes the amount a linearly growing value increased by in a given timeframe
+    /// @dev Computes the amount a linearly growing value increased by in a given timeframe, with a growth period of 1 year
     /// @dev Usually, the value is some sort of an interest rate per year, and the function is used to compute
     ///      the growth of an index over aribtrary time
     /// @param value Target growth per year
     /// @param timestampLastUpdate Timestamp to compute the growth since
     function calcLinearGrowth(uint256 value, uint256 timestampLastUpdate) internal view returns (uint256) {
-        // timeDifference = blockTime - previous timeStamp
+        return calcLinearGrowth(value, timestampLastUpdate, SECONDS_PER_YEAR);
+    }
 
-        //                             timeDifference
-        //  valueGrowth = value  *  -------------------
-        //                           SECONDS_PER_YEAR
-        //
-        return value * (block.timestamp - timestampLastUpdate) / SECONDS_PER_YEAR;
+    /// @dev Computes the amount a linearly growing value increased by in a given timeframe
+    /// @dev Usually, the value is some sort of an interest rate per period, and the function is used to compute
+    ///      the growth of an index over aribtrary time
+    /// @param value Target growth per year
+    /// @param timestampLastUpdate Timestamp to compute the growth since
+    /// @param period Total period of growth
+    function calcLinearGrowth(uint256 value, uint256 timestampLastUpdate, uint256 period)
+        internal
+        view
+        returns (uint256)
+    {
+        return value * (block.timestamp - timestampLastUpdate) / period;
+    }
+
+    /// @dev Computes the amount a linearly growing value increased by in a given timeframe, with growth
+    ///      stopping after the period has elapsed
+    /// @param value Target growth per year
+    /// @param timestampLastUpdate Timestamp to compute the growth since
+    /// @param period Total period of growth
+    function calcBoundedLinearGrowth(uint256 value, uint256 timestampLastUpdate, uint256 period)
+        internal
+        view
+        returns (uint256)
+    {
+        return (block.timestamp - timestampLastUpdate) > period
+            ? value
+            : calcLinearGrowth(value, timestampLastUpdate, period);
     }
 
     /// @dev Calculates outstanding interest, given the principal and current and previous interest index values
