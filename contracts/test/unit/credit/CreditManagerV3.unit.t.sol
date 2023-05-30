@@ -555,6 +555,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: 12039120,
             cumulativeIndexLastUpdate: 23e3,
             cumulativeQuotaInterest: cumulativeQuotaInterestBefore,
+            quotaProfits: 1,
             enabledTokensMask: enabledTokensMaskBefore,
             flags: 34343,
             borrower: address(0)
@@ -1027,6 +1028,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: collateralDebtData.debt,
             cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
             cumulativeQuotaInterest: 0,
+            quotaProfits: 1,
             enabledTokensMask: 0,
             flags: 0,
             borrower: USER
@@ -1117,6 +1119,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: collateralDebtData.debt,
             cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
             cumulativeQuotaInterest: uint128(initialCQI),
+            quotaProfits: 1,
             enabledTokensMask: 0,
             flags: 0,
             borrower: USER
@@ -1134,13 +1137,14 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             uint256 expectedNewDebt,
             uint256 expectedCumulativeIndex,
             uint256 expectedProfit,
-            uint256 expectedCumulativeQuotaInterest
+            uint256 expectedCumulativeQuotaInterest,
         ) = CreditLogic.calcDecrease({
             amount: _amountMinusFee(amount),
             debt: collateralDebtData.debt,
             cumulativeIndexNow: collateralDebtData.cumulativeIndexNow,
             cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
             cumulativeQuotaInterest: collateralDebtData.cumulativeQuotaInterest,
+            quotaProfits: collateralDebtData.quotaProfits,
             feeInterest: DEFAULT_FEE_INTEREST
         });
 
@@ -1249,6 +1253,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: collateralDebtData.debt,
             cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
             cumulativeQuotaInterest: collateralDebtData.cumulativeQuotaInterest + 1,
+            quotaProfits: 1,
             enabledTokensMask: 0,
             flags: 0,
             borrower: USER
@@ -1494,6 +1499,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: 100330010,
             cumulativeIndexLastUpdate: RAY,
             cumulativeQuotaInterest: 0,
+            quotaProfits: 0,
             enabledTokensMask: enabledTokensMask,
             flags: 0,
             borrower: USER
@@ -1547,6 +1553,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: collateralDebtData.twvUSD - 1,
             cumulativeIndexLastUpdate: RAY,
             cumulativeQuotaInterest: 0,
+            quotaProfits: 0,
             enabledTokensMask: 0,
             flags: 0,
             borrower: USER
@@ -1592,6 +1599,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: debt,
             cumulativeIndexLastUpdate: cumulativeIndexLastUpdate,
             cumulativeQuotaInterest: 0,
+            quotaProfits: 0,
             enabledTokensMask: UNDERLYING_TOKEN_MASK,
             flags: 0,
             borrower: USER
@@ -1649,6 +1657,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: debt,
             cumulativeIndexLastUpdate: vars.get("cumulativeIndexLastUpdate"),
             cumulativeQuotaInterest: INITIAL_INTEREST,
+            quotaProfits: 1,
             enabledTokensMask: UNDERLYING_TOKEN_MASK | LINK_TOKEN_MASK | STETH_TOKEN_MASK,
             flags: 0,
             borrower: USER
@@ -1871,6 +1880,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                     debt: debt,
                     cumulativeIndexLastUpdate: vars.get("cumulativeIndexLastUpdate"),
                     cumulativeQuotaInterest: uint128(vars.get("INITIAL_INTEREST") + 1),
+                    quotaProfits: 1,
                     enabledTokensMask: _case.enabledTokensMask,
                     flags: 0,
                     borrower: USER
@@ -1937,6 +1947,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 debt: debt,
                 cumulativeIndexLastUpdate: vars.get("cumulativeIndexLastUpdate"),
                 cumulativeQuotaInterest: uint128(vars.get("INITIAL_INTEREST") + 1),
+                quotaProfits: 1,
                 enabledTokensMask: UNDERLYING_TOKEN_MASK,
                 flags: setFlag ? WITHDRAWAL_FLAG : 0,
                 borrower: USER
@@ -2158,6 +2169,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: 0,
             cumulativeIndexLastUpdate: 0,
             cumulativeQuotaInterest: INITIAL_INTEREST,
+            quotaProfits: 0,
             enabledTokensMask: 0,
             flags: 0,
             borrower: USER
@@ -2645,6 +2657,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: 0,
             cumulativeIndexLastUpdate: 0,
             cumulativeQuotaInterest: 0,
+            quotaProfits: 0,
             enabledTokensMask: enabledTokensMask,
             flags: flags,
             borrower: USER
@@ -2666,6 +2679,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                     debt: 0,
                     cumulativeIndexLastUpdate: 0,
                     cumulativeQuotaInterest: 0,
+                    quotaProfits: 0,
                     enabledTokensMask: 0,
                     flags: flag,
                     borrower: USER
@@ -2693,6 +2707,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: 0,
             cumulativeIndexLastUpdate: 0,
             cumulativeQuotaInterest: 0,
+            quotaProfits: 0,
             enabledTokensMask: 0,
             flags: 0,
             borrower: address(0)

@@ -259,6 +259,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         if (supportsQuotas) {
             creditAccountInfo[creditAccount].cumulativeQuotaInterest = 1;
+            creditAccountInfo[creditAccount].quotaProfits = 1;
         } // U:[CM-6]
 
         // Requests the pool to transfer tokens the Credit Account
@@ -474,17 +475,20 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             }); // U:[CM-11]
 
             uint128 newCumulativeQuotaInterest;
+            uint128 newQuotaProfits;
             // Pays the entire amount back to the pool
             ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amount}); // U:[CM-11]
             {
                 uint256 profit;
 
-                (newDebt, newCumulativeIndex, profit, newCumulativeQuotaInterest) = CreditLogic.calcDecrease({
+                (newDebt, newCumulativeIndex, profit, newCumulativeQuotaInterest, newQuotaProfits) = CreditLogic
+                    .calcDecrease({
                     amount: _amountMinusFee(amount),
                     debt: collateralDebtData.debt,
                     cumulativeIndexNow: collateralDebtData.cumulativeIndexNow,
                     cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
                     cumulativeQuotaInterest: collateralDebtData.cumulativeQuotaInterest,
+                    quotaProfits: collateralDebtData.quotaProfits,
                     feeInterest: feeInterest
                 }); // U:[CM-11]
 
@@ -502,6 +506,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     tokens: collateralDebtData.quotedTokens
                 });
                 creditAccountInfo[creditAccount].cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // U:[CM-11]
+                creditAccountInfo[creditAccount].quotaProfits = newQuotaProfits + 1;
             }
 
             /// If the entire underlying balance was spent on repayment, it is disabled
@@ -807,6 +812,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             }); // U:[CM-21]
 
             collateralDebtData.cumulativeQuotaInterest += creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1; // U:[CM-21]
+            collateralDebtData.quotaProfits = creditAccountInfo[creditAccount].quotaProfits - 1;
         }
 
         collateralDebtData.accruedInterest = CreditLogic.calcAccruedInterest({
@@ -816,7 +822,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }) + collateralDebtData.cumulativeQuotaInterest; // U:[CM-21] // I: [CMQ-07]
 
         collateralDebtData.accruedFees = (collateralDebtData.accruedInterest * feeInterest) / PERCENTAGE_FACTOR
-            + (supportsQuotas ? creditAccountInfo[creditAccount].quotaProfits : 0); // U:[CM-21]
+            + (supportsQuotas ? collateralDebtData.quotaProfits : 0); // U:[CM-21]
 
         if (task == CollateralCalcTask.DEBT_ONLY) return collateralDebtData; // U:[CM-21]
 
