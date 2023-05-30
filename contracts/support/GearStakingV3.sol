@@ -13,7 +13,9 @@ import {
     UserVoteLockData,
     WithdrawalData,
     MultiVote,
-    VotingContractStatus
+    VotingContractStatus,
+    EPOCHS_TO_WITHDRAW,
+    EPOCH_LENGTH
 } from "../interfaces/IGearStakingV3.sol";
 
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
@@ -21,13 +23,17 @@ import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
-uint256 constant EPOCH_LENGTH = 7 days;
-
 contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     using SafeCast for uint256;
 
+    /// @notice Contract version
+    uint256 public constant override version = 3_00;
+
     /// @notice Address of the GEAR token
     address public immutable override gear;
+
+    /// @notice Timestamp of the first epoch of voting
+    uint256 immutable firstEpochTimestamp;
 
     /// @notice Mapping of user address to their total staked tokens and tokens available for voting
     mapping(address => UserVoteLockData) internal voteLockData;
@@ -38,75 +44,9 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     /// @notice Mapping of address to their status as allowed voting contract
     mapping(address => VotingContractStatus) public allowedVotingContract;
 
-    /// @notice Timestamp of the first epoch of voting
-    uint256 immutable firstEpochTimestamp;
-
-    /// @notice Contract version
-    uint256 public constant override version = 3_00;
-
     constructor(address _addressProvider, uint256 _firstEpochTimestamp) ACLNonReentrantTrait(_addressProvider) {
-        gear = IAddressProviderV3(_addressProvider).getAddressOrRevert(AP_GEAR_TOKEN, NO_VERSION_CONTROL);
-        firstEpochTimestamp = _firstEpochTimestamp;
-    }
-
-    /// @notice Returns the current global voting epoch
-    function getCurrentEpoch() public view returns (uint16) {
-        if (block.timestamp < firstEpochTimestamp) return 0;
-        return uint16((block.timestamp - firstEpochTimestamp) / EPOCH_LENGTH) + 1;
-    }
-
-    /// @notice Returns the total amount of GEAR the user staked into staked GEAR
-    function balanceOf(address user) external view returns (uint256) {
-        return uint256(voteLockData[user].totalStaked);
-    }
-
-    /// @notice Returns the balance available for voting or withdrawal
-    function availableBalance(address user) external view returns (uint256) {
-        return uint256(voteLockData[user].available);
-    }
-
-    /// @notice Returns the amounts withdrawable now and over the next 4 epochs
-    function getWithdrawableAmounts(address user)
-        external
-        view
-        returns (uint256 withdrawableNow, uint256[4] memory withdrawableInEpochs)
-    {
-        uint16 epochNow = getCurrentEpoch();
-
-        WithdrawalData memory wd = withdrawalData[user];
-
-        if (epochNow > wd.epochLastUpdate) {
-            if (
-                wd.withdrawalsPerEpoch[0] + wd.withdrawalsPerEpoch[1] + wd.withdrawalsPerEpoch[2]
-                    + wd.withdrawalsPerEpoch[3] > 0
-            ) {
-                uint16 epochDiff = epochNow - wd.epochLastUpdate;
-
-                for (uint256 i = 0; i < 4;) {
-                    if (i < epochDiff) {
-                        withdrawableNow += wd.withdrawalsPerEpoch[i];
-                    }
-
-                    if (epochDiff < 4 && i < 4 - epochDiff) {
-                        withdrawableInEpochs[i] = wd.withdrawalsPerEpoch[i + epochDiff];
-                    } else {
-                        withdrawableInEpochs[i] = 0;
-                    }
-
-                    unchecked {
-                        ++i;
-                    }
-                }
-            }
-        } else {
-            for (uint256 i = 0; i < 4;) {
-                withdrawableInEpochs[i] = uint256(wd.withdrawalsPerEpoch[i]);
-
-                unchecked {
-                    ++i;
-                }
-            }
-        }
+        gear = IAddressProviderV3(_addressProvider).getAddressOrRevert(AP_GEAR_TOKEN, NO_VERSION_CONTROL); // U:[GS-01]
+        firstEpochTimestamp = _firstEpochTimestamp; // U:[GS-01]
     }
 
     /// @notice Deposits an amount of GEAR into staked GEAR. Optionally, performs a sequence of vote changes according to
@@ -117,19 +57,13 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     ///              * voteAmount - amount of staked GEAR to add to or remove from a vote
     ///              * isIncrease - whether to add or remove votes
     ///              * extraData - data specific to the voting contract that is decoded on recipient side
-    function deposit(uint256 amount, MultiVote[] memory votes) external nonReentrant {
+    function deposit(uint96 amount, MultiVote[] calldata votes) external nonReentrant {
         IERC20(gear).transferFrom(msg.sender, address(this), amount);
 
-        {
-            uint96 amount96 = amount.toUint96();
+        UserVoteLockData storage vld = voteLockData[msg.sender];
 
-            UserVoteLockData memory vld = voteLockData[msg.sender];
-
-            vld.totalStaked += amount96;
-            vld.available += amount96;
-
-            voteLockData[msg.sender] = vld;
-        }
+        vld.totalStaked += amount;
+        vld.available += amount;
 
         emit DepositGear(msg.sender, amount);
 
@@ -144,7 +78,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     ///              * voteAmount - amount of staked GEAR to add to or remove from a vote
     ///              * isIncrease - whether to add or remove votes
     ///              * extraData - data specific to the voting contract that is decoded on recipient side
-    function multivote(MultiVote[] memory votes) external nonReentrant {
+    function multivote(MultiVote[] calldata votes) external nonReentrant {
         _multivote(msg.sender, votes);
     }
 
@@ -159,16 +93,15 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     ///              * voteAmount - amount of staked GEAR to add to or remove from a vote
     ///              * isIncrease - whether to add or remove votes
     ///              * extraData - data specific to the voting contract that is decoded on recipient side
-    function withdraw(uint256 amount, address to, MultiVote[] memory votes) external nonReentrant {
-        if (votes.length > 0) {
+    function withdraw(uint96 amount, address to, MultiVote[] calldata votes) external nonReentrant {
+        if (votes.length != 0) {
             _multivote(msg.sender, votes);
         }
 
         _processPendingWithdrawals(msg.sender, to);
 
-        uint96 amount96 = amount.toUint96();
-        voteLockData[msg.sender].available -= amount96;
-        withdrawalData[msg.sender].withdrawalsPerEpoch[3] += amount96;
+        voteLockData[msg.sender].available -= amount;
+        withdrawalData[msg.sender].withdrawalsPerEpoch[EPOCHS_TO_WITHDRAW - 1] += amount;
 
         emit ScheduleGearWithdrawal(msg.sender, amount);
     }
@@ -188,40 +121,28 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
         WithdrawalData memory wd = withdrawalData[user];
 
         if (epochNow > wd.epochLastUpdate) {
-            if (
-                wd.withdrawalsPerEpoch[0] + wd.withdrawalsPerEpoch[1] + wd.withdrawalsPerEpoch[2]
-                    + wd.withdrawalsPerEpoch[3] > 0
-            ) {
-                uint16 epochDiff = epochNow - wd.epochLastUpdate;
-                uint256 totalClaimable = 0;
+            uint16 epochDiff = epochNow - wd.epochLastUpdate;
+            uint256 totalClaimable;
 
-                // Epochs one, two, three and four in the struct are always relative
-                // to epochLastUpdate, so the amounts are "shifted" by the number of epochs that passed
-                // since epochLastUpdate, on each update. If some amount shifts beyond epoch one, it is mature,
-                // so GEAR is sent to the user.
-
-                for (uint256 i = 0; i < 4;) {
+            // Epochs one, two, three and four in the struct are always relative
+            // to epochLastUpdate, so the amounts are "shifted" by the number of epochs that passed
+            // since epochLastUpdate, on each update. If some amount shifts beyond epoch one, it is mature,
+            // so GEAR is sent to the user.
+            unchecked {
+                for (uint256 i = 0; i < EPOCHS_TO_WITHDRAW; ++i) {
                     if (i < epochDiff) {
                         totalClaimable += wd.withdrawalsPerEpoch[i];
                     }
 
-                    if (epochDiff < 4 && i < 4 - epochDiff) {
-                        wd.withdrawalsPerEpoch[i] = wd.withdrawalsPerEpoch[i + epochDiff];
-                    } else {
-                        wd.withdrawalsPerEpoch[i] = 0;
-                    }
-
-                    unchecked {
-                        ++i;
-                    }
+                    wd.withdrawalsPerEpoch[i] =
+                        (i + epochDiff < EPOCHS_TO_WITHDRAW) ? wd.withdrawalsPerEpoch[i + epochDiff] : 0;
                 }
+            }
 
-                if (totalClaimable > 0) {
-                    IERC20(gear).transfer(to, totalClaimable);
-                    emit ClaimGearWithdrawal(user, to, totalClaimable);
-                }
-
+            if (totalClaimable > 0) {
+                IERC20(gear).transfer(to, totalClaimable);
                 voteLockData[user].totalStaked -= totalClaimable.toUint96();
+                emit ClaimGearWithdrawal(user, to, totalClaimable);
             }
 
             wd.epochLastUpdate = epochNow;
@@ -230,13 +151,13 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     }
 
     /// @dev Performs a sequence of vote changes based on the passed array
-    function _multivote(address user, MultiVote[] memory votes) internal {
+    function _multivote(address user, MultiVote[] calldata votes) internal {
         uint256 len = votes.length;
 
-        UserVoteLockData memory vld = voteLockData[user];
+        UserVoteLockData storage vld = voteLockData[user];
 
         for (uint256 i = 0; i < len;) {
-            MultiVote memory currentVote = votes[i];
+            MultiVote calldata currentVote = votes[i];
 
             if (currentVote.isIncrease) {
                 if (allowedVotingContract[currentVote.votingContract] != VotingContractStatus.ALLOWED) {
@@ -260,8 +181,47 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
                 ++i;
             }
         }
+    }
 
-        voteLockData[user] = vld;
+    //
+    // GETTERS
+    //
+
+    /// @notice Returns the current global voting epoch
+    function getCurrentEpoch() public view returns (uint16) {
+        if (block.timestamp < firstEpochTimestamp) return 0; // U:[GS-01]
+        return uint16((block.timestamp - firstEpochTimestamp) / EPOCH_LENGTH) + 1; // U:[GS-01]
+    }
+
+    /// @notice Returns the total amount of GEAR the user staked into staked GEAR
+    function balanceOf(address user) external view returns (uint256) {
+        return uint256(voteLockData[user].totalStaked);
+    }
+
+    /// @notice Returns the balance available for voting or withdrawal
+    function availableBalance(address user) external view returns (uint256) {
+        return uint256(voteLockData[user].available);
+    }
+
+    /// @notice Returns the amounts withdrawable now and over the next 4 epochs
+    function getWithdrawableAmounts(address user)
+        external
+        view
+        returns (uint256 withdrawableNow, uint256[EPOCHS_TO_WITHDRAW] memory withdrawableInEpochs)
+    {
+        WithdrawalData storage wd = withdrawalData[user];
+
+        uint16 epochDiff = getCurrentEpoch() - wd.epochLastUpdate;
+        unchecked {
+            for (uint256 i = 0; i < EPOCHS_TO_WITHDRAW; ++i) {
+                if (i < epochDiff) {
+                    withdrawableNow += wd.withdrawalsPerEpoch[i];
+                }
+
+                withdrawableInEpochs[i] =
+                    (i + epochDiff < EPOCHS_TO_WITHDRAW) ? wd.withdrawalsPerEpoch[i + epochDiff] : 0;
+            }
+        }
     }
 
     //

@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {GearStakingV3} from "../../../support/GearStakingV3.sol";
+import {GearStakingV3, EPOCH_LENGTH} from "../../../support/GearStakingV3.sol";
 import {IGearStakingV3Events, MultiVote, VotingContractStatus} from "../../../interfaces/IGearStakingV3.sol";
 import {IVotingContractV3} from "../../../interfaces/IVotingContractV3.sol";
 
@@ -23,8 +23,6 @@ import {Tokens} from "../../config/Tokens.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
-
-uint256 constant EPOCH_LENGTH = 7 days;
 
 contract GearStakingTest is Test, IGearStakingV3Events {
     address gearToken;
@@ -56,19 +54,20 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         gearStaking.setVotingContractStatus(address(votingContract), VotingContractStatus.ALLOWED);
     }
 
-    /// @dev [GS-01]: constructor sets correct values
-    function test_GS_01_constructor_sets_correct_values() public {
+    /// @dev U:[GS-01]: constructor sets correct values
+    function test_U_GS_01_constructor_sets_correct_values() public {
         assertEq(address(gearStaking.gear()), gearToken, "Gear token incorrect");
-
         assertEq(gearStaking.getCurrentEpoch(), 0, "First epoch timestamp incorrect");
 
         vm.warp(block.timestamp + 1);
-
         assertEq(gearStaking.getCurrentEpoch(), 1, "First epoch timestamp incorrect");
+
+        vm.warp(block.timestamp + EPOCH_LENGTH);
+        assertEq(gearStaking.getCurrentEpoch(), 2, "First epoch timestamp incorrect");
     }
 
     /// @dev [GS-02]: deposit performs operations in order and emits events
-    function test_GS_02_deposit_works_correctly() public {
+    function test_U_GS_02_deposit_works_correctly() public {
         MultiVote[] memory votes = new MultiVote[](1);
         votes[0] = MultiVote({
             votingContract: address(votingContract),
@@ -86,7 +85,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         vm.expectCall(address(votingContract), abi.encodeCall(IVotingContractV3.vote, (USER, uint96(WAD / 2), "")));
 
         vm.prank(USER);
-        gearStaking.deposit(WAD, votes);
+        gearStaking.deposit(uint96(WAD), votes);
 
         assertEq(gearStaking.balanceOf(USER), WAD);
 
@@ -94,7 +93,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
     }
 
     /// @dev [GS-03]: withdraw performs operations in order and emits events
-    function test_GS_03_withdraw_works_correctly() public {
+    function test_U_GS_03_withdraw_works_correctly() public {
         MultiVote[] memory votes = new MultiVote[](1);
         votes[0] = MultiVote({
             votingContract: address(votingContract),
@@ -107,7 +106,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
         vm.prank(USER);
-        gearStaking.deposit(WAD, votes);
+        gearStaking.deposit(uint96(WAD), votes);
 
         votes = new MultiVote[](1);
         votes[0] = MultiVote({
@@ -123,7 +122,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         emit ScheduleGearWithdrawal(USER, WAD);
 
         vm.prank(USER);
-        gearStaking.withdraw(WAD, FRIEND, votes);
+        gearStaking.withdraw(uint96(WAD), FRIEND, votes);
 
         assertEq(gearStaking.balanceOf(USER), WAD);
 
@@ -137,14 +136,14 @@ contract GearStakingTest is Test, IGearStakingV3Events {
     }
 
     /// @dev [GS-04]: multivote works correctly
-    function test_GS_04_multivote_works_correctly() public {
+    function test_U_GS_04_multivote_works_correctly() public {
         MultiVote[] memory votes = new MultiVote[](0);
 
         tokenTestSuite.mint(gearToken, USER, WAD);
         tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
         vm.prank(USER);
-        gearStaking.deposit(WAD, votes);
+        gearStaking.deposit(uint96(WAD), votes);
 
         TargetContractMock votingContract2 = new TargetContractMock();
 
@@ -188,7 +187,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
     }
 
     /// @dev [GS-04A]: multivote reverts if voting contract status is incorrect
-    function test_GS_04A_multivote_respects_voting_contract_status() public {
+    function test_U_GS_04A_multivote_respects_voting_contract_status() public {
         MultiVote[] memory votes = new MultiVote[](1);
         votes[0] = MultiVote({
             votingContract: address(votingContract),
@@ -201,7 +200,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
         vm.prank(USER);
-        gearStaking.deposit(WAD, votes);
+        gearStaking.deposit(uint96(WAD), votes);
 
         vm.prank(CONFIGURATOR);
         gearStaking.setVotingContractStatus(address(votingContract), VotingContractStatus.NOT_ALLOWED);
@@ -261,14 +260,14 @@ contract GearStakingTest is Test, IGearStakingV3Events {
     }
 
     /// @dev [GS-05]: claimWithdrawals correctly processes pending withdrawals
-    function test_GS_05_claimWithdrawals_works_correctly() public {
+    function test_U_GS_05_claimWithdrawals_works_correctly() public {
         MultiVote[] memory votes = new MultiVote[](0);
 
         tokenTestSuite.mint(gearToken, USER, WAD);
         tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
         vm.prank(USER);
-        gearStaking.deposit(WAD, votes);
+        gearStaking.deposit(uint96(WAD), votes);
 
         vm.prank(USER);
         gearStaking.withdraw(1000, FRIEND, votes);
@@ -352,7 +351,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
     }
 
     /// @dev [GS-06]: setVotingContractStatus respects access control and emits event
-    function test_GS_06_setVotingContractStatus_works_correctly() public {
+    function test_U_GS_06_setVotingContractStatus_works_correctly() public {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         gearStaking.setVotingContractStatus(DUMB_ADDRESS, VotingContractStatus.ALLOWED);
 
