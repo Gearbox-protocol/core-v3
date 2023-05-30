@@ -155,7 +155,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         (,,, address creditAccount) = cms.openCreditAccount();
 
-        (,, uint256 cumulativeQuotaInterest,,,,) = creditManager.creditAccountInfo(creditAccount);
+        (,, uint128 cumulativeQuotaInterest,,,,,) = creditManager.creditAccountInfo(creditAccount);
 
         assertEq(cumulativeQuotaInterest, 1, "SETUP: Cumulative quota interest was not updated correctly");
 
@@ -205,7 +205,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         assertEq(tokensToEnable, 0, "Incorrect tokensToEnable");
         assertEq(tokensToDisable, linkMask, "Incorrect tokensToDisable");
 
-        (,, cumulativeQuotaInterest,,,,) = creditManager.creditAccountInfo(creditAccount);
+        (,, cumulativeQuotaInterest,,,,,) = creditManager.creditAccountInfo(creditAccount);
 
         assertEq(
             cumulativeQuotaInterest,

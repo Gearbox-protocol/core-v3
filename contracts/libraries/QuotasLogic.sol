@@ -74,9 +74,10 @@ library QuotasLogic {
     function calcAccruedQuotaInterest(uint96 quoted, uint192 cumulativeIndexNow, uint192 cumulativeIndexLU)
         internal
         pure
-        returns (uint256)
+        returns (uint128)
     {
-        return uint256(quoted) * (cumulativeIndexNow - cumulativeIndexLU) / RAY; // U: [QL-2]
+        // downcast to uint128 is safe, because quoted is uint96 and cumulativeIndex / RAY could no be bigger > 2**32
+        return uint128(uint256(quoted) * (cumulativeIndexNow - cumulativeIndexLU) / RAY); // U: [QL-2]
     }
 
     /// @dev Calculates interest accrued on quota since last update
@@ -88,7 +89,7 @@ library QuotasLogic {
         TokenQuotaParams storage tokenQuotaParams,
         AccountQuota storage accountQuota,
         uint256 lastQuotaRateUpdate
-    ) internal view returns (uint256 caQuotaInterestChange) {
+    ) internal view returns (uint128 caQuotaInterestChange) {
         uint96 quoted = accountQuota.quota;
         if (quoted > 1) {
             return calcAccruedQuotaInterest(
@@ -120,8 +121,8 @@ library QuotasLogic {
         internal
         initializedQuotasOnly(tokenQuotaParams) // U: [QL-9]
         returns (
-            uint256 caQuotaInterestChange,
-            uint256 tradingFees,
+            uint128 caQuotaInterestChange,
+            uint128 tradingFees,
             int256 quotaRevenueChange,
             int96 realQuotaChange,
             bool enableToken,
@@ -179,7 +180,7 @@ library QuotasLogic {
             // For some tokens, a one-time quota increase fee may be charged. This is a proxy for
             // trading fees for tokens with high volume but short position duration, in which
             // case trading fees are a more effective pricing policy than charging interest over time
-            tradingFees = uint256(change) * tokenQuotaParams.quotaIncreaseFee / PERCENTAGE_FACTOR; // U: [QL-3]
+            tradingFees = uint128(change) * tokenQuotaParams.quotaIncreaseFee / PERCENTAGE_FACTOR; // U: [QL-3]
             caQuotaInterestChange += tradingFees;
 
             // Quota revenue is a global sum of all quota interest received from all tokens and accounts
@@ -223,7 +224,7 @@ library QuotasLogic {
     )
         internal
         initializedQuotasOnly(tokenQuotaParams) // U: [QL-9]
-        returns (uint256 caQuotaInterestChange)
+        returns (uint128 caQuotaInterestChange)
     {
         uint96 quoted = accountQuota.quota;
         uint192 cumulativeIndexNow = cumulativeIndexSince(tokenQuotaParams, lastQuotaRateUpdate);

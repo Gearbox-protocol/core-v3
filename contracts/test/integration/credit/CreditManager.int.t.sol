@@ -203,7 +203,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         address creditAccount = creditManager.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER);
         assertEq(creditAccount, expectedCreditAccount, "Incorrecct credit account address");
 
-        (uint256 debt, uint256 cumulativeIndexLastUpdate,,,,,) = creditManager.creditAccountInfo(creditAccount);
+        (uint256 debt, uint256 cumulativeIndexLastUpdate,,,,,,) = creditManager.creditAccountInfo(creditAccount);
 
         assertEq(debt, DAI_ACCOUNT_AMOUNT, "Incorrect borrowed amount set in CA");
         assertEq(cumulativeIndexLastUpdate, cumulativeAtOpen, "Incorrect cumulativeIndexLastUpdate set in CA");
@@ -859,7 +859,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         //     "Incorrect cumulative index"
         // );
 
-        (uint256 debt,,,,,,) = creditManager.creditAccountInfo(creditAccount);
+        (uint256 debt,,,,,,,) = creditManager.creditAccountInfo(creditAccount);
         assertEq(debt, newBorrowedAmount, "Incorrect borrowedAmount");
 
         expectBalance(Tokens.DAI, creditAccount, newBorrowedAmount, "Incorrect balance on credit account");

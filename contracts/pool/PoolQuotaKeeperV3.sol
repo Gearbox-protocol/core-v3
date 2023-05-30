@@ -106,8 +106,8 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         override
         creditManagerOnly // U:[PQK-4]
         returns (
-            uint256 caQuotaInterestChange,
-            uint256 tradingFees,
+            uint128 caQuotaInterestChange,
+            uint128 tradingFees,
             int96 realQuotaChange,
             bool enableToken,
             bool disableToken
@@ -233,7 +233,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         external
         view
         override
-        returns (uint256 quoted, uint256 interest)
+        returns (uint256 quoted, uint128 interest)
     {
         AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
         TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];

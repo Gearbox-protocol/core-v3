@@ -47,7 +47,7 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         address creditAccount,
         uint256 debt,
         uint256 cumulativeIndexLastUpdate,
-        uint256 cumulativeQuotaInterest,
+        uint128 cumulativeQuotaInterest,
         uint256 enabledTokensMask,
         uint16 flags,
         address borrower

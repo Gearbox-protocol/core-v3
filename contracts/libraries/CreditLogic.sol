@@ -227,12 +227,12 @@ library CreditLogic {
         uint256 debt,
         uint256 cumulativeIndexNow,
         uint256 cumulativeIndexLastUpdate,
-        uint256 cumulativeQuotaInterest,
+        uint128 cumulativeQuotaInterest,
         uint16 feeInterest
     )
         internal
         pure
-        returns (uint256 newDebt, uint256 newCumulativeIndex, uint256 profit, uint256 newCumulativeQuotaInterest)
+        returns (uint256 newDebt, uint256 newCumulativeIndex, uint256 profit, uint128 newCumulativeQuotaInterest)
     {
         uint256 amountToRepay = amount;
 
@@ -261,7 +261,7 @@ library CreditLogic {
                 profit += amountToRepay - amountToPool; // U:[CL-03B]
                 amountToRepay = 0; // U:[CL-03B]
 
-                newCumulativeQuotaInterest = cumulativeQuotaInterest - amountToPool; // U:[CL-03A]
+                newCumulativeQuotaInterest = uint128(cumulativeQuotaInterest - amountToPool); // U:[CL-03A]
 
                 newDebt = debt; // U:[CL-03A]
                 newCumulativeIndex = cumulativeIndexLastUpdate; // U:[CL-03A]

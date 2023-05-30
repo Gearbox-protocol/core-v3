@@ -181,7 +181,7 @@ contract CreditLogicTest is TestHelper {
         uint256 indexNow,
         uint256 indexAtOpen,
         uint256 delta,
-        uint256 quotaInterest,
+        uint128 quotaInterest,
         uint16 feeInterest
     ) public {
         debt = WAD + debt % (2 ** 128 - WAD - 1);
@@ -227,7 +227,7 @@ contract CreditLogicTest is TestHelper {
         uint256 indexNow,
         uint256 indexAtOpen,
         uint256 delta,
-        uint256 quotaInterest,
+        uint128 quotaInterest,
         uint16 feeInterest
     ) public {
         debt = WAD + debt % (2 ** 128 - WAD - 1);

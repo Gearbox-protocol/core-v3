@@ -473,7 +473,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 task: CollateralCalcTask.DEBT_ONLY
             }); // U:[CM-11]
 
-            uint256 newCumulativeQuotaInterest;
+            uint128 newCumulativeQuotaInterest;
             // Pays the entire amount back to the pool
             ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amount}); // U:[CM-11]
             {
@@ -815,7 +815,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             cumulativeIndexNow: collateralDebtData.cumulativeIndexNow
         }) + collateralDebtData.cumulativeQuotaInterest; // U:[CM-21] // I: [CMQ-07]
 
-        collateralDebtData.accruedFees = (collateralDebtData.accruedInterest * feeInterest) / PERCENTAGE_FACTOR; // U:[CM-21]
+        collateralDebtData.accruedFees = (collateralDebtData.accruedInterest * feeInterest) / PERCENTAGE_FACTOR
+            + (supportsQuotas ? creditAccountInfo[creditAccount].quotaProfits : 0); // U:[CM-21]
 
         if (task == CollateralCalcTask.DEBT_ONLY) return collateralDebtData; // U:[CM-21]
 
@@ -888,7 +889,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         view
         returns (
             address[] memory quotaTokens,
-            uint256 outstandingQuotaInterest,
+            uint128 outstandingQuotaInterest,
             uint256[] memory quotas,
             uint16[] memory lts,
             uint256 _quotedTokensMask
@@ -928,7 +929,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
                         quotaTokens[j] = token; // U:[CM-24]
 
-                        uint256 outstandingInterestDelta;
+                        uint128 outstandingInterestDelta;
                         (quotas[j], outstandingInterestDelta) =
                             IPoolQuotaKeeperV3(_poolQuotaKeeper).getQuotaAndOutstandingInterest(ca, token); // U:[CM-24]
 
@@ -962,10 +963,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         /// so the cumulative index inside PQK needs to be updated before setting the new quota value).
         /// PQK also reports whether the quota was changed from zero to non-zero and vice versa, in order to
         /// safely enable and disable quoted tokens
-        uint256 caInterestChange;
+        uint128 caInterestChange;
         bool enable;
         bool disable;
-        uint256 tradingFees;
+        uint128 tradingFees;
 
         (caInterestChange, tradingFees, realQuotaChange, enable, disable) = IPoolQuotaKeeperV3(poolQuotaKeeper())
             .updateQuota({
@@ -983,6 +984,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
 
         creditAccountInfo[creditAccount].cumulativeQuotaInterest += caInterestChange; // U:[CM-25] // I: [CMQ-3]
+        creditAccountInfo[creditAccount].quotaProfits += tradingFees;
     }
 
     ///

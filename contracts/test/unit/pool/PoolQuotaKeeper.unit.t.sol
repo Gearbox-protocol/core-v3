@@ -556,8 +556,8 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
 
             vm.prank(address(creditManagerMock));
             (
-                uint256 caQuotaInterestChange,
-                uint256 tradingFees,
+                uint128 caQuotaInterestChange,
+                uint128 tradingFees,
                 int96 realQuotaChange,
                 bool enableToken,
                 bool disableToken
