@@ -60,6 +60,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     using BitMask for uint256;
     using SafeCast for uint256;
 
+    /// @notice Contract version
+    uint256 public constant override version = 3_00;
+
+    /// @notice maxDebt to maxQuota miltiplier
+    uint256 public constant maxQuotaMultiplier = 3;
+
     /// @notice Credit Manager connected to this Credit Facade
     address public immutable creditManager;
 
@@ -116,9 +122,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// In the interest of fairness, emergency liquidators do not receive a premium
     /// And are compensated by the Gearbox DAO separately.
     mapping(address => bool) public override canLiquidateWhilePaused;
-
-    /// @notice Contract version
-    uint256 public constant override version = 3_00;
 
     /// @notice Restricts functions to the connected Credit Configurator only
     modifier creditConfiguratorOnly() {
@@ -954,7 +957,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             token: token,
             quotaChange: quotaChange,
             minQuota: minQuota,
-            maxQuota: uint96(Math.min(type(uint96).max, debtLimits.maxDebt))
+            maxQuota: uint96(Math.min(type(uint96).max, uint256(debtLimits.maxDebt) * maxQuotaMultiplier))
         }); // U:[FA-34]
 
         emit UpdateQuota({creditAccount: creditAccount, token: token, quotaChange: realQuotaChange}); // U:[FA-34]

@@ -1787,7 +1787,10 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.expectCall(
             address(creditManagerMock),
-            abi.encodeCall(ICreditManagerV3.updateQuota, (creditAccount, link, change, 0, maxDebt))
+            abi.encodeCall(
+                ICreditManagerV3.updateQuota,
+                (creditAccount, link, change, 0, uint96(maxDebt * creditFacade.maxQuotaMultiplier()))
+            )
         );
 
         vm.expectEmit(true, true, false, false);
