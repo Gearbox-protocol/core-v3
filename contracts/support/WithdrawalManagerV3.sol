@@ -71,7 +71,7 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
 
     /// @notice Allows this contract to unwrap WETH and forbids receiving ETH another way
     receive() external payable {
-        if (msg.sender != weth) revert ReceiveIsNotAllowedException();
+        if (msg.sender != weth) revert ReceiveIsNotAllowedException(); // U:[WM-2]
     }
 
     // --------------------- //
