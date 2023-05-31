@@ -984,7 +984,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
 
         creditAccountInfo[creditAccount].cumulativeQuotaInterest += caInterestChange; // U:[CM-25] // I: [CMQ-3]
-        creditAccountInfo[creditAccount].quotaProfits += tradingFees;
+
+        if (tradingFees != 0) {
+            creditAccountInfo[creditAccount].quotaProfits += tradingFees;
+        }
     }
 
     ///
