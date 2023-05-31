@@ -117,19 +117,19 @@ contract PolicyManagerV3 is ACLNonReentrantTrait {
 
         uint8 flags = policy.flags;
 
-        if (flags & CHECK_EXACT_VALUE_FLAG > 0) {
+        if (flags & CHECK_EXACT_VALUE_FLAG != 0) {
             if (newValue != policy.exactValue) return false; // F: [PM-03]
         }
 
-        if (flags & CHECK_MIN_VALUE_FLAG > 0) {
+        if (flags & CHECK_MIN_VALUE_FLAG != 0) {
             if (newValue < policy.minValue) return false; // F: [PM-04]
         }
 
-        if (flags & CHECK_MAX_VALUE_FLAG > 0) {
+        if (flags & CHECK_MAX_VALUE_FLAG != 0) {
             if (newValue > policy.maxValue) return false; // F: [PM-05]
         }
 
-        uint256 rp;
+        uint256 referencePoint;
 
         /// The policy uses a reference point to gauge relative parameter changes. A reference point
         /// is a value that is set to current value on updating a parameter. All future values for a period
@@ -138,37 +138,39 @@ contract PolicyManagerV3 is ACLNonReentrantTrait {
         if (
             flags
                 & (CHECK_MIN_CHANGE_FLAG | CHECK_MAX_CHANGE_FLAG | CHECK_MIN_PCT_CHANGE_FLAG | CHECK_MAX_PCT_CHANGE_FLAG)
-                > 0
+                != 0
         ) {
             if (block.timestamp > policy.referencePointTimestampLU + policy.referencePointUpdatePeriod) {
                 policy.referencePoint = oldValue; // F: [PM-06]
                 policy.referencePointTimestampLU = uint40(block.timestamp); // F: [PM-06]
             }
-            rp = policy.referencePoint;
-        }
 
-        if (flags & CHECK_MIN_CHANGE_FLAG > 0) {
-            uint256 diff = newValue > rp ? newValue - rp : rp - newValue;
-            if (diff < policy.minChange) return false; // F: [PM-07]
-        }
+            referencePoint = policy.referencePoint;
+            uint256 diff = absDiff(newValue, referencePoint);
 
-        if (flags & CHECK_MAX_CHANGE_FLAG > 0) {
-            uint256 diff = newValue > rp ? newValue - rp : rp - newValue;
-            if (diff > policy.maxChange) return false; // F: [PM-08]
-        }
+            if (flags & CHECK_MIN_CHANGE_FLAG != 0) {
+                if (diff < policy.minChange) return false; // F: [PM-07]
+            }
 
-        if (flags & CHECK_MIN_PCT_CHANGE_FLAG > 0) {
-            uint256 diff = newValue > rp ? newValue - rp : rp - newValue;
-            uint256 pctDiff = diff * PERCENTAGE_FACTOR / rp;
-            if (pctDiff < policy.minPctChange) return false; // F: [PM-09]
-        }
+            if (flags & CHECK_MAX_CHANGE_FLAG != 0) {
+                if (diff > policy.maxChange) return false; // F: [PM-08]
+            }
 
-        if (flags & CHECK_MAX_PCT_CHANGE_FLAG > 0) {
-            uint256 diff = newValue > rp ? newValue - rp : rp - newValue;
-            uint256 pctDiff = diff * PERCENTAGE_FACTOR / rp;
-            if (pctDiff > policy.maxPctChange) return false; // F: [PM-10]
+            if (flags & CHECK_MIN_PCT_CHANGE_FLAG != 0) {
+                uint256 pctDiff = diff * PERCENTAGE_FACTOR / referencePoint;
+                if (pctDiff < policy.minPctChange) return false; // F: [PM-09]
+            }
+
+            if (flags & CHECK_MAX_PCT_CHANGE_FLAG != 0) {
+                uint256 pctDiff = diff * PERCENTAGE_FACTOR / referencePoint;
+                if (pctDiff > policy.maxPctChange) return false; // F: [PM-10]
+            }
         }
 
         return true;
+    }
+
+    function absDiff(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a > b ? a - b : b - a;
     }
 }

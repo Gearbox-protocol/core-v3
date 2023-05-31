@@ -405,6 +405,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
         uint96 maxQuota;
         /// expected
         uint256 expectedCaQuotaInterestChange;
+        uint256 expectedTradingFees;
         int96 expectedRealQuotaChange;
         bool expectedEnableToken;
         bool expectedDisableToken;
@@ -423,7 +424,8 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 minQuota: 0,
                 maxQuota: 100_000_000,
                 ///
-                expectedCaQuotaInterestChange: 4_000,
+                expectedCaQuotaInterestChange: 0,
+                expectedTradingFees: 4_000,
                 expectedRealQuotaChange: 10_000,
                 expectedEnableToken: true,
                 expectedDisableToken: false,
@@ -439,6 +441,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 maxQuota: 100_000_000,
                 /// 10_000 * 10% quota
                 expectedCaQuotaInterestChange: 1_000,
+                expectedTradingFees: 0,
                 expectedRealQuotaChange: 0,
                 expectedEnableToken: false,
                 expectedDisableToken: false,
@@ -454,6 +457,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 maxQuota: 100_000_000,
                 /// 10_000 * 10% quota
                 expectedCaQuotaInterestChange: 0,
+                expectedTradingFees: 0,
                 expectedRealQuotaChange: 0,
                 expectedEnableToken: false,
                 expectedDisableToken: false,
@@ -469,6 +473,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 maxQuota: 9_000,
                 /// 10_000 * 10% quota
                 expectedCaQuotaInterestChange: 0,
+                expectedTradingFees: 0,
                 expectedRealQuotaChange: 0,
                 expectedEnableToken: false,
                 expectedDisableToken: false,
@@ -484,6 +489,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 maxQuota: 100_000_000,
                 /// 10_000 * 10% quota
                 expectedCaQuotaInterestChange: 1_000,
+                expectedTradingFees: 0,
                 expectedRealQuotaChange: -5000,
                 expectedEnableToken: false,
                 expectedDisableToken: false,
@@ -498,7 +504,8 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 minQuota: 1_000,
                 maxQuota: 100_000_000,
                 /// 10_000 * 10% quota
-                expectedCaQuotaInterestChange: 500 + 35_000 * 40 / 100, // 500 for prev year + fee
+                expectedCaQuotaInterestChange: 500, // 500 for prev year + fee
+                expectedTradingFees: 35_000 * 40 / 100,
                 expectedRealQuotaChange: 35_000,
                 expectedEnableToken: false,
                 expectedDisableToken: false,
@@ -513,6 +520,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 minQuota: 0,
                 maxQuota: 100_000_000,
                 expectedCaQuotaInterestChange: 40_000 * 10 / 100, // 4_000 for prev year
+                expectedTradingFees: 0,
                 expectedRealQuotaChange: -40_000,
                 expectedEnableToken: false,
                 expectedDisableToken: true,
