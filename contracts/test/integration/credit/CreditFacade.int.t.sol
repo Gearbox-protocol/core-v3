@@ -674,7 +674,7 @@ contract CreditFacadeIntegrationTest is
         vm.roll(block.number + 1);
 
         vm.prank(USER);
-        creditFacade.closeCreditAccount(creditAccount, FRIEND, 10, true, calls);
+        creditFacade.closeCreditAccount(creditAccount, FRIEND, 10, false, calls);
 
         assertEq0(targetMock.callData(), DUMB_CALLDATA, "Incorrect calldata");
     }
@@ -782,7 +782,7 @@ contract CreditFacadeIntegrationTest is
         emit LiquidateCreditAccount(creditAccount, USER, LIQUIDATOR, FRIEND, ClosureAction.LIQUIDATE_ACCOUNT, 0);
 
         vm.prank(LIQUIDATOR);
-        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 10, true, calls);
+        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 10, false, calls);
     }
 
     /// @dev I:[FA-15A]: Borrowing is prohibited after a liquidation with loss
@@ -800,7 +800,7 @@ contract CreditFacadeIntegrationTest is
         _makeAccountsLiquitable();
 
         vm.prank(LIQUIDATOR);
-        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 10, true, calls);
+        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 10, false, calls);
 
         maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
 
@@ -821,7 +821,7 @@ contract CreditFacadeIntegrationTest is
         _makeAccountsLiquitable();
 
         vm.prank(LIQUIDATOR);
-        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 10, true, calls);
+        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 10, false, calls);
 
         assertTrue(creditFacade.paused(), "Credit manager was not paused");
     }

@@ -39,7 +39,6 @@ import {
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {IWETHGatewayV3} from "../../../interfaces/IWETHGatewayV3.sol";
 import {ClaimAction, IWithdrawalManagerV3} from "../../../interfaces/IWithdrawalManagerV3.sol";
 import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 
@@ -53,7 +52,6 @@ import {PoolMock} from "../../mocks/pool/PoolMock.sol";
 import {PoolQuotaKeeperMock} from "../../mocks/pool/PoolQuotaKeeperMock.sol";
 import {ERC20FeeMock} from "../../mocks/token/ERC20FeeMock.sol";
 import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
-import {WETHGatewayMock} from "../../mocks/support/WETHGatewayMock.sol";
 import {CreditAccountMock, CreditAccountMockEvents} from "../../mocks/credit/CreditAccountMock.sol";
 import {WithdrawalManagerMock} from "../../mocks/support/WithdrawalManagerMock.sol";
 // SUITES
@@ -89,7 +87,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     PoolQuotaKeeperMock poolQuotaKeeperMock;
 
     PriceOracleMock priceOracleMock;
-    WETHGatewayMock wethGateway;
     WithdrawalManagerMock withdrawalManagerMock;
 
     address underlying;
@@ -149,7 +146,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
 
         accountFactory = AccountFactoryMock(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL));
-        wethGateway = WETHGatewayMock(addressProvider.getAddressOrRevert(AP_WETH_GATEWAY, 3_00));
         withdrawalManagerMock = WithdrawalManagerMock(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00));
 
         priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 2));
@@ -345,9 +341,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         );
 
         assertEq(
-            address(creditManager.wethGateway()),
-            addressProvider.getAddressOrRevert(AP_WETH_GATEWAY, 3_00),
-            _testCaseErr("Incorrect WETH Gateway")
+            creditManager.withdrawalManager(),
+            addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00),
+            _testCaseErr("Incorrect withdrawalManager")
         );
 
         assertEq(
@@ -979,7 +975,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                         reason: string.concat("transfer token ", IERC20Metadata(token).symbol()),
                         token: token,
                         from: creditAccount,
-                        to: (convertToEth && token == weth) ? address(wethGateway) : FRIEND,
+                        to: (convertToEth && token == weth) ? address(withdrawalManagerMock) : FRIEND,
                         amount: balance - 1
                     });
                 }
@@ -2514,7 +2510,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                     reason: string.concat("transfer token ", IERC20Metadata(token).symbol()),
                     token: token,
                     from: creditAccount,
-                    to: (convertToEth && token == weth) ? address(wethGateway) : FRIEND,
+                    to: (convertToEth && token == weth) ? address(withdrawalManagerMock) : FRIEND,
                     amount: (tokenMask == UNDERLYING_TOKEN_MASK) ? _amountMinusFee(balance - 1) : balance - 1
                 });
             }
@@ -2554,12 +2550,15 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 reason: "transfer token ",
                 token: weth,
                 from: creditAccount,
-                to: convertToEth ? address(wethGateway) : FRIEND,
+                to: convertToEth ? address(withdrawalManagerMock) : FRIEND,
                 amount: amount
             });
 
             if (convertToEth) {
-                vm.expectCall(address(wethGateway), abi.encodeCall(IWETHGatewayV3.deposit, (FRIEND, amount)));
+                vm.expectCall(
+                    address(withdrawalManagerMock),
+                    abi.encodeCall(IWithdrawalManagerV3.addImmediateWithdrawal, (weth, address(this), amount))
+                );
             }
 
             creditManager.safeTokenTransfer({

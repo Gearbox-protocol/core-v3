@@ -6,7 +6,6 @@ pragma solidity ^0.8.17;
 import "../../../core/AddressProviderV3.sol";
 import {AccountFactoryMock} from "../core/AccountFactoryMock.sol";
 import {PriceOracleMock} from "../oracles/PriceOracleMock.sol";
-import {WETHGatewayMock} from "../support/WETHGatewayMock.sol";
 import {WithdrawalManagerMock} from "../support/WithdrawalManagerMock.sol";
 import {BotListMock} from "../support/BotListMock.sol";
 
@@ -30,9 +29,6 @@ contract AddressProviderV3ACLMock is Test, AddressProviderV3 {
     constructor() AddressProviderV3(address(this)) {
         PriceOracleMock priceOracleMock = new PriceOracleMock();
         _setAddress(AP_PRICE_ORACLE, address(priceOracleMock), priceOracleMock.version());
-
-        WETHGatewayMock wethGatewayMock = new WETHGatewayMock();
-        _setAddress(AP_WETH_GATEWAY, address(wethGatewayMock), wethGatewayMock.version());
 
         WithdrawalManagerMock withdrawalManagerMock = new WithdrawalManagerMock();
         _setAddress(AP_WITHDRAWAL_MANAGER, address(withdrawalManagerMock), withdrawalManagerMock.version());

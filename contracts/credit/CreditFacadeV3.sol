@@ -28,14 +28,13 @@ import {
     BOT_PERMISSIONS_SET_FLAG
 } from "../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
-import {ClaimAction} from "../interfaces/IWithdrawalManagerV3.sol";
+import {ClaimAction, ETH_ADDRESS, IWithdrawalManagerV3} from "../interfaces/IWithdrawalManagerV3.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
 import {IPriceFeedOnDemand} from "../interfaces/IPriceFeedOnDemand.sol";
 
 import {IPoolV3, IPoolBase} from "../interfaces/IPoolV3.sol";
 import {IDegenNFTV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFTV2.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
-import {IWETHGatewayV3} from "../interfaces/IWETHGatewayV3.sol";
 import {IBotListV3} from "../interfaces/IBotListV3.sol";
 
 // CONSTANTS
@@ -79,8 +78,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @notice Address of WETH
     address public immutable weth;
 
-    /// @notice Address of WETH Gateway
-    address public immutable wethGateway;
+    /// @notice Address of withdrawal manager contract
+    address public immutable withdrawalManager;
 
     /// @notice Address of the IDegenNFTV2 that gatekeeps account openings in whitelisted mode
     address public immutable override degenNFT;
@@ -185,7 +184,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         creditManager = _creditManager; // U:[FA-1] // F:[FA-1A]
 
         weth = ICreditManagerV3(_creditManager).weth(); // U:[FA-1] // F:[FA-1A]
-        wethGateway = ICreditManagerV3(_creditManager).wethGateway(); // U:[FA-1]
+        withdrawalManager = ICreditManagerV3(_creditManager).withdrawalManager(); // U:[FA-1]
         botList =
             IAddressProviderV3(ICreditManagerV3(_creditManager).addressProvider()).getAddressOrRevert(AP_BOT_LIST, 3_00);
 
@@ -1235,11 +1234,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         tokensToEnable = ICreditManagerV3(creditManager).claimWithdrawals(creditAccount, to, action); // U:[FA-16,37]
     }
 
-    /// @notice Internal wrapper for `IWETHGatewayV3.claim()`
-    /// @dev The external call is wrapped to optimize contract size
-    /// @dev Used to convert WETH to ETH and send it to user
+    /// @dev Claims ETH from withdrawal manager, expecting that WETH was deposited there earlier in the transaction
     function _wethWithdrawTo(address to) internal {
-        IWETHGatewayV3(wethGateway).claim(to);
+        IWithdrawalManagerV3(withdrawalManager).claimImmediateWithdrawal({token: ETH_ADDRESS, to: to});
     }
 
     function _eraseAllBotPermissions(address creditAccount) internal {

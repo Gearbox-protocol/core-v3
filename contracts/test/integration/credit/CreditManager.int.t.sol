@@ -18,7 +18,6 @@ import {
 } from "../../../interfaces/ICreditManagerV3.sol";
 
 import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
-import {IWETHGatewayV3} from "../../../interfaces/IWETHGatewayV3.sol";
 import {IWithdrawalManagerV3} from "../../../interfaces/IWithdrawalManagerV3.sol";
 
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
@@ -69,7 +68,6 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
     CreditManagerV3 creditManager;
     PoolMock poolMock;
     IPriceOracleV2 priceOracle;
-    IWETHGatewayV3 wethGateway;
     IWithdrawalManagerV3 withdrawalManager;
     ACL acl;
     address underlying;
@@ -102,7 +100,6 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
 
         priceOracle = IPriceOracleV2(creditManager.priceOracle());
         underlying = creditManager.underlying();
-        wethGateway = IWETHGatewayV3(creditManager.wethGateway());
     }
 
     /// @dev Opens credit account for testing management functions
@@ -691,9 +688,9 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         uint256 amountToPool = borrowedAmount + interestAccrued + profit;
 
         assertEq(
-            wethGateway.balanceOf(USER),
+            withdrawalManager.immediateWithdrawals(cms.creditFacade(), tokenTestSuite.addressOf(Tokens.WETH)),
             2 * borrowedAmount - amountToPool - 1,
-            "Incorrect amount deposited on wethGateway"
+            "Incorrect amount deposited to withdrawalManager"
         );
     }
 
@@ -731,7 +728,11 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
 
         expectBalance(Tokens.WETH, creditAccount, 1);
 
-        assertEq(wethGateway.balanceOf(USER), WETH_EXCHANGE_AMOUNT - 1, "Incorrect amount deposited on wethGateway");
+        assertEq(
+            withdrawalManager.immediateWithdrawals(cms.creditFacade(), tokenTestSuite.addressOf(Tokens.WETH)),
+            WETH_EXCHANGE_AMOUNT - 1,
+            "Incorrect amount deposited to withdrawalManager"
+        );
     }
 
     /// @dev I:[CM-18]: closeCreditAccount sends ETH for WETH creditManger to borrower
@@ -783,7 +784,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         // expectBalance(Tokens.WETH, USER, userBalanceBefore + remainingFunds, "Incorrect amount were paid back");
 
         assertEq(
-            wethGateway.balanceOf(FRIEND),
+            withdrawalManager.immediateWithdrawals(cms.creditFacade(), tokenTestSuite.addressOf(Tokens.WETH)),
             (totalValue * (PERCENTAGE_FACTOR - liquidationDiscount)) / PERCENTAGE_FACTOR,
             "Incorrect amount were paid to liqiudator friend address"
         );
@@ -827,7 +828,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         expectBalance(Tokens.WETH, creditAccount, 1);
 
         assertEq(
-            wethGateway.balanceOf(FRIEND),
+            withdrawalManager.immediateWithdrawals(cms.creditFacade(), tokenTestSuite.addressOf(Tokens.WETH)),
             WETH_EXCHANGE_AMOUNT - 1,
             "Incorrect amount were paid to liqiudator friend address"
         );

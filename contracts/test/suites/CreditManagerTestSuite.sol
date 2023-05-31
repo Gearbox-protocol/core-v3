@@ -29,7 +29,7 @@ contract CreditManagerTestSuite is PoolDeployer {
 
     IWETH wethToken;
 
-    address creditFacade;
+    address public creditFacade;
     uint256 creditAccountAmount;
 
     bool supportsQuotas;
