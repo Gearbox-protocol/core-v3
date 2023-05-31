@@ -377,7 +377,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
     /// @dev IMPLEMENTATION: setTokenLimit
     function _setTokenLimit(TokenQuotaParams storage tokenQuotaParams, address token, uint96 limit) internal {
-        /// @dev setLimit checks that token is initialize, otherwise it reverts
+        // setLimit checks that token is initialize, otherwise it reverts
         // F:[PQK-11]
         if (tokenQuotaParams.setLimit(limit)) {
             emit SetTokenLimit(token, limit); // U:[PQK-12]
