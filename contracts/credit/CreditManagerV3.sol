@@ -254,7 +254,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         if (supportsQuotas) {
             creditAccountInfo[creditAccount].cumulativeQuotaInterest = 1;
-            creditAccountInfo[creditAccount].quotaProfits = 1;
+            creditAccountInfo[creditAccount].quotaProfits = 0;
         } // U:[CM-6]
 
         // Requests the pool to transfer tokens the Credit Account
@@ -504,7 +504,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     tokens: collateralDebtData.quotedTokens
                 });
                 creditAccountInfo[creditAccount].cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // U:[CM-11]
-                creditAccountInfo[creditAccount].quotaProfits = newQuotaProfits + 1;
+                creditAccountInfo[creditAccount].quotaProfits = newQuotaProfits;
             }
 
             /// If the entire underlying balance was spent on repayment, it is disabled
