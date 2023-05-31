@@ -13,8 +13,8 @@ import {ICreditFacadeV3} from "../../../interfaces/ICreditFacadeV3.sol";
 import "../../lib/constants.sol";
 
 // MOCKS
-import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
-
+import {AddressProviderV3ACLMock, AP_WETH_TOKEN, AP_TREASURY} from "../../mocks/core/AddressProviderV3ACLMock.sol";
+import {WETHMock} from "../../mocks/token/WETHMock.sol";
 import {GeneralMock} from "../../mocks/GeneralMock.sol";
 
 // SUITES
@@ -35,6 +35,7 @@ contract InvalidCFMock {
 /// @notice Designed for unit test purposes only
 contract BotListTest is Test, IBotListV3Events {
     AddressProviderV3ACLMock public addressProvider;
+    WETHMock public weth;
 
     BotListV3 botList;
 
@@ -50,6 +51,7 @@ contract BotListTest is Test, IBotListV3Events {
     function setUp() public {
         vm.prank(CONFIGURATOR);
         addressProvider = new AddressProviderV3ACLMock();
+        weth = WETHMock(payable(addressProvider.getAddressOrRevert(AP_WETH_TOKEN, 0)));
 
         tokenTestSuite = new TokensTestSuite();
 
@@ -92,7 +94,8 @@ contract BotListTest is Test, IBotListV3Events {
 
     /// @dev [BL-1]: constructor sets correct values
     function test_BL_01_constructor_sets_correct_values() public {
-        assertEq(botList.treasury(), addressProvider.getTreasuryContract(), "Treasury contract incorrect");
+        assertEq(botList.treasury(), addressProvider.getAddressOrRevert(AP_TREASURY, 0), "Treasury contract incorrect");
+        assertEq(botList.weth(), address(weth), "WETH incorrect");
         assertEq(botList.daoFee(), 0, "Initial DAO fee incorrect");
     }
 
@@ -259,36 +262,36 @@ contract BotListTest is Test, IBotListV3Events {
         assertEq(bots.length, 0, "Incorrect active bots array length");
     }
 
-    /// @dev [BL-4]: addFunding and removeFunding work correctly
-    function test_BL_04_addFunding_removeFunding_work_correctly() public {
+    /// @dev [BL-4]: deposit and withdraw work correctly
+    function test_BL_04_deposit_withdraw_work_correctly() public {
         vm.deal(USER, 10 ether);
 
         vm.expectRevert(AmountCantBeZeroException.selector);
-        botList.addFunding();
+        botList.deposit();
 
         vm.expectEmit(true, false, false, true);
-        emit ChangeFunding(USER, 1 ether);
+        emit Deposit(USER, 1 ether);
 
         vm.prank(USER);
-        botList.addFunding{value: 1 ether}();
+        botList.deposit{value: 1 ether}();
 
-        assertEq(botList.fundingBalances(USER), 1 ether, "User's bot funding wallet has incorrect balance");
+        assertEq(botList.balanceOf(USER), 1 ether, "User's bot funding wallet has incorrect balance");
 
         vm.expectEmit(true, false, false, true);
-        emit ChangeFunding(USER, 2 ether);
+        emit Deposit(USER, 1 ether);
 
         vm.prank(USER);
-        botList.addFunding{value: 1 ether}();
+        botList.deposit{value: 1 ether}();
 
-        assertEq(botList.fundingBalances(USER), 2 ether, "User's bot funding wallet has incorrect balance");
+        assertEq(botList.balanceOf(USER), 2 ether, "User's bot funding wallet has incorrect balance");
 
         vm.expectEmit(true, false, false, true);
-        emit ChangeFunding(USER, 3 ether / 2);
+        emit Withdraw(USER, 1 ether / 2);
 
         vm.prank(USER);
-        botList.removeFunding(1 ether / 2);
+        botList.withdraw(1 ether / 2);
 
-        assertEq(botList.fundingBalances(USER), 3 ether / 2, "User's bot funding wallet has incorrect balance");
+        assertEq(botList.balanceOf(USER), 3 ether / 2, "User's bot funding wallet has incorrect balance");
 
         assertEq(USER.balance, 85 ether / 10, "User's balance is incorrect");
     }
@@ -307,7 +310,7 @@ contract BotListTest is Test, IBotListV3Events {
         vm.deal(USER, 10 ether);
 
         vm.prank(USER);
-        botList.addFunding{value: 2 ether}();
+        botList.deposit{value: 2 ether}();
 
         vm.prank(address(creditFacade));
         botList.setBotPermissions({
@@ -352,14 +355,14 @@ contract BotListTest is Test, IBotListV3Events {
         );
 
         assertEq(
-            botList.fundingBalances(USER),
+            botList.balanceOf(USER),
             2 ether - (1 ether / 20) - (1 ether / 40),
             "User remaining funding balance incorrect"
         );
 
         assertEq(allowanceLU, block.timestamp - 1 days, "Allowance update timestamp incorrect");
 
-        assertEq(address(bot).balance, 1 ether / 20, "Bot was sent incorrect ETH amount");
+        assertEq(weth.balanceOf(address(bot)), 1 ether / 20, "Bot was sent incorrect WETH amount");
 
         assertEq(addressProvider.getTreasuryContract().balance, 1 ether / 40, "Treasury was sent incorrect amount");
 
@@ -387,12 +390,12 @@ contract BotListTest is Test, IBotListV3Events {
         assertEq(allowanceLU, block.timestamp, "Allowance update timestamp incorrect");
 
         assertEq(
-            botList.fundingBalances(USER),
+            botList.balanceOf(USER),
             2 ether - (2 ether / 20) - (2 ether / 40),
             "User remaining funding balance incorrect"
         );
 
-        assertEq(address(bot).balance, 2 ether / 20, "Bot was sent incorrect ETH amount");
+        assertEq(weth.balanceOf(address(bot)), 2 ether / 20, "Bot was sent incorrect WETH amount");
 
         assertEq(addressProvider.getTreasuryContract().balance, 2 ether / 40, "Treasury was sent incorrect amount");
     }
@@ -425,8 +428,11 @@ contract BotListTest is Test, IBotListV3Events {
         vm.prank(invalidCF);
         botList.eraseAllBotPermissions(address(creditAccount));
 
-        vm.expectEmit(true, false, false, false);
-        emit EraseBots(address(creditAccount));
+        vm.expectEmit(true, true, false, false);
+        emit EraseBot(address(creditAccount), address(bot));
+
+        vm.expectEmit(true, true, false, false);
+        emit EraseBot(address(creditAccount), address(bot2));
 
         vm.prank(address(creditFacade));
         botList.eraseAllBotPermissions(address(creditAccount));
@@ -448,8 +454,6 @@ contract BotListTest is Test, IBotListV3Events {
 
         assertEq(remainingWeeklyAllowance, 0, "Remaining funds were not zeroed");
 
-        assertEq(allowanceLU, block.timestamp, "Allowance update timestamp incorrect");
-
         (remainingFunds, maxWeeklyAllowance, remainingWeeklyAllowance, allowanceLU) =
             botList.botFunding(address(creditAccount), address(bot2));
 
@@ -458,8 +462,6 @@ contract BotListTest is Test, IBotListV3Events {
         assertEq(maxWeeklyAllowance, 0, "Remaining funds were not zeroed");
 
         assertEq(remainingWeeklyAllowance, 0, "Remaining funds were not zeroed");
-
-        assertEq(allowanceLU, block.timestamp, "Allowance update timestamp incorrect");
 
         address[] memory activeBots = botList.getActiveBots(address(creditAccount));
 

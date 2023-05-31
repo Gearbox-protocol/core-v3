@@ -73,7 +73,7 @@ library BalancesLogic {
             forbiddenBalances = new  BalanceWithMask[](forbiddenTokensOnAccount.calcEnabledTokens());
             unchecked {
                 uint256 i;
-                for (uint256 tokenMask = 1; tokenMask < forbiddenTokensOnAccount; tokenMask <<= 1) {
+                for (uint256 tokenMask = 1; tokenMask <= forbiddenTokensOnAccount; tokenMask <<= 1) {
                     if (forbiddenTokensOnAccount & tokenMask != 0) {
                         address token = getTokenByMaskFn(tokenMask);
                         forbiddenBalances[i].token = token;

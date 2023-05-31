@@ -91,7 +91,7 @@ contract PoolDeployer is Test {
         withdrawalManager =
             WithdrawalManagerV3(payable(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00)));
 
-        botList = BotListV3(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00));
+        botList = BotListV3(payable(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00)));
 
         underlying = _underlying;
 
