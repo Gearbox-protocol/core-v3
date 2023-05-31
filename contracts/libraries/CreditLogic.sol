@@ -185,20 +185,6 @@ library CreditLogic {
         ); // U:[CL-05]
     }
 
-    function increaseQuotaParams(
-        CreditAccountInfo storage creditAccountInfo,
-        uint128 cumulativeQuotaInterestIncrease,
-        uint128 quotaProfitsIncrease
-    ) internal {
-        assembly {
-            let slot := add(creditAccountInfo.slot, 2)
-            let currentValue := sload(slot)
-            let value :=
-                add(currentValue, or(shl(128, cumulativeQuotaInterestIncrease), shl(128, quotaProfitsIncrease)))
-            sstore(slot, value)
-        }
-    }
-
     //
     // INTEREST CALCULATIONS ON CHANGING DEBT
     //
