@@ -243,7 +243,6 @@ library CreditLogic {
             uint128 newCumulativeQuotaInterest,
             uint128 newQuotaProfits
         )
-
     {
         uint256 amountToRepay = amount;
 

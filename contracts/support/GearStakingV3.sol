@@ -198,12 +198,12 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
 
     /// @notice Returns the total amount of GEAR the user staked into staked GEAR
     function balanceOf(address user) external view returns (uint256) {
-        return uint256(voteLockData[user].totalStaked);
+        return voteLockData[user].totalStaked;
     }
 
     /// @notice Returns the balance available for voting or withdrawal
     function availableBalance(address user) external view returns (uint256) {
-        return uint256(voteLockData[user].available);
+        return voteLockData[user].available;
     }
 
     /// @notice Returns the amounts withdrawable now and over the next 4 epochs
