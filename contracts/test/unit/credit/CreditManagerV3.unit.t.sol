@@ -551,7 +551,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: 12039120,
             cumulativeIndexLastUpdate: 23e3,
             cumulativeQuotaInterest: cumulativeQuotaInterestBefore,
-            quotaProfits: 1,
+            quotaProfits: 0,
             enabledTokensMask: enabledTokensMaskBefore,
             flags: 34343,
             borrower: address(0)
@@ -1024,7 +1024,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: collateralDebtData.debt,
             cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
             cumulativeQuotaInterest: 0,
-            quotaProfits: 1,
+            quotaProfits: 0,
             enabledTokensMask: 0,
             flags: 0,
             borrower: USER
@@ -1115,7 +1115,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: collateralDebtData.debt,
             cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
             cumulativeQuotaInterest: uint128(initialCQI),
-            quotaProfits: 1,
+            quotaProfits: 0,
             enabledTokensMask: 0,
             flags: 0,
             borrower: USER
@@ -1140,7 +1140,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             cumulativeIndexNow: collateralDebtData.cumulativeIndexNow,
             cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
             cumulativeQuotaInterest: collateralDebtData.cumulativeQuotaInterest,
-            quotaProfits: collateralDebtData.quotaProfits,
+            quotaProfits: 0,
             feeInterest: DEFAULT_FEE_INTEREST
         });
 
@@ -1249,7 +1249,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: collateralDebtData.debt,
             cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
             cumulativeQuotaInterest: collateralDebtData.cumulativeQuotaInterest + 1,
-            quotaProfits: 1,
+            quotaProfits: 0,
             enabledTokensMask: 0,
             flags: 0,
             borrower: USER
@@ -1653,7 +1653,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: debt,
             cumulativeIndexLastUpdate: vars.get("cumulativeIndexLastUpdate"),
             cumulativeQuotaInterest: INITIAL_INTEREST,
-            quotaProfits: 1,
+            quotaProfits: 0,
             enabledTokensMask: UNDERLYING_TOKEN_MASK | LINK_TOKEN_MASK | STETH_TOKEN_MASK,
             flags: 0,
             borrower: USER
@@ -1876,7 +1876,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                     debt: debt,
                     cumulativeIndexLastUpdate: vars.get("cumulativeIndexLastUpdate"),
                     cumulativeQuotaInterest: uint128(vars.get("INITIAL_INTEREST") + 1),
-                    quotaProfits: 1,
+                    quotaProfits: 0,
                     enabledTokensMask: _case.enabledTokensMask,
                     flags: 0,
                     borrower: USER
@@ -1943,7 +1943,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 debt: debt,
                 cumulativeIndexLastUpdate: vars.get("cumulativeIndexLastUpdate"),
                 cumulativeQuotaInterest: uint128(vars.get("INITIAL_INTEREST") + 1),
-                quotaProfits: 1,
+                quotaProfits: 0,
                 enabledTokensMask: UNDERLYING_TOKEN_MASK,
                 flags: setFlag ? WITHDRAWAL_FLAG : 0,
                 borrower: USER
