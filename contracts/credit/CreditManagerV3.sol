@@ -246,15 +246,17 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         creditAccount = IAccountFactoryBase(accountFactory).takeCreditAccount(0, 0); // U:[CM-6]
 
-        creditAccountInfo[creditAccount].debt = debt; // U:[CM-6]
-        creditAccountInfo[creditAccount].cumulativeIndexLastUpdate = _poolCumulativeIndexNow(); // U:[CM-6]
-        creditAccountInfo[creditAccount].since = uint64(block.number); // U:[CM-6]
-        creditAccountInfo[creditAccount].flags = 0; // U:[CM-6]
-        creditAccountInfo[creditAccount].borrower = onBehalfOf; // U:[CM-6]
+        CreditAccountInfo storage newCreditAccountInfo = creditAccountInfo[creditAccount];
+
+        newCreditAccountInfo.debt = debt; // U:[CM-6]
+        newCreditAccountInfo.cumulativeIndexLastUpdate = _poolCumulativeIndexNow(); // U:[CM-6]
+        newCreditAccountInfo.since = uint64(block.number); // U:[CM-6]
+        newCreditAccountInfo.flags = 0; // U:[CM-6]
+        newCreditAccountInfo.borrower = onBehalfOf; // U:[CM-6]
 
         if (supportsQuotas) {
-            creditAccountInfo[creditAccount].cumulativeQuotaInterest = 1;
-            creditAccountInfo[creditAccount].quotaProfits = 0;
+            newCreditAccountInfo.cumulativeQuotaInterest = 1;
+            newCreditAccountInfo.quotaProfits = 0;
         } // U:[CM-6]
 
         // Requests the pool to transfer tokens the Credit Account
@@ -433,20 +435,22 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacadeOnly // U:[CM-2]
         returns (uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable)
     {
-        CollateralDebtData memory collateralDebtData;
         uint256[] memory collateralHints;
+        CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
+
+        CollateralDebtData memory collateralDebtData = _calcDebtAndCollateral({
+            creditAccount: creditAccount,
+            enabledTokensMask: enabledTokensMask,
+            collateralHints: collateralHints,
+            minHealthFactor: PERCENTAGE_FACTOR,
+            task: (action == ManageDebtAction.INCREASE_DEBT)
+                ? CollateralCalcTask.GENERIC_PARAMS
+                : CollateralCalcTask.DEBT_ONLY
+        }); // U:[CM-10, 11]
 
         uint256 newCumulativeIndex;
         if (action == ManageDebtAction.INCREASE_DEBT) {
             /// INCREASE DEBT
-
-            collateralDebtData = _calcDebtAndCollateral({
-                creditAccount: creditAccount,
-                enabledTokensMask: enabledTokensMask,
-                collateralHints: collateralHints,
-                minHealthFactor: PERCENTAGE_FACTOR,
-                task: CollateralCalcTask.GENERIC_PARAMS
-            }); // U:[CM-10]
 
             (newDebt, newCumulativeIndex) = CreditLogic.calcIncrease({
                 amount: amount,
@@ -461,23 +465,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         } else {
             // DECREASE DEBT
 
-            collateralDebtData = _calcDebtAndCollateral({
-                creditAccount: creditAccount,
-                enabledTokensMask: enabledTokensMask,
-                collateralHints: collateralHints,
-                minHealthFactor: PERCENTAGE_FACTOR,
-                task: CollateralCalcTask.DEBT_ONLY
-            }); // U:[CM-11]
+            // Pays the entire amount back to the pool
+            ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amount}); // U:[CM-11]
 
             uint128 newCumulativeQuotaInterest;
             uint128 newQuotaProfits;
-
-            // Pays the entire amount back to the pool
-            ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amount}); // U:[CM-11]
             {
                 uint256 profit;
 
-                uint128 quotaProfits = (supportsQuotas) ? creditAccountInfo[creditAccount].quotaProfits : 0;
+                uint128 quotaProfits = (supportsQuotas) ? currentCreditAccountInfo.quotaProfits : 0;
 
                 (newDebt, newCumulativeIndex, profit, newCumulativeQuotaInterest, newQuotaProfits) = CreditLogic
                     .calcDecrease({
@@ -503,8 +499,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     creditAccount: creditAccount,
                     tokens: collateralDebtData.quotedTokens
                 });
-                creditAccountInfo[creditAccount].cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // U:[CM-11]
-                creditAccountInfo[creditAccount].quotaProfits = newQuotaProfits;
+
+                currentCreditAccountInfo.cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // U:[CM-11]
+                currentCreditAccountInfo.quotaProfits = newQuotaProfits;
             }
 
             /// If the entire underlying balance was spent on repayment, it is disabled
@@ -513,8 +510,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             }
         }
 
-        creditAccountInfo[creditAccount].debt = newDebt; // U:[CM-10, 11]
-        creditAccountInfo[creditAccount].cumulativeIndexLastUpdate = newCumulativeIndex; // U:[CM-10, 11]
+        currentCreditAccountInfo.debt = newDebt; // U:[CM-10, 11]
+        currentCreditAccountInfo.cumulativeIndexLastUpdate = newCumulativeIndex; // U:[CM-10, 11]
     }
 
     /// @notice Transfer collateral from the payer to the credit account
@@ -687,12 +684,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             revert NotEnoughCollateralException(); // U:[CM-18]
         }
 
+        uint256 enabledTokensMaskAfter = collateralDebtData.enabledTokensMask;
         /// During a multicall, all changes to enabledTokenMask are stored in-memory
         /// to avoid redundant storage writes. Saving to storage is only done at the end
         /// of a full collateral check, which is performed after every multicall
-        _saveEnabledTokensMask(creditAccount, collateralDebtData.enabledTokensMask); // U:[CM-18]
-
-        return collateralDebtData.enabledTokensMask;
+        _saveEnabledTokensMask(creditAccount, enabledTokensMaskAfter); // U:[CM-18]
+        return enabledTokensMaskAfter;
     }
 
     /// @notice Returns whether the passed credit account is unhealthy given the provided minHealthFactor
@@ -776,11 +773,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         uint16 minHealthFactor,
         CollateralCalcTask task
     ) internal view returns (CollateralDebtData memory collateralDebtData) {
+        CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
+
         /// GENERIC PARAMS
         /// The generic parameters include the debt principal and base interest current and LU indexes
         /// This is the minimal amount of debt data required to perform computations after increasing debt.
-        collateralDebtData.debt = creditAccountInfo[creditAccount].debt; // U:[CM-20]
-        collateralDebtData.cumulativeIndexLastUpdate = creditAccountInfo[creditAccount].cumulativeIndexLastUpdate; // U:[CM-20]
+        collateralDebtData.debt = currentCreditAccountInfo.debt; // U:[CM-20]
+        collateralDebtData.cumulativeIndexLastUpdate = currentCreditAccountInfo.cumulativeIndexLastUpdate; // U:[CM-20]
         collateralDebtData.cumulativeIndexNow = _poolCumulativeIndexNow(); // U:[CM-20]
 
         if (task == CollateralCalcTask.GENERIC_PARAMS) {
@@ -809,17 +808,19 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 _poolQuotaKeeper: collateralDebtData._poolQuotaKeeper
             }); // U:[CM-21]
 
-            collateralDebtData.cumulativeQuotaInterest += creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1; // U:[CM-21]
+            collateralDebtData.cumulativeQuotaInterest += currentCreditAccountInfo.cumulativeQuotaInterest - 1; // U:[CM-21]
+
+            collateralDebtData.accruedInterest = collateralDebtData.cumulativeQuotaInterest;
+            collateralDebtData.accruedFees = currentCreditAccountInfo.quotaProfits;
         }
 
-        collateralDebtData.accruedInterest = CreditLogic.calcAccruedInterest({
+        collateralDebtData.accruedInterest += CreditLogic.calcAccruedInterest({
             amount: collateralDebtData.debt,
             cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
             cumulativeIndexNow: collateralDebtData.cumulativeIndexNow
-        }) + collateralDebtData.cumulativeQuotaInterest; // U:[CM-21] // I: [CMQ-07]
+        }); // U:[CM-21] // I: [CMQ-07]
 
-        collateralDebtData.accruedFees = (collateralDebtData.accruedInterest * feeInterest) / PERCENTAGE_FACTOR
-            + (supportsQuotas ? creditAccountInfo[creditAccount].quotaProfits : 0); // U:[CM-21]
+        collateralDebtData.accruedFees += (collateralDebtData.accruedInterest * feeInterest) / PERCENTAGE_FACTOR; // U:[CM-21]
 
         if (task == CollateralCalcTask.DEBT_ONLY) return collateralDebtData; // U:[CM-21]
 
@@ -1068,6 +1069,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
             (hasScheduled, tokensToEnable) =
                 IWithdrawalManagerV3(withdrawalManager).claimScheduledWithdrawals(creditAccount, to, action); // U:[CM-29]
+
             if (!hasScheduled) {
                 // WITHDRAWAL_FLAG is disabled when there are no more pending withdrawals
                 _disableFlag(creditAccount, WITHDRAWAL_FLAG); // U:[CM-29]
@@ -1282,7 +1284,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     ///      * 1 - WITHDRAWALS_FLAG - whether the account has pending withdrawals
     ///      * 2 - BOT_PERMISSIONS_FLAG - whether the account has non-zero permissions for at least one bot
     /// @param creditAccount Account to get the mask for
-    function flagsOf(address creditAccount) external view override returns (uint16) {
+    function flagsOf(address creditAccount) public view override returns (uint16) {
         return creditAccountInfo[creditAccount].flags; // U:[CM-35]
     }
 
@@ -1315,7 +1317,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     /// @notice Efficiently checks whether the CA has pending withdrawals using the flag
     function _hasWithdrawals(address creditAccount) internal view returns (bool) {
-        return creditAccountInfo[creditAccount].flags & WITHDRAWAL_FLAG != 0; // U:[CM-36]
+        return flagsOf(creditAccount) & WITHDRAWAL_FLAG != 0; // U:[CM-36]
     }
 
     /// @notice Returns the mask containing the account's enabled tokens
@@ -1327,15 +1329,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Checks quantity of enabled tokens and saves the mask to creditAccountInfo
 
     function _saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) internal {
-        uint256 enabledTokensMaskOld = creditAccountInfo[creditAccount].enabledTokensMask;
-
-        if (enabledTokensMask != enabledTokensMaskOld) {
-            if (enabledTokensMask.calcEnabledTokens() > maxEnabledTokens) {
-                revert TooManyEnabledTokensException(); // U:[CM-37]
-            }
-
-            creditAccountInfo[creditAccount].enabledTokensMask = enabledTokensMask; // U:[CM-37]
+        if (enabledTokensMask.calcEnabledTokens() > maxEnabledTokens) {
+            revert TooManyEnabledTokensException(); // U:[CM-37]
         }
+
+        creditAccountInfo[creditAccount].enabledTokensMask = enabledTokensMask; // U:[CM-37]
     }
 
     ///
