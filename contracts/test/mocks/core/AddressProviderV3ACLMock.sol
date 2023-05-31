@@ -9,6 +9,7 @@ import {PriceOracleMock} from "../oracles/PriceOracleMock.sol";
 import {WETHGatewayMock} from "../support/WETHGatewayMock.sol";
 import {WithdrawalManagerMock} from "../support/WithdrawalManagerMock.sol";
 import {BotListMock} from "../support/BotListMock.sol";
+import {WETHMock} from "../token/WETHMock.sol";
 
 import {Test} from "forge-std/Test.sol";
 
@@ -46,6 +47,8 @@ contract AddressProviderV3ACLMock is Test, AddressProviderV3 {
         _setAddress(AP_CONTRACTS_REGISTER, address(this), 1);
 
         _setAddress(AP_TREASURY, makeAddr("TREASURY"), 0);
+
+        _setAddress(AP_WETH_TOKEN, address(new WETHMock()), 0);
 
         isConfigurator[msg.sender] = true;
         owner = msg.sender;

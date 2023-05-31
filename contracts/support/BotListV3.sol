@@ -9,17 +9,18 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {IBotListV3, BotFunding} from "../interfaces/IBotListV3.sol";
-import {IAddressProvider} from "@gearbox-protocol/core-v2/contracts/interfaces/IAddressProvider.sol";
+import {IAddressProviderV3, AP_TREASURY, AP_WETH_TOKEN, NO_VERSION_CONTROL} from "../core/AddressProviderV3.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {ICreditFacadeV3} from "../interfaces/ICreditFacadeV3.sol";
 import {ICreditAccountBase} from "../interfaces/ICreditAccountV3.sol";
+import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 
 import "../interfaces/IExceptions.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 /// @title BotList
 /// @notice Used to store a mapping of borrowers => bots. A separate contract is used for transferability when
-///      changing Credit Facades
+///      changing Credit Facades.
 contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     using SafeCast for uint256;
     using Address for address;
@@ -51,11 +52,15 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @notice Address of the DAO treasury
     address public immutable treasury;
 
+    /// @notice Address of the WETH token
+    address public immutable weth;
+
     /// @notice Contract version
     uint256 public constant override version = 3_00;
 
     constructor(address _addressProvider) ACLNonReentrantTrait(_addressProvider) {
-        treasury = IAddressProvider(_addressProvider).getTreasuryContract();
+        treasury = IAddressProviderV3(_addressProvider).getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL);
+        weth = IAddressProviderV3(_addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL);
     }
 
     /// @notice Limits access to a function only to Credit Facades connected to approved CMs
@@ -128,7 +133,6 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
             botFunding[creditAccount][bot].remainingFunds = 0; // F: [BL-06]
             botFunding[creditAccount][bot].maxWeeklyAllowance = 0; // F: [BL-06]
             botFunding[creditAccount][bot].remainingWeeklyAllowance = 0; // F: [BL-06]
-            botFunding[creditAccount][bot].allowanceLU = uint40(block.timestamp); // F: [BL-06]
             activeBots[creditAccount].remove(bot); // F: [BL-06]
             unchecked {
                 ++i;
@@ -165,9 +169,9 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         bf.remainingWeeklyAllowance -= paymentAmount + feeAmount; // F: [BL-05]
         bf.remainingFunds -= paymentAmount + feeAmount; // F: [BL-05]
 
-        fundingBalances[payer] -= uint256(paymentAmount + feeAmount); // F: [BL-05]
+        fundingBalances[payer] -= paymentAmount + feeAmount; // F: [BL-05]
 
-        payable(bot).sendValue(paymentAmount); // F: [BL-05]
+        _convertAndSendWETH(bot, paymentAmount);
         if (feeAmount > 0) payable(treasury).sendValue(feeAmount); // F: [BL-05]
 
         emit PayBot(payer, creditAccount, bot, paymentAmount, feeAmount); // F: [BL-05]
@@ -208,6 +212,13 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         returns (uint192 permissions, bool forbidden)
     {
         return (botPermissions[creditAccount][bot], forbiddenBot[bot]);
+    }
+
+    /// @dev Converts ETH to WETH and sends to recipient
+    /// @dev Used to avoid giving flow control to bots
+    function _convertAndSendWETH(address to, uint256 amount) internal {
+        IWETH(weth).deposit{value: amount}();
+        IWETH(weth).transfer(to, amount);
     }
 
     //
