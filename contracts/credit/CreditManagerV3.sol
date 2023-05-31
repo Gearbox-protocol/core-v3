@@ -951,7 +951,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param creditAccount Address of credit account
     /// @param token Address of quoted token
     /// @param quotaChange Change in quota in SIGNED format
-    function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota)
+    function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota, uint96 maxQuota)
         external
         override
         nonReentrant // U:[CM-5]
@@ -970,7 +970,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             creditAccount: creditAccount,
             token: token,
             quotaChange: quotaChange,
-            minQuota: minQuota
+            minQuota: minQuota,
+            maxQuota: maxQuota
         }); // U:[CM-25] // I: [CMQ-3]
 
         if (enable) {

@@ -10,6 +10,7 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {BalancesLogic, Balance, BalanceWithMask} from "../libraries/BalancesLogic.sol";
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {BitMask, UNDERLYING_TOKEN_MASK} from "../libraries/BitMask.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 //  DATA
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
@@ -58,6 +59,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     using Address for address;
     using BitMask for uint256;
     using SafeCast for uint256;
+
+    /// @notice Contract version
+    uint256 public constant override version = 3_00;
+
+    /// @notice maxDebt to maxQuota multiplier
+    uint256 public constant maxQuotaMultiplier = 8;
 
     /// @notice Credit Manager connected to this Credit Facade
     address public immutable creditManager;
@@ -115,9 +122,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// In the interest of fairness, emergency liquidators do not receive a premium
     /// And are compensated by the Gearbox DAO separately.
     mapping(address => bool) public override canLiquidateWhilePaused;
-
-    /// @notice Contract version
-    uint256 public constant override version = 3_00;
 
     /// @notice Restricts functions to the connected Credit Configurator only
     modifier creditConfiguratorOnly() {
@@ -948,8 +952,13 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     {
         int96 realQuotaChange;
         (address token, int96 quotaChange, uint96 minQuota) = abi.decode(callData, (address, int96, uint96)); // U:[FA-34]
-        (realQuotaChange, tokensToEnable, tokensToDisable) =
-            ICreditManagerV3(creditManager).updateQuota(creditAccount, token, quotaChange, minQuota); // U:[FA-34]
+        (realQuotaChange, tokensToEnable, tokensToDisable) = ICreditManagerV3(creditManager).updateQuota({
+            creditAccount: creditAccount,
+            token: token,
+            quotaChange: quotaChange,
+            minQuota: minQuota,
+            maxQuota: uint96(Math.min(type(uint96).max, maxQuotaMultiplier * debtLimits.maxDebt))
+        }); // U:[FA-34]
 
         emit UpdateQuota({creditAccount: creditAccount, token: token, quotaChange: realQuotaChange}); // U:[FA-34]
     }

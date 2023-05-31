@@ -11,6 +11,7 @@ import {CreditLogic} from "./CreditLogic.sol";
 import {RAY, SECONDS_PER_YEAR, PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 import "../interfaces/IExceptions.sol";
+import "forge-std/console.sol";
 
 uint192 constant RAY_DIVIDED_BY_PERCENTAGE = uint192(RAY / PERCENTAGE_FACTOR);
 

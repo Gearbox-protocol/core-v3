@@ -60,14 +60,14 @@ contract GaugeMock is ACLNonReentrantTrait {
         keeper.updateRates();
     }
 
-    function addQuotaToken(address token, uint16 _rate) external configuratorOnly {
-        rates[token] = _rate;
+    function addQuotaToken(address token, uint16 rate) external configuratorOnly {
+        rates[token] = rate;
         IPoolQuotaKeeperV3 keeper = IPoolQuotaKeeperV3(pool.poolQuotaKeeper());
         keeper.addQuotaToken(token);
     }
 
-    function changeQuotaTokenRateParams(address token, uint16 _rate) external configuratorOnly {
-        rates[token] = _rate;
+    function changeQuotaTokenRateParams(address token, uint16 rate) external configuratorOnly {
+        rates[token] = rate;
     }
 
     function getRates(address[] memory tokens) external view returns (uint16[] memory result) {
