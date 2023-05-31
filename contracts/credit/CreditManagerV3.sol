@@ -499,6 +499,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     creditAccount: creditAccount,
                     tokens: collateralDebtData.quotedTokens
                 });
+
                 currentCreditAccountInfo.cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // U:[CM-11]
                 currentCreditAccountInfo.quotaProfits = newQuotaProfits;
             }

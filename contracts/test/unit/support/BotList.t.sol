@@ -148,14 +148,6 @@ contract BotListTest is Test, IBotListV3Events {
             weeklyFundingAllowance: uint72(1 ether / 10)
         });
 
-        vm.prank(address(creditFacade));
-        botList.setBotPermissions({
-            creditAccount: creditAccount,
-            bot: address(bot),
-            permissions: 0,
-            fundingAmount: 0,
-            weeklyFundingAllowance: 0
-        });
 
         vm.prank(CONFIGURATOR);
         botList.setBotForbiddenStatus(address(bot), false);
@@ -222,6 +214,9 @@ contract BotListTest is Test, IBotListV3Events {
         assertEq(bots.length, 1, "Incorrect active bots array length");
 
         assertEq(bots[0], address(bot), "Incorrect address added to active bots list");
+
+        vm.expectEmit(true, true, false, false);
+        emit EraseBot(address(creditAccount), address(bot));
 
         vm.prank(address(creditFacade));
         activeBotsRemaining = botList.setBotPermissions({
