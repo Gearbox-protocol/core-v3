@@ -235,7 +235,7 @@ library CreditLogic {
         uint16 feeInterest
     )
         internal
-        view
+        pure
         returns (
             uint256 newDebt,
             uint256 newCumulativeIndex,
@@ -252,20 +252,21 @@ library CreditLogic {
         /// partially repaid (with part of payment going to fees pro-rata), while base interest
         /// and debt remain inchanged. If the amount covers quota interest fully, then the same logic
         /// applies to the remaining amount and base interest/debt.
-
-        if (quotaProfits != 0) {
-            if (amountToRepay > quotaProfits) {
-                newQuotaProfits = 0;
-                amountToRepay -= quotaProfits;
-                profit = quotaProfits;
-            } else {
-                newQuotaProfits = quotaProfits - amountToRepay.toUint128();
-                profit = amountToRepay;
-                amountToRepay = 0;
+        unchecked {
+            if (quotaProfits != 0) {
+                if (amountToRepay > quotaProfits) {
+                    newQuotaProfits = 0;
+                    amountToRepay -= quotaProfits;
+                    profit = quotaProfits;
+                } else {
+                    newQuotaProfits = quotaProfits - amountToRepay.toUint128();
+                    profit = amountToRepay;
+                    amountToRepay = 0;
+                }
             }
         }
 
-        if (cumulativeQuotaInterest != 0 && amountToRepay > 0) {
+        if (cumulativeQuotaInterest != 0 && amountToRepay != 0) {
             uint256 quotaProfit = (cumulativeQuotaInterest * feeInterest) / PERCENTAGE_FACTOR;
 
             if (amountToRepay >= cumulativeQuotaInterest + quotaProfit) {
@@ -293,13 +294,16 @@ library CreditLogic {
             newCumulativeQuotaInterest = cumulativeQuotaInterest;
         }
 
-        if (amountToRepay > 0) {
-            uint256 interestAccrued = (debt * cumulativeIndexNow) / cumulativeIndexLastUpdate - debt; // U:[CL-03A]
+        if (amountToRepay != 0) {
+            uint256 interestAccrued = calcAccruedInterest({
+                amount: debt,
+                cumulativeIndexLastUpdate: cumulativeIndexLastUpdate,
+                cumulativeIndexNow: cumulativeIndexNow
+            }); // U:[CL-03A]
             uint256 profitFromInterest = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR; // U:[CL-03A]
 
             if (amountToRepay >= interestAccrued + profitFromInterest) {
                 amountToRepay -= interestAccrued + profitFromInterest;
-                newDebt = debt - amountToRepay;
 
                 profit += profitFromInterest; // U:[CL-03B]
 
@@ -312,8 +316,6 @@ library CreditLogic {
 
                 profit += amountToRepay - amountToPool; // U:[CL-03B]
                 amountToRepay = 0; // U:[CL-03B]
-
-                newDebt = debt; // U:[CL-03A]
 
                 // Since the interest was only repaid partially, we need to recompute the
                 // cumulativeIndexLastUpdate, so that "debt * (indexNow / indexAtOpenNew - 1)"
@@ -330,8 +332,8 @@ library CreditLogic {
                     ); // U:[CL-03A]
             }
         } else {
-            newDebt = debt; // U:[CL-03A]
             newCumulativeIndex = cumulativeIndexLastUpdate; // U:[CL-03A]
         }
+        newDebt = debt - amountToRepay;
     }
 }

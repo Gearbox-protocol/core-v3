@@ -75,10 +75,8 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
 
     /// @notice Limits access to a function only to Credit Facades connected to approved CMs
     modifier onlyValidCreditFacade() {
-        address creditManager = ICreditFacadeV3(msg.sender).creditManager();
-        if (!approvedCreditManager[creditManager] || ICreditManagerV3(creditManager).creditFacade() != msg.sender) {
-            revert CallerNotCreditFacadeException();
-        }
+        _revertIfNotValidCreditFacade();
+
         _;
     }
 
@@ -88,6 +86,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @param permissions A bit mask of permissions
     /// @param fundingAmount Total amount of ETH available to the bot for payments
     /// @param weeklyFundingAllowance Amount of ETH available to the bot weekly
+
     function setBotPermissions(
         address creditAccount,
         address bot,
@@ -145,7 +144,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         unchecked {
             for (uint256 i = 0; i < len; ++i) {
                 address bot = activeBots[creditAccount].at(len - i - 1); // F: [BL-06]
-                _eraseBot(creditAccount, bot);
+                _eraseBot({creditAccount: creditAccount, bot: bot});
             }
         }
     }
@@ -155,7 +154,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         delete botFunding[creditAccount][bot]; // F: [BL-06]
 
         activeBots[creditAccount].remove(bot); // F: [BL-06]
-        emit EraseBot(creditAccount, bot); // F: [BL-06]
+        emit EraseBot({creditAccount: creditAccount, bot: bot}); // F: [BL-06]
     }
 
     /// @notice Takes payment for performed services from the user's balance and sends to the bot
@@ -263,6 +262,14 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
             emit CreditManagerAdded(creditManager);
         } else {
             emit CreditManagerRemoved(creditManager);
+        }
+    }
+
+    /// @notice Reverts if caller is not creditFacade
+    function _revertIfNotValidCreditFacade() internal view {
+        address creditManager = ICreditFacadeV3(msg.sender).creditManager();
+        if (!approvedCreditManager[creditManager] || ICreditManagerV3(creditManager).creditFacade() != msg.sender) {
+            revert CallerNotCreditFacadeException();
         }
     }
 
