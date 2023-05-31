@@ -23,7 +23,8 @@ uint8 constant BOT_PERMISSIONS_SET_FLAG = 1 << 1;
 struct CreditAccountInfo {
     uint256 debt;
     uint256 cumulativeIndexLastUpdate;
-    uint256 cumulativeQuotaInterest;
+    uint128 cumulativeQuotaInterest;
+    uint128 quotaProfits;
     uint256 enabledTokensMask;
     uint16 flags;
     uint64 since;
@@ -44,7 +45,8 @@ struct CollateralDebtData {
     uint256 debt;
     uint256 cumulativeIndexNow;
     uint256 cumulativeIndexLastUpdate;
-    uint256 cumulativeQuotaInterest;
+    uint128 cumulativeQuotaInterest;
+    uint128 quotaProfits;
     uint256 accruedInterest;
     uint256 accruedFees;
     uint256 totalDebtUSD;

@@ -49,7 +49,7 @@ interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion {
     /// @param quotaChange Requested quota change in pool's underlying asset units
     function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota, uint96 maxQuota)
         external
-        returns (uint256 caQuotaInterestChange, int96 change, bool enableToken, bool disableToken);
+        returns (uint128 caQuotaInterestChange, uint128 tradingFees, int96 change, bool enableToken, bool disableToken);
 
     /// @dev Updates all quotas to zero when closing a credit account, and computes the final quota interest change
     /// @param creditAccount Address of the Credit Account being closed
@@ -101,5 +101,5 @@ interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion {
     function getQuotaAndOutstandingInterest(address creditAccount, address token)
         external
         view
-        returns (uint256 quoted, uint256 outstandingInterest);
+        returns (uint256 quoted, uint128 outstandingInterest);
 }

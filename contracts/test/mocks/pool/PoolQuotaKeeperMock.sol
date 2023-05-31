@@ -34,7 +34,7 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     bool public call_setLimitsToZero;
 
     ///
-    uint256 internal return_caQuotaInterestChange;
+    uint128 internal return_caQuotaInterestChange;
     int96 internal return_realQuotaChange;
     bool internal return_enableToken;
     bool internal return_disableToken;
@@ -44,7 +44,7 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     bool internal return_isQuotedToken;
 
     mapping(address => uint96) internal _quoted;
-    mapping(address => uint256) internal _outstandingInterest;
+    mapping(address => uint128) internal _outstandingInterest;
 
     constructor(address _pool, address _underlying) {
         pool = _pool;
@@ -54,7 +54,13 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     function updateQuota(address, address, int96, uint96, uint96)
         external
         view
-        returns (uint256 caQuotaInterestChange, int96 realQuotaChange, bool enableToken, bool disableToken)
+        returns (
+            uint128 caQuotaInterestChange,
+            uint128 tradingFees,
+            int96 realQuotaChange,
+            bool enableToken,
+            bool disableToken
+        )
     {
         caQuotaInterestChange = return_caQuotaInterestChange;
         realQuotaChange = return_realQuotaChange;
@@ -63,7 +69,7 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     }
 
     function setUpdateQuotaReturns(
-        uint256 caQuotaInterestChange,
+        uint128 caQuotaInterestChange,
         int96 realQuotaChange,
         bool enableToken,
         bool disableToken
@@ -96,7 +102,7 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     /// @dev Batch updates the quota rates and changes the combined quota revenue
     function updateRates() external {}
 
-    function setQuotaAndOutstandingInterest(address token, uint96 quoted, uint256 outstandingInterest) external {
+    function setQuotaAndOutstandingInterest(address token, uint96 quoted, uint128 outstandingInterest) external {
         _quoted[token] = quoted;
         _outstandingInterest[token] = outstandingInterest;
     }
@@ -106,7 +112,7 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
         external
         view
         override
-        returns (uint256 quoted, uint256 interest)
+        returns (uint256 quoted, uint128 interest)
     {
         quoted = _quoted[token];
         interest = _outstandingInterest[token];

@@ -254,7 +254,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
     }
 
-    function _addQuotedToken(address token, uint16 lt, uint96 quoted, uint256 outstandingInterest) internal {
+    function _addQuotedToken(address token, uint16 lt, uint96 quoted, uint128 outstandingInterest) internal {
         _addToken({token: token, lt: lt});
         poolQuotaKeeperMock.setQuotaAndOutstandingInterest({
             token: token,
@@ -263,7 +263,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
     }
 
-    function _addQuotedToken(Tokens token, uint16 lt, uint96 quoted, uint256 outstandingInterest) internal {
+    function _addQuotedToken(Tokens token, uint16 lt, uint96 quoted, uint128 outstandingInterest) internal {
         _addQuotedToken({
             token: tokenTestSuite.addressOf(token),
             lt: lt,
@@ -547,7 +547,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         assertEq(creditManager.creditAccounts().length, 0, _testCaseErr("SETUP: incorrect creditAccounts() length"));
 
-        uint256 cumulativeQuotaInterestBefore = 123412321;
+        uint128 cumulativeQuotaInterestBefore = 123412321;
         uint256 enabledTokensMaskBefore = 231423;
 
         creditManager.setCreditAccountInfoMap({
@@ -555,6 +555,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: 12039120,
             cumulativeIndexLastUpdate: 23e3,
             cumulativeQuotaInterest: cumulativeQuotaInterestBefore,
+            quotaProfits: 1,
             enabledTokensMask: enabledTokensMaskBefore,
             flags: 34343,
             borrower: address(0)
@@ -570,7 +571,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         (
             uint256 debt,
             uint256 cumulativeIndexLastUpdate,
-            uint256 cumulativeQuotaInterest,
+            uint128 cumulativeQuotaInterest,
+            ,
             uint256 enabledTokensMask,
             uint16 flags,
             uint64 since,
@@ -893,7 +895,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 reason: "Pool balance invariant"
             });
 
-            (,,,,,, address borrower) = creditManager.creditAccountInfo(creditAccount);
+            (,,,,,,, address borrower) = creditManager.creditAccountInfo(creditAccount);
             assertEq(borrower, address(0), "Borrowers wasn't cleared");
 
             assertEq(
@@ -1026,6 +1028,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: collateralDebtData.debt,
             cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
             cumulativeQuotaInterest: 0,
+            quotaProfits: 1,
             enabledTokensMask: 0,
             flags: 0,
             borrower: USER
@@ -1071,7 +1074,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         /// @notice checking creditAccountInf update
 
-        (uint256 debt, uint256 cumulativeIndexLastUpdate,,,,,) = creditManager.creditAccountInfo(creditAccount);
+        (uint256 debt, uint256 cumulativeIndexLastUpdate,,,,,,) = creditManager.creditAccountInfo(creditAccount);
 
         assertEq(debt, expectedNewDebt, _testCaseErr("Incorrect debt update in creditAccountInfo"));
         assertEq(
@@ -1103,7 +1106,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         collateralDebtData.cumulativeIndexLastUpdate = RAY;
 
         if (supportsQuotas) {
-            collateralDebtData.cumulativeQuotaInterest = amount / (amount % 5 + 1);
+            collateralDebtData.cumulativeQuotaInterest = uint128(amount / (amount % 5 + 1));
         }
 
         poolMock.setCumulativeIndexNow(collateralDebtData.cumulativeIndexNow);
@@ -1115,7 +1118,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             creditAccount: creditAccount,
             debt: collateralDebtData.debt,
             cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
-            cumulativeQuotaInterest: initialCQI,
+            cumulativeQuotaInterest: uint128(initialCQI),
+            quotaProfits: 1,
             enabledTokensMask: 0,
             flags: 0,
             borrower: USER
@@ -1133,13 +1137,14 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             uint256 expectedNewDebt,
             uint256 expectedCumulativeIndex,
             uint256 expectedProfit,
-            uint256 expectedCumulativeQuotaInterest
+            uint256 expectedCumulativeQuotaInterest,
         ) = CreditLogic.calcDecrease({
             amount: _amountMinusFee(amount),
             debt: collateralDebtData.debt,
             cumulativeIndexNow: collateralDebtData.cumulativeIndexNow,
             cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
             cumulativeQuotaInterest: collateralDebtData.cumulativeQuotaInterest,
+            quotaProfits: collateralDebtData.quotaProfits,
             feeInterest: DEFAULT_FEE_INTEREST
         });
 
@@ -1194,7 +1199,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         /// @notice checking creditAccountInf update
         {
-            (uint256 debt, uint256 cumulativeIndexLastUpdate, uint256 cumulativeQuotaInterest,,,,) =
+            (uint256 debt, uint256 cumulativeIndexLastUpdate, uint256 cumulativeQuotaInterest,,,,,) =
                 creditManager.creditAccountInfo(creditAccount);
 
             assertEq(debt, expectedNewDebt, _testCaseErr("Incorrect debt update in creditAccountInfo"));
@@ -1233,7 +1238,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         collateralDebtData.cumulativeIndexLastUpdate = RAY;
 
         if (supportsQuotas) {
-            collateralDebtData.cumulativeQuotaInterest = debt / (debt % 5 + 1);
+            collateralDebtData.cumulativeQuotaInterest = uint128(debt / (debt % 5 + 1));
         }
 
         /// todo: add outstanding interest for quota token
@@ -1248,6 +1253,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: collateralDebtData.debt,
             cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
             cumulativeQuotaInterest: collateralDebtData.cumulativeQuotaInterest + 1,
+            quotaProfits: 1,
             enabledTokensMask: 0,
             flags: 0,
             borrower: USER
@@ -1271,7 +1277,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             );
             assertEq(tokensToDisable, 0, _testCaseErr("Incorrect tokensToDisable"));
 
-            (uint256 caiDebt, uint256 caiCumulativeIndexLastUpdate, uint256 caiCumulativeQuotaInterest,,,,) =
+            (uint256 caiDebt, uint256 caiCumulativeIndexLastUpdate, uint256 caiCumulativeQuotaInterest,,,,,) =
                 creditManager.creditAccountInfo(creditAccount);
 
             assertEq(newDebt, debt, _testCaseErr("Incorrect debt update in creditAccountInfo"));
@@ -1493,6 +1499,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: 100330010,
             cumulativeIndexLastUpdate: RAY,
             cumulativeQuotaInterest: 0,
+            quotaProfits: 0,
             enabledTokensMask: enabledTokensMask,
             flags: 0,
             borrower: USER
@@ -1546,6 +1553,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: collateralDebtData.twvUSD - 1,
             cumulativeIndexLastUpdate: RAY,
             cumulativeQuotaInterest: 0,
+            quotaProfits: 0,
             enabledTokensMask: 0,
             flags: 0,
             borrower: USER
@@ -1591,6 +1599,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: debt,
             cumulativeIndexLastUpdate: cumulativeIndexLastUpdate,
             cumulativeQuotaInterest: 0,
+            quotaProfits: 0,
             enabledTokensMask: UNDERLYING_TOKEN_MASK,
             flags: 0,
             borrower: USER
@@ -1619,9 +1628,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         uint96 LINK_QUOTA = uint96(debt / 2);
         uint96 STETH_QUOTA = uint96(debt / 8);
 
-        uint256 LINK_INTEREST = debt / 8;
-        uint256 STETH_INTEREST = debt / 100;
-        uint256 INITIAL_INTEREST = 500;
+        uint128 LINK_INTEREST = uint128(debt / 8);
+        uint128 STETH_INTEREST = uint128(debt / 100);
+        uint128 INITIAL_INTEREST = 500;
 
         if (supportsQuotas) {
             _addQuotedToken({token: Tokens.LINK, lt: 80_00, quoted: LINK_QUOTA, outstandingInterest: LINK_INTEREST});
@@ -1648,6 +1657,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: debt,
             cumulativeIndexLastUpdate: vars.get("cumulativeIndexLastUpdate"),
             cumulativeQuotaInterest: INITIAL_INTEREST,
+            quotaProfits: 1,
             enabledTokensMask: UNDERLYING_TOKEN_MASK | LINK_TOKEN_MASK | STETH_TOKEN_MASK,
             flags: 0,
             borrower: USER
@@ -1744,7 +1754,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 token: Tokens.LINK,
                 lt: uint16(vars.get("LINK_LT")),
                 quoted: uint96(vars.get("LINK_QUOTA")),
-                outstandingInterest: vars.get("LINK_INTEREST")
+                outstandingInterest: uint128(vars.get("LINK_INTEREST"))
             });
         } else {
             _addToken({token: Tokens.LINK, lt: uint16(vars.get("LINK_LT"))});
@@ -1869,7 +1879,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                     creditAccount: creditAccount,
                     debt: debt,
                     cumulativeIndexLastUpdate: vars.get("cumulativeIndexLastUpdate"),
-                    cumulativeQuotaInterest: vars.get("INITIAL_INTEREST") + 1,
+                    cumulativeQuotaInterest: uint128(vars.get("INITIAL_INTEREST") + 1),
+                    quotaProfits: 1,
                     enabledTokensMask: _case.enabledTokensMask,
                     flags: 0,
                     borrower: USER
@@ -1935,7 +1946,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 creditAccount: creditAccount,
                 debt: debt,
                 cumulativeIndexLastUpdate: vars.get("cumulativeIndexLastUpdate"),
-                cumulativeQuotaInterest: vars.get("INITIAL_INTEREST") + 1,
+                cumulativeQuotaInterest: uint128(vars.get("INITIAL_INTEREST") + 1),
+                quotaProfits: 1,
                 enabledTokensMask: UNDERLYING_TOKEN_MASK,
                 flags: setFlag ? WITHDRAWAL_FLAG : 0,
                 borrower: USER
@@ -2148,8 +2160,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         _addToken(Tokens.LINK, 80_00);
         uint256 LINK_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.LINK});
 
-        uint256 INITIAL_INTEREST = 123123;
-        uint256 caInterestChange = 10323212323;
+        uint128 INITIAL_INTEREST = 123123;
+        uint128 caInterestChange = 10323212323;
         address creditAccount = DUMB_ADDRESS;
 
         creditManager.setCreditAccountInfoMap({
@@ -2157,6 +2169,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: 0,
             cumulativeIndexLastUpdate: 0,
             cumulativeQuotaInterest: INITIAL_INTEREST,
+            quotaProfits: 0,
             enabledTokensMask: 0,
             flags: 0,
             borrower: USER
@@ -2189,7 +2202,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 maxQuota: type(uint96).max
             });
 
-            (,, uint256 cumulativeQuotaInterest,,,,) = creditManager.creditAccountInfo(creditAccount);
+            (,, uint128 cumulativeQuotaInterest,,,,,) = creditManager.creditAccountInfo(creditAccount);
 
             assertEq(tokensToEnable, expectedTokensToEnable, _testCaseErr("Incorrect tokensToEnable"));
             assertEq(tokensToDisable, expectedTokensToDisable, _testCaseErr("Incorrect tokensToDisable"));
@@ -2644,6 +2657,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: 0,
             cumulativeIndexLastUpdate: 0,
             cumulativeQuotaInterest: 0,
+            quotaProfits: 0,
             enabledTokensMask: enabledTokensMask,
             flags: flags,
             borrower: USER
@@ -2665,6 +2679,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                     debt: 0,
                     cumulativeIndexLastUpdate: 0,
                     cumulativeQuotaInterest: 0,
+                    quotaProfits: 0,
                     enabledTokensMask: 0,
                     flags: flag,
                     borrower: USER
@@ -2692,6 +2707,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             debt: 0,
             cumulativeIndexLastUpdate: 0,
             cumulativeQuotaInterest: 0,
+            quotaProfits: 0,
             enabledTokensMask: 0,
             flags: 0,
             borrower: address(0)

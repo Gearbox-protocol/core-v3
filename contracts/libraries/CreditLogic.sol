@@ -3,6 +3,8 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+
 import {CollateralDebtData, CollateralTokenData} from "../interfaces/ICreditManagerV3.sol";
 import {SECONDS_PER_YEAR, PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import "../interfaces/IExceptions.sol";
@@ -15,6 +17,7 @@ uint256 constant INDEX_PRECISION = 10 ** 9;
 /// @dev Implements functions used for debt and repayment calculations
 library CreditLogic {
     using BitMask for uint256;
+    using SafeCast for uint256;
 
     //
     // DEBT AND REPAYMENT CALCULATIONS
@@ -227,22 +230,42 @@ library CreditLogic {
         uint256 debt,
         uint256 cumulativeIndexNow,
         uint256 cumulativeIndexLastUpdate,
-        uint256 cumulativeQuotaInterest,
+        uint128 cumulativeQuotaInterest,
+        uint128 quotaProfits,
         uint16 feeInterest
     )
         internal
-        pure
-        returns (uint256 newDebt, uint256 newCumulativeIndex, uint256 profit, uint256 newCumulativeQuotaInterest)
+        view
+        returns (
+            uint256 newDebt,
+            uint256 newCumulativeIndex,
+            uint256 profit,
+            uint128 newCumulativeQuotaInterest,
+            uint128 newQuotaProfits
+        )
     {
         uint256 amountToRepay = amount;
 
-        /// The debt is repaid in the order of: quota interest -> base interest -> debt
-        /// I.e., if the repayment amount only partially covers quota interest, then that will be
+        /// The debt is repaid in the order of: quota profits -> quota interest -> base interest -> debt
+        /// I.e., first the amount is subtracted from quota profits. If there is a remainder, it goes
+        /// to repay quota interest, and so on. If the repayment amount only partially covers quota interest, then that will be
         /// partially repaid (with part of payment going to fees pro-rata), while base interest
         /// and debt remain inchanged. If the amount covers quota interest fully, then the same logic
         /// applies to the remaining amount and base interest/debt.
 
-        if (cumulativeQuotaInterest != 0) {
+        if (quotaProfits != 0) {
+            if (amountToRepay > quotaProfits) {
+                newQuotaProfits = 0;
+                amountToRepay -= quotaProfits;
+                profit = quotaProfits;
+            } else {
+                newQuotaProfits = quotaProfits - amountToRepay.toUint128();
+                profit = amountToRepay;
+                amountToRepay = 0;
+            }
+        }
+
+        if (cumulativeQuotaInterest != 0 && amountToRepay > 0) {
             uint256 quotaProfit = (cumulativeQuotaInterest * feeInterest) / PERCENTAGE_FACTOR;
 
             if (amountToRepay >= cumulativeQuotaInterest + quotaProfit) {
@@ -261,11 +284,13 @@ library CreditLogic {
                 profit += amountToRepay - amountToPool; // U:[CL-03B]
                 amountToRepay = 0; // U:[CL-03B]
 
-                newCumulativeQuotaInterest = cumulativeQuotaInterest - amountToPool; // U:[CL-03A]
+                newCumulativeQuotaInterest = uint128(cumulativeQuotaInterest - amountToPool); // U:[CL-03A]
 
                 newDebt = debt; // U:[CL-03A]
                 newCumulativeIndex = cumulativeIndexLastUpdate; // U:[CL-03A]
             }
+        } else {
+            newCumulativeQuotaInterest = cumulativeQuotaInterest;
         }
 
         if (amountToRepay > 0) {
