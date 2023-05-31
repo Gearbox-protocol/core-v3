@@ -6,26 +6,45 @@ pragma solidity ^0.8.17;
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+
+import "../interfaces/IAddressProviderV3.sol";
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {IBotListV3, BotFunding} from "../interfaces/IBotListV3.sol";
-import {IAddressProviderV3, AP_TREASURY, AP_WETH_TOKEN, NO_VERSION_CONTROL} from "../core/AddressProviderV3.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {ICreditFacadeV3} from "../interfaces/ICreditFacadeV3.sol";
 import {ICreditAccountBase} from "../interfaces/ICreditAccountV3.sol";
-import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 
 import "../interfaces/IExceptions.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 /// @title BotList
 /// @notice Used to store a mapping of borrowers => bots. A separate contract is used for transferability when
-///      changing Credit Facades.
+///      changing Credit Facades
 contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     using SafeCast for uint256;
     using Address for address;
     using Address for address payable;
     using EnumerableSet for EnumerableSet.AddressSet;
+    using SafeERC20 for IERC20;
+
+    /// @notice Contract version
+    uint256 public constant override version = 3_00;
+
+    /// @notice Address of the DAO treasury
+    address public immutable treasury;
+
+    /// @notice Address of the DAO treasury
+    address public immutable weth;
+
+    /// @notice ERC20 compatibility to be able to add to wallet to manager user's bot funding
+    string public constant symbol = "gETH";
+
+    /// @notice ERC20 compatibility to be able to add to wallet to manager user's bot funding
+    string public constant name = "Gearbox bot funding";
 
     /// @notice Mapping from Credit Manager address to their status as an approved Credit Manager
     ///      Only Credit Facades connected to approved Credit Managers can alter bot permissions
@@ -41,7 +60,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     mapping(address => bool) public forbiddenBot;
 
     /// @notice Mapping from borrower to their bot funding balance
-    mapping(address => uint256) public fundingBalances;
+    mapping(address => uint256) public override balanceOf;
 
     /// @notice Mapping of (creditAccount, bot) to bot funding parameters
     mapping(address => mapping(address => BotFunding)) public botFunding;
@@ -49,18 +68,9 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @notice A fee (in PERCENTAGE_FACTOR format) charged by the DAO on bot payments
     uint16 public daoFee = 0;
 
-    /// @notice Address of the DAO treasury
-    address public immutable treasury;
-
-    /// @notice Address of the WETH token
-    address public immutable weth;
-
-    /// @notice Contract version
-    uint256 public constant override version = 3_00;
-
-    constructor(address _addressProvider) ACLNonReentrantTrait(_addressProvider) {
-        treasury = IAddressProviderV3(_addressProvider).getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL);
-        weth = IAddressProviderV3(_addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL);
+    constructor(address addressProvider) ACLNonReentrantTrait(addressProvider) {
+        treasury = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL);
+        weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL);
     }
 
     /// @notice Limits access to a function only to Credit Facades connected to approved CMs
@@ -100,23 +110,28 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
 
         if (permissions != 0) {
             activeBots[creditAccount].add(bot); // F: [BL-03]
-        } else if (permissions == 0) {
-            if (fundingAmount != 0 || weeklyFundingAllowance != 0) {
-                revert PositiveFundingForInactiveBotException(); // F: [BL-03]
-            }
 
-            activeBots[creditAccount].remove(bot); // F: [BL-03]
+            botPermissions[creditAccount][bot] = permissions; // F: [BL-03]
+
+            BotFunding storage bf = botFunding[creditAccount][bot];
+
+            bf.remainingFunds = fundingAmount; // F: [BL-03]
+            bf.maxWeeklyAllowance = weeklyFundingAllowance; // F: [BL-03]
+            bf.remainingWeeklyAllowance = weeklyFundingAllowance; // F: [BL-03]
+            bf.allowanceLU = uint40(block.timestamp); // F: [BL-03]
+
+            emit SetBotPermissions({
+                creditAccount: creditAccount,
+                bot: bot,
+                permissions: permissions,
+                fundingAmount: fundingAmount,
+                weeklyFundingAllowance: weeklyFundingAllowance
+            }); // F: [BL-03]
+        } else {
+            _ereaseBot(creditAccount, bot); // F: [BL-03]
         }
 
-        botPermissions[creditAccount][bot] = permissions; // F: [BL-03]
-        botFunding[creditAccount][bot].remainingFunds = fundingAmount; // F: [BL-03]
-        botFunding[creditAccount][bot].maxWeeklyAllowance = weeklyFundingAllowance; // F: [BL-03]
-        botFunding[creditAccount][bot].remainingWeeklyAllowance = weeklyFundingAllowance; // F: [BL-03]
-        botFunding[creditAccount][bot].allowanceLU = uint40(block.timestamp); // F: [BL-03]
-
         activeBotsRemaining = activeBots[creditAccount].length(); // F: [BL-03]
-
-        emit SetBotPermissions(creditAccount, bot, permissions, fundingAmount, weeklyFundingAllowance); // F: [BL-03]
     }
 
     /// @notice Removes permissions and funding for all bots with non-zero permissions for a credit account
@@ -127,21 +142,20 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     {
         uint256 len = activeBots[creditAccount].length();
 
-        for (uint256 i = 0; i < len;) {
-            address bot = activeBots[creditAccount].at(0); // F: [BL-06]
-            botPermissions[creditAccount][bot] = 0; // F: [BL-06]
-            botFunding[creditAccount][bot].remainingFunds = 0; // F: [BL-06]
-            botFunding[creditAccount][bot].maxWeeklyAllowance = 0; // F: [BL-06]
-            botFunding[creditAccount][bot].remainingWeeklyAllowance = 0; // F: [BL-06]
-            activeBots[creditAccount].remove(bot); // F: [BL-06]
-            unchecked {
-                ++i;
+        unchecked {
+            for (uint256 i = 0; i < len; ++i) {
+                address bot = activeBots[creditAccount].at(len - i - 1); // F: [BL-06]
+                _ereaseBot(creditAccount, bot);
             }
         }
+    }
 
-        if (len > 0) {
-            emit EraseBots(creditAccount); // F: [BL-06]
-        }
+    function _ereaseBot(address creditAccount, address bot) internal {
+        delete botPermissions[creditAccount][bot]; // F: [BL-06]
+        delete botFunding[creditAccount][bot]; // F: [BL-06]
+
+        activeBots[creditAccount].remove(bot); // F: [BL-06]
+        emit EraseBot(creditAccount, bot); // F: [BL-06]
     }
 
     /// @notice Takes payment for performed services from the user's balance and sends to the bot
@@ -153,9 +167,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         external
         onlyValidCreditFacade
     {
-        if (paymentAmount == 0) {
-            revert AmountCantBeZeroException(); // F: [BL-05]
-        }
+        if (paymentAmount == 0) return;
 
         BotFunding storage bf = botFunding[creditAccount][bot]; // F: [BL-05]
 
@@ -164,40 +176,45 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
             bf.remainingWeeklyAllowance = bf.maxWeeklyAllowance; // F: [BL-05]
         }
 
-        uint72 feeAmount = daoFee * paymentAmount / PERCENTAGE_FACTOR; // F: [BL-05]
+        /// feeAmount is always < paymentAmount, however uint256 conversation adds more space for computations
+        uint72 feeAmount = uint72(uint256(daoFee) * paymentAmount / PERCENTAGE_FACTOR); // F: [BL-05]
 
-        bf.remainingWeeklyAllowance -= paymentAmount + feeAmount; // F: [BL-05]
-        bf.remainingFunds -= paymentAmount + feeAmount; // F: [BL-05]
+        uint72 totalAmount = paymentAmount + feeAmount;
 
-        fundingBalances[payer] -= paymentAmount + feeAmount; // F: [BL-05]
+        bf.remainingWeeklyAllowance -= totalAmount; // F: [BL-05]
+        bf.remainingFunds -= totalAmount; // F: [BL-05]
 
-        _convertAndSendWETH(bot, paymentAmount);
-        if (feeAmount > 0) payable(treasury).sendValue(feeAmount); // F: [BL-05]
+        balanceOf[payer] -= totalAmount; // F: [BL-05]
+
+        IERC20(weth).safeTransfer(bot, paymentAmount); // F: [BL-05]
+
+        if (feeAmount != 0) {
+            IERC20(weth).safeTransfer(treasury, feeAmount); // F: [BL-05]
+        }
 
         emit PayBot(payer, creditAccount, bot, paymentAmount, feeAmount); // F: [BL-05]
     }
 
     /// @notice Adds funds to the borrower's bot payment wallet
-    function addFunding() external payable nonReentrant {
+    function deposit() public payable nonReentrant {
         if (msg.value == 0) {
             revert AmountCantBeZeroException(); // F: [BL-04]
         }
 
-        uint256 newFunds = fundingBalances[msg.sender] + msg.value; // F: [BL-04]
+        IWETH(weth).deposit{value: msg.value}();
+        balanceOf[msg.sender] += msg.value;
 
-        fundingBalances[msg.sender] = newFunds; // F: [BL-04]
-
-        emit ChangeFunding(msg.sender, newFunds); // F: [BL-04]
+        emit Deposit(msg.sender, msg.value); // F: [BL-04]
     }
 
     /// @notice Removes funds from the borrower's bot payment wallet
-    function removeFunding(uint256 amount) external nonReentrant {
-        uint256 newFunds = fundingBalances[msg.sender] - amount; // F: [BL-04]
+    function withdraw(uint256 amount) external nonReentrant {
+        balanceOf[msg.sender] -= amount; // F: [BL-04]
 
-        fundingBalances[msg.sender] = newFunds; // F: [BL-04]
+        IWETH(weth).withdraw(amount);
         payable(msg.sender).sendValue(amount); // F: [BL-04]
 
-        emit ChangeFunding(msg.sender, newFunds); // F: [BL-04]
+        emit Withdraw(msg.sender, amount); // F: [BL-04]
     }
 
     /// @notice Returns all active bots currently on the account
@@ -214,13 +231,6 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         return (botPermissions[creditAccount][bot], forbiddenBot[bot]);
     }
 
-    /// @dev Converts ETH to WETH and sends to recipient
-    /// @dev Used to avoid giving flow control to bots
-    function _convertAndSendWETH(address to, uint256 amount) internal {
-        IWETH(weth).deposit{value: amount}();
-        IWETH(weth).transfer(to, amount);
-    }
-
     //
     // CONFIGURATION
     //
@@ -234,6 +244,10 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @notice Sets the DAO fee on bot payments
     /// @param newFee The new fee value
     function setDAOFee(uint16 newFee) external configuratorOnly {
+        if (daoFee > PERCENTAGE_FACTOR) {
+            revert IncorrectParameterException();
+        }
+
         daoFee = newFee; // F: [BL-02]
 
         emit SetBotDAOFee(newFee); // F: [BL-02]
@@ -250,5 +264,10 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         } else {
             emit CreditManagerRemoved(creditManager);
         }
+    }
+
+    /// @notice Allows this contract to unwrap WETH and deposit if address is not WETH
+    receive() external payable {
+        if (msg.sender != address(weth)) deposit();
     }
 }
