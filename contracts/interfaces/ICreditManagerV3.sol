@@ -46,7 +46,6 @@ struct CollateralDebtData {
     uint256 cumulativeIndexNow;
     uint256 cumulativeIndexLastUpdate;
     uint128 cumulativeQuotaInterest;
-    uint128 quotaProfits;
     uint256 accruedInterest;
     uint256 accruedFees;
     uint256 totalDebtUSD;

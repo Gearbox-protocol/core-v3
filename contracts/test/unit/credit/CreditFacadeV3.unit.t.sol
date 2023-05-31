@@ -561,7 +561,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             cumulativeIndexNow: getHash({value: enabledTokensMask, seed: 3}),
             cumulativeIndexLastUpdate: getHash({value: enabledTokensMask, seed: 4}),
             cumulativeQuotaInterest: uint128(getHash({value: enabledTokensMask, seed: 5})),
-            quotaProfits: 0,
             accruedInterest: getHash({value: enabledTokensMask, seed: 6}),
             accruedFees: getHash({value: enabledTokensMask, seed: 7}),
             totalDebtUSD: 0,

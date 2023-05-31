@@ -5,6 +5,10 @@ pragma solidity ^0.8.17;
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
+uint256 constant EPOCH_LENGTH = 7 days;
+
+uint256 constant EPOCHS_TO_WITHDRAW = 4;
+
 enum VotingContractStatus {
     NOT_ALLOWED,
     ALLOWED,
@@ -17,7 +21,7 @@ struct UserVoteLockData {
 }
 
 struct WithdrawalData {
-    uint96[4] withdrawalsPerEpoch;
+    uint96[EPOCHS_TO_WITHDRAW] withdrawalsPerEpoch;
     uint16 epochLastUpdate;
 }
 
@@ -54,7 +58,7 @@ interface IGearStakingV3 is IGearStakingV3Events, IVersion {
     ///              * voteAmount - amount of staked GEAR to add to or remove from a vote
     ///              * isIncrease - whether to add or remove votes
     ///              * extraData - data specific to the voting contract that is decoded on recipient side
-    function deposit(uint256 amount, MultiVote[] memory votes) external;
+    function deposit(uint96 amount, MultiVote[] memory votes) external;
 
     /// @dev Performs a sequence of vote changes according to the passed array
     /// @param votes Array of MultVote structs:
@@ -75,14 +79,14 @@ interface IGearStakingV3 is IGearStakingV3Events, IVersion {
     ///              * voteAmount - amount of staked GEAR to add to or remove from a vote
     ///              * isIncrease - whether to add or remove votes
     ///              * extraData - data specific to the voting contract that is decoded on recipient side
-    function withdraw(uint256 amount, address to, MultiVote[] memory votes) external;
+    function withdraw(uint96 amount, address to, MultiVote[] memory votes) external;
 
     /// @dev Claims all of the caller's withdrawals that are mature
     /// @param to Address to send claimable GEAR, if any
     function claimWithdrawals(address to) external;
 
     //
-    // GETTER
+    // GETTERS
     //
 
     /// @dev GEAR token address
