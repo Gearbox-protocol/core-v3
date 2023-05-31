@@ -402,7 +402,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.fullCollateralCheck(DUMB_ADDRESS, 0, new uint256[](0), 1);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
-        creditManager.updateQuota(DUMB_ADDRESS, DUMB_ADDRESS, 0, 0);
+        creditManager.updateQuota(DUMB_ADDRESS, DUMB_ADDRESS, 0, 0, 0);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.scheduleWithdrawal(DUMB_ADDRESS, DUMB_ADDRESS, 0);
@@ -500,7 +500,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.fullCollateralCheck(DUMB_ADDRESS, 0, new uint256[](0), 1);
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditManager.updateQuota(DUMB_ADDRESS, DUMB_ADDRESS, 0, 0);
+        creditManager.updateQuota(DUMB_ADDRESS, DUMB_ADDRESS, 0, 0, 0);
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditManager.scheduleWithdrawal(DUMB_ADDRESS, DUMB_ADDRESS, 0);
@@ -2181,7 +2181,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 creditAccount: creditAccount,
                 token: tokenTestSuite.addressOf(Tokens.LINK),
                 quotaChange: 122,
-                minQuota: 122
+                minQuota: 122,
+                maxQuota: type(uint96).max
             });
 
             (,, uint256 cumulativeQuotaInterest,,,,) = creditManager.creditAccountInfo(creditAccount);

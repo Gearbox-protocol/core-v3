@@ -1776,6 +1776,11 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     function test_U_FA_34_multicall_updateQuota_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
+        uint96 maxDebt = 443330;
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setDebtLimits(0, maxDebt, type(uint8).max);
+
         address link = tokenTestSuite.addressOf(Tokens.LINK);
         uint256 maskToEnable = 1 << 4;
         uint256 maskToDisable = 1 << 7;
@@ -1785,7 +1790,11 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditManagerMock.setUpdateQuota({change: change, tokensToEnable: maskToEnable, tokensToDisable: maskToDisable});
 
         vm.expectCall(
-            address(creditManagerMock), abi.encodeCall(ICreditManagerV3.updateQuota, (creditAccount, link, change, 0))
+            address(creditManagerMock),
+            abi.encodeCall(
+                ICreditManagerV3.updateQuota,
+                (creditAccount, link, change, 0, uint96(maxDebt * creditFacade.maxQuotaMultiplier()))
+            )
         );
 
         vm.expectEmit(true, true, false, false);

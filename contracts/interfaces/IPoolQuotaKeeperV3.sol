@@ -47,7 +47,7 @@ interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion {
     /// @param creditAccount Address of credit account
     /// @param token Address of the token to change the quota for
     /// @param quotaChange Requested quota change in pool's underlying asset units
-    function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota)
+    function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota, uint96 maxQuota)
         external
         returns (uint256 caQuotaInterestChange, int96 change, bool enableToken, bool disableToken);
 
