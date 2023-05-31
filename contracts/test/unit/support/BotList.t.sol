@@ -148,25 +148,6 @@ contract BotListTest is Test, IBotListV3Events {
             weeklyFundingAllowance: uint72(1 ether / 10)
         });
 
-        vm.expectRevert(PositiveFundingForInactiveBotException.selector);
-        vm.prank(address(creditFacade));
-        botList.setBotPermissions({
-            creditAccount: address(creditAccount),
-            bot: address(bot),
-            permissions: 0,
-            fundingAmount: uint72(1 ether),
-            weeklyFundingAllowance: uint72(1 ether / 10)
-        });
-
-        vm.prank(address(creditFacade));
-        botList.setBotPermissions({
-            creditAccount: address(creditAccount),
-            bot: address(bot),
-            permissions: 0,
-            fundingAmount: 0,
-            weeklyFundingAllowance: 0
-        });
-
         vm.prank(CONFIGURATOR);
         botList.setBotForbiddenStatus(address(bot), false);
 
@@ -233,6 +214,9 @@ contract BotListTest is Test, IBotListV3Events {
 
         assertEq(bots[0], address(bot), "Incorrect address added to active bots list");
 
+        vm.expectEmit(true, true, false, false);
+        emit EraseBot(address(creditAccount), address(bot));
+
         vm.prank(address(creditFacade));
         activeBotsRemaining = botList.setBotPermissions({
             creditAccount: address(creditAccount),
@@ -255,7 +239,7 @@ contract BotListTest is Test, IBotListV3Events {
 
         assertEq(remainingWeeklyAllowance, 0, "Incorrect remaining weekly allowance");
 
-        assertEq(allowanceLU, block.timestamp, "Incorrect allowance update timestamp");
+        assertEq(allowanceLU, 0, "Incorrect allowance update timestamp");
 
         bots = botList.getActiveBots(address(creditAccount));
 
@@ -364,7 +348,9 @@ contract BotListTest is Test, IBotListV3Events {
 
         assertEq(weth.balanceOf(address(bot)), 1 ether / 20, "Bot was sent incorrect WETH amount");
 
-        assertEq(addressProvider.getTreasuryContract().balance, 1 ether / 40, "Treasury was sent incorrect amount");
+        assertEq(
+            weth.balanceOf(addressProvider.getTreasuryContract()), 1 ether / 40, "Treasury was sent incorrect amount"
+        );
 
         vm.warp(block.timestamp + 7 days);
 
@@ -397,7 +383,9 @@ contract BotListTest is Test, IBotListV3Events {
 
         assertEq(weth.balanceOf(address(bot)), 2 ether / 20, "Bot was sent incorrect WETH amount");
 
-        assertEq(addressProvider.getTreasuryContract().balance, 2 ether / 40, "Treasury was sent incorrect amount");
+        assertEq(
+            weth.balanceOf(addressProvider.getTreasuryContract()), 2 ether / 40, "Treasury was sent incorrect amount"
+        );
     }
 
     /// @dev [BL-6]: eraseAllBotPermissions works correctly
@@ -429,10 +417,10 @@ contract BotListTest is Test, IBotListV3Events {
         botList.eraseAllBotPermissions(address(creditAccount));
 
         vm.expectEmit(true, true, false, false);
-        emit EraseBot(address(creditAccount), address(bot));
+        emit EraseBot(address(creditAccount), address(bot2));
 
         vm.expectEmit(true, true, false, false);
-        emit EraseBot(address(creditAccount), address(bot2));
+        emit EraseBot(address(creditAccount), address(bot));
 
         vm.prank(address(creditFacade));
         botList.eraseAllBotPermissions(address(creditAccount));

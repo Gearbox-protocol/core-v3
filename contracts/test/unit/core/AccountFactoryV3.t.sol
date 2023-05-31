@@ -156,6 +156,7 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
 
     /// @notice U:[AF-4C]: `addCreditManager` works correctly
     function test_U_AF_04C_addCreditManager_works_correctly(address manager) public {
+        vm.assume(manager != creditManager);
         addressProvider.addCreditManager(manager);
 
         vm.expectEmit(true, false, false, false);
