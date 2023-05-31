@@ -51,8 +51,6 @@ import "../interfaces/IExceptions.sol";
 
 /// @title Credit Manager
 /// @dev Encapsulates the business logic for managing Credit Accounts
-///
-/// More info: https://dev.gearbox.fi/developers/credit/credit_manager
 contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using BitMask for uint256;
@@ -250,14 +248,24 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         newCreditAccountInfo.debt = debt; // U:[CM-6]
         newCreditAccountInfo.cumulativeIndexLastUpdate = _poolCumulativeIndexNow(); // U:[CM-6]
-        newCreditAccountInfo.since = uint64(block.number); // U:[CM-6]
-        newCreditAccountInfo.flags = 0; // U:[CM-6]
-        newCreditAccountInfo.borrower = onBehalfOf; // U:[CM-6]
+
+        // newCreditAccountInfo.since = uint64(block.number); // U:[CM-6]
+        // newCreditAccountInfo.flags = 0; // U:[CM-6]
+        // newCreditAccountInfo.borrower = onBehalfOf; // U:[CM-6]
+        assembly {
+            let slot := add(newCreditAccountInfo.slot, 4)
+            let value := or(shl(80, onBehalfOf), shl(16, number()))
+            sstore(slot, value)
+        }
 
         if (supportsQuotas) {
-            newCreditAccountInfo.cumulativeQuotaInterest = 1;
-            newCreditAccountInfo.quotaProfits = 0;
-        } // U:[CM-6]
+            //     newCreditAccountInfo.cumulativeQuotaInterest = 1;
+            //     newCreditAccountInfo.quotaProfits = 0;
+            assembly {
+                let slot := add(newCreditAccountInfo.slot, 2)
+                sstore(slot, 1)
+            } // U:[CM-6]
+        }
 
         // Requests the pool to transfer tokens the Credit Account
         _poolLendCreditAccount(debt, creditAccount); // U:[CM-6]
@@ -310,10 +318,18 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         // Checks that the Credit Account exists for the borrower
         address borrower = getBorrowerOrRevert(creditAccount); // U:[CM-7]
 
-        if (creditAccountInfo[creditAccount].since == block.number) revert OpenCloseAccountInOneBlockException();
+        {
+            CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
 
-        // Sets borrower's Credit Account to zero address
-        delete creditAccountInfo[creditAccount].borrower; // U:[CM-8]
+            if (currentCreditAccountInfo.since == block.number) revert OpenCloseAccountInOneBlockException();
+
+            // Sets borrower's Credit Account to zero address
+            // delete creditAccountInfo[creditAccount].borrower; // U:[CM-8]
+            assembly {
+                let slot := add(currentCreditAccountInfo.slot, 4)
+                sstore(slot, 0)
+            }
+        }
 
         uint256 amountToPool;
         uint256 profit;
@@ -987,10 +1003,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             tokensToDisable = getTokenMaskOrRevert(token); // U:[CM-25]
         }
 
-        creditAccountInfo[creditAccount].cumulativeQuotaInterest += caInterestChange; // U:[CM-25] // I: [CMQ-3]
+        CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
+
+        currentCreditAccountInfo.cumulativeQuotaInterest += caInterestChange; // U:[CM-25] // I: [CMQ-3]
 
         if (tradingFees != 0) {
-            creditAccountInfo[creditAccount].quotaProfits += tradingFees;
+            currentCreditAccountInfo.quotaProfits += tradingFees;
         }
     }
 
