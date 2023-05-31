@@ -647,6 +647,9 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
             "Incorrect target contract for new adapter"
         );
 
+        address[] memory allowedAdapters = creditConfigurator.allowedAdapters();
+        assertFalse(allowedAdapters.includes(address(adapter1)), "Old adapter was not removed");
+
         assertEq(creditManager.adapterToContract(address(adapter1)), address(0), "Old adapter was not removed");
     }
 

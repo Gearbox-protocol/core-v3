@@ -410,6 +410,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         external
         override
         whenNotPaused // U:[P4-4]
+        nonReentrant
     {
         uint128 repaidAmountU128 = repaidAmount.toUint128();
 
@@ -521,7 +522,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
 
     /// @dev Computes base interest accrued since given timestamp
     function _calcBaseInterestAccrued(uint256 timestamp) private view returns (uint256) {
-        return (baseInterestRate() * _totalDebt.borrowed / RAY).calcLinearGrowth(timestamp);
+        return _totalDebt.borrowed * baseInterestRate().calcLinearGrowth(timestamp) / RAY;
     }
 
     /// @dev Computes current value of base interest index
@@ -539,12 +540,12 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     }
 
     /// @inheritdoc IPoolV3
-    function updateQuotaRevenue(int256 quotaRevenueDelta) external override poolQuotaKeeperOnly {
+    function updateQuotaRevenue(int256 quotaRevenueDelta) external override nonReentrant poolQuotaKeeperOnly {
         _setQuotaRevenue((quotaRevenue().toInt256() + quotaRevenueDelta).toUint256()); // U:[P4-17]
     }
 
     /// @inheritdoc IPoolV3
-    function setQuotaRevenue(uint256 newQuotaRevenue) external override poolQuotaKeeperOnly {
+    function setQuotaRevenue(uint256 newQuotaRevenue) external override nonReentrant poolQuotaKeeperOnly {
         _setQuotaRevenue(newQuotaRevenue); // U:[P4-17]
     }
 

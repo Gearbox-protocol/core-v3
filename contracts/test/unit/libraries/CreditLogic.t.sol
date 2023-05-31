@@ -108,9 +108,10 @@ contract CreditLogicTest is TestHelper {
         uint256 indexNow,
         uint256 indexOpen,
         uint256 quotaInterest,
+        uint256 quotaProfits,
         uint16 feeInterest
     ) internal pure returns (uint256) {
-        return debt
+        return debt + quotaProfits
             + (debt * indexNow / indexOpen + quotaInterest - debt) * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR;
     }
 
@@ -182,11 +183,13 @@ contract CreditLogicTest is TestHelper {
         uint256 indexAtOpen,
         uint256 delta,
         uint128 quotaInterest,
+        uint128 quotaProfits,
         uint16 feeInterest
     ) public {
         debt = WAD + debt % (2 ** 128 - WAD - 1);
         delta = delta % (2 ** 128 - 1);
-        quotaInterest = quotaInterest % (2 ** 128 - 1);
+        quotaInterest = quotaInterest % (2 ** 96 - 1);
+        quotaProfits = quotaInterest % (2 ** 96 - 1);
 
         vm.assume(debt + delta <= 2 ** 128 - 1);
 
@@ -204,14 +207,16 @@ contract CreditLogicTest is TestHelper {
 
         vm.assume(interest > 1);
 
-        if (delta > debt + interest + quotaInterest) delta %= debt + interest + quotaInterest;
+        if (delta > debt + interest + quotaInterest + quotaProfits) {
+            delta %= debt + interest + quotaInterest + quotaProfits;
+        }
 
-        (uint256 newDebt, uint256 newCumulativeIndex,, uint256 cumulativeQuotaInterest) =
-            CreditLogic.calcDecrease(delta, debt, indexNow, indexAtOpen, quotaInterest, feeInterest);
+        (uint256 newDebt, uint256 newCumulativeIndex,, uint256 cumulativeQuotaInterest, uint256 newQuotaProfits) =
+            CreditLogic.calcDecrease(delta, debt, indexNow, indexAtOpen, quotaInterest, quotaProfits, feeInterest);
 
-        uint256 oldTotalDebt = _calcTotalDebt(debt, indexNow, indexAtOpen, quotaInterest, feeInterest);
+        uint256 oldTotalDebt = _calcTotalDebt(debt, indexNow, indexAtOpen, quotaInterest, quotaProfits, feeInterest);
         uint256 newTotalDebt =
-            _calcTotalDebt(newDebt, indexNow, newCumulativeIndex, cumulativeQuotaInterest, feeInterest);
+            _calcTotalDebt(newDebt, indexNow, newCumulativeIndex, cumulativeQuotaInterest, newQuotaProfits, feeInterest);
 
         uint256 debtError = _calcDiff(oldTotalDebt, newTotalDebt + delta);
         uint256 rel = oldTotalDebt > newTotalDebt ? oldTotalDebt : newTotalDebt;
@@ -228,11 +233,13 @@ contract CreditLogicTest is TestHelper {
         uint256 indexAtOpen,
         uint256 delta,
         uint128 quotaInterest,
+        uint128 quotaProfits,
         uint16 feeInterest
     ) public {
         debt = WAD + debt % (2 ** 128 - WAD - 1);
         delta = delta % (2 ** 128 - 1);
-        quotaInterest = quotaInterest % (2 ** 128 - 1);
+        quotaInterest = quotaInterest % (2 ** 96 - 1);
+        quotaProfits = quotaInterest % (2 ** 96 - 1);
 
         vm.assume(debt + delta <= 2 ** 128 - 1);
 
@@ -250,26 +257,32 @@ contract CreditLogicTest is TestHelper {
 
         vm.assume(interest > 1);
 
-        if (delta > debt + interest + quotaInterest) delta %= debt + interest + quotaInterest;
+        if (delta > debt + interest + quotaInterest + quotaProfits) {
+            delta %= debt + interest + quotaInterest + quotaProfits;
+        }
 
-        (uint256 newDebt,, uint256 profit,) =
-            CreditLogic.calcDecrease(delta, debt, indexNow, indexAtOpen, quotaInterest, feeInterest);
+        (uint256 newDebt,, uint256 profit,,) =
+            CreditLogic.calcDecrease(delta, debt, indexNow, indexAtOpen, quotaInterest, quotaProfits, feeInterest);
 
-        uint256 expectedProfit = delta
-            > (interest + quotaInterest) * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR
-            ? (interest + quotaInterest) * feeInterest / PERCENTAGE_FACTOR
-            : delta * feeInterest / (PERCENTAGE_FACTOR + feeInterest);
+        uint256 expectedProfit;
 
-        uint256 profitError = _calcDiff(expectedProfit, profit);
+        if (delta > quotaProfits) {
+            uint256 remainingDelta = delta - quotaProfits;
+            expectedProfit = quotaProfits;
+            expectedProfit += remainingDelta
+                > (interest + quotaInterest) * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR
+                ? (interest + quotaInterest) * feeInterest / PERCENTAGE_FACTOR
+                : remainingDelta * feeInterest / (PERCENTAGE_FACTOR + feeInterest);
+        } else {
+            expectedProfit = delta;
+        }
 
-        assertLe(profitError, 100, "Profit error too large");
+        assertLe(_calcDiff(expectedProfit, profit), 100, "Profit error too large");
 
         uint256 expectedRepaid =
             delta > interest + quotaInterest + expectedProfit ? delta - interest - quotaInterest - expectedProfit : 0;
 
-        uint256 newDebtError = _calcDiff(expectedRepaid, debt - newDebt);
-
-        assertLe(newDebtError, 100, "New debt error too large");
+        assertLe(_calcDiff(expectedRepaid, debt - newDebt), 100, "New debt error too large");
     }
 
     struct CalcLiquidationPaymentsTestCase {

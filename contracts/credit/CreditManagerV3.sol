@@ -22,7 +22,6 @@ import {IERC20Helper} from "../libraries/IERC20Helper.sol";
 import {IAccountFactoryBase} from "../interfaces/IAccountFactoryV3.sol";
 import {ICreditAccountBase} from "../interfaces/ICreditAccountV3.sol";
 import {IPoolBase, IPoolV3} from "../interfaces/IPoolV3.sol";
-import {IWETHGatewayV3} from "../interfaces/IWETHGatewayV3.sol";
 import {ClaimAction, IWithdrawalManagerV3} from "../interfaces/IWithdrawalManagerV3.sol";
 import {
     ICreditManagerV3,
@@ -85,9 +84,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     /// @notice Address of WETH
     address public immutable override weth;
-
-    /// @notice Address of WETH Gateway
-    address public immutable wethGateway;
 
     /// @notice Whether the CM supports quota-related logic
     bool public immutable override supportsQuotas;
@@ -216,14 +212,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         weth =
             IAddressProviderV3(addressProvider).getAddressOrRevert({key: AP_WETH_TOKEN, _version: NO_VERSION_CONTROL}); // U:[CM-1]
-        wethGateway = IAddressProviderV3(addressProvider).getAddressOrRevert({key: AP_WETH_GATEWAY, _version: 3_00}); // U:[CM-1]
         priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert({key: AP_PRICE_ORACLE, _version: 2}); // U:[CM-1]
         accountFactory = IAddressProviderV3(addressProvider).getAddressOrRevert({
             key: AP_ACCOUNT_FACTORY,
             _version: NO_VERSION_CONTROL
         }); // U:[CM-1]
         withdrawalManager =
-            IAddressProviderV3(addressProvider).getAddressOrRevert({key: AP_WITHDRAWAL_MANAGER, _version: 3_00});
+            IAddressProviderV3(addressProvider).getAddressOrRevert({key: AP_WITHDRAWAL_MANAGER, _version: 3_00}); // U:[CM-1]
 
         creditConfigurator = msg.sender; // U:[CM-1]
 
@@ -259,6 +254,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         if (supportsQuotas) {
             creditAccountInfo[creditAccount].cumulativeQuotaInterest = 1;
+            creditAccountInfo[creditAccount].quotaProfits = 1;
         } // U:[CM-6]
 
         // Requests the pool to transfer tokens the Credit Account
@@ -297,7 +293,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     function closeCreditAccount(
         address creditAccount,
         ClosureAction closureAction,
-        CollateralDebtData memory collateralDebtData,
+        CollateralDebtData memory DData,
         address payer,
         address to,
         uint256 skipTokensMask,
@@ -474,17 +470,21 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             }); // U:[CM-11]
 
             uint128 newCumulativeQuotaInterest;
+            uint128 newQuotaProfits;
+
             // Pays the entire amount back to the pool
             ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amount}); // U:[CM-11]
             {
                 uint256 profit;
 
-                (newDebt, newCumulativeIndex, profit, newCumulativeQuotaInterest) = CreditLogic.calcDecrease({
+                (newDebt, newCumulativeIndex, profit, newCumulativeQuotaInterest, newQuotaProfits) = CreditLogic
+                    .calcDecrease({
                     amount: _amountMinusFee(amount),
                     debt: collateralDebtData.debt,
                     cumulativeIndexNow: collateralDebtData.cumulativeIndexNow,
                     cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
                     cumulativeQuotaInterest: collateralDebtData.cumulativeQuotaInterest,
+                    quotaProfits: collateralDebtData.quotaProfits,
                     feeInterest: feeInterest
                 }); // U:[CM-11]
 
@@ -502,6 +502,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     tokens: collateralDebtData.quotedTokens
                 });
                 creditAccountInfo[creditAccount].cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // U:[CM-11]
+                creditAccountInfo[creditAccount].quotaProfits = newQuotaProfits + 1;
             }
 
             /// If the entire underlying balance was spent on repayment, it is disabled
@@ -807,6 +808,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             }); // U:[CM-21]
 
             collateralDebtData.cumulativeQuotaInterest += creditAccountInfo[creditAccount].cumulativeQuotaInterest - 1; // U:[CM-21]
+            collateralDebtData.quotaProfits = creditAccountInfo[creditAccount].quotaProfits - 1;
         }
 
         collateralDebtData.accruedInterest = CreditLogic.calcAccruedInterest({
@@ -816,7 +818,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }) + collateralDebtData.cumulativeQuotaInterest; // U:[CM-21] // I: [CMQ-07]
 
         collateralDebtData.accruedFees = (collateralDebtData.accruedInterest * feeInterest) / PERCENTAGE_FACTOR
-            + (supportsQuotas ? creditAccountInfo[creditAccount].quotaProfits : 0); // U:[CM-21]
+   + (supportsQuotas ? creditAccountInfo[creditAccount].quotaProfits : 0); // U:[CM-21]
 
         if (task == CollateralCalcTask.DEBT_ONLY) return collateralDebtData; // U:[CM-21]
 
@@ -1129,22 +1131,22 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
     }
 
-    /// @notice Requests the Credit Account to transfer a token to another address. If a token transfer
-    ///         fails, the token will be transferred to WithdrawalManagerV3, where the `to` address can
-    ///         withdraw it from to any address.
+    /// @notice Requests the Credit Account to transfer a token to another address
+    ///         If transfer fails (e.g., `to` gets blacklisted in the token), the token will be transferred
+    ///         to withdrawal manager from which `to` can later claim it to an arbitrary address.
     /// @param creditAccount Address of the sender Credit Account
     /// @param token Address of the token
     /// @param to Recipient address
     /// @param amount Amount to transfer
+    /// @param convertToETH If true, WETH will be transferred to withdrawal manager, from which Credit Facade can
+    ///        claim it as ETH later in the transaction (ignored if token is not WETH)
     function _safeTokenTransfer(address creditAccount, address token, address to, uint256 amount, bool convertToETH)
         internal
     {
         if (convertToETH && token == weth) {
-            ICreditAccountBase(creditAccount).transfer({token: token, to: wethGateway, amount: amount}); // U:[CM-31, 32]
-            IWETHGatewayV3(wethGateway).deposit({to: to, amount: amount}); // U:[CM-31, 32]
+            ICreditAccountBase(creditAccount).transfer({token: token, to: withdrawalManager, amount: amount}); // U:[CM-31, 32]
+            _addImmediateWithdrawal({token: token, to: msg.sender, amount: amount}); // U:[CM-31, 32]
         } else {
-            // In case a token transfer fails (e.g., borrower getting blacklisted by USDC), the token will be sent
-            // to WithdrawalManagerV3
             try ICreditAccountBase(creditAccount).safeTransfer({token: token, to: to, amount: amount}) {
                 // U:[CM-31, 32, 33]
             } catch {
@@ -1153,7 +1155,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     to: withdrawalManager,
                     amount: amount
                 }); // U:[CM-33]
-                IWithdrawalManagerV3(withdrawalManager).addImmediateWithdrawal({token: token, to: to, amount: delivered}); // U:[CM-33]
+                _addImmediateWithdrawal({token: token, to: to, amount: delivered}); // U:[CM-33]
             }
         }
     }
@@ -1583,5 +1585,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (uint256 amountInToken)
     {
         amountInToken = IPriceOracleV2(_priceOracle).convertFromUSD(amountInUSD, token);
+    }
+
+    //
+    // WITHDRAWAL MANAGER
+    //
+
+    /// @dev Internal wrapper for `addImmediateWithdrawal` to reduce contract size
+    function _addImmediateWithdrawal(address token, address to, uint256 amount) internal {
+        IWithdrawalManagerV3(withdrawalManager).addImmediateWithdrawal({token: token, to: to, amount: amount});
     }
 }

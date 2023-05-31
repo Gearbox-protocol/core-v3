@@ -255,9 +255,6 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @dev Address of WETH
     function weth() external view returns (address);
 
-    /// @dev Address of WETH gateway
-    function wethGateway() external view returns (address);
-
     /// @dev Returns the liquidation threshold for the provided token
     /// @param token Token to retrieve the LT for
     function liquidationThresholds(address token) external view returns (uint16);
