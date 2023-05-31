@@ -1580,7 +1580,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     // WITHDRAWAL MANAGER
     //
 
-    /// @notice Internal wrapper for `addImmediateWithdrawal` to reduce contract size
+    /// @dev Internal wrapper for `addImmediateWithdrawal` to reduce contract size
     function _addImmediateWithdrawal(address token, address to, uint256 amount) internal {
         IWithdrawalManagerV3(withdrawalManager).addImmediateWithdrawal({token: token, to: to, amount: amount});
     }
