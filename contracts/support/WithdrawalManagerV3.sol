@@ -18,7 +18,9 @@ import {
     NothingToClaimException,
     ReceiveIsNotAllowedException
 } from "../interfaces/IExceptions.sol";
-import {ClaimAction, IWithdrawalManagerV3, ScheduledWithdrawal} from "../interfaces/IWithdrawalManagerV3.sol";
+import {
+    ClaimAction, ETH_ADDRESS, IWithdrawalManagerV3, ScheduledWithdrawal
+} from "../interfaces/IWithdrawalManagerV3.sol";
 import {IERC20Helper} from "../libraries/IERC20Helper.sol";
 import {WithdrawalsLogic} from "../libraries/WithdrawalsLogic.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
@@ -88,12 +90,17 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
     }
 
     /// @inheritdoc IWithdrawalManagerV3
-    function claimImmediateWithdrawal(address token, address to, bool unwrapWETH)
+    function claimImmediateWithdrawal(address token, address to)
         external
         override
         nonZeroAddress(to) // U:[WM-4A]
     {
-        _claimImmediateWithdrawal({account: msg.sender, token: token, to: to, unwrapWETH: unwrapWETH});
+        _claimImmediateWithdrawal({
+            account: msg.sender,
+            token: token == ETH_ADDRESS ? weth : token,
+            to: to,
+            unwrapWETH: token == ETH_ADDRESS
+        });
     }
 
     /// @dev Increases `account`'s immediately withdrawable balance of `token` by `amount`

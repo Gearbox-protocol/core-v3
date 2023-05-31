@@ -38,7 +38,7 @@ import {
 import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {IBotListV3} from "../../../interfaces/IBotListV3.sol";
 
-import {ClaimAction, IWithdrawalManagerV3} from "../../../interfaces/IWithdrawalManagerV3.sol";
+import {ClaimAction, ETH_ADDRESS, IWithdrawalManagerV3} from "../../../interfaces/IWithdrawalManagerV3.sol";
 import {BitMask, UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
@@ -590,7 +590,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditManagerMock.setDebtAndCollateralData(collateralDebtData);
 
         bool convertToETH = (getHash({value: enabledTokensMask, seed: 1}) % 2) == 1;
-        address weth = creditFacade.weth();
 
         caseName =
             string.concat(caseName, "convertToETH = ", boolToStr(convertToETH), ", hasCalls = ", boolToStr(hasCalls));
@@ -626,7 +625,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         if (convertToETH) {
             vm.expectCall(
                 address(withdrawalManagerMock),
-                abi.encodeCall(IWithdrawalManagerV3.claimImmediateWithdrawal, (weth, FRIEND, true))
+                abi.encodeCall(IWithdrawalManagerV3.claimImmediateWithdrawal, (ETH_ADDRESS, FRIEND))
             );
         }
 
@@ -928,7 +927,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         }
 
         bool convertToETH = (getHash({value: enabledTokensMask, seed: 1}) % 2) == 1;
-        address weth = creditFacade.weth();
 
         caseName =
             string.concat(caseName, "convertToETH = ", boolToStr(convertToETH), ", hasCalls = ", boolToStr(hasCalls));
@@ -967,7 +965,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         if (convertToETH) {
             vm.expectCall(
                 address(withdrawalManagerMock),
-                abi.encodeCall(IWithdrawalManagerV3.claimImmediateWithdrawal, (weth, FRIEND, true))
+                abi.encodeCall(IWithdrawalManagerV3.claimImmediateWithdrawal, (ETH_ADDRESS, FRIEND))
             );
         }
 

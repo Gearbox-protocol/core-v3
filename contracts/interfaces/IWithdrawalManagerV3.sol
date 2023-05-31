@@ -29,6 +29,9 @@ struct ScheduledWithdrawal {
     uint256 amount;
 }
 
+/// @dev Special address that denotes pure ETH
+address constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
 interface IWithdrawalManagerV3Events {
     /// @notice Emitted when new immediate withdrawal is added
     /// @param account Account immediate withdrawal was added for
@@ -88,10 +91,9 @@ interface IWithdrawalManagerV3 is IWithdrawalManagerV3Events, IVersion {
     function addImmediateWithdrawal(address token, address to, uint256 amount) external;
 
     /// @notice Claims caller's immediate withdrawal
-    /// @param token Token to claim
+    /// @param token Token to claim (if `ETH_ADDRESS`, claims WETH, but unwraps it before sending)
     /// @param to Token recipient
-    /// @param unwrapWETH Whether to unwrap WETH before sending (ignored if `token` is not WETH)
-    function claimImmediateWithdrawal(address token, address to, bool unwrapWETH) external;
+    function claimImmediateWithdrawal(address token, address to) external;
 
     // --------------------- //
     // SCHEDULED WITHDRAWALS //

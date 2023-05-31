@@ -65,5 +65,5 @@ contract WithdrawalManagerMock {
 
     function addImmediateWithdrawal(address token, address to, uint256 amount) external {}
 
-    function claimImmediateWithdrawal(address token, address to, bool unwrapETH) external {}
+    function claimImmediateWithdrawal(address token, address to) external {}
 }

@@ -28,7 +28,7 @@ import {
     BOT_PERMISSIONS_SET_FLAG
 } from "../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
-import {ClaimAction, IWithdrawalManagerV3} from "../interfaces/IWithdrawalManagerV3.sol";
+import {ClaimAction, ETH_ADDRESS, IWithdrawalManagerV3} from "../interfaces/IWithdrawalManagerV3.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
 import {IPriceFeedOnDemand} from "../interfaces/IPriceFeedOnDemand.sol";
 
@@ -1236,7 +1236,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
     /// @dev Claims ETH from withdrawal manager, expecting that WETH was deposited there earlier in the transaction
     function _wethWithdrawTo(address to) internal {
-        IWithdrawalManagerV3(withdrawalManager).claimImmediateWithdrawal({token: weth, to: to, unwrapWETH: true});
+        IWithdrawalManagerV3(withdrawalManager).claimImmediateWithdrawal({token: ETH_ADDRESS, to: to});
     }
 
     function _eraseAllBotPermissions(address creditAccount) internal {

@@ -1134,11 +1134,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         if (convertToETH && token == weth) {
             ICreditAccountBase(creditAccount).transfer({token: token, to: withdrawalManager, amount: amount}); // U:[CM-31, 32]
-            IWithdrawalManagerV3(withdrawalManager).addImmediateWithdrawal({
-                token: token,
-                to: msg.sender,
-                amount: amount
-            }); // U:[CM-31, 32]
+            _addImmediateWithdrawal({token: token, to: msg.sender, amount: amount}); // U:[CM-31, 32]
         } else {
             try ICreditAccountBase(creditAccount).safeTransfer({token: token, to: to, amount: amount}) {
                 // U:[CM-31, 32, 33]
@@ -1148,7 +1144,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     to: withdrawalManager,
                     amount: amount
                 }); // U:[CM-33]
-                IWithdrawalManagerV3(withdrawalManager).addImmediateWithdrawal({token: token, to: to, amount: delivered}); // U:[CM-33]
+                _addImmediateWithdrawal({token: token, to: to, amount: delivered}); // U:[CM-33]
             }
         }
     }
@@ -1578,5 +1574,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (uint256 amountInToken)
     {
         amountInToken = IPriceOracleV2(_priceOracle).convertFromUSD(amountInUSD, token);
+    }
+
+    //
+    // WITHDRAWAL MANAGER
+    //
+
+    /// @notice Internal wrapper for `addImmediateWithdrawal` to reduce contract size
+    function _addImmediateWithdrawal(address token, address to, uint256 amount) internal {
+        IWithdrawalManagerV3(withdrawalManager).addImmediateWithdrawal({token: token, to: to, amount: amount});
     }
 }

@@ -3,10 +3,11 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-
 import {
-    ClaimAction, IWithdrawalManagerV3Events, ScheduledWithdrawal
+    ClaimAction,
+    ETH_ADDRESS,
+    IWithdrawalManagerV3Events,
+    ScheduledWithdrawal
 } from "../../../interfaces/IWithdrawalManagerV3.sol";
 import {
     AmountCantBeZeroException,
@@ -87,8 +88,7 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerV3Events {
 
         deal(USER, 1 ether);
         vm.expectRevert(ReceiveIsNotAllowedException.selector);
-        (bool success, bytes memory returndata) = address(manager).call{value: 1 ether}("");
-        Address.verifyCallResult(success, returndata, "");
+        payable(manager).transfer(1 ether);
 
         vm.expectRevert(RegisteredCreditManagerOnlyException.selector);
         manager.addImmediateWithdrawal(address(0), address(0), 0);
@@ -148,14 +148,14 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerV3Events {
     function test_U_WM_04A_claimImmediateWithdrawal_reverts_on_zero_recipient() public {
         vm.expectRevert(ZeroAddressException.selector);
         vm.prank(USER);
-        manager.claimImmediateWithdrawal(address(token0), address(0), false);
+        manager.claimImmediateWithdrawal(address(token0), address(0));
     }
 
     /// @notice U:[WM-4B]: `claimImmediateWithdrawal` reverts on nothing to claim
     function test_U_WM_04B_claimImmediateWithdrawal_reverts_on_nothing_to_claim() public {
         vm.expectRevert(NothingToClaimException.selector);
         vm.prank(USER);
-        manager.claimImmediateWithdrawal(address(token0), address(USER), false);
+        manager.claimImmediateWithdrawal(address(token0), address(USER));
     }
 
     /// @notice U:[WM-4C]: `claimImmediateWithdrawal` works correctly
@@ -169,14 +169,14 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerV3Events {
         emit ClaimImmediateWithdrawal(USER, address(token0), USER, AMOUNT - 1);
 
         vm.prank(USER);
-        manager.claimImmediateWithdrawal(address(token0), USER, false);
+        manager.claimImmediateWithdrawal(address(token0), USER);
 
         assertEq(manager.immediateWithdrawals(USER, address(token0)), 1, "Incorrect claimable balance");
         assertEq(ts.balanceOf(Tokens.USDC, USER), AMOUNT - 1, "Incorrect claimed amount");
     }
 
-    /// @notice U:[WM-4D]: `claimImmediateWithdrawal` works correctly with unwrap WETH
-    function test_U_WM_04D_claimImmediateWithdrawal_works_correctly_with_unwrap_weth() public {
+    /// @notice U:[WM-4D]: `claimImmediateWithdrawal` works correctly with Ether
+    function test_U_WM_04D_claimImmediateWithdrawal_works_correctly_with_ether() public {
         deal(address(token1), address(manager), AMOUNT);
 
         vm.prank(creditManager);
@@ -186,7 +186,7 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerV3Events {
         emit ClaimImmediateWithdrawal(USER, address(token1), USER, AMOUNT - 1);
 
         vm.prank(USER);
-        manager.claimImmediateWithdrawal(address(token1), USER, true);
+        manager.claimImmediateWithdrawal(ETH_ADDRESS, USER);
 
         assertEq(manager.immediateWithdrawals(USER, address(token1)), 1, "Incorrect claimable balance");
         assertEq(address(USER).balance, AMOUNT - 1, "Incorrect claimed amount");
