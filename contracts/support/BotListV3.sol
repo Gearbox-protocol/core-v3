@@ -128,7 +128,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
                 weeklyFundingAllowance: weeklyFundingAllowance
             }); // F: [BL-03]
         } else {
-            _ereaseBot(creditAccount, bot); // F: [BL-03]
+            _eraseBot(creditAccount, bot); // F: [BL-03]
         }
 
         activeBotsRemaining = activeBots[creditAccount].length(); // F: [BL-03]
@@ -145,12 +145,12 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         unchecked {
             for (uint256 i = 0; i < len; ++i) {
                 address bot = activeBots[creditAccount].at(len - i - 1); // F: [BL-06]
-                _ereaseBot(creditAccount, bot);
+                _eraseBot(creditAccount, bot);
             }
         }
     }
 
-    function _ereaseBot(address creditAccount, address bot) internal {
+    function _eraseBot(address creditAccount, address bot) internal {
         delete botPermissions[creditAccount][bot]; // F: [BL-06]
         delete botFunding[creditAccount][bot]; // F: [BL-06]
 
@@ -268,6 +268,6 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
 
     /// @notice Allows this contract to unwrap WETH and deposit if address is not WETH
     receive() external payable {
-        if (msg.sender != address(weth)) deposit();
+        if (msg.sender != weth) deposit();
     }
 }
