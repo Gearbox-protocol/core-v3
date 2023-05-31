@@ -75,7 +75,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
 
     /// @notice Limits access to a function only to Credit Facades connected to approved CMs
     modifier onlyValidCreditFacade() {
-        _revertIfNotValidCreditFacade();
+        _revertIfCallerNotValidCreditFacade();
 
         _;
     }
@@ -266,7 +266,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     }
 
     /// @notice Reverts if caller is not creditFacade
-    function _revertIfNotValidCreditFacade() internal view {
+    function _revertIfCallerNotValidCreditFacade() internal view {
         address creditManager = ICreditFacadeV3(msg.sender).creditManager();
         if (!approvedCreditManager[creditManager] || ICreditManagerV3(creditManager).creditFacade() != msg.sender) {
             revert CallerNotCreditFacadeException();
