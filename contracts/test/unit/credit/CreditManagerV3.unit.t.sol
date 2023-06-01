@@ -94,8 +94,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
     CreditConfig creditConfig;
 
-    CollateralTokenData tokenData;
-
     // Fee token settings
     bool isFeeToken;
     uint256 tokenFee = 0;
@@ -2861,12 +2859,12 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         assertEq(ctd.timestampRampStart, timestampRampStart, "Incorrect timestampRampStart");
         assertEq(ctd.rampDuration, rampDuration, "Incorrect rampDuration");
 
-        tokenData.ltInitial = ctd.ltInitial;
-        tokenData.ltFinal = ctd.ltFinal;
-        tokenData.timestampRampStart = ctd.timestampRampStart;
-        tokenData.rampDuration = ctd.rampDuration;
-
-        uint16 expectedLT = tokenData.getLiquidationThreshold();
+        uint16 expectedLT = CreditLogic.getLiquidationThreshold({
+            ltInitial: ctd.ltInitial,
+            ltFinal: ctd.ltFinal,
+            timestampRampStart: ctd.timestampRampStart,
+            rampDuration: ctd.rampDuration
+        });
 
         assertEq(creditManager.liquidationThresholds(weth), expectedLT, "Incorrect LT for weth");
 

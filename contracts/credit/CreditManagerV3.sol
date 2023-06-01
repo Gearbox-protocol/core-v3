@@ -48,13 +48,13 @@ import {
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
+import "forge-std/console.sol";
 
 /// @title Credit Manager
 /// @dev Encapsulates the business logic for managing Credit Accounts
 contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using BitMask for uint256;
-    using CreditLogic for CollateralTokenData;
     using CreditLogic for CollateralDebtData;
     using CollateralLogic for CollateralDebtData;
     using SafeERC20 for IERC20;
@@ -1232,12 +1232,38 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             liquidationThreshold = ltUnderlying; // U:[CM-35]
         } else {
             CollateralTokenData storage tokenData = collateralTokensData[tokenMask]; // U:[CM-34]
-            token = tokenData.getTokenOrRevert(); // U:[CM-34]
+
+            bytes32 rawData;
+            assembly {
+                rawData := sload(tokenData.slot)
+                token := and(rawData, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF) // U:[CM-34]
+            }
+
+            if (token == address(0)) {
+                revert TokenNotAllowedException(); // U:[CM-34]
+            }
 
             if (calcLT) {
+                uint16 ltInitial;
+                uint16 ltFinal;
+                uint40 timestampRampStart;
+                uint24 rampDuration;
+
+                assembly {
+                    ltInitial := and(shr(160, rawData), 0xFFFF)
+                    ltFinal := and(shr(176, rawData), 0xFFFF)
+                    timestampRampStart := and(shr(192, rawData), 0xFFFFFFFFFF)
+                    rampDuration := and(shr(232, rawData), 0xFFFFFF)
+                }
+
                 // The logic to calculate a ramping LT is isolated to the `CreditLogic` library.
                 // See `CreditLogic.getLiquidationThreshold()` for details.
-                liquidationThreshold = tokenData.getLiquidationThreshold(); // U:[CM-42]
+                liquidationThreshold = CreditLogic.getLiquidationThreshold({
+                    ltInitial: ltInitial,
+                    ltFinal: ltFinal,
+                    timestampRampStart: timestampRampStart,
+                    rampDuration: rampDuration
+                }); // U:[CM-42]
             }
         }
     }
