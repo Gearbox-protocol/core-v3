@@ -163,7 +163,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
         assertEq(tokens[0], DUMB_ADDRESS, "Incorrect address was added to quotaTokenSet");
         assertEq(tokens.length, 1, "token wasn't added to quotaTokenSet");
 
-        (uint96 totalQuoted, uint96 limit, uint16 rate, uint192 cumulativeIndexLU_RAY,) =
+        (uint16 rate, uint192 cumulativeIndexLU_RAY,, uint96 totalQuoted, uint96 limit) =
             pqk.totalQuotaParams(DUMB_ADDRESS);
 
         assertEq(totalQuoted, 0, "totalQuoted !=0");
@@ -255,7 +255,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
             vm.prank(address(gaugeMock));
             pqk.updateRates();
 
-            (uint96 totalQuoted, uint96 limit, uint16 rate, uint192 cumulativeIndexLU_RAY,) = pqk.totalQuotaParams(DAI);
+            (uint16 rate, uint192 cumulativeIndexLU_RAY,, uint96 totalQuoted, uint96 limit) = pqk.totalQuotaParams(DAI);
 
             assertEq(rate, DAI_QUOTA_RATE, _testCaseErr("Incorrect DAI rate"));
             assertEq(
@@ -264,7 +264,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 _testCaseErr("Incorrect DAI cumulativeIndexLU")
             );
 
-            (totalQuoted, limit, rate, cumulativeIndexLU_RAY,) = pqk.totalQuotaParams(USDC);
+            (rate, cumulativeIndexLU_RAY,, totalQuoted, limit) = pqk.totalQuotaParams(USDC);
 
             assertEq(rate, USDC_QUOTA_RATE, _testCaseErr("Incorrect USDC rate"));
             assertEq(
@@ -358,7 +358,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
 
         pqk.setTokenLimit(DUMB_ADDRESS, limit);
 
-        (, uint96 limitSet,,,) = pqk.totalQuotaParams(DUMB_ADDRESS);
+        (,,,, uint96 limitSet) = pqk.totalQuotaParams(DUMB_ADDRESS);
 
         assertEq(limitSet, limit, "Incorrect limit was set");
     }
@@ -374,7 +374,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
 
         pqk.setTokenQuotaIncreaseFee(DUMB_ADDRESS, fee);
 
-        (,,,, uint16 feeSet) = pqk.totalQuotaParams(DUMB_ADDRESS);
+        (,, uint16 feeSet,,) = pqk.totalQuotaParams(DUMB_ADDRESS);
 
         assertEq(feeSet, fee, "Incorrect fee was set");
     }

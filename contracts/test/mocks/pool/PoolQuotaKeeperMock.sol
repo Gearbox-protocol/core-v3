@@ -112,7 +112,7 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
         external
         view
         override
-        returns (uint256 quoted, uint128 interest)
+        returns (uint96 quoted, uint128 interest)
     {
         quoted = _quoted[token];
         interest = _outstandingInterest[token];

@@ -522,7 +522,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         for (uint256 i = 0; i < quotedTokens.length; ++i) {
             if (quotedTokens[i] == address(0)) continue;
 
-            (, uint96 limit,,,) = poolQuotaKeeper.totalQuotaParams(quotedTokens[i]);
+            (,,, uint96 limit,) = poolQuotaKeeper.totalQuotaParams(quotedTokens[i]);
 
             assertEq(limit, 1, "Limit was not zeroed");
         }

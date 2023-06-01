@@ -6,11 +6,11 @@ pragma solidity ^0.8.17;
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 struct TokenQuotaParams {
+    uint16 rate; // current rate update
+    uint192 cumulativeIndexLU; // max 10^57
+    uint16 quotaIncreaseFee;
     uint96 totalQuoted;
     uint96 limit;
-    uint16 rate; // current rate update
-    uint192 cumulativeIndexLU_RAY; // max 10^57
-    uint16 quotaIncreaseFee;
 }
 
 struct AccountQuota {
@@ -101,5 +101,5 @@ interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion {
     function getQuotaAndOutstandingInterest(address creditAccount, address token)
         external
         view
-        returns (uint256 quoted, uint128 outstandingInterest);
+        returns (uint96 quoted, uint128 outstandingInterest);
 }
