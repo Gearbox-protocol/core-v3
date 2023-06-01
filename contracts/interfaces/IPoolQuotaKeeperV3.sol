@@ -54,12 +54,12 @@ interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion {
     /// @dev Updates all quotas to zero when closing a credit account, and computes the final quota interest change
     /// @param creditAccount Address of the Credit Account being closed
     /// @param tokens Array of all active quoted tokens on the account
-    function removeQuotas(address creditAccount, address[] memory tokens, bool setLimitsToZero) external;
+    function removeQuotas(address creditAccount, address[] calldata tokens, bool setLimitsToZero) external;
 
     /// @dev Computes the accrued quota interest and updates interest indexes
     /// @param creditAccount Address of the Credit Account to accrue interest for
     /// @param tokens Array of all active quoted tokens on the account
-    function accrueQuotaInterest(address creditAccount, address[] memory tokens) external;
+    function accrueQuotaInterest(address creditAccount, address[] calldata tokens) external;
 
     /// @dev Gauge management
 

@@ -202,7 +202,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @param creditAccount Address of the Credit Account to remove quotas from
     /// @param tokens Array of all active quoted tokens on the account
     /// @param setLimitsToZero Whether limits for affected tokens should be set to zero
-    function removeQuotas(address creditAccount, address[] memory tokens, bool setLimitsToZero)
+    function removeQuotas(address creditAccount, address[] calldata tokens, bool setLimitsToZero)
         external
         override
         creditManagerOnly // U:[PQK-4]
@@ -263,7 +263,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     ///      beforehand
     /// @param creditAccount Address of the Credit Account to accrue interest for
     /// @param tokens Array of all active quoted tokens on the account
-    function accrueQuotaInterest(address creditAccount, address[] memory tokens)
+    function accrueQuotaInterest(address creditAccount, address[] calldata tokens)
         external
         override
         creditManagerOnly // U:[PQK-4]
