@@ -570,8 +570,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             enabledTokensMask: enabledTokensMask,
             quotedTokensMask: 0,
             quotedTokens: new address[](0),
-            quotedLts: new uint16[](0),
-            quotas: new uint256[](0),
+            // quotedLts: new uint16[](0),
+            // quotas: new uint256[](0),
             _poolQuotaKeeper: address(0)
         });
 

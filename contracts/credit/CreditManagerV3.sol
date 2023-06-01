@@ -808,14 +808,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         /// during quota interest computation and can be later reused to compute quota token collateral
         collateralDebtData.enabledTokensMask = enabledTokensMask; // U:[CM-21]
 
+        // uint16[] memory quotaLts;
+        uint256[] memory quotasPacked;
         if (supportsQuotas) {
             collateralDebtData._poolQuotaKeeper = poolQuotaKeeper(); // U:[CM-21]
 
             (
                 collateralDebtData.quotedTokens,
                 collateralDebtData.cumulativeQuotaInterest,
-                collateralDebtData.quotas,
-                collateralDebtData.quotedLts,
+                quotasPacked,
                 collateralDebtData.quotedTokensMask
             ) = _getQuotedTokensData({
                 creditAccount: creditAccount,
@@ -855,13 +856,21 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         /// The logic for computing collateral is isolated into the `CreditLogic` library. See `CreditLogic.calcCollateral` for details.
         uint256 tokensToDisable;
+
+        /// The limit is a TWV threshold at which lazy computation stops. Normally, it happens when TWV
+        /// exceeds the total debt, but the user can also configure a custom HF threshold (above 1),
+        /// in order to maintain a desired level of position health
+        uint256 limit = (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY)
+            ? collateralDebtData.totalDebtUSD * minHealthFactor / PERCENTAGE_FACTOR
+            : type(uint256).max;
+
         (collateralDebtData.totalValueUSD, collateralDebtData.twvUSD, tokensToDisable) = collateralDebtData
             .calcCollateral({
             creditAccount: creditAccount,
             underlying: underlying,
-            lazy: task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY,
-            minHealthFactor: minHealthFactor,
+            limit: limit,
             collateralHints: collateralHints,
+            quotasPacked: quotasPacked,
             priceOracle: _priceOracle,
             collateralTokenByMaskFn: _collateralTokenByMask,
             convertToUSDFn: _convertToUSD
@@ -896,8 +905,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param _poolQuotaKeeper The PoolQuotaKeeper contract storing the quota and quota interest data
     /// @return quotaTokens An array of address of quoted tokens on the Credit Account
     /// @return outstandingQuotaInterest Quota interest that has not been saved in the Credit Manager
-    /// @return quotas Current quotas on quoted tokens, in the same order as quoted tokens
-    /// @return lts Current lts of quoted tokens, in the same order as quoted tokens
+    /// @return quotasPacked Current quotas on quoted tokens packet with their lts
     /// @return _quotedTokensMask The mask of enabled quoted tokens on the account
     function _getQuotedTokensData(
         address creditAccount,
@@ -910,8 +918,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (
             address[] memory quotaTokens,
             uint128 outstandingQuotaInterest,
-            uint256[] memory quotas,
-            uint16[] memory lts,
+            uint256[] memory quotasPacked,
             uint256 _quotedTokensMask
         )
     {
@@ -924,8 +931,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         // This is desirable, as it makes it simple to check whether there are any quoted tokens
         if (tokensToCheckMask != 0) {
             quotaTokens = new address[](_maxEnabledTokens); // U:[CM-24]
-            quotas = new uint256[](_maxEnabledTokens); // U:[CM-24]
-            lts = new uint16[](_maxEnabledTokens); // U:[CM-24]
+            quotasPacked = new uint256[](_maxEnabledTokens); // U:[CM-24]
 
             uint256 j;
 
@@ -944,14 +950,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                             revert TooManyEnabledTokensException(); // U:[CM-24]
                         }
 
-                        address token; // U:[CM-24]
-                        (token, lts[j]) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
+                        (address token, uint16 lt) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
+
+                        (uint256 quota, uint128 outstandingInterestDelta) =
+                            IPoolQuotaKeeperV3(_poolQuotaKeeper).getQuotaAndOutstandingInterest(ca, token); // U:[CM-24]
 
                         quotaTokens[j] = token; // U:[CM-24]
-
-                        uint128 outstandingInterestDelta;
-                        (quotas[j], outstandingInterestDelta) =
-                            IPoolQuotaKeeperV3(_poolQuotaKeeper).getQuotaAndOutstandingInterest(ca, token); // U:[CM-24]
+                        quotasPacked[j] = CollateralLogic.packQuota(uint96(quota), lt);
 
                         /// Quota interest is equal to quota * APY * time. Since quota is a uint96, this is unlikely to overflow in any realistic scenario.
                         outstandingQuotaInterest += outstandingInterestDelta; // U:[CM-24]
