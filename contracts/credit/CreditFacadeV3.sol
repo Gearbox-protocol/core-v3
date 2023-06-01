@@ -1091,7 +1091,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         /// @dev It's safe covert because we control that
         /// uint256(_maxDebtPerBlockMultiplier) * debtLimits.maxDebt < type(uint128).max
-
         totalBorrowedInBlock = uint128(newDebtInCurrentBlock); // U:[FA-43]
     }
 
@@ -1099,7 +1098,17 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param debt The current principal of a Credit Account
     function _revertIfOutOfDebtLimits(uint256 debt) internal view {
         // Checks that amount is in debtLimits
-        if (debt < uint256(debtLimits.minDebt) || debt > uint256(debtLimits.maxDebt)) {
+        uint256 minDebt;
+        uint256 maxDebt;
+
+        // minDebt = debtLimits.minDebt, maxDebt = debtLimits.maxDebt
+        assembly {
+            let data := sload(debtLimits.slot)
+            maxDebt := shr(128, data)
+            minDebt := and(data, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+        }
+
+        if ((debt < minDebt) || (debt > maxDebt)) {
             revert BorrowAmountOutOfLimitsException(); // U:[FA-44]
         }
     }
@@ -1139,16 +1148,29 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @notice Updates total debt and checks that it does not exceed the limit
     function _revertIfOutOfTotalDebtLimit(uint256 delta, ManageDebtAction action) internal {
         if (delta != 0) {
-            TotalDebt storage td = totalDebt; // U:[FA-47]
+            uint256 currentTotalDebt; // U:[FA-47]
+            uint256 totalDebtLimit; // U:[FA-47]
+
+            // currentTotalDebt = totalDebt.currentTotalDebt, totalDebtLimit = totalDebt.currentTotalDebt
+            assembly {
+                let data := sload(totalDebt.slot)
+                totalDebtLimit := shr(128, data)
+                currentTotalDebt := and(data, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+            }
 
             if (action == ManageDebtAction.INCREASE_DEBT) {
-                td.currentTotalDebt += delta.toUint128(); // U:[FA-47]
-                if (td.currentTotalDebt > td.totalDebtLimit) {
+                currentTotalDebt += delta; // U:[FA-47]
+                if (currentTotalDebt > totalDebtLimit) {
                     revert CreditManagerCantBorrowException(); // U:[FA-47]
                 }
+
+                // it's safe, because currentTotalDebt <= totalDebtLimit which is uint128
+                totalDebt.currentTotalDebt = uint128(currentTotalDebt); // U:[FA-47]
             } else {
-                uint128 delta128 = delta.toUint128();
-                td.currentTotalDebt = td.currentTotalDebt > delta128 ? td.currentTotalDebt - delta128 : 0; // U:[FA-47]
+                unchecked {
+                    /// It's safe to downcast to uint128m because currentTotalDebt - delta < currentTotalDebt which is uint128
+                    totalDebt.currentTotalDebt = currentTotalDebt > delta ? uint128(currentTotalDebt - delta) : 0; // U:[FA-47]
+                }
             }
         }
     }
