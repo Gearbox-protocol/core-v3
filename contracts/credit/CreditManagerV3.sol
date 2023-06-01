@@ -295,7 +295,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     function closeCreditAccount(
         address creditAccount,
         ClosureAction closureAction,
-        CollateralDebtData memory collateralDebtData,
+        CollateralDebtData calldata collateralDebtData,
         address payer,
         address to,
         uint256 skipTokensMask,
@@ -654,7 +654,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     function fullCollateralCheck(
         address creditAccount,
         uint256 enabledTokensMask,
-        uint256[] memory collateralHints,
+        uint256[] calldata collateralHints,
         uint16 minHealthFactor
     )
         external

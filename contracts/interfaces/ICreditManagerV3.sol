@@ -120,7 +120,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     function closeCreditAccount(
         address creditAccount,
         ClosureAction closureAction,
-        CollateralDebtData memory collateralDebtData,
+        CollateralDebtData calldata collateralDebtData,
         address payer,
         address to,
         uint256 skipTokensMask,
@@ -164,7 +164,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @dev Requests a Credit Account to make a low-level call with provided data
     /// This is the intended pathway for state-changing interactions with 3rd-party protocols
     /// @param callData Data to pass with the call
-    function execute(bytes memory callData) external returns (bytes memory);
+    function execute(bytes calldata callData) external returns (bytes memory);
 
     //
     // COLLATERAL VALIDITY AND ACCOUNT HEALTH CHECKS
@@ -178,7 +178,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     function fullCollateralCheck(
         address creditAccount,
         uint256 enabledTokensMaskBefore,
-        uint256[] memory collateralHints,
+        uint256[] calldata collateralHints,
         uint16 minHealthFactor
     ) external returns (uint256 updatedEnabledTokensMaskBefore);
 

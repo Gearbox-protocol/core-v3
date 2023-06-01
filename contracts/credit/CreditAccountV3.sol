@@ -59,7 +59,7 @@ contract CreditAccountV3 is ICreditAccountV3 {
     }
 
     /// @inheritdoc ICreditAccountV3
-    function execute(address target, bytes memory data)
+    function execute(address target, bytes calldata data)
         external
         override
         creditManagerOnly // U:[CA-2]
@@ -69,7 +69,7 @@ contract CreditAccountV3 is ICreditAccountV3 {
     }
 
     /// @inheritdoc ICreditAccountV3
-    function rescue(address target, bytes memory data)
+    function rescue(address target, bytes calldata data)
         external
         override
         factoryOnly // U:[CA-2]

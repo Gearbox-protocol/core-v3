@@ -10,7 +10,7 @@ import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.
 interface ICreditAccountBase is IVersion {
     function creditManager() external view returns (address);
     function safeTransfer(address token, address to, uint256 amount) external;
-    function execute(address target, bytes memory data) external returns (bytes memory result);
+    function execute(address target, bytes calldata data) external returns (bytes memory result);
 }
 
 /// @title Credit account V3 interface
@@ -32,12 +32,12 @@ interface ICreditAccountV3 is ICreditAccountBase {
     /// @param target Contract to call
     /// @param data Data to call the target contract with
     /// @return result Call result
-    function execute(address target, bytes memory data) external override returns (bytes memory result);
+    function execute(address target, bytes calldata data) external override returns (bytes memory result);
 
     /// @notice Executes function call from the account to the target contract with provided data,
     ///         can only be called by the factory.
     ///         Allows to rescue funds that were accidentally left on the account upon closure.
     /// @param target Contract to call
     /// @param data Data to call the target contract with
-    function rescue(address target, bytes memory data) external;
+    function rescue(address target, bytes calldata data) external;
 }
