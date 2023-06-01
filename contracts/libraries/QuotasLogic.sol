@@ -11,21 +11,12 @@ import {CreditLogic} from "./CreditLogic.sol";
 import {RAY, SECONDS_PER_YEAR, PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 import "../interfaces/IExceptions.sol";
-import "forge-std/console.sol";
 
 uint192 constant RAY_DIVIDED_BY_PERCENTAGE = uint192(RAY / PERCENTAGE_FACTOR);
 
 /// @title Quota Library
 library QuotasLogic {
     using SafeCast for uint256;
-
-    /// @dev Only allows quoted tokens (with initialized data) to be passed to a function
-    modifier initializedQuotasOnly(TokenQuotaParams storage tokenQuotaParams) {
-        if (!isInitialised(tokenQuotaParams)) {
-            revert TokenIsNotQuotedException(); // F:[PQK-13]
-        }
-        _;
-    }
 
     /// @dev Returns whether the quoted token data is initialized
     /// @dev Since for initialized quoted token the interest index starts at RAY,
@@ -76,7 +67,8 @@ library QuotasLogic {
         pure
         returns (uint128)
     {
-        // downcast to uint128 is safe, because quoted is uint96 and cumulativeIndex / RAY could no be bigger > 2**32
+        // Downcasting to uint128 should be safe, since quoted is uint96, and cumulativeIndex / RAY cannot grow
+        // beyond 2 ** 32 in any reasonable time
         return uint128(uint256(quoted) * (cumulativeIndexNow - cumulativeIndexLU) / RAY); // U: [QL-2]
     }
 
@@ -95,11 +87,15 @@ library QuotasLogic {
         cumulativeIndexNow = cumulativeIndexSince(tokenQuotaParams, lastQuotaRateUpdate);
 
         if (quoted > 1) {
-            caQuotaInterestChange = calcAccruedQuotaInterest(quoted, cumulativeIndexNow, accountQuota.cumulativeIndexLU); // U: [QL-4]
+            caQuotaInterestChange = calcAccruedQuotaInterest(quoted, cumulativeIndexNow, accountQuota.cumulativeIndexLU);
         }
     }
 
-    function calcQuotaInterestChange(TokenQuotaParams storage tokenQuotaParams, int96 change)
+    /// @dev Computes the pool quota revenue change given the current rate and the
+    ///      actual quota change
+    /// @param tokenQuotaParams Quota parameters for a token
+    /// @param change Real change in quota
+    function calcQuotaRevenueChange(TokenQuotaParams storage tokenQuotaParams, int256 change)
         internal
         view
         returns (int256)
@@ -107,6 +103,9 @@ library QuotasLogic {
         return int256(change) * int256(uint256(tokenQuotaParams.rate)) / int16(PERCENTAGE_FACTOR);
     }
 
+    /// @dev Computes a trading fee applied on quota increase
+    /// @param tokenQuotaParams Quota parameters for a token
+    /// @param change Real change in quota
     /// @return tradingFees Trading fees computed during increasing quota
     function calcQuotaTradingFees(TokenQuotaParams storage tokenQuotaParams, int96 change)
         internal
@@ -116,10 +115,10 @@ library QuotasLogic {
         // For some tokens, a one-time quota increase fee may be charged. This is a proxy for
         // trading fees for tokens with high volume but short position duration, in which
         // case trading fees are a more effective pricing policy than charging interest over time
-        return uint128(uint96(change)) * tokenQuotaParams.quotaIncreaseFee / PERCENTAGE_FACTOR; // U: [QL-3]
+        return uint128(uint96(change)) * tokenQuotaParams.quotaIncreaseFee / PERCENTAGE_FACTOR;
     }
 
-    /// @dev Changes the quota on a token for an account, and recomputes adjacent parameters
+    /// @dev Computes the actual quota change with respect to total limit on quotas
     /// When the quota is increased, the new amount is checked against the global limit on quotas
     /// If the amount is larger than the existing capacity, then the quota is only increased
     /// by capacity. This is done instead of reverting to avoid unexpected reverts due to race conditions
@@ -128,24 +127,24 @@ library QuotasLogic {
 
     /// @return realQuotaChange Amount the quota actually changed by after taking
     ///                         capacity into account
-    function calcIncreaseQuotaChange(TokenQuotaParams storage tokenQuotaParams, int96 quotaChange)
+    function calcRealQuotaIncreaseChange(TokenQuotaParams storage tokenQuotaParams, int96 quotaChange)
         internal
         view
-        initializedQuotasOnly(tokenQuotaParams) // U: [QL-9]
         returns (int96 realQuotaChange)
     {
         uint96 totalQuoted = tokenQuotaParams.totalQuoted;
         uint96 limit = tokenQuotaParams.limit;
 
         if (totalQuoted >= limit) {
-            return 0; // U: [QL-3]
+            return 0;
         }
 
         unchecked {
             uint96 maxQuotaCapacity = limit - totalQuoted;
 
-            // Downcasting maxQuotaCapacity to int96 is safe. because maxQuotaCapacity < int96 quotaChange
-            realQuotaChange = uint96(quotaChange) > maxQuotaCapacity ? int96(maxQuotaCapacity) : quotaChange; // I:[CMQ-08,10] U: [QL-3]
+            // Since limit should be less than int96.max under correct configuration, downcasting maxQuotaCapacity should
+            // be safe
+            realQuotaChange = uint96(quotaChange) > maxQuotaCapacity ? int96(maxQuotaCapacity) : quotaChange; // I:[CMQ-08,10]
         }
     }
 }

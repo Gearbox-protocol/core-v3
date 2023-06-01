@@ -390,7 +390,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
         pqk.updateQuota({
             creditAccount: DUMB_ADDRESS,
             token: link,
-            quotaChange: int96(uint96(100 * WAD)),
+            quotaChange: -int96(uint96(100 * WAD)),
             minQuota: 0,
             maxQuota: 1
         });

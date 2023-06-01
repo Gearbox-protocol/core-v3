@@ -115,26 +115,36 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
         TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
 
+        if (!tokenQuotaParams.isInitialised()) {
+            revert TokenIsNotQuotedException(); // U: [PQK-14]
+        }
+
         uint192 cumulativeIndexNow;
 
-        // FOR ANY CHANGE: Computes the accrued quota interest since last update and updates the interest index,
+        // FOR ANY CHANGE: Computes the accrued quota interest since last update and the new index,
         // Since interest is computed dynamically as a multiplier of current quota amount,
-        // the outstanding interest has to be saved beforehand so that interest doesn't change
-        // with quota amount
+        // the outstanding interest has to be cached beforehand to avoid interest also being
+        // changed with the amount. The cached interest is stored in the CM, so the outstanding interest
+        // value is returned there, while the cumulative index is written to account's
+        // cumulativeIndexLU to set local quota interest to zero
+
         (caQuotaInterestChange,, cumulativeIndexNow) = QuotasLogic.calcOutstandingQuotaInterest({
             tokenQuotaParams: tokenQuotaParams,
             accountQuota: accountQuota,
             lastQuotaRateUpdate: lastQuotaRateUpdate
-        });
+        }); // U: [PQK-15]
 
         if (quotaChange > 0) {
             // INCREASE
 
             // Computes the current capacity until quota limit and checks the amount against it
-            // Computes whether the token should be enabled (quota changed from zero to non-zero)
-            realQuotaChange = QuotasLogic.calcIncreaseQuotaChange(tokenQuotaParams, quotaChange);
+            // If the requested increase amount is above capacity, only the remaining capacity will
+            // be provided as a quota
+            realQuotaChange = QuotasLogic.calcRealQuotaIncreaseChange(tokenQuotaParams, quotaChange); // U: [PQK-15]
 
-            tradingFees = QuotasLogic.calcQuotaTradingFees(tokenQuotaParams, realQuotaChange);
+            // If applicable, trading fees are computed on the quota increase amount and
+            // added to accrued fees in the CM
+            tradingFees = QuotasLogic.calcQuotaTradingFees(tokenQuotaParams, realQuotaChange); // U: [PQK-15]
 
             // Quoted tokens are only enabled in the CM when their quotas are changed
             // from zero to non-zero. This is done to correctly
@@ -142,38 +152,40 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             // the CM will fail to zero it on closing an account, which will break quota interest computations.
             // This value is returned in order for Credit Manager to update enabled tokens locally.
             if (accountQuota.quota <= 1) {
-                enableToken = true; // U: [QL-3]
+                enableToken = true; // U: [PQK-15]
             }
 
             // Increases the account quota and total quota by the amount (or remaining capacity, if the amount exceeds it)
-            accountQuota.quota += uint96(realQuotaChange); // U: [QL-3]
-            tokenQuotaParams.totalQuoted += uint96(realQuotaChange); // U: [QL-3]
+            accountQuota.quota += uint96(realQuotaChange); // U: [PQK-15]
+            tokenQuotaParams.totalQuoted += uint96(realQuotaChange); // U: [PQK-15]
         } else {
             /// DECREASE
-            /// * Decreases the account quota and total quota by the amount
-            /// * Computes whether the token should be disabled (quota changed from non-zero to zero)
-            realQuotaChange = quotaChange;
-            accountQuota.quota -= uint96(-realQuotaChange); // U: [QL-3]
-            tokenQuotaParams.totalQuoted -= uint96(-realQuotaChange); // U: [QL-3]
+            /// Decreases the account quota and total quota by the amount
 
+            realQuotaChange = quotaChange;
+            accountQuota.quota -= uint96(-realQuotaChange); // U: [PQK-15]
+            tokenQuotaParams.totalQuoted -= uint96(-realQuotaChange); // U: [PQK-15]
+
+            /// Computes whether the token should be disabled (quota changed from non-zero to zero)
             if (accountQuota.quota <= 1) {
-                disableToken = true; // U: [QL-3]
+                disableToken = true; // U: [PQK-15]
             }
         }
 
         // Checks that quota is in desired boudnaries
-        if (accountQuota.quota < minQuota || accountQuota.quota > maxQuota) revert QuotaIsOutOfBoundsException();
+        if (accountQuota.quota < minQuota || accountQuota.quota > maxQuota) revert QuotaIsOutOfBoundsException(); // U: [PQK-15]
+
+        // The cumulative index is updated to current in order to zero
+        // local interest
+        accountQuota.cumulativeIndexLU = cumulativeIndexNow; // U: [PQK-15]
 
         // Computes the total quota revenue change
-        accountQuota.cumulativeIndexLU = cumulativeIndexNow;
+        int256 quotaRevenueChange = QuotasLogic.calcQuotaRevenueChange(tokenQuotaParams, int256(realQuotaChange)); // U: [PQK-15]
 
-        // Computes the total quota revenue change
-        int256 quotaRevenueChange = QuotasLogic.calcQuotaInterestChange(tokenQuotaParams, realQuotaChange); // U: [QL-3]
-
-        // Quota revenue must be changed on each quota updated, so that the
+        // Quota revenue must be changed on each quota update, so that the
         // pool can correctly compute its liquidity metrics in the future
         if (quotaRevenueChange != 0) {
-            IPoolV3(pool).updateQuotaRevenue(quotaRevenueChange);
+            IPoolV3(pool).updateQuotaRevenue(quotaRevenueChange); // U: [PQK-15]
         }
     }
 
@@ -203,18 +215,18 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
                 quoted--;
 
                 /// Computes quota revenue change
-                quotaRevenueChange += QuotasLogic.calcQuotaInterestChange(tokenQuotaParams, -int96(quoted));
+                quotaRevenueChange += QuotasLogic.calcQuotaRevenueChange(tokenQuotaParams, -int256(uint256(quoted)));
 
                 /// Decreases the total token quota by the account's quota
-                tokenQuotaParams.totalQuoted -= quoted; // U: [QL-5]
+                tokenQuotaParams.totalQuoted -= quoted;
             }
+
+            // Sets account quota to zero
+            accountQuota.quota = 1;
 
             // Unlike general quota updates, quota removals do not update accountQuota.cumulativeIndexLU to save gas (i.e., do not accrue interest)
             // This is safe, since the quota is set to 1 and the index will be updated to the correct value on next change from
             // zero to non-zero, without breaking any interest calculations.
-
-            // Sets account quota to zero
-            accountQuota.quota = 1; // U: [QL-5]
 
             /// On some critical triggers (such as account liquidating with a loss), the Credit Manager
             /// may request the PQK to set quota limits to 0, effectively preventing any further exposure
@@ -357,16 +369,14 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             address token = tokens[i];
             uint16 rate = rates[i];
 
-            /// Before writing a new rate, the token's interest index current value is also
-            /// saved, to ensure that further calculations with the new rates are correct
             TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token]; // U:[PQK-7]
 
-            tokenQuotaParams.cumulativeIndexLU_RAY = QuotasLogic.cumulativeIndexSince(tokenQuotaParams, timestampLU); // U: [QL-8]
-            tokenQuotaParams.rate = rate; // U: [QL-8]
+            /// Before writing a new rate, the token's interest index current value is also
+            /// saved, to ensure that further calculations with the new rates are correct
+            tokenQuotaParams.cumulativeIndexLU_RAY = QuotasLogic.cumulativeIndexSince(tokenQuotaParams, timestampLU); // U:[PQK-7]
+            tokenQuotaParams.rate = rate; // U:[PQK-7]
 
-            quotaRevenue += uint256(tokenQuotaParams.totalQuoted) * rate / PERCENTAGE_FACTOR; // U: [QL-8]
-
-            // tokenQuotaParams.updateRate(timestampLU, rate); // U:[PQK-7]
+            quotaRevenue += uint256(tokenQuotaParams.totalQuoted) * rate / PERCENTAGE_FACTOR; // U:[PQK-7]
 
             emit UpdateTokenQuotaRate(token, rate); // U:[PQK-7]
 
@@ -432,11 +442,11 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         // F:[PQK-11]
 
         if (!tokenQuotaParams.isInitialised()) {
-            revert TokenIsNotQuotedException(); // F:[PQK-13]
+            revert TokenIsNotQuotedException(); // F:[PQK-11]
         }
 
         if (tokenQuotaParams.limit != limit) {
-            tokenQuotaParams.limit = limit; // U: [QL-6]
+            tokenQuotaParams.limit = limit; // U:[PQK-12]
             emit SetTokenLimit(token, limit); // U:[PQK-12]
         }
     }
@@ -451,11 +461,11 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token]; // U:[PQK-13]
 
         if (!tokenQuotaParams.isInitialised()) {
-            revert TokenIsNotQuotedException(); // F:[PQK-13]
+            revert TokenIsNotQuotedException();
         }
 
         if (tokenQuotaParams.quotaIncreaseFee != fee) {
-            tokenQuotaParams.quotaIncreaseFee = fee; // U: [QL-7]
+            tokenQuotaParams.quotaIncreaseFee = fee; // U:[PQK-13]
             emit SetQuotaIncreaseFee(token, fee); // U:[PQK-13]
         }
     }
