@@ -1679,7 +1679,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         assertEq(
             collateralDebtData.quotedTokens,
-            supportsQuotas ? tokenTestSuite.listOf(Tokens.LINK, Tokens.STETH, Tokens.NO_TOKEN) : new address[](0),
+            supportsQuotas ? tokenTestSuite.listOf(Tokens.LINK, Tokens.STETH) : new address[](0),
             "Incorrect quotedTokens"
         );
 
@@ -2013,7 +2013,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         uint256 expertedOutstandingQuotaInterest;
         uint256[] expectedQuotas;
         uint16[] expectedLts;
-        bool expectRevert;
     }
 
     /// @dev U:[CM-24]: _getQuotedTokensData works correctly
@@ -2054,42 +2053,30 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         //
         // CASES
         //
-        GetQuotedTokenDataTestCase[5] memory cases = [
+        GetQuotedTokenDataTestCase[4] memory cases = [
             GetQuotedTokenDataTestCase({
                 name: "No quoted tokens",
                 enabledTokensMask: UNDERLYING_TOKEN_MASK | WETH_TOKEN_MASK | USDC_TOKEN_MASK,
                 expectedQuotaTokens: new address[](0),
                 expertedOutstandingQuotaInterest: 0,
                 expectedQuotas: new uint256[](0),
-                expectedLts: new uint16[](0),
-                expectRevert: false
-            }),
-            GetQuotedTokenDataTestCase({
-                name: "Revert if quoted tokens > maxEnabledTokens",
-                enabledTokensMask: LINK_TOKEN_MASK | USDT_TOKEN_MASK | STETH_TOKEN_MASK | CVX_TOKEN_MASK,
-                expectedQuotaTokens: new address[](0),
-                expertedOutstandingQuotaInterest: 0,
-                expectedQuotas: new uint256[](0),
-                expectedLts: new uint16[](0),
-                expectRevert: true
+                expectedLts: new uint16[](0)
             }),
             GetQuotedTokenDataTestCase({
                 name: "1 quotes token",
                 enabledTokensMask: STETH_TOKEN_MASK | WETH_TOKEN_MASK | USDC_TOKEN_MASK,
-                expectedQuotaTokens: tokenTestSuite.listOf(Tokens.STETH, Tokens.NO_TOKEN, Tokens.NO_TOKEN),
+                expectedQuotaTokens: tokenTestSuite.listOf(Tokens.STETH),
                 expertedOutstandingQuotaInterest: 10_000,
                 expectedQuotas: arrayOf(20_000, 0, 0),
-                expectedLts: arrayOfU16(30_00, 0, 0),
-                expectRevert: false
+                expectedLts: arrayOfU16(30_00, 0, 0)
             }),
             GetQuotedTokenDataTestCase({
                 name: "2 quotes token",
                 enabledTokensMask: STETH_TOKEN_MASK | LINK_TOKEN_MASK | WETH_TOKEN_MASK | USDC_TOKEN_MASK,
-                expectedQuotaTokens: tokenTestSuite.listOf(Tokens.LINK, Tokens.STETH, Tokens.NO_TOKEN),
+                expectedQuotaTokens: tokenTestSuite.listOf(Tokens.LINK, Tokens.STETH),
                 expertedOutstandingQuotaInterest: 40_000 + 10_000,
                 expectedQuotas: arrayOf(10_000, 20_000, 0),
-                expectedLts: arrayOfU16(80_00, 30_00, 0),
-                expectRevert: false
+                expectedLts: arrayOfU16(80_00, 30_00, 0)
             }),
             GetQuotedTokenDataTestCase({
                 name: "3 quotes token",
@@ -2097,8 +2084,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 expectedQuotaTokens: tokenTestSuite.listOf(Tokens.LINK, Tokens.STETH, Tokens.CVX),
                 expertedOutstandingQuotaInterest: 40_000 + 10_000 + 30_000,
                 expectedQuotas: arrayOf(10_000, 20_000, 100_000),
-                expectedLts: arrayOfU16(80_00, 30_00, 20_00),
-                expectRevert: false
+                expectedLts: arrayOfU16(80_00, 30_00, 20_00)
             })
         ];
 
@@ -2112,10 +2098,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             /// @notice DUMB_ADDRESS is used because poolQuotaMock has predefined returns
             ///  depended on token only
 
-            if (_case.expectRevert) {
-                vm.expectRevert(TooManyEnabledTokensException.selector);
-            }
-
             (
                 address[] memory quotaTokens,
                 uint256 outstandingQuotaInterest,
@@ -2128,17 +2110,15 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 _poolQuotaKeeper: address(poolQuotaKeeperMock)
             });
 
-            if (!_case.expectRevert) {
-                assertEq(quotaTokens, _case.expectedQuotaTokens, _testCaseErr("Incorrect quotedTokens"));
-                assertEq(
-                    outstandingQuotaInterest,
-                    _case.expertedOutstandingQuotaInterest,
-                    _testCaseErr("Incorrect expertedOutstandingQuotaInterest")
-                );
-                // assertEq(quotas, _case.expectedQuotas, _testCaseErr("Incorrect expectedQuotas"));
-                // assertEq(lts, _case.expectedLts, _testCaseErr("Incorrect expectedLts"));
-                assertEq(returnedQuotedTokensMask, quotedTokensMask, _testCaseErr("Incorrect expectedQuotedMask"));
-            }
+            assertEq(quotaTokens, _case.expectedQuotaTokens, _testCaseErr("Incorrect quotedTokens"));
+            assertEq(
+                outstandingQuotaInterest,
+                _case.expertedOutstandingQuotaInterest,
+                _testCaseErr("Incorrect expertedOutstandingQuotaInterest")
+            );
+            // assertEq(quotas, _case.expectedQuotas, _testCaseErr("Incorrect expectedQuotas"));
+            // assertEq(lts, _case.expectedLts, _testCaseErr("Incorrect expectedLts"));
+            assertEq(returnedQuotedTokensMask, quotedTokensMask, _testCaseErr("Incorrect expectedQuotedMask"));
 
             vm.revertTo(snapshot);
         }

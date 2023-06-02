@@ -503,7 +503,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         creditManager.fullCollateralCheck(creditAccount, enabledTokensMap, new uint256[](0), 10_000);
 
-        address[] memory quotedTokens = new address[](creditManager.maxEnabledTokens());
+        address[] memory quotedTokens = new address[](2);
 
         quotedTokens[0] = tokenTestSuite.addressOf(Tokens.USDT);
         quotedTokens[1] = tokenTestSuite.addressOf(Tokens.LINK);
