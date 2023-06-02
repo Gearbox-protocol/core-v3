@@ -72,7 +72,7 @@ interface ICreditFacadeV3Events {
     event UpdateQuota(address indexed creditAccount, address indexed token, int96 quotaChange);
 
     /// @dev Emits when a multicall is started
-    event StartMultiCall(address indexed creditAccount);
+    event StartMultiCall(address indexed creditAccount, address indexed caller);
 
     /// @dev Emits when a call to an external contract is made through the Credit Manager
     event Execute(address indexed creditAccount, address indexed targetContract);
