@@ -119,7 +119,6 @@ contract CreditManagerV3Harness is CreditManagerV3 {
             address[] memory quotaTokens,
             uint256 outstandingQuotaInterest,
             uint256[] memory quotas,
-            uint16[] memory lts,
             uint256 quotedMask
         )
     {

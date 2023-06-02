@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {CreditLogic} from "../../../libraries/CreditLogic.sol";
-import {ClosureAction, CollateralDebtData, CollateralTokenData} from "../../../interfaces/ICreditManagerV3.sol";
+import {ClosureAction, CollateralDebtData} from "../../../interfaces/ICreditManagerV3.sol";
 import {TestHelper} from "../../lib/helper.sol";
 import {GeneralMock} from "../../mocks/GeneralMock.sol";
 
@@ -15,8 +15,6 @@ import {RAY, WAD} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.
 /// @notice [BM]: Unit tests for bit mask library
 contract CreditLogicTest is TestHelper {
     uint256 public constant TEST_FEE = 50;
-
-    CollateralTokenData ctd;
 
     address[8] tokens;
     uint16[8] tokenLTsStorage;
@@ -527,13 +525,13 @@ contract CreditLogicTest is TestHelper {
         ];
 
         for (uint256 i = 0; i < cases.length; i++) {
-            ctd.ltInitial = cases[i].ltInitial;
-            ctd.ltFinal = cases[i].ltFinal;
-            ctd.timestampRampStart = cases[i].timestampRampStart;
-            ctd.rampDuration = cases[i].rampDuration;
-
             assertEq(
-                CreditLogic.getLiquidationThreshold(ctd),
+                CreditLogic.getLiquidationThreshold({
+                    ltInitial: cases[i].ltInitial,
+                    ltFinal: cases[i].ltFinal,
+                    timestampRampStart: cases[i].timestampRampStart,
+                    rampDuration: cases[i].rampDuration
+                }),
                 cases[i].expectedLT,
                 string(abi.encodePacked(cases[i].name, ": LT"))
             );

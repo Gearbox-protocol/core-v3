@@ -5,9 +5,9 @@ pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/utils/Create2.sol";
 
-import {CreditManagerV3} from "../credit/CreditManagerV3.sol";
-import {CreditFacadeV3} from "../credit/CreditFacadeV3.sol";
-import {CreditConfiguratorV3, CreditManagerOpts} from "../credit/CreditConfiguratorV3.sol";
+import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
+import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
+import {CreditConfiguratorV3, CreditManagerOpts} from "../../credit/CreditConfiguratorV3.sol";
 
 /// @title CreditManagerFactory
 /// @notice Deploys 3 core interdependent contracts: CreditManage, CreditFacadeV3 and CredigConfigurator

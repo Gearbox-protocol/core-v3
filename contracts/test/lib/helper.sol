@@ -142,8 +142,8 @@ contract TestHelper is Test {
         assertEq(cdd1.enabledTokensMask, cdd2.enabledTokensMask, string.concat(reason, "\nIncorrect enabledTokensMask"));
         assertEq(cdd1.quotedTokensMask, cdd2.quotedTokensMask, string.concat(reason, "\nIncorrect quotedTokensMask"));
         assertEq(cdd1.quotedTokens, cdd2.quotedTokens, string.concat(reason, "\nIncorrect quotedTokens"));
-        assertEq(cdd1.quotedLts, cdd2.quotedLts, string.concat(reason, "\nIncorrect quotedLts"));
-        assertEq(cdd1.quotas, cdd2.quotas, string.concat(reason, "\nIncorrect quotas"));
+        // assertEq(cdd1.quotedLts, cdd2.quotedLts, string.concat(reason, "\nIncorrect quotedLts"));
+        // assertEq(cdd1.quotas, cdd2.quotas, string.concat(reason, "\nIncorrect quotas"));
         assertEq(cdd1._poolQuotaKeeper, cdd2._poolQuotaKeeper, string.concat(reason, "\nIncorrect _poolQuotaKeeper"));
     }
 
@@ -161,8 +161,8 @@ contract TestHelper is Test {
         dst.enabledTokensMask = src.enabledTokensMask;
         dst.quotedTokensMask = src.quotedTokensMask;
         dst.quotedTokens = src.quotedTokens;
-        dst.quotedLts = src.quotedLts;
-        dst.quotas = src.quotas;
+        // dst.quotedLts = src.quotedLts;
+        // dst.quotas = src.quotas;
         dst._poolQuotaKeeper = src._poolQuotaKeeper;
     }
 

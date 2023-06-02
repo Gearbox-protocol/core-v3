@@ -148,7 +148,6 @@ contract BotListTest is Test, IBotListV3Events {
             weeklyFundingAllowance: uint72(1 ether / 10)
         });
 
-
         vm.prank(CONFIGURATOR);
         botList.setBotForbiddenStatus(address(bot), false);
 

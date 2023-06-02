@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: UNLICENSED
-// Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Holdings, 2023
+// // SPDX-License-Identifier: UNLICENSED
+// // Gearbox Protocol. Generalized leverage for DeFi protocols
+// // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -434,14 +434,13 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
 
             uint256 underlyingPriceRAY = RAY * prices[Tokens.DAI];
 
-            CollateralDebtData memory collateralDebtData;
-
-            collateralDebtData = setQuotas(collateralDebtData, _case.quotas);
+            (address[] memory quotedTokens, uint256[] memory quotasPacked) = getQuotas(_case.quotas);
 
             startSession();
 
             (uint256 totalValueUSD, uint256 twvUSD) = CollateralLogic.calcQuotedTokensCollateral({
-                collateralDebtData: collateralDebtData,
+                quotedTokens: quotedTokens,
+                quotasPacked: quotasPacked,
                 creditAccount: creditAccount,
                 underlyingPriceRAY: underlyingPriceRAY,
                 limit: _case.limit,
@@ -610,16 +609,21 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
             collateralDebtData.enabledTokensMask = _case.enabledTokensMask;
             collateralDebtData.quotedTokensMask = _case.quotedTokensMask;
 
-            collateralDebtData = setQuotas(collateralDebtData, _case.quotas);
+            uint256[] memory quotasPacked;
+            (collateralDebtData.quotedTokens, quotasPacked) = getQuotas(_case.quotas);
 
             startSession();
+
+            uint256 limit = _case.lazy
+                ? collateralDebtData.totalDebtUSD * _case.minHealthFactor / PERCENTAGE_FACTOR
+                : type(uint256).max;
 
             (uint256 totalValueUSD, uint256 twvUSD, uint256 tokensToDisable) = CollateralLogic.calcCollateral({
                 collateralDebtData: collateralDebtData,
                 creditAccount: creditAccount,
                 underlying: addressOf[Tokens.DAI],
-                lazy: _case.lazy,
-                minHealthFactor: _case.minHealthFactor,
+                quotasPacked: quotasPacked,
+                limit: limit,
                 collateralHints: _case.collateralHints,
                 convertToUSDFn: _convertToUSD,
                 collateralTokenByMaskFn: _collateralTokenByMask,
