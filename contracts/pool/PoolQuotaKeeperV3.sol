@@ -110,6 +110,25 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             bool disableToken
         )
     {
+        (caQuotaInterestChange, tradingFees, realQuotaChange, enableToken, disableToken) =
+            _updateQuota(creditAccount, token, quotaChange, minQuota, maxQuota);
+
+        if (realQuotaChange != 0) {
+            emit UpdateQuota({creditAccount: creditAccount, token: token, realQuotaChange: realQuotaChange});
+        }
+    }
+
+    /// @dev IMPLEMENTATION: updateQuota
+    function _updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota, uint96 maxQuota)
+        internal
+        returns (
+            uint128 caQuotaInterestChange,
+            uint128 tradingFees,
+            int96 realQuotaChange,
+            bool enableToken,
+            bool disableToken
+        )
+    {
         AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
         TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
 
@@ -229,6 +248,8 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
                 /// Decreases the total token quota by the account's quota
                 tokenQuotaParams.totalQuoted = totalQuoted - quoted; // U: [PQK-16]
+
+                emit RemoveQuota({creditAccount: creditAccount, token: token});
             }
 
             // Sets account quota to zero

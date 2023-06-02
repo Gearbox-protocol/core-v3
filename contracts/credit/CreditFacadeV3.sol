@@ -958,8 +958,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             minQuota: minQuota,
             maxQuota: uint96(Math.min(type(uint96).max, maxQuotaMultiplier * debtLimits.maxDebt))
         }); // U:[FA-34]
-
-        emit UpdateQuota({creditAccount: creditAccount, token: token, quotaChange: realQuotaChange}); // U:[FA-34]
     }
 
     /// @notice Requests the Credit Manager to schedule a withdrawal

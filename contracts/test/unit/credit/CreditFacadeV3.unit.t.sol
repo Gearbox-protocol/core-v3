@@ -1795,9 +1795,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             )
         );
 
-        vm.expectEmit(true, true, false, false);
-        emit UpdateQuota(creditAccount, link, change);
-
         FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
             creditAccount: creditAccount,
             calls: MultiCallBuilder.build(

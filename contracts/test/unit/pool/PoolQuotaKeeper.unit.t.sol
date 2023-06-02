@@ -564,6 +564,11 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 }
             }
 
+            if (_case.expectedRealQuotaChange != 0) {
+                vm.expectEmit(true, true, false, false);
+                emit UpdateQuota(creditAccount, token, _case.expectedRealQuotaChange);
+            }
+
             vm.prank(address(creditManagerMock));
             (
                 uint128 caQuotaInterestChange,
@@ -699,6 +704,16 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 vm.expectCall(
                     address(poolMock), abi.encodeCall(IPoolV3.updateQuotaRevenue, (cases[i].expectedRevenueChange))
                 );
+            }
+
+            if (cases[i].token1Quota > 1) {
+                vm.expectEmit(true, true, false, false);
+                emit RemoveQuota(creditAccount, token1);
+            }
+
+            if (cases[i].token2Quota > 1) {
+                vm.expectEmit(true, true, false, false);
+                emit RemoveQuota(creditAccount, token2);
             }
 
             vm.prank(address(creditManagerMock));

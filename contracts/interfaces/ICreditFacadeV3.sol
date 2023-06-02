@@ -68,9 +68,6 @@ interface ICreditFacadeV3Events {
     /// @dev Emits when the account owner add new collateral to a CA
     event AddCollateral(address indexed creditAccount, address indexed token, uint256 value);
 
-    /// @dev Emits when the quota updated
-    event UpdateQuota(address indexed creditAccount, address indexed token, int96 quotaChange);
-
     /// @dev Emits when a multicall is started
     event StartMultiCall(address indexed creditAccount);
 
