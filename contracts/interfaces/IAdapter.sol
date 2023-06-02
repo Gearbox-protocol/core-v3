@@ -7,18 +7,13 @@ import {AdapterType} from "@gearbox-protocol/integration-types/contracts/Adapter
 
 /// @title Adapter interface
 interface IAdapter {
-    /// @notice Credit manager the adapter is connected to
     function creditManager() external view returns (address);
 
-    /// @notice Address of the contract the adapter is interacting with
-    function targetContract() external view returns (address);
-
-    /// @notice Address provider contract
     function addressProvider() external view returns (address);
 
-    /// @notice Adapter type
+    function targetContract() external view returns (address);
+
     function _gearboxAdapterType() external pure returns (AdapterType);
 
-    /// @notice Adapter version
     function _gearboxAdapterVersion() external pure returns (uint16);
 }
