@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {Tokens} from "../../config/Tokens.sol";
 import {TokensData, TestToken} from "../../config/TokensData.sol";
-
+import {CollateralLogic} from "../../../libraries/CollateralLogic.sol";
 import {CollateralDebtData} from "../../../interfaces/ICreditManagerV3.sol";
 
 import "../../lib/constants.sol";
@@ -198,24 +198,20 @@ contract CollateralLogicHelper is Test, TokensData {
         }
     }
 
-    function setQuotas(CollateralDebtData memory collateralDebtData, Q[] memory quotas)
+    function getQuotas(Q[] memory quotas)
         internal
         view
-        returns (CollateralDebtData memory)
+        returns (address[] memory quotedTokens, uint256[] memory quotasPacked)
     {
         uint256 len = quotas.length;
 
-        collateralDebtData.quotedTokens = new address[](len);
-        collateralDebtData.quotas = new uint256[](len);
-        collateralDebtData.quotedLts = new uint16[](len);
+        quotedTokens = new address[](len);
+        quotasPacked = new uint256[](len);
 
         for (uint256 i; i < len; ++i) {
-            collateralDebtData.quotedTokens[i] = addressOf[quotas[i].t];
-            collateralDebtData.quotas[i] = quotas[i].quota;
-            collateralDebtData.quotedLts[i] = lts[quotas[i].t];
+            quotedTokens[i] = addressOf[quotas[i].t];
+            quotasPacked[i] = CollateralLogic.packQuota(uint96(quotas[i].quota), lts[quotas[i].t]);
         }
-
-        return collateralDebtData;
     }
 
     ///

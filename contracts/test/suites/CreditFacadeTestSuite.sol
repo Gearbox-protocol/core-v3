@@ -8,7 +8,7 @@ import {CreditConfiguratorV3} from "../../credit/CreditConfiguratorV3.sol";
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
-import {CreditManagerFactory} from "../../factories/CreditManagerFactory.sol";
+import {CreditManagerFactory} from "./CreditManagerFactory.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 

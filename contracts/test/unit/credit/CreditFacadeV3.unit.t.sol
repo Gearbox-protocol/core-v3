@@ -497,7 +497,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         emit OpenCreditAccount(expectedCreditAccount, FRIEND, USER, debt, REFERRAL_CODE);
 
         vm.expectEmit(true, true, false, false);
-        emit StartMultiCall(expectedCreditAccount);
+        emit StartMultiCall({creditAccount: expectedCreditAccount, caller: USER});
 
         vm.expectEmit(true, false, false, false);
         emit FinishMultiCall();
@@ -570,8 +570,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             enabledTokensMask: enabledTokensMask,
             quotedTokensMask: 0,
             quotedTokens: new address[](0),
-            quotedLts: new uint16[](0),
-            quotas: new uint256[](0),
+            // quotedLts: new uint16[](0),
+            // quotas: new uint256[](0),
             _poolQuotaKeeper: address(0)
         });
 
@@ -1105,7 +1105,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             );
 
             vm.expectEmit(true, true, false, false);
-            emit StartMultiCall(creditAccount);
+            emit StartMultiCall({creditAccount: creditAccount, caller: botMulticallCase ? address(this) : USER});
 
             vm.expectEmit(true, false, false, false);
             emit FinishMultiCall();
@@ -1302,7 +1302,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             );
 
             if (testCase == 1) {
-                vm.expectRevert(abi.encodeWithSelector(BalanceLessThanMinimumDesiredException.selector, (link)));
+                vm.expectRevert(BalanceLessThanMinimumDesiredException.selector);
             }
 
             if (testCase == 2) {

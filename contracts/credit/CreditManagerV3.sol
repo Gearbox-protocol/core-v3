@@ -48,15 +48,13 @@ import {
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
+import "forge-std/console.sol";
 
 /// @title Credit Manager
 /// @dev Encapsulates the business logic for managing Credit Accounts
-///
-/// More info: https://dev.gearbox.fi/developers/credit/credit_manager
 contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using BitMask for uint256;
-    using CreditLogic for CollateralTokenData;
     using CreditLogic for CollateralDebtData;
     using CollateralLogic for CollateralDebtData;
     using SafeERC20 for IERC20;
@@ -250,14 +248,24 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         newCreditAccountInfo.debt = debt; // U:[CM-6]
         newCreditAccountInfo.cumulativeIndexLastUpdate = _poolCumulativeIndexNow(); // U:[CM-6]
-        newCreditAccountInfo.since = uint64(block.number); // U:[CM-6]
-        newCreditAccountInfo.flags = 0; // U:[CM-6]
-        newCreditAccountInfo.borrower = onBehalfOf; // U:[CM-6]
+
+        // newCreditAccountInfo.since = uint64(block.number); // U:[CM-6]
+        // newCreditAccountInfo.flags = 0; // U:[CM-6]
+        // newCreditAccountInfo.borrower = onBehalfOf; // U:[CM-6]
+        assembly {
+            let slot := add(newCreditAccountInfo.slot, 4)
+            let value := or(shl(80, onBehalfOf), shl(16, number()))
+            sstore(slot, value)
+        }
 
         if (supportsQuotas) {
-            newCreditAccountInfo.cumulativeQuotaInterest = 1;
-            newCreditAccountInfo.quotaProfits = 0;
-        } // U:[CM-6]
+            //     newCreditAccountInfo.cumulativeQuotaInterest = 1;
+            //     newCreditAccountInfo.quotaProfits = 0;
+            assembly {
+                let slot := add(newCreditAccountInfo.slot, 2)
+                sstore(slot, 1)
+            } // U:[CM-6]
+        }
 
         // Requests the pool to transfer tokens the Credit Account
         _poolLendCreditAccount(debt, creditAccount); // U:[CM-6]
@@ -310,10 +318,18 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         // Checks that the Credit Account exists for the borrower
         address borrower = getBorrowerOrRevert(creditAccount); // U:[CM-7]
 
-        if (creditAccountInfo[creditAccount].since == block.number) revert OpenCloseAccountInOneBlockException();
+        {
+            CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
 
-        // Sets borrower's Credit Account to zero address
-        delete creditAccountInfo[creditAccount].borrower; // U:[CM-8]
+            if (currentCreditAccountInfo.since == block.number) revert OpenCloseAccountInOneBlockException();
+
+            // Sets borrower's Credit Account to zero address
+            // delete creditAccountInfo[creditAccount].borrower; // U:[CM-8]
+            assembly {
+                let slot := add(currentCreditAccountInfo.slot, 4)
+                sstore(slot, 0)
+            }
+        }
 
         uint256 amountToPool;
         uint256 profit;
@@ -792,14 +808,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         /// during quota interest computation and can be later reused to compute quota token collateral
         collateralDebtData.enabledTokensMask = enabledTokensMask; // U:[CM-21]
 
+        // uint16[] memory quotaLts;
+        uint256[] memory quotasPacked;
         if (supportsQuotas) {
             collateralDebtData._poolQuotaKeeper = poolQuotaKeeper(); // U:[CM-21]
 
             (
                 collateralDebtData.quotedTokens,
                 collateralDebtData.cumulativeQuotaInterest,
-                collateralDebtData.quotas,
-                collateralDebtData.quotedLts,
+                quotasPacked,
                 collateralDebtData.quotedTokensMask
             ) = _getQuotedTokensData({
                 creditAccount: creditAccount,
@@ -839,13 +856,21 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         /// The logic for computing collateral is isolated into the `CreditLogic` library. See `CreditLogic.calcCollateral` for details.
         uint256 tokensToDisable;
+
+        /// Target is a TWV threshold at which lazy computation stops. Normally, it happens when TWV
+        /// exceeds the total debt, but the user can also configure a custom HF threshold (above 1),
+        /// in order to maintain a desired level of position health
+        uint256 target = (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY)
+            ? collateralDebtData.totalDebtUSD * minHealthFactor / PERCENTAGE_FACTOR
+            : type(uint256).max;
+
         (collateralDebtData.totalValueUSD, collateralDebtData.twvUSD, tokensToDisable) = collateralDebtData
             .calcCollateral({
             creditAccount: creditAccount,
             underlying: underlying,
-            lazy: task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY,
-            minHealthFactor: minHealthFactor,
+            twvUSDTarget: target,
             collateralHints: collateralHints,
+            quotasPacked: quotasPacked,
             priceOracle: _priceOracle,
             collateralTokenByMaskFn: _collateralTokenByMask,
             convertToUSDFn: _convertToUSD
@@ -880,8 +905,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param _poolQuotaKeeper The PoolQuotaKeeper contract storing the quota and quota interest data
     /// @return quotaTokens An array of address of quoted tokens on the Credit Account
     /// @return outstandingQuotaInterest Quota interest that has not been saved in the Credit Manager
-    /// @return quotas Current quotas on quoted tokens, in the same order as quoted tokens
-    /// @return lts Current lts of quoted tokens, in the same order as quoted tokens
+    /// @return quotasPacked Current quotas on quoted tokens packet with their lts
     /// @return _quotedTokensMask The mask of enabled quoted tokens on the account
     function _getQuotedTokensData(
         address creditAccount,
@@ -894,12 +918,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (
             address[] memory quotaTokens,
             uint128 outstandingQuotaInterest,
-            uint256[] memory quotas,
-            uint16[] memory lts,
+            uint256[] memory quotasPacked,
             uint256 _quotedTokensMask
         )
     {
-        uint256 _maxEnabledTokens = maxEnabledTokens; // U:[CM-24]
         _quotedTokensMask = quotedTokensMask; // U:[CM-24]
 
         uint256 tokensToCheckMask = enabledTokensMask & _quotedTokensMask; // U:[CM-24]
@@ -907,9 +929,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         // If there are not quoted tokens on the account, then zero-length arrays are returned
         // This is desirable, as it makes it simple to check whether there are any quoted tokens
         if (tokensToCheckMask != 0) {
-            quotaTokens = new address[](_maxEnabledTokens); // U:[CM-24]
-            quotas = new uint256[](_maxEnabledTokens); // U:[CM-24]
-            lts = new uint16[](_maxEnabledTokens); // U:[CM-24]
+            uint256 tokensToCheckLen = tokensToCheckMask.calcEnabledTokens(); // U:[CM-24]
+            quotaTokens = new address[](tokensToCheckLen); // U:[CM-24]
+            quotasPacked = new uint256[](tokensToCheckLen); // U:[CM-24]
 
             uint256 j;
 
@@ -924,18 +946,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     tokenMask = (i < len) ? collateralHints[i] : 1 << (i - len);
 
                     if (tokensToCheckMask & tokenMask != 0) {
-                        if (j == _maxEnabledTokens) {
-                            revert TooManyEnabledTokensException(); // U:[CM-24]
-                        }
+                        (address token, uint16 lt) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
 
-                        address token; // U:[CM-24]
-                        (token, lts[j]) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
+                        (uint256 quota, uint128 outstandingInterestDelta) =
+                            IPoolQuotaKeeperV3(_poolQuotaKeeper).getQuotaAndOutstandingInterest(ca, token); // U:[CM-24]
 
                         quotaTokens[j] = token; // U:[CM-24]
-
-                        uint128 outstandingInterestDelta;
-                        (quotas[j], outstandingInterestDelta) =
-                            IPoolQuotaKeeperV3(_poolQuotaKeeper).getQuotaAndOutstandingInterest(ca, token); // U:[CM-24]
+                        quotasPacked[j] = CollateralLogic.packQuota(uint96(quota), lt);
 
                         /// Quota interest is equal to quota * APY * time. Since quota is a uint96, this is unlikely to overflow in any realistic scenario.
                         outstandingQuotaInterest += outstandingInterestDelta; // U:[CM-24]
@@ -987,10 +1004,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             tokensToDisable = getTokenMaskOrRevert(token); // U:[CM-25]
         }
 
-        creditAccountInfo[creditAccount].cumulativeQuotaInterest += caInterestChange; // U:[CM-25] // I: [CMQ-3]
+        CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
+
+        currentCreditAccountInfo.cumulativeQuotaInterest += caInterestChange; // U:[CM-25] // I: [CMQ-3]
 
         if (tradingFees != 0) {
-            creditAccountInfo[creditAccount].quotaProfits += tradingFees;
+            currentCreditAccountInfo.quotaProfits += tradingFees;
         }
     }
 
@@ -1214,12 +1233,38 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             liquidationThreshold = ltUnderlying; // U:[CM-35]
         } else {
             CollateralTokenData storage tokenData = collateralTokensData[tokenMask]; // U:[CM-34]
-            token = tokenData.getTokenOrRevert(); // U:[CM-34]
+
+            bytes32 rawData;
+            assembly {
+                rawData := sload(tokenData.slot)
+                token := and(rawData, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF) // U:[CM-34]
+            }
+
+            if (token == address(0)) {
+                revert TokenNotAllowedException(); // U:[CM-34]
+            }
 
             if (calcLT) {
+                uint16 ltInitial;
+                uint16 ltFinal;
+                uint40 timestampRampStart;
+                uint24 rampDuration;
+
+                assembly {
+                    ltInitial := and(shr(160, rawData), 0xFFFF)
+                    ltFinal := and(shr(176, rawData), 0xFFFF)
+                    timestampRampStart := and(shr(192, rawData), 0xFFFFFFFFFF)
+                    rampDuration := and(shr(232, rawData), 0xFFFFFF)
+                }
+
                 // The logic to calculate a ramping LT is isolated to the `CreditLogic` library.
                 // See `CreditLogic.getLiquidationThreshold()` for details.
-                liquidationThreshold = tokenData.getLiquidationThreshold(); // U:[CM-42]
+                liquidationThreshold = CreditLogic.getLiquidationThreshold({
+                    ltInitial: ltInitial,
+                    ltFinal: ltFinal,
+                    timestampRampStart: timestampRampStart,
+                    rampDuration: rampDuration
+                }); // U:[CM-42]
             }
         }
     }

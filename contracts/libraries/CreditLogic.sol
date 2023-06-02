@@ -136,16 +136,6 @@ library CreditLogic {
     // TOKEN AND LT
     //
 
-    /// @dev Returns the token from tokenData or reverts, if there is none
-    /// @dev Isolated into a separate function to avoid repeated code in CreditManager
-    function getTokenOrRevert(CollateralTokenData storage tokenData) internal view returns (address token) {
-        token = tokenData.token;
-
-        if (token == address(0)) {
-            revert TokenNotAllowedException();
-        }
-    }
-
     /// @dev Returns the current liquidation threshold based on token data
     /// @dev GearboxV3 supports liquidation threshold ramping, which means that the LT
     ///      can be set to change dynamically from one value to another over a period
@@ -153,19 +143,20 @@ library CreditLogic {
     ///      and ending at ltFinal at ramping period end. In case a static LT value is set,
     ///      it is written to ltInitial and ramping start is set to far future, which results
     ///      in the same LT value always being returned
-    function getLiquidationThreshold(CollateralTokenData storage tokenData) internal view returns (uint16) {
-        if (block.timestamp < tokenData.timestampRampStart) {
-            return tokenData.ltInitial; // U:[CL-05]
+    function getLiquidationThreshold(uint16 ltInitial, uint16 ltFinal, uint40 timestampRampStart, uint24 rampDuration)
+        internal
+        view
+        returns (uint16)
+    {
+        if (block.timestamp < timestampRampStart) {
+            return ltInitial; // U:[CL-05]
         }
-        if (block.timestamp < tokenData.timestampRampStart + tokenData.rampDuration) {
+        if (block.timestamp < timestampRampStart + rampDuration) {
             return _getRampingLiquidationThreshold(
-                tokenData.ltInitial,
-                tokenData.ltFinal,
-                tokenData.timestampRampStart,
-                tokenData.timestampRampStart + tokenData.rampDuration
+                ltInitial, ltFinal, timestampRampStart, timestampRampStart + rampDuration
             ); // U:[CL-05]
         }
-        return tokenData.ltFinal; // U:[CL-05]
+        return ltFinal; // U:[CL-05]
     }
 
     /// @dev Computes the LT in the middle of a ramp

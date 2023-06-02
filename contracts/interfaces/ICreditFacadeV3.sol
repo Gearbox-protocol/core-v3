@@ -69,7 +69,7 @@ interface ICreditFacadeV3Events {
     event AddCollateral(address indexed creditAccount, address indexed token, uint256 value);
 
     /// @dev Emits when a multicall is started
-    event StartMultiCall(address indexed creditAccount);
+    event StartMultiCall(address indexed creditAccount, address indexed caller);
 
     /// @dev Emits when a call to an external contract is made through the Credit Manager
     event Execute(address indexed creditAccount, address indexed targetContract);

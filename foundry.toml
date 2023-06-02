@@ -3,7 +3,7 @@ libs = ['lib']
 out = 'forge-out'
 solc_version = '0.8.17'
 src = 'contracts'
-optimizer_runs = 2000
+optimizer_runs = 5000
 
 # See more config options https://github.com/gakonst/foundry/tree/master/config
 block_number = 120000 

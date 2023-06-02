@@ -9,9 +9,6 @@ import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.so
 import {BalancesLogic, BalanceWithMask} from "../../../libraries/BalancesLogic.sol";
 import {BitMask} from "../../../libraries/BitMask.sol";
 import {TestHelper} from "../../lib/helper.sol";
-import {BalancesLogicCaller} from "./BalancesLogicCaller.sol";
-
-import {BalanceLessThanMinimumDesiredException, ForbiddenTokensException} from "../../../interfaces/IExceptions.sol";
 
 /// @title BalancesLogic test
 /// @notice [BM]: Unit tests for BalancesLogic
@@ -67,36 +64,23 @@ contract BalancesLogicTest is TestHelper {
     ) public {
         vm.assume(length <= 16);
 
-        BalancesLogicCaller caller = new BalancesLogicCaller();
-
         _setupTokenBalances(balances, length);
 
-        bool expectRevert;
-        address exceptionToken;
-
+        bool expectedResult = true;
         for (uint256 i = 0; i < length; ++i) {
             if (expectedBalances[i] > balances[i]) {
-                expectRevert = true;
-                exceptionToken = tokens[i];
+                expectedResult = false;
                 break;
             }
         }
 
         Balance[] memory expectedArray = new Balance[](length);
-
         for (uint256 i = 0; i < length; ++i) {
             expectedArray[i] = Balance({token: tokens[i], balance: expectedBalances[i]});
         }
 
-        if (expectRevert) {
-            vm.expectRevert(abi.encodeWithSelector(BalanceLessThanMinimumDesiredException.selector, exceptionToken));
-        }
-
-        caller.compareBalances(creditAccount, expectedArray);
-    }
-
-    function _getTokenByMask(uint256 mask) internal view returns (address) {
-        return tokens[maskToIndex[mask]];
+        bool result = BalancesLogic.compareBalances(creditAccount, expectedArray);
+        assertEq(result, expectedResult, "Incorrect result");
     }
 
     /// @notice U:[BLL-3]: storeForbiddenBalances works correctly
@@ -128,42 +112,6 @@ contract BalancesLogicTest is TestHelper {
         }
     }
 
-    //     /// @dev Checks that no new forbidden tokens were enabled and that balances of existing forbidden tokens
-    // ///      were not increased
-    // /// @param creditAccount Credit Account to check
-    // /// @param enabledTokensMaskBefore Mask of enabled tokens on the account before operations
-    // /// @param enabledTokensMaskAfter Mask of enabled tokens on the account after operations
-    // /// @param forbiddenBalances Array of balances of forbidden tokens (received from `storeForbiddenBalances`)
-    // /// @param forbiddenTokenMask Mask of forbidden tokens
-    // function checkForbiddenBalances(
-    //     address creditAccount,
-    //     uint256 enabledTokensMaskBefore,
-    //     uint256 enabledTokensMaskAfter,
-    //     BalanceWithMask[] memory forbiddenBalances,
-    //     uint256 forbiddenTokenMask
-    // ) internal view {
-    //     uint256 forbiddenTokensOnAccount = enabledTokensMaskAfter & forbiddenTokenMask;
-    //     if (forbiddenTokensOnAccount == 0) return;
-
-    //     /// A diff between the forbidden tokens before and after is computed
-    //     /// If there are forbidden tokens enabled during operations, the function would revert
-    //     uint256 forbiddenTokensOnAccountBefore = enabledTokensMaskBefore & forbiddenTokenMask;
-    //     if (forbiddenTokensOnAccount & ~forbiddenTokensOnAccountBefore != 0) revert ForbiddenTokensException();
-
-    //     /// Then, the function checks that any remaining forbidden tokens didn't have their balances increased
-    //     unchecked {
-    //         uint256 len = forbiddenBalances.length;
-    //         for (uint256 i = 0; i < len; ++i) {
-    //             if (forbiddenTokensOnAccount & forbiddenBalances[i].tokenMask != 0) {
-    //                 uint256 currentBalance = IERC20Helper.balanceOf(forbiddenBalances[i].token, creditAccount);
-    //                 if (currentBalance > forbiddenBalances[i].balance) {
-    //                     revert ForbiddenTokensException();
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
     /// @notice U:[BLL-4]: checkForbiddenBalances works correctly
     function test_BLL_04_storeForbiddenBalances_works_correctly(
         uint128[16] calldata balancesBefore,
@@ -176,8 +124,6 @@ contract BalancesLogicTest is TestHelper {
         enabledTokensMaskAfter %= (2 ** 16);
         forbiddenTokensMask %= (2 ** 16);
 
-        BalancesLogicCaller caller = new BalancesLogicCaller();
-
         _setupTokenBalances(balancesBefore, 16);
 
         BalanceWithMask[] memory forbiddenBalances = BalancesLogic.storeForbiddenBalances(
@@ -186,25 +132,25 @@ contract BalancesLogicTest is TestHelper {
 
         _setupTokenBalances(balancesAfter, 16);
 
-        bool shouldRevert;
-
-        if ((enabledTokensMaskAfter & ~enabledTokensMaskBefore) & forbiddenTokensMask > 0) shouldRevert = true;
+        bool expectedResult = true;
+        if ((enabledTokensMaskAfter & ~enabledTokensMaskBefore) & forbiddenTokensMask > 0) expectedResult = false;
 
         for (uint256 i = 0; i < 16; ++i) {
             uint256 tokenMask = 1 << i;
             if ((enabledTokensMaskAfter & forbiddenTokensMask & tokenMask > 0) && balancesAfter[i] > balancesBefore[i])
             {
-                shouldRevert = true;
+                expectedResult = false;
                 break;
             }
         }
 
-        if (shouldRevert) {
-            vm.expectRevert(ForbiddenTokensException.selector);
-        }
-
-        caller.checkForbiddenBalances(
+        bool result = BalancesLogic.checkForbiddenBalances(
             creditAccount, enabledTokensMaskBefore, enabledTokensMaskAfter, forbiddenBalances, forbiddenTokensMask
         );
+        assertEq(result, expectedResult, "Incorrect result");
+    }
+
+    function _getTokenByMask(uint256 mask) internal view returns (address) {
+        return tokens[maskToIndex[mask]];
     }
 }

@@ -9,6 +9,7 @@ import {PERCENTAGE_FACTOR, RAY} from "@gearbox-protocol/core-v2/contracts/librar
 
 import {BitMask} from "./BitMask.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import "forge-std/console.sol";
 
 /// @title Collateral logic Library
 /// @dev Implements functions that compute value of collateral on a Credit Account
@@ -21,8 +22,7 @@ library CollateralLogic {
     ///                           DEBT_ONLY task or higher
     /// @param creditAccount Credit Account to compute collateral for
     /// @param underlying The underlying token of the corresponding Credit Manager
-    /// @param lazy Whether to stop computing collateral on reaching the minimal HF threshold
-    /// @param minHealthFactor The minimal health factor to reach before stopping (if lazy)
+    /// @param twvUSDTarget Target twvUSD value to stop calculation after (`type(uint256).max` to perform full calculation)
     /// @param collateralHints Array of token masks denoting the order to check collateral in.
     ///                        Note that this is only used for non-quoted tokens
     /// @param collateralTokenByMaskFn A function to return collateral token data by its mask. Must accept inputs:
@@ -40,18 +40,13 @@ library CollateralLogic {
         CollateralDebtData memory collateralDebtData,
         address creditAccount,
         address underlying,
-        bool lazy,
-        uint16 minHealthFactor,
+        uint256 twvUSDTarget,
         uint256[] memory collateralHints,
+        uint256[] memory quotasPacked,
         function (uint256, bool) view returns (address, uint16) collateralTokenByMaskFn,
         function (address, uint256, address) view returns(uint256) convertToUSDFn,
         address priceOracle
     ) internal view returns (uint256 totalValueUSD, uint256 twvUSD, uint256 tokensToDisable) {
-        /// The limit is a TWV threshold at which lazy computation stops. Normally, it happens when TWV
-        /// exceeds the total debt, but the user can also configure a custom HF threshold (above 1),
-        /// in order to maintain a desired level of position health
-        uint256 limit = lazy ? collateralDebtData.totalDebtUSD * minHealthFactor / PERCENTAGE_FACTOR : type(uint256).max;
-
         //
         // QUOTED TOKENS COMPUTATION
         //
@@ -60,19 +55,20 @@ library CollateralLogic {
             uint256 underlyingPriceRAY = convertToUSDFn(priceOracle, RAY, underlying);
 
             (totalValueUSD, twvUSD) = calcQuotedTokensCollateral({
-                collateralDebtData: collateralDebtData,
+                quotedTokens: collateralDebtData.quotedTokens,
+                quotasPacked: quotasPacked,
                 creditAccount: creditAccount,
                 underlyingPriceRAY: underlyingPriceRAY,
-                limit: limit,
+                twvUSDTarget: twvUSDTarget,
                 convertToUSDFn: convertToUSDFn,
                 priceOracle: priceOracle
             }); // U:[CLL-5]
 
-            if (twvUSD >= limit) {
+            if (twvUSD >= twvUSDTarget) {
                 return (totalValueUSD, twvUSD, 0); // U:[CLL-5]
             } else {
                 unchecked {
-                    limit -= twvUSD; // U:[CLL-5]
+                    twvUSDTarget -= twvUSD; // U:[CLL-5]
                 }
             }
         }
@@ -91,7 +87,7 @@ library CollateralLogic {
                 tokensToCheckMask: tokensToCheckMask,
                 priceOracle: priceOracle,
                 creditAccount: creditAccount,
-                limit: limit,
+                twvUSDTarget: twvUSDTarget,
                 collateralHints: collateralHints,
                 collateralTokenByMaskFn: collateralTokenByMaskFn,
                 convertToUSDFn: convertToUSDFn
@@ -103,11 +99,11 @@ library CollateralLogic {
     }
 
     /// @dev Computes USD value of quoted tokens an a Credit Account
-    /// @param collateralDebtData A struct containing information on debt and collateral
+    // @param collateralDebtData A struct containing information on debt and collateral
     ///                           Quota-related data must be filled in for this function to work
     /// @param creditAccount A Credit Account to compute value for
     /// @param underlyingPriceRAY Price of the underlying token, in RAY format
-    /// @param limit TWV threshold to stop computing at
+    /// @param twvUSDTarget Target twvUSD value to stop calculation after (`type(uint256).max` to perform full calculation)
     /// @param convertToUSDFn A function to return collateral value in USD. Must accept inputs:
     ///                       * address priceOracle - price oracle to convert assets in
     ///                       * uint256 amount - amount of token to convert
@@ -116,26 +112,27 @@ library CollateralLogic {
     /// @return totalValueUSD Total value of Credit Account's assets (NB: an underestimated value can be returned if `lazy == true`)
     /// @return twvUSD Total LT-weighted value of Credit Account's assets (NB: an underestimated value can be returned if `lazy == true`)
     function calcQuotedTokensCollateral(
-        CollateralDebtData memory collateralDebtData,
+        address[] memory quotedTokens,
+        uint256[] memory quotasPacked,
         address creditAccount,
         uint256 underlyingPriceRAY,
-        uint256 limit,
+        uint256 twvUSDTarget,
         function (address, uint256, address) view returns(uint256) convertToUSDFn,
         address priceOracle
     ) internal view returns (uint256 totalValueUSD, uint256 twvUSD) {
-        uint256 len = collateralDebtData.quotedTokens.length; // U:[CLL-4]
+        uint256 len = quotedTokens.length; // U:[CLL-4]
 
         for (uint256 i; i < len;) {
-            address token = collateralDebtData.quotedTokens[i]; // U:[CLL-4]
+            address token = quotedTokens[i]; // U:[CLL-4]
             /// The quoted token array is either 0-length (in which case this function is not entered),
             /// or has length of maxEnabledTokens. Therefore, encountering address(0) means that all
             /// quoted tokens have been processed
             if (token == address(0)) break; // U:[CLL-4]
             {
-                uint16 liquidationThreshold = collateralDebtData.quotedLts[i]; // U:[CLL-4]
+                (uint256 quota, uint16 liquidationThreshold) = unpackQuota(quotasPacked[i]); // U:[CLL-4]
                 /// Since Chainlink oracles always price token amounts linearly, the price only
                 /// needs to be queried once, and then quota values can be computed locally
-                uint256 quotaUSD = collateralDebtData.quotas[i] * underlyingPriceRAY / RAY; // U:[CLL-4]
+                uint256 quotaUSD = quota * underlyingPriceRAY / RAY; // U:[CLL-4]
 
                 (uint256 valueUSD, uint256 weightedValueUSD,) = calcOneTokenCollateral({
                     priceOracle: priceOracle,
@@ -149,7 +146,7 @@ library CollateralLogic {
                 totalValueUSD += valueUSD; // U:[CLL-4]
                 twvUSD += weightedValueUSD; // U:[CLL-4]
             }
-            if (twvUSD >= limit) {
+            if (twvUSD >= twvUSDTarget) {
                 return (totalValueUSD, twvUSD); // U:[CLL-4]
             }
 
@@ -161,7 +158,7 @@ library CollateralLogic {
 
     /// @dev Computes USD value of non-quoted tokens an a Credit Account
     /// @param creditAccount A Credit Account to compute value for
-    /// @param limit TWV threshold to stop computing at
+    /// @param twvUSDTarget Target twvUSD value to stop calculation after (`type(uint256).max` to perform full calculation)
     /// @param collateralHints Array of token masks denoting the order to check collateral in.
     /// @param convertToUSDFn A function to return collateral value in USD. Must accept inputs:
     ///                       * address priceOracle - price oracle to convert assets in
@@ -178,7 +175,7 @@ library CollateralLogic {
     /// @return tokensToDisable Mask of tokens that have zero balances and need to be disabled
     function calcNonQuotedTokensCollateral(
         address creditAccount,
-        uint256 limit,
+        uint256 twvUSDTarget,
         uint256[] memory collateralHints,
         function (address, uint256, address) view returns(uint256) convertToUSDFn,
         function (uint256, bool) view returns (address, uint16) collateralTokenByMaskFn,
@@ -214,7 +211,7 @@ library CollateralLogic {
                     twvUSD += weightedValueUSD; // U:[CLL-3]
                 }
                 if (nonZero) {
-                    if (twvUSD >= limit) {
+                    if (twvUSD >= twvUSDTarget) {
                         break; // U:[CLL-3]
                     }
                 } else {
@@ -299,5 +296,14 @@ library CollateralLogic {
             weightedValueUSD = Math.min(valueUSD, quotaUSD) * liquidationThreshold / PERCENTAGE_FACTOR; // U:[CLL-1]
             nonZeroBalance = true; // U:[CLL-1]
         }
+    }
+
+    function packQuota(uint96 quota, uint16 lt) internal pure returns (uint256) {
+        return (uint256(lt) << 96) | quota;
+    }
+
+    function unpackQuota(uint256 packedQuota) internal pure returns (uint256 quota, uint16 lt) {
+        lt = uint16(packedQuota >> 96);
+        quota = uint96(packedQuota);
     }
 }

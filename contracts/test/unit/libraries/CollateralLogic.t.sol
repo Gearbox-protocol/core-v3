@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: UNLICENSED
-// Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Holdings, 2023
+// // SPDX-License-Identifier: UNLICENSED
+// // Gearbox Protocol. Generalized leverage for DeFi protocols
+// // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -226,7 +226,7 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
     struct CalcNonQuotedTokenCollateralTestCase {
         string name;
         B[] balances;
-        uint256 limit;
+        uint256 target;
         uint256[] collateralHints;
         uint256 tokensToCheckMask;
         // expected
@@ -240,9 +240,9 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
     function test_U_CLL_03_calcOneNonQuotedCollateral_works_correctly() public withTokenSetup {
         CalcNonQuotedTokenCollateralTestCase[7] memory cases = [
             CalcNonQuotedTokenCollateralTestCase({
-                name: "One token calc, no limit, no hints",
+                name: "One token calc, no target, no hints",
                 balances: arrayOf(B({t: Tokens.DAI, balance: 10_000})),
-                limit: type(uint256).max,
+                target: type(uint256).max,
                 collateralHints: new uint256[](0),
                 tokensToCheckMask: getTokenMask(arrayOf(Tokens.DAI)),
                 expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.DAI],
@@ -251,9 +251,9 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
                 expectedOrder: arrayOf(Tokens.DAI)
             }),
             CalcNonQuotedTokenCollateralTestCase({
-                name: "Two tokens calc, no limit, no hints",
+                name: "Two tokens calc, no target, no hints",
                 balances: arrayOf(B({t: Tokens.DAI, balance: 10_000}), B({t: Tokens.STETH, balance: 100})),
-                limit: type(uint256).max,
+                target: type(uint256).max,
                 collateralHints: new uint256[](0),
                 tokensToCheckMask: getTokenMask(arrayOf(Tokens.DAI, Tokens.STETH)),
                 expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.DAI] + (100 - 1) * prices[Tokens.STETH],
@@ -265,7 +265,7 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
             CalcNonQuotedTokenCollateralTestCase({
                 name: "Disable tokens with 0 or 1 balance",
                 balances: arrayOf(B({t: Tokens.DAI, balance: 10_000}), B({t: Tokens.STETH, balance: 1})),
-                limit: type(uint256).max,
+                target: type(uint256).max,
                 collateralHints: new uint256[](0),
                 tokensToCheckMask: getTokenMask(arrayOf(Tokens.DAI, Tokens.STETH, Tokens.LINK)),
                 expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.DAI],
@@ -274,9 +274,9 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
                 expectedOrder: arrayOf(Tokens.DAI, Tokens.LINK, Tokens.STETH)
             }),
             CalcNonQuotedTokenCollateralTestCase({
-                name: "Stops on limit",
+                name: "Stops on target",
                 balances: arrayOf(B({t: Tokens.DAI, balance: 10_000}), B({t: Tokens.STETH, balance: 100_000})),
-                limit: (10_000 - 1) * prices[Tokens.DAI] * lts[Tokens.DAI] / PERCENTAGE_FACTOR,
+                target: (10_000 - 1) * prices[Tokens.DAI] * lts[Tokens.DAI] / PERCENTAGE_FACTOR,
                 collateralHints: new uint256[](0),
                 tokensToCheckMask: getTokenMask(arrayOf(Tokens.DAI, Tokens.STETH, Tokens.LINK)),
                 expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.DAI],
@@ -287,7 +287,7 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
             CalcNonQuotedTokenCollateralTestCase({
                 name: "Call tokens by collateral hints order",
                 balances: arrayOf(B({t: Tokens.DAI, balance: 10_000}), B({t: Tokens.STETH, balance: 300})),
-                limit: type(uint256).max,
+                target: type(uint256).max,
                 collateralHints: getHints(arrayOf(Tokens.LINK, Tokens.DAI, Tokens.STETH)),
                 tokensToCheckMask: getTokenMask(arrayOf(Tokens.DAI, Tokens.STETH, Tokens.LINK)),
                 expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.DAI] + (300 - 1) * prices[Tokens.STETH],
@@ -299,7 +299,7 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
             CalcNonQuotedTokenCollateralTestCase({
                 name: "Call tokens by normal order after collateral hints order",
                 balances: arrayOf(B({t: Tokens.DAI, balance: 10_000}), B({t: Tokens.STETH, balance: 300})),
-                limit: type(uint256).max,
+                target: type(uint256).max,
                 collateralHints: getHints(arrayOf(Tokens.LINK, Tokens.STETH)),
                 tokensToCheckMask: getTokenMask(arrayOf(Tokens.DAI, Tokens.STETH, Tokens.LINK)),
                 expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.DAI] + (300 - 1) * prices[Tokens.STETH],
@@ -311,7 +311,7 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
             CalcNonQuotedTokenCollateralTestCase({
                 name: "Do not double count tokens if it's mask added twice to collatreral hints",
                 balances: arrayOf(B({t: Tokens.DAI, balance: 10_000})),
-                limit: type(uint256).max,
+                target: type(uint256).max,
                 collateralHints: getHints(arrayOf(Tokens.DAI, Tokens.DAI)),
                 tokensToCheckMask: getTokenMask(arrayOf(Tokens.DAI)),
                 expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.DAI],
@@ -336,7 +336,7 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
             (uint256 totalValueUSD, uint256 twvUSD, uint256 tokensToDisable) = CollateralLogic
                 .calcNonQuotedTokensCollateral({
                 creditAccount: creditAccount,
-                limit: _case.limit,
+                twvUSDTarget: _case.target,
                 collateralHints: _case.collateralHints,
                 convertToUSDFn: _convertToUSD,
                 collateralTokenByMaskFn: _collateralTokenByMask,
@@ -358,7 +358,7 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
         string name;
         B[] balances;
         Q[] quotas;
-        uint256 limit;
+        uint256 target;
         // expected
         uint256 expectedTotalValueUSD;
         uint256 expectedTwvUSD;
@@ -369,28 +369,28 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
     function test_U_CLL_04_calcQuotedTokensCollateral_works_correctly() public withTokenSetup {
         CalcQuotedTokenCollateralTestCase[5] memory cases = [
             CalcQuotedTokenCollateralTestCase({
-                name: "One token calc, no limit, twv < quota",
+                name: "One token calc, no target, twv < quota",
                 balances: arrayOf(B({t: Tokens.USDT, balance: 10_000})),
                 quotas: arrayOf(Q({t: Tokens.USDT, quota: 10_000})),
-                limit: type(uint256).max,
+                target: type(uint256).max,
                 expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.USDT],
                 expectedTwvUSD: (10_000 - 1) * prices[Tokens.USDT] * lts[Tokens.USDT] / PERCENTAGE_FACTOR,
                 expectedOrder: arrayOf(Tokens.USDT)
             }),
             CalcQuotedTokenCollateralTestCase({
-                name: "One token calc, no limit, twv > quota",
+                name: "One token calc, no target, twv > quota",
                 balances: arrayOf(B({t: Tokens.USDT, balance: 10_000})),
                 quotas: arrayOf(Q({t: Tokens.USDT, quota: 5_000})),
-                limit: type(uint256).max,
+                target: type(uint256).max,
                 expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.USDT],
                 expectedTwvUSD: 5_000 * prices[Tokens.DAI] * lts[Tokens.USDT] / PERCENTAGE_FACTOR,
                 expectedOrder: arrayOf(Tokens.USDT)
             }),
             CalcQuotedTokenCollateralTestCase({
-                name: "Two token calc, no limit, one twv<quota, another twv > quota",
+                name: "Two token calc, no target, one twv<quota, another twv > quota",
                 balances: arrayOf(B({t: Tokens.USDT, balance: 10_000}), B({t: Tokens.LINK, balance: 1_000})),
                 quotas: arrayOf(Q({t: Tokens.USDT, quota: 5_000}), Q({t: Tokens.LINK, quota: 20_000})),
-                limit: type(uint256).max,
+                target: type(uint256).max,
                 expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.USDT] + (1_000 - 1) * prices[Tokens.LINK],
                 expectedTwvUSD: 5_000 * prices[Tokens.DAI] * lts[Tokens.USDT] / PERCENTAGE_FACTOR
                     + (1_000 - 1) * prices[Tokens.LINK] * lts[Tokens.LINK] / PERCENTAGE_FACTOR,
@@ -404,18 +404,18 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
                     Q({t: Tokens.NO_TOKEN, quota: 10_000}),
                     Q({t: Tokens.USDT, quota: 10_000})
                     ),
-                limit: type(uint256).max,
+                target: type(uint256).max,
                 expectedTotalValueUSD: 0,
                 expectedTwvUSD: 0,
                 expectedOrder: arrayOf(Tokens.WETH)
             }),
             CalcQuotedTokenCollateralTestCase({
-                name: "Stops when limit reached",
+                name: "Stops when target reached",
                 balances: arrayOf(B({t: Tokens.USDT, balance: 10_000})),
                 quotas: arrayOf(
                     Q({t: Tokens.USDT, quota: 5_000}), Q({t: Tokens.WETH, quota: 50}), Q({t: Tokens.LINK, quota: 50_000})
                     ),
-                limit: 5_000 * prices[Tokens.DAI] * lts[Tokens.USDT] / PERCENTAGE_FACTOR,
+                target: 5_000 * prices[Tokens.DAI] * lts[Tokens.USDT] / PERCENTAGE_FACTOR,
                 expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.USDT],
                 expectedTwvUSD: 5_000 * prices[Tokens.DAI] * lts[Tokens.USDT] / PERCENTAGE_FACTOR,
                 expectedOrder: arrayOf(Tokens.USDT)
@@ -434,17 +434,16 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
 
             uint256 underlyingPriceRAY = RAY * prices[Tokens.DAI];
 
-            CollateralDebtData memory collateralDebtData;
-
-            collateralDebtData = setQuotas(collateralDebtData, _case.quotas);
+            (address[] memory quotedTokens, uint256[] memory quotasPacked) = getQuotas(_case.quotas);
 
             startSession();
 
             (uint256 totalValueUSD, uint256 twvUSD) = CollateralLogic.calcQuotedTokensCollateral({
-                collateralDebtData: collateralDebtData,
+                quotedTokens: quotedTokens,
+                quotasPacked: quotasPacked,
                 creditAccount: creditAccount,
                 underlyingPriceRAY: underlyingPriceRAY,
-                limit: _case.limit,
+                twvUSDTarget: _case.target,
                 convertToUSDFn: _convertToUSD,
                 priceOracle: PRICE_ORACLE
             });
@@ -484,7 +483,7 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
     function test_U_CLL_05_calcCollateral_works_correctly() public withTokenSetup {
         CalcCollateralTestCase[7] memory cases = [
             CalcCollateralTestCase({
-                name: "One non-quoted token calc, no limit, no hints",
+                name: "One non-quoted token calc, no target, no hints",
                 balances: arrayOf(B({t: Tokens.DAI, balance: 10_000})),
                 quotas: new Q[](0),
                 enabledTokensMask: getTokenMask(arrayOf(Tokens.DAI)),
@@ -499,7 +498,7 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
                 expectedOrder: arrayOf(Tokens.DAI)
             }),
             CalcCollateralTestCase({
-                name: "One quoted token calc, no limit, no hints, value < quota",
+                name: "One quoted token calc, no target, no hints, value < quota",
                 balances: arrayOf(B({t: Tokens.USDT, balance: 10_000})),
                 quotas: arrayOf(Q({t: Tokens.USDT, quota: 10_000})),
                 enabledTokensMask: getTokenMask(arrayOf(Tokens.USDT)),
@@ -514,7 +513,7 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
                 expectedOrder: arrayOf(Tokens.USDT)
             }),
             CalcCollateralTestCase({
-                name: "One quoted token calc, no limit, no hints, value < quota",
+                name: "One quoted token calc, no target, no hints, value < quota",
                 balances: arrayOf(B({t: Tokens.USDT, balance: 10_000})),
                 quotas: arrayOf(Q({t: Tokens.USDT, quota: 5_000})),
                 enabledTokensMask: getTokenMask(arrayOf(Tokens.USDT)),
@@ -544,7 +543,7 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
                 expectedOrder: arrayOf(Tokens.USDT, Tokens.DAI, Tokens.LINK)
             }),
             CalcCollateralTestCase({
-                name: "It stops if limit reached during quoted token collateral computation",
+                name: "It stops if target reached during quoted token collateral computation",
                 balances: arrayOf(B({t: Tokens.USDT, balance: 10_000}), B({t: Tokens.LINK, balance: 1})),
                 quotas: arrayOf(Q({t: Tokens.USDT, quota: 5_000}), Q({t: Tokens.WETH, quota: 5_000})),
                 enabledTokensMask: getTokenMask(arrayOf(Tokens.USDT, Tokens.WETH, Tokens.LINK, Tokens.DAI)),
@@ -559,7 +558,7 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
                 expectedOrder: arrayOf(Tokens.USDT)
             }),
             CalcCollateralTestCase({
-                name: "It stops if limit reached during non-quoted token collateral computation, and updates limit properly after quoted calc",
+                name: "It stops if target reached during non-quoted token collateral computation, and updates target properly after quoted calc",
                 balances: arrayOf(B({t: Tokens.USDT, balance: 10_000}), B({t: Tokens.DAI, balance: 8_000})),
                 quotas: arrayOf(Q({t: Tokens.USDT, quota: 5_000}), Q({t: Tokens.WETH, quota: 5_000})),
                 enabledTokensMask: getTokenMask(arrayOf(Tokens.USDT, Tokens.WETH, Tokens.LINK, Tokens.DAI)),
@@ -610,16 +609,21 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
             collateralDebtData.enabledTokensMask = _case.enabledTokensMask;
             collateralDebtData.quotedTokensMask = _case.quotedTokensMask;
 
-            collateralDebtData = setQuotas(collateralDebtData, _case.quotas);
+            uint256[] memory quotasPacked;
+            (collateralDebtData.quotedTokens, quotasPacked) = getQuotas(_case.quotas);
 
             startSession();
+
+            uint256 target = _case.lazy
+                ? collateralDebtData.totalDebtUSD * _case.minHealthFactor / PERCENTAGE_FACTOR
+                : type(uint256).max;
 
             (uint256 totalValueUSD, uint256 twvUSD, uint256 tokensToDisable) = CollateralLogic.calcCollateral({
                 collateralDebtData: collateralDebtData,
                 creditAccount: creditAccount,
                 underlying: addressOf[Tokens.DAI],
-                lazy: _case.lazy,
-                minHealthFactor: _case.minHealthFactor,
+                quotasPacked: quotasPacked,
+                twvUSDTarget: target,
                 collateralHints: _case.collateralHints,
                 convertToUSDFn: _convertToUSD,
                 collateralTokenByMaskFn: _collateralTokenByMask,

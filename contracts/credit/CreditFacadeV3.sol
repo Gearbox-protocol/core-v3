@@ -598,7 +598,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             supportsQuotas ? ~ICreditManagerV3(creditManager).quotedTokensMask() : type(uint256).max;
 
         // Emits event for multicall start - used in analytics to track actions within multicalls
-        emit StartMultiCall(creditAccount); // U:[FA-18]
+        emit StartMultiCall({creditAccount: creditAccount, caller: msg.sender}); // U:[FA-18]
 
         // Declares the expectedBalances array, which can later be used for slippage control
         Balance[] memory expectedBalances;
@@ -824,7 +824,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         // If expectedBalances was set by calling revertIfGetLessThan,
         // checks that actual token balances are not less than expected balances
         if (expectedBalances.length != 0) {
-            BalancesLogic.compareBalances(creditAccount, expectedBalances); // U:[FA-23]
+            bool success = BalancesLogic.compareBalances(creditAccount, expectedBalances);
+            if (!success) revert BalanceLessThanMinimumDesiredException(); // U:[FA-23]
         }
 
         /// If increaseDebt was called during the multicall, all forbidden tokens must be disabled at the end
@@ -936,9 +937,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         // Emits event
         if (action == ManageDebtAction.INCREASE_DEBT) {
-            emit IncreaseDebt(creditAccount, amount); // U:[FA-27]
+            emit IncreaseDebt({creditAccount: creditAccount, amount: amount}); // U:[FA-27]
         } else {
-            emit DecreaseDebt(creditAccount, amount); // U:[FA-31]
+            emit DecreaseDebt({creditAccount: creditAccount, amount: amount}); // U:[FA-31]
         }
     }
 
@@ -1089,7 +1090,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         /// @dev It's safe covert because we control that
         /// uint256(_maxDebtPerBlockMultiplier) * debtLimits.maxDebt < type(uint128).max
-
         totalBorrowedInBlock = uint128(newDebtInCurrentBlock); // U:[FA-43]
     }
 
@@ -1097,7 +1097,17 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param debt The current principal of a Credit Account
     function _revertIfOutOfDebtLimits(uint256 debt) internal view {
         // Checks that amount is in debtLimits
-        if (debt < uint256(debtLimits.minDebt) || debt > uint256(debtLimits.maxDebt)) {
+        uint256 minDebt;
+        uint256 maxDebt;
+
+        // minDebt = debtLimits.minDebt, maxDebt = debtLimits.maxDebt
+        assembly {
+            let data := sload(debtLimits.slot)
+            maxDebt := shr(128, data)
+            minDebt := and(data, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+        }
+
+        if ((debt < minDebt) || (debt > maxDebt)) {
             revert BorrowAmountOutOfLimitsException(); // U:[FA-44]
         }
     }
@@ -1118,13 +1128,14 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             fullCheckParams.minHealthFactor
         );
 
-        BalancesLogic.checkForbiddenBalances({
+        bool success = BalancesLogic.checkForbiddenBalances({
             creditAccount: creditAccount,
             enabledTokensMaskBefore: enabledTokensMaskBefore,
             enabledTokensMaskAfter: enabledTokensMaskUpdated,
             forbiddenBalances: forbiddenBalances,
             forbiddenTokenMask: _forbiddenTokenMask
         });
+        if (!success) revert ForbiddenTokensException(); // U:[FA-30]
 
         emit SetEnabledTokensMask(creditAccount, enabledTokensMaskUpdated);
     }
@@ -1137,16 +1148,29 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @notice Updates total debt and checks that it does not exceed the limit
     function _revertIfOutOfTotalDebtLimit(uint256 delta, ManageDebtAction action) internal {
         if (delta != 0) {
-            TotalDebt storage td = totalDebt; // U:[FA-47]
+            uint256 currentTotalDebt; // U:[FA-47]
+            uint256 totalDebtLimit; // U:[FA-47]
+
+            // currentTotalDebt = totalDebt.currentTotalDebt, totalDebtLimit = totalDebt.currentTotalDebt
+            assembly {
+                let data := sload(totalDebt.slot)
+                totalDebtLimit := shr(128, data)
+                currentTotalDebt := and(data, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+            }
 
             if (action == ManageDebtAction.INCREASE_DEBT) {
-                td.currentTotalDebt += delta.toUint128(); // U:[FA-47]
-                if (td.currentTotalDebt > td.totalDebtLimit) {
+                currentTotalDebt += delta; // U:[FA-47]
+                if (currentTotalDebt > totalDebtLimit) {
                     revert CreditManagerCantBorrowException(); // U:[FA-47]
                 }
+
+                // it's safe, because currentTotalDebt <= totalDebtLimit which is uint128
+                totalDebt.currentTotalDebt = uint128(currentTotalDebt); // U:[FA-47]
             } else {
-                uint128 delta128 = delta.toUint128();
-                td.currentTotalDebt = td.currentTotalDebt > delta128 ? td.currentTotalDebt - delta128 : 0; // U:[FA-47]
+                unchecked {
+                    /// It's safe to downcast to uint128m because currentTotalDebt - delta < currentTotalDebt which is uint128
+                    totalDebt.currentTotalDebt = currentTotalDebt > delta ? uint128(currentTotalDebt - delta) : 0; // U:[FA-47]
+                }
             }
         }
     }

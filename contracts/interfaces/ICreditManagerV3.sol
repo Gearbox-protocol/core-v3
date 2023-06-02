@@ -55,8 +55,6 @@ struct CollateralDebtData {
     uint256 enabledTokensMask;
     uint256 quotedTokensMask;
     address[] quotedTokens;
-    uint16[] quotedLts;
-    uint256[] quotas;
     ///
     address _poolQuotaKeeper;
 }

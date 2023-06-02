@@ -177,7 +177,7 @@ error BorrowAmountOutOfLimitsException();
 
 /// @dev Thrown if one of the balances on a Credit Account is less than expected
 ///      at the end of a multicall, if revertIfReceivedLessThan was called
-error BalanceLessThanMinimumDesiredException(address);
+error BalanceLessThanMinimumDesiredException();
 
 /// @dev Thrown if a user attempts to open an account on a Credit Facade that has expired
 error NotAllowedAfterExpirationException();
