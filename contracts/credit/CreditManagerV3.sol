@@ -922,7 +922,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             uint256 _quotedTokensMask
         )
     {
-        uint256 _maxEnabledTokens = maxEnabledTokens; // U:[CM-24]
         _quotedTokensMask = quotedTokensMask; // U:[CM-24]
 
         uint256 tokensToCheckMask = enabledTokensMask & _quotedTokensMask; // U:[CM-24]
@@ -930,8 +929,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         // If there are not quoted tokens on the account, then zero-length arrays are returned
         // This is desirable, as it makes it simple to check whether there are any quoted tokens
         if (tokensToCheckMask != 0) {
-            quotaTokens = new address[](_maxEnabledTokens); // U:[CM-24]
-            quotasPacked = new uint256[](_maxEnabledTokens); // U:[CM-24]
+            uint256 tokensToCheckLen = tokensToCheckMask.calcEnabledTokens(); // U:[CM-24]
+            quotaTokens = new address[](tokensToCheckLen); // U:[CM-24]
+            quotasPacked = new uint256[](tokensToCheckLen); // U:[CM-24]
 
             uint256 j;
 
@@ -946,10 +946,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     tokenMask = (i < len) ? collateralHints[i] : 1 << (i - len);
 
                     if (tokensToCheckMask & tokenMask != 0) {
-                        if (j == _maxEnabledTokens) {
-                            revert TooManyEnabledTokensException(); // U:[CM-24]
-                        }
-
                         (address token, uint16 lt) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
 
                         (uint256 quota, uint128 outstandingInterestDelta) =
