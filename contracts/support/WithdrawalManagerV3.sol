@@ -41,16 +41,16 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
     using WithdrawalsLogic for ScheduledWithdrawal;
     using WithdrawalsLogic for ScheduledWithdrawal[2];
 
-    /// @inheritdoc IVersion
+    /// @notice Contract version
     uint256 public constant override version = 3_00;
 
-    /// @inheritdoc IWithdrawalManagerV3
+    /// @notice WETH token address
     address public immutable override weth;
 
-    /// @inheritdoc IWithdrawalManagerV3
+    /// @notice Mapping account => token => claimable amount
     mapping(address => mapping(address => uint256)) public override immediateWithdrawals;
 
-    /// @inheritdoc IWithdrawalManagerV3
+    /// @notice Delay for scheduled withdrawals
     uint40 public override delay;
 
     /// @dev Mapping credit account => scheduled withdrawals
@@ -80,7 +80,11 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
     // IMMEDIATE WITHDRAWALS //
     // --------------------- //
 
-    /// @inheritdoc IWithdrawalManagerV3
+    /// @notice Adds new immediate withdrawal for the account
+    /// @param token Token to withdraw
+    /// @param to Account to add immediate withdrawal for
+    /// @param amount Amount to withdraw
+    /// @custom:expects Credit manager transferred `amount` of `token` to this contract prior to calling this function
     function addImmediateWithdrawal(address token, address to, uint256 amount)
         external
         override
@@ -89,7 +93,9 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
         _addImmediateWithdrawal({account: to, token: token, amount: amount});
     }
 
-    /// @inheritdoc IWithdrawalManagerV3
+    /// @notice Claims caller's immediate withdrawal
+    /// @param token Token to claim (if `ETH_ADDRESS`, claims WETH, but unwraps it before sending)
+    /// @param to Token recipient
     function claimImmediateWithdrawal(address token, address to)
         external
         override
@@ -137,7 +143,9 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
     // SCHEDULED WITHDRAWALS //
     // --------------------- //
 
-    /// @inheritdoc IWithdrawalManagerV3
+    /// @notice Returns withdrawals scheduled for a given credit account
+    /// @param creditAccount Account to get withdrawals for
+    /// @return withdrawals See `ScheduledWithdrawal`
     function scheduledWithdrawals(address creditAccount)
         external
         view
@@ -147,7 +155,12 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
         return _scheduled[creditAccount];
     }
 
-    /// @inheritdoc IWithdrawalManagerV3
+    /// @notice Schedules withdrawal from the credit account
+    /// @param creditAccount Account to withdraw from
+    /// @param token Token to withdraw
+    /// @param amount Amount to withdraw
+    /// @param tokenIndex Collateral index of withdrawn token in account's credit manager
+    /// @custom:expects Credit manager transferred `amount` of `token` to this contract prior to calling this function
     function addScheduledWithdrawal(address creditAccount, address token, uint256 amount, uint8 tokenIndex)
         external
         override
@@ -166,7 +179,14 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
         emit AddScheduledWithdrawal(creditAccount, token, amount, maturity); // U:[WM-5B]
     }
 
-    /// @inheritdoc IWithdrawalManagerV3
+    /// @notice Claims scheduled withdrawals from the credit account
+    ///         - Withdrawals are either sent to `to` or returned to `creditAccount` based on maturity and `action`
+    ///         - If `to` is blacklisted in claimed token, scheduled withdrawal turns into immediate
+    /// @param creditAccount Account withdrawal was made from
+    /// @param to Address to send withdrawals to
+    /// @param action See `ClaimAction`
+    /// @return hasScheduled Whether account has at least one scheduled withdrawal after claiming
+    /// @return tokensToEnable Bit mask of returned tokens that should be enabled as account's collateral
     function claimScheduledWithdrawals(address creditAccount, address to, ClaimAction action)
         external
         override
@@ -188,7 +208,7 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
         tokensToEnable = tokensToEnable0 | tokensToEnable1; // U:[WM-6B]
     }
 
-    /// @inheritdoc IWithdrawalManagerV3
+    /// @notice Returns scheduled withdrawals from the credit account that can be cancelled
     function cancellableScheduledWithdrawals(address creditAccount, bool isForceCancel)
         external
         view
@@ -253,15 +273,16 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
     // CONFIGURATION //
     // ------------- //
 
-    /// @inheritdoc IWithdrawalManagerV3
-    function setWithdrawalDelay(uint40 _delay)
+    /// @notice Sets delay for scheduled withdrawals, only affects new withdrawal requests
+    /// @param delay_ New delay for scheduled withdrawals
+    function setWithdrawalDelay(uint40 delay_)
         external
         override
         configuratorOnly // U:[WM-2]
     {
-        if (_delay != delay) {
-            delay = _delay; // U:[WM-11]
-            emit SetWithdrawalDelay(_delay); // U:[WM-11]
+        if (delay_ != delay) {
+            delay = delay_; // U:[WM-11]
+            emit SetWithdrawalDelay(delay_); // U:[WM-11]
         }
     }
 }
