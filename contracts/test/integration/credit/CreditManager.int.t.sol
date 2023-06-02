@@ -254,7 +254,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
             "credit account is not in accountFactory tail!"
         );
 
-        vm.expectRevert(CreditAccountNotExistsException.selector);
+        vm.expectRevert(CreditAccountDoesNotExistException.selector);
         creditManager.getBorrowerOrRevert(creditAccount);
     }
 

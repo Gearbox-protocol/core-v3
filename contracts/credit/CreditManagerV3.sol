@@ -1276,7 +1276,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param creditAccount Credit Account to get the borrower for
     function getBorrowerOrRevert(address creditAccount) public view override returns (address borrower) {
         borrower = creditAccountInfo[creditAccount].borrower; // U:[CM-35]
-        if (borrower == address(0)) revert CreditAccountNotExistsException(); // U:[CM-35]
+        if (borrower == address(0)) revert CreditAccountDoesNotExistException(); // U:[CM-35]
     }
 
     /// @notice Returns the mask containing miscellaneous account flags

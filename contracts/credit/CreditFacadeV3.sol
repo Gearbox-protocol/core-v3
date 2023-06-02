@@ -878,7 +878,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         (address token, bytes memory data) = abi.decode(callData, (address, bytes)); // U:[FA-25]
 
         address priceFeed = IPriceOracleV2(ICreditManagerV3(creditManager).priceOracle()).priceFeeds(token); // U:[FA-25]
-        if (priceFeed == address(0)) revert PriceFeedNotExistsException(); // U:[FA-25]
+        if (priceFeed == address(0)) revert PriceFeedDoesNotExistException(); // U:[FA-25]
 
         IPriceFeedOnDemand(priceFeed).updatePrice(data); // U:[FA-25]
     }

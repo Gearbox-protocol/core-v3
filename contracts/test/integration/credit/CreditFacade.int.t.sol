@@ -215,11 +215,11 @@ contract CreditFacadeIntegrationTest is
 
     /// @dev I:[FA-2]: functions reverts if borrower has no account
     function test_I_FA_02_functions_reverts_if_credit_account_not_exists() public {
-        vm.expectRevert(CreditAccountNotExistsException.selector);
+        vm.expectRevert(CreditAccountDoesNotExistException.selector);
         vm.prank(USER);
         creditFacade.closeCreditAccount(DUMB_ADDRESS, FRIEND, 0, false, MultiCallBuilder.build());
 
-        vm.expectRevert(CreditAccountNotExistsException.selector);
+        vm.expectRevert(CreditAccountDoesNotExistException.selector);
         vm.prank(USER);
         creditFacade.closeCreditAccount(
             DUMB_ADDRESS,
@@ -234,11 +234,11 @@ contract CreditFacadeIntegrationTest is
             )
         );
 
-        vm.expectRevert(CreditAccountNotExistsException.selector);
+        vm.expectRevert(CreditAccountDoesNotExistException.selector);
         vm.prank(USER);
         creditFacade.liquidateCreditAccount(DUMB_ADDRESS, DUMB_ADDRESS, 0, false, MultiCallBuilder.build());
 
-        vm.expectRevert(CreditAccountNotExistsException.selector);
+        vm.expectRevert(CreditAccountDoesNotExistException.selector);
         vm.prank(USER);
         creditFacade.multicall(
             DUMB_ADDRESS,

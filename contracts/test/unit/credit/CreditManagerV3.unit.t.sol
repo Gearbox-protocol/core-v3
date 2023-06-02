@@ -609,7 +609,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         CollateralDebtData memory collateralDebtData;
         address creditAccount = DUMB_ADDRESS;
 
-        vm.expectRevert(CreditAccountNotExistsException.selector);
+        vm.expectRevert(CreditAccountDoesNotExistException.selector);
         creditManager.closeCreditAccount({
             creditAccount: creditAccount,
             closureAction: ClosureAction.CLOSE_ACCOUNT,
@@ -2244,7 +2244,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         tokenTestSuite.mint(underlying, creditAccount, DAI_ACCOUNT_AMOUNT);
 
-        vm.expectRevert(CreditAccountNotExistsException.selector);
+        vm.expectRevert(CreditAccountDoesNotExistException.selector);
         (uint256 tokensToDisable) =
             creditManager.scheduleWithdrawal({creditAccount: creditAccount, token: underlying, amount: 20_000});
 
@@ -2645,7 +2645,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         address creditAccount = DUMB_ADDRESS;
 
         /// @notice revert if borrower not set
-        vm.expectRevert(CreditAccountNotExistsException.selector);
+        vm.expectRevert(CreditAccountDoesNotExistException.selector);
         creditManager.getBorrowerOrRevert(creditAccount);
 
         uint256 enabledTokensMask = 123412312312;

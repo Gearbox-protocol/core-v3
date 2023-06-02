@@ -149,7 +149,7 @@ contract CreditManagerMock {
     }
 
     function getBorrowerOrRevert(address) external view returns (address) {
-        if (borrower == address(0)) revert CreditAccountNotExistsException();
+        if (borrower == address(0)) revert CreditAccountDoesNotExistException();
         return borrower;
     }
 
