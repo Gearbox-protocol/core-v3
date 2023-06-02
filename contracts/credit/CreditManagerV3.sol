@@ -857,10 +857,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         /// The logic for computing collateral is isolated into the `CreditLogic` library. See `CreditLogic.calcCollateral` for details.
         uint256 tokensToDisable;
 
-        /// The limit is a TWV threshold at which lazy computation stops. Normally, it happens when TWV
+        /// Target is a TWV threshold at which lazy computation stops. Normally, it happens when TWV
         /// exceeds the total debt, but the user can also configure a custom HF threshold (above 1),
         /// in order to maintain a desired level of position health
-        uint256 limit = (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY)
+        uint256 target = (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY)
             ? collateralDebtData.totalDebtUSD * minHealthFactor / PERCENTAGE_FACTOR
             : type(uint256).max;
 
@@ -868,7 +868,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             .calcCollateral({
             creditAccount: creditAccount,
             underlying: underlying,
-            limit: limit,
+            twvUSDTarget: target,
             collateralHints: collateralHints,
             quotasPacked: quotasPacked,
             priceOracle: _priceOracle,
