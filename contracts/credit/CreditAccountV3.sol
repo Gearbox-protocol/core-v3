@@ -9,7 +9,6 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 import {ICreditAccountV3} from "../interfaces/ICreditAccountV3.sol";
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 import {CallerNotAccountFactoryException, CallerNotCreditManagerException} from "../interfaces/IExceptions.sol";
 
 /// @title Credit account V3
@@ -17,13 +16,13 @@ contract CreditAccountV3 is ICreditAccountV3 {
     using SafeERC20 for IERC20;
     using Address for address;
 
-    /// @inheritdoc IVersion
+    /// @notice Contract version
     uint256 public constant override version = 3_00;
 
-    /// @inheritdoc ICreditAccountV3
+    /// @notice Account factory this account was deployed with
     address public immutable override factory;
 
-    /// @inheritdoc ICreditAccountV3
+    /// @notice Credit manager this account is connected to
     address public immutable override creditManager;
 
     /// @dev Ensures that function caller is account factory
@@ -49,7 +48,10 @@ contract CreditAccountV3 is ICreditAccountV3 {
         factory = msg.sender; // U:[CA-1]
     }
 
-    /// @inheritdoc ICreditAccountV3
+    /// @notice Transfers tokens from the credit account, can only be called by the credit manager
+    /// @param token Token to transfer
+    /// @param to Transfer recipient
+    /// @param amount Amount to transfer
     function safeTransfer(address token, address to, uint256 amount)
         external
         override
@@ -58,7 +60,11 @@ contract CreditAccountV3 is ICreditAccountV3 {
         IERC20(token).safeTransfer(to, amount); // U:[CA-3]
     }
 
-    /// @inheritdoc ICreditAccountV3
+    /// @notice Executes function call from the account to the target contract with provided data,
+    ///         can only be called by the credit manager
+    /// @param target Contract to call
+    /// @param data Data to call the target contract with
+    /// @return result Call result
     function execute(address target, bytes memory data)
         external
         override
@@ -68,7 +74,11 @@ contract CreditAccountV3 is ICreditAccountV3 {
         result = target.functionCall(data); // U:[CA-4]
     }
 
-    /// @inheritdoc ICreditAccountV3
+    /// @notice Executes function call from the account to the target contract with provided data,
+    ///         can only be called by the factory.
+    ///         Allows to rescue funds that were accidentally left on the account upon closure.
+    /// @param target Contract to call
+    /// @param data Data to call the target contract with
     function rescue(address target, bytes memory data)
         external
         override
