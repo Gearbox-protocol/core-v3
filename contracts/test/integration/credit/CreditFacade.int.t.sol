@@ -453,7 +453,7 @@ contract CreditFacadeIntegrationTest is
         emit OpenCreditAccount(expectedCreditAccountAddress, FRIEND, USER, DAI_ACCOUNT_AMOUNT, REFERRAL_CODE);
 
         vm.expectEmit(true, false, false, false);
-        emit StartMultiCall(expectedCreditAccountAddress);
+        emit StartMultiCall({creditAccount: expectedCreditAccountAddress, caller: USER});
 
         vm.expectCall(
             address(creditManager),
@@ -639,7 +639,7 @@ contract CreditFacadeIntegrationTest is
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount)));
 
         vm.expectEmit(true, false, false, false);
-        emit StartMultiCall(creditAccount);
+        emit StartMultiCall({creditAccount: creditAccount, caller: USER});
 
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.execute, (DUMB_CALLDATA)));
 
@@ -738,7 +738,7 @@ contract CreditFacadeIntegrationTest is
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount)));
 
         vm.expectEmit(true, false, false, false);
-        emit StartMultiCall(creditAccount);
+        emit StartMultiCall({creditAccount: creditAccount, caller: LIQUIDATOR});
 
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.execute, (DUMB_CALLDATA)));
 
@@ -1136,7 +1136,7 @@ contract CreditFacadeIntegrationTest is
         uint256 usdcMask = creditManager.getTokenMaskOrRevert(usdcToken);
 
         vm.expectEmit(true, true, false, true);
-        emit StartMultiCall(creditAccount);
+        emit StartMultiCall({creditAccount: creditAccount, caller: USER});
 
         vm.expectCall(
             address(creditManager),
@@ -1193,7 +1193,7 @@ contract CreditFacadeIntegrationTest is
         uint256 usdcMask = creditManager.getTokenMaskOrRevert(usdcToken);
 
         vm.expectEmit(true, true, false, true);
-        emit StartMultiCall(creditAccount);
+        emit StartMultiCall({creditAccount: creditAccount, caller: USER});
 
         vm.expectCall(
             address(creditManager),
@@ -1276,7 +1276,7 @@ contract CreditFacadeIntegrationTest is
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount)));
 
         vm.expectEmit(true, true, false, true);
-        emit StartMultiCall(creditAccount);
+        emit StartMultiCall({creditAccount: creditAccount, caller: USER});
 
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.execute, (DUMB_CALLDATA)));
 
@@ -1910,7 +1910,7 @@ contract CreditFacadeIntegrationTest is
         );
 
         vm.expectEmit(true, true, false, true);
-        emit StartMultiCall(creditAccount);
+        emit StartMultiCall({creditAccount: creditAccount, caller: bot});
 
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount)));
 

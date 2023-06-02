@@ -598,7 +598,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             supportsQuotas ? ~ICreditManagerV3(creditManager).quotedTokensMask() : type(uint256).max;
 
         // Emits event for multicall start - used in analytics to track actions within multicalls
-        emit StartMultiCall(creditAccount); // U:[FA-18]
+        emit StartMultiCall({creditAccount: creditAccount, caller: msg.sender}); // U:[FA-18]
 
         // Declares the expectedBalances array, which can later be used for slippage control
         Balance[] memory expectedBalances;
@@ -936,9 +936,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         // Emits event
         if (action == ManageDebtAction.INCREASE_DEBT) {
-            emit IncreaseDebt(creditAccount, amount); // U:[FA-27]
+            emit IncreaseDebt({creditAccount: creditAccount, amount: amount}); // U:[FA-27]
         } else {
-            emit DecreaseDebt(creditAccount, amount); // U:[FA-31]
+            emit DecreaseDebt({creditAccount: creditAccount, amount: amount}); // U:[FA-31]
         }
     }
 

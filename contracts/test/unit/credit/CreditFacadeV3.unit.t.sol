@@ -497,7 +497,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         emit OpenCreditAccount(expectedCreditAccount, FRIEND, USER, debt, REFERRAL_CODE);
 
         vm.expectEmit(true, true, false, false);
-        emit StartMultiCall(expectedCreditAccount);
+        emit StartMultiCall({creditAccount: expectedCreditAccount, caller: USER});
 
         vm.expectEmit(true, false, false, false);
         emit FinishMultiCall();
@@ -1105,7 +1105,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             );
 
             vm.expectEmit(true, true, false, false);
-            emit StartMultiCall(creditAccount);
+            emit StartMultiCall({creditAccount: creditAccount, caller: botMulticallCase ? address(this) : USER});
 
             vm.expectEmit(true, false, false, false);
             emit FinishMultiCall();
