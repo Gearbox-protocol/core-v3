@@ -26,6 +26,8 @@ import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
 import {GaugeMock} from "../../mocks/pool/GaugeMock.sol";
 
+import {QuotasLogic} from "../../../libraries/QuotasLogic.sol";
+
 // TEST
 import "../../lib/constants.sol";
 
@@ -587,5 +589,215 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 assertEq(disableToken, _case.expectedDisableToken, _testCaseErr("Incorrece disableToken"));
             }
         }
+    }
+
+    struct RemoveQuotasCase {
+        uint96 token1Quota;
+        uint96 token2Quota;
+        uint96 token1TotalQuoted;
+        uint96 token2TotalQuoted;
+        bool setLimitsToZero;
+        int256 expectedRevenueChange;
+    }
+
+    /// @dev U:[PQK-16]: removeQuotas works correctly
+    function test_U_PQK_16_removeQuotas_works_correctly() public {
+        RemoveQuotasCase[4] memory cases = [
+            RemoveQuotasCase({
+                token1Quota: 1,
+                token2Quota: 0,
+                token1TotalQuoted: uint96(WAD),
+                token2TotalQuoted: uint96(2 * WAD),
+                setLimitsToZero: false,
+                expectedRevenueChange: 0
+            }),
+            RemoveQuotasCase({
+                token1Quota: uint96(WAD),
+                token2Quota: 0,
+                token1TotalQuoted: uint96(WAD),
+                token2TotalQuoted: uint96(2 * WAD),
+                setLimitsToZero: false,
+                expectedRevenueChange: -int96(uint96(WAD) - 1) / 10
+            }),
+            RemoveQuotasCase({
+                token1Quota: uint96(WAD / 2),
+                token2Quota: uint96(WAD / 3),
+                token1TotalQuoted: uint96(WAD),
+                token2TotalQuoted: uint96(2 * WAD),
+                setLimitsToZero: false,
+                expectedRevenueChange: -int96(uint96(WAD / 2) - 1) / 10 - int96(uint96(WAD / 3) - 1) / 5
+            }),
+            RemoveQuotasCase({
+                token1Quota: 1,
+                token2Quota: 0,
+                token1TotalQuoted: uint96(WAD),
+                token2TotalQuoted: uint96(2 * WAD),
+                setLimitsToZero: true,
+                expectedRevenueChange: 0
+            })
+        ];
+
+        pqk.addCreditManager(address(creditManagerMock));
+
+        address token1 = makeAddr("TOKEN1");
+        address token2 = makeAddr("TOKEN2");
+
+        address creditAccount = makeAddr("CREDIT_ACCOUNT");
+
+        gaugeMock.addQuotaToken({token: token1, rate: 10_00});
+        gaugeMock.addQuotaToken({token: token2, rate: 20_00});
+
+        vm.prank(address(gaugeMock));
+        pqk.updateRates();
+        pqk.setTokenLimit({token: token1, limit: uint96(4 * WAD)});
+        pqk.setTokenLimit({token: token2, limit: uint96(3 * WAD)});
+
+        address[] memory tokens = new address[](10);
+        tokens[0] = token1;
+        tokens[1] = token2;
+
+        for (uint256 i = 0; i < cases.length; ++i) {
+            uint256 snapshot = vm.snapshot();
+
+            vm.prank(address(creditManagerMock));
+            pqk.updateQuota({
+                creditAccount: creditAccount,
+                token: token1,
+                quotaChange: int96(cases[i].token1Quota),
+                minQuota: 0,
+                maxQuota: type(uint96).max
+            });
+
+            vm.prank(address(creditManagerMock));
+            pqk.updateQuota({
+                creditAccount: creditAccount,
+                token: token2,
+                quotaChange: int96(cases[i].token2Quota),
+                minQuota: 0,
+                maxQuota: type(uint96).max
+            });
+
+            vm.prank(address(creditManagerMock));
+            pqk.updateQuota({
+                creditAccount: DUMB_ADDRESS,
+                token: token1,
+                quotaChange: int96(cases[i].token1TotalQuoted - cases[i].token1Quota),
+                minQuota: 0,
+                maxQuota: type(uint96).max
+            });
+
+            vm.prank(address(creditManagerMock));
+            pqk.updateQuota({
+                creditAccount: DUMB_ADDRESS,
+                token: token2,
+                quotaChange: int96(cases[i].token2TotalQuoted - cases[i].token2Quota),
+                minQuota: 0,
+                maxQuota: type(uint96).max
+            });
+
+            if (cases[i].expectedRevenueChange != 0) {
+                vm.expectCall(
+                    address(poolMock), abi.encodeCall(IPoolV3.updateQuotaRevenue, (cases[i].expectedRevenueChange))
+                );
+            }
+
+            vm.prank(address(creditManagerMock));
+            pqk.removeQuotas(creditAccount, tokens, cases[i].setLimitsToZero);
+
+            {
+                (uint96 quota1,) = pqk.getQuotaAndOutstandingInterest(creditAccount, token1);
+                (uint96 quota2,) = pqk.getQuotaAndOutstandingInterest(creditAccount, token2);
+
+                assertEq(quota1, cases[i].token1Quota > 0 ? 1 : 0, "Quota 1 was not removed");
+
+                assertEq(quota2, cases[i].token2Quota > 0 ? 1 : 0, "Quota 2 was not removed");
+            }
+
+            (,,, uint96 totalQuoted1, uint96 limit1) = pqk.totalQuotaParams(token1);
+            (,,, uint96 totalQuoted2, uint96 limit2) = pqk.totalQuotaParams(token2);
+
+            assertEq(
+                totalQuoted1,
+                cases[i].token1TotalQuoted - cases[i].token1Quota + (cases[i].token1Quota > 0 ? 1 : 0),
+                "Incorrect new total quoted 1"
+            );
+
+            assertEq(
+                totalQuoted2,
+                cases[i].token2TotalQuoted - cases[i].token2Quota + (cases[i].token2Quota > 0 ? 1 : 0),
+                "Incorrect new total quoted 2"
+            );
+
+            if (cases[i].setLimitsToZero) {
+                assertEq(limit1, 1, "Limit 1 was not set to zero");
+
+                assertEq(limit2, 1, "Limit 2 was not set to zero");
+            }
+
+            vm.revertTo(snapshot);
+        }
+    }
+
+    /// @dev U:[PQK-17]: accrueQuotaInterest works correctly
+    function test_U_PQK_17_accrueQuotaInterest_works_correctly() external {
+        pqk.addCreditManager(address(creditManagerMock));
+
+        address creditAccount = makeAddr("CREDIT_ACCOUNT");
+
+        address[] memory tokens = new address[](10);
+        tokens[0] = DUMB_ADDRESS;
+
+        vm.expectRevert(TokenIsNotQuotedException.selector);
+
+        vm.prank(address(creditManagerMock));
+        pqk.accrueQuotaInterest(creditAccount, tokens);
+
+        address token1 = makeAddr("TOKEN1");
+        address token2 = makeAddr("TOKEN2");
+
+        gaugeMock.addQuotaToken({token: token1, rate: 10_00});
+        gaugeMock.addQuotaToken({token: token2, rate: 20_00});
+
+        vm.prank(address(gaugeMock));
+        pqk.updateRates();
+        pqk.setTokenLimit({token: token1, limit: uint96(4 * WAD)});
+        pqk.setTokenLimit({token: token2, limit: uint96(3 * WAD)});
+
+        tokens[0] = token1;
+        tokens[1] = token2;
+
+        vm.prank(address(creditManagerMock));
+        pqk.updateQuota({
+            creditAccount: creditAccount,
+            token: token1,
+            quotaChange: int96(uint96(WAD)),
+            minQuota: 0,
+            maxQuota: type(uint96).max
+        });
+
+        vm.prank(address(creditManagerMock));
+        pqk.updateQuota({
+            creditAccount: creditAccount,
+            token: token2,
+            quotaChange: int96(uint96(WAD)),
+            minQuota: 0,
+            maxQuota: type(uint96).max
+        });
+
+        uint256 timestampLU = block.timestamp;
+        vm.warp(block.timestamp + 365 days);
+
+        uint192 expectedIndex1 = QuotasLogic.cumulativeIndexSince(uint192(RAY), 1000, timestampLU);
+        uint192 expectedIndex2 = QuotasLogic.cumulativeIndexSince(uint192(RAY), 2000, timestampLU);
+
+        vm.prank(address(creditManagerMock));
+        pqk.accrueQuotaInterest(creditAccount, tokens);
+
+        (, uint192 actualIndex1) = pqk.getQuota(creditAccount, token1);
+        (, uint192 actualIndex2) = pqk.getQuota(creditAccount, token2);
+
+        assertEq(expectedIndex1, actualIndex1, "Incorrect token 1 index");
+
+        assertEq(expectedIndex1, actualIndex1, "Incorrect token 2 index");
     }
 }

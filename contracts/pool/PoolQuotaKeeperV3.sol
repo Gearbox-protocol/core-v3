@@ -21,8 +21,6 @@ import {PERCENTAGE_FACTOR, RAY} from "@gearbox-protocol/core-v2/contracts/librar
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
-import "forge-std/console.sol";
-
 /// @title Pool quota keeper
 /// @dev The PQK works as an intermediary between the Credit Manager and the pool with regards to quotas and quota interest.
 ///      The PQK stores all of the quotas and related parameters, and computes and updates the quota revenue value used by
@@ -213,7 +211,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
         for (uint256 i; i < len;) {
             address token = tokens[i];
-            if (token == address(0)) break;
+            if (token == address(0)) break; // U: [PQK-16]
 
             AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
             TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
@@ -227,14 +225,16 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
                 uint96 totalQuoted = tokenQuotaParams.totalQuoted;
 
                 /// Computes quota revenue change
-                quotaRevenueChange += QuotasLogic.calcQuotaRevenueChange(rate, -int256(uint256(quoted)));
+                quotaRevenueChange += QuotasLogic.calcQuotaRevenueChange(rate, -int256(uint256(quoted))); // U: [PQK-16]
 
                 /// Decreases the total token quota by the account's quota
-                tokenQuotaParams.totalQuoted = totalQuoted - quoted;
+                tokenQuotaParams.totalQuoted = totalQuoted - quoted; // U: [PQK-16]
             }
 
             // Sets account quota to zero
-            accountQuota.quota = 1;
+            if (quoted != 0) {
+                accountQuota.quota = 1; // U: [PQK-16]
+            }
 
             // Unlike general quota updates, quota removals do not update accountQuota.cumulativeIndexLU to save gas (i.e., do not accrue interest)
             // This is safe, since the quota is set to 1 and the index will be updated to the correct value on next change from
@@ -244,7 +244,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             /// may request the PQK to set quota limits to 0, effectively preventing any further exposure
             /// to the token until the limit is raised again
             if (setLimitsToZero) {
-                _setTokenLimit({tokenQuotaParams: tokenQuotaParams, token: token, limit: 1});
+                _setTokenLimit({tokenQuotaParams: tokenQuotaParams, token: token, limit: 1}); // U: [PQK-16]
             }
 
             unchecked {
@@ -253,7 +253,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         }
 
         if (quotaRevenueChange != 0) {
-            IPoolV3(pool).updateQuotaRevenue(quotaRevenueChange);
+            IPoolV3(pool).updateQuotaRevenue(quotaRevenueChange); // U: [PQK-16]
         }
     }
 
@@ -279,10 +279,10 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
                 AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
                 TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
 
-                (uint16 rate, uint192 tqCumulativeIndexLU,) = _getTokenQuotaParamsOrRevert(tokenQuotaParams);
+                (uint16 rate, uint192 tqCumulativeIndexLU,) = _getTokenQuotaParamsOrRevert(tokenQuotaParams); // U: [PQK-17]
 
                 accountQuota.cumulativeIndexLU =
-                    QuotasLogic.cumulativeIndexSince(tqCumulativeIndexLU, rate, lastQuotaRateUpdate_);
+                    QuotasLogic.cumulativeIndexSince(tqCumulativeIndexLU, rate, lastQuotaRateUpdate_); // U: [PQK-17]
             }
         }
     }

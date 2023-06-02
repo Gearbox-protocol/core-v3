@@ -14,6 +14,7 @@ library QuotasLogic {
 
     /// @dev Computes the new interest index value, given the previous value, the interest rate, and time delta
     /// @dev Unlike base pool interest, the interest on quotas is not compounding, so an additive index is used
+    /// @param cumulativeIndexLU Cumulative index that was last written to storage
     /// @param rate The current interest rate on the token's quota
     /// @param lastQuotaRateUpdate Timestamp of the last time quota rates were updated
     function cumulativeIndexSince(uint192 cumulativeIndexLU, uint16 rate, uint256 lastQuotaRateUpdate)
@@ -45,7 +46,6 @@ library QuotasLogic {
     ///      actual quota change
     /// @param rate Rate for current token
     /// @param change Real change in quota
-
     function calcQuotaRevenueChange(uint16 rate, int256 change) internal pure returns (int256) {
         return int256(change) * int256(uint256(rate)) / int16(PERCENTAGE_FACTOR);
     }
@@ -54,13 +54,11 @@ library QuotasLogic {
     /// When the quota is increased, the new amount is checked against the global limit on quotas
     /// If the amount is larger than the existing capacity, then the quota is only increased
     /// by capacity. This is done instead of reverting to avoid unexpected reverts due to race conditions
-    /// @param totalQuoted Total amount of quoted for a token
+    /// @param totalQuoted Sum of all quotas for a token
     /// @param limit Quota limit for a token
-    /// @param quotaChange The amount to change quota for: negative to decrease, positive to increase
-
+    /// @param quotaChange The requested quota increase
     /// @return realQuotaChange Amount the quota actually changed by after taking
     ///                         capacity into account
-
     function calcRealQuotaIncreaseChange(uint96 totalQuoted, uint96 limit, int96 quotaChange)
         internal
         pure
