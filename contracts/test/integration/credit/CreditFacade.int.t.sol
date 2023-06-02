@@ -1514,7 +1514,7 @@ contract CreditFacadeIntegrationTest is
 
     /// [TODO]: add new test
 
-    /// @dev I:[FA-45]: rrevertIfGetLessThan during multicalls works correctly
+    /// @dev I:[FA-45]: revertIfGetLessThan during multicalls works correctly
     function test_I_FA_45_revertIfGetLessThan_works_correctly() public {
         (address creditAccount,) = _openTestCreditAccount();
 
@@ -1556,11 +1556,7 @@ contract CreditFacadeIntegrationTest is
 
         for (uint256 i = 0; i < 2; i++) {
             vm.prank(USER);
-            vm.expectRevert(
-                abi.encodeWithSelector(
-                    BalanceLessThanMinimumDesiredException.selector, ((i == 0) ? underlying : tokenLINK)
-                )
-            );
+            vm.expectRevert(BalanceLessThanMinimumDesiredException.selector);
 
             creditFacade.multicall(
                 creditAccount,

@@ -1302,7 +1302,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             );
 
             if (testCase == 1) {
-                vm.expectRevert(abi.encodeWithSelector(BalanceLessThanMinimumDesiredException.selector, (link)));
+                vm.expectRevert(BalanceLessThanMinimumDesiredException.selector);
             }
 
             if (testCase == 2) {
