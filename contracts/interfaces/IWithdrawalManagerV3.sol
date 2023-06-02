@@ -67,8 +67,8 @@ interface IWithdrawalManagerV3Events {
     event ClaimScheduledWithdrawal(address indexed creditAccount, address indexed token, address to, uint256 amount);
 
     /// @notice Emitted when new scheduled withdrawal delay is set by configurator
-    /// @param delay New delay for scheduled withdrawals
-    event SetWithdrawalDelay(uint40 delay);
+    /// @param newDelay New delay for scheduled withdrawals
+    event SetWithdrawalDelay(uint40 newDelay);
 }
 
 /// @title Withdrawal manager interface
@@ -111,5 +111,5 @@ interface IWithdrawalManagerV3 is IWithdrawalManagerV3Events, IVersion {
     // CONFIGURATION //
     // ------------- //
 
-    function setWithdrawalDelay(uint40 delay_) external;
+    function setWithdrawalDelay(uint40 newDelay) external;
 }

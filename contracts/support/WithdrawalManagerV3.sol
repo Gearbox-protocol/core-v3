@@ -274,15 +274,15 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
     // ------------- //
 
     /// @notice Sets delay for scheduled withdrawals, only affects new withdrawal requests
-    /// @param delay_ New delay for scheduled withdrawals
-    function setWithdrawalDelay(uint40 delay_)
+    /// @param newDelay New delay for scheduled withdrawals
+    function setWithdrawalDelay(uint40 newDelay)
         external
         override
         configuratorOnly // U:[WM-2]
     {
-        if (delay_ != delay) {
-            delay = delay_; // U:[WM-11]
-            emit SetWithdrawalDelay(delay_); // U:[WM-11]
+        if (newDelay != delay) {
+            delay = newDelay; // U:[WM-11]
+            emit SetWithdrawalDelay(newDelay); // U:[WM-11]
         }
     }
 }
