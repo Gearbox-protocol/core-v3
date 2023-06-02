@@ -824,7 +824,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         // If expectedBalances was set by calling revertIfGetLessThan,
         // checks that actual token balances are not less than expected balances
         if (expectedBalances.length != 0) {
-            BalancesLogic.compareBalances(creditAccount, expectedBalances); // U:[FA-23]
+            bool violation = BalancesLogic.compareBalances(creditAccount, expectedBalances);
+            if (violation) revert BalanceLessThanMinimumDesiredException(); // U:[FA-23]
         }
 
         /// If increaseDebt was called during the multicall, all forbidden tokens must be disabled at the end
@@ -1129,13 +1130,14 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             fullCheckParams.minHealthFactor
         );
 
-        BalancesLogic.checkForbiddenBalances({
+        bool violation = BalancesLogic.checkForbiddenBalances({
             creditAccount: creditAccount,
             enabledTokensMaskBefore: enabledTokensMaskBefore,
             enabledTokensMaskAfter: enabledTokensMaskUpdated,
             forbiddenBalances: forbiddenBalances,
             forbiddenTokenMask: _forbiddenTokenMask
         });
+        if (violation) revert ForbiddenTokensException(); // U:[FA-30]
 
         emit SetEnabledTokensMask(creditAccount, enabledTokensMaskUpdated);
     }
