@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Holdings, 2022
+// (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {ControllerTimelockV3} from "../../../support/risk-controller/ControllerTimelockV3.sol";
-import {Policy} from "../../../support/risk-controller/PolicyManagerV3.sol";
+import {ControllerTimelockV3} from "../../../governance/ControllerTimelockV3.sol";
+import {Policy} from "../../../governance/PolicyManagerV3.sol";
 import {GeneralMock} from "../../mocks/GeneralMock.sol";
 
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
