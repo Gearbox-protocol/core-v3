@@ -66,10 +66,10 @@ contract BalancesLogicTest is TestHelper {
 
         _setupTokenBalances(balances, length);
 
-        bool expectedViolation;
+        bool expectedResult = true;
         for (uint256 i = 0; i < length; ++i) {
             if (expectedBalances[i] > balances[i]) {
-                expectedViolation = true;
+                expectedResult = false;
                 break;
             }
         }
@@ -79,8 +79,8 @@ contract BalancesLogicTest is TestHelper {
             expectedArray[i] = Balance({token: tokens[i], balance: expectedBalances[i]});
         }
 
-        bool violation = BalancesLogic.compareBalances(creditAccount, expectedArray);
-        assertEq(violation, expectedViolation, "Incorrect violation");
+        bool result = BalancesLogic.compareBalances(creditAccount, expectedArray);
+        assertEq(result, expectedResult, "Incorrect result");
     }
 
     /// @notice U:[BLL-3]: storeForbiddenBalances works correctly
@@ -132,22 +132,22 @@ contract BalancesLogicTest is TestHelper {
 
         _setupTokenBalances(balancesAfter, 16);
 
-        bool expectedViolation;
-        if ((enabledTokensMaskAfter & ~enabledTokensMaskBefore) & forbiddenTokensMask > 0) expectedViolation = true;
+        bool expectedResult = true;
+        if ((enabledTokensMaskAfter & ~enabledTokensMaskBefore) & forbiddenTokensMask > 0) expectedResult = false;
 
         for (uint256 i = 0; i < 16; ++i) {
             uint256 tokenMask = 1 << i;
             if ((enabledTokensMaskAfter & forbiddenTokensMask & tokenMask > 0) && balancesAfter[i] > balancesBefore[i])
             {
-                expectedViolation = true;
+                expectedResult = false;
                 break;
             }
         }
 
-        bool violation = BalancesLogic.checkForbiddenBalances(
+        bool result = BalancesLogic.checkForbiddenBalances(
             creditAccount, enabledTokensMaskBefore, enabledTokensMaskAfter, forbiddenBalances, forbiddenTokensMask
         );
-        assertEq(violation, expectedViolation, "Incorrect violation");
+        assertEq(result, expectedResult, "Incorrect result");
     }
 
     function _getTokenByMask(uint256 mask) internal view returns (address) {

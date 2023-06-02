@@ -41,17 +41,17 @@ library BalancesLogic {
     /// @dev Compares current balances to previously saved expected balances.
     /// @param creditAccount Credit Account to check
     /// @param expected Expected balances after all operations
-    /// @return True if at least one balance is lower than expected, false otherwise
+    /// @return False if at least one balance is lower than expected, true otherwise
     function compareBalances(address creditAccount, Balance[] memory expected) internal view returns (bool) {
         uint256 len = expected.length;
         unchecked {
             for (uint256 i = 0; i < len; ++i) {
                 if (IERC20Helper.balanceOf(expected[i].token, creditAccount) < expected[i].balance) {
-                    return true; // U:[BLL-2]
+                    return false; // U:[BLL-2]
                 }
             }
         }
-        return false; // U:[BLL-2]
+        return true; // U:[BLL-2]
     }
 
     /// @dev Computes balances of forbidden tokens and returns them for later checks
@@ -90,7 +90,7 @@ library BalancesLogic {
     /// @param enabledTokensMaskAfter Mask of enabled tokens on the account after operations
     /// @param forbiddenBalances Array of balances of forbidden tokens (received from `storeForbiddenBalances`)
     /// @param forbiddenTokenMask Mask of forbidden tokens
-    /// @return True if new forbidden tokens were enabled or balance of at least one forbidden token has increased
+    /// @return False if new forbidden tokens were enabled or balance of at least one forbidden token has increased, true otherwise
     function checkForbiddenBalances(
         address creditAccount,
         uint256 enabledTokensMaskBefore,
@@ -99,12 +99,12 @@ library BalancesLogic {
         uint256 forbiddenTokenMask
     ) internal view returns (bool) {
         uint256 forbiddenTokensOnAccount = enabledTokensMaskAfter & forbiddenTokenMask;
-        if (forbiddenTokensOnAccount == 0) return false; // U:[BLL-4]
+        if (forbiddenTokensOnAccount == 0) return true; // U:[BLL-4]
 
         // A diff between the forbidden tokens before and after is computed
-        // If there are forbidden tokens enabled during operations, the function would return true
+        // If there are forbidden tokens enabled during operations, the function would return false
         uint256 forbiddenTokensOnAccountBefore = enabledTokensMaskBefore & forbiddenTokenMask;
-        if (forbiddenTokensOnAccount & ~forbiddenTokensOnAccountBefore != 0) return true; // U:[BLL-4]
+        if (forbiddenTokensOnAccount & ~forbiddenTokensOnAccountBefore != 0) return false; // U:[BLL-4]
 
         // Then, the function checks that any remaining forbidden tokens didn't have their balances increased
         unchecked {
@@ -113,11 +113,11 @@ library BalancesLogic {
                 if (forbiddenTokensOnAccount & forbiddenBalances[i].tokenMask != 0) {
                     uint256 currentBalance = IERC20Helper.balanceOf(forbiddenBalances[i].token, creditAccount);
                     if (currentBalance > forbiddenBalances[i].balance) {
-                        return true; // U:[BLL-4]
+                        return false; // U:[BLL-4]
                     }
                 }
             }
         }
-        return false; // U:[BLL-4]
+        return true; // U:[BLL-4]
     }
 }
