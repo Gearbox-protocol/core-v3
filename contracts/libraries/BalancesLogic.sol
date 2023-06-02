@@ -41,8 +41,8 @@ library BalancesLogic {
     /// @dev Compares current balances to previously saved expected balances.
     /// @param creditAccount Credit Account to check
     /// @param expected Expected balances after all operations
-    /// @return False if at least one balance is lower than expected, true otherwise
-    function compareBalances(address creditAccount, Balance[] memory expected) internal view returns (bool) {
+    /// @return success False if at least one balance is lower than expected, true otherwise
+    function compareBalances(address creditAccount, Balance[] memory expected) internal view returns (bool success) {
         uint256 len = expected.length;
         unchecked {
             for (uint256 i = 0; i < len; ++i) {
@@ -90,14 +90,14 @@ library BalancesLogic {
     /// @param enabledTokensMaskAfter Mask of enabled tokens on the account after operations
     /// @param forbiddenBalances Array of balances of forbidden tokens (received from `storeForbiddenBalances`)
     /// @param forbiddenTokenMask Mask of forbidden tokens
-    /// @return False if new forbidden tokens were enabled or balance of at least one forbidden token has increased, true otherwise
+    /// @return success False if new forbidden tokens were enabled or balance of at least one forbidden token has increased, true otherwise
     function checkForbiddenBalances(
         address creditAccount,
         uint256 enabledTokensMaskBefore,
         uint256 enabledTokensMaskAfter,
         BalanceWithMask[] memory forbiddenBalances,
         uint256 forbiddenTokenMask
-    ) internal view returns (bool) {
+    ) internal view returns (bool success) {
         uint256 forbiddenTokensOnAccount = enabledTokensMaskAfter & forbiddenTokenMask;
         if (forbiddenTokensOnAccount == 0) return true; // U:[BLL-4]
 
