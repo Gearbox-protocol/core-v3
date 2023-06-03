@@ -11,7 +11,11 @@ import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import {ICreditFacadeV3} from "../../../interfaces/ICreditFacadeV3.sol";
 import {ICreditConfiguratorV3} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
+import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
+import {IGaugeV3} from "../../../interfaces/IGaugeV3.sol";
 import {PoolV3} from "../../../pool/PoolV3.sol";
+import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
+import {GaugeV3} from "../../../pool/GaugeV3.sol";
 import {ILPPriceFeedV2} from "@gearbox-protocol/core-v2/contracts/interfaces/ILPPriceFeedV2.sol";
 import {IControllerTimelockV3Events, IControllerTimelockV3Errors} from "../../../interfaces/IControllerTimelockV3.sol";
 
@@ -43,12 +47,19 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
     function _makeMocks()
         internal
-        returns (address creditManager, address creditFacade, address creditConfigurator, address pool)
+        returns (
+            address creditManager,
+            address creditFacade,
+            address creditConfigurator,
+            address pool,
+            address poolQuotaKeeper
+        )
     {
         creditManager = address(new GeneralMock());
         creditFacade = address(new GeneralMock());
         creditConfigurator = address(new GeneralMock());
         pool = address(new GeneralMock());
+        poolQuotaKeeper = address(new GeneralMock());
 
         vm.mockCall(
             creditManager, abi.encodeWithSelector(ICreditManagerV3.creditFacade.selector), abi.encode(creditFacade)
@@ -62,13 +73,19 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         vm.mockCall(creditManager, abi.encodeWithSelector(ICreditManagerV3.pool.selector), abi.encode(pool));
 
+        vm.mockCall(pool, abi.encodeCall(IPoolV3.poolQuotaKeeper, ()), abi.encode(poolQuotaKeeper));
+
         vm.prank(CONFIGURATOR);
         controllerTimelock.setGroup(creditManager, "CM");
+
+        vm.prank(CONFIGURATOR);
+        controllerTimelock.setGroup(pool, "POOL");
 
         vm.label(creditManager, "CREDIT_MANAGER");
         vm.label(creditFacade, "CREDIT_FACADE");
         vm.label(creditConfigurator, "CREDIT_CONFIGURATOR");
         vm.label(pool, "POOL");
+        vm.label(poolQuotaKeeper, "PQK");
     }
 
     ///
@@ -77,9 +94,9 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
     ///
     ///
 
-    /// @dev [RCT-1]: setExpirationDate works correctly
-    function test_RCT_01_setExpirationDate_works_correctly() public {
-        (address creditManager, address creditFacade, address creditConfigurator, address pool) = _makeMocks();
+    /// @dev U:[CT-1]: setExpirationDate works correctly
+    function test_U_CT_01_setExpirationDate_works_correctly() public {
+        (address creditManager, address creditFacade, address creditConfigurator, address pool,) = _makeMocks();
 
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "EXPIRATION_DATE"));
 
@@ -163,8 +180,8 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         assertTrue(!queued, "Transaction is still queued after execution");
     }
 
-    /// @dev [RCT-2]: setLPPriceFeedLimiter works correctly
-    function test_RCT_02_setLPPriceFeedLimiter_works_correctly() public {
+    /// @dev U:[CT-2]: setLPPriceFeedLimiter works correctly
+    function test_U_CT_02_setLPPriceFeedLimiter_works_correctly() public {
         address lpPriceFeed = address(new GeneralMock());
 
         vm.prank(CONFIGURATOR);
@@ -226,9 +243,9 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         assertTrue(!queued, "Transaction is still queued after execution");
     }
 
-    /// @dev [RCT-3]: setMaxDebtPerBlockMultiplier works correctly
-    function test_RCT_03_setMaxDebtPerBlockMultiplier_works_correctly() public {
-        (address creditManager, address creditFacade, address creditConfigurator,) = _makeMocks();
+    /// @dev U:[CT-3]: setMaxDebtPerBlockMultiplier works correctly
+    function test_U_CT_03_setMaxDebtPerBlockMultiplier_works_correctly() public {
+        (address creditManager, address creditFacade, address creditConfigurator,,) = _makeMocks();
 
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "MAX_DEBT_PER_BLOCK_MULTIPLIER"));
 
@@ -297,12 +314,11 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         assertTrue(!queued, "Transaction is still queued after execution");
     }
 
-    /// @dev [RCT-4]: setDebtLimits works correctly
-    function test_RCT_04_setDebtLimits_works_correctly() public {
-        (address creditManager, address creditFacade, address creditConfigurator,) = _makeMocks();
+    /// @dev U:[CT-4A]: setMinDebtLimit works correctly
+    function test_U_CT_04A_setMinDebtLimit_works_correctly() public {
+        (address creditManager, address creditFacade, address creditConfigurator,,) = _makeMocks();
 
-        bytes32 POLICY_CODE_1 = keccak256(abi.encode("CM", "MIN_DEBT"));
-        bytes32 POLICY_CODE_2 = keccak256(abi.encode("CM", "MAX_DEBT"));
+        bytes32 POLICY_CODE = keccak256(abi.encode("CM", "MIN_DEBT"));
 
         vm.mockCall(creditFacade, abi.encodeWithSelector(ICreditFacadeV3.debtLimits.selector), abi.encode(10, 20));
 
@@ -321,44 +337,27 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
             maxChange: 0
         });
 
-        vm.prank(CONFIGURATOR);
-        controllerTimelock.setPolicy(POLICY_CODE_1, policy);
-
-        policy = Policy({
-            enabled: false,
-            flags: 1,
-            exactValue: 16,
-            minValue: 0,
-            maxValue: 0,
-            referencePoint: 0,
-            referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
-            minChange: 0,
-            maxChange: 0
-        });
+        // VERIFY THAT POLICY CHECKS ARE PERFORMED
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setMinDebtLimit(creditManager, 15);
 
         vm.prank(CONFIGURATOR);
-        controllerTimelock.setPolicy(POLICY_CODE_2, policy);
+        controllerTimelock.setPolicy(POLICY_CODE, policy);
 
         // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
         vm.expectRevert(CallerNotAdminException.selector);
         vm.prank(USER);
-        controllerTimelock.setDebtLimits(creditManager, 15, 16);
+        controllerTimelock.setMinDebtLimit(creditManager, 15);
 
         // VERIFY THAT POLICY CHECKS ARE PERFORMED
         vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(admin);
-        controllerTimelock.setDebtLimits(creditManager, 5, 16);
-
-        vm.expectRevert(ParameterChecksFailedException.selector);
-        vm.prank(admin);
-        controllerTimelock.setDebtLimits(creditManager, 15, 5);
+        controllerTimelock.setMinDebtLimit(creditManager, 5);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
-            abi.encode(creditConfigurator, "setLimits(uint128,uint128)", abi.encode(15, 16), block.timestamp + 1 days)
+            abi.encode(creditConfigurator, "setLimits(uint128,uint128)", abi.encode(15, 20), block.timestamp + 1 days)
         );
 
         vm.expectEmit(true, false, false, true);
@@ -366,14 +365,14 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
             txHash,
             creditConfigurator,
             "setLimits(uint128,uint128)",
-            abi.encode(15, 16),
+            abi.encode(15, 20),
             uint40(block.timestamp + 1 days)
         );
 
         vm.prank(admin);
-        controllerTimelock.setDebtLimits(creditManager, 15, 16);
+        controllerTimelock.setMinDebtLimit(creditManager, 15);
 
-        vm.expectCall(creditConfigurator, abi.encodeWithSelector(ICreditConfiguratorV3.setLimits.selector, 15, 16));
+        vm.expectCall(creditConfigurator, abi.encodeWithSelector(ICreditConfiguratorV3.setLimits.selector, 15, 20));
 
         vm.warp(block.timestamp + 1 days);
 
@@ -385,9 +384,81 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         assertTrue(!queued, "Transaction is still queued after execution");
     }
 
-    /// @dev [RCT-5]: setCreditManagerDebtLimit works correctly
-    function test_RCT_05_setCreditManagerDebtLimit_works_correctly() public {
-        (address creditManager,,, address pool) = _makeMocks();
+    /// @dev U:[CT-4B]: setMaxDebtLimit works correctly
+    function test_U_CT_04B_setMaxDebtLimit_works_correctly() public {
+        (address creditManager, address creditFacade, address creditConfigurator,,) = _makeMocks();
+
+        bytes32 POLICY_CODE = keccak256(abi.encode("CM", "MAX_DEBT"));
+
+        vm.mockCall(creditFacade, abi.encodeWithSelector(ICreditFacadeV3.debtLimits.selector), abi.encode(10, 20));
+
+        Policy memory policy = Policy({
+            enabled: false,
+            flags: 1,
+            exactValue: 25,
+            minValue: 0,
+            maxValue: 0,
+            referencePoint: 0,
+            referencePointUpdatePeriod: 0,
+            referencePointTimestampLU: 0,
+            minPctChange: 0,
+            maxPctChange: 0,
+            minChange: 0,
+            maxChange: 0
+        });
+
+        // VERIFY THAT POLICY CHECKS ARE PERFORMED
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setMaxDebtLimit(creditManager, 25);
+
+        vm.prank(CONFIGURATOR);
+        controllerTimelock.setPolicy(POLICY_CODE, policy);
+
+        // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
+        vm.expectRevert(CallerNotAdminException.selector);
+        vm.prank(USER);
+        controllerTimelock.setMaxDebtLimit(creditManager, 25);
+
+        // VERIFY THAT POLICY CHECKS ARE PERFORMED
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setMaxDebtLimit(creditManager, 5);
+
+        // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
+        bytes32 txHash = keccak256(
+            abi.encode(creditConfigurator, "setLimits(uint128,uint128)", abi.encode(10, 25), block.timestamp + 1 days)
+        );
+
+        vm.expectEmit(true, false, false, true);
+        emit QueueTransaction(
+            txHash,
+            creditConfigurator,
+            "setLimits(uint128,uint128)",
+            abi.encode(10, 25),
+            uint40(block.timestamp + 1 days)
+        );
+
+        vm.prank(admin);
+        controllerTimelock.setMaxDebtLimit(creditManager, 25);
+
+        vm.expectCall(creditConfigurator, abi.encodeWithSelector(ICreditConfiguratorV3.setLimits.selector, 10, 25));
+
+        vm.warp(block.timestamp + 1 days);
+
+        vm.prank(admin);
+        controllerTimelock.executeTransaction(txHash);
+
+        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+
+        assertTrue(!queued, "Transaction is still queued after execution");
+    }
+
+    /// @dev U:[CT-5]: setCreditManagerDebtLimit works correctly
+    function test_U_CT_05_setCreditManagerDebtLimit_works_correctly() public {
+        (address creditManager, address creditFacade,, address pool,) = _makeMocks();
+
+        vm.mockCall(creditFacade, abi.encodeCall(ICreditFacadeV3.trackTotalDebt, ()), abi.encode(false));
 
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "CREDIT_MANAGER_DEBT_LIMIT"));
 
@@ -457,9 +528,78 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         assertTrue(!queued, "Transaction is still queued after execution");
     }
 
-    /// @dev [RCT-6]: rampLiquidationThreshold works correctly
-    function test_RCT_06_rampLiquidationThreshold_works_correctly() public {
-        (address creditManager,, address creditConfigurator,) = _makeMocks();
+    /// @dev U:[CT-5A]: setCreditManagerDebtLimit works correctly, Credit Facade tracks debt
+    function test_U_CT_05A_setCreditManagerDebtLimit_works_correctly_CF_totalDebt() public {
+        (address creditManager, address creditFacade, address creditConfigurator,,) = _makeMocks();
+
+        vm.mockCall(creditFacade, abi.encodeCall(ICreditFacadeV3.trackTotalDebt, ()), abi.encode(true));
+
+        bytes32 POLICY_CODE = keccak256(abi.encode("CM", "CREDIT_MANAGER_DEBT_LIMIT"));
+
+        vm.mockCall(creditFacade, abi.encodeCall(ICreditFacadeV3.totalDebt, ()), abi.encode(uint128(0), uint128(1e18)));
+
+        Policy memory policy = Policy({
+            enabled: false,
+            flags: 1,
+            exactValue: 2e18,
+            minValue: 0,
+            maxValue: 0,
+            referencePoint: 0,
+            referencePointUpdatePeriod: 0,
+            referencePointTimestampLU: 0,
+            minPctChange: 0,
+            maxPctChange: 0,
+            minChange: 0,
+            maxChange: 0
+        });
+
+        vm.prank(CONFIGURATOR);
+        controllerTimelock.setPolicy(POLICY_CODE, policy);
+
+        // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
+        vm.expectRevert(CallerNotAdminException.selector);
+        vm.prank(USER);
+        controllerTimelock.setCreditManagerDebtLimit(creditManager, 2e18);
+
+        // VERIFY THAT POLICY CHECKS ARE PERFORMED
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setCreditManagerDebtLimit(creditManager, 1e18);
+
+        // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
+        bytes32 txHash = keccak256(
+            abi.encode(
+                creditConfigurator, "setTotalDebtLimit(uint128)", abi.encode(uint128(2e18)), block.timestamp + 1 days
+            )
+        );
+
+        vm.expectEmit(true, false, false, true);
+        emit QueueTransaction(
+            txHash,
+            creditConfigurator,
+            "setTotalDebtLimit(uint128)",
+            abi.encode(uint128(2e18)),
+            uint40(block.timestamp + 1 days)
+        );
+
+        vm.prank(admin);
+        controllerTimelock.setCreditManagerDebtLimit(creditManager, 2e18);
+
+        vm.expectCall(creditConfigurator, abi.encodeCall(ICreditConfiguratorV3.setTotalDebtLimit, (2e18)));
+
+        vm.warp(block.timestamp + 1 days);
+
+        vm.prank(admin);
+        controllerTimelock.executeTransaction(txHash);
+
+        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+
+        assertTrue(!queued, "Transaction is still queued after execution");
+    }
+
+    /// @dev U:[CT-6]: rampLiquidationThreshold works correctly
+    function test_U_CT_06_rampLiquidationThreshold_works_correctly() public {
+        (address creditManager,, address creditConfigurator,,) = _makeMocks();
 
         address token = makeAddr("TOKEN");
 
@@ -562,9 +702,9 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         assertTrue(!queued, "Transaction is still queued after execution");
     }
 
-    /// @dev [RCT-7]: cancelTransaction works correctly
-    function test_RCT_07_cancelTransaction_works_correctly() public {
-        (address creditManager, address creditFacade, address creditConfigurator, address pool) = _makeMocks();
+    /// @dev U:[CT-7]: cancelTransaction works correctly
+    function test_U_CT_07_cancelTransaction_works_correctly() public {
+        (address creditManager, address creditFacade, address creditConfigurator, address pool,) = _makeMocks();
 
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "EXPIRATION_DATE"));
 
@@ -625,8 +765,8 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         controllerTimelock.executeTransaction(txHash);
     }
 
-    /// @dev [RCT-8]: configuration functions work correctly
-    function test_RCT_08_cancelTransaction_works_correctly() public {
+    /// @dev U:[CT-8]: configuration functions work correctly
+    function test_U_CT_08_cancelTransaction_works_correctly() public {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         vm.prank(USER);
         controllerTimelock.setAdmin(DUMB_ADDRESS);
@@ -664,9 +804,9 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         assertEq(controllerTimelock.delay(), 5, "Delay was not set");
     }
 
-    /// @dev [RCT-9]: executeTransaction works correctly
-    function test_RCT_09_executeTransaction_works_correctly() public {
-        (address creditManager, address creditFacade, address creditConfigurator, address pool) = _makeMocks();
+    /// @dev U:[CT-9]: executeTransaction works correctly
+    function test_U_CT_09_executeTransaction_works_correctly() public {
+        (address creditManager, address creditFacade, address creditConfigurator, address pool,) = _makeMocks();
 
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "EXPIRATION_DATE"));
 
@@ -742,9 +882,9 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         controllerTimelock.executeTransaction(txHash);
     }
 
-    /// @dev [RCT-10]: forbidAdapter works correctly
-    function test_RCT_10_forbidAdapter_works_correctly() public {
-        (address creditManager,, address creditConfigurator,) = _makeMocks();
+    /// @dev U:[CT-10]: forbidAdapter works correctly
+    function test_U_CT_10_forbidAdapter_works_correctly() public {
+        (address creditManager,, address creditConfigurator,,) = _makeMocks();
 
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "FORBID_ADAPTER"));
 
@@ -796,6 +936,394 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.expectCall(
             creditConfigurator, abi.encodeWithSelector(ICreditConfiguratorV3.forbidAdapter.selector, DUMB_ADDRESS)
         );
+
+        vm.warp(block.timestamp + 1 days);
+
+        vm.prank(admin);
+        controllerTimelock.executeTransaction(txHash);
+
+        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+
+        assertTrue(!queued, "Transaction is still queued after execution");
+    }
+
+    /// @dev U:[CT-12]: setQuotaIncreaseFee works correctly
+    function test_U_CT_12_setQuotaIncreaseFee_works_correctly() public {
+        (,,, address pool, address poolQuotaKeeper) = _makeMocks();
+
+        address token = makeAddr("TOKEN");
+
+        vm.prank(CONFIGURATOR);
+        controllerTimelock.setGroup(token, "TOKEN");
+
+        vm.mockCall(
+            poolQuotaKeeper,
+            abi.encodeCall(IPoolQuotaKeeperV3.getTokenQuotaParams, (token)),
+            abi.encode(uint16(10), uint192(1e27), uint16(15), uint96(1e17), uint96(1e18))
+        );
+
+        bytes32 POLICY_CODE = keccak256(abi.encode("POOL", "TOKEN", "TOKEN_QUOTA_INCREASE_FEE"));
+
+        Policy memory policy = Policy({
+            enabled: false,
+            flags: 1,
+            exactValue: 20,
+            minValue: 0,
+            maxValue: 0,
+            referencePoint: 0,
+            referencePointUpdatePeriod: 0,
+            referencePointTimestampLU: 0,
+            minPctChange: 0,
+            maxPctChange: 0,
+            minChange: 0,
+            maxChange: 0
+        });
+
+        // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setTokenQuotaIncreaseFee(pool, token, 20);
+
+        vm.prank(CONFIGURATOR);
+        controllerTimelock.setPolicy(POLICY_CODE, policy);
+
+        // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
+        vm.expectRevert(CallerNotAdminException.selector);
+        vm.prank(USER);
+        controllerTimelock.setTokenQuotaIncreaseFee(pool, token, 20);
+
+        // VERIFY THAT THE FUNCTION PERFORMS POLICY CHECKS
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setTokenQuotaIncreaseFee(pool, token, 30);
+
+        // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
+        bytes32 txHash = keccak256(
+            abi.encode(
+                poolQuotaKeeper,
+                "setTokenQuotaIncreaseFee(address,uint16)",
+                abi.encode(token, uint16(20)),
+                block.timestamp + 1 days
+            )
+        );
+
+        vm.expectEmit(true, false, false, true);
+        emit QueueTransaction(
+            txHash,
+            poolQuotaKeeper,
+            "setTokenQuotaIncreaseFee(address,uint16)",
+            abi.encode(token, uint16(20)),
+            uint40(block.timestamp + 1 days)
+        );
+
+        vm.prank(admin);
+        controllerTimelock.setTokenQuotaIncreaseFee(pool, token, 20);
+
+        vm.expectCall(poolQuotaKeeper, abi.encodeCall(PoolQuotaKeeperV3.setTokenQuotaIncreaseFee, (token, 20)));
+
+        vm.warp(block.timestamp + 1 days);
+
+        vm.prank(admin);
+        controllerTimelock.executeTransaction(txHash);
+
+        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+
+        assertTrue(!queued, "Transaction is still queued after execution");
+    }
+
+    /// @dev U:[CT-13]: setTotalDebt works correctly
+    function test_U_CT_13_setTotalDebt_works_correctly() public {
+        (,,, address pool,) = _makeMocks();
+
+        vm.mockCall(pool, abi.encodeCall(IPoolV3.totalDebtLimit, ()), abi.encode(1e18));
+
+        bytes32 POLICY_CODE = keccak256(abi.encode("POOL", "TOTAL_DEBT_LIMIT"));
+
+        Policy memory policy = Policy({
+            enabled: false,
+            flags: 1,
+            exactValue: 2e18,
+            minValue: 0,
+            maxValue: 0,
+            referencePoint: 0,
+            referencePointUpdatePeriod: 0,
+            referencePointTimestampLU: 0,
+            minPctChange: 0,
+            maxPctChange: 0,
+            minChange: 0,
+            maxChange: 0
+        });
+
+        // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setTotalDebtLimit(pool, 2e18);
+
+        vm.prank(CONFIGURATOR);
+        controllerTimelock.setPolicy(POLICY_CODE, policy);
+
+        // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
+        vm.expectRevert(CallerNotAdminException.selector);
+        vm.prank(USER);
+        controllerTimelock.setTotalDebtLimit(pool, 2e18);
+
+        // VERIFY THAT THE FUNCTION PERFORMS POLICY CHECKS
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setTotalDebtLimit(pool, 3e18);
+
+        // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
+        bytes32 txHash =
+            keccak256(abi.encode(pool, "setTotalDebtLimit(uint256)", abi.encode(2e18), block.timestamp + 1 days));
+
+        vm.expectEmit(true, false, false, true);
+        emit QueueTransaction(
+            txHash, pool, "setTotalDebtLimit(uint256)", abi.encode(2e18), uint40(block.timestamp + 1 days)
+        );
+
+        vm.prank(admin);
+        controllerTimelock.setTotalDebtLimit(pool, 2e18);
+
+        vm.expectCall(pool, abi.encodeCall(PoolV3.setTotalDebtLimit, (2e18)));
+
+        vm.warp(block.timestamp + 1 days);
+
+        vm.prank(admin);
+        controllerTimelock.executeTransaction(txHash);
+
+        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+
+        assertTrue(!queued, "Transaction is still queued after execution");
+    }
+
+    /// @dev U:[CT-14]: setWithdrawFee works correctly
+    function test_U_CT_14_setWithdrawFee_works_correctly() public {
+        (,,, address pool,) = _makeMocks();
+
+        vm.mockCall(pool, abi.encodeCall(IPoolV3.withdrawFee, ()), abi.encode(10));
+
+        bytes32 POLICY_CODE = keccak256(abi.encode("POOL", "WITHDRAW_FEE"));
+
+        Policy memory policy = Policy({
+            enabled: false,
+            flags: 1,
+            exactValue: 20,
+            minValue: 0,
+            maxValue: 0,
+            referencePoint: 0,
+            referencePointUpdatePeriod: 0,
+            referencePointTimestampLU: 0,
+            minPctChange: 0,
+            maxPctChange: 0,
+            minChange: 0,
+            maxChange: 0
+        });
+
+        // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setWithdrawFee(pool, 20);
+
+        vm.prank(CONFIGURATOR);
+        controllerTimelock.setPolicy(POLICY_CODE, policy);
+
+        // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
+        vm.expectRevert(CallerNotAdminException.selector);
+        vm.prank(USER);
+        controllerTimelock.setWithdrawFee(pool, 20);
+
+        // VERIFY THAT THE FUNCTION PERFORMS POLICY CHECKS
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setWithdrawFee(pool, 30);
+
+        // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
+        bytes32 txHash =
+            keccak256(abi.encode(pool, "setWithdrawFee(uint256)", abi.encode(20), block.timestamp + 1 days));
+
+        vm.expectEmit(true, false, false, true);
+        emit QueueTransaction(txHash, pool, "setWithdrawFee(uint256)", abi.encode(20), uint40(block.timestamp + 1 days));
+
+        vm.prank(admin);
+        controllerTimelock.setWithdrawFee(pool, 20);
+
+        vm.expectCall(pool, abi.encodeCall(PoolV3.setWithdrawFee, (20)));
+
+        vm.warp(block.timestamp + 1 days);
+
+        vm.prank(admin);
+        controllerTimelock.executeTransaction(txHash);
+
+        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+
+        assertTrue(!queued, "Transaction is still queued after execution");
+    }
+
+    /// @dev U:[CT-15A]: setMinQuotaRate works correctly
+    function test_U_CT_15A_setMinQuotaRate_works_correctly() public {
+        (,,, address pool, address poolQuotaKeeper) = _makeMocks();
+
+        address gauge = address(new GeneralMock());
+
+        vm.mockCall(poolQuotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.gauge, ()), abi.encode(gauge));
+
+        address token = makeAddr("TOKEN");
+
+        vm.prank(CONFIGURATOR);
+        controllerTimelock.setGroup(token, "TOKEN");
+
+        vm.mockCall(
+            gauge,
+            abi.encodeCall(IGaugeV3.quotaRateParams, (token)),
+            abi.encode(uint16(10), uint16(20), uint96(100), uint96(200))
+        );
+
+        bytes32 POLICY_CODE = keccak256(abi.encode("POOL", "TOKEN", "TOKEN_QUOTA_MIN_RATE"));
+
+        Policy memory policy = Policy({
+            enabled: false,
+            flags: 1,
+            exactValue: 15,
+            minValue: 0,
+            maxValue: 0,
+            referencePoint: 0,
+            referencePointUpdatePeriod: 0,
+            referencePointTimestampLU: 0,
+            minPctChange: 0,
+            maxPctChange: 0,
+            minChange: 0,
+            maxChange: 0
+        });
+
+        // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setMinQuotaRate(pool, token, 15);
+
+        vm.prank(CONFIGURATOR);
+        controllerTimelock.setPolicy(POLICY_CODE, policy);
+
+        // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
+        vm.expectRevert(CallerNotAdminException.selector);
+        vm.prank(USER);
+        controllerTimelock.setMinQuotaRate(pool, token, 15);
+
+        // VERIFY THAT THE FUNCTION PERFORMS POLICY CHECKS
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setMinQuotaRate(pool, token, 25);
+
+        // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
+        bytes32 txHash = keccak256(
+            abi.encode(
+                gauge,
+                "changeQuotaTokenRateParams(address,uint16,uint16)",
+                abi.encode(token, uint16(15), uint16(20)),
+                block.timestamp + 1 days
+            )
+        );
+
+        vm.expectEmit(true, false, false, true);
+        emit QueueTransaction(
+            txHash,
+            gauge,
+            "changeQuotaTokenRateParams(address,uint16,uint16)",
+            abi.encode(token, uint16(15), uint16(20)),
+            uint40(block.timestamp + 1 days)
+        );
+
+        vm.prank(admin);
+        controllerTimelock.setMinQuotaRate(pool, token, 15);
+
+        vm.expectCall(gauge, abi.encodeCall(GaugeV3.changeQuotaTokenRateParams, (token, 15, 20)));
+
+        vm.warp(block.timestamp + 1 days);
+
+        vm.prank(admin);
+        controllerTimelock.executeTransaction(txHash);
+
+        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+
+        assertTrue(!queued, "Transaction is still queued after execution");
+    }
+
+    /// @dev U:[CT-15B]: setMaxQuotaRate works correctly
+    function test_U_CT_15B_setMaxQuotaRate_works_correctly() public {
+        (,,, address pool, address poolQuotaKeeper) = _makeMocks();
+
+        address gauge = address(new GeneralMock());
+
+        vm.mockCall(poolQuotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.gauge, ()), abi.encode(gauge));
+
+        address token = makeAddr("TOKEN");
+
+        vm.prank(CONFIGURATOR);
+        controllerTimelock.setGroup(token, "TOKEN");
+
+        vm.mockCall(
+            gauge,
+            abi.encodeCall(IGaugeV3.quotaRateParams, (token)),
+            abi.encode(uint16(10), uint16(20), uint96(100), uint96(200))
+        );
+
+        bytes32 POLICY_CODE = keccak256(abi.encode("POOL", "TOKEN", "TOKEN_QUOTA_MAX_RATE"));
+
+        Policy memory policy = Policy({
+            enabled: false,
+            flags: 1,
+            exactValue: 25,
+            minValue: 0,
+            maxValue: 0,
+            referencePoint: 0,
+            referencePointUpdatePeriod: 0,
+            referencePointTimestampLU: 0,
+            minPctChange: 0,
+            maxPctChange: 0,
+            minChange: 0,
+            maxChange: 0
+        });
+
+        // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setMaxQuotaRate(pool, token, 25);
+
+        vm.prank(CONFIGURATOR);
+        controllerTimelock.setPolicy(POLICY_CODE, policy);
+
+        // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
+        vm.expectRevert(CallerNotAdminException.selector);
+        vm.prank(USER);
+        controllerTimelock.setMaxQuotaRate(pool, token, 25);
+
+        // VERIFY THAT THE FUNCTION PERFORMS POLICY CHECKS
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setMaxQuotaRate(pool, token, 35);
+
+        // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
+        bytes32 txHash = keccak256(
+            abi.encode(
+                gauge,
+                "changeQuotaTokenRateParams(address,uint16,uint16)",
+                abi.encode(token, uint16(10), uint16(25)),
+                block.timestamp + 1 days
+            )
+        );
+
+        vm.expectEmit(true, false, false, true);
+        emit QueueTransaction(
+            txHash,
+            gauge,
+            "changeQuotaTokenRateParams(address,uint16,uint16)",
+            abi.encode(token, uint16(10), uint16(25)),
+            uint40(block.timestamp + 1 days)
+        );
+
+        vm.prank(admin);
+        controllerTimelock.setMaxQuotaRate(pool, token, 25);
+
+        vm.expectCall(gauge, abi.encodeCall(GaugeV3.changeQuotaTokenRateParams, (token, 10, 25)));
 
         vm.warp(block.timestamp + 1 days);
 

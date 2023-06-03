@@ -366,6 +366,20 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         return (aq.quota, aq.cumulativeIndexLU);
     }
 
+    /// @dev Returns the global quota-related parameters for a token
+    function getTokenQuotaParams(address token)
+        external
+        view
+        returns (uint16 rate, uint192 cumulativeIndexLU, uint16 quotaIncreaseFee, uint96 totalQuoted, uint96 limit)
+    {
+        TokenQuotaParams storage tq = totalQuotaParams[token];
+        rate = tq.rate;
+        cumulativeIndexLU = tq.cumulativeIndexLU;
+        quotaIncreaseFee = tq.quotaIncreaseFee;
+        totalQuoted = tq.totalQuoted;
+        limit = tq.limit;
+    }
+
     /// @notice Returns the current annual quota revenue to the pool
     function poolQuotaRevenue() external view virtual override returns (uint256 quotaRevenue) {
         address[] memory tokens = quotaTokensSet.values();

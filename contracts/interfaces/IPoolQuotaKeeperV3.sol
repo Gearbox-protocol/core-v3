@@ -100,6 +100,12 @@ interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion {
         view
         returns (uint96 quota, uint192 cumulativeIndexLU);
 
+    /// @dev Returns the global quota-related parameters for a token
+    function getTokenQuotaParams(address token)
+        external
+        view
+        returns (uint16 rate, uint192 cumulativeIndexLU, uint16 quotaIncreaseFee, uint96 totalQuoted, uint96 limit);
+
     /// @dev Computes collateral value for quoted tokens on the account, as well as accrued quota interest
     function getQuotaAndOutstandingInterest(address creditAccount, address token)
         external

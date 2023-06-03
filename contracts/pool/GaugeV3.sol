@@ -12,7 +12,7 @@ import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 
 // TRAITS
-import {ACLTrait} from "../traits/ACLTrait.sol";
+import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 
 // EXCEPTIONS
 import {
@@ -27,7 +27,7 @@ import {
 ///      interval. While there are notable mechanic differences, the overall
 ///      dynamic of token holders controlling strategy yields is similar to
 ///      Curve's gauge system, and thus the contract carries the same name
-contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLTrait {
+contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
     /// @notice Contract version
     uint256 public constant version = 3_00;
 
@@ -57,7 +57,7 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLTrait {
     /// @param _pool Address of the borrowing pool
     /// @param _gearStaking Address of the GEAR staking contract
     constructor(address _pool, address _gearStaking)
-        ACLTrait(IPoolV3(_pool).addressProvider())
+        ACLNonReentrantTrait(IPoolV3(_pool).addressProvider())
         nonZeroAddress(_pool)
         nonZeroAddress(_gearStaking)
     {
@@ -244,7 +244,7 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLTrait {
     function changeQuotaTokenRateParams(address token, uint16 minRate, uint16 maxRate)
         external
         nonZeroAddress(token)
-        configuratorOnly
+        controllerOnly
     {
         _checkParams(minRate, maxRate);
 

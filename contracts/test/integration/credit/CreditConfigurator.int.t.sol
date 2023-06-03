@@ -357,9 +357,6 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         creditConfigurator.removeEmergencyLiquidator(address(0));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.setTotalDebtLimit(0);
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.makeTokenQuoted(address(0));
 
         vm.stopPrank();
@@ -390,6 +387,9 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
 
         vm.expectRevert(CallerNotControllerException.selector);
         creditConfigurator.forbidAdapter(DUMB_ADDRESS);
+
+        vm.expectRevert(CallerNotControllerException.selector);
+        creditConfigurator.setTotalDebtLimit(0);
     }
 
     //

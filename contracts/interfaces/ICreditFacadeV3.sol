@@ -224,4 +224,7 @@ interface ICreditFacadeV3 is ICreditFacadeV3Events, IVersion {
 
     /// @dev Timestamp at which accounts on an expirable CM will be liquidated
     function expirationDate() external view returns (uint40);
+
+    /// @dev Returns whether the Credit Facade tracks the total debt on its own
+    function trackTotalDebt() external view returns (bool);
 }

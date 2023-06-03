@@ -148,4 +148,12 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     function poolQuotaRevenue() external view virtual override returns (uint256 quotaRevenue) {
         return 0;
     }
+
+    function getTokenQuotaParams(address token)
+        external
+        view
+        returns (uint16 rate, uint192 cumulativeIndexLU, uint16 quotaIncreaseFee, uint96 totalQuoted, uint96 limit)
+    {
+        return (0, 0, 0, 0, 0);
+    }
 }
