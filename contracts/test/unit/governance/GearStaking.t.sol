@@ -15,7 +15,7 @@ import "../../lib/constants.sol";
 // MOCKS
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
-import {TargetContractMock} from "../../mocks/adapters/TargetContractMock.sol";
+import {TargetContractMock} from "../../mocks/core/TargetContractMock.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";

@@ -53,7 +53,7 @@ import {PoolQuotaKeeperMock} from "../../mocks/pool/PoolQuotaKeeperMock.sol";
 import {ERC20FeeMock} from "../../mocks/token/ERC20FeeMock.sol";
 import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
 import {CreditAccountMock, CreditAccountMockEvents} from "../../mocks/credit/CreditAccountMock.sol";
-import {WithdrawalManagerMock} from "../../mocks/support/WithdrawalManagerMock.sol";
+import {WithdrawalManagerMock} from "../../mocks/core/WithdrawalManagerMock.sol";
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";

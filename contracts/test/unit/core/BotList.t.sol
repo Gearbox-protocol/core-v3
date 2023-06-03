@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {BotListV3} from "../../../support/BotListV3.sol";
+import {BotListV3} from "../../../core/BotListV3.sol";
 import {IBotListV3Events, BotFunding} from "../../../interfaces/IBotListV3.sol";
 import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";

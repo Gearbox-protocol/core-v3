@@ -6,8 +6,8 @@ pragma solidity ^0.8.17;
 import "../../../core/AddressProviderV3.sol";
 import {AccountFactoryMock} from "../core/AccountFactoryMock.sol";
 import {PriceOracleMock} from "../oracles/PriceOracleMock.sol";
-import {WithdrawalManagerMock} from "../support/WithdrawalManagerMock.sol";
-import {BotListMock} from "../support/BotListMock.sol";
+import {WithdrawalManagerMock} from "../core/WithdrawalManagerMock.sol";
+import {BotListMock} from "../core/BotListMock.sol";
 import {WETHMock} from "../token/WETHMock.sol";
 
 import {Test} from "forge-std/Test.sol";

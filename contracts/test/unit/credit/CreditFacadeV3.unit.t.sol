@@ -16,12 +16,12 @@ import {CreditFacadeV3Harness} from "./CreditFacadeV3Harness.sol";
 
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 import {DegenNFTMock} from "../../mocks/token/DegenNFTMock.sol";
-import {AdapterMock} from "../../mocks/adapters/AdapterMock.sol";
-import {BotListMock} from "../../mocks/support/BotListMock.sol";
-import {WithdrawalManagerMock} from "../../mocks/support/WithdrawalManagerMock.sol";
+import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
+import {BotListMock} from "../../mocks/core/BotListMock.sol";
+import {WithdrawalManagerMock} from "../../mocks/core/WithdrawalManagerMock.sol";
 import {PriceOracleMock} from "../../mocks/oracles/PriceOracleMock.sol";
 import {PriceFeedOnDemandMock} from "../../mocks/oracles/PriceFeedOnDemandMock.sol";
-import {AdapterCallMock} from "../../mocks/adapters/AdapterCallMock.sol";
+import {AdapterCallMock} from "../../mocks/core/AdapterCallMock.sol";
 import {PoolMock} from "../../mocks/pool/PoolMock.sol";
 
 import {ENTERED} from "../../../traits/ReentrancyGuardTrait.sol";

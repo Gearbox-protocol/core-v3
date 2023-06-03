@@ -41,7 +41,7 @@ import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 // MOCKS
 import {PriceFeedMock} from "../../mocks/oracles/PriceFeedMock.sol";
 import {PoolMock} from "../../mocks/pool/PoolMock.sol";
-import {TargetContractMock} from "../../mocks/adapters/TargetContractMock.sol";
+import {TargetContractMock} from "../../mocks/core/TargetContractMock.sol";
 import {ERC20ApproveRestrictedRevert, ERC20ApproveRestrictedFalse} from "../../mocks/token/ERC20ApproveRestricted.sol";
 
 // SUITES
