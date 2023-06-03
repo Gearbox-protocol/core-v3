@@ -1396,10 +1396,12 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
 
         uint96 qu1 = uint96(WAD * 10);
 
-        assertEq(pool.lastQuotaRevenueUpdate(), 0, "SETUP: Incorrect lastQuotaRevenuUpdate");
+        assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "SETUP: Incorrect lastQuotaRevenuUpdate");
 
         assertEq(pool.quotaRevenue(), 0, "SETUP: Incorrect quotaRevenue");
         assertEq(pool.expectedLiquidityLU(), 0, "SETUP: Incorrect expectedLiquidityLU");
+
+        vm.warp(block.timestamp + 1 days);
 
         vm.prank(POOL_QUOTA_KEEPER);
         pool.setQuotaRevenue(qu1);
@@ -1615,6 +1617,10 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
 
         address POOL_QUOTA_KEEPER2 = address(pqk2);
 
+        vm.mockCall(POOL_QUOTA_KEEPER2, abi.encodeCall(PoolQuotaKeeperV3.poolQuotaRevenue, ()), abi.encode(2 * qu));
+
+        vm.expectCall(POOL_QUOTA_KEEPER2, abi.encodeCall(PoolQuotaKeeperV3.poolQuotaRevenue, ()));
+
         vm.expectEmit(true, true, false, false);
         emit SetPoolQuotaKeeper(POOL_QUOTA_KEEPER2);
 
@@ -1622,7 +1628,7 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
         pool.setPoolQuotaKeeper(POOL_QUOTA_KEEPER2);
 
         assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "Incorrect lastQuotaRevenuUpdate");
-        assertEq(pool.quotaRevenue(), qu, "#1: Incorrect quotaRevenue");
+        assertEq(pool.quotaRevenue(), 2 * qu, "#1: Incorrect quotaRevenue");
 
         assertEq(pool.expectedLiquidityLU(), qu, "Incorrect expectedLiquidityLU");
     }

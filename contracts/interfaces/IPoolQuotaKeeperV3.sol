@@ -105,4 +105,7 @@ interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion {
         external
         view
         returns (uint96 quoted, uint128 outstandingInterest);
+
+    /// @dev Returns the current total annual quota revenue to the pool
+    function poolQuotaRevenue() external view returns (uint256);
 }

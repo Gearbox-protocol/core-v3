@@ -143,4 +143,9 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
         AccountQuota storage aq = accountQuota;
         return (aq.quota, aq.cumulativeIndexLU);
     }
+
+    /// @notice Returns the current annual quota revenue to the pool
+    function poolQuotaRevenue() external view virtual override returns (uint256 quotaRevenue) {
+        return 0;
+    }
 }
