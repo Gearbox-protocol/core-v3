@@ -15,7 +15,7 @@ import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {IGaugeV3} from "../../../interfaces/IGaugeV3.sol";
 import {PoolV3} from "../../../pool/PoolV3.sol";
 import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
-import {GaugeV3} from "../../../pool/GaugeV3.sol";
+import {GaugeV3} from "../../../governance/GaugeV3.sol";
 import {ILPPriceFeedV2} from "@gearbox-protocol/core-v2/contracts/interfaces/ILPPriceFeedV2.sol";
 import {IControllerTimelockV3Events, IControllerTimelockV3Errors} from "../../../interfaces/IControllerTimelockV3.sol";
 

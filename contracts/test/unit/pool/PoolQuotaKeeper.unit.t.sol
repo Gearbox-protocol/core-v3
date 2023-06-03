@@ -24,7 +24,7 @@ import {Tokens} from "../../config/Tokens.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 
 import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
-import {GaugeMock} from "../../mocks/pool/GaugeMock.sol";
+import {GaugeMock} from "../../mocks/governance/GaugeMock.sol";
 
 import {QuotasLogic} from "../../../libraries/QuotasLogic.sol";
 

@@ -15,7 +15,7 @@ import {BotListV3} from "../../support/BotListV3.sol";
 
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 import {PoolMock} from "../mocks//pool/PoolMock.sol";
-import {GaugeMock} from "../mocks//pool/GaugeMock.sol";
+import {GaugeMock} from "../mocks//governance/GaugeMock.sol";
 import {PoolQuotaKeeperV3} from "../../pool/PoolQuotaKeeperV3.sol";
 
 import "../lib/constants.sol";

@@ -29,7 +29,7 @@ import {Tokens} from "../../config/Tokens.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 import {ERC20FeeMock} from "../../mocks/token/ERC20FeeMock.sol";
 import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
-import {GaugeMock} from "../../mocks//pool/GaugeMock.sol";
+import {GaugeMock} from "../../mocks//governance/GaugeMock.sol";
 
 // TEST
 import {TestHelper} from "../../lib/helper.sol";

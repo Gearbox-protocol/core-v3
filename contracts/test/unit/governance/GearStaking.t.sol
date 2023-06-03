@@ -3,7 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {GearStakingV3, EPOCH_LENGTH} from "../../../support/GearStakingV3.sol";
+import {GearStakingV3, EPOCH_LENGTH} from "../../../governance/GearStakingV3.sol";
 import {IGearStakingV3Events, MultiVote, VotingContractStatus} from "../../../interfaces/IGearStakingV3.sol";
 import {IVotingContractV3} from "../../../interfaces/IVotingContractV3.sol";
 
