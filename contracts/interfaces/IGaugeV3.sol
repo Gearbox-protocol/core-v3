@@ -49,7 +49,7 @@ interface IGaugeV3 is IGaugeV3Events, IVersion {
     /// @param extraData Gauge specific parameters (encoded into extraData to adhere to a general VotingContract interface)
     ///                  * token - address of the token to vote for
     ///                  * lpSide - votes in favor of LPs (increasing rate) if true, or in favor of CAs (decreasing rate) if false
-    function vote(address user, uint96 votes, bytes memory extraData) external;
+    function vote(address user, uint96 votes, bytes calldata extraData) external;
 
     /// @dev Removes the user's existing vote from the provided token and side
     /// @param user The user that submitted a vote
@@ -57,12 +57,12 @@ interface IGaugeV3 is IGaugeV3Events, IVersion {
     /// @param extraData Gauge specific parameters (encoded into extraData to adhere to a general VotingContract interface)
     ///                  * token - address of the token to unvote from
     ///                  * lpSide - whether the side unvoted from is LP side
-    function unvote(address user, uint96 votes, bytes memory extraData) external;
+    function unvote(address user, uint96 votes, bytes calldata extraData) external;
 
     //
     // GETTERS
     //
-    function getRates(address[] memory tokens) external view returns (uint16[] memory rates);
+    function getRates(address[] calldata tokens) external view returns (uint16[] memory rates);
 
     function epochLastUpdate() external view returns (uint16);
 

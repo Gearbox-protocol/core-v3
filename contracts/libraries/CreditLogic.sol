@@ -211,6 +211,7 @@ library CreditLogic {
     /// @param cumulativeIndexNow The current interest index
     /// @param cumulativeIndexLastUpdate The last recorded interest index of the Credit Account
     /// @param cumulativeQuotaInterest Total quota interest of the account before decrease
+    /// @param quotaFees Fees for updating quotas
     /// @param feeInterest Fee on accrued interest charged by the DAO
     /// @return newDebt Debt principal after repayment
     /// @return newCumulativeIndex The new recorded interest index of the Credit Account
@@ -222,7 +223,7 @@ library CreditLogic {
         uint256 cumulativeIndexNow,
         uint256 cumulativeIndexLastUpdate,
         uint128 cumulativeQuotaInterest,
-        uint128 quotaProfits,
+        uint128 quotaFees,
         uint16 feeInterest
     )
         internal
@@ -232,25 +233,25 @@ library CreditLogic {
             uint256 newCumulativeIndex,
             uint256 profit,
             uint128 newCumulativeQuotaInterest,
-            uint128 newQuotaProfits
+            uint128 newQuotaFees
         )
     {
         uint256 amountToRepay = amount;
 
-        /// The debt is repaid in the order of: quota profits -> quota interest -> base interest -> debt
-        /// I.e., first the amount is subtracted from quota profits. If there is a remainder, it goes
+        /// The debt is repaid in the order of: quota fees -> quota interest -> base interest -> debt
+        /// I.e., first the amount is subtracted from quota fees. If there is a remainder, it goes
         /// to repay quota interest, and so on. If the repayment amount only partially covers quota interest, then that will be
         /// partially repaid (with part of payment going to fees pro-rata), while base interest
         /// and debt remain inchanged. If the amount covers quota interest fully, then the same logic
         /// applies to the remaining amount and base interest/debt.
         unchecked {
-            if (quotaProfits != 0) {
-                if (amountToRepay > quotaProfits) {
-                    newQuotaProfits = 0;
-                    amountToRepay -= quotaProfits;
-                    profit = quotaProfits;
+            if (quotaFees != 0) {
+                if (amountToRepay > quotaFees) {
+                    newQuotaFees = 0;
+                    amountToRepay -= quotaFees;
+                    profit = quotaFees;
                 } else {
-                    newQuotaProfits = quotaProfits - amountToRepay.toUint128();
+                    newQuotaFees = quotaFees - amountToRepay.toUint128();
                     profit = amountToRepay;
                     amountToRepay = 0;
                 }

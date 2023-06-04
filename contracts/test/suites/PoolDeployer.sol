@@ -10,12 +10,12 @@ import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 import {GenesisFactory} from "./GenesisFactory.sol";
-import {WithdrawalManagerV3} from "../../support/WithdrawalManagerV3.sol";
-import {BotListV3} from "../../support/BotListV3.sol";
+import {WithdrawalManagerV3} from "../../core/WithdrawalManagerV3.sol";
+import {BotListV3} from "../../core/BotListV3.sol";
 
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 import {PoolMock} from "../mocks//pool/PoolMock.sol";
-import {GaugeMock} from "../mocks//pool/GaugeMock.sol";
+import {GaugeMock} from "../mocks//governance/GaugeMock.sol";
 import {PoolQuotaKeeperV3} from "../../pool/PoolQuotaKeeperV3.sol";
 
 import "../lib/constants.sol";

@@ -25,8 +25,8 @@ import {CreditFacadeTestHelper} from "../../helpers/CreditFacadeTestHelper.sol";
 // EXCEPTIONS
 
 // MOCKS
-import {AdapterMock} from "../../mocks//adapters/AdapterMock.sol";
-import {TargetContractMock} from "../../mocks/adapters/TargetContractMock.sol";
+import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
+import {TargetContractMock} from "../../mocks/core/TargetContractMock.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";

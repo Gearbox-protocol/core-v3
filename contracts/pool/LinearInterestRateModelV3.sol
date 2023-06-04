@@ -8,7 +8,7 @@ import {WAD, RAY, PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/l
 import {IInterestRateModelV3} from "../interfaces/IInterestRateModelV3.sol";
 
 // EXCEPTIONS
-import {IncorrectParameterException, BorrowingMoreU2ForbiddenException} from "../interfaces/IExceptions.sol";
+import {IncorrectParameterException, BorrowingMoreThanU2ForbiddenException} from "../interfaces/IExceptions.sol";
 
 /// @title Linear Interest Rate Model
 /// @dev GearboxV3 uses a two-point linear model in its pools. Unlike
@@ -140,7 +140,7 @@ contract LinearInterestRateModelV3 is IInterestRateModelV3 {
         /// If U > U2 in `isBorrowingMoreU2Forbidden` and the utilization check requested
         /// the function will revert to prevent raising utilization over the limit
         if (checkOptimalBorrowing && isBorrowingMoreU2Forbidden) {
-            revert BorrowingMoreU2ForbiddenException(); // U:[LIM-3]
+            revert BorrowingMoreThanU2ForbiddenException(); // U:[LIM-3]
         }
 
         // if U >= U2:

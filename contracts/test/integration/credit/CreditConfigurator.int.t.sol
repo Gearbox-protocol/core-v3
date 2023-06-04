@@ -7,7 +7,7 @@ import "../../../interfaces/IAddressProviderV3.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
-import {WithdrawalManagerV3} from "../../../support/WithdrawalManagerV3.sol";
+import {WithdrawalManagerV3} from "../../../core/WithdrawalManagerV3.sol";
 import {
     CreditConfiguratorV3,
     CreditManagerOpts,
@@ -32,8 +32,8 @@ import "../../../interfaces/IExceptions.sol";
 import "../../lib/constants.sol";
 
 // MOCKS
-import {AdapterMock} from "../../mocks//adapters/AdapterMock.sol";
-import {TargetContractMock} from "../../mocks/adapters/TargetContractMock.sol";
+import {AdapterMock} from "../../mocks//core/AdapterMock.sol";
+import {TargetContractMock} from "../../mocks/core/TargetContractMock.sol";
 import {CreditFacadeV3Harness} from "../../unit/credit/CreditFacadeV3Harness.sol";
 
 // SUITES
@@ -357,9 +357,6 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         creditConfigurator.removeEmergencyLiquidator(address(0));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.setTotalDebtLimit(0);
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.makeTokenQuoted(address(0));
 
         vm.stopPrank();
@@ -390,6 +387,9 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
 
         vm.expectRevert(CallerNotControllerException.selector);
         creditConfigurator.forbidAdapter(DUMB_ADDRESS);
+
+        vm.expectRevert(CallerNotControllerException.selector);
+        creditConfigurator.setTotalDebtLimit(0);
     }
 
     //

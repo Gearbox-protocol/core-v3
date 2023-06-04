@@ -35,7 +35,6 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
 
     ///
     uint128 internal return_caQuotaInterestChange;
-    int96 internal return_realQuotaChange;
     bool internal return_enableToken;
     bool internal return_disableToken;
 
@@ -54,28 +53,16 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     function updateQuota(address, address, int96, uint96, uint96)
         external
         view
-        returns (
-            uint128 caQuotaInterestChange,
-            uint128 tradingFees,
-            int96 realQuotaChange,
-            bool enableToken,
-            bool disableToken
-        )
+        returns (uint128 caQuotaInterestChange, uint128 fees, bool enableToken, bool disableToken)
     {
         caQuotaInterestChange = return_caQuotaInterestChange;
-        realQuotaChange = return_realQuotaChange;
+        fees = 0;
         enableToken = return_enableToken;
         disableToken = return_disableToken;
     }
 
-    function setUpdateQuotaReturns(
-        uint128 caQuotaInterestChange,
-        int96 realQuotaChange,
-        bool enableToken,
-        bool disableToken
-    ) external {
+    function setUpdateQuotaReturns(uint128 caQuotaInterestChange, bool enableToken, bool disableToken) external {
         return_caQuotaInterestChange = caQuotaInterestChange;
-        return_realQuotaChange = realQuotaChange;
         return_enableToken = enableToken;
         return_disableToken = disableToken;
     }
@@ -112,7 +99,7 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
         external
         view
         override
-        returns (uint256 quoted, uint128 interest)
+        returns (uint96 quoted, uint128 interest)
     {
         quoted = _quoted[token];
         interest = _outstandingInterest[token];
@@ -142,5 +129,18 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     function getQuota(address, address) external view returns (uint96 quota, uint192 cumulativeIndexLU) {
         AccountQuota storage aq = accountQuota;
         return (aq.quota, aq.cumulativeIndexLU);
+    }
+
+    /// @notice Returns the current annual quota revenue to the pool
+    function poolQuotaRevenue() external view virtual override returns (uint256 quotaRevenue) {
+        return 0;
+    }
+
+    function getTokenQuotaParams(address)
+        external
+        pure
+        returns (uint16 rate, uint192 cumulativeIndexLU, uint16 quotaIncreaseFee, uint96 totalQuoted, uint96 limit)
+    {
+        return (0, 0, 0, 0, 0);
     }
 }

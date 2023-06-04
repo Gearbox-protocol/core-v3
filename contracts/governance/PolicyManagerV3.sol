@@ -91,7 +91,7 @@ contract PolicyManagerV3 is ACLNonReentrantTrait {
     }
 
     /// @notice Sets the policy group of the address
-    function setGroup(address contractAddress, string memory group) external configuratorOnly {
+    function setGroup(address contractAddress, string calldata group) external configuratorOnly {
         _group[contractAddress] = group;
     }
 

@@ -955,7 +955,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function setTotalDebtLimit(uint128 newLimit)
         external
         override
-        configuratorOnly // I: [CC-2]
+        controllerOnly // I: [CC-2]
     {
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
         if (!cf.trackTotalDebt()) revert TotalDebtNotTrackedException(); // I:[CC-34]

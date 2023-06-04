@@ -67,11 +67,17 @@ interface IControllerTimelockV3 is IControllerTimelockV3Errors, IControllerTimel
     /// @param multiplier The new multiplier value
     function setMaxDebtPerBlockMultiplier(address creditManager, uint8 multiplier) external;
 
-    /// @dev Queues a transaction to set a new max debt per block multiplier
+    /// @notice Queues a transaction to set a new min debt per account
+    /// @dev Requires the policy for keccak(group(creditManager), "MIN_DEBT") to be enabled, otherwise auto-fails the check
     /// @param creditManager Adress of CM to update the limits for
-    /// @param minDebt The minimal debt amount
+    /// @param minDebt The new minimal debt amount
+    function setMinDebtLimit(address creditManager, uint128 minDebt) external;
+
+    /// @notice Queues a transaction to set a new max debt per account
+    /// @dev Requires the policy for keccak(group(creditManager), "MAX_DEBT") to be enabled, otherwise auto-fails the check
+    /// @param creditManager Adress of CM to update the limits for
     /// @param maxDebt The maximal debt amount
-    function setDebtLimits(address creditManager, uint128 minDebt, uint128 maxDebt) external;
+    function setMaxDebtLimit(address creditManager, uint128 maxDebt) external;
 
     /// @dev Queues a transaction to set a new debt limit for the Credit Manager
     /// @param creditManager Adress of CM to update the debt limit for

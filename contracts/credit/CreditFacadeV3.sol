@@ -879,7 +879,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         (address token, bytes memory data) = abi.decode(callData, (address, bytes)); // U:[FA-25]
 
         address priceFeed = IPriceOracleV2(ICreditManagerV3(creditManager).priceOracle()).priceFeeds(token); // U:[FA-25]
-        if (priceFeed == address(0)) revert PriceFeedNotExistsException(); // U:[FA-25]
+        if (priceFeed == address(0)) revert PriceFeedDoesNotExistException(); // U:[FA-25]
 
         IPriceFeedOnDemand(priceFeed).updatePrice(data); // U:[FA-25]
     }
@@ -950,17 +950,14 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         internal
         returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
-        int96 realQuotaChange;
         (address token, int96 quotaChange, uint96 minQuota) = abi.decode(callData, (address, int96, uint96)); // U:[FA-34]
-        (realQuotaChange, tokensToEnable, tokensToDisable) = ICreditManagerV3(creditManager).updateQuota({
+        (tokensToEnable, tokensToDisable) = ICreditManagerV3(creditManager).updateQuota({
             creditAccount: creditAccount,
             token: token,
             quotaChange: quotaChange,
             minQuota: minQuota,
             maxQuota: uint96(Math.min(type(uint96).max, maxQuotaMultiplier * debtLimits.maxDebt))
         }); // U:[FA-34]
-
-        emit UpdateQuota({creditAccount: creditAccount, token: token, quotaChange: realQuotaChange}); // U:[FA-34]
     }
 
     /// @notice Requests the Credit Manager to schedule a withdrawal

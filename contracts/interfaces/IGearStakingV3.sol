@@ -58,7 +58,7 @@ interface IGearStakingV3 is IGearStakingV3Events, IVersion {
     ///              * voteAmount - amount of staked GEAR to add to or remove from a vote
     ///              * isIncrease - whether to add or remove votes
     ///              * extraData - data specific to the voting contract that is decoded on recipient side
-    function deposit(uint96 amount, MultiVote[] memory votes) external;
+    function deposit(uint96 amount, MultiVote[] calldata votes) external;
 
     /// @dev Performs a sequence of vote changes according to the passed array
     /// @param votes Array of MultVote structs:
@@ -66,7 +66,7 @@ interface IGearStakingV3 is IGearStakingV3Events, IVersion {
     ///              * voteAmount - amount of staked GEAR to add to or remove from a vote
     ///              * isIncrease - whether to add or remove votes
     ///              * extraData - data specific to the voting contract that is decoded on recipient side
-    function multivote(MultiVote[] memory votes) external;
+    function multivote(MultiVote[] calldata votes) external;
 
     /// @dev Schedules a withdrawal from staked GEAR into GEAR, which can be claimed in 4 epochs.
     ///      If there are any withdrawals available to claim, they are also claimed.
@@ -79,7 +79,7 @@ interface IGearStakingV3 is IGearStakingV3Events, IVersion {
     ///              * voteAmount - amount of staked GEAR to add to or remove from a vote
     ///              * isIncrease - whether to add or remove votes
     ///              * extraData - data specific to the voting contract that is decoded on recipient side
-    function withdraw(uint96 amount, address to, MultiVote[] memory votes) external;
+    function withdraw(uint96 amount, address to, MultiVote[] calldata votes) external;
 
     /// @dev Claims all of the caller's withdrawals that are mature
     /// @param to Address to send claimable GEAR, if any
@@ -102,7 +102,7 @@ interface IGearStakingV3 is IGearStakingV3Events, IVersion {
     function getWithdrawableAmounts(address user)
         external
         view
-        returns (uint256 withdrawableNow, uint256[4] memory withdrawableInEpochs);
+        returns (uint256 withdrawableNow, uint256[EPOCHS_TO_WITHDRAW] memory withdrawableInEpochs);
 
     /// @dev Mapping of address to their status as allowed voting contract
     function allowedVotingContract(address c) external view returns (VotingContractStatus);

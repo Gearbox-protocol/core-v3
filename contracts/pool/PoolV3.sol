@@ -600,10 +600,12 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         if (IPoolQuotaKeeperV3(newPoolQuotaKeeper).pool() != address(this)) {
             revert IncompatiblePoolQuotaKeeperException(); // U:[P4-23B]
         }
-        if (poolQuotaKeeper != address(0)) {
-            _setQuotaRevenue(_quotaRevenue); // U:[P4-23C]
-        }
+
         poolQuotaKeeper = newPoolQuotaKeeper; // U:[P4-23C]
+
+        uint256 newQuotaRevenue = IPoolQuotaKeeperV3(poolQuotaKeeper).poolQuotaRevenue();
+        _setQuotaRevenue(newQuotaRevenue); // U:[P4-23C]
+
         emit SetPoolQuotaKeeper(newPoolQuotaKeeper); // U:[P4-23C]
     }
 
