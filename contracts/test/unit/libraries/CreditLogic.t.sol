@@ -209,12 +209,12 @@ contract CreditLogicTest is TestHelper {
             delta %= debt + interest + quotaInterest + quotaFees;
         }
 
-        (uint256 newDebt, uint256 newCumulativeIndex,, uint256 cumulativeQuotaInterest, uint256 newQuotaProfits) =
+        (uint256 newDebt, uint256 newCumulativeIndex,, uint256 cumulativeQuotaInterest, uint256 newQuotaFees) =
             CreditLogic.calcDecrease(delta, debt, indexNow, indexAtOpen, quotaInterest, quotaFees, feeInterest);
 
         uint256 oldTotalDebt = _calcTotalDebt(debt, indexNow, indexAtOpen, quotaInterest, quotaFees, feeInterest);
         uint256 newTotalDebt =
-            _calcTotalDebt(newDebt, indexNow, newCumulativeIndex, cumulativeQuotaInterest, newQuotaProfits, feeInterest);
+            _calcTotalDebt(newDebt, indexNow, newCumulativeIndex, cumulativeQuotaInterest, newQuotaFees, feeInterest);
 
         uint256 debtError = _calcDiff(oldTotalDebt, newTotalDebt + delta);
         uint256 rel = oldTotalDebt > newTotalDebt ? oldTotalDebt : newTotalDebt;

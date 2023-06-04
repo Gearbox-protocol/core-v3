@@ -485,13 +485,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amount}); // U:[CM-11]
 
             uint128 newCumulativeQuotaInterest;
-            uint128 newQuotaProfits;
+            uint128 newQuotaFees;
             {
                 uint256 profit;
 
                 uint128 quotaFees = (supportsQuotas) ? currentCreditAccountInfo.quotaFees : 0;
 
-                (newDebt, newCumulativeIndex, profit, newCumulativeQuotaInterest, newQuotaProfits) = CreditLogic
+                (newDebt, newCumulativeIndex, profit, newCumulativeQuotaInterest, newQuotaFees) = CreditLogic
                     .calcDecrease({
                     amount: _amountMinusFee(amount),
                     debt: collateralDebtData.debt,
@@ -517,7 +517,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 });
 
                 currentCreditAccountInfo.cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // U:[CM-11]
-                currentCreditAccountInfo.quotaFees = newQuotaProfits;
+                currentCreditAccountInfo.quotaFees = newQuotaFees;
             }
 
             /// If the entire underlying balance was spent on repayment, it is disabled

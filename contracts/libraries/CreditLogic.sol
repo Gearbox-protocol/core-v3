@@ -233,13 +233,13 @@ library CreditLogic {
             uint256 newCumulativeIndex,
             uint256 profit,
             uint128 newCumulativeQuotaInterest,
-            uint128 newQuotaProfits
+            uint128 newQuotaFees
         )
     {
         uint256 amountToRepay = amount;
 
-        /// The debt is repaid in the order of: quota profits -> quota interest -> base interest -> debt
-        /// I.e., first the amount is subtracted from quota profits. If there is a remainder, it goes
+        /// The debt is repaid in the order of: quota fees -> quota interest -> base interest -> debt
+        /// I.e., first the amount is subtracted from quota fees. If there is a remainder, it goes
         /// to repay quota interest, and so on. If the repayment amount only partially covers quota interest, then that will be
         /// partially repaid (with part of payment going to fees pro-rata), while base interest
         /// and debt remain inchanged. If the amount covers quota interest fully, then the same logic
@@ -247,11 +247,11 @@ library CreditLogic {
         unchecked {
             if (quotaFees != 0) {
                 if (amountToRepay > quotaFees) {
-                    newQuotaProfits = 0;
+                    newQuotaFees = 0;
                     amountToRepay -= quotaFees;
                     profit = quotaFees;
                 } else {
-                    newQuotaProfits = quotaFees - amountToRepay.toUint128();
+                    newQuotaFees = quotaFees - amountToRepay.toUint128();
                     profit = amountToRepay;
                     amountToRepay = 0;
                 }
