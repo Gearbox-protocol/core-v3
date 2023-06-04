@@ -412,6 +412,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         // Checks that the CA exists to revert early for late liquidations and save gas
         address borrower = _getBorrowerOrRevert(creditAccount); // F:[FA-5]
 
+        _applyPricesOnDemand(calls);
+
         // Checks that the account hf < 1 and computes the totalValue
         // before the multicall
         ClosureAction closeAction;
@@ -447,8 +449,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         }
 
         if (calls.length != 0) {
-            FullCheckParams memory fullCheckParams =
-                _multicall(creditAccount, calls, collateralDebtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS); // U:[FA-16]
+            FullCheckParams memory fullCheckParams = _multicall(
+                creditAccount,
+                calls,
+                collateralDebtData.enabledTokensMask,
+                CLOSE_CREDIT_ACCOUNT_FLAGS | PRICES_ON_DEMAND_ALREADY_SET
+            ); // U:[FA-16]
             collateralDebtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter; // U:[FA-16]
         }
 
@@ -655,7 +661,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     /// price updates. This helps support tokens where there is no traditional price feeds,
                     /// but there is attested off-chain price data.
                     else if (method == ICreditFacadeV3Multicall.onDemandPriceUpdate.selector) {
-                        _onDemandPriceUpdate(mcall.callData[4:]); // U:[FA-25]
+                        if (flags & PRICES_ON_DEMAND_ALREADY_SET == 0) {
+                            _onDemandPriceUpdate(mcall.callData[4:]); // U:[FA-25]
+                        }
                     }
                     //
                     // ADD COLLATERAL
@@ -845,6 +853,31 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         /// Saves the final enabledTokensMask to be later passed into the fullCollateralCheck,
         /// where it will be saved to storage
         fullCheckParams.enabledTokensMaskAfter = enabledTokensMask; // U:[FA-38]
+    }
+
+    function _applyPricesOnDemand(MultiCall[] calldata calls) internal {
+        uint256 len = calls.length;
+
+        unchecked {
+            for (uint256 i = 0; i < len; ++i) {
+                MultiCall calldata mcall = calls[i];
+                //
+                // ON DEMAND PRICE UPDATE
+                //
+                /// Utility function that enables support for price feeds with on-demand
+                /// price updates. This helps support tokens where there is no traditional price feeds,
+                /// but there is attested off-chain price data.
+
+                if (
+                    mcall.target == address(this)
+                        && bytes4(mcall.callData) == ICreditFacadeV3Multicall.onDemandPriceUpdate.selector
+                ) {
+                    _onDemandPriceUpdate(mcall.callData[4:]);
+                } else {
+                    break;
+                }
+            }
+        }
     }
 
     /// @notice Sets the `activeCreditAccount` in Credit Manager

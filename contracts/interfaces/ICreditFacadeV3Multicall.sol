@@ -7,15 +7,15 @@ import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.so
 import {RevocationPair} from "./ICreditManagerV3.sol";
 
 uint192 constant ADD_COLLATERAL_PERMISSION = 1;
-uint192 constant INCREASE_DEBT_PERMISSION = 2 ** 1;
-uint192 constant DECREASE_DEBT_PERMISSION = 2 ** 2;
-uint192 constant ENABLE_TOKEN_PERMISSION = 2 ** 3;
-uint192 constant DISABLE_TOKEN_PERMISSION = 2 ** 4;
-uint192 constant WITHDRAW_PERMISSION = 2 ** 5;
-uint192 constant UPDATE_QUOTA_PERMISSION = 2 ** 6;
-uint192 constant REVOKE_ALLOWANCES_PERMISSION = 2 ** 7;
+uint192 constant INCREASE_DEBT_PERMISSION = 2 << 1;
+uint192 constant DECREASE_DEBT_PERMISSION = 2 << 2;
+uint192 constant ENABLE_TOKEN_PERMISSION = 2 << 3;
+uint192 constant DISABLE_TOKEN_PERMISSION = 2 << 4;
+uint192 constant WITHDRAW_PERMISSION = 2 << 5;
+uint192 constant UPDATE_QUOTA_PERMISSION = 2 << 6;
+uint192 constant REVOKE_ALLOWANCES_PERMISSION = 2 << 7;
 
-uint192 constant EXTERNAL_CALLS_PERMISSION = 2 ** 16;
+uint192 constant EXTERNAL_CALLS_PERMISSION = 2 << 16;
 
 uint256 constant ALL_CREDIT_FACADE_CALLS_PERMISSION = ADD_COLLATERAL_PERMISSION | INCREASE_DEBT_PERMISSION
     | DECREASE_DEBT_PERMISSION | ENABLE_TOKEN_PERMISSION | DISABLE_TOKEN_PERMISSION | WITHDRAW_PERMISSION
@@ -24,11 +24,12 @@ uint256 constant ALL_CREDIT_FACADE_CALLS_PERMISSION = ADD_COLLATERAL_PERMISSION 
 uint256 constant ALL_PERMISSIONS = ALL_CREDIT_FACADE_CALLS_PERMISSION | EXTERNAL_CALLS_PERMISSION;
 
 // All flags start from 193rd bit, because bot permissions is uint192
-uint256 constant INCREASE_DEBT_WAS_CALLED = 2 ** 193;
-uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 2 ** 194;
+uint256 constant INCREASE_DEBT_WAS_CALLED = 2 << 193;
+uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 2 << 194;
+uint256 constant PRICES_ON_DEMAND_ALREADY_SET = 2 << 195;
 
 // pay bot is a flag which is enabled in botMulticall function only to allow one payment operation
-uint256 constant PAY_BOT_CAN_BE_CALLED = 2 ** 195;
+uint256 constant PAY_BOT_CAN_BE_CALLED = 2 << 196;
 
 interface ICreditFacadeV3Multicall {
     /// @dev Instructs CreditFacadeV3 to check token balances at the end
