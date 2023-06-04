@@ -990,7 +990,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         ).updateQuota({
             creditAccount: creditAccount,
             token: token,
-            quotaChange: quotaChange,
+            requestedChange: quotaChange,
             minQuota: minQuota,
             maxQuota: maxQuota
         }); // U:[CM-25] // I: [CMQ-3]

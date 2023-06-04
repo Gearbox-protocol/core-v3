@@ -220,7 +220,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 pqk.updateQuota({
                     creditAccount: DUMB_ADDRESS,
                     token: DAI,
-                    quotaChange: daiQuota,
+                    requestedChange: daiQuota,
                     minQuota: 0,
                     maxQuota: type(uint96).max
                 });
@@ -229,7 +229,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 pqk.updateQuota({
                     creditAccount: DUMB_ADDRESS,
                     token: USDC,
-                    quotaChange: usdcQuota,
+                    requestedChange: usdcQuota,
                     minQuota: 0,
                     maxQuota: type(uint96).max
                 });
@@ -392,7 +392,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
         pqk.updateQuota({
             creditAccount: DUMB_ADDRESS,
             token: link,
-            quotaChange: -int96(uint96(100 * WAD)),
+            requestedChange: -int96(uint96(100 * WAD)),
             minQuota: 0,
             maxQuota: 1
         });
@@ -669,7 +669,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
             pqk.updateQuota({
                 creditAccount: creditAccount,
                 token: token1,
-                quotaChange: int96(cases[i].token1Quota),
+                requestedChange: int96(cases[i].token1Quota),
                 minQuota: 0,
                 maxQuota: type(uint96).max
             });
@@ -678,7 +678,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
             pqk.updateQuota({
                 creditAccount: creditAccount,
                 token: token2,
-                quotaChange: int96(cases[i].token2Quota),
+                requestedChange: int96(cases[i].token2Quota),
                 minQuota: 0,
                 maxQuota: type(uint96).max
             });
@@ -687,7 +687,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
             pqk.updateQuota({
                 creditAccount: DUMB_ADDRESS,
                 token: token1,
-                quotaChange: int96(cases[i].token1TotalQuoted - cases[i].token1Quota),
+                requestedChange: int96(cases[i].token1TotalQuoted - cases[i].token1Quota),
                 minQuota: 0,
                 maxQuota: type(uint96).max
             });
@@ -696,7 +696,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
             pqk.updateQuota({
                 creditAccount: DUMB_ADDRESS,
                 token: token2,
-                quotaChange: int96(cases[i].token2TotalQuoted - cases[i].token2Quota),
+                requestedChange: int96(cases[i].token2TotalQuoted - cases[i].token2Quota),
                 minQuota: 0,
                 maxQuota: type(uint96).max
             });
@@ -786,7 +786,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
         pqk.updateQuota({
             creditAccount: creditAccount,
             token: token1,
-            quotaChange: int96(uint96(WAD)),
+            requestedChange: int96(uint96(WAD)),
             minQuota: 0,
             maxQuota: type(uint96).max
         });
@@ -795,7 +795,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
         pqk.updateQuota({
             creditAccount: creditAccount,
             token: token2,
-            quotaChange: int96(uint96(WAD)),
+            requestedChange: int96(uint96(WAD)),
             minQuota: 0,
             maxQuota: type(uint96).max
         });
