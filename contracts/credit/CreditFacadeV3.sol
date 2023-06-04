@@ -950,9 +950,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         internal
         returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
-        int96 realQuotaChange;
         (address token, int96 quotaChange, uint96 minQuota) = abi.decode(callData, (address, int96, uint96)); // U:[FA-34]
-        (realQuotaChange, tokensToEnable, tokensToDisable) = ICreditManagerV3(creditManager).updateQuota({
+        (tokensToEnable, tokensToDisable) = ICreditManagerV3(creditManager).updateQuota({
             creditAccount: creditAccount,
             token: token,
             quotaChange: quotaChange,

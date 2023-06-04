@@ -10,7 +10,7 @@ import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {IGearStakingV3} from "../../../interfaces/IGearStakingV3.sol";
 // Mocks
 import {PoolMock} from "../../mocks/pool/PoolMock.sol";
-import {GearStakingMock} from "../../mocks/support/GearStakingMock.sol";
+import {GearStakingMock} from "../../mocks/governance/GearStakingMock.sol";
 import {GeneralMock} from "../../mocks/GeneralMock.sol";
 import "../../../interfaces/IAddressProviderV3.sol";
 
@@ -20,7 +20,7 @@ import "../../lib/constants.sol";
 // MOCKS
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
-import {TargetContractMock} from "../../mocks/adapters/TargetContractMock.sol";
+import {TargetContractMock} from "../../mocks/core/TargetContractMock.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";

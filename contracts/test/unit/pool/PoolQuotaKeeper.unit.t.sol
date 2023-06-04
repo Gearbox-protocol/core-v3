@@ -24,7 +24,7 @@ import {Tokens} from "../../config/Tokens.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 
 import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
-import {GaugeMock} from "../../mocks/pool/GaugeMock.sol";
+import {GaugeMock} from "../../mocks/governance/GaugeMock.sol";
 
 import {QuotasLogic} from "../../../libraries/QuotasLogic.sol";
 
@@ -220,7 +220,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 pqk.updateQuota({
                     creditAccount: DUMB_ADDRESS,
                     token: DAI,
-                    quotaChange: daiQuota,
+                    requestedChange: daiQuota,
                     minQuota: 0,
                     maxQuota: type(uint96).max
                 });
@@ -229,7 +229,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 pqk.updateQuota({
                     creditAccount: DUMB_ADDRESS,
                     token: USDC,
-                    quotaChange: usdcQuota,
+                    requestedChange: usdcQuota,
                     minQuota: 0,
                     maxQuota: type(uint96).max
                 });
@@ -392,7 +392,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
         pqk.updateQuota({
             creditAccount: DUMB_ADDRESS,
             token: link,
-            quotaChange: -int96(uint96(100 * WAD)),
+            requestedChange: -int96(uint96(100 * WAD)),
             minQuota: 0,
             maxQuota: 1
         });
@@ -407,7 +407,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
         uint96 maxQuota;
         /// expected
         uint256 expectedCaQuotaInterestChange;
-        uint256 expectedTradingFees;
+        uint256 expectedFees;
         int96 expectedRealQuotaChange;
         bool expectedEnableToken;
         bool expectedDisableToken;
@@ -427,7 +427,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 maxQuota: 100_000_000,
                 ///
                 expectedCaQuotaInterestChange: 0,
-                expectedTradingFees: 4_000,
+                expectedFees: 4_000,
                 expectedRealQuotaChange: 10_000,
                 expectedEnableToken: true,
                 expectedDisableToken: false,
@@ -443,7 +443,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 maxQuota: 100_000_000,
                 /// 10_000 * 10% quota
                 expectedCaQuotaInterestChange: 1_000,
-                expectedTradingFees: 0,
+                expectedFees: 0,
                 expectedRealQuotaChange: 0,
                 expectedEnableToken: false,
                 expectedDisableToken: false,
@@ -459,7 +459,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 maxQuota: 100_000_000,
                 /// 10_000 * 10% quota
                 expectedCaQuotaInterestChange: 0,
-                expectedTradingFees: 0,
+                expectedFees: 0,
                 expectedRealQuotaChange: 0,
                 expectedEnableToken: false,
                 expectedDisableToken: false,
@@ -475,7 +475,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 maxQuota: 9_000,
                 /// 10_000 * 10% quota
                 expectedCaQuotaInterestChange: 0,
-                expectedTradingFees: 0,
+                expectedFees: 0,
                 expectedRealQuotaChange: 0,
                 expectedEnableToken: false,
                 expectedDisableToken: false,
@@ -491,7 +491,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 maxQuota: 100_000_000,
                 /// 10_000 * 10% quota
                 expectedCaQuotaInterestChange: 1_000,
-                expectedTradingFees: 0,
+                expectedFees: 0,
                 expectedRealQuotaChange: -5000,
                 expectedEnableToken: false,
                 expectedDisableToken: false,
@@ -507,7 +507,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 maxQuota: 100_000_000,
                 /// 10_000 * 10% quota
                 expectedCaQuotaInterestChange: 500, // 500 for prev year + fee
-                expectedTradingFees: 35_000 * 40 / 100,
+                expectedFees: 35_000 * 40 / 100,
                 expectedRealQuotaChange: 35_000,
                 expectedEnableToken: false,
                 expectedDisableToken: false,
@@ -522,7 +522,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 minQuota: 0,
                 maxQuota: 100_000_000,
                 expectedCaQuotaInterestChange: 40_000 * 10 / 100, // 4_000 for prev year
-                expectedTradingFees: 0,
+                expectedFees: 0,
                 expectedRealQuotaChange: -40_000,
                 expectedEnableToken: false,
                 expectedDisableToken: true,
@@ -553,6 +553,8 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
 
             /// UPDATE QUOTA
 
+            (uint96 quota0,) = pqk.getQuotaAndOutstandingInterest(creditAccount, token);
+
             if (_case.expectRevert) {
                 vm.expectRevert(QuotaIsOutOfBoundsException.selector);
             } else {
@@ -570,13 +572,10 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
             }
 
             vm.prank(address(creditManagerMock));
-            (
-                uint128 caQuotaInterestChange,
-                uint128 tradingFees,
-                int96 realQuotaChange,
-                bool enableToken,
-                bool disableToken
-            ) = pqk.updateQuota(creditAccount, token, _case.change, _case.minQuota, _case.maxQuota);
+            (uint128 caQuotaInterestChange,, bool enableToken, bool disableToken) =
+                pqk.updateQuota(creditAccount, token, _case.change, _case.minQuota, _case.maxQuota);
+
+            (uint96 quota1,) = pqk.getQuotaAndOutstandingInterest(creditAccount, token);
 
             if (!_case.expectRevert) {
                 assertEq(
@@ -586,7 +585,9 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 );
 
                 assertEq(
-                    realQuotaChange, _case.expectedRealQuotaChange, _testCaseErr("Incorrece expectedRealQuotaChang")
+                    int96(quota1) - int96(quota0),
+                    _case.expectedRealQuotaChange,
+                    _testCaseErr("Incorrece expectedRealQuotaChang")
                 );
 
                 assertEq(enableToken, _case.expectedEnableToken, _testCaseErr("Incorrece enableToken"));
@@ -657,7 +658,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
         pqk.setTokenLimit({token: token1, limit: uint96(4 * WAD)});
         pqk.setTokenLimit({token: token2, limit: uint96(3 * WAD)});
 
-        address[] memory tokens = new address[](10);
+        address[] memory tokens = new address[](2);
         tokens[0] = token1;
         tokens[1] = token2;
 
@@ -668,7 +669,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
             pqk.updateQuota({
                 creditAccount: creditAccount,
                 token: token1,
-                quotaChange: int96(cases[i].token1Quota),
+                requestedChange: int96(cases[i].token1Quota),
                 minQuota: 0,
                 maxQuota: type(uint96).max
             });
@@ -677,7 +678,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
             pqk.updateQuota({
                 creditAccount: creditAccount,
                 token: token2,
-                quotaChange: int96(cases[i].token2Quota),
+                requestedChange: int96(cases[i].token2Quota),
                 minQuota: 0,
                 maxQuota: type(uint96).max
             });
@@ -686,7 +687,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
             pqk.updateQuota({
                 creditAccount: DUMB_ADDRESS,
                 token: token1,
-                quotaChange: int96(cases[i].token1TotalQuoted - cases[i].token1Quota),
+                requestedChange: int96(cases[i].token1TotalQuoted - cases[i].token1Quota),
                 minQuota: 0,
                 maxQuota: type(uint96).max
             });
@@ -695,7 +696,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
             pqk.updateQuota({
                 creditAccount: DUMB_ADDRESS,
                 token: token2,
-                quotaChange: int96(cases[i].token2TotalQuoted - cases[i].token2Quota),
+                requestedChange: int96(cases[i].token2TotalQuoted - cases[i].token2Quota),
                 minQuota: 0,
                 maxQuota: type(uint96).max
             });
@@ -708,12 +709,12 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
 
             if (cases[i].token1Quota > 1) {
                 vm.expectEmit(true, true, false, false);
-                emit RemoveQuota(creditAccount, token1);
+                emit UpdateQuota(creditAccount, token1, -int96(cases[i].token1Quota - 1));
             }
 
             if (cases[i].token2Quota > 1) {
                 vm.expectEmit(true, true, false, false);
-                emit RemoveQuota(creditAccount, token2);
+                emit UpdateQuota(creditAccount, token2, -int96(cases[i].token1Quota - 1));
             }
 
             vm.prank(address(creditManagerMock));
@@ -759,7 +760,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
 
         address creditAccount = makeAddr("CREDIT_ACCOUNT");
 
-        address[] memory tokens = new address[](10);
+        address[] memory tokens = new address[](2);
         tokens[0] = DUMB_ADDRESS;
 
         vm.expectRevert(TokenIsNotQuotedException.selector);
@@ -785,7 +786,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
         pqk.updateQuota({
             creditAccount: creditAccount,
             token: token1,
-            quotaChange: int96(uint96(WAD)),
+            requestedChange: int96(uint96(WAD)),
             minQuota: 0,
             maxQuota: type(uint96).max
         });
@@ -794,7 +795,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
         pqk.updateQuota({
             creditAccount: creditAccount,
             token: token2,
-            quotaChange: int96(uint96(WAD)),
+            requestedChange: int96(uint96(WAD)),
             minQuota: 0,
             maxQuota: type(uint96).max
         });
@@ -803,13 +804,13 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
         vm.warp(block.timestamp + 365 days);
 
         uint192 expectedIndex1 = QuotasLogic.cumulativeIndexSince(uint192(RAY), 1000, timestampLU);
-        uint192 expectedIndex2 = QuotasLogic.cumulativeIndexSince(uint192(RAY), 2000, timestampLU);
+        // uint192 expectedIndex2 = QuotasLogic.cumulativeIndexSince(uint192(RAY), 2000, timestampLU);
 
         vm.prank(address(creditManagerMock));
         pqk.accrueQuotaInterest(creditAccount, tokens);
 
         (, uint192 actualIndex1) = pqk.getQuota(creditAccount, token1);
-        (, uint192 actualIndex2) = pqk.getQuota(creditAccount, token2);
+        // (, uint192 actualIndex2) = pqk.getQuota(creditAccount, token2);
 
         assertEq(expectedIndex1, actualIndex1, "Incorrect token 1 index");
 

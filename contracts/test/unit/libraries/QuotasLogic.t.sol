@@ -268,7 +268,7 @@ contract QuotasLogicTest is TestHelper {
 
     //         (
     //             uint256 caQuotaInterestChange,
-    //             uint256 tradingFees,
+    //             uint256 fees,
     //             int256 quotaRevenueChange,
     //             int96 realQuotaChange,
     //             bool enableToken,

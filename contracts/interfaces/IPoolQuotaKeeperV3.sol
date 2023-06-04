@@ -20,10 +20,7 @@ struct AccountQuota {
 
 interface IPoolQuotaKeeperV3Events {
     /// @dev Emits when a quota for an account is updated
-    event UpdateQuota(address indexed creditAccount, address indexed token, int96 realQuotaChange);
-
-    /// @dev Emits when a quota for an account is updated
-    event RemoveQuota(address indexed creditAccount, address indexed token);
+    event UpdateQuota(address indexed creditAccount, address indexed token, int96 quotaChange);
 
     /// @dev Emits when the quota rate is updated
     event UpdateTokenQuotaRate(address indexed token, uint16 rate);
@@ -49,10 +46,12 @@ interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion {
     /// @dev Updates credit account's quotas for multiple tokens
     /// @param creditAccount Address of credit account
     /// @param token Address of the token to change the quota for
-    /// @param quotaChange Requested quota change in pool's underlying asset units
-    function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota, uint96 maxQuota)
+    /// @param requestedChange Requested quota change in pool's underlying asset units
+    /// @param minQuota Minimum deisred quota amount
+    /// @param maxQuota The maximal possible quota amount
+    function updateQuota(address creditAccount, address token, int96 requestedChange, uint96 minQuota, uint96 maxQuota)
         external
-        returns (uint128 caQuotaInterestChange, uint128 tradingFees, int96 change, bool enableToken, bool disableToken);
+        returns (uint128 caQuotaInterestChange, uint128 fees, bool enableToken, bool disableToken);
 
     /// @dev Updates all quotas to zero when closing a credit account, and computes the final quota interest change
     /// @param creditAccount Address of the Credit Account being closed
@@ -100,9 +99,18 @@ interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion {
         view
         returns (uint96 quota, uint192 cumulativeIndexLU);
 
+    /// @dev Returns the global quota-related parameters for a token
+    function getTokenQuotaParams(address token)
+        external
+        view
+        returns (uint16 rate, uint192 cumulativeIndexLU, uint16 quotaIncreaseFee, uint96 totalQuoted, uint96 limit);
+
     /// @dev Computes collateral value for quoted tokens on the account, as well as accrued quota interest
     function getQuotaAndOutstandingInterest(address creditAccount, address token)
         external
         view
         returns (uint96 quoted, uint128 outstandingInterest);
+
+    /// @dev Returns the current total annual quota revenue to the pool
+    function poolQuotaRevenue() external view returns (uint256);
 }

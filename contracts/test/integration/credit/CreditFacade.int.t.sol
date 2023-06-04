@@ -8,7 +8,7 @@ import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWE
 
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 
-import {BotListV3} from "../../../support/BotListV3.sol";
+import {BotListV3} from "../../../core/BotListV3.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 
 import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
@@ -45,8 +45,8 @@ import {CreditFacadeTestHelper} from "../../helpers/CreditFacadeTestHelper.sol";
 import "../../../interfaces/IExceptions.sol";
 
 // MOCKS
-import {AdapterMock} from "../../mocks//adapters/AdapterMock.sol";
-import {TargetContractMock} from "../../mocks/adapters/TargetContractMock.sol";
+import {AdapterMock} from "../../mocks//core/AdapterMock.sol";
+import {TargetContractMock} from "../../mocks/core/TargetContractMock.sol";
 
 import {GeneralMock} from "../../mocks//GeneralMock.sol";
 

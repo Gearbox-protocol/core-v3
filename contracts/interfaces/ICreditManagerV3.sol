@@ -24,7 +24,7 @@ struct CreditAccountInfo {
     uint256 debt;
     uint256 cumulativeIndexLastUpdate;
     uint128 cumulativeQuotaInterest;
-    uint128 quotaProfits;
+    uint128 quotaFees;
     uint256 enabledTokensMask;
     uint16 flags;
     uint64 since;
@@ -188,7 +188,7 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @param creditAccount Address of credit account
     function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota, uint96 maxQuota)
         external
-        returns (int96 realQuotaChange, uint256 tokensToEnable, uint256 tokensToDisable);
+        returns (uint256 tokensToEnable, uint256 tokensToDisable);
 
     //
     // GETTERS
