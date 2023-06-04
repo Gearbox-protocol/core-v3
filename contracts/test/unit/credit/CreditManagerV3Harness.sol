@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: UNLICENSED
+// Gearbox Protocol. Generalized leverage for DeFi protocols
+// (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
 import {CreditManagerV3, CreditAccountInfo} from "../../../credit/CreditManagerV3.sol";
@@ -48,7 +51,7 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         uint256 debt,
         uint256 cumulativeIndexLastUpdate,
         uint128 cumulativeQuotaInterest,
-        uint128 quotaProfits,
+        uint128 quotaFees,
         uint256 enabledTokensMask,
         uint16 flags,
         address borrower
@@ -56,7 +59,7 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         creditAccountInfo[creditAccount].debt = debt;
         creditAccountInfo[creditAccount].cumulativeIndexLastUpdate = cumulativeIndexLastUpdate;
         creditAccountInfo[creditAccount].cumulativeQuotaInterest = cumulativeQuotaInterest;
-        creditAccountInfo[creditAccount].quotaProfits = quotaProfits;
+        creditAccountInfo[creditAccount].quotaFees = quotaFees;
         creditAccountInfo[creditAccount].enabledTokensMask = enabledTokensMask;
         creditAccountInfo[creditAccount].flags = flags;
         creditAccountInfo[creditAccount].borrower = borrower;

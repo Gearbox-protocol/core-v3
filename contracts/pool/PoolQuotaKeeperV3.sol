@@ -94,17 +94,17 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @return caQuotaInterestChange Accrued quota interest since last interest update.
     ///                               It is expected that this value is stored/used by the caller,
     ///                               as PQK will update the interest index, which will set local accrued interest to 0
-    /// @return tradingFees Trading fees computed during increasing quota
+    /// @return fees Trading fees computed during increasing quota
     /// @return enableToken Whether the token needs to be enabled
     /// @return disableToken Whether the token needs to be disabled
     function updateQuota(address creditAccount, address token, int96 requestedChange, uint96 minQuota, uint96 maxQuota)
         external
         override
         creditManagerOnly // U:[PQK-4]
-        returns (uint128 caQuotaInterestChange, uint128 tradingFees, bool enableToken, bool disableToken)
+        returns (uint128 caQuotaInterestChange, uint128 fees, bool enableToken, bool disableToken)
     {
         int96 quotaChange;
-        (caQuotaInterestChange, tradingFees, quotaChange, enableToken, disableToken) =
+        (caQuotaInterestChange, fees, quotaChange, enableToken, disableToken) =
             _updateQuota(creditAccount, token, requestedChange, minQuota, maxQuota);
 
         if (quotaChange != 0) {
@@ -115,13 +115,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @dev IMPLEMENTATION: updateQuota
     function _updateQuota(address creditAccount, address token, int96 requestedChange, uint96 minQuota, uint96 maxQuota)
         internal
-        returns (
-            uint128 caQuotaInterestChange,
-            uint128 tradingFees,
-            int96 quotaChange,
-            bool enableToken,
-            bool disableToken
-        )
+        returns (uint128 caQuotaInterestChange, uint128 fees, int96 quotaChange, bool enableToken, bool disableToken)
     {
         AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
         TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
@@ -164,7 +158,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             // For some tokens, a one-time quota increase fee may be charged. This is a proxy for
             // trading fees for tokens with high volume but short position duration, in which
             // case trading fees are a more effective pricing policy than charging interest over time
-            tradingFees = uint128(uint96(quotaChange)) * quotaIncreaseFee / PERCENTAGE_FACTOR; // U: [PQK-15]
+            fees = uint128(uint96(quotaChange)) * quotaIncreaseFee / PERCENTAGE_FACTOR; // U: [PQK-15]
 
             // Increases the account quota and total quota by the amount (or remaining capacity, if the amount exceeds it)
             newQuoted = quoted + uint96(quotaChange);

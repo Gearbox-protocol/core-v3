@@ -24,7 +24,7 @@ struct CreditAccountInfo {
     uint256 debt;
     uint256 cumulativeIndexLastUpdate;
     uint128 cumulativeQuotaInterest;
-    uint128 quotaProfits;
+    uint128 quotaFees;
     uint256 enabledTokensMask;
     uint16 flags;
     uint64 since;

@@ -260,7 +260,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         if (supportsQuotas) {
             //     newCreditAccountInfo.cumulativeQuotaInterest = 1;
-            //     newCreditAccountInfo.quotaProfits = 0;
+            //     newCreditAccountInfo.quotaFees = 0;
             assembly {
                 let slot := add(newCreditAccountInfo.slot, 2)
                 sstore(slot, 1)
@@ -489,7 +489,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             {
                 uint256 profit;
 
-                uint128 quotaProfits = (supportsQuotas) ? currentCreditAccountInfo.quotaProfits : 0;
+                uint128 quotaFees = (supportsQuotas) ? currentCreditAccountInfo.quotaFees : 0;
 
                 (newDebt, newCumulativeIndex, profit, newCumulativeQuotaInterest, newQuotaProfits) = CreditLogic
                     .calcDecrease({
@@ -498,7 +498,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     cumulativeIndexNow: collateralDebtData.cumulativeIndexNow,
                     cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
                     cumulativeQuotaInterest: collateralDebtData.cumulativeQuotaInterest,
-                    quotaProfits: quotaProfits,
+                    quotaFees: quotaFees,
                     feeInterest: feeInterest
                 }); // U:[CM-11]
 
@@ -517,7 +517,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 });
 
                 currentCreditAccountInfo.cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // U:[CM-11]
-                currentCreditAccountInfo.quotaProfits = newQuotaProfits;
+                currentCreditAccountInfo.quotaFees = newQuotaProfits;
             }
 
             /// If the entire underlying balance was spent on repayment, it is disabled
@@ -828,7 +828,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             collateralDebtData.cumulativeQuotaInterest += currentCreditAccountInfo.cumulativeQuotaInterest - 1; // U:[CM-21]
 
             collateralDebtData.accruedInterest = collateralDebtData.cumulativeQuotaInterest;
-            collateralDebtData.accruedFees = currentCreditAccountInfo.quotaProfits;
+            collateralDebtData.accruedFees = currentCreditAccountInfo.quotaFees;
         }
 
         collateralDebtData.accruedInterest += CreditLogic.calcAccruedInterest({
@@ -985,9 +985,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         /// PQK also reports whether the quota was changed from zero to non-zero and vice versa, in order to
         /// safely enable and disable quoted tokens
 
-        (uint128 caInterestChange, uint128 tradingFees, bool enable, bool disable) = IPoolQuotaKeeperV3(
-            poolQuotaKeeper()
-        ).updateQuota({
+        (uint128 caInterestChange, uint128 quotaFees, bool enable, bool disable) = IPoolQuotaKeeperV3(poolQuotaKeeper())
+            .updateQuota({
             creditAccount: creditAccount,
             token: token,
             requestedChange: quotaChange,
@@ -1005,8 +1004,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         currentCreditAccountInfo.cumulativeQuotaInterest += caInterestChange; // U:[CM-25] // I: [CMQ-3]
 
-        if (tradingFees != 0) {
-            currentCreditAccountInfo.quotaProfits += tradingFees;
+        if (quotaFees != 0) {
+            currentCreditAccountInfo.quotaFees += quotaFees;
         }
     }
 

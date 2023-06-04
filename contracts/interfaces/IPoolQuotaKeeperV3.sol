@@ -51,7 +51,7 @@ interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion {
     /// @param maxQuota The maximal possible quota amount
     function updateQuota(address creditAccount, address token, int96 requestedChange, uint96 minQuota, uint96 maxQuota)
         external
-        returns (uint128 caQuotaInterestChange, uint128 tradingFees, bool enableToken, bool disableToken);
+        returns (uint128 caQuotaInterestChange, uint128 fees, bool enableToken, bool disableToken);
 
     /// @dev Updates all quotas to zero when closing a credit account, and computes the final quota interest change
     /// @param creditAccount Address of the Credit Account being closed
