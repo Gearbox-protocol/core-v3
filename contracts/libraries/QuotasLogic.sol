@@ -47,7 +47,7 @@ library QuotasLogic {
     /// @param rate Rate for current token
     /// @param change Real change in quota
     function calcQuotaRevenueChange(uint16 rate, int256 change) internal pure returns (int256) {
-        return int256(change) * int256(uint256(rate)) / int16(PERCENTAGE_FACTOR);
+        return change * int256(uint256(rate)) / int16(PERCENTAGE_FACTOR);
     }
 
     /// @dev Computes the actual quota change with respect to total limit on quotas

@@ -2163,11 +2163,11 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 caseName = string.concat(caseName, "disable case");
                 expectedTokensToDisable = LINK_TOKEN_MASK;
             }
-            poolQuotaKeeperMock.setUpdateQuotaReturns(caInterestChange, 456, enable, disable);
+            poolQuotaKeeperMock.setUpdateQuotaReturns(caInterestChange, enable, disable);
 
             /// @notice mock returns predefined values which do not depend on params
 
-            (int96 rqc, uint256 tokensToEnable, uint256 tokensToDisable) = creditManager.updateQuota({
+            (uint256 tokensToEnable, uint256 tokensToDisable) = creditManager.updateQuota({
                 creditAccount: creditAccount,
                 token: tokenTestSuite.addressOf(Tokens.LINK),
                 quotaChange: 122,
@@ -2184,7 +2184,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 INITIAL_INTEREST + caInterestChange,
                 _testCaseErr("Incorrect cumulativeQuotaInterest")
             );
-            assertEq(rqc, 456, _testCaseErr("Incorrect realQuotaChange"));
 
             vm.revertTo(snapshot);
         }

@@ -98,7 +98,7 @@ error AllowanceFailedException();
 /// @dev Thrown on attempting to perform an action for an address that owns no Credit Account
 error CreditAccountDoesNotExistException();
 
-/// @dev Thrown on configurator attempting to add more than 256 collateral tokens
+/// @dev Thrown on configurator attempting to add more than 255 collateral tokens
 error TooManyTokensException();
 
 /// @dev Thrown if more than the maximal number of tokens were enabled on a Credit Account,

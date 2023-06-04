@@ -124,8 +124,7 @@ contract CreditManagerMock {
         IPoolV3(poolService).repayCreditAccount(borrowedAmount, profit, loss);
     }
 
-    function setUpdateQuota(int96 change, uint256 tokensToEnable, uint256 tokensToDisable) external {
-        qu_change = change;
+    function setUpdateQuota(uint256 tokensToEnable, uint256 tokensToDisable) external {
         qu_tokensToEnable = tokensToEnable;
         qu_tokensToDisable = tokensToDisable;
     }
@@ -133,9 +132,8 @@ contract CreditManagerMock {
     function updateQuota(address, address, int96, uint96, uint96)
         external
         view
-        returns (int96 change, uint256 tokensToEnable, uint256 tokensToDisable)
+        returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
-        change = qu_change;
         tokensToEnable = qu_tokensToEnable;
         tokensToDisable = qu_tokensToDisable;
     }

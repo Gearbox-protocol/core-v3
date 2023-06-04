@@ -35,7 +35,6 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
 
     ///
     uint128 internal return_caQuotaInterestChange;
-    int96 internal return_realQuotaChange;
     bool internal return_enableToken;
     bool internal return_disableToken;
 
@@ -54,28 +53,15 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     function updateQuota(address, address, int96, uint96, uint96)
         external
         view
-        returns (
-            uint128 caQuotaInterestChange,
-            uint128 tradingFees,
-            int96 realQuotaChange,
-            bool enableToken,
-            bool disableToken
-        )
+        returns (uint128 caQuotaInterestChange, uint128 tradingFees, bool enableToken, bool disableToken)
     {
         caQuotaInterestChange = return_caQuotaInterestChange;
-        realQuotaChange = return_realQuotaChange;
         enableToken = return_enableToken;
         disableToken = return_disableToken;
     }
 
-    function setUpdateQuotaReturns(
-        uint128 caQuotaInterestChange,
-        int96 realQuotaChange,
-        bool enableToken,
-        bool disableToken
-    ) external {
+    function setUpdateQuotaReturns(uint128 caQuotaInterestChange, bool enableToken, bool disableToken) external {
         return_caQuotaInterestChange = caQuotaInterestChange;
-        return_realQuotaChange = realQuotaChange;
         return_enableToken = enableToken;
         return_disableToken = disableToken;
     }

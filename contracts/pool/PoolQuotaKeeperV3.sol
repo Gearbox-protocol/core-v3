@@ -90,26 +90,20 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @param token Address of the token
     /// @param quotaChange Signed quota change amount
     /// @param minQuota Minimum deisred quota amount
+    /// @param maxQuota The maximal possible quota amount
     /// @return caQuotaInterestChange Accrued quota interest since last interest update.
     ///                               It is expected that this value is stored/used by the caller,
     ///                               as PQK will update the interest index, which will set local accrued interest to 0
     /// @return tradingFees Trading fees computed during increasing quota
-    /// @return realQuotaChange Actual quota change. Can be lower than requested on quota increase, it total quotas are
-    ///                         at capacity.
     /// @return enableToken Whether the token needs to be enabled
     /// @return disableToken Whether the token needs to be disabled
     function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota, uint96 maxQuota)
         external
         override
         creditManagerOnly // U:[PQK-4]
-        returns (
-            uint128 caQuotaInterestChange,
-            uint128 tradingFees,
-            int96 realQuotaChange,
-            bool enableToken,
-            bool disableToken
-        )
+        returns (uint128 caQuotaInterestChange, uint128 tradingFees, bool enableToken, bool disableToken)
     {
+        int96 realQuotaChange;
         (caQuotaInterestChange, tradingFees, realQuotaChange, enableToken, disableToken) =
             _updateQuota(creditAccount, token, quotaChange, minQuota, maxQuota);
 
@@ -230,7 +224,6 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
         for (uint256 i; i < len;) {
             address token = tokens[i];
-            if (token == address(0)) break; // U: [PQK-16]
 
             AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
             TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
@@ -241,15 +234,14 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
                 quoted--;
 
                 uint16 rate = tokenQuotaParams.rate;
-                uint96 totalQuoted = tokenQuotaParams.totalQuoted;
 
                 /// Computes quota revenue change
                 quotaRevenueChange += QuotasLogic.calcQuotaRevenueChange(rate, -int256(uint256(quoted))); // U: [PQK-16]
 
                 /// Decreases the total token quota by the account's quota
-                tokenQuotaParams.totalQuoted = totalQuoted - quoted; // U: [PQK-16]
+                tokenQuotaParams.totalQuoted -= quoted; // U: [PQK-16]
 
-                emit RemoveQuota({creditAccount: creditAccount, token: token});
+                emit UpdateQuota({creditAccount: creditAccount, token: token, realQuotaChange: -int96(quoted)});
             }
 
             // Sets account quota to zero
@@ -295,7 +287,6 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         unchecked {
             for (uint256 i; i < len; ++i) {
                 address token = tokens[i];
-                if (token == address(0)) break;
 
                 AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
                 TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];

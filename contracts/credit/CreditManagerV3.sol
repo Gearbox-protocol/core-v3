@@ -978,19 +978,16 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         override
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
-        returns (int96 realQuotaChange, uint256 tokensToEnable, uint256 tokensToDisable)
+        returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
         /// The PoolQuotaKeeper returns the interest to be cached (quota interest is computed dynamically,
         /// so the cumulative index inside PQK needs to be updated before setting the new quota value).
         /// PQK also reports whether the quota was changed from zero to non-zero and vice versa, in order to
         /// safely enable and disable quoted tokens
-        uint128 caInterestChange;
-        bool enable;
-        bool disable;
-        uint128 tradingFees;
 
-        (caInterestChange, tradingFees, realQuotaChange, enable, disable) = IPoolQuotaKeeperV3(poolQuotaKeeper())
-            .updateQuota({
+        (uint128 caInterestChange, uint128 tradingFees, bool enable, bool disable) = IPoolQuotaKeeperV3(
+            poolQuotaKeeper()
+        ).updateQuota({
             creditAccount: creditAccount,
             token: token,
             quotaChange: quotaChange,
