@@ -26,10 +26,14 @@ uint256 constant ALL_PERMISSIONS = ALL_CREDIT_FACADE_CALLS_PERMISSION | EXTERNAL
 // All flags start from 193rd bit, because bot permissions is uint192
 uint256 constant INCREASE_DEBT_WAS_CALLED = 1 << 193;
 uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 1 << 194;
-uint256 constant PRICES_ON_DEMAND_ALREADY_SET = 1 << 195;
+uint256 constant PRICE_UPDATES_ALREADY_APPLIED = 1 << 195;
 
 // pay bot is a flag which is enabled in botMulticall function only to allow one payment operation
 uint256 constant PAY_BOT_CAN_BE_CALLED = 1 << 196;
+
+interface IUpdatablePriceFeed {
+    function updatePrice(bytes calldata data) external;
+}
 
 interface ICreditFacadeV3Multicall {
     /// @dev Instructs CreditFacadeV3 to check token balances at the end

@@ -236,7 +236,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     function openCreditAccount(uint256 debt, address onBehalfOf)
         external
         override
-        nonZeroAddress(onBehalfOf) // todo: add check
+        nonZeroAddress(onBehalfOf)
         nonReentrant // U:[CM-5]
         creditFacadeOnly // // U:[CM-2]
         returns (address creditAccount)
@@ -1475,7 +1475,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     ///         which gives users/bots time to react and adjust their position for the new LT
     /// @dev A static LT can be forced by setting ltInitial to desired LT and setting timestampRampStart to unit40.max
     /// @param token The collateral token to set the LT for
-    /// todo: add ltInitial
+    /// @param ltInitial The initial LT before ramping
     /// @param ltFinal The final LT after ramping
     /// @param timestampRampStart Timestamp when the LT starts ramping
     /// @param rampDuration Duration of ramping

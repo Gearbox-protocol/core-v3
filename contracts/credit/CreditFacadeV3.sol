@@ -30,7 +30,6 @@ import {
 import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
 import {ClaimAction, ETH_ADDRESS, IWithdrawalManagerV3} from "../interfaces/IWithdrawalManagerV3.sol";
 import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
-import {IPriceFeedOnDemand} from "../interfaces/IPriceFeedOnDemand.sol";
 
 import {IPoolV3, IPoolBase} from "../interfaces/IPoolV3.sol";
 import {IDegenNFTV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFTV2.sol";
@@ -361,6 +360,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     }
 
     /// @notice Runs a batch of transactions within a multicall and liquidates the account
+    /// - Applies on-demand price feed updates if any are found in the multicall.
     /// - Computes the total value and checks that hf < 1. An account can't be liquidated when hf >= 1.
     ///   Total value has to be computed before the multicall, otherwise the liquidator would be able
     ///   to manipulate it. Withdrawals are included into the total value according to the following logic
@@ -412,7 +412,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         // Checks that the CA exists to revert early for late liquidations and save gas
         address borrower = _getBorrowerOrRevert(creditAccount); // F:[FA-5]
 
-        _applyPricesOnDemand(calls);
+        // Price feed updates must be applied before the multicall because they affect CA's collateral evaluation
+        uint256 remainingCalls = _applyOnDemandPriceUpdates(calls);
 
         // Checks that the account hf < 1 and computes the totalValue
         // before the multicall
@@ -448,12 +449,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(tokensToEnable); // U:[FA-15]
         }
 
-        if (calls.length != 0) {
+        if (remainingCalls != 0) {
             FullCheckParams memory fullCheckParams = _multicall(
                 creditAccount,
                 calls,
                 collateralDebtData.enabledTokensMask,
-                CLOSE_CREDIT_ACCOUNT_FLAGS | PRICES_ON_DEMAND_ALREADY_SET
+                CLOSE_CREDIT_ACCOUNT_FLAGS | PRICE_UPDATES_ALREADY_APPLIED
             ); // U:[FA-16]
             collateralDebtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter; // U:[FA-16]
         }
@@ -649,7 +650,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     /// price updates. This helps support tokens where there is no traditional price feeds,
                     /// but there is attested off-chain price data.
                     else if (method == ICreditFacadeV3Multicall.onDemandPriceUpdate.selector) {
-                        if (flags & PRICES_ON_DEMAND_ALREADY_SET == 0) {
+                        if (flags & PRICE_UPDATES_ALREADY_APPLIED == 0) {
                             _onDemandPriceUpdate(mcall.callData[4:]); // U:[FA-25]
                         }
                     }
@@ -817,7 +818,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     bytes memory result = mcall.target.functionCall(mcall.callData); // U:[FA-38]
 
                     // Emits an event
-                    emit Execute({creditAccount: creditAccount, targetContract: targetContract}); // todo: add check
+                    emit Execute({creditAccount: creditAccount, targetContract: targetContract});
 
                     (uint256 tokensToEnable, uint256 tokensToDisable) = abi.decode(result, (uint256, uint256)); // U:[FA-38]
                     enabledTokensMask = enabledTokensMask.enableDisable({
@@ -855,28 +856,23 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         fullCheckParams.enabledTokensMaskAfter = enabledTokensMask; // U:[FA-38]
     }
 
-    function _applyPricesOnDemand(MultiCall[] calldata calls) internal {
+    /// @dev Applies on-demand price feed updates from the multicall if the are any, returns number of calls remaining
+    ///      `onDemandPriceUpdate` calls are expected to be placed before all other calls in the multicall
+    function _applyOnDemandPriceUpdates(MultiCall[] calldata calls) internal returns (uint256 remainingCalls) {
         uint256 len = calls.length;
-
         unchecked {
-            for (uint256 i = 0; i < len; ++i) {
+            for (uint256 i; i < len; ++i) {
                 MultiCall calldata mcall = calls[i];
-                //
-                // ON DEMAND PRICE UPDATE
-                //
-                /// Utility function that enables support for price feeds with on-demand
-                /// price updates. This helps support tokens where there is no traditional price feeds,
-                /// but there is attested off-chain price data.
-
                 if (
                     mcall.target == address(this)
                         && bytes4(mcall.callData) == ICreditFacadeV3Multicall.onDemandPriceUpdate.selector
                 ) {
                     _onDemandPriceUpdate(mcall.callData[4:]);
                 } else {
-                    break;
+                    return len - i;
                 }
             }
+            return 0;
         }
     }
 
@@ -914,7 +910,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         address priceFeed = IPriceOracleV2(ICreditManagerV3(creditManager).priceOracle()).priceFeeds(token); // U:[FA-25]
         if (priceFeed == address(0)) revert PriceFeedDoesNotExistException(); // U:[FA-25]
 
-        IPriceFeedOnDemand(priceFeed).updatePrice(data); // U:[FA-25]
+        IUpdatablePriceFeed(priceFeed).updatePrice(data); // U:[FA-25]
     }
 
     /// @notice Requests the Credit Manager to transfer collateral from the caller to the Credit Account
