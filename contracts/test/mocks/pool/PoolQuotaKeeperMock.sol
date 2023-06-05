@@ -53,9 +53,10 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     function updateQuota(address, address, int96, uint96, uint96)
         external
         view
-        returns (uint128 caQuotaInterestChange, uint128 tradingFees, bool enableToken, bool disableToken)
+        returns (uint128 caQuotaInterestChange, uint128 fees, bool enableToken, bool disableToken)
     {
         caQuotaInterestChange = return_caQuotaInterestChange;
+        fees = 0;
         enableToken = return_enableToken;
         disableToken = return_disableToken;
     }
@@ -135,9 +136,9 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
         return 0;
     }
 
-    function getTokenQuotaParams(address token)
+    function getTokenQuotaParams(address)
         external
-        view
+        pure
         returns (uint16 rate, uint192 cumulativeIndexLU, uint16 quotaIncreaseFee, uint96 totalQuoted, uint96 limit)
     {
         return (0, 0, 0, 0, 0);

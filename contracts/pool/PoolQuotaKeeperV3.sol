@@ -88,40 +88,34 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @notice Updates a Credit Account's quota amount for a token
     /// @param creditAccount Address of credit account
     /// @param token Address of the token
-    /// @param quotaChange Signed quota change amount
+    /// @param requestedChange Requested quota change in pool's underlying asset units
     /// @param minQuota Minimum deisred quota amount
     /// @param maxQuota The maximal possible quota amount
     /// @return caQuotaInterestChange Accrued quota interest since last interest update.
     ///                               It is expected that this value is stored/used by the caller,
     ///                               as PQK will update the interest index, which will set local accrued interest to 0
-    /// @return tradingFees Trading fees computed during increasing quota
+    /// @return fees Trading fees computed during increasing quota
     /// @return enableToken Whether the token needs to be enabled
     /// @return disableToken Whether the token needs to be disabled
-    function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota, uint96 maxQuota)
+    function updateQuota(address creditAccount, address token, int96 requestedChange, uint96 minQuota, uint96 maxQuota)
         external
         override
         creditManagerOnly // U:[PQK-4]
-        returns (uint128 caQuotaInterestChange, uint128 tradingFees, bool enableToken, bool disableToken)
+        returns (uint128 caQuotaInterestChange, uint128 fees, bool enableToken, bool disableToken)
     {
-        int96 realQuotaChange;
-        (caQuotaInterestChange, tradingFees, realQuotaChange, enableToken, disableToken) =
-            _updateQuota(creditAccount, token, quotaChange, minQuota, maxQuota);
+        int96 quotaChange;
+        (caQuotaInterestChange, fees, quotaChange, enableToken, disableToken) =
+            _updateQuota(creditAccount, token, requestedChange, minQuota, maxQuota);
 
-        if (realQuotaChange != 0) {
-            emit UpdateQuota({creditAccount: creditAccount, token: token, realQuotaChange: realQuotaChange});
+        if (quotaChange != 0) {
+            emit UpdateQuota({creditAccount: creditAccount, token: token, quotaChange: quotaChange});
         }
     }
 
     /// @dev IMPLEMENTATION: updateQuota
-    function _updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota, uint96 maxQuota)
+    function _updateQuota(address creditAccount, address token, int96 requestedChange, uint96 minQuota, uint96 maxQuota)
         internal
-        returns (
-            uint128 caQuotaInterestChange,
-            uint128 tradingFees,
-            int96 realQuotaChange,
-            bool enableToken,
-            bool disableToken
-        )
+        returns (uint128 caQuotaInterestChange, uint128 fees, int96 quotaChange, bool enableToken, bool disableToken)
     {
         AccountQuota storage accountQuota = accountQuotas[creditAccount][token];
         TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
@@ -147,9 +141,9 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
         uint96 newQuoted;
 
-        realQuotaChange = quotaChange;
+        quotaChange = requestedChange;
 
-        if (realQuotaChange > 0) {
+        if (quotaChange > 0) {
             // INCREASE
 
             (uint96 totalQuoted, uint96 limit) = _getTokenQuotaTotalAndLimit(tokenQuotaParams);
@@ -157,34 +151,34 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             // Computes the current capacity until quota limit and checks the amount against it
             // If the requested increase amount is above capacity, only the remaining capacity will
             // be provided as a quota
-            realQuotaChange = QuotasLogic.calcRealQuotaIncreaseChange(totalQuoted, limit, realQuotaChange); // U: [PQK-15]
+            quotaChange = QuotasLogic.calcActualQuotaChange(totalQuoted, limit, quotaChange); // U: [PQK-15]
 
             // If applicable, trading fees are computed on the quota increase amount and
             // added to accrued fees in the CM
             // For some tokens, a one-time quota increase fee may be charged. This is a proxy for
             // trading fees for tokens with high volume but short position duration, in which
             // case trading fees are a more effective pricing policy than charging interest over time
-            tradingFees = uint128(uint96(realQuotaChange)) * quotaIncreaseFee / PERCENTAGE_FACTOR; // U: [PQK-15]
+            fees = uint128(uint96(quotaChange)) * quotaIncreaseFee / PERCENTAGE_FACTOR; // U: [PQK-15]
+
+            // Increases the account quota and total quota by the amount (or remaining capacity, if the amount exceeds it)
+            newQuoted = quoted + uint96(quotaChange);
 
             // Quoted tokens are only enabled in the CM when their quotas are changed
             // from zero to non-zero. This is done to correctly
             // update quotas on closing the account - if a token ends up disabled while having a non-zero quota,
             // the CM will fail to zero it on closing an account, which will break quota interest computations.
             // This value is returned in order for Credit Manager to update enabled tokens locally.
-            if (quoted <= 1) {
+            if (quoted <= 1 && newQuoted > 1) {
                 enableToken = true; // U: [PQK-15]
             }
 
-            // Increases the account quota and total quota by the amount (or remaining capacity, if the amount exceeds it)
-            newQuoted = quoted + uint96(realQuotaChange);
-
-            tokenQuotaParams.totalQuoted = totalQuoted + uint96(realQuotaChange); // U: [PQK-15]
+            tokenQuotaParams.totalQuoted = totalQuoted + uint96(quotaChange); // U: [PQK-15]
         } else {
             /// DECREASE
-            /// Decreases the account quota and total quota by the amount
 
-            newQuoted = quoted - uint96(-realQuotaChange);
-            tokenQuotaParams.totalQuoted -= uint96(-realQuotaChange); // U: [PQK-15]
+            /// Decreases the account quota and total quota by the amount
+            newQuoted = quoted - uint96(-quotaChange);
+            tokenQuotaParams.totalQuoted -= uint96(-quotaChange); // U: [PQK-15]
 
             /// Computes whether the token should be disabled (quota changed from non-zero to zero)
             if (newQuoted <= 1) {
@@ -200,7 +194,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         accountQuota.cumulativeIndexLU = cumulativeIndexNow; // U: [PQK-15]
 
         // Computes the total quota revenue change
-        int256 quotaRevenueChange = QuotasLogic.calcQuotaRevenueChange(rate, int256(realQuotaChange)); // U: [PQK-15]
+        int256 quotaRevenueChange = QuotasLogic.calcQuotaRevenueChange(rate, int256(quotaChange)); // U: [PQK-15]
 
         // Quota revenue must be changed on each quota update, so that the
         // pool can correctly compute its liquidity metrics in the future
@@ -241,7 +235,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
                 /// Decreases the total token quota by the account's quota
                 tokenQuotaParams.totalQuoted -= quoted; // U: [PQK-16]
 
-                emit UpdateQuota({creditAccount: creditAccount, token: token, realQuotaChange: -int96(quoted)});
+                emit UpdateQuota({creditAccount: creditAccount, token: token, quotaChange: -int96(quoted)});
             }
 
             // Sets account quota to zero

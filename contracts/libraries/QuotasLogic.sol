@@ -56,13 +56,13 @@ library QuotasLogic {
     /// by capacity. This is done instead of reverting to avoid unexpected reverts due to race conditions
     /// @param totalQuoted Sum of all quotas for a token
     /// @param limit Quota limit for a token
-    /// @param quotaChange The requested quota increase
-    /// @return realQuotaChange Amount the quota actually changed by after taking
+    /// @param requestedChange The requested quota increase
+    /// @return quotaChange Amount the quota actually changed by after taking
     ///                         capacity into account
-    function calcRealQuotaIncreaseChange(uint96 totalQuoted, uint96 limit, int96 quotaChange)
+    function calcActualQuotaChange(uint96 totalQuoted, uint96 limit, int96 requestedChange)
         internal
         pure
-        returns (int96 realQuotaChange)
+        returns (int96 quotaChange)
     {
         if (totalQuoted >= limit) {
             return 0;
@@ -73,7 +73,7 @@ library QuotasLogic {
 
             // Since limit should be less than int96.max under correct configuration, downcasting maxQuotaCapacity should
             // be safe
-            return uint96(quotaChange) > maxQuotaCapacity ? int96(maxQuotaCapacity) : quotaChange; // I:[CMQ-08,10]
+            return uint96(requestedChange) > maxQuotaCapacity ? int96(maxQuotaCapacity) : requestedChange; // I:[CMQ-08,10]
         }
     }
 }

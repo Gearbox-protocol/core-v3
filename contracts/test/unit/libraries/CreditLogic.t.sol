@@ -106,10 +106,10 @@ contract CreditLogicTest is TestHelper {
         uint256 indexNow,
         uint256 indexOpen,
         uint256 quotaInterest,
-        uint256 quotaProfits,
+        uint256 quotaFees,
         uint16 feeInterest
     ) internal pure returns (uint256) {
-        return debt + quotaProfits
+        return debt + quotaFees
             + (debt * indexNow / indexOpen + quotaInterest - debt) * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR;
     }
 
@@ -181,13 +181,13 @@ contract CreditLogicTest is TestHelper {
         uint256 indexAtOpen,
         uint256 delta,
         uint128 quotaInterest,
-        uint128 quotaProfits,
+        uint128 quotaFees,
         uint16 feeInterest
     ) public {
         debt = WAD + debt % (2 ** 128 - WAD - 1);
         delta = delta % (2 ** 128 - 1);
         quotaInterest = quotaInterest % (2 ** 96 - 1);
-        quotaProfits = quotaInterest % (2 ** 96 - 1);
+        quotaFees = quotaInterest % (2 ** 96 - 1);
 
         vm.assume(debt + delta <= 2 ** 128 - 1);
 
@@ -205,16 +205,16 @@ contract CreditLogicTest is TestHelper {
 
         vm.assume(interest > 1);
 
-        if (delta > debt + interest + quotaInterest + quotaProfits) {
-            delta %= debt + interest + quotaInterest + quotaProfits;
+        if (delta > debt + interest + quotaInterest + quotaFees) {
+            delta %= debt + interest + quotaInterest + quotaFees;
         }
 
-        (uint256 newDebt, uint256 newCumulativeIndex,, uint256 cumulativeQuotaInterest, uint256 newQuotaProfits) =
-            CreditLogic.calcDecrease(delta, debt, indexNow, indexAtOpen, quotaInterest, quotaProfits, feeInterest);
+        (uint256 newDebt, uint256 newCumulativeIndex,, uint256 cumulativeQuotaInterest, uint256 newQuotaFees) =
+            CreditLogic.calcDecrease(delta, debt, indexNow, indexAtOpen, quotaInterest, quotaFees, feeInterest);
 
-        uint256 oldTotalDebt = _calcTotalDebt(debt, indexNow, indexAtOpen, quotaInterest, quotaProfits, feeInterest);
+        uint256 oldTotalDebt = _calcTotalDebt(debt, indexNow, indexAtOpen, quotaInterest, quotaFees, feeInterest);
         uint256 newTotalDebt =
-            _calcTotalDebt(newDebt, indexNow, newCumulativeIndex, cumulativeQuotaInterest, newQuotaProfits, feeInterest);
+            _calcTotalDebt(newDebt, indexNow, newCumulativeIndex, cumulativeQuotaInterest, newQuotaFees, feeInterest);
 
         uint256 debtError = _calcDiff(oldTotalDebt, newTotalDebt + delta);
         uint256 rel = oldTotalDebt > newTotalDebt ? oldTotalDebt : newTotalDebt;
@@ -231,13 +231,13 @@ contract CreditLogicTest is TestHelper {
         uint256 indexAtOpen,
         uint256 delta,
         uint128 quotaInterest,
-        uint128 quotaProfits,
+        uint128 quotaFees,
         uint16 feeInterest
     ) public {
         debt = WAD + debt % (2 ** 128 - WAD - 1);
         delta = delta % (2 ** 128 - 1);
         quotaInterest = quotaInterest % (2 ** 96 - 1);
-        quotaProfits = quotaInterest % (2 ** 96 - 1);
+        quotaFees = quotaInterest % (2 ** 96 - 1);
 
         vm.assume(debt + delta <= 2 ** 128 - 1);
 
@@ -255,18 +255,18 @@ contract CreditLogicTest is TestHelper {
 
         vm.assume(interest > 1);
 
-        if (delta > debt + interest + quotaInterest + quotaProfits) {
-            delta %= debt + interest + quotaInterest + quotaProfits;
+        if (delta > debt + interest + quotaInterest + quotaFees) {
+            delta %= debt + interest + quotaInterest + quotaFees;
         }
 
         (uint256 newDebt,, uint256 profit,,) =
-            CreditLogic.calcDecrease(delta, debt, indexNow, indexAtOpen, quotaInterest, quotaProfits, feeInterest);
+            CreditLogic.calcDecrease(delta, debt, indexNow, indexAtOpen, quotaInterest, quotaFees, feeInterest);
 
         uint256 expectedProfit;
 
-        if (delta > quotaProfits) {
-            uint256 remainingDelta = delta - quotaProfits;
-            expectedProfit = quotaProfits;
+        if (delta > quotaFees) {
+            uint256 remainingDelta = delta - quotaFees;
+            expectedProfit = quotaFees;
             expectedProfit += remainingDelta
                 > (interest + quotaInterest) * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR
                 ? (interest + quotaInterest) * feeInterest / PERCENTAGE_FACTOR
