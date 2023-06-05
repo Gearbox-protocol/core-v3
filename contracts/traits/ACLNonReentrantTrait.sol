@@ -22,40 +22,49 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable, ReentrancyGuardTra
     /// @notice Emitted when new external controller is set
     event NewController(address indexed newController);
 
-    /// @notice Whether contract has an external controller set
-    bool public externalController;
-
     /// @notice External controller address
     address public controller;
 
-    /// @dev Ensures that function caller is external controller (if it is set) or configurator
+    /// @dev Ensures that function caller is external controller or configurator
     modifier controllerOnly() {
-        if (externalController) {
-            if (msg.sender != controller) {
-                revert CallerNotControllerException();
-            }
-        } else {
-            if (!_isConfigurator({account: msg.sender})) {
-                revert CallerNotControllerException();
-            }
-        }
+        _ensureCallerIsControllerOrConfigurator();
         _;
+    }
+
+    /// @dev Reverts if the caller is not controller or configurator
+    /// @dev Used to cut contract size on modifiers
+    function _ensureCallerIsControllerOrConfigurator() internal view {
+        if (msg.sender != controller && !_isConfigurator({account: msg.sender})) {
+            revert CallerNotControllerException();
+        }
     }
 
     /// @dev Ensures that function caller has pausable admin role
     modifier pausableAdminsOnly() {
+        _ensureCallerIsPausableAdmin();
+        _;
+    }
+
+    /// @dev Reverts if the caller is not pausable admin
+    /// @dev Used to cut contract size on modifiers
+    function _ensureCallerIsPausableAdmin() internal view {
         if (!_isPausableAdmin({account: msg.sender})) {
             revert CallerNotPausableAdminException();
         }
-        _;
     }
 
     /// @dev Ensures that function caller has unpausable admin role
     modifier unpausableAdminsOnly() {
+        _ensureCallerIsUnpausableAdmin();
+        _;
+    }
+
+    /// @dev Reverts if the caller is not unpausable admin
+    /// @dev Used to cut contract size on modifiers
+    function _ensureCallerIsUnpausableAdmin() internal view {
         if (!_isUnpausableAdmin({account: msg.sender})) {
             revert CallerNotUnpausableAdminException();
         }
-        _;
     }
 
     /// @notice Constructor
@@ -76,7 +85,7 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable, ReentrancyGuardTra
 
     /// @notice Sets new external controller, can only be called by configurator
     function setController(address newController) external configuratorOnly {
-        externalController = !_isConfigurator(newController);
+        if (controller == newController) return;
         controller = newController;
         emit NewController(newController);
     }

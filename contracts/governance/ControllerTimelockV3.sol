@@ -18,17 +18,15 @@ import {ILPPriceFeedV2} from "@gearbox-protocol/core-v2/contracts/interfaces/ILP
 ///      manipulate system parameters, within set boundaries.
 ///      This is mostly related to risk parameters that should ideally
 ///      be adjusted frequently, or periodic tasks (e.g., updating price feed limiters)
-///      that are too trivial to employ full governance
+///      that are too trivial to employ full governance for.
 /// @dev The contract uses PolicyManager as its underlying engine
 ///      to set parameter change boundaries and conditions. In order to
 ///      schedule a change for a particular contract / function combination
-///      a policy needs to be defined for it. See more in `PolicyManager`
+///      a policy needs to be defined for it. The policy also determines the
+///      address that can change a particular parameter. See more in `PolicyManager`
 contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @notice Period before a mature transaction becomes stale
     uint256 public constant GRACE_PERIOD = 14 days;
-
-    /// @notice Admin address that can schedule controller transactions
-    address public admin;
 
     /// @notice Admin address that can cancel transactions
     address public vetoAdmin;
@@ -41,18 +39,11 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
 
     /// @dev Constructor
     /// @param _addressProvider Address of the contract address repository
-    /// @param _admin Admin of the controller contract that can schedule transactions
     /// @param _vetoAdmin Admin that can cancel transactions
-    constructor(address _addressProvider, address _admin, address _vetoAdmin) PolicyManagerV3(_addressProvider) {
-        admin = _admin;
+    constructor(address _addressProvider, address _vetoAdmin) PolicyManagerV3(_addressProvider) {
         vetoAdmin = _vetoAdmin;
     }
 
-    /// @dev Allows access to functions only to the controller admin
-    modifier adminOnly() {
-        _revertIfCallerIsNotAdmin();
-        _;
-    }
 
     /// @dev Allows access to function only to veto admin
     modifier vetoAdminOnly() {
@@ -60,11 +51,6 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         _;
     }
 
-    function _revertIfCallerIsNotAdmin() internal view {
-        if (msg.sender != admin) {
-            revert CallerNotAdminException();
-        }
-    }
 
     function _revertIfCallerIsNotVetoAdmin() internal view {
         if (msg.sender != vetoAdmin) {
@@ -76,10 +62,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @dev Requires the policy for keccak(group(creditManager), "EXPIRATION_DATE") to be enabled, otherwise auto-fails the check
     /// @param creditManager Adress of CM to update the expiration date for
     /// @param expirationDate The new expiration date
-    function setExpirationDate(address creditManager, uint40 expirationDate)
-        external
-        adminOnly // U: [CT-01]
-    {
+    function setExpirationDate(address creditManager, uint40 expirationDate) external {
         ICreditFacadeV3 creditFacade = ICreditFacadeV3(ICreditManagerV3(creditManager).creditFacade());
         address creditConfigurator = ICreditManagerV3(creditManager).creditConfigurator();
         IPoolV3 pool = IPoolV3(ICreditManagerV3(creditManager).pool());
@@ -105,10 +88,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @dev Requires the policy for keccak(group(priceFeed), "LP_PRICE_FEED_LIMITER") to be enabled, otherwise auto-fails the check
     /// @param priceFeed The price feed to update the limiter in
     /// @param lowerBound The new limiter lower bound value
-    function setLPPriceFeedLimiter(address priceFeed, uint256 lowerBound)
-        external
-        adminOnly // U: [CT-02]
-    {
+    function setLPPriceFeedLimiter(address priceFeed, uint256 lowerBound) external {
         uint256 currentLowerBound = ILPPriceFeedV2(priceFeed).lowerBound();
 
         if (!_checkPolicy(priceFeed, "LP_PRICE_FEED_LIMITER", currentLowerBound, lowerBound)) {
@@ -122,10 +102,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @dev Requires the policy for keccak(group(creditManager), "MAX_DEBT_PER_BLOCK_MULTIPLIER") to be enabled, otherwise auto-fails the check
     /// @param creditManager Adress of CM to update the multiplier for
     /// @param multiplier The new multiplier value
-    function setMaxDebtPerBlockMultiplier(address creditManager, uint8 multiplier)
-        external
-        adminOnly // U: [CT-03]
-    {
+    function setMaxDebtPerBlockMultiplier(address creditManager, uint8 multiplier) external {
         ICreditFacadeV3 creditFacade = ICreditFacadeV3(ICreditManagerV3(creditManager).creditFacade());
         address creditConfigurator = ICreditManagerV3(creditManager).creditConfigurator();
 
@@ -150,10 +127,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @dev Requires the policy for keccak(group(creditManager), "MIN_DEBT") to be enabled, otherwise auto-fails the check
     /// @param creditManager Adress of CM to update the limits for
     /// @param minDebt The new minimal debt amount
-    function setMinDebtLimit(address creditManager, uint128 minDebt)
-        external
-        adminOnly // U: [CT-04A]
-    {
+    function setMinDebtLimit(address creditManager, uint128 minDebt) external {
         ICreditFacadeV3 creditFacade = ICreditFacadeV3(ICreditManagerV3(creditManager).creditFacade());
         address creditConfigurator = ICreditManagerV3(creditManager).creditConfigurator();
 
@@ -174,10 +148,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @dev Requires the policy for keccak(group(creditManager), "MAX_DEBT") to be enabled, otherwise auto-fails the check
     /// @param creditManager Adress of CM to update the limits for
     /// @param maxDebt The maximal debt amount
-    function setMaxDebtLimit(address creditManager, uint128 maxDebt)
-        external
-        adminOnly // U: [CT-04B]
-    {
+    function setMaxDebtLimit(address creditManager, uint128 maxDebt) external {
         ICreditFacadeV3 creditFacade = ICreditFacadeV3(ICreditManagerV3(creditManager).creditFacade());
         address creditConfigurator = ICreditManagerV3(creditManager).creditConfigurator();
 
@@ -198,10 +169,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @dev Requires the policy for keccak(group(creditManager), "CREDIT_MANAGER_DEBT_LIMIT") to be enabled, otherwise auto-fails the check
     /// @param creditManager Adress of CM to update the debt limit for
     /// @param debtLimit The new debt limit
-    function setCreditManagerDebtLimit(address creditManager, uint256 debtLimit)
-        external
-        adminOnly // U: [CT-05]
-    {
+    function setCreditManagerDebtLimit(address creditManager, uint256 debtLimit) external {
         ICreditFacadeV3 creditFacade = ICreditFacadeV3(ICreditManagerV3(creditManager).creditFacade());
 
         if (creditFacade.trackTotalDebt()) {
@@ -251,10 +219,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         uint16 liquidationThresholdFinal,
         uint40 rampStart,
         uint24 rampDuration
-    )
-        external
-        adminOnly // U: [CT-06]
-    {
+    ) external {
         bytes32 policyHash = keccak256(abi.encode(_group[creditManager], _group[token], "TOKEN_LT"));
 
         address creditConfigurator = ICreditManagerV3(creditManager).creditConfigurator();
@@ -278,10 +243,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @dev Requires the policy for keccak(group(contractManager), "FORBID_ADAPTER") to be enabled, otherwise auto-fails the check
     /// @param creditManager Adress of CM to forbid a contract for
     /// @param adapter Address of adapter to forbid
-    function forbidAdapter(address creditManager, address adapter)
-        external
-        adminOnly // U: [CT-10]
-    {
+    function forbidAdapter(address creditManager, address adapter) external {
         bytes32 policyHash = keccak256(abi.encode(_group[creditManager], "FORBID_ADAPTER"));
 
         address creditConfigurator = ICreditManagerV3(creditManager).creditConfigurator();
@@ -299,10 +261,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @param pool Pool to update the limit for
     /// @param token Token to update the limit for
     /// @param limit The new value of the limit
-    function setTokenLimit(address pool, address token, uint96 limit)
-        external
-        adminOnly // U: [CT-11]
-    {
+    function setTokenLimit(address pool, address token, uint96 limit) external {
         bytes32 policyHash = keccak256(abi.encode(_group[pool], _group[token], "TOKEN_LIMIT"));
 
         address poolQuotaKeeper = IPoolV3(pool).poolQuotaKeeper();
@@ -324,7 +283,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @param pool Pool to update the limit for
     /// @param token Token to update the limit for
     /// @param quotaIncreaseFee The new value of the fee in bp
-    function setTokenQuotaIncreaseFee(address pool, address token, uint16 quotaIncreaseFee) external adminOnly {
+    function setTokenQuotaIncreaseFee(address pool, address token, uint16 quotaIncreaseFee) external {
         bytes32 policyHash = keccak256(abi.encode(_group[pool], _group[token], "TOKEN_QUOTA_INCREASE_FEE"));
 
         address poolQuotaKeeper = IPoolV3(pool).poolQuotaKeeper();
@@ -345,7 +304,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @notice Queues a transaction to set a new total debt limit for the entire pool
     /// @param pool Pool to update the limit for
     /// @param newLimit The new value of the limit
-    function setTotalDebtLimit(address pool, uint256 newLimit) external adminOnly {
+    function setTotalDebtLimit(address pool, uint256 newLimit) external {
         bytes32 policyHash = keccak256(abi.encode(_group[pool], "TOTAL_DEBT_LIMIT"));
 
         uint256 totalDebtLimitOld = IPoolV3(pool).totalDebtLimit();
@@ -360,7 +319,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @notice Queues a transaction to set a new withdrawal fee in a pool
     /// @param pool Pool to update the limit for
     /// @param newFee The new value of the fee in bp
-    function setWithdrawFee(address pool, uint256 newFee) external adminOnly {
+    function setWithdrawFee(address pool, uint256 newFee) external {
         bytes32 policyHash = keccak256(abi.encode(_group[pool], "WITHDRAW_FEE"));
 
         uint256 withdrawFeeOld = IPoolV3(pool).withdrawFee();
@@ -376,7 +335,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @param pool Pool to update the limit for
     /// @param token Token to set the new fee for
     /// @param rate The new minimal rate
-    function setMinQuotaRate(address pool, address token, uint16 rate) external adminOnly {
+    function setMinQuotaRate(address pool, address token, uint16 rate) external {
         bytes32 policyHash = keccak256(abi.encode(_group[pool], _group[token], "TOKEN_QUOTA_MIN_RATE"));
 
         address poolQuotaKeeper = IPoolV3(pool).poolQuotaKeeper();
@@ -400,7 +359,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @param pool Pool to update the limit for
     /// @param token Token to set the new fee for
     /// @param rate The new minimal rate
-    function setMaxQuotaRate(address pool, address token, uint16 rate) external adminOnly {
+    function setMaxQuotaRate(address pool, address token, uint16 rate) external {
         bytes32 policyHash = keccak256(abi.encode(_group[pool], _group[token], "TOKEN_QUOTA_MAX_RATE"));
 
         address poolQuotaKeeper = IPoolV3(pool).poolQuotaKeeper();
@@ -427,12 +386,26 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     function _queueTransaction(address target, string memory signature, bytes memory data) internal returns (bytes32) {
         uint256 eta = block.timestamp + delay;
 
-        bytes32 txHash = keccak256(abi.encode(target, signature, data, eta));
+        bytes32 txHash = keccak256(abi.encode(msg.sender, target, signature, data, eta));
 
-        queuedTransactions[txHash] =
-            QueuedTransactionData({queued: true, target: target, eta: uint40(eta), signature: signature, data: data});
+        queuedTransactions[txHash] = QueuedTransactionData({
+            queued: true,
+            executor: msg.sender,
+            target: target,
+            eta: uint40(eta),
+            signature: signature,
+            data: data
+        });
 
-        emit QueueTransaction(txHash, target, signature, data, uint40(eta));
+        emit QueueTransaction({
+            txHash: txHash,
+            executor: msg.sender,
+            target: target,
+            signature: signature,
+            data: data,
+            eta: uint40(eta)
+        });
+
         return txHash;
     }
 
@@ -448,14 +421,15 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
 
     /// @dev Executes a queued transaction
     /// @param txHash Hash of the transaction to be executed
-    function executeTransaction(bytes32 txHash)
-        external
-        adminOnly // U: [CT-09]
-    {
+    function executeTransaction(bytes32 txHash) external {
         QueuedTransactionData memory qtd = queuedTransactions[txHash];
 
         if (!qtd.queued) {
             revert TxNotQueuedException(); // U: [CT-07]
+        }
+
+        if (msg.sender != qtd.executor) {
+            revert CallerNotExecutorException(); // U: [CT-09]
         }
 
         address target = qtd.target;
@@ -487,15 +461,6 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     }
 
     /// CONFIGURATION
-
-    /// @dev Sets a new risk admin address
-    function setAdmin(address newAdmin)
-        external
-        configuratorOnly // U: [CT-08]
-    {
-        admin = newAdmin; // U: [CT-08]
-        emit SetAdmin(newAdmin); // U: [CT-08]
-    }
 
     /// @dev Sets a new veto admin address
     function setVetoAdmin(address newAdmin)
