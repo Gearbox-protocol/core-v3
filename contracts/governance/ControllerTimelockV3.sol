@@ -423,7 +423,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         }
 
         if (msg.sender != qtd.executor) {
-            revert CallerNotExecutorException();
+            revert CallerNotExecutorException(); // U: [CT-09]
         }
 
         address target = qtd.target;
