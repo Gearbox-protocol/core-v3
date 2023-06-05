@@ -11,8 +11,8 @@ import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
 import "../../interfaces/IAddressProviderV3.sol";
-import {WithdrawalManagerV3} from "../../support/WithdrawalManagerV3.sol";
-import {BotListV3} from "../../support/BotListV3.sol";
+import {WithdrawalManagerV3} from "../../core/WithdrawalManagerV3.sol";
+import {BotListV3} from "../../core/BotListV3.sol";
 import {PriceOracleV2, PriceFeedConfig} from "@gearbox-protocol/core-v2/contracts/oracles/PriceOracleV2.sol";
 import {GearToken} from "@gearbox-protocol/core-v2/contracts/tokens/GearToken.sol";
 

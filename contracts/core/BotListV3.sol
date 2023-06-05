@@ -86,7 +86,6 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @param permissions A bit mask of permissions
     /// @param fundingAmount Total amount of ETH available to the bot for payments
     /// @param weeklyFundingAllowance Amount of ETH available to the bot weekly
-
     function setBotPermissions(
         address creditAccount,
         address bot,
@@ -149,6 +148,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         }
     }
 
+    /// @dev Removes all permissions and funding for a (credit account, bot) pair
     function _eraseBot(address creditAccount, address bot) internal {
         delete botPermissions[creditAccount][bot]; // F: [BL-06]
         delete botFunding[creditAccount][bot]; // F: [BL-06]
@@ -164,7 +164,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @param paymentAmount Amount to pay
     function payBot(address payer, address creditAccount, address bot, uint72 paymentAmount)
         external
-        onlyValidCreditFacade
+        onlyValidCreditFacade // F: [BL-05]
     {
         if (paymentAmount == 0) return;
 

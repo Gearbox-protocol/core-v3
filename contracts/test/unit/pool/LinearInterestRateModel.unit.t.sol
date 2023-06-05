@@ -449,7 +449,7 @@ contract LinearInterestRateModelV3UniTest is TestHelper {
         );
 
             if (testCase.expectedRevert) {
-                vm.expectRevert(BorrowingMoreU2ForbiddenException.selector);
+                vm.expectRevert(BorrowingMoreThanU2ForbiddenException.selector);
             }
 
             irm.calcBorrowRate(testCase.expectedLiquidity, testCase.availableLiquidity, true);

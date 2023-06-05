@@ -56,10 +56,12 @@ contract QuotasLogicTest is TestHelper {
             })
         ];
 
-        for (uint256 i = 0; i < cases.length; ++i) {
-            params.cumulativeIndexLU_RAY = cases[i].cumulativeIndexLU;
+        vm.warp(5 * 365 days);
 
-            uint192 index = QuotasLogic.calcAdditiveCumulativeIndex(params, cases[i].rate, cases[i].deltaTimestamp);
+        for (uint256 i = 0; i < cases.length; ++i) {
+            uint192 index = QuotasLogic.cumulativeIndexSince(
+                cases[i].cumulativeIndexLU, cases[i].rate, block.timestamp - cases[i].deltaTimestamp
+            );
 
             assertEq(index, cases[i].expectedIndex, "Index computed incorrectly");
         }
@@ -102,7 +104,7 @@ contract QuotasLogicTest is TestHelper {
         ];
 
         for (uint256 i = 0; i < cases.length; ++i) {
-            params.cumulativeIndexLU_RAY = cases[i].cumulativeIndexLU;
+            params.cumulativeIndexLU = cases[i].cumulativeIndexLU;
 
             uint256 interest = QuotasLogic.calcAccruedQuotaInterest(
                 cases[i].quoted, cases[i].cumulativeIndexNow, cases[i].cumulativeIndexLU
@@ -255,7 +257,7 @@ contract QuotasLogicTest is TestHelper {
     //     ];
 
     //     for (uint256 i = 0; i < cases.length; ++i) {
-    //         params.cumulativeIndexLU_RAY = cases[i].cumulativeIndexTokenLU;
+    //         params.cumulativeIndexLU = cases[i].cumulativeIndexTokenLU;
     //         params.rate = cases[i].rate;
     //         params.limit = cases[i].quotaLimit;
     //         params.totalQuoted = cases[i].totalQuoted;
@@ -266,7 +268,7 @@ contract QuotasLogicTest is TestHelper {
 
     //         (
     //             uint256 caQuotaInterestChange,
-    //             uint256 tradingFees,
+    //             uint256 fees,
     //             int256 quotaRevenueChange,
     //             int96 realQuotaChange,
     //             bool enableToken,
@@ -346,7 +348,7 @@ contract QuotasLogicTest is TestHelper {
     //     ];
 
     //     for (uint256 i = 0; i < cases.length; ++i) {
-    //         params.cumulativeIndexLU_RAY = cases[i].cumulativeIndexTokenLU;
+    //         params.cumulativeIndexLU = cases[i].cumulativeIndexTokenLU;
     //         params.rate = cases[i].rate;
 
     //         accountQuota.quota = cases[i].quota;
@@ -371,7 +373,7 @@ contract QuotasLogicTest is TestHelper {
     // /// @notice U:[QL-5]: `removeQuota` works correctly
     // function test_U_QL_05_removeQuota_works_correctly() public {
     //     params.rate = 3650;
-    //     params.cumulativeIndexLU_RAY = uint192(RAY);
+    //     params.cumulativeIndexLU = uint192(RAY);
     //     params.totalQuoted = uint96(3 * WAD);
     //     accountQuota.quota = uint96(WAD);
 
@@ -386,7 +388,7 @@ contract QuotasLogicTest is TestHelper {
 
     // /// @notice U:[QL-6]: `setLimit` works correctly
     // function test_U_QL_06_setLimit_works_correctly() public {
-    //     params.cumulativeIndexLU_RAY = uint192(RAY);
+    //     params.cumulativeIndexLU = uint192(RAY);
     //     params.limit = uint96(WAD);
 
     //     bool changed = QuotasLogic.setLimit(params, uint96(WAD));
@@ -402,7 +404,7 @@ contract QuotasLogicTest is TestHelper {
 
     // /// @notice U:[QL-7]: `setQuotaIncreaseFee` works correctly
     // function test_U_QL_07_setQuotaIncreaseFee_works_correctly() public {
-    //     params.cumulativeIndexLU_RAY = uint192(RAY);
+    //     params.cumulativeIndexLU = uint192(RAY);
     //     params.quotaIncreaseFee = 100;
 
     //     bool changed = QuotasLogic.setQuotaIncreaseFee(params, 100);
@@ -418,7 +420,7 @@ contract QuotasLogicTest is TestHelper {
 
     // /// @notice U:[QL-8]: `updateRate` works correctly
     // function test_U_QL_08_updateRate_works_correctly() public {
-    //     params.cumulativeIndexLU_RAY = uint192(RAY);
+    //     params.cumulativeIndexLU = uint192(RAY);
     //     params.totalQuoted = uint96(WAD);
     //     params.rate = 1000;
 
@@ -431,7 +433,7 @@ contract QuotasLogicTest is TestHelper {
 
     //     assertEq(params.rate, 2000, "Incorrect rate set");
 
-    //     assertEq(params.cumulativeIndexLU_RAY, uint192(11 * RAY / 10));
+    //     assertEq(params.cumulativeIndexLU, uint192(11 * RAY / 10));
     // }
 
     // /// @notice U:[QL-9]: state-changing token-dependent functions fail on non-initialized token

@@ -16,12 +16,12 @@ import {CreditFacadeV3Harness} from "./CreditFacadeV3Harness.sol";
 
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 import {DegenNFTMock} from "../../mocks/token/DegenNFTMock.sol";
-import {AdapterMock} from "../../mocks/adapters/AdapterMock.sol";
-import {BotListMock} from "../../mocks/support/BotListMock.sol";
-import {WithdrawalManagerMock} from "../../mocks/support/WithdrawalManagerMock.sol";
+import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
+import {BotListMock} from "../../mocks/core/BotListMock.sol";
+import {WithdrawalManagerMock} from "../../mocks/core/WithdrawalManagerMock.sol";
 import {PriceOracleMock} from "../../mocks/oracles/PriceOracleMock.sol";
 import {PriceFeedOnDemandMock} from "../../mocks/oracles/PriceFeedOnDemandMock.sol";
-import {AdapterCallMock} from "../../mocks/adapters/AdapterCallMock.sol";
+import {AdapterCallMock} from "../../mocks/core/AdapterCallMock.sol";
 import {PoolMock} from "../../mocks/pool/PoolMock.sol";
 
 import {ENTERED} from "../../../traits/ReentrancyGuardTrait.sol";
@@ -310,7 +310,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
     /// @dev U:[FA-5]: borrower related functions revert if called not by borrower
     function test_U_FA_05_borrower_related_functions_revert_if_called_not_by_borrower() public notExpirableCase {
-        vm.expectRevert(CreditAccountNotExistsException.selector);
+        vm.expectRevert(CreditAccountDoesNotExistException.selector);
         creditFacade.closeCreditAccount({
             creditAccount: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
@@ -319,7 +319,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             calls: new MultiCall[](0)
         });
 
-        vm.expectRevert(CreditAccountNotExistsException.selector);
+        vm.expectRevert(CreditAccountDoesNotExistException.selector);
         creditFacade.liquidateCreditAccount({
             creditAccount: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
@@ -328,13 +328,13 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             calls: new MultiCall[](0)
         });
 
-        vm.expectRevert(CreditAccountNotExistsException.selector);
+        vm.expectRevert(CreditAccountDoesNotExistException.selector);
         creditFacade.multicall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
 
-        vm.expectRevert(CreditAccountNotExistsException.selector);
+        vm.expectRevert(CreditAccountDoesNotExistException.selector);
         creditFacade.claimWithdrawals({creditAccount: DUMB_ADDRESS, to: DUMB_ADDRESS});
 
-        vm.expectRevert(CreditAccountNotExistsException.selector);
+        vm.expectRevert(CreditAccountDoesNotExistException.selector);
         creditFacade.setBotPermissions({
             creditAccount: DUMB_ADDRESS,
             bot: DUMB_ADDRESS,
@@ -1400,7 +1400,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             })
         );
 
-        vm.expectRevert(PriceFeedNotExistsException.selector);
+        vm.expectRevert(PriceFeedDoesNotExistException.selector);
         creditFacade.multicallInt({creditAccount: creditAccount, calls: calls, enabledTokensMask: 0, flags: 0});
     }
 
@@ -1785,7 +1785,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         int96 change = -990;
 
-        creditManagerMock.setUpdateQuota({change: change, tokensToEnable: maskToEnable, tokensToDisable: maskToDisable});
+        creditManagerMock.setUpdateQuota({tokensToEnable: maskToEnable, tokensToDisable: maskToDisable});
 
         vm.expectCall(
             address(creditManagerMock),
@@ -1794,9 +1794,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 (creditAccount, link, change, 0, uint96(maxDebt * creditFacade.maxQuotaMultiplier()))
             )
         );
-
-        vm.expectEmit(true, true, false, false);
-        emit UpdateQuota(creditAccount, link, change);
 
         FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
             creditAccount: creditAccount,

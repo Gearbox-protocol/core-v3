@@ -10,7 +10,7 @@ import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.
 interface ICreditAccountBase is IVersion {
     function creditManager() external view returns (address);
     function safeTransfer(address token, address to, uint256 amount) external;
-    function execute(address target, bytes memory data) external returns (bytes memory result);
+    function execute(address target, bytes calldata data) external returns (bytes memory result);
 }
 
 /// @title Credit account V3 interface
@@ -21,7 +21,7 @@ interface ICreditAccountV3 is ICreditAccountBase {
 
     function safeTransfer(address token, address to, uint256 amount) external override;
 
-    function execute(address target, bytes memory data) external override returns (bytes memory result);
+    function execute(address target, bytes calldata data) external override returns (bytes memory result);
 
-    function rescue(address target, bytes memory data) external;
+    function rescue(address target, bytes calldata data) external;
 }

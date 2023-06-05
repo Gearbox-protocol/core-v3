@@ -65,7 +65,7 @@ contract CreditAccountV3 is ICreditAccountV3 {
     /// @param target Contract to call
     /// @param data Data to call the target contract with
     /// @return result Call result
-    function execute(address target, bytes memory data)
+    function execute(address target, bytes calldata data)
         external
         override
         creditManagerOnly // U:[CA-2]
@@ -79,7 +79,7 @@ contract CreditAccountV3 is ICreditAccountV3 {
     ///         Allows to rescue funds that were accidentally left on the account upon closure.
     /// @param target Contract to call
     /// @param data Data to call the target contract with
-    function rescue(address target, bytes memory data)
+    function rescue(address target, bytes calldata data)
         external
         override
         factoryOnly // U:[CA-2]
