@@ -38,6 +38,7 @@ contract PolicyManagerTest is Test {
     function test_PM_01_setPolicy_getPolicy_setGroup_getGroup_work_correctly() public {
         Policy memory policy = Policy({
             enabled: false,
+            admin: FRIEND,
             flags: 2 + 4 + 16,
             exactValue: 15,
             minValue: 10,
@@ -61,6 +62,8 @@ contract PolicyManagerTest is Test {
         Policy memory policy2 = policyManager.getPolicy(bytes32(uint256(1)));
 
         assertTrue(policy2.enabled, "Enabled not set by setPolicy");
+
+        assertEq(policy2.admin, FRIEND, "Admin was not set correctly");
 
         assertEq(policy2.flags, 22, "Flags are incorrect");
 
@@ -98,6 +101,7 @@ contract PolicyManagerTest is Test {
     function test_PM_02_checkPolicy_false_on_disabled() public {
         Policy memory policy = Policy({
             enabled: false,
+            admin: FRIEND,
             flags: 2 + 4 + 16,
             exactValue: 15,
             minValue: 10,
@@ -117,6 +121,7 @@ contract PolicyManagerTest is Test {
         vm.prank(CONFIGURATOR);
         policyManager.disablePolicy(bytes32(uint256(1)));
 
+        vm.prank(FRIEND);
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), 0, 1));
     }
 
@@ -124,6 +129,7 @@ contract PolicyManagerTest is Test {
     function test_PM_03_checkPolicy_exactValue_works_correctly(uint256 newValue) public {
         Policy memory policy = Policy({
             enabled: false,
+            admin: FRIEND,
             flags: 1,
             exactValue: 15,
             minValue: 0,
@@ -140,6 +146,7 @@ contract PolicyManagerTest is Test {
         vm.prank(CONFIGURATOR);
         policyManager.setPolicy(bytes32(uint256(1)), policy);
 
+        vm.prank(FRIEND);
         assertTrue(newValue == 15 || !policyManager.checkPolicy(bytes32(uint256(1)), 0, newValue));
     }
 
@@ -147,6 +154,7 @@ contract PolicyManagerTest is Test {
     function test_PM_04_checkPolicy_minValue_works_correctly(uint256 minValue, uint256 newValue) public {
         Policy memory policy = Policy({
             enabled: false,
+            admin: FRIEND,
             flags: 2,
             exactValue: 0,
             minValue: minValue,
@@ -163,6 +171,7 @@ contract PolicyManagerTest is Test {
         vm.prank(CONFIGURATOR);
         policyManager.setPolicy(bytes32(uint256(1)), policy);
 
+        vm.prank(FRIEND);
         assertTrue(newValue >= minValue || !policyManager.checkPolicy(bytes32(uint256(1)), 0, newValue));
     }
 
@@ -170,6 +179,7 @@ contract PolicyManagerTest is Test {
     function test_PM_05_checkPolicy_maxValue_works_correctly(uint256 maxValue, uint256 newValue) public {
         Policy memory policy = Policy({
             enabled: false,
+            admin: FRIEND,
             flags: 4,
             exactValue: 0,
             minValue: 0,
@@ -186,6 +196,7 @@ contract PolicyManagerTest is Test {
         vm.prank(CONFIGURATOR);
         policyManager.setPolicy(bytes32(uint256(1)), policy);
 
+        vm.prank(FRIEND);
         assertTrue(newValue <= maxValue || !policyManager.checkPolicy(bytes32(uint256(1)), 0, newValue));
     }
 
@@ -193,6 +204,7 @@ contract PolicyManagerTest is Test {
     function test_PM_06_checkPolicy_correctly_sets_reference_point() public {
         Policy memory policy = Policy({
             enabled: false,
+            admin: FRIEND,
             flags: 8,
             exactValue: 0,
             minValue: 0,
@@ -209,6 +221,7 @@ contract PolicyManagerTest is Test {
         vm.prank(CONFIGURATOR);
         policyManager.setPolicy(bytes32(uint256(1)), policy);
 
+        vm.prank(FRIEND);
         policyManager.checkPolicy(bytes32(uint256(1)), 20, 20);
 
         Policy memory policy2 = policyManager.getPolicy(bytes32(uint256(1)));
@@ -228,6 +241,7 @@ contract PolicyManagerTest is Test {
     ) public {
         Policy memory policy = Policy({
             enabled: false,
+            admin: FRIEND,
             flags: 8,
             exactValue: 0,
             minValue: 0,
@@ -246,18 +260,21 @@ contract PolicyManagerTest is Test {
 
         uint256 diff = newValue1 > oldValue ? newValue1 - oldValue : oldValue - newValue1;
 
+        vm.prank(FRIEND);
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), oldValue, newValue1) || diff >= minChange);
 
         vm.warp(block.timestamp + 1);
 
         diff = newValue2 > oldValue ? newValue2 - oldValue : oldValue - newValue2;
 
+        vm.prank(FRIEND);
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), newValue1, newValue2) || diff >= minChange);
 
         vm.warp(block.timestamp + 1 days);
 
         diff = newValue3 > newValue2 ? newValue3 - newValue2 : newValue2 - newValue3;
 
+        vm.prank(FRIEND);
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), newValue2, newValue3) || diff >= minChange);
 
         Policy memory policy2 = policyManager.getPolicy(bytes32(uint256(1)));
@@ -277,6 +294,7 @@ contract PolicyManagerTest is Test {
     ) public {
         Policy memory policy = Policy({
             enabled: false,
+            admin: FRIEND,
             flags: 16,
             exactValue: 0,
             minValue: 0,
@@ -295,18 +313,21 @@ contract PolicyManagerTest is Test {
 
         uint256 diff = newValue1 > oldValue ? newValue1 - oldValue : oldValue - newValue1;
 
+        vm.prank(FRIEND);
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), oldValue, newValue1) || diff <= maxChange);
 
         vm.warp(block.timestamp + 1);
 
         diff = newValue2 > oldValue ? newValue2 - oldValue : oldValue - newValue2;
 
+        vm.prank(FRIEND);
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), newValue1, newValue2) || diff <= maxChange);
 
         vm.warp(block.timestamp + 1 days);
 
         diff = newValue3 > newValue2 ? newValue3 - newValue2 : newValue2 - newValue3;
 
+        vm.prank(FRIEND);
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), newValue2, newValue3) || diff <= maxChange);
 
         Policy memory policy2 = policyManager.getPolicy(bytes32(uint256(1)));
@@ -334,6 +355,7 @@ contract PolicyManagerTest is Test {
 
         Policy memory policy = Policy({
             enabled: false,
+            admin: FRIEND,
             flags: 32,
             exactValue: 0,
             minValue: 0,
@@ -353,11 +375,13 @@ contract PolicyManagerTest is Test {
         uint256 pctDiff =
             (newValue1 > oldValue ? newValue1 - oldValue : oldValue - newValue1) * PERCENTAGE_FACTOR / oldValue;
 
+        vm.prank(FRIEND);
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), oldValue, newValue1) || pctDiff >= minPctChange);
         vm.warp(block.timestamp + 1);
 
         pctDiff = (newValue2 > oldValue ? newValue2 - oldValue : oldValue - newValue2) * PERCENTAGE_FACTOR / oldValue;
 
+        vm.prank(FRIEND);
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), newValue1, newValue2) || pctDiff >= minPctChange);
 
         vm.warp(block.timestamp + 1 days);
@@ -365,6 +389,7 @@ contract PolicyManagerTest is Test {
         pctDiff =
             (newValue3 > newValue2 ? newValue3 - newValue2 : newValue2 - newValue3) * PERCENTAGE_FACTOR / newValue2;
 
+        vm.prank(FRIEND);
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), newValue2, newValue3) || pctDiff >= minPctChange);
 
         Policy memory policy2 = policyManager.getPolicy(bytes32(uint256(1)));
@@ -392,6 +417,7 @@ contract PolicyManagerTest is Test {
 
         Policy memory policy = Policy({
             enabled: false,
+            admin: FRIEND,
             flags: 64,
             exactValue: 0,
             minValue: 0,
@@ -411,11 +437,13 @@ contract PolicyManagerTest is Test {
         uint256 pctDiff =
             (newValue1 > oldValue ? newValue1 - oldValue : oldValue - newValue1) * PERCENTAGE_FACTOR / oldValue;
 
+        vm.prank(FRIEND);
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), oldValue, newValue1) || pctDiff <= maxPctChange);
         vm.warp(block.timestamp + 1);
 
         pctDiff = (newValue2 > oldValue ? newValue2 - oldValue : oldValue - newValue2) * PERCENTAGE_FACTOR / oldValue;
 
+        vm.prank(FRIEND);
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), newValue1, newValue2) || pctDiff <= maxPctChange);
 
         vm.warp(block.timestamp + 1 days);
@@ -423,6 +451,7 @@ contract PolicyManagerTest is Test {
         pctDiff =
             (newValue3 > newValue2 ? newValue3 - newValue2 : newValue2 - newValue3) * PERCENTAGE_FACTOR / newValue2;
 
+        vm.prank(FRIEND);
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), newValue2, newValue3) || pctDiff <= maxPctChange);
 
         Policy memory policy2 = policyManager.getPolicy(bytes32(uint256(1)));
@@ -430,5 +459,33 @@ contract PolicyManagerTest is Test {
         assertEq(policy2.referencePoint, newValue2, "Incorrect reference point");
 
         assertEq(policy2.referencePointTimestampLU, block.timestamp, "Incorrect timestamp LU");
+    }
+
+    /// @dev [PM-11]: checkPolicy returns false on caller not being admin
+    function test_PM_11_checkPolicy_returns_false_on_wrong_caller() public {
+        Policy memory policy = Policy({
+            enabled: false,
+            admin: FRIEND,
+            flags: 0,
+            exactValue: 0,
+            minValue: 0,
+            maxValue: 0,
+            referencePoint: 0,
+            referencePointUpdatePeriod: 0,
+            referencePointTimestampLU: 0,
+            minPctChange: 0,
+            maxPctChange: 0,
+            minChange: 0,
+            maxChange: 0
+        });
+
+        vm.prank(CONFIGURATOR);
+        policyManager.setPolicy(bytes32(uint256(1)), policy);
+
+        vm.prank(USER);
+        assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), 0, 0));
+
+        vm.prank(FRIEND);
+        assertTrue(policyManager.checkPolicy(bytes32(uint256(1)), 0, 0));
     }
 }

@@ -30,14 +30,8 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable, ReentrancyGuardTra
 
     /// @dev Ensures that function caller is external controller (if it is set) or configurator
     modifier controllerOnly() {
-        if (externalController) {
-            if (msg.sender != controller) {
-                revert CallerNotControllerException();
-            }
-        } else {
-            if (!_isConfigurator({account: msg.sender})) {
-                revert CallerNotControllerException();
-            }
+        if (msg.sender != controller && !_isConfigurator({account: msg.sender})) {
+            revert CallerNotControllerException();
         }
         _;
     }
