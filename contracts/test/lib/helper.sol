@@ -108,6 +108,32 @@ contract TestHelper is Test {
         }
     }
 
+    function arrayOf(address v1) internal pure returns (address[] memory array) {
+        array = new address[](1);
+        array[0] = v1;
+    }
+
+    function arrayOf(address v1, address v2) internal pure returns (address[] memory array) {
+        array = new address[](2);
+        array[0] = v1;
+        array[1] = v2;
+    }
+
+    function arrayOf(address v1, address v2, address v3) internal pure returns (address[] memory array) {
+        array = new address[](3);
+        array[0] = v1;
+        array[1] = v2;
+        array[2] = v3;
+    }
+
+    function arrayOf(address v1, address v2, address v3, address v4) internal pure returns (address[] memory array) {
+        array = new address[](4);
+        array[0] = v1;
+        array[1] = v2;
+        array[2] = v3;
+        array[3] = v4;
+    }
+
     function assertEq(uint16[] memory a1, uint16[] memory a2, string memory reason) internal {
         assertEq(a1.length, a2.length, string.concat(reason, "Arrays has different length"));
 
