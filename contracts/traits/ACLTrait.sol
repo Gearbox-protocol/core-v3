@@ -24,10 +24,16 @@ abstract contract ACLTrait is SanityCheckTrait {
 
     /// @dev Ensures that function caller has configurator role
     modifier configuratorOnly() {
+        _ensureConfigurator();
+        _;
+    }
+
+    /// @dev Reverts if the caller is not the configurator
+    /// @dev Used to cut contract size on modifiers
+    function _ensureConfigurator() internal view {
         if (!_isConfigurator({account: msg.sender})) {
             revert CallerNotConfiguratorException();
         }
-        _;
     }
 
     /// @dev Checks whether given account has configurator role

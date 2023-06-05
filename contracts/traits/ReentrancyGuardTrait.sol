@@ -18,7 +18,7 @@ abstract contract ReentrancyGuardTrait {
     /// `private` function that does the actual work.
     modifier nonReentrant() {
         // On the first call to nonReentrant, _notEntered will be true
-        require(_reentrancyStatus != ENTERED, "ReentrancyGuard: reentrant call");
+        _ensureNotEntered();
 
         // Any calls to nonReentrant after this point will fail
         _reentrancyStatus = ENTERED;
@@ -28,5 +28,11 @@ abstract contract ReentrancyGuardTrait {
         // By storing the original value once again, a refund is triggered (see
         // https://eips.ethereum.org/EIPS/eip-2200)
         _reentrancyStatus = NOT_ENTERED;
+    }
+
+    /// @dev Reverts if the contract is currently entered
+    /// @dev /// @dev Used to cut contract size on modifiers
+    function _ensureNotEntered() internal view {
+        require(_reentrancyStatus != ENTERED, "ReentrancyGuard: reentrant call");
     }
 }
