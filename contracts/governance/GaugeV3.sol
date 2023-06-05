@@ -58,41 +58,38 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
     /// @param _gearStaking Address of the GEAR staking contract
     constructor(address _pool, address _gearStaking)
         ACLNonReentrantTrait(IPoolV3(_pool).addressProvider())
-        nonZeroAddress(_pool)
-        nonZeroAddress(_gearStaking)
+        nonZeroAddress(_gearStaking) // U:[GA-01]
     {
-        addressProvider = IPoolV3(_pool).addressProvider(); // F:[P4-01]
-        pool = _pool; // F:[P4-01]
-        voter = _gearStaking;
-        epochLastUpdate = IGearStakingV3(voter).getCurrentEpoch();
+        addressProvider = IPoolV3(_pool).addressProvider(); // U:[GA-01]
+        pool = _pool; // U:[GA-01]
+        voter = _gearStaking; // U:[GA-01]
+        epochLastUpdate = IGearStakingV3(voter).getCurrentEpoch(); // U:[GA-01]
     }
 
     /// @dev Reverts if the function is called by an address other than the voter
     modifier onlyVoter() {
-        if (msg.sender != voter) {
-            revert CallerNotVoterException();
-        }
+        _revertIfCallerNotVoter(); // U:[GA-02]
         _;
     }
 
     /// @notice Rolls the new epoch and updates all quota rates
     function updateEpoch() external {
-        _checkAndUpdateEpoch();
+        _checkAndUpdateEpoch(); // U:[GA-14]
     }
 
     /// @dev IMPLEMENTATION: updateEpoch()
     function _checkAndUpdateEpoch() internal {
-        uint16 epochNow = IGearStakingV3(voter).getCurrentEpoch();
+        uint16 epochNow = IGearStakingV3(voter).getCurrentEpoch(); // U:[GA-14]
 
         if (epochNow > epochLastUpdate) {
-            epochLastUpdate = epochNow;
+            epochLastUpdate = epochNow; // U:[GA-14]
 
             /// The PQK retrieves all rates from the Gauge on its own and saves them
             /// Since this function is only callable by the Gauge, active rates can only
             /// be updated once per epoch at most
-            _poolQuotaKeeper().updateRates();
+            _poolQuotaKeeper().updateRates(); // U:[GA-14]
 
-            emit UpdateEpoch(epochNow);
+            emit UpdateEpoch(epochNow); // U:[GA-14]
         }
     }
 
@@ -103,20 +100,20 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
     /// @param tokens Array of tokens to computes rates for
     /// @return rates Array of rates, in the same order as passed tokens
     function getRates(address[] calldata tokens) external view override returns (uint16[] memory rates) {
-        uint256 len = tokens.length;
-        rates = new uint16[](len);
+        uint256 len = tokens.length; // U:[GA-15]
+        rates = new uint16[](len); // U:[GA-15]
 
         unchecked {
             for (uint256 i; i < len; ++i) {
-                address token = tokens[i];
+                address token = tokens[i]; // U:[GA-15]
 
-                if (!isTokenAdded(token)) revert TokenNotAllowedException();
+                if (!isTokenAdded(token)) revert TokenNotAllowedException(); // U:[GA-15]
 
-                QuotaRateParams memory qrp = quotaRateParams[token];
+                QuotaRateParams memory qrp = quotaRateParams[token]; // U:[GA-15]
 
-                uint96 votesLpSide = qrp.totalVotesLpSide;
-                uint96 votesCaSide = qrp.totalVotesCaSide;
-                uint256 totalVotes = votesLpSide + votesCaSide;
+                uint96 votesLpSide = qrp.totalVotesLpSide; // U:[GA-15]
+                uint96 votesCaSide = qrp.totalVotesCaSide; // U:[GA-15]
+                uint256 totalVotes = votesLpSide + votesCaSide; // U:[GA-15]
 
                 /// Quota interest rates are determined by GEAR holders through voting
                 /// for one of two sides (for each token) - CA side or LP side.
@@ -129,7 +126,7 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
 
                 rates[i] = totalVotes == 0
                     ? qrp.minRate
-                    : uint16((uint256(qrp.minRate) * votesCaSide + uint256(qrp.maxRate) * votesLpSide) / totalVotes);
+                    : uint16((uint256(qrp.minRate) * votesCaSide + uint256(qrp.maxRate) * votesLpSide) / totalVotes); // U:[GA-15]
             }
         }
     }
@@ -143,10 +140,10 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
     function vote(address user, uint96 votes, bytes calldata extraData)
         external
         override(IGaugeV3, IVotingContractV3)
-        onlyVoter
+        onlyVoter // U:[GA-02]
     {
-        (address token, bool lpSide) = abi.decode(extraData, (address, bool));
-        _vote({user: user, token: token, votes: votes, lpSide: lpSide});
+        (address token, bool lpSide) = abi.decode(extraData, (address, bool)); // U:[GA-10,11,12]
+        _vote({user: user, token: token, votes: votes, lpSide: lpSide}); // U:[GA-10,11,12]
     }
 
     /// @dev IMPLEMENTATION: vote
@@ -155,21 +152,22 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
     /// @param token Token to add votes to
     /// @param lpSide Side to add votes to: `true` for LP side, `false` for CA side
     function _vote(address user, uint96 votes, address token, bool lpSide) internal {
-        _checkAndUpdateEpoch();
+        if (!isTokenAdded(token)) revert TokenNotAllowedException(); // U:[GA-10]
 
-        if (!isTokenAdded(token)) revert TokenNotAllowedException();
+        _checkAndUpdateEpoch(); // U:[GA-11]
 
-        QuotaRateParams storage qp = quotaRateParams[token];
+        QuotaRateParams storage qp = quotaRateParams[token]; // U:[GA-12]
         UserVotes storage uv = userTokenVotes[user][token];
+
         if (lpSide) {
-            qp.totalVotesLpSide += votes;
-            uv.votesLpSide += votes;
+            qp.totalVotesLpSide += votes; // U:[GA-12]
+            uv.votesLpSide += votes; // U:[GA-12]
         } else {
-            qp.totalVotesCaSide += votes;
-            uv.votesCaSide += votes;
+            qp.totalVotesCaSide += votes; // U:[GA-12]
+            uv.votesCaSide += votes; // U:[GA-12]
         }
 
-        emit Vote({user: user, token: token, votes: votes, lpSide: lpSide});
+        emit Vote({user: user, token: token, votes: votes, lpSide: lpSide}); // U:[GA-12]
     }
 
     /// @notice Removes the user's existing vote from the provided token and side
@@ -181,10 +179,10 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
     function unvote(address user, uint96 votes, bytes calldata extraData)
         external
         override(IGaugeV3, IVotingContractV3)
-        onlyVoter
+        onlyVoter // U:[GA-02]
     {
-        (address token, bool lpSide) = abi.decode(extraData, (address, bool));
-        _unvote({user: user, token: token, votes: votes, lpSide: lpSide});
+        (address token, bool lpSide) = abi.decode(extraData, (address, bool)); // U:[GA-10,11,13]
+        _unvote({user: user, token: token, votes: votes, lpSide: lpSide}); // U:[GA-10,11,13]
     }
 
     /// @dev IMPLEMENTATION: unvote
@@ -193,22 +191,22 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
     /// @param token Token to remove votes from
     /// @param lpSide Side to remove votes from: `true` for LP side, `false` for CA side
     function _unvote(address user, uint96 votes, address token, bool lpSide) internal {
-        _checkAndUpdateEpoch();
+        if (!isTokenAdded(token)) revert TokenNotAllowedException(); // U:[GA-10]
 
-        if (!isTokenAdded(token)) revert TokenNotAllowedException();
+        _checkAndUpdateEpoch(); // U:[GA-11]
 
-        QuotaRateParams storage qp = quotaRateParams[token];
-        UserVotes storage uv = userTokenVotes[user][token];
+        QuotaRateParams storage qp = quotaRateParams[token]; // U:[GA-13]
+        UserVotes storage uv = userTokenVotes[user][token]; // U:[GA-13]
 
         if (lpSide) {
-            qp.totalVotesLpSide -= votes;
-            uv.votesLpSide -= votes;
+            qp.totalVotesLpSide -= votes; // U:[GA-13]
+            uv.votesLpSide -= votes; // U:[GA-13]
         } else {
-            qp.totalVotesCaSide -= votes;
-            uv.votesCaSide -= votes;
+            qp.totalVotesCaSide -= votes; // U:[GA-13]
+            uv.votesCaSide -= votes; // U:[GA-13]
         }
 
-        emit Unvote({user: user, token: token, votes: votes, lpSide: lpSide});
+        emit Unvote({user: user, token: token, votes: votes, lpSide: lpSide}); // U:[GA-13]
     }
 
     //
@@ -217,25 +215,33 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
 
     /// @notice Sets the GEAR staking contract, which is the only entity allowed to vote/unvote directly
     /// @param newVoter The new voter contract
-    function setVoter(address newVoter) external nonZeroAddress(newVoter) configuratorOnly {
-        voter = newVoter;
+    function setVoter(address newVoter)
+        external
+        nonZeroAddress(newVoter)
+        configuratorOnly // U:[GA-03]
+    {
+        voter = newVoter; // U:[GA-09]
 
-        emit SetVoter({newVoter: newVoter});
+        emit SetVoter({newVoter: newVoter}); // U:[GA-09]
     }
 
     /// @dev Adds a new quoted token to the Gauge and PoolQuotaKeeper, and sets the initial rate params
     /// @param token Address of the token to add
     /// @param minRate The minimal interest rate paid on token's quotas
     /// @param maxRate The maximal interest rate paid on token's quotas
-    function addQuotaToken(address token, uint16 minRate, uint16 maxRate) external configuratorOnly {
-        _checkParams({minRate: minRate, maxRate: maxRate});
+    function addQuotaToken(address token, uint16 minRate, uint16 maxRate)
+        external
+        nonZeroAddress(token) // U:[GA-04]
+        configuratorOnly // U:[GA-03]
+    {
+        _checkParams({minRate: minRate, maxRate: maxRate}); // U:[GA-04]
 
         quotaRateParams[token] =
-            QuotaRateParams({minRate: minRate, maxRate: maxRate, totalVotesLpSide: 0, totalVotesCaSide: 0});
+            QuotaRateParams({minRate: minRate, maxRate: maxRate, totalVotesLpSide: 0, totalVotesCaSide: 0}); // U:[GA-05
 
-        _poolQuotaKeeper().addQuotaToken({token: token});
+        _poolQuotaKeeper().addQuotaToken({token: token}); // U:[GA-05]
 
-        emit AddQuotaToken({token: token, minRate: minRate, maxRate: maxRate});
+        emit AddQuotaToken({token: token, minRate: minRate, maxRate: maxRate}); // U:[GA-05]
     }
 
     /// @dev Changes the rate params for a quoted token
@@ -243,30 +249,49 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
     /// @param maxRate The maximal interest rate paid on token's quotas
     function changeQuotaTokenRateParams(address token, uint16 minRate, uint16 maxRate)
         external
-        nonZeroAddress(token)
-        controllerOnly
+        nonZeroAddress(token) // U:[GA-04]
+        configuratorOnly // U:[GA-03]
     {
-        _checkParams(minRate, maxRate);
+        _changeQuotaTokenRateParams(token, minRate, maxRate);
+    }
 
-        QuotaRateParams storage qrp = quotaRateParams[token];
-        qrp.minRate = minRate;
-        qrp.maxRate = maxRate;
+    /// @dev Changes the rate params for a quoted token
+    /// @param minRate The minimal interest rate paid on token's quotas
+    function changeQuotaTokenMinRate(address token, uint16 minRate) external nonZeroAddress(token) controllerOnly {
+        _changeQuotaTokenRateParams(token, minRate, quotaRateParams[token].maxRate); // U:[GA-06]
+    }
 
-        emit SetQuotaTokenParams({token: token, minRate: minRate, maxRate: maxRate});
+    function _changeQuotaTokenRateParams(address token, uint16 minRate, uint16 maxRate) internal {
+        if (!isTokenAdded(token)) revert TokenNotAllowedException(); // U:[GA-06]
+
+        _checkParams(minRate, maxRate); // U:[GA-04]
+
+        QuotaRateParams storage qrp = quotaRateParams[token]; // U:[GA-06]
+        qrp.minRate = minRate; // U:[GA-06]
+        qrp.maxRate = maxRate; // U:[GA-06]
+
+        emit SetQuotaTokenParams({token: token, minRate: minRate, maxRate: maxRate}); // U:[GA-06]
     }
 
     function _checkParams(uint16 minRate, uint16 maxRate) internal pure {
         if (minRate == 0 || minRate > maxRate) {
-            revert IncorrectParameterException();
+            revert IncorrectParameterException(); // U:[GA-04]
         }
     }
 
     function isTokenAdded(address token) public view returns (bool) {
-        return quotaRateParams[token].minRate != 0;
+        return quotaRateParams[token].maxRate != 0; // U:[GA-08]
     }
 
     /// @dev Returns quota keeper connected to the pool
     function _poolQuotaKeeper() private view returns (IPoolQuotaKeeperV3) {
         return IPoolQuotaKeeperV3(IPoolV3(pool).poolQuotaKeeper());
+    }
+
+    /// @dev Reverts if caller is not voter
+    function _revertIfCallerNotVoter() internal view {
+        if (msg.sender != voter) {
+            revert CallerNotVoterException(); // U:[GA-02]
+        }
     }
 }
