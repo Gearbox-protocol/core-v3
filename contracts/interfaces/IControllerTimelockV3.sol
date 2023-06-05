@@ -21,7 +21,7 @@ interface IControllerTimelockV3Events {
 
     /// @dev Emits when a transaction is queued
     event QueueTransaction(
-        bytes32 indexed txHash, address executor, address target, string signature, bytes data, uint40 eta
+        bytes32 indexed txHash, address indexed executor, address target, string signature, bytes data, uint40 eta
     );
 
     /// @dev Emits when a transaction is executed

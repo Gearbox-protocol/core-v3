@@ -31,7 +31,7 @@ abstract contract ReentrancyGuardTrait {
     }
 
     /// @dev Reverts if the contract is currently entered
-    /// @dev /// @dev Used to cut contract size on modifiers
+    /// @dev Used to cut contract size on modifiers
     function _ensureNotEntered() internal view {
         require(_reentrancyStatus != ENTERED, "ReentrancyGuard: reentrant call");
     }

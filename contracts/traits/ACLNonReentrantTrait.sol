@@ -27,13 +27,13 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable, ReentrancyGuardTra
 
     /// @dev Ensures that function caller is external controller or configurator
     modifier controllerOnly() {
-        _ensureControllerOrConfigurator();
+        _ensureCallerIsControllerOrConfigurator();
         _;
     }
 
     /// @dev Reverts if the caller is not controller or configurator
     /// @dev Used to cut contract size on modifiers
-    function _ensureControllerOrConfigurator() internal view {
+    function _ensureCallerIsControllerOrConfigurator() internal view {
         if (msg.sender != controller && !_isConfigurator({account: msg.sender})) {
             revert CallerNotControllerException();
         }
@@ -41,13 +41,13 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable, ReentrancyGuardTra
 
     /// @dev Ensures that function caller has pausable admin role
     modifier pausableAdminsOnly() {
-        _ensurePausableAdmin();
+        _ensureCallerIsPausableAdmin();
         _;
     }
 
     /// @dev Reverts if the caller is not pausable admin
     /// @dev Used to cut contract size on modifiers
-    function _ensurePausableAdmin() internal view {
+    function _ensureCallerIsPausableAdmin() internal view {
         if (!_isPausableAdmin({account: msg.sender})) {
             revert CallerNotPausableAdminException();
         }
@@ -55,13 +55,13 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable, ReentrancyGuardTra
 
     /// @dev Ensures that function caller has unpausable admin role
     modifier unpausableAdminsOnly() {
-        _ensureUnpausableAdmin();
+        _ensureCallerIsUnpausableAdmin();
         _;
     }
 
     /// @dev Reverts if the caller is not unpausable admin
     /// @dev Used to cut contract size on modifiers
-    function _ensureUnpausableAdmin() internal view {
+    function _ensureCallerIsUnpausableAdmin() internal view {
         if (!_isUnpausableAdmin({account: msg.sender})) {
             revert CallerNotUnpausableAdminException();
         }
@@ -85,6 +85,7 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable, ReentrancyGuardTra
 
     /// @notice Sets new external controller, can only be called by configurator
     function setController(address newController) external configuratorOnly {
+        if (controller == newController) return;
         controller = newController;
         emit NewController(newController);
     }
