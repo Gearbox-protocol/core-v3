@@ -5,6 +5,7 @@ pragma solidity ^0.8.17;
 
 struct QueuedTransactionData {
     bool queued;
+    address executor;
     address target;
     uint40 eta;
     string signature;
@@ -12,9 +13,6 @@ struct QueuedTransactionData {
 }
 
 interface IControllerTimelockV3Events {
-    /// @dev Emits when the admin of the controller is updated
-    event SetAdmin(address indexed newAdmin);
-
     /// @dev Emits when the veto admin of the controller is updated
     event SetVetoAdmin(address indexed newAdmin);
 
@@ -22,7 +20,9 @@ interface IControllerTimelockV3Events {
     event SetDelay(uint256 newDelay);
 
     /// @dev Emits when a transaction is queued
-    event QueueTransaction(bytes32 indexed txHash, address target, string signature, bytes data, uint40 eta);
+    event QueueTransaction(
+        bytes32 indexed txHash, address indexed executor, address target, string signature, bytes data, uint40 eta
+    );
 
     /// @dev Emits when a transaction is executed
     event ExecuteTransaction(bytes32 indexed txHash);
@@ -32,8 +32,9 @@ interface IControllerTimelockV3Events {
 }
 
 interface IControllerTimelockV3Errors {
-    /// @dev Thrown when the access-restricted function is called by other than the admin
-    error CallerNotAdminException();
+    /// @dev Thrown when an address that is not the designated executor
+    ///      attempts to execute a transaction
+    error CallerNotExecutorException();
 
     /// @dev Thrown when the access-restricted function is called by other than the veto admin
     error CallerNotVetoAdminException();

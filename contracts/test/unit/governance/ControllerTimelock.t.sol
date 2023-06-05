@@ -42,7 +42,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         vm.prank(CONFIGURATOR);
         addressProvider = new AddressProviderV3ACLMock();
-        controllerTimelock = new ControllerTimelockV3(address(addressProvider), admin, vetoAdmin);
+        controllerTimelock = new ControllerTimelockV3(address(addressProvider), vetoAdmin);
     }
 
     function _makeMocks()
@@ -110,6 +110,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         Policy memory policy = Policy({
             enabled: false,
+            admin: admin,
             flags: 1,
             exactValue: block.timestamp + 5,
             minValue: 0,
@@ -123,11 +124,16 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
             maxChange: 0
         });
 
+        // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setExpirationDate(creditManager, uint40(block.timestamp + 5));
+
         vm.prank(CONFIGURATOR);
         controllerTimelock.setPolicy(POLICY_CODE, policy);
 
         // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
-        vm.expectRevert(CallerNotAdminException.selector);
+        vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(USER);
         controllerTimelock.setExpirationDate(creditManager, uint40(block.timestamp + 5));
 
@@ -146,6 +152,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
             abi.encode(
+                admin,
                 creditConfigurator,
                 "setExpirationDate(uint40)",
                 abi.encode(block.timestamp + 5),
@@ -156,6 +163,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
             txHash,
+            admin,
             creditConfigurator,
             "setExpirationDate(uint40)",
             abi.encode(block.timestamp + 5),
@@ -175,7 +183,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -193,6 +201,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         Policy memory policy = Policy({
             enabled: false,
+            admin: admin,
             flags: 1,
             exactValue: 7,
             minValue: 0,
@@ -206,11 +215,16 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
             maxChange: 0
         });
 
+        // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setLPPriceFeedLimiter(lpPriceFeed, 7);
+
         vm.prank(CONFIGURATOR);
         controllerTimelock.setPolicy(POLICY_CODE, policy);
 
         // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
-        vm.expectRevert(CallerNotAdminException.selector);
+        vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(USER);
         controllerTimelock.setLPPriceFeedLimiter(lpPriceFeed, 7);
 
@@ -221,11 +235,11 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash =
-            keccak256(abi.encode(lpPriceFeed, "setLimiter(uint256)", abi.encode(7), block.timestamp + 1 days));
+            keccak256(abi.encode(admin, lpPriceFeed, "setLimiter(uint256)", abi.encode(7), block.timestamp + 1 days));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
-            txHash, lpPriceFeed, "setLimiter(uint256)", abi.encode(7), uint40(block.timestamp + 1 days)
+            txHash, admin, lpPriceFeed, "setLimiter(uint256)", abi.encode(7), uint40(block.timestamp + 1 days)
         );
 
         vm.prank(admin);
@@ -238,7 +252,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -255,6 +269,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         Policy memory policy = Policy({
             enabled: false,
+            admin: admin,
             flags: 1,
             exactValue: 4,
             minValue: 0,
@@ -268,11 +283,16 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
             maxChange: 0
         });
 
+        // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setMaxDebtPerBlockMultiplier(creditManager, 4);
+
         vm.prank(CONFIGURATOR);
         controllerTimelock.setPolicy(POLICY_CODE, policy);
 
         // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
-        vm.expectRevert(CallerNotAdminException.selector);
+        vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(USER);
         controllerTimelock.setMaxDebtPerBlockMultiplier(creditManager, 4);
 
@@ -284,13 +304,18 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
             abi.encode(
-                creditConfigurator, "setMaxDebtPerBlockMultiplier(uint8)", abi.encode(4), block.timestamp + 1 days
+                admin,
+                creditConfigurator,
+                "setMaxDebtPerBlockMultiplier(uint8)",
+                abi.encode(4),
+                block.timestamp + 1 days
             )
         );
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
             txHash,
+            admin,
             creditConfigurator,
             "setMaxDebtPerBlockMultiplier(uint8)",
             abi.encode(4),
@@ -309,7 +334,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -324,6 +349,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         Policy memory policy = Policy({
             enabled: false,
+            admin: admin,
             flags: 1,
             exactValue: 15,
             minValue: 0,
@@ -337,7 +363,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
             maxChange: 0
         });
 
-        // VERIFY THAT POLICY CHECKS ARE PERFORMED
+        // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
         vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(admin);
         controllerTimelock.setMinDebtLimit(creditManager, 15);
@@ -346,7 +372,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         controllerTimelock.setPolicy(POLICY_CODE, policy);
 
         // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
-        vm.expectRevert(CallerNotAdminException.selector);
+        vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(USER);
         controllerTimelock.setMinDebtLimit(creditManager, 15);
 
@@ -357,12 +383,15 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
-            abi.encode(creditConfigurator, "setLimits(uint128,uint128)", abi.encode(15, 20), block.timestamp + 1 days)
+            abi.encode(
+                admin, creditConfigurator, "setLimits(uint128,uint128)", abi.encode(15, 20), block.timestamp + 1 days
+            )
         );
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
             txHash,
+            admin,
             creditConfigurator,
             "setLimits(uint128,uint128)",
             abi.encode(15, 20),
@@ -379,7 +408,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -394,6 +423,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         Policy memory policy = Policy({
             enabled: false,
+            admin: admin,
             flags: 1,
             exactValue: 25,
             minValue: 0,
@@ -407,7 +437,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
             maxChange: 0
         });
 
-        // VERIFY THAT POLICY CHECKS ARE PERFORMED
+        // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
         vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(admin);
         controllerTimelock.setMaxDebtLimit(creditManager, 25);
@@ -416,7 +446,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         controllerTimelock.setPolicy(POLICY_CODE, policy);
 
         // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
-        vm.expectRevert(CallerNotAdminException.selector);
+        vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(USER);
         controllerTimelock.setMaxDebtLimit(creditManager, 25);
 
@@ -427,12 +457,15 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
-            abi.encode(creditConfigurator, "setLimits(uint128,uint128)", abi.encode(10, 25), block.timestamp + 1 days)
+            abi.encode(
+                admin, creditConfigurator, "setLimits(uint128,uint128)", abi.encode(10, 25), block.timestamp + 1 days
+            )
         );
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
             txHash,
+            admin,
             creditConfigurator,
             "setLimits(uint128,uint128)",
             abi.encode(10, 25),
@@ -449,7 +482,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -468,6 +501,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         Policy memory policy = Policy({
             enabled: false,
+            admin: admin,
             flags: 1,
             exactValue: 2e18,
             minValue: 0,
@@ -481,11 +515,16 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
             maxChange: 0
         });
 
+        // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setCreditManagerDebtLimit(creditManager, 2e18);
+
         vm.prank(CONFIGURATOR);
         controllerTimelock.setPolicy(POLICY_CODE, policy);
 
         // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
-        vm.expectRevert(CallerNotAdminException.selector);
+        vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(USER);
         controllerTimelock.setCreditManagerDebtLimit(creditManager, 2e18);
 
@@ -497,6 +536,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
             abi.encode(
+                admin,
                 pool,
                 "setCreditManagerDebtLimit(address,uint256)",
                 abi.encode(creditManager, 2e18),
@@ -507,6 +547,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
             txHash,
+            admin,
             pool,
             "setCreditManagerDebtLimit(address,uint256)",
             abi.encode(creditManager, 2e18),
@@ -523,7 +564,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -540,6 +581,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         Policy memory policy = Policy({
             enabled: false,
+            admin: admin,
             flags: 1,
             exactValue: 2e18,
             minValue: 0,
@@ -553,11 +595,16 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
             maxChange: 0
         });
 
+        // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setCreditManagerDebtLimit(creditManager, 2e18);
+
         vm.prank(CONFIGURATOR);
         controllerTimelock.setPolicy(POLICY_CODE, policy);
 
         // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
-        vm.expectRevert(CallerNotAdminException.selector);
+        vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(USER);
         controllerTimelock.setCreditManagerDebtLimit(creditManager, 2e18);
 
@@ -569,13 +616,18 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
             abi.encode(
-                creditConfigurator, "setTotalDebtLimit(uint128)", abi.encode(uint128(2e18)), block.timestamp + 1 days
+                admin,
+                creditConfigurator,
+                "setTotalDebtLimit(uint128)",
+                abi.encode(uint128(2e18)),
+                block.timestamp + 1 days
             )
         );
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
             txHash,
+            admin,
             creditConfigurator,
             "setTotalDebtLimit(uint128)",
             abi.encode(uint128(2e18)),
@@ -592,7 +644,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -614,6 +666,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         Policy memory policy = Policy({
             enabled: false,
+            admin: admin,
             flags: 1,
             exactValue: 6000,
             minValue: 0,
@@ -627,11 +680,18 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
             maxChange: 0
         });
 
+        // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.rampLiquidationThreshold(
+            creditManager, token, 6000, uint40(block.timestamp + 14 days), 7 days
+        );
+
         vm.prank(CONFIGURATOR);
         controllerTimelock.setPolicy(POLICY_CODE, policy);
 
         // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
-        vm.expectRevert(CallerNotAdminException.selector);
+        vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(USER);
         controllerTimelock.rampLiquidationThreshold(
             creditManager, token, 6000, uint40(block.timestamp + 14 days), 7 days
@@ -660,6 +720,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
             abi.encode(
+                admin,
                 creditConfigurator,
                 "rampLiquidationThreshold(address,uint16,uint40,uint24)",
                 abi.encode(token, 6000, block.timestamp + 14 days, 7 days),
@@ -670,6 +731,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
             txHash,
+            admin,
             creditConfigurator,
             "rampLiquidationThreshold(address,uint16,uint40,uint24)",
             abi.encode(token, 6000, block.timestamp + 14 days, 7 days),
@@ -697,7 +759,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -716,6 +778,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         Policy memory policy = Policy({
             enabled: false,
+            admin: admin,
             flags: 1,
             exactValue: block.timestamp + 5,
             minValue: 0,
@@ -735,6 +798,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
             abi.encode(
+                admin,
                 creditConfigurator,
                 "setExpirationDate(uint40)",
                 abi.encode(block.timestamp + 5),
@@ -756,7 +820,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.prank(vetoAdmin);
         controllerTimelock.cancelTransaction(txHash);
 
-        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after cancelling");
 
@@ -766,11 +830,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
     }
 
     /// @dev U:[CT-8]: configuration functions work correctly
-    function test_U_CT_08_cancelTransaction_works_correctly() public {
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        vm.prank(USER);
-        controllerTimelock.setAdmin(DUMB_ADDRESS);
-
+    function test_U_CT_08_configuration_works_correctly() public {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         vm.prank(USER);
         controllerTimelock.setVetoAdmin(DUMB_ADDRESS);
@@ -778,14 +838,6 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.expectRevert(CallerNotConfiguratorException.selector);
         vm.prank(USER);
         controllerTimelock.setDelay(5);
-
-        vm.expectEmit(true, false, false, false);
-        emit SetAdmin(DUMB_ADDRESS);
-
-        vm.prank(CONFIGURATOR);
-        controllerTimelock.setAdmin(DUMB_ADDRESS);
-
-        assertEq(controllerTimelock.admin(), DUMB_ADDRESS, "Admin address was not set");
 
         vm.expectEmit(true, false, false, false);
         emit SetVetoAdmin(DUMB_ADDRESS);
@@ -820,6 +872,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         Policy memory policy = Policy({
             enabled: false,
+            admin: FRIEND,
             flags: 1,
             exactValue: expirationDate,
             minValue: 0,
@@ -839,26 +892,29 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
             abi.encode(
-                creditConfigurator, "setExpirationDate(uint40)", abi.encode(expirationDate), block.timestamp + 1 days
+                FRIEND,
+                creditConfigurator,
+                "setExpirationDate(uint40)",
+                abi.encode(expirationDate),
+                block.timestamp + 1 days
             )
         );
 
-        vm.prank(admin);
+        vm.prank(FRIEND);
         controllerTimelock.setExpirationDate(creditManager, expirationDate);
 
-        vm.expectRevert(CallerNotAdminException.selector);
-
+        vm.expectRevert(CallerNotExecutorException.selector);
         vm.prank(USER);
         controllerTimelock.executeTransaction(txHash);
 
         vm.expectRevert(TxExecutedOutsideTimeWindowException.selector);
-        vm.prank(admin);
+        vm.prank(FRIEND);
         controllerTimelock.executeTransaction(txHash);
 
         vm.warp(block.timestamp + 20 days);
 
         vm.expectRevert(TxExecutedOutsideTimeWindowException.selector);
-        vm.prank(admin);
+        vm.prank(FRIEND);
         controllerTimelock.executeTransaction(txHash);
 
         vm.warp(block.timestamp - 10 days);
@@ -870,7 +926,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         );
 
         vm.expectRevert(TxExecutionRevertedException.selector);
-        vm.prank(admin);
+        vm.prank(FRIEND);
         controllerTimelock.executeTransaction(txHash);
 
         vm.clearMockedCalls();
@@ -878,7 +934,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.expectEmit(true, false, false, false);
         emit ExecuteTransaction(txHash);
 
-        vm.prank(admin);
+        vm.prank(FRIEND);
         controllerTimelock.executeTransaction(txHash);
     }
 
@@ -890,6 +946,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         Policy memory policy = Policy({
             enabled: false,
+            admin: admin,
             flags: 0,
             exactValue: 0,
             minValue: 0,
@@ -912,18 +969,21 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         controllerTimelock.setPolicy(POLICY_CODE, policy);
 
         // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
-        vm.expectRevert(CallerNotAdminException.selector);
+        vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(USER);
         controllerTimelock.forbidAdapter(creditManager, DUMB_ADDRESS);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
-            abi.encode(creditConfigurator, "forbidAdapter(address)", abi.encode(DUMB_ADDRESS), block.timestamp + 1 days)
+            abi.encode(
+                admin, creditConfigurator, "forbidAdapter(address)", abi.encode(DUMB_ADDRESS), block.timestamp + 1 days
+            )
         );
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
             txHash,
+            admin,
             creditConfigurator,
             "forbidAdapter(address)",
             abi.encode(DUMB_ADDRESS),
@@ -942,7 +1002,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -966,6 +1026,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         Policy memory policy = Policy({
             enabled: false,
+            admin: admin,
             flags: 1,
             exactValue: 20,
             minValue: 0,
@@ -988,7 +1049,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         controllerTimelock.setPolicy(POLICY_CODE, policy);
 
         // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
-        vm.expectRevert(CallerNotAdminException.selector);
+        vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(USER);
         controllerTimelock.setTokenQuotaIncreaseFee(pool, token, 20);
 
@@ -1000,6 +1061,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
             abi.encode(
+                admin,
                 poolQuotaKeeper,
                 "setTokenQuotaIncreaseFee(address,uint16)",
                 abi.encode(token, uint16(20)),
@@ -1010,6 +1072,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
             txHash,
+            admin,
             poolQuotaKeeper,
             "setTokenQuotaIncreaseFee(address,uint16)",
             abi.encode(token, uint16(20)),
@@ -1026,7 +1089,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -1041,6 +1104,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         Policy memory policy = Policy({
             enabled: false,
+            admin: admin,
             flags: 1,
             exactValue: 2e18,
             minValue: 0,
@@ -1063,7 +1127,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         controllerTimelock.setPolicy(POLICY_CODE, policy);
 
         // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
-        vm.expectRevert(CallerNotAdminException.selector);
+        vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(USER);
         controllerTimelock.setTotalDebtLimit(pool, 2e18);
 
@@ -1074,11 +1138,11 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash =
-            keccak256(abi.encode(pool, "setTotalDebtLimit(uint256)", abi.encode(2e18), block.timestamp + 1 days));
+            keccak256(abi.encode(admin, pool, "setTotalDebtLimit(uint256)", abi.encode(2e18), block.timestamp + 1 days));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
-            txHash, pool, "setTotalDebtLimit(uint256)", abi.encode(2e18), uint40(block.timestamp + 1 days)
+            txHash, admin, pool, "setTotalDebtLimit(uint256)", abi.encode(2e18), uint40(block.timestamp + 1 days)
         );
 
         vm.prank(admin);
@@ -1091,7 +1155,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -1106,6 +1170,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         Policy memory policy = Policy({
             enabled: false,
+            admin: admin,
             flags: 1,
             exactValue: 20,
             minValue: 0,
@@ -1128,7 +1193,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         controllerTimelock.setPolicy(POLICY_CODE, policy);
 
         // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
-        vm.expectRevert(CallerNotAdminException.selector);
+        vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(USER);
         controllerTimelock.setWithdrawFee(pool, 20);
 
@@ -1139,10 +1204,12 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash =
-            keccak256(abi.encode(pool, "setWithdrawFee(uint256)", abi.encode(20), block.timestamp + 1 days));
+            keccak256(abi.encode(admin, pool, "setWithdrawFee(uint256)", abi.encode(20), block.timestamp + 1 days));
 
         vm.expectEmit(true, false, false, true);
-        emit QueueTransaction(txHash, pool, "setWithdrawFee(uint256)", abi.encode(20), uint40(block.timestamp + 1 days));
+        emit QueueTransaction(
+            txHash, admin, pool, "setWithdrawFee(uint256)", abi.encode(20), uint40(block.timestamp + 1 days)
+        );
 
         vm.prank(admin);
         controllerTimelock.setWithdrawFee(pool, 20);
@@ -1154,7 +1221,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -1182,6 +1249,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         Policy memory policy = Policy({
             enabled: false,
+            admin: admin,
             flags: 1,
             exactValue: 15,
             minValue: 0,
@@ -1204,7 +1272,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         controllerTimelock.setPolicy(POLICY_CODE, policy);
 
         // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
-        vm.expectRevert(CallerNotAdminException.selector);
+        vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(USER);
         controllerTimelock.setMinQuotaRate(pool, token, 15);
 
@@ -1216,6 +1284,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
             abi.encode(
+                admin,
                 gauge,
                 "changeQuotaTokenRateParams(address,uint16,uint16)",
                 abi.encode(token, uint16(15), uint16(20)),
@@ -1226,6 +1295,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
             txHash,
+            admin,
             gauge,
             "changeQuotaTokenRateParams(address,uint16,uint16)",
             abi.encode(token, uint16(15), uint16(20)),
@@ -1242,7 +1312,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -1270,6 +1340,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         Policy memory policy = Policy({
             enabled: false,
+            admin: admin,
             flags: 1,
             exactValue: 25,
             minValue: 0,
@@ -1292,7 +1363,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         controllerTimelock.setPolicy(POLICY_CODE, policy);
 
         // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
-        vm.expectRevert(CallerNotAdminException.selector);
+        vm.expectRevert(ParameterChecksFailedException.selector);
         vm.prank(USER);
         controllerTimelock.setMaxQuotaRate(pool, token, 25);
 
@@ -1304,6 +1375,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
             abi.encode(
+                admin,
                 gauge,
                 "changeQuotaTokenRateParams(address,uint16,uint16)",
                 abi.encode(token, uint16(10), uint16(25)),
@@ -1314,6 +1386,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
             txHash,
+            admin,
             gauge,
             "changeQuotaTokenRateParams(address,uint16,uint16)",
             abi.encode(token, uint16(10), uint16(25)),
@@ -1330,7 +1403,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
