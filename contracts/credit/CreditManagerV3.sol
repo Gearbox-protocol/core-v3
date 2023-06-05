@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 // LIBRARIES
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 
 // LIBS & TRAITS
 import {UNDERLYING_TOKEN_MASK, BitMask} from "../libraries/BitMask.sol";
@@ -58,7 +58,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     using CreditLogic for CollateralDebtData;
     using CollateralLogic for CollateralDebtData;
     using SafeERC20 for IERC20;
-    using IERC20Helper for IERC20;
     using CreditAccountHelper for ICreditAccountBase;
 
     // IMMUTABLE PARAMS
@@ -359,7 +358,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             }); // U:[CM-8]
         }
         {
-            uint256 underlyingBalance = IERC20Helper.balanceOf({token: underlying, holder: creditAccount}); // U:[CM-8]
+            uint256 underlyingBalance = IERC20(underlying).safeBalanceOf({account: creditAccount}); // U:[CM-8]
 
             // If there is an underlying shortfall, attempts to transfer it from the payer
             if (underlyingBalance < amountToPool + remainingFunds + 1) {
@@ -367,7 +366,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     IERC20(underlying).safeTransferFrom({
                         from: payer,
                         to: creditAccount,
-                        value: _amountWithFee(amountToPool + remainingFunds + 1 - underlyingBalance)
+                        amount: _amountWithFee(amountToPool + remainingFunds + 1 - underlyingBalance)
                     }); // U:[CM-8]
                 }
             }
@@ -521,7 +520,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             }
 
             /// If the entire underlying balance was spent on repayment, it is disabled
-            if (IERC20Helper.balanceOf({token: underlying, holder: creditAccount}) <= 1) {
+            if (IERC20(underlying).safeBalanceOf({account: creditAccount}) <= 1) {
                 tokensToDisable = UNDERLYING_TOKEN_MASK; // U:[CM-11]
             }
         }
@@ -542,7 +541,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (uint256 tokenMask)
     {
         tokenMask = getTokenMaskOrRevert({token: token}); // U:[CM-13]
-        IERC20(token).safeTransferFrom({from: payer, to: creditAccount, value: amount}); // U:[CM-13]
+        IERC20(token).safeTransferFrom({from: payer, to: creditAccount, amount: amount}); // U:[CM-13]
     }
 
     ///
@@ -1059,7 +1058,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             _enableFlag({creditAccount: creditAccount, flag: WITHDRAWAL_FLAG});
         }
 
-        if (IERC20Helper.balanceOf({token: token, holder: creditAccount}) <= 1) {
+        if (IERC20(token).safeBalanceOf({account: creditAccount}) <= 1) {
             tokensToDisable = tokenMask; // U:[CM-27]
         }
     }
@@ -1135,7 +1134,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 // enabledTokensMask & tokenMask == tokenMask when the token is enabled, and 0 otherwise
                 if (tokensToTransferMask & tokenMask != 0) {
                     address token = getTokenByMask(tokenMask); // U:[CM-31]
-                    uint256 amount = IERC20Helper.balanceOf({token: token, holder: creditAccount}); // U:[CM-31]
+                    uint256 amount = IERC20(token).safeBalanceOf({account: creditAccount}); // U:[CM-31]
                     if (amount > 1) {
                         // 1 is subtracted from amount to leave a non-zero value in the balance mapping, optimizing future writes
                         // Since the amount is checked to be more than 1, the block can be marked as unchecked

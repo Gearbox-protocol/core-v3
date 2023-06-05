@@ -50,18 +50,26 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
 
     /// @dev Allows access to functions only to the controller admin
     modifier adminOnly() {
-        if (msg.sender != admin) {
-            revert CallerNotAdminException();
-        }
+        _revertIfCallerIsNotAdmin();
         _;
     }
 
     /// @dev Allows access to function only to veto admin
     modifier vetoAdminOnly() {
+        _revertIfCallerIsNotVetoAdmin();
+        _;
+    }
+
+    function _revertIfCallerIsNotAdmin() internal view {
+        if (msg.sender != admin) {
+            revert CallerNotAdminException();
+        }
+    }
+
+    function _revertIfCallerIsNotVetoAdmin() internal view {
         if (msg.sender != vetoAdmin) {
             revert CallerNotVetoAdminException();
         }
-        _;
     }
 
     /// @notice Queues a transaction to set a new expiration date in the Credit Facade

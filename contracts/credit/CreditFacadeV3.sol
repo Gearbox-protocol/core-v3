@@ -128,24 +128,10 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         _;
     }
 
-    /// @notice Private function for `creditConfiguratorOnly`; used for contract size optimization
-    function _checkCreditConfigurator() private view {
-        if (msg.sender != ICreditManagerV3(creditManager).creditConfigurator()) {
-            revert CallerNotConfiguratorException();
-        }
-    }
-
     /// @notice Restricts functions to the owner of a Credit Account
     modifier creditAccountOwnerOnly(address creditAccount) {
         _checkCreditAccountOwner(creditAccount);
         _;
-    }
-
-    /// @notice Private function for `creditAccountOwnerOnly`; used for contract size optimization
-    function _checkCreditAccountOwner(address creditAccount) private view {
-        if (msg.sender != _getBorrowerOrRevert(creditAccount)) {
-            revert CallerNotCreditAccountOwnerException();
-        }
     }
 
     /// @notice Restricts functions to the non-paused contract state, unless the caller
@@ -161,17 +147,31 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         _;
     }
 
+    /// @notice Wraps ETH and sends it back to msg.sender address
+    modifier wrapETH() {
+        _wrapETH();
+        _;
+    }
+
+    /// @notice Private function for `creditConfiguratorOnly`; used for contract size optimization
+    function _checkCreditConfigurator() private view {
+        if (msg.sender != ICreditManagerV3(creditManager).creditConfigurator()) {
+            revert CallerNotConfiguratorException();
+        }
+    }
+
+    /// @notice Private function for `creditAccountOwnerOnly`; used for contract size optimization
+    function _checkCreditAccountOwner(address creditAccount) private view {
+        if (msg.sender != _getBorrowerOrRevert(creditAccount)) {
+            revert CallerNotCreditAccountOwnerException();
+        }
+    }
+
     /// @notice Reverts if the contract is expired
     function _checkExpired() private view {
         if (_isExpired()) {
             revert NotAllowedAfterExpirationException(); // F: [FA-46]
         }
-    }
-
-    /// @notice Wraps ETH and sends it back to msg.sender address
-    modifier wrapETH() {
-        _wrapETH();
-        _;
     }
 
     /// @notice Initializes creditFacade and connects it to CreditManagerV3
@@ -643,18 +643,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         expectedBalances = BalancesLogic.storeBalances(creditAccount, expected); // U:[FA-23]
                     }
                     //
-                    // SET FULL CHECK PARAMS
-                    //
-                    /// Sets the parameters to be used during the full collateral check.
-                    /// Collateral hints can be used to check tokens in a particular order - this allows
-                    /// to put the most valuable tokens first and save gas, as full collateral check eval
-                    /// is lazy. minHealthFactor can be used to set a custom health factor threshold, which
-                    /// is especially useful for bots.
-                    else if (method == ICreditFacadeV3Multicall.setFullCheckParams.selector) {
-                        (fullCheckParams.collateralHints, fullCheckParams.minHealthFactor) =
-                            abi.decode(mcall.callData[4:], (uint256[], uint16)); // U:[FA-24]
-                    }
-                    //
                     // ON DEMAND PRICE UPDATE
                     //
                     /// Utility function that enables support for price feeds with on-demand
@@ -675,6 +663,34 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                             bitsToEnable: _addCollateral(creditAccount, mcall.callData[4:]),
                             invertedSkipMask: quotedTokensMaskInverted
                         }); // U:[FA-26]
+                    }
+                    //
+                    // UPDATE QUOTA
+                    //
+                    /// Updates a quota on a token. Quota is an underlying-denominated value
+                    /// that imposes a limit on the exposure of borrowed funds to a certain asset.
+                    /// Tokens with quota logic are only enabled and disabled on updating the quota
+                    /// from zero to positive value and back, respectively.
+                    else if (method == ICreditFacadeV3Multicall.updateQuota.selector) {
+                        _revertIfNoPermission(flags, UPDATE_QUOTA_PERMISSION); // U:[FA-21]
+                        (uint256 tokensToEnable, uint256 tokensToDisable) =
+                            _updateQuota(creditAccount, mcall.callData[4:]); // U:[FA-34]
+                        enabledTokensMask = enabledTokensMask.enableDisable(tokensToEnable, tokensToDisable); // U:[FA-34]
+                    }
+                    //
+                    // WITHDRAW
+                    //
+                    /// Schedules a delayed withdrawal of assets from a Credit Account.
+                    /// This sends asset from the CA to the withdrawal manager and excludes them
+                    /// from collateral computations (with some exceptions). After a delay,
+                    /// the account owner can claim the withdrawal.
+                    else if (method == ICreditFacadeV3Multicall.scheduleWithdrawal.selector) {
+                        _revertIfNoPermission(flags, WITHDRAW_PERMISSION); // U:[FA-21]
+                        uint256 tokensToDisable = _scheduleWithdrawal(creditAccount, mcall.callData[4:]); // U:[FA-34]
+                        enabledTokensMask = enabledTokensMask.disable({
+                            bitsToDisable: tokensToDisable,
+                            invertedSkipMask: quotedTokensMaskInverted
+                        }); // U:[FA-35]
                     }
                     //
                     // INCREASE DEBT
@@ -707,6 +723,28 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         enabledTokensMask = enabledTokensMask.disable(tokensToDisable); // U:[FA-31]
                     }
                     //
+                    // PAY BOT
+                    //
+                    /// Requests the bot list to pay a bot. Used by bots to receive payment for their services.
+                    /// Only available in `botMulticall` and can only be called once
+                    else if (method == ICreditFacadeV3Multicall.payBot.selector) {
+                        _revertIfNoPermission(flags, PAY_BOT_CAN_BE_CALLED); // U:[FA-21]
+                        flags = flags.disable(PAY_BOT_CAN_BE_CALLED); // U:[FA-37]
+                        _payBot(creditAccount, mcall.callData[4:]); // U:[FA-37]
+                    }
+                    //
+                    // SET FULL CHECK PARAMS
+                    //
+                    /// Sets the parameters to be used during the full collateral check.
+                    /// Collateral hints can be used to check tokens in a particular order - this allows
+                    /// to put the most valuable tokens first and save gas, as full collateral check eval
+                    /// is lazy. minHealthFactor can be used to set a custom health factor threshold, which
+                    /// is especially useful for bots.
+                    else if (method == ICreditFacadeV3Multicall.setFullCheckParams.selector) {
+                        (fullCheckParams.collateralHints, fullCheckParams.minHealthFactor) =
+                            abi.decode(mcall.callData[4:], (uint256[], uint16)); // U:[FA-24]
+                    }
+                    //
                     // ENABLE TOKEN
                     //
                     /// Enables a token on a Credit Account, which includes it into collateral
@@ -736,34 +774,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         }); // U:[FA-33]
                     }
                     //
-                    // UPDATE QUOTA
-                    //
-                    /// Updates a quota on a token. Quota is an underlying-denominated value
-                    /// that imposes a limit on the exposure of borrowed funds to a certain asset.
-                    /// Tokens with quota logic are only enabled and disabled on updating the quota
-                    /// from zero to positive value and back, respectively.
-                    else if (method == ICreditFacadeV3Multicall.updateQuota.selector) {
-                        _revertIfNoPermission(flags, UPDATE_QUOTA_PERMISSION); // U:[FA-21]
-                        (uint256 tokensToEnable, uint256 tokensToDisable) =
-                            _updateQuota(creditAccount, mcall.callData[4:]); // U:[FA-34]
-                        enabledTokensMask = enabledTokensMask.enableDisable(tokensToEnable, tokensToDisable); // U:[FA-34]
-                    }
-                    //
-                    // WITHDRAW
-                    //
-                    /// Schedules a delayed withdrawal of assets from a Credit Account.
-                    /// This sends asset from the CA to the withdrawal manager and excludes them
-                    /// from collateral computations (with some exceptions). After a delay,
-                    /// the account owner can claim the withdrawal.
-                    else if (method == ICreditFacadeV3Multicall.scheduleWithdrawal.selector) {
-                        _revertIfNoPermission(flags, WITHDRAW_PERMISSION); // U:[FA-21]
-                        uint256 tokensToDisable = _scheduleWithdrawal(creditAccount, mcall.callData[4:]); // U:[FA-34]
-                        enabledTokensMask = enabledTokensMask.disable({
-                            bitsToDisable: tokensToDisable,
-                            invertedSkipMask: quotedTokensMaskInverted
-                        }); // U:[FA-35]
-                    }
-                    //
                     // REVOKE ADAPTER ALLOWANCES
                     //
                     /// Sets allowance to the provided list of contracts to one. Can be used
@@ -771,16 +781,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeV3Multicall.revokeAdapterAllowances.selector) {
                         _revertIfNoPermission(flags, REVOKE_ALLOWANCES_PERMISSION); // U:[FA-21]
                         _revokeAdapterAllowances(creditAccount, mcall.callData[4:]); // U:[FA-36]
-                    }
-                    //
-                    // PAY BOT
-                    //
-                    /// Requests the bot list to pay a bot. Used by bots to receive payment for their services.
-                    /// Only available in `botMulticall` and can only be called once
-                    else if (method == ICreditFacadeV3Multicall.payBot.selector) {
-                        _revertIfNoPermission(flags, PAY_BOT_CAN_BE_CALLED); // U:[FA-21]
-                        flags = flags.disable(PAY_BOT_CAN_BE_CALLED); // U:[FA-37]
-                        _payBot(creditAccount, mcall.callData[4:]); // U:[FA-37]
                     }
                     //
                     // UNKNOWN METHOD
