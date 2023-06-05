@@ -4,7 +4,7 @@
 pragma solidity ^0.8.10;
 
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
-import {IPriceFeedType, PriceFeedType} from "../../../interfaces/IPriceFeedType.sol";
+import {IPriceFeedType, PriceFeedType} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceFeedType.sol";
 
 enum FlagState {
     FALSE,
