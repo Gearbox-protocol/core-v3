@@ -11,13 +11,13 @@ import {ACLTrait} from "../traits/ACLTrait.sol";
 /// @title Abstract adapter
 /// @dev Inheriting adapters MUST use provided internal functions to perform all operations with credit accounts
 abstract contract AbstractAdapter is IAdapter, ACLTrait {
-    /// @inheritdoc IAdapter
+    /// @notice Credit manager the adapter is connected to
     address public immutable override creditManager;
 
-    /// @inheritdoc IAdapter
+    /// @notice Address provider contract
     address public immutable override addressProvider;
 
-    /// @inheritdoc IAdapter
+    /// @notice Address of the contract the adapter is interacting with
     address public immutable override targetContract;
 
     /// @notice Constructor

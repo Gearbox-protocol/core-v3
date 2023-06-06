@@ -67,8 +67,8 @@ interface IWithdrawalManagerV3Events {
     event ClaimScheduledWithdrawal(address indexed creditAccount, address indexed token, address to, uint256 amount);
 
     /// @notice Emitted when new scheduled withdrawal delay is set by configurator
-    /// @param delay New delay for scheduled withdrawals
-    event SetWithdrawalDelay(uint40 delay);
+    /// @param newDelay New delay for scheduled withdrawals
+    event SetWithdrawalDelay(uint40 newDelay);
 }
 
 /// @title Withdrawal manager interface
@@ -77,60 +77,31 @@ interface IWithdrawalManagerV3 is IWithdrawalManagerV3Events, IVersion {
     // IMMEDIATE WITHDRAWALS //
     // --------------------- //
 
-    /// @notice WETH token address
     function weth() external view returns (address);
 
-    /// @notice Returns amount of token claimable by the account
     function immediateWithdrawals(address account, address token) external view returns (uint256);
 
-    /// @notice Adds new immediate withdrawal for the account
-    /// @param token Token to withdraw
-    /// @param to Account to add immediate withdrawal for
-    /// @param amount Amount to withdraw
-    /// @custom:expects Credit manager transferred `amount` of `token` to this contract prior to calling this function
     function addImmediateWithdrawal(address token, address to, uint256 amount) external;
 
-    /// @notice Claims caller's immediate withdrawal
-    /// @param token Token to claim (if `ETH_ADDRESS`, claims WETH, but unwraps it before sending)
-    /// @param to Token recipient
     function claimImmediateWithdrawal(address token, address to) external;
 
     // --------------------- //
     // SCHEDULED WITHDRAWALS //
     // --------------------- //
 
-    /// @notice Delay for scheduled withdrawals
     function delay() external view returns (uint40);
 
-    /// @notice Returns withdrawals scheduled for a given credit account
-    /// @param creditAccount Account to get withdrawals for
-    /// @return withdrawals See `ScheduledWithdrawal`
     function scheduledWithdrawals(address creditAccount)
         external
         view
         returns (ScheduledWithdrawal[2] memory withdrawals);
 
-    /// @notice Schedules withdrawal from the credit account
-    /// @param creditAccount Account to withdraw from
-    /// @param token Token to withdraw
-    /// @param amount Amount to withdraw
-    /// @param tokenIndex Collateral index of withdrawn token in account's credit manager
-    /// @custom:expects Credit manager transferred `amount` of `token` to this contract prior to calling this function
     function addScheduledWithdrawal(address creditAccount, address token, uint256 amount, uint8 tokenIndex) external;
 
-    /// @notice Claims scheduled withdrawals from the credit account
-    ///         - Withdrawals are either sent to `to` or returned to `creditAccount` based on maturity and `action`
-    ///         - If `to` is blacklisted in claimed token, scheduled withdrawal turns into immediate
-    /// @param creditAccount Account withdrawal was made from
-    /// @param to Address to send withdrawals to
-    /// @param action See `ClaimAction`
-    /// @return hasScheduled Whether account has at least one scheduled withdrawal after claiming
-    /// @return tokensToEnable Bit mask of returned tokens that should be enabled as account's collateral
     function claimScheduledWithdrawals(address creditAccount, address to, ClaimAction action)
         external
         returns (bool hasScheduled, uint256 tokensToEnable);
 
-    /// @notice Returns scheduled withdrawals from the credit account that can be cancelled
     function cancellableScheduledWithdrawals(address creditAccount, bool isForceCancel)
         external
         view
@@ -140,7 +111,5 @@ interface IWithdrawalManagerV3 is IWithdrawalManagerV3Events, IVersion {
     // CONFIGURATION //
     // ------------- //
 
-    /// @notice Sets delay for scheduled withdrawals, only affects new withdrawal requests
-    /// @param delay New delay for scheduled withdrawals
-    function setWithdrawalDelay(uint40 delay) external;
+    function setWithdrawalDelay(uint40 newDelay) external;
 }

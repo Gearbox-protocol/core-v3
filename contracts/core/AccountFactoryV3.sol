@@ -14,7 +14,6 @@ import {
     CreditAccountIsInUseException,
     MasterCreditAccountAlreadyDeployedException
 } from "../interfaces/IExceptions.sol";
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
@@ -43,10 +42,10 @@ struct QueuedAccount {
 ///           allows DAO to rescue funds that might have been accidentally left upon account closure, and serves
 ///           as protection against potential attacks involving reopening an account right after closing it
 contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait {
-    /// @inheritdoc IVersion
+    /// @notice Contract version
     uint256 public constant override version = 3_00;
 
-    /// @inheritdoc IAccountFactoryV3
+    /// @notice Delay after which returned credit accounts can be reused
     uint40 public constant override delay = 3 days;
 
     /// @dev Mapping credit manager => factory params
@@ -59,7 +58,11 @@ contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait
     /// @param addressProvider Address provider contract address
     constructor(address addressProvider) ACLTrait(addressProvider) ContractsRegisterTrait(addressProvider) {}
 
-    /// @inheritdoc IAccountFactoryV3
+    /// @notice Provides a reusable credit account from the queue to the credit manager.
+    ///         If there are no accounts that can be reused in the queue, deploys a new one.
+    /// @return creditAccount Address of the provided credit account
+    /// @dev Parameters are ignored and only kept for backward compatibility
+    /// @custom:expects Credit manager sets account's borrower to non-zero address after calling this function
     function takeCreditAccount(uint256, uint256) external override returns (address creditAccount) {
         FactoryParams storage fp = _factoryParams[msg.sender];
 
@@ -83,7 +86,10 @@ contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait
         emit TakeCreditAccount({creditAccount: creditAccount, creditManager: msg.sender}); // U:[AF-2A,2B]
     }
 
-    /// @inheritdoc IAccountFactoryV3
+    /// @notice Returns a used credit account to the queue
+    /// @param creditAccount Address of the returned credit account
+    /// @custom:expects Credit account is connected to the calling credit manager
+    /// @custom:expects Credit manager sets account's borrower to zero-address before calling this function
     function returnCreditAccount(address creditAccount) external override {
         FactoryParams storage fp = _factoryParams[msg.sender];
 
@@ -104,7 +110,8 @@ contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait
     // CONFIGURATION //
     // ------------- //
 
-    /// @inheritdoc IAccountFactoryV3
+    /// @notice Adds a credit manager to the factory and deploys the master credit account for it
+    /// @param creditManager Credit manager address
     function addCreditManager(address creditManager)
         external
         override
@@ -119,7 +126,12 @@ contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait
         emit AddCreditManager(creditManager, masterCreditAccount); // U:[AF-4C]
     }
 
-    /// @inheritdoc IAccountFactoryV3
+    /// @notice Executes function call from the account to the target contract with provided data,
+    ///         can only be called by configurator when account is not in use by anyone.
+    ///         Allows to rescue funds that were accidentally left on the account upon closure.
+    /// @param creditAccount Credit account to execute the call from
+    /// @param target Contract to call
+    /// @param data Data to call the target contract with
     function rescue(address creditAccount, address target, bytes calldata data)
         external
         configuratorOnly // U:[AF-1]

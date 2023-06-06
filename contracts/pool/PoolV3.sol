@@ -4,11 +4,12 @@
 pragma solidity ^0.8.17;
 pragma abicoder v1;
 
-import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
+
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
@@ -20,7 +21,6 @@ import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {IInterestRateModelV3} from "../interfaces/IInterestRateModelV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 // LIBS & TRAITS
 import {CreditLogic} from "../libraries/CreditLogic.sol";
@@ -54,31 +54,31 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
 
-    /// @inheritdoc IVersion
+    /// @notice Contract version
     uint256 public constant override version = 3_00;
 
-    /// @inheritdoc IPoolV3
+    /// @notice Address provider contract address
     address public immutable override addressProvider;
 
-    /// @inheritdoc IPoolV3
+    /// @notice Underlying token address
     address public immutable override underlyingToken;
 
-    /// @inheritdoc IPoolV3
+    /// @notice Protocol treasury address
     address public immutable override treasury;
 
-    /// @inheritdoc IPoolV3
+    /// @notice Whether pool supports quotas
     bool public immutable override supportsQuotas;
 
-    /// @inheritdoc IPoolV3
+    /// @notice Interest rate model contract address
     address public override interestRateModel;
-    /// @inheritdoc IPoolV3
+    /// @notice Timestamp of the last base interest rate and index update
     uint40 public override lastBaseInterestUpdate;
-    /// @inheritdoc IPoolV3
+    /// @notice Timestamp of the last quota revenue update
     uint40 public override lastQuotaRevenueUpdate;
-    /// @inheritdoc IPoolV3
+    /// @notice Withdrawal fee in bps
     uint16 public override withdrawFee;
 
-    /// @inheritdoc IPoolV3
+    /// @notice Pool quota keeper contract address
     address public override poolQuotaKeeper;
     /// @dev Current quota revenue
     uint96 internal _quotaRevenue;
@@ -153,12 +153,13 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         supportsQuotas = supportsQuotas_; // U:[P4-1]
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Addresses of all connected credit managers
     function creditManagers() external view override returns (address[] memory) {
         return _creditManagerSet.values();
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Annual interest rate in ray that liquidity providers receive per unit of deposited capital,
+    ///         consists of base interest and quota revenue
     function supplyRate() external view override returns (uint256) {
         uint256 assets = expectedLiquidity();
         uint256 baseInterestRate_ = baseInterestRate();
@@ -167,17 +168,18 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
             / PERCENTAGE_FACTOR / assets; // U:[P4-28]
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Available liquidity in the pool
     function availableLiquidity() public view override returns (uint256) {
         return IERC20(underlyingToken).balanceOf(address(this));
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Amount of underlying that would be in the pool if debt principal, base interest
+    ///         and quota revenue were fully repaid
     function expectedLiquidity() public view override returns (uint256) {
         return _expectedLiquidityLU + _calcBaseInterestAccrued() + (supportsQuotas ? _calcQuotaRevenueAccrued() : 0);
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Expected liquidity stored as of last update
     function expectedLiquidityLU() public view override returns (uint256) {
         return _expectedLiquidityLU;
     }
@@ -186,15 +188,19 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     // ERC-4626 LENDING //
     // ---------------- //
 
-    /// @inheritdoc IPoolV3
-    function totalAssets() public view override(ERC4626, IPoolV3) returns (uint256 assets) {
+    /// @notice Total amount of underlying tokens managed by the pool, same as `expectedLiquidity`
+    /// @dev Since `totalAssets` doesn't depend on underlying balance, pools are not vulnerable to the inflation attack
+    function totalAssets() public view override(ERC4626, IERC4626) returns (uint256 assets) {
         return expectedLiquidity();
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Deposits given amount of underlying tokens to the pool in exchange for pool shares
+    /// @param assets Amount of underlying to deposit
+    /// @param receiver Account to mint pool shares to
+    /// @return shares Number of shares minted
     function deposit(uint256 assets, address receiver)
         public
-        override(ERC4626, IPoolV3)
+        override(ERC4626, IERC4626)
         whenNotPaused // U:[P4-4]
         nonReentrant
         nonZeroAddress(receiver)
@@ -205,7 +211,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         _deposit(receiver, assets, assetsReceived, shares); // U:[P4-5]
     }
 
-    /// @inheritdoc IPoolV3
+    /// @dev Same as `deposit`, but allows to specify the referral code
     function depositWithReferral(uint256 assets, address receiver, uint16 referralCode)
         external
         override
@@ -215,10 +221,13 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         emit Refer(receiver, referralCode, assets); // U:[P4-5]
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Deposits underlying tokens to the pool in exhcange for given number of pool shares
+    /// @param shares Number of shares to mint
+    /// @param receiver Account to mint pool shares to
+    /// @return assets Amount of underlying transferred from caller
     function mint(uint256 shares, address receiver)
         public
-        override(ERC4626, IPoolV3)
+        override(ERC4626, IERC4626)
         whenNotPaused // U:[P4-4]
         nonReentrant
         nonZeroAddress(receiver)
@@ -229,10 +238,14 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         _deposit(receiver, assets, assetsReceived, shares); // U:[P4-6,7]
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Withdraws pool shares for given amount of underlying tokens
+    /// @param assets Amount of underlying to withdraw
+    /// @param receiver Account to send underlying to
+    /// @param owner Account to burn pool shares from
+    /// @return shares Number of pool shares burned
     function withdraw(uint256 assets, address receiver, address owner)
         public
-        override(ERC4626, IPoolV3)
+        override(ERC4626, IERC4626)
         whenNotPaused // U:[P4-4]
         nonReentrant
         nonZeroAddress(receiver)
@@ -243,10 +256,14 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         _withdraw(receiver, owner, assetsSent, assets, shares); // U:[P4-8]
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Redeems given number of pool shares for underlying tokens
+    /// @param shares Number of pool shares to redeem
+    /// @param receiver Account to send underlying to
+    /// @param owner Account to burn pool shares from
+    /// @return assets Amount of underlying withdrawn
     function redeem(uint256 shares, address receiver, address owner)
         public
-        override(ERC4626, IPoolV3)
+        override(ERC4626, IERC4626)
         whenNotPaused // U:[P4-4]
         nonReentrant
         nonZeroAddress(receiver)
@@ -257,50 +274,50 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         _withdraw(receiver, owner, assetsSent, assets, shares); // U:[P4-9]
     }
 
-    /// @inheritdoc IPoolV3
-    function previewDeposit(uint256 assets) public view override(ERC4626, IPoolV3) returns (uint256 shares) {
+    /// @notice Number of pool shares that would be minted on depositing `assets`
+    function previewDeposit(uint256 assets) public view override(ERC4626, IERC4626) returns (uint256 shares) {
         shares = _convertToShares(_amountMinusFee(assets), Math.Rounding.Down);
     }
 
-    /// @inheritdoc IPoolV3
-    function previewMint(uint256 shares) public view override(ERC4626, IPoolV3) returns (uint256) {
+    /// @notice Amount of underlying that would be spent to mint `shares`
+    function previewMint(uint256 shares) public view override(ERC4626, IERC4626) returns (uint256) {
         return _amountWithFee(_convertToAssets(shares, Math.Rounding.Up));
     }
 
-    /// @inheritdoc IPoolV3
-    function previewWithdraw(uint256 assets) public view override(ERC4626, IPoolV3) returns (uint256) {
+    /// @notice Number of pool shares that would be burned on withdrawing `assets`
+    function previewWithdraw(uint256 assets) public view override(ERC4626, IERC4626) returns (uint256) {
         return _convertToShares(_amountWithWithdrawalFee(_amountWithFee(assets)), Math.Rounding.Up);
     }
 
-    /// @inheritdoc IPoolV3
-    function previewRedeem(uint256 shares) public view override(ERC4626, IPoolV3) returns (uint256) {
+    /// @notice Amount of underlying that would be received after redeeming `shares`
+    function previewRedeem(uint256 shares) public view override(ERC4626, IERC4626) returns (uint256) {
         return _amountMinusFee(_amountMinusWithdrawalFee(_convertToAssets(shares, Math.Rounding.Down)));
     }
 
-    /// @inheritdoc IPoolV3
-    function maxDeposit(address) public view override(ERC4626, IPoolV3) returns (uint256) {
+    /// @notice Maximum amount of underlying that can be deposited to the pool, 0 if pool is on pause
+    function maxDeposit(address) public view override(ERC4626, IERC4626) returns (uint256) {
         return paused() ? 0 : type(uint256).max;
     }
 
-    /// @inheritdoc IPoolV3
-    function maxMint(address) public view override(ERC4626, IPoolV3) returns (uint256) {
+    /// @notice Maximum number of pool shares that can be minted, 0 if pool is on pause
+    function maxMint(address) public view override(ERC4626, IERC4626) returns (uint256) {
         return paused() ? 0 : type(uint256).max;
     }
 
-    /// @inheritdoc IPoolV3
-    function maxWithdraw(address owner) public view override(ERC4626, IPoolV3) returns (uint256) {
+    /// @notice Maximum amount of underlying that can be withdrawn from the pool by `owner`, 0 if pool is on pause
+    function maxWithdraw(address owner) public view override(ERC4626, IERC4626) returns (uint256) {
         return paused() ? 0 : Math.min(availableLiquidity(), _convertToAssets(balanceOf(owner), Math.Rounding.Down));
     }
 
-    /// @inheritdoc IPoolV3
-    function maxRedeem(address owner) public view override(ERC4626, IPoolV3) returns (uint256) {
+    /// @notice Maximum number of shares that can be redeemed for underlying by `owner`, 0 if pool is on pause
+    function maxRedeem(address owner) public view override(ERC4626, IERC4626) returns (uint256) {
         return paused() ? 0 : Math.min(balanceOf(owner), _convertToShares(availableLiquidity(), Math.Rounding.Down));
     }
 
-    /// @notice `deposit` / `mint` implementation
-    ///         - transfers underlying from the caller
-    ///         - updates base interest rate and index
-    ///         - mints pool shares to `receiver`
+    /// @dev `deposit` / `mint` implementation
+    ///      - transfers underlying from the caller
+    ///      - updates base interest rate and index
+    ///      - mints pool shares to `receiver`
     function _deposit(address receiver, uint256 assetsSent, uint256 assetsReceived, uint256 shares) internal {
         IERC20(underlyingToken).safeTransferFrom({from: msg.sender, to: address(this), amount: assetsSent}); // U:[P4-5,6]
 
@@ -314,10 +331,10 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         emit Deposit(msg.sender, receiver, assetsSent, shares); // U:[P4-5,6]
     }
 
-    /// @notice `withdraw` / `redeem` implementation
-    ///         - burns pool shares from `owner`
-    ///         - updates base interest rate and index
-    ///         - transfers underlying to `receiver` and, if withdrawal fee is activated, to the treasury
+    /// @dev `withdraw` / `redeem` implementation
+    ///      - burns pool shares from `owner`
+    ///      - updates base interest rate and index
+    ///      - transfers underlying to `receiver` and, if withdrawal fee is activated, to the treasury
     function _withdraw(address receiver, address owner, uint256 assetsSent, uint256 assetsReceived, uint256 shares)
         internal
     {
@@ -344,27 +361,27 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     // BORROWING //
     // --------- //
 
-    /// @inheritdoc IPoolV3
+    /// @notice Total borrowed amount (principal only)
     function totalBorrowed() external view override returns (uint256) {
         return _totalDebt.borrowed;
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Total debt limit, `type(uint256).max` means no limit
     function totalDebtLimit() external view override returns (uint256) {
         return _convertToU256(_totalDebt.limit);
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Amount borrowed by a given credit manager
     function creditManagerBorrowed(address creditManager) external view override returns (uint256) {
         return _creditManagerDebt[creditManager].borrowed;
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Debt limit for a given credit manager, `type(uint256).max` means no limit
     function creditManagerDebtLimit(address creditManager) external view override returns (uint256) {
         return _convertToU256(_creditManagerDebt[creditManager].limit); // U:[P4-21]
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Amount available to borrow for a given credit manager
     function creditManagerBorrowable(address creditManager) external view override returns (uint256 borrowable) {
         borrowable = _borrowable(_totalDebt); // U:[P4-27]
         if (borrowable == 0) return 0; // U:[P4-27]
@@ -380,7 +397,9 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         borrowable = Math.min(borrowable, available); // U:[P4-27]
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Lends funds to a credit account, can only be called by credit managers
+    /// @param borrowedAmount Amount to borrow
+    /// @param creditAccount Credit account to send the funds to
     function lendCreditAccount(uint256 borrowedAmount, address creditAccount)
         external
         override
@@ -409,7 +428,19 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         emit Borrow(msg.sender, creditAccount, borrowedAmount); // U:[P4-11]
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Updates pool state to indicate debt repayment, can only be called by credit managers
+    ///         after transferring underlying from a credit account to the pool.
+    ///         - If transferred amount exceeds debt principal + base interest + quota interest,
+    ///           the difference is deemed protocol's profit and the respective number of shares
+    ///           is minted to the treasury.
+    ///         - If, however, transferred amount is insufficient to repay debt and interest,
+    ///           which may only happen during liquidation, treasury's shares are burned to
+    ///           cover as much of the loss as possible.
+    /// @param repaidAmount Amount of debt principal repaid
+    /// @param profit Pool's profit in underlying after repaying
+    /// @param loss Pool's loss in underlying after repaying
+    /// @custom:expects Credit manager transfers underlying from a credit account to the pool before calling this function
+    /// @custom:expects Profit/loss computed in the credit manager are cosistent with pool's implicit calculations
     function repayCreditAccount(uint256 repaidAmount, uint256 profit, uint256 loss)
         external
         override
@@ -471,24 +502,24 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     // INTEREST RATE //
     // ------------- //
 
-    /// @inheritdoc IPoolV3
+    /// @notice Annual interest rate in ray that credit account owners pay per unit of borrowed capital
     function baseInterestRate() public view override returns (uint256) {
         return _baseInterestRate;
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Current cumulative base interest index in ray
     function baseInterestIndex() public view override returns (uint256) {
         uint256 timestampLU = lastBaseInterestUpdate;
         if (block.timestamp == timestampLU) return _baseInterestIndexLU; // U:[P4-15]
         return _calcBaseInterestIndex(timestampLU); // U:[P4-15]
     }
 
-    /// @inheritdoc IPoolV3
+    /// @dev Same as `baseInterestIndex`, kept for backward compatibility
     function calcLinearCumulative_RAY() external view override returns (uint256) {
         return baseInterestIndex(); // U:[P4-15]
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Cumulative base interest index stored as of last update in ray
     function baseInterestIndexLU() external view override returns (uint256) {
         return _baseInterestIndexLU;
     }
@@ -538,17 +569,19 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     // QUOTAS //
     // ------ //
 
-    /// @inheritdoc IPoolV3
+    /// @notice Current annual quota revenue in underlying tokens
     function quotaRevenue() public view override returns (uint256) {
         return _quotaRevenue;
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Updates quota revenue value by given delta
+    /// @param quotaRevenueDelta Quota revenue delta
     function updateQuotaRevenue(int256 quotaRevenueDelta) external override nonReentrant poolQuotaKeeperOnly {
         _setQuotaRevenue((quotaRevenue().toInt256() + quotaRevenueDelta).toUint256()); // U:[P4-17]
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Sets new quota revenue value
+    /// @param newQuotaRevenue New quota revenue value
     function setQuotaRevenue(uint256 newQuotaRevenue) external override nonReentrant poolQuotaKeeperOnly {
         _setQuotaRevenue(newQuotaRevenue); // U:[P4-17]
     }
@@ -579,7 +612,8 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     // CONFIGURATION //
     // ------------- //
 
-    /// @inheritdoc IPoolV3
+    /// @notice Sets new interest rate model, can only be called by configurator
+    /// @param newInterestRateModel Address of the new interest rate model contract
     function setInterestRateModel(address newInterestRateModel)
         external
         override
@@ -591,7 +625,8 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         emit SetInterestRateModel(newInterestRateModel); // U:[P4-22]
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Sets new pool quota keeper, can only be called by configurator
+    /// @param newPoolQuotaKeeper Address of the new pool quota keeper contract
     function setPoolQuotaKeeper(address newPoolQuotaKeeper)
         external
         override
@@ -613,7 +648,8 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         emit SetPoolQuotaKeeper(newPoolQuotaKeeper); // U:[P4-23C]
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Sets new total debt limit, can only be called by controller
+    /// @param newLimit New debt limit, `type(uint256).max` for no limit
     function setTotalDebtLimit(uint256 newLimit)
         external
         override
@@ -622,7 +658,10 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         _setTotalDebtLimit(newLimit); // U:[P4-25]
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Sets new debt limit for a given credit manager, can only be called by controller
+    ///         Adds credit manager to the list of connected managers when called for the first time
+    /// @param creditManager Credit manager to set the limit for
+    /// @param newLimit New debt limit, `type(uint256).max` for no limit (has smaller priority than total debt limit)
     function setCreditManagerDebtLimit(address creditManager, uint256 newLimit)
         external
         override
@@ -641,7 +680,8 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         emit SetCreditManagerDebtLimit(creditManager, newLimit); // U:[P4-21]
     }
 
-    /// @inheritdoc IPoolV3
+    /// @notice Sets new withdrawal fee, can only be called by controller
+    /// @param newWithdrawFee New withdrawal fee in bps
     function setWithdrawFee(uint256 newWithdrawFee)
         external
         override
