@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Holdings, 2022
+// (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -208,7 +208,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             revert IncorrectPriceFeedException(); // I:[CC-3]
         }
 
-        // сreditManager has an additional check that the token is not added yet
+        // creditManager has an additional check that the token is not added yet
         CreditManagerV3(creditManager).addToken({token: token}); // I:[CC-4]
 
         if (_isQuotedToken(token)) {
@@ -681,10 +681,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             _setMaxCumulativeLoss(_creditFacade, maxCumulativeLoss); // I: [CC-22]
 
             // Migrates array-based parameters
-            _migrateEmergencyLiquidators(_creditFacade); // I:[CC-22С]
+            _migrateEmergencyLiquidators(_creditFacade); // I:[CC-22c]
 
             // Copy forbidden token mask
-            _migrateForbiddenTokens(_creditFacade, prevCreditFacace.forbiddenTokenMask()); // I:[CC-22С]
+            _migrateForbiddenTokens(_creditFacade, prevCreditFacace.forbiddenTokenMask()); // I:[CC-22c]
 
             // Copies the expiration date if the contract is expirable
             if (prevCreditFacace.expirable()) _setExpirationDate(_creditFacade, prevCreditFacace.expirationDate()); // I:[CC-22]
@@ -692,7 +692,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             address botList = prevCreditFacace.botList();
             if (botList != address(0)) _setBotList(_creditFacade, botList); // I:[CC-22A]
         } else {
-            _clearArrayCreditFacadeParams(); // I:[CC-22С]
+            _clearArrayCreditFacadeParams(); // I:[CC-22c]
         }
 
         // If credit facade tracks total debt, it copies it's value and limit if migration is on

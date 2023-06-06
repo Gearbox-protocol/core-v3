@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Holdings, 2023
+// (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
 import {AdapterType} from "@gearbox-protocol/integration-types/contracts/AdapterType.sol";

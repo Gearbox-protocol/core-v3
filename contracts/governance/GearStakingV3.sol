@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Holdings, 2022
+// (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
