@@ -4,13 +4,12 @@
 pragma solidity ^0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-// import {SafeTransferFailedException, SafeTransferFromFailedException} from "../interfaces/IExceptions.sol";
 
-/// @title ERC20 helper library
+/// @title UnsafeERC20 library
 library UnsafeERC20 {
     /// @dev Same as OpenZeppelin's `safeTransfer`, but, instead of reverting, returns `false` when transfer fails
     function unsafeTransfer(IERC20 token, address to, uint256 amount) internal returns (bool success) {
-        return _unsafeCall(address(token), abi.encodeCall(IERC20.transfer, (to, amount))); // U:[EH-1]
+        return _unsafeCall(address(token), abi.encodeCall(IERC20.transfer, (to, amount))); // U:[UE-1]
     }
 
     /// @dev Same as OpenZeppelin's `safeTransferFrom`, but, instead of reverting, returns `false` when transfer fails
@@ -18,7 +17,7 @@ library UnsafeERC20 {
         internal
         returns (bool success)
     {
-        return _unsafeCall(address(token), abi.encodeCall(IERC20.transferFrom, (from, to, amount))); // U:[EH-2]
+        return _unsafeCall(address(token), abi.encodeCall(IERC20.transferFrom, (from, to, amount))); // U:[UE-2]
     }
 
     /// @dev Executes call to a function that returns either boolean value indicating call success or nothing
