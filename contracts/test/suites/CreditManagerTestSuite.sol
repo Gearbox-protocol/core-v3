@@ -101,6 +101,8 @@ contract CreditManagerTestSuite is PoolDeployer {
             AccountFactoryV3(address(af)).addCreditManager(address(creditManager));
         }
 
+        withdrawalManager.addCreditManager(address(creditManager));
+
         vm.stopPrank();
 
         // Approve USER & LIQUIDATOR to credit manager

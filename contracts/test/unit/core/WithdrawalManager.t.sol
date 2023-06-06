@@ -12,6 +12,7 @@ import {
 import {
     AmountCantBeZeroException,
     CallerNotConfiguratorException,
+    CallerNotCreditManagerException,
     NoFreeWithdrawalSlotsException,
     NothingToClaimException,
     ReceiveIsNotAllowedException,
@@ -70,6 +71,7 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerV3Events {
         acl.setAddress(AP_WETH_TOKEN, address(token1), false);
         acl.addCreditManager(creditManager);
         manager = new WithdrawalManagerHarness(address(acl), DELAY);
+        manager.addCreditManager(creditManager);
         vm.stopPrank();
     }
 
@@ -90,17 +92,20 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerV3Events {
         vm.expectRevert(ReceiveIsNotAllowedException.selector);
         payable(manager).transfer(1 ether);
 
-        vm.expectRevert(RegisteredCreditManagerOnlyException.selector);
+        vm.expectRevert(CallerNotCreditManagerException.selector);
         manager.addImmediateWithdrawal(address(0), address(0), 0);
 
-        vm.expectRevert(RegisteredCreditManagerOnlyException.selector);
+        vm.expectRevert(CallerNotCreditManagerException.selector);
         manager.addScheduledWithdrawal(address(0), address(0), 0, 0);
 
-        vm.expectRevert(RegisteredCreditManagerOnlyException.selector);
+        vm.expectRevert(CallerNotCreditManagerException.selector);
         manager.claimScheduledWithdrawals(address(0), address(0), ClaimAction(0));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         manager.setWithdrawalDelay(0);
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        manager.addCreditManager(address(0));
 
         vm.stopPrank();
     }
@@ -711,6 +716,29 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerV3Events {
         manager.setWithdrawalDelay(newDelay);
 
         assertEq(manager.delay(), newDelay, "Incorrect delay");
+    }
+
+    /// @notice U:[WM-12A]: `addCreditManager` reverts for non-registered credit manager
+    function test_U_WM_12A_addCreditManager_reverts_for_non_registered_credit_manager() public {
+        vm.expectRevert(RegisteredCreditManagerOnlyException.selector);
+        vm.prank(configurator);
+        manager.addCreditManager(address(0));
+    }
+
+    /// @notice U:[WM-12B]: `addCreditManager` works correctly
+    function test_U_WM_12B_addCreditManager_works_correctly() public {
+        manager = new WithdrawalManagerHarness(address(acl), DELAY);
+        assertEq(manager.creditManagers().length, 0, "Incorrect credit managers list length before adding");
+
+        vm.expectEmit(true, false, false, false);
+        emit AddCreditManager(creditManager);
+
+        vm.prank(configurator);
+        manager.addCreditManager(creditManager);
+
+        address[] memory cms = manager.creditManagers();
+        assertEq(cms.length, 1, "Incorrect credit managers list length after adding");
+        assertEq(cms[0], creditManager, "Incorrect credit manager address");
     }
 
     // ------- //
