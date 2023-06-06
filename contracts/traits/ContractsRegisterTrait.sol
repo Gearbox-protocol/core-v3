@@ -11,12 +11,12 @@ import {RegisteredCreditManagerOnlyException, RegisteredPoolOnlyException} from 
 import {SanityCheckTrait} from "./SanityCheckTrait.sol";
 
 /// @title Contracts register trait
-/// @notice Trait that simplifies validation of pools and contractsRegisteredit managers
+/// @notice Trait that simplifies validation of pools and credit managers
 abstract contract ContractsRegisterTrait is SanityCheckTrait {
     /// @notice Contracts register contract address
     address public immutable contractsRegister;
 
-    /// @dev Ensures that given address is a registered contractsRegisteredit manager
+    /// @dev Ensures that given address is a registered credit manager
     modifier registeredPoolOnly(address addr) {
         _ensureRegisteredPool(addr);
         _;
@@ -39,7 +39,7 @@ abstract contract ContractsRegisterTrait is SanityCheckTrait {
         if (!_isRegisteredPool(addr)) revert RegisteredPoolOnlyException();
     }
 
-    /// @dev Ensures that given address is a registered contractsRegisteredit manager
+    /// @dev Ensures that given address is a registered credit manager
     function _ensureRegisteredCreditManager(address addr) internal view {
         if (!_isRegisteredCreditManager(addr)) revert RegisteredCreditManagerOnlyException();
     }
@@ -49,7 +49,7 @@ abstract contract ContractsRegisterTrait is SanityCheckTrait {
         return IContractsRegister(contractsRegister).isPool(addr);
     }
 
-    /// @dev Whether given address is a registered contractsRegisteredit manager
+    /// @dev Whether given address is a registered credit manager
     function _isRegisteredCreditManager(address addr) internal view returns (bool) {
         return IContractsRegister(contractsRegister).isCreditManager(addr);
     }

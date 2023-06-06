@@ -69,6 +69,10 @@ interface IWithdrawalManagerV3Events {
     /// @notice Emitted when new scheduled withdrawal delay is set by configurator
     /// @param newDelay New delay for scheduled withdrawals
     event SetWithdrawalDelay(uint40 newDelay);
+
+    /// @notice Emitted when new credit manager is added
+    /// @param creditManager Added credit manager
+    event AddCreditManager(address indexed creditManager);
 }
 
 /// @title Withdrawal manager interface
@@ -111,5 +115,9 @@ interface IWithdrawalManagerV3 is IWithdrawalManagerV3Events, IVersion {
     // CONFIGURATION //
     // ------------- //
 
+    function creditManagers() external view returns (address[] memory);
+
     function setWithdrawalDelay(uint40 newDelay) external;
+
+    function addCreditManager(address newCreditManager) external;
 }

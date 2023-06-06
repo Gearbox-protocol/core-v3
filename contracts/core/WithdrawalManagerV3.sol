@@ -6,6 +6,7 @@ pragma solidity ^0.8.17;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
@@ -37,6 +38,7 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
     using SafeERC20 for IERC20;
     using UnsafeERC20 for IERC20;
     using Address for address payable;
+    using EnumerableSet for EnumerableSet.AddressSet;
     using WithdrawalsLogic for ClaimAction;
     using WithdrawalsLogic for ScheduledWithdrawal;
     using WithdrawalsLogic for ScheduledWithdrawal[2];
@@ -55,6 +57,15 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
 
     /// @dev Mapping credit account => scheduled withdrawals
     mapping(address => ScheduledWithdrawal[2]) internal _scheduled;
+
+    /// @dev List of all added credit managers that can interact with this contract
+    EnumerableSet.AddressSet internal _creditManagersSet;
+
+    /// @dev Ensures that function caller is one of added credit managers
+    modifier creditManagerOnly() {
+        _ensureCallerIsCreditManager();
+        _;
+    }
 
     /// @notice Constructor
     /// @param _addressProvider Address of the address provider
@@ -88,9 +99,9 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
     function addImmediateWithdrawal(address token, address to, uint256 amount)
         external
         override
-        registeredCreditManagerOnly(msg.sender) // U:[WM-2]
+        creditManagerOnly // U:[WM-2]
     {
-        _addImmediateWithdrawal({account: to, token: token, amount: amount});
+        _addImmediateWithdrawal({account: to, token: token, amount: amount}); // U:[WM-3]
     }
 
     /// @notice Claims caller's immediate withdrawal
@@ -106,7 +117,7 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
             token: token == ETH_ADDRESS ? weth : token,
             to: to,
             unwrapWETH: token == ETH_ADDRESS
-        });
+        }); // U:[WM-4B,4C,4D]
     }
 
     /// @dev Increases `account`'s immediately withdrawable balance of `token` by `amount`
@@ -164,7 +175,7 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
     function addScheduledWithdrawal(address creditAccount, address token, uint256 amount, uint8 tokenIndex)
         external
         override
-        registeredCreditManagerOnly(msg.sender) // U:[WM-2]
+        creditManagerOnly // U:[WM-2]
     {
         if (amount < 2) {
             revert AmountCantBeZeroException(); // U:[WM-5A]
@@ -190,7 +201,7 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
     function claimScheduledWithdrawals(address creditAccount, address to, ClaimAction action)
         external
         override
-        registeredCreditManagerOnly(msg.sender) // U:[WM-2]
+        creditManagerOnly // U:[WM-2]
         returns (bool hasScheduled, uint256 tokensToEnable)
     {
         ScheduledWithdrawal[2] storage withdrawals = _scheduled[creditAccount];
@@ -273,6 +284,11 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
     // CONFIGURATION //
     // ------------- //
 
+    /// @notice List of all added credit managers that can interact with this contract
+    function creditManagers() external view override returns (address[] memory) {
+        return _creditManagersSet.values();
+    }
+
     /// @notice Sets delay for scheduled withdrawals, only affects new withdrawal requests
     /// @param newDelay New delay for scheduled withdrawals
     function setWithdrawalDelay(uint40 newDelay)
@@ -283,6 +299,27 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
         if (newDelay != delay) {
             delay = newDelay; // U:[WM-11]
             emit SetWithdrawalDelay(newDelay); // U:[WM-11]
+        }
+    }
+
+    /// @notice Adds new credit manager that can interact with this contract
+    /// @param newCreditManager New credit manager to add
+    function addCreditManager(address newCreditManager)
+        external
+        override
+        configuratorOnly // U:[WM-2]
+        registeredCreditManagerOnly(newCreditManager) // U:[WM-12A]
+    {
+        if (!_creditManagersSet.contains(newCreditManager)) {
+            _creditManagersSet.add(newCreditManager); // U:[WM-12B]
+            emit AddCreditManager(newCreditManager); // U:[WM-12B]
+        }
+    }
+
+    /// @dev Ensures caller is one of added credit managers
+    function _ensureCallerIsCreditManager() internal view {
+        if (!_creditManagersSet.contains(msg.sender)) {
+            revert CallerNotCreditManagerException();
         }
     }
 }

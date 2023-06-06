@@ -9,8 +9,8 @@ import {UnsafeERC20} from "../../../libraries/UnsafeERC20.sol";
 
 import {TestHelper} from "../../lib/helper.sol";
 
-/// @title ERC20 helper library unit test
-/// @notice U:[EH]: Unit tests for ERC20 helper library
+/// @title UnsafeERC20 library unit test
+/// @notice U:[UE]: Unit tests for UnsafeERC20 library
 contract UnsafeERC20UnitTest is TestHelper {
     using UnsafeERC20 for IERC20;
 
@@ -21,8 +21,8 @@ contract UnsafeERC20UnitTest is TestHelper {
         bool expectedResult;
     }
 
-    /// @notice U:[EH-1]: `unsafeTransfer` works correctly
-    function test_U_EH_01_unsafeTransfer_works_correctly() public {
+    /// @notice U:[UE-1]: `unsafeTransfer` works correctly
+    function test_U_UE_01_unsafeTransfer_works_correctly() public {
         UnsafeTransferTestCase[4] memory cases = [
             UnsafeTransferTestCase({
                 name: "function reverts",
@@ -69,8 +69,8 @@ contract UnsafeERC20UnitTest is TestHelper {
         }
     }
 
-    /// @notice U:[EH-2]: `unsafeTransferFrom` works correctly
-    function test_U_EH_02_unsafeTransferFrom_works_correctly() public {
+    /// @notice U:[UE-2]: `unsafeTransferFrom` works correctly
+    function test_U_UE_02_unsafeTransferFrom_works_correctly() public {
         UnsafeTransferTestCase[4] memory cases = [
             UnsafeTransferTestCase({
                 name: "function reverts",
