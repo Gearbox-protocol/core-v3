@@ -21,7 +21,7 @@ import {
 import {
     ClaimAction, ETH_ADDRESS, IWithdrawalManagerV3, ScheduledWithdrawal
 } from "../interfaces/IWithdrawalManagerV3.sol";
-import {IERC20Helper} from "../libraries/IERC20Helper.sol";
+import {UnsafeERC20} from "../libraries/UnsafeERC20.sol";
 import {WithdrawalsLogic} from "../libraries/WithdrawalsLogic.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
@@ -35,7 +35,7 @@ import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 ///           from credit accounts. One credit account can have up to two scheduled withdrawals at the same time.
 contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegisterTrait {
     using SafeERC20 for IERC20;
-    using IERC20Helper for IERC20;
+    using UnsafeERC20 for IERC20;
     using Address for address payable;
     using WithdrawalsLogic for ClaimAction;
     using WithdrawalsLogic for ScheduledWithdrawal;
