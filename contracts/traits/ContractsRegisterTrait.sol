@@ -11,12 +11,12 @@ import {RegisteredCreditManagerOnlyException, RegisteredPoolOnlyException} from 
 import {SanityCheckTrait} from "./SanityCheckTrait.sol";
 
 /// @title Contracts register trait
-/// @notice Trait that simplifies validation of pools and credit managers
+/// @notice Trait that simplifies validation of pools and contractsRegisteredit managers
 abstract contract ContractsRegisterTrait is SanityCheckTrait {
     /// @notice Contracts register contract address
-    address public immutable cr;
+    address public immutable contractsRegister;
 
-    /// @dev Ensures that given address is a registered credit manager
+    /// @dev Ensures that given address is a registered contractsRegisteredit manager
     modifier registeredPoolOnly(address addr) {
         _ensureRegisteredPool(addr);
         _;
@@ -31,7 +31,7 @@ abstract contract ContractsRegisterTrait is SanityCheckTrait {
     /// @notice Constructor
     /// @param addressProvider Address provider contract address
     constructor(address addressProvider) nonZeroAddress(addressProvider) {
-        cr = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_CONTRACTS_REGISTER, 1);
+        contractsRegister = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_CONTRACTS_REGISTER, 1);
     }
 
     /// @dev Ensures that given address is a registered pool
@@ -39,18 +39,18 @@ abstract contract ContractsRegisterTrait is SanityCheckTrait {
         if (!_isRegisteredPool(addr)) revert RegisteredPoolOnlyException();
     }
 
-    /// @dev Ensures that given address is a registered credit manager
+    /// @dev Ensures that given address is a registered contractsRegisteredit manager
     function _ensureRegisteredCreditManager(address addr) internal view {
         if (!_isRegisteredCreditManager(addr)) revert RegisteredCreditManagerOnlyException();
     }
 
     /// @dev Whether given address is a registered pool
     function _isRegisteredPool(address addr) internal view returns (bool) {
-        return IContractsRegister(cr).isPool(addr);
+        return IContractsRegister(contractsRegister).isPool(addr);
     }
 
-    /// @dev Whether given address is a registered credit manager
+    /// @dev Whether given address is a registered contractsRegisteredit manager
     function _isRegisteredCreditManager(address addr) internal view returns (bool) {
-        return IContractsRegister(cr).isCreditManager(addr);
+        return IContractsRegister(contractsRegister).isCreditManager(addr);
     }
 }

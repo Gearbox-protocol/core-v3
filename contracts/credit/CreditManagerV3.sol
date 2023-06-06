@@ -85,6 +85,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Whether the CM supports quota-related logic
     bool public immutable override supportsQuotas;
 
+    /// @notice Contract that handles withdrawals
+    address public immutable override withdrawalManager;
+
     /// @notice Address of the connected Credit Facade
     address public override creditFacade;
 
@@ -125,9 +128,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     /// @notice Mask of tokens to apply quota logic for
     uint256 public override quotedTokensMask;
-
-    /// @notice Contract that handles withdrawals
-    address public immutable override withdrawalManager;
 
     /// @notice Address of the connected Credit Configurator
     address public creditConfigurator;

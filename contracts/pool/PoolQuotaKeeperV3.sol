@@ -32,6 +32,9 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     using EnumerableSet for EnumerableSet.AddressSet;
     using QuotasLogic for TokenQuotaParams;
 
+    /// @notice Contract version
+    uint256 public constant override version = 3_00;
+
     /// @notice Address of the underlying token
     address public immutable underlying;
 
@@ -55,9 +58,6 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
     /// @notice Timestamp of the last time quota rates were batch-updated
     uint40 public lastQuotaRateUpdate;
-
-    /// @notice Contract version
-    uint256 public constant override version = 3_00;
 
     /// @dev Reverts if the function is called by non-gauge
     modifier gaugeOnly() {
