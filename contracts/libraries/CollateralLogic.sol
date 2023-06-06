@@ -3,7 +3,9 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {IERC20Helper} from "./IERC20Helper.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
+
 import {CollateralDebtData} from "../interfaces/ICreditManagerV3.sol";
 import {PERCENTAGE_FACTOR, RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
@@ -15,6 +17,7 @@ import "forge-std/console.sol";
 /// @dev Implements functions that compute value of collateral on a Credit Account
 library CollateralLogic {
     using BitMask for uint256;
+    using SafeERC20 for IERC20;
 
     /// @dev Computes USD-denominated total value and TWV of a Credit Account
     /// @param collateralDebtData A struct containing data on the Credit Account's debt and quoted tokens
@@ -283,7 +286,7 @@ library CollateralLogic {
         uint16 liquidationThreshold,
         uint256 quotaUSD
     ) internal view returns (uint256 valueUSD, uint256 weightedValueUSD, bool nonZeroBalance) {
-        uint256 balance = IERC20Helper.balanceOf(token, creditAccount); // U:[CLL-1]
+        uint256 balance = IERC20(token).safeBalanceOf({account: creditAccount}); // U:[CLL-1]
 
         /// Collateral computations are skipped if the balance is 0
         /// and nonZeroBalance will be equal to false

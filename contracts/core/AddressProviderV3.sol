@@ -17,10 +17,14 @@ contract AddressProviderV3 is IAddressProviderV3 {
     uint256 public constant override(IVersion) version = 3_00;
 
     modifier configuratorOnly() {
+        _revertIfNotConfigurator();
+        _;
+    }
+
+    function _revertIfNotConfigurator() internal view {
         if (!IACL(getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL)).isConfigurator(msg.sender)) {
             revert CallerNotConfiguratorException();
         }
-        _;
     }
 
     constructor(address _acl) {

@@ -3,7 +3,9 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {IERC20Helper} from "./IERC20Helper.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
+
 import {BitMask} from "./BitMask.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
@@ -19,6 +21,7 @@ struct BalanceWithMask {
 /// @notice Implements functions that used for before-and-after balance comparisons
 library BalancesLogic {
     using BitMask for uint256;
+    using SafeERC20 for IERC20;
 
     /// @dev Returns an array of balances that are expected after operations
     /// @param creditAccount Credit Account to compute new balances for
@@ -31,7 +34,7 @@ library BalancesLogic {
         expected = deltas; // U:[BLL-1]
         uint256 len = deltas.length;
         for (uint256 i = 0; i < len;) {
-            expected[i].balance += IERC20Helper.balanceOf(expected[i].token, creditAccount); // U:[BLL-1]
+            expected[i].balance += IERC20(expected[i].token).safeBalanceOf({account: creditAccount}); // U:[BLL-1]
             unchecked {
                 ++i;
             }
@@ -46,7 +49,7 @@ library BalancesLogic {
         uint256 len = expected.length;
         unchecked {
             for (uint256 i = 0; i < len; ++i) {
-                if (IERC20Helper.balanceOf(expected[i].token, creditAccount) < expected[i].balance) {
+                if (IERC20(expected[i].token).safeBalanceOf({account: creditAccount}) < expected[i].balance) {
                     return false; // U:[BLL-2]
                 }
             }
@@ -76,7 +79,7 @@ library BalancesLogic {
                         address token = getTokenByMaskFn(tokenMask);
                         forbiddenBalances[i].token = token; // U:[BLL-3]
                         forbiddenBalances[i].tokenMask = tokenMask; // U:[BLL-3]
-                        forbiddenBalances[i].balance = IERC20Helper.balanceOf(token, creditAccount); // U:[BLL-3]
+                        forbiddenBalances[i].balance = IERC20(token).safeBalanceOf({account: creditAccount}); // U:[BLL-3]
                         ++i;
                     }
                 }
@@ -111,7 +114,7 @@ library BalancesLogic {
             uint256 len = forbiddenBalances.length;
             for (uint256 i = 0; i < len; ++i) {
                 if (forbiddenTokensOnAccount & forbiddenBalances[i].tokenMask != 0) {
-                    uint256 currentBalance = IERC20Helper.balanceOf(forbiddenBalances[i].token, creditAccount);
+                    uint256 currentBalance = IERC20(forbiddenBalances[i].token).safeBalanceOf({account: creditAccount});
                     if (currentBalance > forbiddenBalances[i].balance) {
                         return false; // U:[BLL-4]
                     }

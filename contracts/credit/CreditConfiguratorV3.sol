@@ -71,8 +71,12 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
 
     /// @notice Sanity check to verify that the token is not the underlying
     modifier nonUnderlyingTokenOnly(address token) {
-        if (token == underlying) revert TokenNotAllowedException();
+        _revertIfUnderlyingToken(token);
         _;
+    }
+
+    function _revertIfUnderlyingToken(address token) internal view {
+        if (token == underlying) revert TokenNotAllowedException();
     }
 
     /// @notice Constructor has a special role in Credit Manager deployment
