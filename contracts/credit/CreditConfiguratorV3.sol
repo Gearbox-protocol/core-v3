@@ -51,6 +51,9 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     using Address for address;
     using BitMask for uint256;
 
+    /// @notice Contract version
+    uint256 public constant version = 3_00;
+
     /// @notice Address provider (needed for upgrading the Price Oracle)
     address public immutable override addressProvider;
 
@@ -65,9 +68,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
 
     /// @notice Set of emergency liquidators
     EnumerableSet.AddressSet private emergencyLiquidatorsSet;
-
-    /// @notice Contract version
-    uint256 public constant version = 3_00;
 
     /// @notice Sanity check to verify that the token is not the underlying
     modifier nonUnderlyingTokenOnly(address token) {

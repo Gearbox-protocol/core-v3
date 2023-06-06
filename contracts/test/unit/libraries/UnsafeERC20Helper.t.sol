@@ -5,14 +5,14 @@ pragma solidity ^0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {IERC20Helper} from "../../../libraries/IERC20Helper.sol";
+import {UnsafeERC20} from "../../../libraries/UnsafeERC20.sol";
 
 import {TestHelper} from "../../lib/helper.sol";
 
 /// @title ERC20 helper library unit test
 /// @notice U:[EH]: Unit tests for ERC20 helper library
-contract IERC20HelperUnitTest is TestHelper {
-    using IERC20Helper for IERC20;
+contract UnsafeERC20UnitTest is TestHelper {
+    using UnsafeERC20 for IERC20;
 
     struct UnsafeTransferTestCase {
         string name;

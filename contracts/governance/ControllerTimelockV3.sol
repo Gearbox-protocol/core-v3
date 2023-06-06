@@ -25,6 +25,9 @@ import {ILPPriceFeedV2} from "@gearbox-protocol/core-v2/contracts/interfaces/ILP
 ///      a policy needs to be defined for it. The policy also determines the
 ///      address that can change a particular parameter. See more in `PolicyManager`
 contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
+    /// @notice Contract version
+    uint256 public constant version = 3_00;
+
     /// @notice Period before a mature transaction becomes stale
     uint256 public constant GRACE_PERIOD = 14 days;
 
@@ -44,13 +47,11 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         vetoAdmin = _vetoAdmin;
     }
 
-
     /// @dev Allows access to function only to veto admin
     modifier vetoAdminOnly() {
         _revertIfCallerIsNotVetoAdmin();
         _;
     }
-
 
     function _revertIfCallerIsNotVetoAdmin() internal view {
         if (msg.sender != vetoAdmin) {
@@ -467,8 +468,10 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         external
         configuratorOnly // U: [CT-08]
     {
-        vetoAdmin = newAdmin; // U: [CT-08]
-        emit SetVetoAdmin(newAdmin); // U: [CT-08]
+        if (vetoAdmin != newAdmin) {
+            vetoAdmin = newAdmin; // U: [CT-08]
+            emit SetVetoAdmin(newAdmin); // U: [CT-08]
+        }
     }
 
     /// @dev Sets a new ops admin delay
@@ -476,7 +479,9 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         external
         configuratorOnly // U: [CT-08]
     {
-        delay = newDelay; // U: [CT-08]
-        emit SetDelay(newDelay); // U: [CT-08]
+        if (delay != newDelay) {
+            delay = newDelay; // U: [CT-08]
+            emit SetDelay(newDelay); // U: [CT-08]
+        }
     }
 }

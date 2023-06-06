@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 // import {SafeTransferFailedException, SafeTransferFromFailedException} from "../interfaces/IExceptions.sol";
 
 /// @title ERC20 helper library
-library IERC20Helper {
+library UnsafeERC20 {
     /// @dev Same as OpenZeppelin's `safeTransfer`, but, instead of reverting, returns `false` when transfer fails
     function unsafeTransfer(IERC20 token, address to, uint256 amount) internal returns (bool success) {
         return _unsafeCall(address(token), abi.encodeCall(IERC20.transfer, (to, amount))); // U:[EH-1]

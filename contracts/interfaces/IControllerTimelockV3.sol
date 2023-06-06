@@ -3,6 +3,8 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
+import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+
 struct QueuedTransactionData {
     bool queued;
     address executor;
@@ -52,7 +54,7 @@ interface IControllerTimelockV3Errors {
     error TxExecutionRevertedException();
 }
 
-interface IControllerTimelockV3 is IControllerTimelockV3Errors, IControllerTimelockV3Events {
+interface IControllerTimelockV3 is IControllerTimelockV3Errors, IControllerTimelockV3Events, IVersion {
     /// @dev Queues a transaction to set a new expiration date in the Credit Facade
     /// @param creditManager Adress of CM to update the expiration date for
     /// @param expirationDate The new expiration date

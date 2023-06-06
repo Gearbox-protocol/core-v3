@@ -16,7 +16,7 @@ import {CreditAccountHelper} from "../libraries/CreditAccountHelper.sol";
 
 import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
-import {IERC20Helper} from "../libraries/IERC20Helper.sol";
+import {UnsafeERC20} from "../libraries/UnsafeERC20.sol";
 
 // INTERFACES
 import {IAccountFactoryBase} from "../interfaces/IAccountFactoryV3.sol";
@@ -85,6 +85,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Whether the CM supports quota-related logic
     bool public immutable override supportsQuotas;
 
+    /// @notice Contract that handles withdrawals
+    address public immutable override withdrawalManager;
+
     /// @notice Address of the connected Credit Facade
     address public override creditFacade;
 
@@ -125,9 +128,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     /// @notice Mask of tokens to apply quota logic for
     uint256 public override quotedTokensMask;
-
-    /// @notice Contract that handles withdrawals
-    address public immutable override withdrawalManager;
 
     /// @notice Address of the connected Credit Configurator
     address public creditConfigurator;

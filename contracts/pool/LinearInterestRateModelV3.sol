@@ -19,6 +19,9 @@ import {IncorrectParameterException, BorrowingMoreThanU2ForbiddenException} from
 ///      (beyond the U2 point), in order to create a reserve for exits and make
 ///      rates more stable
 contract LinearInterestRateModelV3 is IInterestRateModelV3 {
+    /// @notice Contract version
+    uint256 public constant version = 3_00;
+
     /// @notice Whether to revert when borrowing beyond U2 utilization
     bool public immutable isBorrowingMoreU2Forbidden;
 
@@ -42,9 +45,6 @@ contract LinearInterestRateModelV3 is IInterestRateModelV3 {
     /// @notice Slope of the third region. The rate at U = 100% is equal
     ///         to R_base_RAY + R_slope1_RAY + R_slope2_RAY
     uint256 public immutable R_slope3_RAY;
-
-    /// @notice Contract version
-    uint256 public constant version = 3_00;
 
     /// @dev Constructor
     /// @param U_1 U1 in basis points
