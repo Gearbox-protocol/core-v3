@@ -250,15 +250,9 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
     function changeQuotaTokenRateParams(address token, uint16 minRate, uint16 maxRate)
         external
         nonZeroAddress(token) // U:[GA-04]
-        configuratorOnly // U:[GA-03]
+        controllerOnly // U:[GA-03]
     {
         _changeQuotaTokenRateParams(token, minRate, maxRate);
-    }
-
-    /// @dev Changes the rate params for a quoted token
-    /// @param minRate The minimal interest rate paid on token's quotas
-    function changeQuotaTokenMinRate(address token, uint16 minRate) external nonZeroAddress(token) controllerOnly {
-        _changeQuotaTokenRateParams(token, minRate, quotaRateParams[token].maxRate); // U:[GA-06]
     }
 
     function _changeQuotaTokenRateParams(address token, uint16 minRate, uint16 maxRate) internal {

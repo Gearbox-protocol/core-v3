@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 pragma abicoder v1;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 import {ICreditAccountV3} from "../interfaces/ICreditAccountV3.sol";
@@ -35,10 +35,14 @@ contract CreditAccountV3 is ICreditAccountV3 {
 
     /// @dev Ensures that function caller is credit manager
     modifier creditManagerOnly() {
+        _revertIfNotCreditManager();
+        _;
+    }
+
+    function _revertIfNotCreditManager() internal view {
         if (msg.sender != creditManager) {
             revert CallerNotCreditManagerException();
         }
-        _;
     }
 
     /// @notice Constructor

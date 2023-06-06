@@ -3,3 +3,4 @@ forge-std/=lib/forge-std/src/
 @chainlink/=node_modules/@chainlink/
 @openzeppelin/=node_modules/@openzeppelin/
 @gearbox-protocol=node_modules/@gearbox-protocol/
+@1inch=node_modules/@1inch/

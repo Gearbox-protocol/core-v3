@@ -13,6 +13,9 @@ struct Policy {
     /// @dev Determines whether the policy is enabled
     ///      A disabled policy will auto-fail the policy check
     bool enabled;
+    /// @dev The admin responsible that can change the parameter under
+    ///      the given policy
+    address admin;
     /// @dev Bitmask of flags that determine which policy checks to apply on parameter change:
     ///      0 - check exact value
     ///      1 - check min value
@@ -114,6 +117,8 @@ contract PolicyManagerV3 is ACLNonReentrantTrait {
         Policy storage policy = _policies[policyHash];
 
         if (!policy.enabled) return false; // F: [PM-02]
+
+        if (policy.admin != msg.sender) return false;
 
         uint8 flags = policy.flags;
 

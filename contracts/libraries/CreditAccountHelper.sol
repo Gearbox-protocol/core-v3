@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20Helper} from "./IERC20Helper.sol";
+import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 
 import {ICreditAccountBase} from "../interfaces/ICreditAccountV3.sol";
 import {AllowanceFailedException} from "../interfaces/IExceptions.sol";
@@ -12,7 +12,7 @@ import {AllowanceFailedException} from "../interfaces/IExceptions.sol";
 /// @title CreditAccount Helper library
 /// @dev Implements functions that help manage assets on a Credit Account
 library CreditAccountHelper {
-    using IERC20Helper for IERC20;
+    using SafeERC20 for IERC20;
 
     /// @dev Requests a Credit Account to do an approval with support for various kinds of tokens
     /// @dev Supports up-to-spec ERC20 tokens, ERC20 tokens that revert on transfer failure,
@@ -88,8 +88,8 @@ library CreditAccountHelper {
         address to,
         uint256 amount
     ) internal returns (uint256 delivered) {
-        uint256 balanceBefore = IERC20Helper.balanceOf(token, to);
+        uint256 balanceBefore = IERC20(token).safeBalanceOf({account: to});
         transfer(creditAccount, token, to, amount);
-        delivered = IERC20Helper.balanceOf(token, to) - balanceBefore;
+        delivered = IERC20(token).safeBalanceOf({account: to}) - balanceBefore;
     }
 }

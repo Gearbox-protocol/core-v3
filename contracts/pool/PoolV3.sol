@@ -4,11 +4,12 @@
 pragma solidity ^0.8.17;
 pragma abicoder v1;
 
+import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
+
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
@@ -46,12 +47,12 @@ struct DebtParams {
 /// @title Pool V3
 /// @notice Pool contract that implements lending and borrowing logic, compatible with ERC-4626 standard
 contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV3 {
-    using SafeERC20 for IERC20;
     using Math for uint256;
     using SafeCast for int256;
     using SafeCast for uint256;
     using CreditLogic for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
+    using SafeERC20 for IERC20;
 
     /// @notice Contract version
     uint256 public constant override version = 3_00;
@@ -101,8 +102,12 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
 
     /// @dev Ensures that function can only be called by the pool quota keeper
     modifier poolQuotaKeeperOnly() {
-        if (msg.sender != poolQuotaKeeper) revert CallerNotPoolQuotaKeeperException(); // U:[P4-5]
+        _revertIfCallerIsNotPoolQuotaKeeper();
         _;
+    }
+
+    function _revertIfCallerIsNotPoolQuotaKeeper() internal view {
+        if (msg.sender != poolQuotaKeeper) revert CallerNotPoolQuotaKeeperException(); // U:[P4-5]
     }
 
     /// @notice Constructor
@@ -314,7 +319,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     ///      - updates base interest rate and index
     ///      - mints pool shares to `receiver`
     function _deposit(address receiver, uint256 assetsSent, uint256 assetsReceived, uint256 shares) internal {
-        IERC20(underlyingToken).safeTransferFrom(msg.sender, address(this), assetsSent); // U:[P4-5,6]
+        IERC20(underlyingToken).safeTransferFrom({from: msg.sender, to: address(this), amount: assetsSent}); // U:[P4-5,6]
 
         _updateBaseInterest({
             expectedLiquidityDelta: assetsReceived.toInt256(),
@@ -343,10 +348,10 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         }); // U:[P4-8,9]
 
         uint256 amountToUser = _amountWithFee(assetsReceived);
-        IERC20(underlyingToken).safeTransfer(receiver, amountToUser); // U:[P4-8,9]
+        IERC20(underlyingToken).safeTransfer({to: receiver, value: amountToUser}); // U:[P4-8,9]
         if (assetsSent > amountToUser) {
             unchecked {
-                IERC20(underlyingToken).safeTransfer(treasury, assetsSent - amountToUser); // U:[P4-8,9]
+                IERC20(underlyingToken).safeTransfer({to: treasury, value: assetsSent - amountToUser}); // U:[P4-8,9]
             }
         }
         emit Withdraw(msg.sender, receiver, owner, assetsReceived, shares); // U:[P4-8, 9]
@@ -419,7 +424,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         cmDebt.borrowed = cmBorrowed_; // U:[P4-11]
         _totalDebt.borrowed = totalBorrowed_; // U:[P4-11]
 
-        IERC20(underlyingToken).safeTransfer(creditAccount, borrowedAmount); // U:[P4-11]
+        IERC20(underlyingToken).safeTransfer({to: creditAccount, value: borrowedAmount}); // U:[P4-11]
         emit Borrow(msg.sender, creditAccount, borrowedAmount); // U:[P4-11]
     }
 

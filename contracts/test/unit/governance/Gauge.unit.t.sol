@@ -92,7 +92,7 @@ contract GauageTest is TestHelper, IGaugeV3Events {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         gauge.addQuotaToken(DUMB_ADDRESS, 0, 0);
 
-        vm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.expectRevert(CallerNotControllerException.selector);
         gauge.changeQuotaTokenRateParams(DUMB_ADDRESS, 0, 0);
     }
 
@@ -187,46 +187,6 @@ contract GauageTest is TestHelper, IGaugeV3Events {
 
         assertEq(_minRate, minRate, "Incorrect minRate");
         assertEq(_maxRate, maxRate, "Incorrect maxRate");
-
-        assertEq(_totalVotesLpSide, totalVotesLpSide, "Incorrect totalVotesLpSide");
-        assertEq(_totalVotesCaSide, totalVotesCaSide, "Incorrect totalVotesCaSide");
-    }
-
-    /// @dev U:[GA-07]: changeQuotaTokenRateParams works as expected
-    function test_U_GA_07_changeQuotaTokenMinRate_works_as_expected() public {
-        address token = makeAddr("TOKEN");
-        uint16 minRate = 100;
-        uint16 maxRate = 500;
-
-        // Case: it reverts if token is not added before
-        vm.expectRevert(TokenNotAllowedException.selector);
-        vm.prank(CONFIGURATOR);
-        gauge.changeQuotaTokenMinRate(token, minRate);
-
-        // Case: it updates rates only if token added
-
-        uint96 totalVotesLpSide = 9323;
-        uint96 totalVotesCaSide = 12323;
-
-        gauge.setQuotaRateParams({
-            token: token,
-            minRate: minRate + 1312,
-            maxRate: maxRate + 1923,
-            totalVotesLpSide: totalVotesLpSide,
-            totalVotesCaSide: totalVotesCaSide
-        });
-
-        vm.expectEmit(true, true, false, true);
-        emit SetQuotaTokenParams({token: token, minRate: minRate, maxRate: maxRate + 1923});
-
-        vm.prank(CONFIGURATOR);
-        gauge.changeQuotaTokenMinRate(token, minRate);
-
-        (uint16 _minRate, uint16 _maxRate, uint96 _totalVotesLpSide, uint96 _totalVotesCaSide) =
-            gauge.quotaRateParams(token);
-
-        assertEq(_minRate, minRate, "Incorrect minRate");
-        assertEq(_maxRate, maxRate + 1923, "Incorrect maxRate");
 
         assertEq(_totalVotesLpSide, totalVotesLpSide, "Incorrect totalVotesLpSide");
         assertEq(_totalVotesCaSide, totalVotesCaSide, "Incorrect totalVotesCaSide");
