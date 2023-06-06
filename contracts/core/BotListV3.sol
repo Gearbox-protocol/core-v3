@@ -237,7 +237,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @notice Forbids the bot system-wide if it is known to be compromised
     function setBotForbiddenStatus(address bot, bool status) external configuratorOnly {
         forbiddenBot[bot] = status;
-        emit BotForbiddenStatusChanged(bot, status);
+        emit SetBotForbiddenStatus(bot, status);
     }
 
     /// @notice Sets the DAO fee on bot payments
@@ -254,14 +254,11 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
 
     /// @notice Sets an address' status as an approved Credit Manager
     /// @param creditManager Address of the Credit Manager to change status for
-    /// @param status The new status
-    function setApprovedCreditManagerStatus(address creditManager, bool status) external configuratorOnly {
-        approvedCreditManager[creditManager] = status;
-
-        if (status) {
-            emit CreditManagerAdded(creditManager);
-        } else {
-            emit CreditManagerRemoved(creditManager);
+    /// @param newStatus The new status
+    function setApprovedCreditManagerStatus(address creditManager, bool newStatus) external configuratorOnly {
+        if (approvedCreditManager[creditManager] != newStatus) {
+            approvedCreditManager[creditManager] = newStatus;
+            emit SetCreditManagerStatus(creditManager, newStatus);
         }
     }
 

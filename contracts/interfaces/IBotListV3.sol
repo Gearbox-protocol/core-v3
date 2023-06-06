@@ -23,7 +23,7 @@ interface IBotListV3Events {
     );
 
     /// @dev Emits when a bot is forbidden system-wide
-    event BotForbiddenStatusChanged(address indexed bot, bool status);
+    event SetBotForbiddenStatus(address indexed bot, bool status);
 
     /// @dev Emits when the user changes the amount of funds in his bot wallet
     event Deposit(address indexed payer, uint256 amount);
@@ -49,11 +49,8 @@ interface IBotListV3Events {
     /// @dev Emits when all bot permissions for a Credit Account are erased
     event EraseBot(address indexed creditAccount, address indexed bot);
 
-    /// @dev Emits when a new Credit Manager is approved in BotList
-    event CreditManagerAdded(address indexed creditManager);
-
-    /// @dev Emits when a Credit Manager is removed from BotList
-    event CreditManagerRemoved(address indexed creditManager);
+    /// @dev Emits when Credit Manager's status in BotList is changed
+    event SetCreditManagerStatus(address indexed creditManager, bool newStatus);
 }
 
 /// @title IBotListV3
