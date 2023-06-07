@@ -10,6 +10,8 @@ import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/Contra
 import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
+import {GearStakingV3} from "../../governance/GearStakingV3.sol";
+
 import "../../interfaces/IAddressProviderV3.sol";
 import {WithdrawalManagerV3} from "../../core/WithdrawalManagerV3.sol";
 import {BotListV3} from "../../core/BotListV3.sol";
@@ -60,6 +62,10 @@ contract GenesisFactory is Ownable {
 
         GearToken gearToken = new GearToken(address(this)); // T:[GD-1]
         addressProvider.setAddress(AP_GEAR_TOKEN, address(gearToken), false); // T:[GD-1]
+
+        GearStakingV3 gearStaking = new GearStakingV3(address(addressProvider), 1);
+        addressProvider.setAddress(AP_GEAR_STAKING, address(gearStaking), true);
+
         gearToken.transferOwnership(msg.sender); // T:[GD-1]
         acl.transferOwnership(msg.sender); // T:[GD-1]
     }

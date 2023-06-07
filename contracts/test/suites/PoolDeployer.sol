@@ -14,8 +14,10 @@ import {WithdrawalManagerV3} from "../../core/WithdrawalManagerV3.sol";
 import {BotListV3} from "../../core/BotListV3.sol";
 
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
-import {PoolMock} from "../mocks//pool/PoolMock.sol";
-import {GaugeMock} from "../mocks//governance/GaugeMock.sol";
+import {PoolV3} from "../../pool/PoolV3.sol";
+import {LinearInterestRateModelV3} from "../../pool/LinearInterestRateModelV3.sol";
+
+import {GaugeV3} from "../../governance/GaugeV3.sol";
 import {PoolQuotaKeeperV3} from "../../pool/PoolQuotaKeeperV3.sol";
 
 import "../lib/constants.sol";
@@ -44,9 +46,9 @@ contract PoolDeployer is Test {
     IAddressProviderV3 public addressProvider;
     GenesisFactory public gp;
     AccountFactory public af;
-    PoolMock public poolMock;
+    PoolV3 public pool;
     PoolQuotaKeeperV3 public poolQuotaKeeper;
-    GaugeMock public gaugeMock;
+    GaugeV3 public gauge;
     ContractsRegister public cr;
     WithdrawalManagerV3 public withdrawalManager;
     BotListV3 public botList;
@@ -62,7 +64,8 @@ contract PoolDeployer is Test {
         address wethToken,
         uint256 initialBalance,
         PriceFeedConfig[] memory priceFeeds,
-        uint8 accountFactoryVersion
+        uint8 accountFactoryVersion,
+        bool supportQuotas
     ) {
         new Roles();
 
@@ -95,24 +98,47 @@ contract PoolDeployer is Test {
 
         underlying = _underlying;
 
-        poolMock = new PoolMock(
+        ///    uint16 U_1,
+        // uint16 U_2,
+        // uint16 R_base,
+        // uint16 R_slope1,
+        // uint16 R_slope2,
+        // uint16 R_slope3,
+        // bool _isBorrowingMoreU2Forbidden
+        LinearInterestRateModelV3 irm = new LinearInterestRateModelV3(70_00, 85_00, 0, 15_00, 30_00, 120_00, true);
+
+        // //   address addressProvider_,
+        //     address underlyingToken_,
+        //     address interestRateModel_,
+        //     uint256 totalDebtLimit_,
+        //     bool supportsQuotas_,
+        //     string memory namePrefix_,
+        //     string memory symbolPrefix_
+        pool = new PoolV3(
             address(gp.addressProvider()),
-            underlying
+            underlying,
+            address(irm),
+            type(uint256).max,
+            supportQuotas,
+            "d",
+            "diesel"
         );
 
-        tokenTestSuite.mint(_underlying, address(poolMock), initialBalance);
+        tokenTestSuite.mint(_underlying, address(pool), initialBalance);
 
-        cr.addPool(address(poolMock));
+        cr.addPool(address(pool));
 
-        poolQuotaKeeper = new PoolQuotaKeeperV3(payable(address(poolMock)));
+        poolQuotaKeeper = new PoolQuotaKeeperV3(payable(address(pool)));
 
-        gaugeMock = new GaugeMock(address(poolMock));
+        address gearStaking = gp.addressProvider().getAddressOrRevert(AP_GEAR_STAKING, 3_00);
 
-        vm.label(address(gaugeMock), "Gauge");
+        gauge = new GaugeV3(address(pool), gearStaking);
 
-        poolQuotaKeeper.setGauge(address(gaugeMock));
+        vm.label(address(gauge), "Gauge");
 
-        poolMock.setPoolQuotaKeeper(address(poolQuotaKeeper));
+        poolQuotaKeeper.setGauge(address(gauge));
+
+        pool.setPoolQuotaKeeper(address(poolQuotaKeeper));
 
         acl.transferOwnership(CONFIGURATOR);
 

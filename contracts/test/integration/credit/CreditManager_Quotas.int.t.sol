@@ -34,7 +34,10 @@ import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 
 // MOCKS
 
-import {PoolMock} from "../../mocks//pool/PoolMock.sol";
+// import {PoolMock} from "../../mocks//pool/PoolMock.sol";
+import {PoolV3} from "../../../pool/PoolV3.sol";
+import {GaugeV3} from "../../../governance/GaugeV3.sol";
+
 import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
 
 // SUITES
@@ -57,9 +60,10 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
     AccountFactory af;
     CreditManagerV3 creditManager;
-    PoolMock poolMock;
+    PoolV3 pool;
     PoolQuotaKeeperV3 poolQuotaKeeper;
     IPriceOracleV2 priceOracle;
+    GaugeV3 gauge;
     ACL acl;
     address underlying;
 
@@ -84,8 +88,9 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         addressProvider = cms.addressProvider();
         af = cms.af();
 
-        poolMock = cms.poolMock();
+        pool = PoolV3(address(cms.pool()));
         poolQuotaKeeper = cms.poolQuotaKeeper();
+        gauge = cms.gauge();
 
         creditManager = cms.creditManager();
 
@@ -379,7 +384,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
 
-        uint256 poolBalanceBefore = tokenTestSuite.balanceOf(Tokens.DAI, address(poolMock));
+        uint256 poolBalanceBefore = tokenTestSuite.balanceOf(Tokens.DAI, address(pool));
 
         creditManager.closeCreditAccount(
             creditAccount,
@@ -393,7 +398,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         expectBalance(
             Tokens.DAI,
-            address(poolMock),
+            address(pool),
             poolBalanceBefore + borrowedAmount + interestAccured + expectedQuotasInterest,
             "Incorrect pool balance"
         );

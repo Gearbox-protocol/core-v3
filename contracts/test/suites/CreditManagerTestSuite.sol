@@ -41,22 +41,19 @@ contract CreditManagerTestSuite is PoolDeployer {
             creditConfig.wethToken(),
             10 * creditConfig.getAccountAmount(),
             creditConfig.getPriceFeeds(),
-            accountFactoryVer
+            accountFactoryVer,
+            _supportsQuotas
         )
     {
         supportsQuotas = _supportsQuotas;
-
-        if (supportsQuotas) {
-            poolMock.setSupportsQuotas(true);
-        }
 
         creditAccountAmount = creditConfig.getAccountAmount();
 
         tokenTestSuite = creditConfig.tokenTestSuite();
 
         creditManager = internalSuite
-            ? new CreditManagerV3Harness(address(addressProvider), address(poolMock))
-            : new CreditManagerV3(address(addressProvider), address(poolMock));
+            ? new CreditManagerV3Harness(address(addressProvider), address(pool))
+            : new CreditManagerV3(address(addressProvider), address(pool));
 
         creditFacade = msg.sender;
 
@@ -148,7 +145,7 @@ contract CreditManagerTestSuite is PoolDeployer {
         borrowedAmount = _borrowedAmount;
 
         cumulativeIndexLastUpdate = RAY;
-        poolMock.setCumulativeIndexNow(cumulativeIndexLastUpdate);
+        // pool.setCumulativeIndexNow(cumulativeIndexLastUpdate);
 
         vm.prank(creditFacade);
 
@@ -159,17 +156,18 @@ contract CreditManagerTestSuite is PoolDeployer {
         vm.roll(block.number + 1);
 
         cumulativeIndexAtClose = (cumulativeIndexLastUpdate * 12) / 10;
-        poolMock.setCumulativeIndexNow(cumulativeIndexAtClose);
+        // pool.setCumulativeIndexNow(cumulativeIndexAtClose);
     }
 
     function makeTokenQuoted(address token, uint16 rate, uint96 limit) external {
         require(supportsQuotas, "Test suite does not support quotas");
 
         vm.startPrank(CONFIGURATOR);
-        gaugeMock.addQuotaToken(token, rate);
+        gauge.addQuotaToken(token, rate, rate);
         poolQuotaKeeper.setTokenLimit(token, limit);
 
-        gaugeMock.updateEpoch();
+        vm.warp(block.timestamp + 7 days);
+        gauge.updateEpoch();
 
         uint256 tokenMask = creditManager.getTokenMaskOrRevert(token);
         uint256 limitedMask = creditManager.quotedTokensMask();

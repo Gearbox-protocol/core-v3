@@ -560,7 +560,7 @@ contract CreditFacadeIntegrationTest is
     function test_I_FA_11A_openCreditAccount_reverts_if_met_borrowed_limit_per_block() public {
         (uint128 _minDebt, uint128 _maxDebt) = creditFacade.debtLimits();
 
-        tokenTestSuite.mint(Tokens.DAI, address(cft.poolMock()), _maxDebt * 2);
+        tokenTestSuite.mint(Tokens.DAI, address(cft.pool()), _maxDebt * 2);
 
         tokenTestSuite.mint(Tokens.DAI, USER, DAI_ACCOUNT_AMOUNT);
         tokenTestSuite.mint(Tokens.DAI, FRIEND, DAI_ACCOUNT_AMOUNT);
@@ -913,7 +913,7 @@ contract CreditFacadeIntegrationTest is
 
         uint256 amount = maxDebt - DAI_ACCOUNT_AMOUNT + 1;
 
-        tokenTestSuite.mint(Tokens.DAI, address(cft.poolMock()), amount);
+        tokenTestSuite.mint(Tokens.DAI, address(cft.pool()), amount);
 
         vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
 
@@ -1023,7 +1023,7 @@ contract CreditFacadeIntegrationTest is
 
         uint256 amount = DAI_ACCOUNT_AMOUNT - minDebt + 1;
 
-        tokenTestSuite.mint(Tokens.DAI, address(cft.poolMock()), amount);
+        tokenTestSuite.mint(Tokens.DAI, address(cft.pool()), amount);
 
         vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
 

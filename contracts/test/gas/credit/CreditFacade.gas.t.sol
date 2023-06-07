@@ -212,19 +212,19 @@ contract CreditFacadeGasTest is
     /// @dev G:[FA-5]: openCreditAccount with adding quoted collateral and updating quota
     function test_G_FA_05_openCreditAccountMulticall_gas_estimate_4() public {
         vm.startPrank(CONFIGURATOR);
-        cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
+        cft.gauge().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
         cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-        cft.gaugeMock().updateEpoch();
+        cft.gauge().updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
 
-        cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.USDC), 500);
+        cft.gauge().addQuotaToken(tokenTestSuite.addressOf(Tokens.USDC), 500, 500);
         cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.USDC), type(uint96).max);
-        cft.gaugeMock().updateEpoch();
+        cft.gauge().updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.USDC));
 
-        cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.WETH), 500);
+        cft.gauge().addQuotaToken(tokenTestSuite.addressOf(Tokens.WETH), 500, 500);
         cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.WETH), type(uint96).max);
-        cft.gaugeMock().updateEpoch();
+        cft.gauge().updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.WETH));
         vm.stopPrank();
 
@@ -278,9 +278,9 @@ contract CreditFacadeGasTest is
     /// @dev G:[FA-6]: openCreditAccount with swapping and updating quota
     function test_G_FA_06_openCreditAccountMulticall_gas_estimate_5() public {
         vm.startPrank(CONFIGURATOR);
-        cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
+        cft.gauge().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
         cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-        cft.gaugeMock().updateEpoch();
+        cft.gauge().updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
         vm.stopPrank();
 
@@ -392,9 +392,9 @@ contract CreditFacadeGasTest is
     /// @dev G:[FA-9]: multicall with decreaseDebt and active quota interest
     function test_G_FA_09_decreaseDebt_gas_estimate_2() public {
         vm.startPrank(CONFIGURATOR);
-        cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
+        cft.gauge().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
         cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-        cft.gaugeMock().updateEpoch();
+        cft.gauge().updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
         vm.stopPrank();
 
@@ -591,9 +591,9 @@ contract CreditFacadeGasTest is
     /// @dev G:[FA-13]: multicall with a single swap into quoted token
     function test_G_FA_13_multicall_gas_estimate_2() public {
         vm.startPrank(CONFIGURATOR);
-        cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
+        cft.gauge().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
         cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-        cft.gaugeMock().updateEpoch();
+        cft.gauge().updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
         vm.stopPrank();
 
@@ -723,9 +723,9 @@ contract CreditFacadeGasTest is
     /// @dev G:[FA-16]: closeCreditAccount with 2 tokens and active quota interest
     function test_G_FA_16_closeCreditAccount_gas_estimate_3() public {
         vm.startPrank(CONFIGURATOR);
-        cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
+        cft.gauge().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
         cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-        cft.gaugeMock().updateEpoch();
+        cft.gauge().updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
         vm.stopPrank();
 
@@ -887,9 +887,9 @@ contract CreditFacadeGasTest is
     /// @dev G:[FA-20]: liquidateCreditAccount with 2 tokens and active quota interest
     function test_G_FA_20_liquidateCreditAccount_gas_estimate_3() public {
         vm.startPrank(CONFIGURATOR);
-        cft.gaugeMock().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500);
+        cft.gauge().addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
         cft.poolQuotaKeeper().setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-        cft.gaugeMock().updateEpoch();
+        cft.gauge().updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
         vm.stopPrank();
 

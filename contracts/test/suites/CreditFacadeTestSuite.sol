@@ -50,10 +50,10 @@ contract CreditFacadeTestSuite is PoolDeployer {
             _creditConfig.wethToken(),
             10 * _creditConfig.getAccountAmount(),
             _creditConfig.getPriceFeeds(),
-            accountFactoryVer
+            accountFactoryVer,
+            supportQuotas
         )
     {
-        poolMock.setSupportsQuotas(supportQuotas);
         creditConfig = _creditConfig;
 
         minDebt = creditConfig.minDebt();
@@ -82,7 +82,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
 
         CreditManagerFactory cmf = new CreditManagerFactory(
             address(addressProvider),
-            address(poolMock),
+            address(pool),
             cmOpts,
             0
         );
@@ -117,7 +117,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
         vm.prank(CONFIGURATOR);
         botList.setApprovedCreditManagerStatus(address(creditManager), true);
 
-        vm.label(address(poolMock), "Pool");
+        vm.label(address(pool), "Pool");
         vm.label(address(creditFacade), "CreditFacadeV3");
         vm.label(address(creditManager), "CreditManagerV3");
         vm.label(address(creditConfigurator), "CreditConfiguratorV3");

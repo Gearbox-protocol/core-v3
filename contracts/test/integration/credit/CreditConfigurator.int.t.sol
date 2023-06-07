@@ -257,7 +257,7 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
             expirable: false
         });
 
-        creditManager = new CreditManagerV3(address(cct.addressProvider()), address(cct.poolMock()));
+        creditManager = new CreditManagerV3(address(cct.addressProvider()), address(cct.pool()));
         creditFacade = new CreditFacadeV3(
             address(creditManager),
             creditOpts.degenNFT,
