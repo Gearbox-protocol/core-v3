@@ -36,6 +36,8 @@ import {BitMask, UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
 import "../../lib/constants.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 
+import "forge-std/console.sol";
+
 // EXCEPTIONS
 
 // MOCKS
@@ -78,15 +80,15 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         tokenTestSuite = new TokensTestSuite();
 
         tokenTestSuite.topUpWETH{value: 100 * WAD}();
-        _connectCreditManagerSuite(Tokens.DAI, false);
+        _connectCreditManagerSuite(Tokens.DAI);
     }
 
     ///
     /// HELPERS
 
-    function _connectCreditManagerSuite(Tokens t, bool internalSuite) internal {
+    function _connectCreditManagerSuite(Tokens t) internal {
         creditConfig = new CreditConfig(tokenTestSuite, t);
-        cms = new CreditManagerTestSuite(creditConfig, internalSuite, false, 1);
+        cms = new CreditManagerTestSuite(creditConfig,  false, 1);
 
         acl = cms.acl();
 
@@ -193,7 +195,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
             AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL)).head();
 
         uint256 blockAtOpen = block.number;
-        uint256 cumulativeAtOpen = 1012;
+        uint256 cumulativeAtOpen = pool.calcLinearCumulative_RAY();
         // pool.setCumulativeIndexNow(cumulativeAtOpen);
 
         // Existing address case
@@ -212,6 +214,10 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         // assertEq(pool.lendAccount(), creditAccount, "Incorrect credit account in lendCreditAccount call");
         // assertEq(creditManager.creditAccounts(USER), creditAccount, "Credit account is not associated with user");
         assertEq(creditManager.enabledTokensMaskOf(creditAccount), 0, "Incorrect enabled token mask");
+
+        console.log(address(pool));
+        console.log(creditManager.pool());
+        console.log(pool.expectedLiquidity());
     }
 
     //
@@ -641,7 +647,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
     function test_I_CM_16_close_weth_credit_account_sends_eth_to_borrower() public {
         // It takes "clean" address which doesn't holds any assets
 
-        _connectCreditManagerSuite(Tokens.WETH, false);
+        _connectCreditManagerSuite(Tokens.WETH);
 
         /// CLOSURE CASE
         (
@@ -744,7 +750,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
 
         // It takes "clean" address which doesn't holds any assets
 
-        _connectCreditManagerSuite(Tokens.WETH, false);
+        _connectCreditManagerSuite(Tokens.WETH);
 
         /// CLOSURE CASE
         (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();

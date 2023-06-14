@@ -73,15 +73,15 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         tokenTestSuite = new TokensTestSuite();
 
         tokenTestSuite.topUpWETH{value: 100 * WAD}();
-        _connectCreditManagerSuite(Tokens.DAI, false);
+        _connectCreditManagerSuite(Tokens.DAI);
     }
 
     ///
     /// HELPERS
 
-    function _connectCreditManagerSuite(Tokens t, bool internalSuite) internal {
+    function _connectCreditManagerSuite(Tokens t) internal {
         creditConfig = new CreditConfig(tokenTestSuite, t);
-        cms = new CreditManagerTestSuite(creditConfig, internalSuite, true, 1);
+        cms = new CreditManagerTestSuite(creditConfig,  true, 1);
 
         acl = cms.acl();
 

@@ -115,6 +115,9 @@ contract CreditFacadeTestSuite is PoolDeployer {
         }
 
         vm.prank(CONFIGURATOR);
+        pool.setCreditManagerDebtLimit(address(creditManager), type(uint256).max);
+
+        vm.prank(CONFIGURATOR);
         botList.setApprovedCreditManagerStatus(address(creditManager), true);
 
         vm.label(address(pool), "Pool");

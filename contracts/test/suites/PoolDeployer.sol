@@ -124,21 +124,28 @@ contract PoolDeployer is Test {
             "diesel"
         );
 
-        tokenTestSuite.mint(_underlying, address(pool), initialBalance);
+        tokenTestSuite.mint(_underlying, INITIAL_LP, initialBalance);
+
+        tokenTestSuite.approve(_underlying, INITIAL_LP, address(pool));
+
+        vm.prank(INITIAL_LP);
+        pool.deposit(initialBalance, INITIAL_LP);
 
         cr.addPool(address(pool));
 
-        poolQuotaKeeper = new PoolQuotaKeeperV3(payable(address(pool)));
+        if (supportQuotas) {
+            poolQuotaKeeper = new PoolQuotaKeeperV3(payable(address(pool)));
 
-        address gearStaking = gp.addressProvider().getAddressOrRevert(AP_GEAR_STAKING, 3_00);
+            address gearStaking = gp.addressProvider().getAddressOrRevert(AP_GEAR_STAKING, 3_00);
 
-        gauge = new GaugeV3(address(pool), gearStaking);
+            gauge = new GaugeV3(address(pool), gearStaking);
 
-        vm.label(address(gauge), "Gauge");
+            vm.label(address(gauge), "Gauge");
 
-        poolQuotaKeeper.setGauge(address(gauge));
+            poolQuotaKeeper.setGauge(address(gauge));
 
-        pool.setPoolQuotaKeeper(address(poolQuotaKeeper));
+            pool.setPoolQuotaKeeper(address(poolQuotaKeeper));
+        }
 
         acl.transferOwnership(CONFIGURATOR);
 

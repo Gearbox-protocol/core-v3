@@ -34,7 +34,7 @@ contract CreditManagerTestSuite is PoolDeployer {
 
     bool supportsQuotas;
 
-    constructor(ICreditConfig creditConfig, bool internalSuite, bool _supportsQuotas, uint8 accountFactoryVer)
+    constructor(ICreditConfig creditConfig, bool _supportsQuotas, uint8 accountFactoryVer)
         PoolDeployer(
             creditConfig.tokenTestSuite(),
             creditConfig.underlying(),
@@ -51,9 +51,7 @@ contract CreditManagerTestSuite is PoolDeployer {
 
         tokenTestSuite = creditConfig.tokenTestSuite();
 
-        creditManager = internalSuite
-            ? new CreditManagerV3Harness(address(addressProvider), address(pool))
-            : new CreditManagerV3(address(addressProvider), address(pool));
+        creditManager = new CreditManagerV3(address(addressProvider), address(pool));
 
         creditFacade = msg.sender;
 
@@ -87,6 +85,8 @@ contract CreditManagerTestSuite is PoolDeployer {
         }
 
         cr.addCreditManager(address(creditManager));
+
+        pool.setCreditManagerDebtLimit(address(creditManager), type(uint256).max);
 
         assertEq(creditManager.creditConfigurator(), CONFIGURATOR, "Configurator wasn't set");
 
