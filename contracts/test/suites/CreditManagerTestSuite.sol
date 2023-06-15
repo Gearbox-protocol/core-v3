@@ -113,24 +113,14 @@ contract CreditManagerTestSuite is PoolDeployer {
     /// @dev Opens credit account for testing management functions
     function openCreditAccount()
         external
-        returns (
-            uint256 borrowedAmount,
-            uint256 cumulativeIndexLastUpdate,
-            uint256 cumulativeIndexAtClose,
-            address creditAccount
-        )
+        returns (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, address creditAccount)
     {
         return openCreditAccount(creditAccountAmount);
     }
 
     function openCreditAccount(uint256 _borrowedAmount)
         public
-        returns (
-            uint256 borrowedAmount,
-            uint256 cumulativeIndexLastUpdate,
-            uint256 cumulativeIndexAtClose,
-            address creditAccount
-        )
+        returns (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, address creditAccount)
     {
         // Set up real value, which should be configired before CM would be launched
         vm.prank(CONFIGURATOR);
@@ -144,7 +134,7 @@ contract CreditManagerTestSuite is PoolDeployer {
 
         borrowedAmount = _borrowedAmount;
 
-        cumulativeIndexLastUpdate = RAY;
+        cumulativeIndexLastUpdate = pool.calcLinearCumulative_RAY();
         // pool.setCumulativeIndexNow(cumulativeIndexLastUpdate);
 
         vm.prank(creditFacade);
@@ -154,8 +144,8 @@ contract CreditManagerTestSuite is PoolDeployer {
 
         // Increase block number cause it's forbidden to close credit account in the same block
         vm.roll(block.number + 1);
+        // vm.warp(block.timestamp + 100 days);
 
-        cumulativeIndexAtClose = (cumulativeIndexLastUpdate * 12) / 10;
         // pool.setCumulativeIndexNow(cumulativeIndexAtClose);
     }
 

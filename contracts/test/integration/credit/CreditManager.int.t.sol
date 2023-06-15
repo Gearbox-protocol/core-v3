@@ -107,12 +107,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
     /// @dev Opens credit account for testing management functions
     function _openCreditAccount()
         internal
-        returns (
-            uint256 borrowedAmount,
-            uint256 cumulativeIndexLastUpdate,
-            uint256 cumulativeIndexAtClose,
-            address creditAccount
-        )
+        returns (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, address creditAccount)
     {
         return cms.openCreditAccount();
     }
@@ -227,7 +222,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
     /// @dev I:[CM-9]: closeCreditAccount returns account to the end of AF1s
     /// remove borrower from creditAccounts mapping
     function test_I_CM_09_close_credit_account_updates_pool_correctly() public {
-        (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
+        (uint256 borrowedAmount,, address creditAccount) = _openCreditAccount();
 
         assertTrue(
             creditAccount
@@ -272,17 +267,16 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
     /// Send all assets: false
     ///
     function test_I_CM_10_close_credit_account_returns_underlying_token_if_not_liquidated() public {
-        (
-            uint256 borrowedAmount,
-            uint256 cumulativeIndexLastUpdate,
-            uint256 cumulativeIndexAtClose,
-            address creditAccount
-        ) = _openCreditAccount();
+        (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, address creditAccount) = _openCreditAccount();
 
         uint256 poolBalanceBefore = tokenTestSuite.balanceOf(Tokens.DAI, address(pool));
 
         // Transfer additional borrowedAmount. After that underluying token balance = 2 * borrowedAmount
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
+
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 cumulativeIndexAtClose = pool.calcLinearCumulative_RAY();
 
         uint256 interestAccrued = (borrowedAmount * cumulativeIndexAtClose) / cumulativeIndexLastUpdate - borrowedAmount;
 
@@ -333,17 +327,16 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
     /// Send all assets: false
     ///
     function test_I_CM_11_close_credit_account_charges_caller_if_underlying_token_not_enough() public {
-        (
-            uint256 borrowedAmount,
-            uint256 cumulativeIndexLastUpdate,
-            uint256 cumulativeIndexAtClose,
-            address creditAccount
-        ) = _openCreditAccount();
+        (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, address creditAccount) = _openCreditAccount();
 
         uint256 poolBalanceBefore = tokenTestSuite.balanceOf(Tokens.DAI, address(pool));
 
         // Transfer funds to USER account to be able to cover extra cost
         tokenTestSuite.mint(Tokens.DAI, USER, borrowedAmount);
+
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 cumulativeIndexAtClose = pool.calcLinearCumulative_RAY();
 
         uint256 interestAccrued = (borrowedAmount * cumulativeIndexAtClose) / cumulativeIndexLastUpdate - borrowedAmount;
 
@@ -406,9 +399,11 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
 
             {
                 uint256 cumulativeIndexLastUpdate;
-                uint256 cumulativeIndexAtClose;
-                (borrowedAmount, cumulativeIndexLastUpdate, cumulativeIndexAtClose, creditAccount) =
-                    _openCreditAccount();
+                (borrowedAmount, cumulativeIndexLastUpdate, creditAccount) = _openCreditAccount();
+
+                vm.warp(block.timestamp + 365 days);
+
+                uint256 cumulativeIndexAtClose = pool.calcLinearCumulative_RAY();
 
                 interestAccrued = (borrowedAmount * cumulativeIndexAtClose) / cumulativeIndexLastUpdate - borrowedAmount;
             }
@@ -486,11 +481,14 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
             uint256 amountToPool;
             uint256 totalValue;
             uint256 interestAccrued;
+
             {
                 uint256 cumulativeIndexLastUpdate;
-                uint256 cumulativeIndexAtClose;
-                (borrowedAmount, cumulativeIndexLastUpdate, cumulativeIndexAtClose, creditAccount) =
-                    _openCreditAccount();
+                (borrowedAmount, cumulativeIndexLastUpdate, creditAccount) = _openCreditAccount();
+
+                vm.warp(block.timestamp + 365 days);
+
+                uint256 cumulativeIndexAtClose = pool.calcLinearCumulative_RAY();
 
                 interestAccrued = (borrowedAmount * cumulativeIndexAtClose) / cumulativeIndexLastUpdate - borrowedAmount;
 
@@ -603,7 +601,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
     ///
 
     function test_I_CM_14_close_credit_account_with_nonzero_skipTokenMask_sends_correct_tokens() public {
-        (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
+        (uint256 borrowedAmount,, address creditAccount) = _openCreditAccount();
 
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
         tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
@@ -650,15 +648,14 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         _connectCreditManagerSuite(Tokens.WETH);
 
         /// CLOSURE CASE
-        (
-            uint256 borrowedAmount,
-            uint256 cumulativeIndexLastUpdate,
-            uint256 cumulativeIndexAtClose,
-            address creditAccount
-        ) = _openCreditAccount();
+        (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, address creditAccount) = _openCreditAccount();
 
         // Transfer additional borrowedAmount. After that underluying token balance = 2 * borrowedAmount
         tokenTestSuite.mint(Tokens.WETH, creditAccount, borrowedAmount);
+
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 cumulativeIndexAtClose = pool.calcLinearCumulative_RAY();
 
         uint256 interestAccrued = (borrowedAmount * cumulativeIndexAtClose) / cumulativeIndexLastUpdate - borrowedAmount;
 
@@ -703,7 +700,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
     /// Underlying token: DAI
     function test_I_CM_17_close_dai_credit_account_sends_eth_to_borrower() public {
         /// CLOSURE CASE
-        (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
+        (uint256 borrowedAmount,, address creditAccount) = _openCreditAccount();
 
         // Transfer additional borrowedAmount. After that underluying token balance = 2 * borrowedAmount
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
@@ -753,7 +750,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         _connectCreditManagerSuite(Tokens.WETH);
 
         /// CLOSURE CASE
-        (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
+        (uint256 borrowedAmount,, address creditAccount) = _openCreditAccount();
 
         // Transfer additional borrowedAmount. After that underluying token balance = 2 * borrowedAmount
         tokenTestSuite.mint(Tokens.WETH, creditAccount, borrowedAmount);
@@ -799,7 +796,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
     /// Underlying token: DAI
     function test_I_CM_19_close_dai_credit_account_sends_eth_to_liquidator() public {
         /// CLOSURE CASE
-        (uint256 borrowedAmount,,, address creditAccount) = _openCreditAccount();
+        (uint256 borrowedAmount,, address creditAccount) = _openCreditAccount();
         // creditManager.transferAccountOwnership(creditAccount, address(this));
 
         // Transfer additional borrowedAmount. After that underluying token balance = 2 * borrowedAmount
@@ -843,20 +840,32 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
     //
 
     /// @dev I:[CM-20]: manageDebt correctly increases debt
-    function test_I_CM_20_manageDebt_correctly_increases_debt(uint128 amount) public {
-        (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate,, address creditAccount) = cms.openCreditAccount(1);
+    function test_I_CM_20_manageDebt_correctly_increases_debt(uint120 amount) public {
+        tokenTestSuite.mint(Tokens.DAI, INITIAL_LP, amount);
 
-        tokenTestSuite.mint(Tokens.DAI, address(pool), amount);
+        vm.assume(amount > 1);
+
+        vm.prank(INITIAL_LP);
+        pool.deposit(amount, INITIAL_LP);
+
+        vm.prank(CONFIGURATOR);
+        pool.setCreditManagerDebtLimit(address(creditManager), type(uint256).max);
+
+        (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, address creditAccount) = cms.openCreditAccount(1);
 
         // pool.setCumulativeIndexNow(cumulativeIndexLastUpdate * 2);
+
+        vm.warp(block.timestamp + 365 days);
 
         // uint256 expectedNewCulumativeIndex =
         //     (2 * cumulativeIndexLastUpdate * (borrowedAmount + amount)) / (2 * borrowedAmount + amount);
 
-        (uint256 newBorrowedAmount,,) =
-            creditManager.manageDebt(creditAccount, amount, 1, ManageDebtAction.INCREASE_DEBT);
+        uint256 moreDebt = amount / 2;
 
-        assertEq(newBorrowedAmount, borrowedAmount + amount, "Incorrect returned newBorrowedAmount");
+        (uint256 newBorrowedAmount,,) =
+            creditManager.manageDebt(creditAccount, moreDebt, 1, ManageDebtAction.INCREASE_DEBT);
+
+        assertEq(newBorrowedAmount, borrowedAmount + moreDebt, "Incorrect returned newBorrowedAmount");
 
         // assertLe(
         //     (ICreditAccount(creditAccount).cumulativeIndexLastUpdate() * (10 ** 6)) / expectedNewCulumativeIndex,
@@ -951,7 +960,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
 
     /// @dev I:[CM-25A]: approveCreditAccount reverts if the token is not added
     function test_I_CM_25A_approveCreditAccount_reverts_if_the_token_is_not_added() public {
-        (,,, address creditAccount) = _openCreditAccount();
+        (,, address creditAccount) = _openCreditAccount();
         creditManager.setActiveCreditAccount(creditAccount);
 
         vm.prank(CONFIGURATOR);
@@ -965,7 +974,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
 
     /// @dev I:[CM-26]: approveCreditAccount approves with desired allowance
     function test_I_CM_26_approveCreditAccount_approves_with_desired_allowance() public {
-        (,,, address creditAccount) = _openCreditAccount();
+        (,, address creditAccount) = _openCreditAccount();
         creditManager.setActiveCreditAccount(creditAccount);
 
         vm.prank(CONFIGURATOR);
@@ -984,7 +993,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
 
     /// @dev I:[CM-27A]: approveCreditAccount works for ERC20 that revert if allowance > 0 before approve
     function test_I_CM_27A_approveCreditAccount_works_for_ERC20_with_approve_restrictions() public {
-        (,,, address creditAccount) = _openCreditAccount();
+        (,, address creditAccount) = _openCreditAccount();
         creditManager.setActiveCreditAccount(creditAccount);
 
         vm.prank(CONFIGURATOR);
@@ -1006,7 +1015,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
 
     // /// @dev I:[CM-27B]: approveCreditAccount works for ERC20 that returns false if allowance > 0 before approve
     function test_I_CM_27B_approveCreditAccount_works_for_ERC20_with_approve_restrictions() public {
-        (,,, address creditAccount) = _openCreditAccount();
+        (,, address creditAccount) = _openCreditAccount();
         creditManager.setActiveCreditAccount(creditAccount);
 
         address approveFalseToken = address(new ERC20ApproveRestrictedFalse());
@@ -1032,7 +1041,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
 
     /// @dev I:[CM-29]: execute calls credit account method and emit event
     function test_I_CM_29_execute_calls_credit_account_method_and_emit_event() public {
-        (,,, address creditAccount) = _openCreditAccount();
+        (,, address creditAccount) = _openCreditAccount();
         creditManager.setActiveCreditAccount(creditAccount);
 
         TargetContractMock targetMock = new TargetContractMock();
@@ -1133,12 +1142,15 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
 
     /// @dev I:[CM-68]: fullCollateralCheck checks tokens in correct order
     function test_I_CM_68_fullCollateralCheck_is_evaluated_in_order_of_hints() public {
-        (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, uint256 cumulativeIndexNow, address creditAccount) =
-            _openCreditAccount();
+        (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, address creditAccount) = _openCreditAccount();
 
         uint256 daiBalance = tokenTestSuite.balanceOf(Tokens.DAI, creditAccount);
 
         tokenTestSuite.burn(Tokens.DAI, creditAccount, daiBalance);
+
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 cumulativeIndexNow = pool.calcLinearCumulative_RAY();
 
         uint256 borrowAmountWithInterest = borrowedAmount * cumulativeIndexNow / cumulativeIndexLastUpdate;
         uint256 interestAccured = borrowAmountWithInterest - borrowedAmount;
@@ -1185,7 +1197,7 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
 
     /// @dev I:[CM-70]: fullCollateralCheck reverts when an illegal mask is passed in collateralHints
     function test_I_CM_70_fullCollateralCheck_reverts_for_illegal_mask_in_hints() public {
-        (,,, address creditAccount) = _openCreditAccount();
+        (,, address creditAccount) = _openCreditAccount();
 
         vm.expectRevert(TokenNotAllowedException.selector);
 

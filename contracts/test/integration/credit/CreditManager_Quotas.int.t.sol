@@ -158,7 +158,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
-        (,,, address creditAccount) = cms.openCreditAccount();
+        (,, address creditAccount) = cms.openCreditAccount();
 
         (,, uint128 cumulativeQuotaInterest,,,,,) = creditManager.creditAccountInfo(creditAccount);
 
@@ -236,7 +236,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
-        (,,, address creditAccount) = cms.openCreditAccount();
+        (,, address creditAccount) = cms.openCreditAccount();
         tokenTestSuite.mint(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT * 2);
 
         uint256 enabledTokensMask = UNDERLYING_TOKEN_MASK;
@@ -293,7 +293,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 1000, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
-        (,,, address creditAccount) = cms.openCreditAccount();
+        (,, address creditAccount) = cms.openCreditAccount();
         tokenTestSuite.mint(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT * 2);
 
         uint256 enabledTokensMask = UNDERLYING_TOKEN_MASK;
@@ -342,12 +342,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 5_00, uint96(1_000_000 * WAD));
 
-        (
-            uint256 borrowedAmount,
-            uint256 cumulativeIndexLastUpdate,
-            uint256 cumulativeIndexAtClose,
-            address creditAccount
-        ) = cms.openCreditAccount();
+        (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, address creditAccount) = cms.openCreditAccount();
 
         tokenTestSuite.mint(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT * 2);
 
@@ -372,6 +367,10 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         creditManager.fullCollateralCheck(creditAccount, enabledTokensMask, new uint256[](0), 10_000);
 
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 cumulativeIndexAtClose = pool.calcLinearCumulative_RAY();
+
         (uint16 feeInterest,,,,) = creditManager.fees();
 
         uint256 interestAccured = (borrowedAmount * cumulativeIndexAtClose / cumulativeIndexLastUpdate - borrowedAmount)
@@ -379,8 +378,6 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         uint256 expectedQuotasInterest = (100 * WAD * 10_00 / PERCENTAGE_FACTOR + 200 * WAD * 5_00 / PERCENTAGE_FACTOR)
             * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR;
-
-        vm.warp(block.timestamp + 365 days);
 
         tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
 
@@ -419,12 +416,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
-        (
-            uint256 borrowedAmount,
-            uint256 cumulativeIndexLastUpdate,
-            uint256 cumulativeIndexAtClose,
-            address creditAccount
-        ) = cms.openCreditAccount();
+        (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, address creditAccount) = cms.openCreditAccount();
 
         vm.assume(quotaLink < type(uint96).max / 2);
         vm.assume(quotaUsdt < type(uint96).max / 2);
@@ -452,7 +444,9 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
 
         creditManager.fullCollateralCheck(creditAccount, enabledTokensMask, new uint256[](0), 10_000);
 
-        vm.warp(block.timestamp + 60 * 60 * 24 * 365);
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 cumulativeIndexAtClose = pool.calcLinearCumulative_RAY();
 
         (uint16 feeInterest,,,,) = creditManager.fees();
 
@@ -482,7 +476,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper 
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
-        (,,, address creditAccount) = cms.openCreditAccount();
+        (,, address creditAccount) = cms.openCreditAccount();
 
         tokenTestSuite.mint(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT * 2);
 
