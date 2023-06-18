@@ -151,10 +151,9 @@ library CreditLogic {
         if (block.timestamp < timestampRampStart) {
             return ltInitial; // U:[CL-05]
         }
-        if (block.timestamp < timestampRampStart + rampDuration) {
-            return _getRampingLiquidationThreshold(
-                ltInitial, ltFinal, timestampRampStart, timestampRampStart + rampDuration
-            ); // U:[CL-05]
+        uint40 timestampRampEnd = timestampRampStart + rampDuration;
+        if (block.timestamp < timestampRampEnd) {
+            return _getRampingLiquidationThreshold(ltInitial, ltFinal, timestampRampStart, timestampRampEnd); // U:[CL-05]
         }
         return ltFinal; // U:[CL-05]
     }

@@ -161,14 +161,10 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
                 if (diff > policy.maxChange) return false; // F: [PM-08]
             }
 
-            if (flags & CHECK_MIN_PCT_CHANGE_FLAG != 0) {
+            if (flags & (CHECK_MIN_PCT_CHANGE_FLAG | CHECK_MAX_PCT_CHANGE_FLAG) != 0) {
                 uint256 pctDiff = diff * PERCENTAGE_FACTOR / referencePoint;
-                if (pctDiff < policy.minPctChange) return false; // F: [PM-09]
-            }
-
-            if (flags & CHECK_MAX_PCT_CHANGE_FLAG != 0) {
-                uint256 pctDiff = diff * PERCENTAGE_FACTOR / referencePoint;
-                if (pctDiff > policy.maxPctChange) return false; // F: [PM-10]
+                if (flags & CHECK_MIN_PCT_CHANGE_FLAG != 0 && pctDiff < policy.minPctChange) return false; // F: [PM-09]
+                if (flags & CHECK_MAX_PCT_CHANGE_FLAG != 0 && pctDiff > policy.maxPctChange) return false; // F: [PM-10]
             }
         }
 
