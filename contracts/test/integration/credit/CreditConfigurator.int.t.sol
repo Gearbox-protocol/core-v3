@@ -1151,6 +1151,10 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         creditConfigurator.setMaxEnabledTokens(255);
 
         assertEq(creditManager.maxEnabledTokens(), 255, "Credit manager max enabled tokens incorrect");
+
+        vm.expectRevert(IncorrectParameterException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setMaxEnabledTokens(0);
     }
 
     /// @dev I:[CC-27]: addEmergencyLiquidator works correctly and emits event
