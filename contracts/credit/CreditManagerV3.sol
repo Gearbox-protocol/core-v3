@@ -520,7 +520,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             }
 
             /// If the entire underlying balance was spent on repayment, it is disabled
-            if (IERC20(underlying).safeBalanceOf({account: creditAccount}) <= 1) {
+            if (IERC20(underlying).safeBalanceOf({account: creditAccount}) < 2) {
                 tokensToDisable = UNDERLYING_TOKEN_MASK; // U:[CM-11]
             }
         }
@@ -1058,7 +1058,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             _enableFlag({creditAccount: creditAccount, flag: WITHDRAWAL_FLAG});
         }
 
-        if (IERC20(token).safeBalanceOf({account: creditAccount}) <= 1) {
+        if (IERC20(token).safeBalanceOf({account: creditAccount}) < 2) {
             tokensToDisable = tokenMask; // U:[CM-27]
         }
     }
