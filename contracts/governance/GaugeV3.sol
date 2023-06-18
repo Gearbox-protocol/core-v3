@@ -31,9 +31,6 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
     /// @notice Contract version
     uint256 public constant version = 3_00;
 
-    /// @notice Address of the address provider
-    address public immutable addressProvider;
-
     /// @notice Address of the pool
     address public immutable override pool;
 
@@ -60,7 +57,6 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
         ACLNonReentrantTrait(IPoolV3(_pool).addressProvider())
         nonZeroAddress(_gearStaking) // U:[GA-01]
     {
-        addressProvider = IPoolV3(_pool).addressProvider(); // U:[GA-01]
         pool = _pool; // U:[GA-01]
         voter = _gearStaking; // U:[GA-01]
         epochLastUpdate = IGearStakingV3(voter).getCurrentEpoch(); // U:[GA-01]
