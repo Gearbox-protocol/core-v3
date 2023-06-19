@@ -552,54 +552,66 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
 
         for (uint256 i; i < cases.length; ++i) {
             MintTestCase memory testCase = cases[i];
+            for (uint256 rc; rc < 2; ++rc) {
+                bool withReferralCode = rc == 0;
 
-            _setUpTestCase(
-                testCase.asset,
-                testCase.tokenFee,
-                testCase.utilisation,
-                testCase.initialLiquidity,
-                testCase.dieselRate,
-                testCase.withdrawFee,
-                false
-            );
+                _setUpTestCase(
+                    testCase.asset,
+                    testCase.tokenFee,
+                    testCase.utilisation,
+                    testCase.initialLiquidity,
+                    testCase.dieselRate,
+                    testCase.withdrawFee,
+                    false
+                );
 
-            vm.expectEmit(true, true, false, true);
-            emit Transfer(address(0), FRIEND, testCase.desiredShares);
+                vm.expectEmit(true, true, false, true);
+                emit Transfer(address(0), FRIEND, testCase.desiredShares);
 
-            vm.expectEmit(true, true, false, true);
-            emit Deposit(USER, FRIEND, testCase.expectedAssetsWithdrawal, testCase.desiredShares);
+                vm.expectEmit(true, true, false, true);
+                emit Deposit(USER, FRIEND, testCase.expectedAssetsWithdrawal, testCase.desiredShares);
 
-            vm.prank(USER);
-            uint256 assets = pool.mint(testCase.desiredShares, FRIEND);
+                if (withReferralCode) {
+                    vm.expectEmit(true, true, false, true);
+                    emit Refer(FRIEND, referral, testCase.expectedAssetsWithdrawal);
+                }
 
-            expectBalance(
-                address(pool), FRIEND, testCase.desiredShares, _testCaseErr(testCase.name, "Incorrect shares ")
-            );
-            expectBalance(
-                underlying,
-                USER,
-                liquidityProviderInitBalance - testCase.expectedAssetsWithdrawal,
-                _testCaseErr(testCase.name, "Incorrect USER balance")
-            );
-            assertEq(
-                pool.expectedLiquidity(),
-                testCase.expectedLiquidityAfter,
-                _testCaseErr(testCase.name, "Incorrect expected liquidity")
-            );
-            assertEq(
-                pool.availableLiquidity(),
-                testCase.expectedAvailableLiquidity,
-                _testCaseErr(testCase.name, "Incorrect available liquidity")
-            );
-            assertEq(
-                assets, testCase.expectedAssetsWithdrawal, _testCaseErr(testCase.name, "Incorrect assets return value")
-            );
+                vm.prank(USER);
+                uint256 assets = withReferralCode
+                    ? pool.mintWithReferral(testCase.desiredShares, FRIEND, referral)
+                    : pool.mint(testCase.desiredShares, FRIEND);
 
-            assertEq(
-                pool.baseInterestRate(),
-                irm.calcBorrowRate(pool.expectedLiquidity(), pool.availableLiquidity(), false),
-                _testCaseErr(testCase.name, "Borrow rate wasn't update correcty")
-            );
+                expectBalance(
+                    address(pool), FRIEND, testCase.desiredShares, _testCaseErr(testCase.name, "Incorrect shares ")
+                );
+                expectBalance(
+                    underlying,
+                    USER,
+                    liquidityProviderInitBalance - testCase.expectedAssetsWithdrawal,
+                    _testCaseErr(testCase.name, "Incorrect USER balance")
+                );
+                assertEq(
+                    pool.expectedLiquidity(),
+                    testCase.expectedLiquidityAfter,
+                    _testCaseErr(testCase.name, "Incorrect expected liquidity")
+                );
+                assertEq(
+                    pool.availableLiquidity(),
+                    testCase.expectedAvailableLiquidity,
+                    _testCaseErr(testCase.name, "Incorrect available liquidity")
+                );
+                assertEq(
+                    assets,
+                    testCase.expectedAssetsWithdrawal,
+                    _testCaseErr(testCase.name, "Incorrect assets return value")
+                );
+
+                assertEq(
+                    pool.baseInterestRate(),
+                    irm.calcBorrowRate(pool.expectedLiquidity(), pool.availableLiquidity(), false),
+                    _testCaseErr(testCase.name, "Borrow rate wasn't update correcty")
+                );
+            }
         }
     }
 
