@@ -86,9 +86,6 @@ contract GauageTest is TestHelper, IGaugeV3Events {
     /// @dev U:[GA-03]: configuratorOnly functions reverts if called by non-configurator
     function test_U_GA_03_configuratorOnly_functions_reverts_if_called_by_non_configurator() public {
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        gauge.setVoter(DUMB_ADDRESS);
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
         gauge.addQuotaToken(DUMB_ADDRESS, 0, 0);
 
         vm.expectRevert(CallerNotControllerException.selector);
@@ -202,26 +199,6 @@ contract GauageTest is TestHelper, IGaugeV3Events {
         gauge.setQuotaRateParams({token: token, minRate: 0, maxRate: 1, totalVotesLpSide: 0, totalVotesCaSide: 0});
 
         assertEq(gauge.isTokenAdded(token), true, "token incorrectly not added");
-    }
-
-    // @dev U:[GA-09]: setVoter works as expected
-    function test_U_GA_09_setVoter_works_as_expected() public {
-        // Case: it reverts for zero address
-
-        vm.startPrank(CONFIGURATOR);
-
-        vm.expectRevert(ZeroAddressException.selector);
-        gauge.setVoter(address(0));
-
-        assertEq(gauge.voter(), address(gearStakingMock), "SETUP: incorrect voter");
-
-        vm.expectEmit(true, true, false, false);
-        emit SetVoter(DUMB_ADDRESS);
-
-        gauge.setVoter(DUMB_ADDRESS);
-        assertEq(gauge.voter(), DUMB_ADDRESS, "incorrect voter");
-
-        vm.stopPrank();
     }
 
     //
