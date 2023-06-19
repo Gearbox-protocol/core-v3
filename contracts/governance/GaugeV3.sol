@@ -216,6 +216,7 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
         nonZeroAddress(newVoter)
         configuratorOnly // U:[GA-03]
     {
+        if (newVoter == voter) return;
         voter = newVoter; // U:[GA-09]
 
         emit SetVoter({newVoter: newVoter}); // U:[GA-09]
@@ -257,6 +258,7 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
         _checkParams(minRate, maxRate); // U:[GA-04]
 
         QuotaRateParams storage qrp = quotaRateParams[token]; // U:[GA-06]
+        if (minRate == qrp.minRate && maxRate == qrp.maxRate) return;
         qrp.minRate = minRate; // U:[GA-06]
         qrp.maxRate = maxRate; // U:[GA-06]
 

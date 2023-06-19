@@ -21,6 +21,9 @@ contract PolicyManagerTest is Test {
 
     PolicyManagerInternal public policyManager;
 
+    event SetPolicy(bytes32 indexed policyHash, bool enabled);
+    event SetGroup(address indexed contractAddress, string group);
+
     function setUp() public {
         vm.prank(CONFIGURATOR);
         addressProvider = new AddressProviderV3ACLMock();
@@ -55,6 +58,9 @@ contract PolicyManagerTest is Test {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         vm.prank(USER);
         policyManager.setPolicy(bytes32(uint256(1)), policy);
+
+        vm.expectEmit(true, false, false, true);
+        emit SetPolicy(bytes32(uint256(1)), true);
 
         vm.prank(CONFIGURATOR);
         policyManager.setPolicy(bytes32(uint256(1)), policy);
@@ -91,6 +97,9 @@ contract PolicyManagerTest is Test {
         vm.prank(USER);
         policyManager.setGroup(DUMB_ADDRESS, "GROUP");
 
+        vm.expectEmit(true, false, false, true);
+        emit SetGroup(DUMB_ADDRESS, "GROUP");
+
         vm.prank(CONFIGURATOR);
         policyManager.setGroup(DUMB_ADDRESS, "GROUP");
 
@@ -117,6 +126,9 @@ contract PolicyManagerTest is Test {
 
         vm.prank(CONFIGURATOR);
         policyManager.setPolicy(bytes32(uint256(1)), policy);
+
+        vm.expectEmit(true, false, false, true);
+        emit SetPolicy(bytes32(uint256(1)), false);
 
         vm.prank(CONFIGURATOR);
         policyManager.disablePolicy(bytes32(uint256(1)));

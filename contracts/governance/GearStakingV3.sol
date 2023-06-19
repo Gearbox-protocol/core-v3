@@ -238,6 +238,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     ///               * ALLOWED - can both vote and unvote
     ///               * UNVOTE_ONLY - can only unvote
     function setVotingContractStatus(address votingContract, VotingContractStatus status) external configuratorOnly {
+        if (status == allowedVotingContract[votingContract]) return;
         allowedVotingContract[votingContract] = status;
 
         emit SetVotingContractStatus(votingContract, status);
