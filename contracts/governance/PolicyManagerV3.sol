@@ -69,7 +69,7 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
     event SetPolicy(bytes32 indexed policyHash, bool enabled);
 
     /// @dev Emitted when new policy group of the address is set
-    event SetGroup(address indexed contractAddress, string group);
+    event SetGroup(address indexed contractAddress, string indexed group);
 
     constructor(address _addressProvider) ACLNonReentrantTrait(_addressProvider) {}
 

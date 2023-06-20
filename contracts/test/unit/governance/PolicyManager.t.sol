@@ -22,7 +22,7 @@ contract PolicyManagerTest is Test {
     PolicyManagerInternal public policyManager;
 
     event SetPolicy(bytes32 indexed policyHash, bool enabled);
-    event SetGroup(address indexed contractAddress, string group);
+    event SetGroup(address indexed contractAddress, string indexed group);
 
     function setUp() public {
         vm.prank(CONFIGURATOR);
@@ -97,7 +97,7 @@ contract PolicyManagerTest is Test {
         vm.prank(USER);
         policyManager.setGroup(DUMB_ADDRESS, "GROUP");
 
-        vm.expectEmit(true, false, false, true);
+        vm.expectEmit(true, true, false, false);
         emit SetGroup(DUMB_ADDRESS, "GROUP");
 
         vm.prank(CONFIGURATOR);
