@@ -168,7 +168,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             // update quotas on closing the account - if a token ends up disabled while having a non-zero quota,
             // the CM will fail to zero it on closing an account, which will break quota interest computations.
             // This value is returned in order for Credit Manager to update enabled tokens locally.
-            if (quoted < 2 && newQuoted > 1) {
+            if (quoted <= 1 && newQuoted > 1) {
                 enableToken = true; // U: [PQK-15]
             }
 
@@ -181,7 +181,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             tokenQuotaParams.totalQuoted -= uint96(-quotaChange); // U: [PQK-15]
 
             /// Computes whether the token should be disabled (quota changed from non-zero to zero)
-            if (newQuoted < 2) {
+            if (newQuoted <= 1) {
                 disableToken = true; // U: [PQK-15]
             }
         }
