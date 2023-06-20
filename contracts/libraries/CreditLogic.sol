@@ -250,7 +250,7 @@ library CreditLogic {
                     amountToRepay -= quotaFees;
                     profit = quotaFees;
                 } else {
-                    newQuotaFees = quotaFees - amountToRepay.toUint128();
+                    newQuotaFees = quotaFees - uint128(amountToRepay);
                     profit = amountToRepay;
                     amountToRepay = 0;
                 }
@@ -277,9 +277,6 @@ library CreditLogic {
                 amountToRepay = 0; // U:[CL-03B]
 
                 newCumulativeQuotaInterest = uint128(cumulativeQuotaInterest - amountToPool); // U:[CL-03A]
-
-                newDebt = debt; // U:[CL-03A]
-                newCumulativeIndex = cumulativeIndexLastUpdate; // U:[CL-03A]
             }
         } else {
             newCumulativeQuotaInterest = cumulativeQuotaInterest;
@@ -325,6 +322,6 @@ library CreditLogic {
         } else {
             newCumulativeIndex = cumulativeIndexLastUpdate; // U:[CL-03A]
         }
-        newDebt = debt - amountToRepay;
+        newDebt = debt - amountToRepay; // U:[CL-03A]
     }
 }

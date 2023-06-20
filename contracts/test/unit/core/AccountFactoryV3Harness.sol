@@ -12,13 +12,6 @@ contract AccountFactoryV3Harness is AccountFactoryV3 {
         return _queuedAccounts[creditManager][index];
     }
 
-    function initQueuedAccounts(address creditManager, uint256 tail) external {
-        QueuedAccount memory qa;
-        for (uint256 i; i < tail; ++i) {
-            _queuedAccounts[creditManager].push(qa);
-        }
-    }
-
     function setQueuedAccount(address creditManager, uint256 index, address creditAccount, uint40 reusableAfter)
         external
     {

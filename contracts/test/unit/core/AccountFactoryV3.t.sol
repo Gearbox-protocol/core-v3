@@ -69,7 +69,6 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
         vm.assume(head <= tail);
         FactoryParams memory fp = accountFactory.factoryParams(creditManager);
         accountFactory.setFactoryParams(creditManager, fp.masterCreditAccount, head, tail);
-        accountFactory.initQueuedAccounts(creditManager, tail);
         if (head < tail) {
             accountFactory.setQueuedAccount(creditManager, head, address(0), uint40(block.timestamp + 1));
         }
@@ -100,7 +99,6 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
 
         FactoryParams memory fp = accountFactory.factoryParams(creditManager);
         accountFactory.setFactoryParams(creditManager, fp.masterCreditAccount, head, tail);
-        accountFactory.initQueuedAccounts(creditManager, tail);
         accountFactory.setQueuedAccount(creditManager, head, creditAccount, uint40(block.timestamp - 1));
 
         vm.expectEmit(true, true, false, false);
@@ -117,7 +115,6 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
     function test_U_AF_03_returnCreditAccount_works_correctly(address creditAccount, uint8 tail) public {
         FactoryParams memory fp = accountFactory.factoryParams(creditManager);
         accountFactory.setFactoryParams(creditManager, fp.masterCreditAccount, fp.head, tail);
-        accountFactory.initQueuedAccounts(creditManager, tail);
 
         vm.expectEmit(true, true, false, false);
         emit ReturnCreditAccount(creditAccount, creditManager);

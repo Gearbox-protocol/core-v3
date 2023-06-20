@@ -193,7 +193,9 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     /// @notice Returns the current global voting epoch
     function getCurrentEpoch() public view returns (uint16) {
         if (block.timestamp < firstEpochTimestamp) return 0; // U:[GS-01]
-        return uint16((block.timestamp - firstEpochTimestamp) / EPOCH_LENGTH) + 1; // U:[GS-01]
+        unchecked {
+            return uint16((block.timestamp - firstEpochTimestamp) / EPOCH_LENGTH) + 1; // U:[GS-01]
+        }
     }
 
     /// @notice Returns the total amount of GEAR the user staked into staked GEAR
