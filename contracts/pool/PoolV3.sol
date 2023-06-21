@@ -38,8 +38,6 @@ import {
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
-import "forge-std/console.sol";
-
 /// @dev Struct that holds borrowed amount and debt limit
 struct DebtParams {
     uint128 borrowed;
@@ -539,9 +537,8 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         int256 availableLiquidityDelta,
         bool checkOptimalBorrowing
     ) internal {
-        console.log(expectedLiquidityLU());
-
-        uint256 expectedLiquidity_ = expectedLiquidityLU(); // U:[P4-16]
+        uint256 expectedLiquidity_ = (expectedLiquidityLU().toInt256() + expectedLiquidityDelta).toUint256(); // U:[P4-16]
+        uint256 availableLiquidity_ = (availableLiquidity().toInt256() + availableLiquidityDelta).toUint256(); // U:[P4-16]
 
         uint256 timestampLU = lastBaseInterestUpdate;
         if (block.timestamp != timestampLU) {
@@ -549,9 +546,6 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
             _baseInterestIndexLU = _calcBaseInterestIndex(timestampLU).toUint128(); // U:[P4-16]
             lastBaseInterestUpdate = uint40(block.timestamp); // U:[P4-16]
         }
-
-        expectedLiquidity_ = (expectedLiquidity_.toInt256() + expectedLiquidityDelta).toUint256();
-        uint256 availableLiquidity_ = (availableLiquidity().toInt256() + availableLiquidityDelta).toUint256(); // U:[P4-16]
 
         _expectedLiquidityLU = expectedLiquidity_.toUint128(); // U:[P4-16]
         _baseInterestRate = IInterestRateModelV3(interestRateModel).calcBorrowRate({

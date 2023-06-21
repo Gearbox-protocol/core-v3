@@ -9,7 +9,7 @@ import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
 import {CreditManagerFactory} from "./CreditManagerFactory.sol";
-
+import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {DegenNFTV2} from "@gearbox-protocol/core-v2/contracts/tokens/DegenNFTV2.sol";
@@ -20,8 +20,6 @@ import {PoolDeployer} from "./PoolDeployer.sol";
 import {ICreditConfig, CreditManagerOpts} from "../interfaces/ICreditConfig.sol";
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 
-/// @title CreditManagerTestSuite
-/// @notice Deploys contract for unit testing of CreditManagerV3.sol
 contract CreditFacadeTestSuite is PoolDeployer {
     ITokenTestSuite public tokenTestSuite;
 
@@ -37,9 +35,11 @@ contract CreditFacadeTestSuite is PoolDeployer {
 
     ICreditConfig creditConfig;
 
+    bool supportsQuotas;
+
     constructor(
         ICreditConfig _creditConfig,
-        bool supportQuotas,
+        bool _supportQuotas,
         bool withDegenNFT,
         bool withExpiration,
         uint8 accountFactoryVer
@@ -51,10 +51,11 @@ contract CreditFacadeTestSuite is PoolDeployer {
             10 * _creditConfig.getAccountAmount(),
             _creditConfig.getPriceFeeds(),
             accountFactoryVer,
-            supportQuotas
+            _supportQuotas
         )
     {
         creditConfig = _creditConfig;
+        supportsQuotas = _supportQuotas;
 
         minDebt = creditConfig.minDebt();
         maxDebt = creditConfig.maxDebt();
@@ -109,7 +110,7 @@ contract CreditFacadeTestSuite is PoolDeployer {
             AccountFactoryV3(address(af)).addCreditManager(address(creditManager));
         }
 
-        if (supportQuotas) {
+        if (supportsQuotas) {
             vm.prank(CONFIGURATOR);
             poolQuotaKeeper.addCreditManager(address(creditManager));
         }
@@ -132,5 +133,62 @@ contract CreditFacadeTestSuite is PoolDeployer {
         IERC20(underlying).approve(address(creditManager), type(uint256).max);
         vm.prank(FRIEND);
         IERC20(underlying).approve(address(creditManager), type(uint256).max);
+    }
+
+    function makeTokenQuoted(address token, uint16 rate, uint96 limit) external {
+        require(supportsQuotas, "Test suite does not support quotas");
+
+        vm.startPrank(CONFIGURATOR);
+        gauge.addQuotaToken(token, rate, rate);
+        poolQuotaKeeper.setTokenLimit(token, limit);
+
+        vm.warp(block.timestamp + 7 days);
+        gauge.updateEpoch();
+
+        // uint256 tokenMask = creditManager.getTokenMaskOrRevert(token);
+        // uint256 limitedMask = creditManager.quotedTokensMask();
+
+        creditConfigurator.makeTokenQuoted(token);
+
+        vm.stopPrank();
+    }
+
+    /// @dev Opens credit account for testing management functions
+    function openCreditAccount()
+        external
+        returns (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, address creditAccount)
+    {
+        return openCreditAccount(creditAccountAmount);
+    }
+
+    function openCreditAccount(uint256 _borrowedAmount)
+        public
+        returns (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate, address creditAccount)
+    {
+        // Set up real value, which should be configired before CM would be launched
+        // vm.prank(CONFIGURATOR);
+        // creditManager.setCollateralTokenData(
+        //     underlying,
+        //     uint16(PERCENTAGE_FACTOR - DEFAULT_FEE_LIQUIDATION - DEFAULT_LIQUIDATION_PREMIUM),
+        //     uint16(PERCENTAGE_FACTOR - DEFAULT_FEE_LIQUIDATION - DEFAULT_LIQUIDATION_PREMIUM),
+        //     type(uint40).max,
+        //     0
+        // );
+
+        borrowedAmount = _borrowedAmount;
+
+        cumulativeIndexLastUpdate = pool.calcLinearCumulative_RAY();
+        // pool.setCumulativeIndexNow(cumulativeIndexLastUpdate);
+
+        vm.prank(address(creditFacade));
+
+        // Existing address case
+        creditAccount = creditManager.openCreditAccount(borrowedAmount, USER);
+
+        // Increase block number cause it's forbidden to close credit account in the same block
+        vm.roll(block.number + 1);
+        // vm.warp(block.timestamp + 100 days);
+
+        // pool.setCumulativeIndexNow(cumulativeIndexAtClose);
     }
 }

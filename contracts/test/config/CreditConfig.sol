@@ -19,8 +19,6 @@ struct CollateralTokensItem {
     uint16 liquidationThreshold;
 }
 
-/// @title CreditManagerTestSuite
-/// @notice Deploys contract for unit testing of CreditManagerV3.sol
 contract CreditConfig is Test, ICreditConfig {
     uint128 public minDebt;
     uint128 public maxDebt;

@@ -46,51 +46,46 @@ contract CreditFacadeGasTest is
     ICreditManagerV3Events,
     ICreditFacadeV3Events
 {
-    AccountFactory accountFactory;
+    // function setUp() public {
+    //     _setUp(Tokens.DAI, true, false, false);
+    // }
 
-    TargetContractMock targetMock;
-    AdapterMock adapterMock;
+    // function _setUp(Tokens _underlying, bool supportQuotas, bool withDegenNFT, bool withExpiration) internal {
+    //     tokenTestSuite = new TokensTestSuite();
+    //     tokenTestSuite.topUpWETH{value: 100 * WAD}();
 
-    function setUp() public {
-        _setUp(Tokens.DAI, true, false, false);
-    }
+    //     CreditConfig creditConfig = new CreditConfig(
+    //         tokenTestSuite,
+    //         _underlying
+    //     );
 
-    function _setUp(Tokens _underlying, bool supportQuotas, bool withDegenNFT, bool withExpiration) internal {
-        tokenTestSuite = new TokensTestSuite();
-        tokenTestSuite.topUpWETH{value: 100 * WAD}();
+    //     cft = new CreditFacadeTestSuite({ _creditConfig: creditConfig,
+    //      _supportQuotas: supportQuotas,
+    //      withDegenNFT: withDegenNFT,
+    //      withExpiration:  withExpiration,
+    //      accountFactoryVer: 1});
 
-        CreditConfig creditConfig = new CreditConfig(
-            tokenTestSuite,
-            _underlying
-        );
+    //     // cft.testFacadeWithQuotas();
 
-        cft = new CreditFacadeTestSuite({ _creditConfig: creditConfig,
-         supportQuotas: supportQuotas,
-         withDegenNFT: withDegenNFT,
-         withExpiration:  withExpiration,
-         accountFactoryVer: 1});
+    //     underlying = tokenTestSuite.addressOf(_underlying);
+    //     creditManager = cft.creditManager();
+    //     creditFacade = cft.creditFacade();
+    //     creditConfigurator = cft.creditConfigurator();
 
-        // cft.testFacadeWithQuotas();
+    //     accountFactory = cft.af();
 
-        underlying = tokenTestSuite.addressOf(_underlying);
-        creditManager = cft.creditManager();
-        creditFacade = cft.creditFacade();
-        creditConfigurator = cft.creditConfigurator();
+    //     targetMock = new TargetContractMock();
+    //     adapterMock = new AdapterMock(
+    //         address(creditManager),
+    //         address(targetMock)
+    //     );
 
-        accountFactory = cft.af();
+    //     vm.prank(CONFIGURATOR);
+    //     creditConfigurator.allowAdapter(address(adapterMock));
 
-        targetMock = new TargetContractMock();
-        adapterMock = new AdapterMock(
-            address(creditManager),
-            address(targetMock)
-        );
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.allowAdapter(address(adapterMock));
-
-        vm.label(address(adapterMock), "AdapterMock");
-        vm.label(address(targetMock), "TargetContractMock");
-    }
+    //     vm.label(address(adapterMock), "AdapterMock");
+    //     vm.label(address(targetMock), "TargetContractMock");
+    // }
 
     function _zeroAllLTs() internal {
         uint256 collateralTokensCount = creditManager.collateralTokensCount();

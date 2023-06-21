@@ -24,24 +24,8 @@ import "../lib/constants.sol";
 
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 
-struct PoolOpts {
-    address addressProvider; // address of addressProvider contract
-    address underlying; // address of underlying token for pool and creditManager
-    uint256 U_optimal; // linear interest model parameter
-    uint256 R_base; // linear interest model parameter
-    uint256 R_slope1; // linear interest model parameter
-    uint256 R_slope2; // linear interest model parameter
-    uint256 expectedLiquidityLimit; // linear interest model parameter
-    uint256 withdrawFee; // withdrawFee
-}
+import {PoolFactory} from "./PoolFactory.sol";
 
-struct PoolCreditOpts {
-    PoolOpts poolOpts;
-    CreditManagerOpts creditOpts;
-}
-
-/// @title CreditManagerTestSuite
-/// @notice Deploys contract for unit testing of CreditManagerV3.sol
 contract PoolDeployer is Test {
     IAddressProviderV3 public addressProvider;
     GenesisFactory public gp;
@@ -89,8 +73,6 @@ contract PoolDeployer is Test {
 
         acl = ACL(addressProvider.getAddressOrRevert(AP_ACL, 0));
 
-        cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
-
         withdrawalManager =
             WithdrawalManagerV3(payable(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00)));
 
@@ -98,31 +80,16 @@ contract PoolDeployer is Test {
 
         underlying = _underlying;
 
-        ///    uint16 U_1,
-        // uint16 U_2,
-        // uint16 R_base,
-        // uint16 R_slope1,
-        // uint16 R_slope2,
-        // uint16 R_slope3,
-        // bool _isBorrowingMoreU2Forbidden
-        LinearInterestRateModelV3 irm = new LinearInterestRateModelV3(70_00, 85_00, 0, 15_00, 30_00, 120_00, true);
+        acl.transferOwnership(CONFIGURATOR);
 
-        // //   address addressProvider_,
-        //     address underlyingToken_,
-        //     address interestRateModel_,
-        //     uint256 totalDebtLimit_,
-        //     bool supportsQuotas_,
-        //     string memory namePrefix_,
-        //     string memory symbolPrefix_
-        pool = new PoolV3(
-            address(gp.addressProvider()),
-            underlying,
-            address(irm),
-            type(uint256).max,
-            supportQuotas,
-            "d",
-            "diesel"
-        );
+        vm.prank(CONFIGURATOR);
+        acl.claimOwnership();
+
+        PoolFactory pf = new PoolFactory(address(addressProvider), _underlying, supportQuotas);
+
+        pool = pf.pool();
+        gauge = pf.gauge();
+        poolQuotaKeeper = pf.poolQuotaKeeper();
 
         tokenTestSuite.mint(_underlying, INITIAL_LP, initialBalance);
 
@@ -131,28 +98,23 @@ contract PoolDeployer is Test {
         vm.prank(INITIAL_LP);
         pool.deposit(initialBalance, INITIAL_LP);
 
+        cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
+
+        vm.prank(CONFIGURATOR);
         cr.addPool(address(pool));
 
-        if (supportQuotas) {
-            poolQuotaKeeper = new PoolQuotaKeeperV3(payable(address(pool)));
+        // if (supportQuotas) {
+        //     address gearStaking = gp.addressProvider().getAddressOrRevert(AP_GEAR_STAKING, 3_00);
 
-            address gearStaking = gp.addressProvider().getAddressOrRevert(AP_GEAR_STAKING, 3_00);
+        //     gauge = new GaugeV3(address(pool), gearStaking);
 
-            gauge = new GaugeV3(address(pool), gearStaking);
+        //     vm.label(address(gauge), "Gauge");
 
-            vm.label(address(gauge), "Gauge");
+        //     poolQuotaKeeper = new PoolQuotaKeeperV3(payable(address(pool)));
+        //     poolQuotaKeeper.setGauge(address(gauge));
+        //     pool.setPoolQuotaKeeper(address(poolQuotaKeeper));
 
-            poolQuotaKeeper.setGauge(address(gauge));
-
-            pool.setPoolQuotaKeeper(address(poolQuotaKeeper));
-        }
-
-        acl.transferOwnership(CONFIGURATOR);
-
-        vm.startPrank(CONFIGURATOR);
-
-        acl.claimOwnership();
-
-        vm.stopPrank();
+        //     vm.label(address(poolQuotaKeeper), "PoolQuotaKeeper");
+        // }
     }
 }
