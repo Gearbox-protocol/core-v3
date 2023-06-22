@@ -13,9 +13,7 @@ import {GenesisFactory} from "./GenesisFactory.sol";
 import {WithdrawalManagerV3} from "../../core/WithdrawalManagerV3.sol";
 import {BotListV3} from "../../core/BotListV3.sol";
 
-import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 import {PoolV3} from "../../pool/PoolV3.sol";
-import {LinearInterestRateModelV3} from "../../pool/LinearInterestRateModelV3.sol";
 
 import {GaugeV3} from "../../governance/GaugeV3.sol";
 import {PoolQuotaKeeperV3} from "../../pool/PoolQuotaKeeperV3.sol";

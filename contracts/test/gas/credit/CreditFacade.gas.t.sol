@@ -9,7 +9,6 @@ import {
     ICreditFacadeV3, ICreditFacadeV3Multicall, ICreditFacadeV3Events
 } from "../../../interfaces/ICreditFacadeV3.sol";
 import {ICreditManagerV3, ICreditManagerV3Events, ClosureAction} from "../../../interfaces/ICreditManagerV3.sol";
-import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 
 // DATA
 import {MultiCall, MultiCallOps} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
@@ -26,13 +25,10 @@ import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 
 // MOCKS
 import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
-import {TargetContractMock} from "../../mocks/core/TargetContractMock.sol";
 
 // SUITES
-import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
-import {Tokens} from "../../config/Tokens.sol";
 
-import {CreditConfig} from "../../config/CreditConfig.sol";
+import {Tokens} from "../../config/Tokens.sol";
 
 uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
 uint16 constant REFERRAL_CODE = 23;

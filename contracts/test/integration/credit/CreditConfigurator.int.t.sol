@@ -7,7 +7,7 @@ import "../../../interfaces/IAddressProviderV3.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
-import {WithdrawalManagerV3} from "../../../core/WithdrawalManagerV3.sol";
+
 import {
     CreditConfiguratorV3,
     CreditManagerOpts,
@@ -20,7 +20,6 @@ import {ICreditConfiguratorEvents} from "../../../interfaces/ICreditConfigurator
 import {IAdapter} from "@gearbox-protocol/core-v2/contracts/interfaces/adapters/IAdapter.sol";
 
 //
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {AddressList} from "../../lib/AddressList.sol";
 

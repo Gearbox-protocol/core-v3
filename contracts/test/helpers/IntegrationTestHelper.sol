@@ -7,7 +7,6 @@ import "../../interfaces/IAddressProviderV3.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
 
-import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -22,7 +21,7 @@ import {DegenNFTV2} from "@gearbox-protocol/core-v2/contracts/tokens/DegenNFTV2.
 import {CreditManagerFactory} from "../suites/CreditManagerFactory.sol";
 
 import {ICreditFacadeV3Multicall} from "../../interfaces/ICreditFacadeV3.sol";
-import {ICreditManagerV3Events} from "../../interfaces/ICreditManagerV3.sol";
+
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
 import {IWithdrawalManagerV3} from "../../interfaces/IWithdrawalManagerV3.sol";

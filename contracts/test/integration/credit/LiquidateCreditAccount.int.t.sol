@@ -3,13 +3,7 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
-
-import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
-
 import {BotListV3} from "../../../core/BotListV3.sol";
-import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 
 import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
 
@@ -20,25 +14,19 @@ import {
     ManageDebtAction,
     BOT_PERMISSIONS_SET_FLAG
 } from "../../../interfaces/ICreditManagerV3.sol";
-import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
+
 import "../../../interfaces/ICreditFacadeV3.sol";
-import {IDegenNFTV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFTV2.sol";
 
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // DATA
 
-import {MultiCall, MultiCallOps} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
-import {Balance} from "../../../libraries/BalancesLogic.sol";
-
 // CONSTANTS
-
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // TESTS
 
 import "../../lib/constants.sol";
-import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
+
 import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 
 // EXCEPTIONS
@@ -46,17 +34,8 @@ import "../../../interfaces/IExceptions.sol";
 
 // MOCKS
 import {AdapterMock} from "../../mocks//core/AdapterMock.sol";
-import {TargetContractMock} from "../../mocks/core/TargetContractMock.sol";
-
-import {GeneralMock} from "../../mocks//GeneralMock.sol";
 
 // SUITES
-import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
-import {Tokens} from "../../config/Tokens.sol";
-
-import {CreditConfig} from "../../config/CreditConfig.sol";
-
-import "forge-std/console.sol";
 
 uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
 uint16 constant REFERRAL_CODE = 23;

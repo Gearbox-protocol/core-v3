@@ -13,7 +13,6 @@ import {BitMask, UNDERLYING_TOKEN_MASK} from "../libraries/BitMask.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 //  DATA
-import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 
 /// INTERFACES
 import "../interfaces/ICreditFacadeV3.sol";

@@ -3,11 +3,8 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import "../../../interfaces/IAddressProviderV3.sol";
-import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import "../../../interfaces/ICreditFacadeV3Multicall.sol";
 
-import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 import {
     ICreditManagerV3,
     ICreditManagerV3Events,
@@ -18,17 +15,9 @@ import {
     CollateralDebtData
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {IPoolQuotaKeeperV3, AccountQuota} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
-import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
 
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
-
-import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
-import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
-
-import {UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
-
-import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {CreditLogic} from "../../../libraries/CreditLogic.sol";
@@ -36,22 +25,15 @@ import {CreditLogic} from "../../../libraries/CreditLogic.sol";
 // TESTS
 import "../../lib/constants.sol";
 
-import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
-
 // MOCKS
 
 // import {PoolMock} from "../../mocks//pool/PoolMock.sol";
-import {PoolV3} from "../../../pool/PoolV3.sol";
-import {GaugeV3} from "../../../governance/GaugeV3.sol";
-
-import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
 
 // SUITES
-import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
+
 import {Tokens} from "../../config/Tokens.sol";
 
 import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
-import {CreditConfig} from "../../config/CreditConfig.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";

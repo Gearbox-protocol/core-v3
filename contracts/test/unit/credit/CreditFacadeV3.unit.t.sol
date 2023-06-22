@@ -44,9 +44,6 @@ import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // DATA
 
-import {MultiCall, MultiCallOps} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
-import {Balance, BalanceWithMask} from "../../../libraries/BalancesLogic.sol";
-
 // CONSTANTS
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 

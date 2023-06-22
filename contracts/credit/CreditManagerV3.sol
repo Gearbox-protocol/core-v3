@@ -16,7 +16,6 @@ import {CreditAccountHelper} from "../libraries/CreditAccountHelper.sol";
 
 import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
-import {UnsafeERC20} from "../libraries/UnsafeERC20.sol";
 
 // INTERFACES
 import {IAccountFactoryBase} from "../interfaces/IAccountFactoryV3.sol";
@@ -48,7 +47,6 @@ import {
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
-import "forge-std/console.sol";
 
 /// @title Credit Manager
 /// @dev Encapsulates the business logic for managing Credit Accounts

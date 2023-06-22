@@ -3,11 +3,6 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import "../../../interfaces/IAddressProviderV3.sol";
-import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
-
-import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
-import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
 import {
     ICreditManagerV3,
     ICreditManagerV3Events,
@@ -16,18 +11,9 @@ import {
     ManageDebtAction,
     CollateralDebtData
 } from "../../../interfaces/ICreditManagerV3.sol";
-import "../../../interfaces/ICreditFacadeV3Multicall.sol";
 
-import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
-import {IWithdrawalManagerV3} from "../../../interfaces/IWithdrawalManagerV3.sol";
-
-import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
-
-import {IPoolService} from "@gearbox-protocol/core-v2/contracts/interfaces/IPoolService.sol";
-
-import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
+
 import {PERCENTAGE_FACTOR, SECONDS_PER_YEAR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // LIBS & TRAITS
@@ -38,27 +24,19 @@ import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 import "../../lib/constants.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 
-import "forge-std/console.sol";
-
 // EXCEPTIONS
 
 // MOCKS
-import {PriceFeedMock} from "../../mocks/oracles/PriceFeedMock.sol";
-import {PoolV3} from "../../../pool/PoolV3.sol";
+
 import {TargetContractMock} from "../../mocks/core/TargetContractMock.sol";
 import {ERC20ApproveRestrictedRevert, ERC20ApproveRestrictedFalse} from "../../mocks/token/ERC20ApproveRestricted.sol";
 
 // SUITES
-import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
-import {Tokens} from "../../config/Tokens.sol";
 
-import {CreditConfig} from "../../config/CreditConfig.sol";
+import {Tokens} from "../../config/Tokens.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
-
-import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
-import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHelper, IntegrationTestHelper {
     using BitMask for uint256;

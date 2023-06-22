@@ -4,16 +4,7 @@
 pragma solidity ^0.8.17;
 
 import "../../interfaces/IAddressProviderV3.sol";
-import {IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
-import {PriceFeedConfig} from "@gearbox-protocol/core-v2/contracts/oracles/PriceOracleV2.sol";
-import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
-import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
-import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
-import {GenesisFactory} from "./GenesisFactory.sol";
-import {WithdrawalManagerV3} from "../../core/WithdrawalManagerV3.sol";
-import {BotListV3} from "../../core/BotListV3.sol";
 
-import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 import {PoolV3} from "../../pool/PoolV3.sol";
 import {LinearInterestRateModelV3} from "../../pool/LinearInterestRateModelV3.sol";
 
@@ -21,8 +12,6 @@ import {GaugeV3} from "../../governance/GaugeV3.sol";
 import {PoolQuotaKeeperV3} from "../../pool/PoolQuotaKeeperV3.sol";
 
 import "../lib/constants.sol";
-
-import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 
 contract PoolFactory is Test {
     PoolV3 public pool;
