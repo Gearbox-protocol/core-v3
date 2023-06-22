@@ -40,7 +40,7 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/C
 
 import "../../lib/constants.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
-import {CreditFacadeTestHelper} from "../../helpers/CreditFacadeTestHelper.sol";
+import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
@@ -54,7 +54,7 @@ import {GeneralMock} from "../../mocks//GeneralMock.sol";
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";
-import {CreditFacadeTestSuite} from "../../suites/CreditFacadeTestSuite.sol";
+
 import {CreditConfig} from "../../config/CreditConfig.sol";
 
 import {IPoolBase} from "../../../interfaces/IPoolV3.sol";
@@ -64,36 +64,9 @@ import "forge-std/console.sol";
 uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
 uint16 constant REFERRAL_CODE = 23;
 
-/// @title CreditFacadeTest
-/// @notice Designed for unit test purposes only
-contract CloseCreditAccountIntegrationTest is
-    Test,
-    BalanceHelper,
-    CreditFacadeTestHelper,
-    ICreditManagerV3Events,
-    ICreditFacadeV3Events
-{
-    ///
-    ///
-    ///  HELPERS
-    ///
-    ///
-
-    function _prepareMockCall() internal returns (bytes memory callData) {
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.allowAdapter(address(adapterMock));
-
-        callData = abi.encodeWithSignature("hello(string)", "world");
-    }
-
-    ///
-    ///
-    ///  TESTS
-    ///
-    ///
-
-    /// @dev I:[FA-2]: functions reverts if borrower has no account
-    function test_I_FA_02_functions_reverts_if_credit_account_not_exists() public {
+contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
+    /// @dev I:[CCA-1]: closeCreditAccount reverts if borrower has no account
+    function test_I_CCA_01_closeCreditAccount_reverts_if_credit_account_not_exists() public creditTest {
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
         vm.prank(USER);
         creditFacade.closeCreditAccount(DUMB_ADDRESS, FRIEND, 0, false, MultiCallBuilder.build());
@@ -133,7 +106,8 @@ contract CloseCreditAccountIntegrationTest is
         // creditConfigurator.allowContract(address(targetMock), address(adapterMock));
     }
 
-    function test_I_FA_03C_closeCreditAccount_correctly_wraps_ETH() public {
+    /// @dev I:[CCA-2]: closeCreditAccount correctly wraps ETH
+    function test_I_CCA_02_closeCreditAccount_correctly_wraps_ETH() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
         vm.roll(block.number + 1);
@@ -146,12 +120,8 @@ contract CloseCreditAccountIntegrationTest is
         _checkForWETHTest();
     }
 
-    //
-    // CLOSE CREDIT ACCOUNT
-    //
-
-    /// @dev I:[FA-12]: closeCreditAccount runs multicall operations in correct order
-    function test_I_FA_12_closeCreditAccount_runs_operations_in_correct_order() public {
+    /// @dev I:[CCA-3]: closeCreditAccount runs multicall operations in correct order
+    function test_I_CCA_03_closeCreditAccount_runs_operations_in_correct_order() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
@@ -216,8 +186,8 @@ contract CloseCreditAccountIntegrationTest is
         assertEq0(targetMock.callData(), DUMB_CALLDATA, "Incorrect calldata");
     }
 
-    /// @dev I:[FA-13]: closeCreditAccount reverts on internal calls in multicall
-    function test_I_FA_13_closeCreditAccount_reverts_on_internal_call_in_multicall_on_closure() public {
+    /// @dev I:[CCA-4]: closeCreditAccount reverts on internal calls in multicall
+    function test_I_CCA_04_closeCreditAccount_reverts_on_internal_call_in_multicall_on_closure() public creditTest {
         /// TODO: CHANGE TEST
         // bytes memory DUMB_CALLDATA = abi.encodeWithSignature("hello(string)", "world");
 
@@ -235,13 +205,8 @@ contract CloseCreditAccountIntegrationTest is
         // );
     }
 
-    //
-    // CLOSE CREDIT ACCOUNT
-    //
-
-    /// @dev I:[CM-9]: closeCreditAccount returns account to the end of AF1s
-    /// remove borrower from creditAccounts mapping
-    function test_I_CM_09_close_credit_account_updates_pool_correctly() public notExpirableCase {
+    /// @dev I:[CCA-5]: closeCreditAccount returns account to the end of AF1s remove borrower from creditAccounts mapping
+    function test_I_CCA_05_close_credit_account_updates_pool_correctly() public withAccountFactoryV1 creditTest {
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
@@ -277,14 +242,14 @@ contract CloseCreditAccountIntegrationTest is
         creditManager.getBorrowerOrRevert(creditAccount);
     }
 
-    /// @dev I:[CM-10]: closeCreditAccount returns undelying tokens if credit account balance > amounToPool
+    /// @dev I:[CCA-6]: closeCreditAccount returns undelying tokens if credit account balance > amounToPool
     ///
     /// This test covers the case:
     /// Closure type: CLOSURE
     /// Underlying balance: > amountToPool
     /// Send all assets: false
     ///
-    function test_I_CM_10_close_credit_account_returns_underlying_token_if_not_liquidated() public notExpirableCase {
+    function test_I_CCA_06_close_credit_account_returns_underlying_token_if_not_liquidated() public creditTest {
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
@@ -331,17 +296,14 @@ contract CloseCreditAccountIntegrationTest is
         );
     }
 
-    /// @dev I:[CM-11]: closeCreditAccount sets correct values and transfers tokens from pool
+    /// @dev I:[CCA-7]: closeCreditAccount sets correct values and transfers tokens from pool
     ///
     /// This test covers the case:
     /// Closure type: CLOSURE
     /// Underlying balance: < amountToPool
     /// Send all assets: false
     ///
-    function test_I_CM_11_close_credit_account_charges_caller_if_underlying_token_not_enough()
-        public
-        notExpirableCase
-    {
+    function test_I_CCA_07_close_credit_account_charges_caller_if_underlying_token_not_enough() public creditTest {
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
@@ -407,7 +369,7 @@ contract CloseCreditAccountIntegrationTest is
         expectBalance(Tokens.DAI, FRIEND, friendBalanceBefore, "Incorrect amount were paid back");
     }
 
-    /// @dev I:[CM-12]: liquidateCreditAccount sets correct values and transfers tokens from pool
+    /// @dev I:[CCA-8]: liquidateCreditAccount sets correct values and transfers tokens from pool
     ///
     /// This test covers the case:
     /// Closure type: LIQUIDATION
@@ -415,10 +377,7 @@ contract CloseCreditAccountIntegrationTest is
     /// Send all assets: false
     /// Remaining funds: 0
     ///
-    function test_I_CM_12_liquidate_credit_account_charges_caller_if_underlying_token_not_enough()
-        public
-        notExpirableCase
-    {
+    function test_I_CCA_08_liquidate_credit_account_charges_caller_if_underlying_token_not_enough() public creditTest {
         uint256 friendBalanceBefore = tokenTestSuite.balanceOf(Tokens.DAI, FRIEND);
 
         uint256 interestAccrued;
@@ -493,5 +452,150 @@ contract CloseCreditAccountIntegrationTest is
         expectBalance(
             Tokens.DAI, FRIEND, expectedFriendBalance, "Incorrect amount were paid to liqiudator friend address"
         );
+    }
+
+    /// @dev I:[CCA-9]: closeCreditAccount sends assets depends on sendAllAssets flag
+    ///
+    /// This test covers the case:
+    /// Closure type: LIQUIDATION
+    /// Underlying balance: < amountToPool
+    /// Send all assets: false
+    /// Remaining funds: >0
+    ///
+
+    function test_I_CCA_09_close_credit_account_with_nonzero_skipTokenMask_sends_correct_tokens() public {
+        // (uint256 debt,, address creditAccount) = _openCreditAccount();
+
+        // tokenTestSuite.mint(Tokens.DAI, creditAccount, debt);
+        // tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
+
+        // tokenTestSuite.mint(Tokens.USDC, creditAccount, USDC_EXCHANGE_AMOUNT);
+
+        // tokenTestSuite.mint(Tokens.LINK, creditAccount, LINK_EXCHANGE_AMOUNT);
+
+        // uint256 wethTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.WETH));
+        // uint256 usdcTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.USDC));
+        // uint256 linkTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.LINK));
+
+        // CollateralDebtData memory collateralDebtData;
+        // collateralDebtData.debt = debt;
+        // collateralDebtData.accruedInterest = 0;
+        // collateralDebtData.accruedFees = 0;
+        // collateralDebtData.enabledTokensMask = wethTokenMask | usdcTokenMask | linkTokenMask;
+
+        // creditManager.closeCreditAccount({
+        //     creditAccount: creditAccount,
+        //     closureAction: ClosureAction.CLOSE_ACCOUNT,
+        //     collateralDebtData: collateralDebtData,
+        //     payer: USER,
+        //     to: FRIEND,
+        //     skipTokensMask: wethTokenMask | usdcTokenMask,
+        //     convertToETH: false
+        // });
+
+        // expectBalance(Tokens.WETH, FRIEND, 0);
+        // expectBalance(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
+
+        // expectBalance(Tokens.USDC, FRIEND, 0);
+        // expectBalance(Tokens.USDC, creditAccount, USDC_EXCHANGE_AMOUNT);
+
+        // expectBalance(Tokens.LINK, FRIEND, LINK_EXCHANGE_AMOUNT - 1);
+    }
+
+    /// @dev I:[CCA-10]: closeCreditAccount sends ETH for WETH creditManger to borrower
+    /// CASE: CLOSURE
+    /// Underlying token: WETH
+    function test_I_CCA_10_close_weth_credit_account_sends_eth_to_borrower() public {
+        // // It takes "clean" address which doesn't holds any assets
+
+        // // _connectCreditManagerSuite(Tokens.WETH);
+
+        // /// CLOSURE CASE
+        // (uint256 debt, uint256 cumulativeIndexLastUpdate, address creditAccount) = _openCreditAccount();
+
+        // // Transfer additional debt. After that underluying token balance = 2 * debt
+        // tokenTestSuite.mint(Tokens.WETH, creditAccount, debt);
+
+        // vm.warp(block.timestamp + 365 days);
+
+        // uint256 cumulativeIndexAtClose = pool.calcLinearCumulative_RAY();
+
+        // uint256 interestAccrued = (debt * cumulativeIndexAtClose) / cumulativeIndexLastUpdate - debt;
+
+        // // creditManager.closeCreditAccount(USER, ClosureAction.CLOSE_ACCOUNT, 0, USER, USER, 0, true);
+
+        // // creditManager.closeCreditAccount(
+        // //     creditAccount, ClosureAction.CLOSE_ACCOUNT, 0, USER, USER, 1, 0, debt + interestAccrued, true
+        // // );
+
+        // (uint16 feeInterest,,,,) = creditManager.fees();
+        // uint256 profit = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR;
+
+        // CollateralDebtData memory collateralDebtData;
+        // collateralDebtData.debt = debt;
+        // collateralDebtData.accruedInterest = interestAccrued;
+        // collateralDebtData.accruedFees = profit;
+        // collateralDebtData.enabledTokensMask = UNDERLYING_TOKEN_MASK;
+
+        // creditManager.closeCreditAccount({
+        //     creditAccount: creditAccount,
+        //     closureAction: ClosureAction.CLOSE_ACCOUNT,
+        //     collateralDebtData: collateralDebtData,
+        //     payer: USER,
+        //     to: USER,
+        //     skipTokensMask: 0,
+        //     convertToETH: true
+        // });
+
+        // expectBalance(Tokens.WETH, creditAccount, 1);
+
+        // uint256 amountToPool = debt + interestAccrued + profit;
+
+        // assertEq(
+        //     withdrawalManager.immediateWithdrawals(address(creditFacade), tokenTestSuite.addressOf(Tokens.WETH)),
+        //     2 * debt - amountToPool - 1,
+        //     "Incorrect amount deposited to withdrawalManager"
+        // );
+    }
+
+    /// @dev I:[CCA-11]: closeCreditAccount sends ETH for WETH creditManger to borrower
+    /// CASE: CLOSURE
+    /// Underlying token: DAI
+    function test_I_CCA_11_close_dai_credit_account_sends_eth_to_borrower() public {
+        // /// CLOSURE CASE
+        // (uint256 debt,, address creditAccount) = _openCreditAccount();
+
+        // // Transfer additional debt. After that underluying token balance = 2 * debt
+        // tokenTestSuite.mint(Tokens.DAI, creditAccount, debt);
+
+        // // Adds WETH to test how it would be converted
+        // tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
+
+        // uint256 wethTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.WETH));
+        // uint256 daiTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI));
+
+        // CollateralDebtData memory collateralDebtData;
+        // collateralDebtData.debt = debt;
+        // collateralDebtData.accruedInterest = 0;
+        // collateralDebtData.accruedFees = 0;
+        // collateralDebtData.enabledTokensMask = wethTokenMask | daiTokenMask;
+
+        // creditManager.closeCreditAccount({
+        //     creditAccount: creditAccount,
+        //     closureAction: ClosureAction.CLOSE_ACCOUNT,
+        //     collateralDebtData: collateralDebtData,
+        //     payer: USER,
+        //     to: USER,
+        //     skipTokensMask: 0,
+        //     convertToETH: true
+        // });
+
+        // expectBalance(Tokens.WETH, creditAccount, 1);
+
+        // assertEq(
+        //     withdrawalManager.immediateWithdrawals(address(creditFacade), tokenTestSuite.addressOf(Tokens.WETH)),
+        //     WETH_EXCHANGE_AMOUNT - 1,
+        //     "Incorrect amount deposited to withdrawalManager"
+        // );
     }
 }

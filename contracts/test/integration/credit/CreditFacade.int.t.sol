@@ -36,7 +36,7 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/C
 
 import "../../lib/constants.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
-import {CreditFacadeTestHelper} from "../../helpers/CreditFacadeTestHelper.sol";
+import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
@@ -50,7 +50,7 @@ import {GeneralMock} from "../../mocks//GeneralMock.sol";
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";
-import {CreditFacadeTestSuite} from "../../suites/CreditFacadeTestSuite.sol";
+
 import {CreditConfig} from "../../config/CreditConfig.sol";
 
 import "forge-std/console.sol";
@@ -63,7 +63,7 @@ uint16 constant REFERRAL_CODE = 23;
 contract CreditFacadeIntegrationTest is
     Test,
     BalanceHelper,
-    CreditFacadeTestHelper,
+    IntegrationTestHelper,
     ICreditManagerV3Events,
     ICreditFacadeV3Events
 {
@@ -88,35 +88,18 @@ contract CreditFacadeIntegrationTest is
 
     // TODO: ideas how to revert with ZA?
 
-    // /// @dev I:[FA-1]: constructor reverts for zero address
-    // function test_I_FA_01_constructor_reverts_for_zero_address() public {
-    //     vm.expectRevert(ZeroAddressException.selector);
-    //     new CreditFacadeV3(address(0), address(0), address(0), false);
-    // }
-
     /// @dev I:[FA-1A]: constructor sets correct values
-    function test_I_FA_01A_constructor_sets_correct_values() public {
+    function test_I_FA_01A_constructor_sets_correct_values() public allExpirableCases allDegenNftCases creditTest {
         assertEq(address(creditFacade.creditManager()), address(creditManager), "Incorrect creditManager");
         // assertEq(creditFacade.underlying(), underlying, "Incorrect underlying token");
 
         assertEq(creditFacade.weth(), creditManager.weth(), "Incorrect weth token");
 
-        assertEq(creditFacade.degenNFT(), address(0), "Incorrect degenNFT");
-
-        // assertTrue(creditFacade.whitelisted() == false, "Incorrect whitelisted");
-
-        _setUp({
-            _underlying: Tokens.DAI,
-            withDegenNFT: true,
-            withExpiration: false,
-            supportQuotas: false,
-            accountFactoryVer: 1
-        });
-        creditFacade = cft.creditFacade();
-
-        assertEq(creditFacade.degenNFT(), address(cft.degenNFT()), "Incorrect degenNFT");
-
-        // assertTrue(creditFacade.whitelisted() == true, "Incorrect whitelisted");
+        if (whitelisted) {
+            assertEq(creditFacade.degenNFT(), address(degenNFT), "Incorrect degenNFT");
+        } else {
+            assertEq(creditFacade.degenNFT(), address(0), "Incorrect degenNFT");
+        }
     }
 
     //
@@ -252,7 +235,7 @@ contract CreditFacadeIntegrationTest is
 
         uint256 amount = maxDebt - DAI_ACCOUNT_AMOUNT + 1;
 
-        tokenTestSuite.mint(Tokens.DAI, address(cft.pool()), amount);
+        tokenTestSuite.mint(Tokens.DAI, address(pool), amount);
 
         vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
 
@@ -362,7 +345,7 @@ contract CreditFacadeIntegrationTest is
 
         uint256 amount = DAI_ACCOUNT_AMOUNT - minDebt + 1;
 
-        tokenTestSuite.mint(Tokens.DAI, address(cft.pool()), amount);
+        tokenTestSuite.mint(Tokens.DAI, address(pool), amount);
 
         vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
 
@@ -935,14 +918,14 @@ contract CreditFacadeIntegrationTest is
     /// CREDIT FACADE WITH EXPIRATION
 
     /// @dev I:[FA-47]: liquidateExpiredCreditAccount should not work before the CreditFacadeV3 is expired
-    function test_I_FA_47_liquidateExpiredCreditAccount_reverts_before_expiration() public {
-        _setUp({
-            _underlying: Tokens.DAI,
-            withDegenNFT: false,
-            withExpiration: true,
-            supportQuotas: false,
-            accountFactoryVer: 1
-        });
+    function test_I_FA_47_liquidateExpiredCreditAccount_reverts_before_expiration() public expirableCase creditTest {
+        // _setUp({
+        //     _underlying: Tokens.DAI,
+        //     withDegenNFT: false,
+        //     withExpiration: true,
+        //     supportQuotas: false,
+        //     accountFactoryVer: 1
+        // });
 
         _openTestCreditAccount();
 

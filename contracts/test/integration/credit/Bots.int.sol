@@ -39,7 +39,7 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/C
 
 import "../../lib/constants.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
-import {CreditFacadeTestHelper} from "../../helpers/CreditFacadeTestHelper.sol";
+import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
@@ -53,8 +53,10 @@ import {GeneralMock} from "../../mocks//GeneralMock.sol";
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";
-import {CreditFacadeTestSuite} from "../../suites/CreditFacadeTestSuite.sol";
+
 import {CreditConfig} from "../../config/CreditConfig.sol";
+
+import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 
 import "forge-std/console.sol";
 
@@ -62,25 +64,9 @@ uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
 
 /// @title CreditFacadeTest
 /// @notice Designed for unit test purposes only
-contract BotsIntegrationTest is
-    Test,
-    BalanceHelper,
-    CreditFacadeTestHelper,
-    ICreditManagerV3Events,
-    ICreditFacadeV3Events
-{
-    ///
-    ///
-    ///  TESTS
-    ///
-    ///
-
-    //
-    // BOT LIST INTEGRATION
-    //
-
-    /// @dev I:[FA-58]: botMulticall works correctly
-    function test_I_FA_58_botMulticall_works_correctly() public {
+contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
+    /// @dev I:[BOT-01]: botMulticall works correctly
+    function test_I_BOT_01_botMulticall_works_correctly() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
         address bot = address(new GeneralMock());
@@ -138,8 +124,8 @@ contract BotsIntegrationTest is
         creditFacade.botMulticall(creditAccount, calls);
     }
 
-    /// @dev I:[FA-58A]: setBotPermissions works correctly in CF
-    function test_I_FA_58A_setBotPermissions_works_correctly() public {
+    /// @dev I:[BOT-02]: setBotPermissions works correctly in CF
+    function test_I_BOT_02_setBotPermissions_works_correctly() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
         address bot = address(new GeneralMock());

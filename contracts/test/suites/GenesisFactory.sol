@@ -23,7 +23,7 @@ contract GenesisFactory is Ownable {
     ACL public acl;
     PriceOracleV2 public priceOracle;
 
-    constructor(address wethToken, address treasury, uint8 accountFactoryVer) {
+    constructor(address wethToken, address treasury, uint256 accountFactoryVer) {
         acl = new ACL(); // T:[GD-1]
         addressProvider = new AddressProviderV3(address(acl)); // T:[GD-1]
         addressProvider.setAddress(AP_WETH_TOKEN, wethToken, false); // T:[GD-1]

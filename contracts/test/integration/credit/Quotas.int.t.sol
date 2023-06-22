@@ -49,46 +49,18 @@ import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";
-import {CreditFacadeTestSuite} from "../../suites/CreditFacadeTestSuite.sol";
-import {CreditFacadeTestHelper} from "../../helpers/CreditFacadeTestHelper.sol";
+
+import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 import {CreditConfig} from "../../config/CreditConfig.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
-contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper, CreditFacadeTestHelper {
+contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events {
     using CreditLogic for CollateralDebtData;
 
-    PoolQuotaKeeperV3 poolQuotaKeeper;
-    GaugeV3 gauge;
-
-    // function setUp() public {
-    //     tokenTestSuite = new TokensTestSuite();
-
-    //     tokenTestSuite.topUpWETH{value: 100 * WAD}();
-    //     _connectCreditManagerSuite(Tokens.DAI);
-    // }
-
-    // ///
-    // /// HELPERS
-
-    // function _connectCreditManagerSuite(Tokens t) internal {
-    //     creditConfig = new CreditConfig(tokenTestSuite, t);
-    //     cft = new CreditFacadeTestSuite(creditConfig,  true, false, false, 1);
-
-    //     pool = PoolV3(address(cft.pool()));
-    //     poolQuotaKeeper = cft.poolQuotaKeeper();
-    //     gauge = cft.gauge();
-
-    //     creditManager = cft.creditManager();
-    //     creditFacade = cft.creditFacade();
-
-    //     priceOracle = IPriceOracleV2(creditManager.priceOracle());
-    //     underlying = creditManager.underlying();
-    // }
-
     function _addQuotedToken(address token, uint16 rate, uint96 limit) internal {
-        cft.makeTokenQuoted(token, rate, limit);
+        makeTokenQuoted(token, rate, limit);
     }
 
     ///
@@ -97,13 +69,8 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper,
     ///
     ///
 
-    /// @dev I:[CMQ-1]: constructor correctly sets supportsQuotas based on pool
-    function test_I_CMQ_01_constructor_correctly_sets_quota_related_params() public {
-        assertTrue(creditManager.supportsQuotas(), "Credit Manager does not support quotas");
-    }
-
     /// @dev I:[CMQ-2]: setQuotedMask works correctly
-    function test_I_CMQ_02_setQuotedMask_works_correctly() public {
+    function test_I_CMQ_02_setQuotedMask_works_correctly() public withQuotas creditTest {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
@@ -114,7 +81,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper,
     }
 
     /// @dev I:[CMQ-3]: updateQuotas works correctly
-    function test_I_CMQ_03_updateQuotas_works_correctly() public {
+    function test_I_CMQ_03_updateQuotas_works_correctly() public withQuotas creditTest {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
@@ -201,7 +168,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper,
     }
 
     /// @dev I:[CMQ-4]: Quotas are handled correctly on debt decrease: amount < quota interest case
-    function test_I_CMQ_04_quotas_are_handled_correctly_at_repayment_partial_case() public {
+    function test_I_CMQ_04_quotas_are_handled_correctly_at_repayment_partial_case() public withQuotas creditTest {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
@@ -261,7 +228,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper,
     }
 
     /// @dev I:[CMQ-5]: Quotas are handled correctly on debt decrease: amount >= quota interest case
-    function test_I_CMQ_05_quotas_are_handled_correctly_at_repayment_full_case() public {
+    function test_I_CMQ_05_quotas_are_handled_correctly_at_repayment_full_case() public withQuotas creditTest {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 1000, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
@@ -311,7 +278,11 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper,
     }
 
     /// @dev I:[CMQ-6]: Quotas are disabled on closing an account
-    function test_I_CMQ_06_quotas_are_disabled_on_close_account_and_all_quota_fees_are_repaid() public {
+    function test_I_CMQ_06_quotas_are_disabled_on_close_account_and_all_quota_fees_are_repaid()
+        public
+        withQuotas
+        creditTest
+    {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 5_00, uint96(1_000_000 * WAD));
 
@@ -437,7 +408,7 @@ contract CreditManagerQuotasTest is Test, ICreditManagerV3Events, BalanceHelper,
     }
 
     /// @dev I:[CMQ-08]: Credit Manager zeroes limits on quoted tokens upon incurring a loss
-    function test_I_CMQ_08_creditManager_triggers_limit_zeroing_on_loss() public {
+    function test_I_CMQ_08_creditManager_triggers_limit_zeroing_on_loss() public withQuotas creditTest {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 

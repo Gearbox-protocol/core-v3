@@ -39,7 +39,7 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/C
 
 import "../../lib/constants.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
-import {CreditFacadeTestHelper} from "../../helpers/CreditFacadeTestHelper.sol";
+import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
@@ -53,7 +53,7 @@ import {GeneralMock} from "../../mocks//GeneralMock.sol";
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "../../config/Tokens.sol";
-import {CreditFacadeTestSuite} from "../../suites/CreditFacadeTestSuite.sol";
+
 import {CreditConfig} from "../../config/CreditConfig.sol";
 
 import "forge-std/console.sol";
@@ -61,90 +61,9 @@ import "forge-std/console.sol";
 uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
 uint16 constant REFERRAL_CODE = 23;
 
-/// @title CreditFacadeTest
-/// @notice Designed for unit test purposes only
-contract LiquidateCreditAccountIntegrationTest is
-    Test,
-    BalanceHelper,
-    CreditFacadeTestHelper,
-    ICreditManagerV3Events,
-    ICreditFacadeV3Events
-{
-    // function setUp() public {
-    //     _setUp(Tokens.DAI);
-    // }
-
-    // function _setUp(Tokens _underlying) internal {
-    //     _setUp(_underlying, false, false, false, 1);
-    // }
-
-    // function _setUp(
-    //     Tokens _underlying,
-    //     bool withDegenNFT,
-    //     bool withExpiration,
-    //     bool supportQuotas,
-    //     uint8 accountFactoryVer
-    // ) internal {
-    //     tokenTestSuite = new TokensTestSuite();
-    //     tokenTestSuite.topUpWETH{value: 100 * WAD}();
-
-    //     CreditConfig creditConfig = new CreditConfig(
-    //         tokenTestSuite,
-    //         _underlying
-    //     );
-
-    //     cft = new CreditFacadeTestSuite({ _creditConfig: creditConfig,
-    //      _supportQuotas: supportQuotas,
-    //      withDegenNFT: withDegenNFT,
-    //      withExpiration:  withExpiration,
-    //      accountFactoryVer:  accountFactoryVer});
-
-    //     underlying = tokenTestSuite.addressOf(_underlying);
-    //     creditManager = cft.creditManager();
-    //     creditFacade = cft.creditFacade();
-    //     creditConfigurator = cft.creditConfigurator();
-
-    //     accountFactory = cft.af();
-    //     botList = cft.botList();
-
-    //     targetMock = new TargetContractMock();
-    //     adapterMock = new AdapterMock(
-    //         address(creditManager),
-    //         address(targetMock)
-    //     );
-
-    //     vm.prank(CONFIGURATOR);
-    //     creditConfigurator.allowAdapter(address(adapterMock));
-
-    //     vm.label(address(adapterMock), "AdapterMock");
-    //     vm.label(address(targetMock), "TargetContractMock");
-    // }
-
-    ///
-    ///
-    ///  HELPERS
-    ///
-    ///
-
-    function _prepareMockCall() internal returns (bytes memory callData) {
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.allowAdapter(address(adapterMock));
-
-        callData = abi.encodeWithSignature("hello(string)", "world");
-    }
-
-    ///
-    ///
-    ///  TESTS
-    ///
-    ///
-
-    //
-    // ALL FUNCTIONS REVERTS IF USER HAS NO ACCOUNT
-    //
-
-    /// @dev I:[FA-2]: functions reverts if borrower has no account
-    function test_I_FA_02_functions_reverts_if_credit_account_not_exists() public {
+contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
+    /// @dev I:[LCA-1]: functions reverts if borrower has no account
+    function test_I_LCA_01_functions_reverts_if_credit_account_not_exists() public creditTest {
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
         vm.prank(USER);
         creditFacade.closeCreditAccount(DUMB_ADDRESS, FRIEND, 0, false, MultiCallBuilder.build());
@@ -184,8 +103,8 @@ contract LiquidateCreditAccountIntegrationTest is
         // creditConfigurator.allowContract(address(targetMock), address(adapterMock));
     }
 
-    /// @dev I:[FA-14]: liquidateCreditAccount reverts if hf > 1
-    function test_I_FA_14_liquidateCreditAccount_reverts_if_hf_is_greater_than_1() public {
+    /// @dev I:[LCA-2]: liquidateCreditAccount reverts if hf > 1
+    function test_I_LCA_2_liquidateCreditAccount_reverts_if_hf_is_greater_than_1() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
         vm.expectRevert(CreditAccountNotLiquidatableException.selector);
@@ -194,8 +113,8 @@ contract LiquidateCreditAccountIntegrationTest is
         creditFacade.liquidateCreditAccount(creditAccount, LIQUIDATOR, 0, true, MultiCallBuilder.build());
     }
 
-    /// @dev I:[FA-15]: liquidateCreditAccount executes needed calls and emits events
-    function test_I_FA_15_liquidateCreditAccount_executes_needed_calls_and_emits_events() public {
+    /// @dev I:[LCA-3]: liquidateCreditAccount executes needed calls and emits events
+    function test_I_LCA_03_liquidateCreditAccount_executes_needed_calls_and_emits_events() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
@@ -267,8 +186,8 @@ contract LiquidateCreditAccountIntegrationTest is
         creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 10, false, calls);
     }
 
-    /// @dev I:[FA-15A]: Borrowing is prohibited after a liquidation with loss
-    function test_I_FA_15A_liquidateCreditAccount_prohibits_borrowing_on_loss() public {
+    /// @dev I:[LCA-4]: Borrowing is prohibited after a liquidation with loss
+    function test_I_LCA_04_liquidateCreditAccount_prohibits_borrowing_on_loss() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
         uint8 maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
@@ -289,8 +208,8 @@ contract LiquidateCreditAccountIntegrationTest is
         assertEq(maxDebtPerBlockMultiplier, 0, "Increase debt wasn't forbidden after loss");
     }
 
-    /// @dev I:[FA-15B]: CreditFacade is paused after too much cumulative loss from liquidations
-    function test_I_FA_15B_liquidateCreditAccount_pauses_CreditFacade_on_too_much_loss() public {
+    /// @dev I:[LCA-5]: CreditFacade is paused after too much cumulative loss from liquidations
+    function test_I_LCA_05_liquidateCreditAccount_pauses_CreditFacade_on_too_much_loss() public creditTest {
         vm.prank(CONFIGURATOR);
         creditConfigurator.setMaxCumulativeLoss(1);
 
@@ -308,7 +227,11 @@ contract LiquidateCreditAccountIntegrationTest is
         assertTrue(creditFacade.paused(), "Credit manager was not paused");
     }
 
-    function test_I_FA_16_liquidateCreditAccount_reverts_on_internal_call_in_multicall_on_closure() public {
+    /// @dev I:[LCA-6]: liquidateCreditAccount reverts on internal call in multicall on closure
+    function test_I_LCA_06_liquidateCreditAccount_reverts_on_internal_call_in_multicall_on_closure()
+        public
+        creditTest
+    {
         /// TODO: Add all cases with different permissions!
 
         MultiCall[] memory calls = MultiCallBuilder.build(
@@ -327,5 +250,229 @@ contract LiquidateCreditAccountIntegrationTest is
 
         // It's used dumb calldata, cause all calls to creditFacade are forbidden
         creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 10, true, calls);
+    }
+
+    /// @dev I:[LCA-7]: liquidateCreditAccount sets correct values and transfers tokens from pool
+    ///
+    /// This test covers the case:
+    /// Closure type: LIQUIDATION / LIQUIDATION_EXPIRED
+    /// Underlying balance: < amountToPool
+    /// Send all assets: false
+    /// Remaining funds: >0
+    ///
+
+    function test_I_LCA_07_liquidate_credit_account_charges_caller_if_underlying_token_not_enough() public creditTest {
+        // uint256 debt;
+        // address creditAccount;
+
+        // uint256 expectedRemainingFunds = 100 * WAD;
+
+        // uint256 profit;
+        // uint256 amountToPool;
+        // uint256 totalValue;
+        // uint256 interestAccrued;
+
+        // {
+        //     uint256 cumulativeIndexLastUpdate;
+        //     (debt, cumulativeIndexLastUpdate, creditAccount) = _openCreditAccount();
+
+        //     vm.warp(block.timestamp + 365 days);
+
+        //     uint256 cumulativeIndexAtClose = pool.calcLinearCumulative_RAY();
+
+        //     interestAccrued = (debt * cumulativeIndexAtClose) / cumulativeIndexLastUpdate - debt;
+
+        //     uint16 feeInterest;
+        //     uint16 feeLiquidation;
+        //     uint16 liquidationDiscount;
+
+        //     {
+        //         (feeInterest,,,,) = creditManager.fees();
+        //     }
+
+        //     {
+        //         uint16 feeLiquidationNormal;
+        //         uint16 feeLiquidationExpired;
+
+        //         (, feeLiquidationNormal,, feeLiquidationExpired,) = creditManager.fees();
+
+        //         feeLiquidation = expirable ? feeLiquidationExpired : feeLiquidationNormal;
+        //     }
+
+        //     {
+        //         uint16 liquidationDiscountNormal;
+        //         uint16 liquidationDiscountExpired;
+
+        //         (feeInterest,, liquidationDiscountNormal,, liquidationDiscountExpired) = creditManager.fees();
+
+        //         liquidationDiscount = expirable ? liquidationDiscountExpired : liquidationDiscountNormal;
+        //     }
+
+        //     uint256 profitInterest = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR;
+
+        //     amountToPool = debt + interestAccrued + profitInterest;
+
+        //     totalValue =
+        //         ((amountToPool + expectedRemainingFunds) * PERCENTAGE_FACTOR) / (liquidationDiscount - feeLiquidation);
+
+        //     uint256 profitLiquidation = (totalValue * feeLiquidation) / PERCENTAGE_FACTOR;
+
+        //     amountToPool += profitLiquidation;
+
+        //     profit = profitInterest + profitLiquidation;
+        // }
+
+        // uint256 poolBalanceBefore = tokenTestSuite.balanceOf(Tokens.DAI, address(pool));
+
+        // tokenTestSuite.mint(Tokens.DAI, LIQUIDATOR, totalValue);
+        // expectBalance(Tokens.DAI, USER, 0, "USER has non-zero balance");
+        // expectBalance(Tokens.DAI, FRIEND, 0, "FRIEND has non-zero balance");
+        // expectBalance(Tokens.DAI, LIQUIDATOR, totalValue, "LIQUIDATOR has incorrect initial balance");
+
+        // expectBalance(Tokens.DAI, creditAccount, debt, "creditAccount has incorrect initial balance");
+
+        // uint256 remainingFunds;
+
+        // {
+        //     uint256 loss;
+
+        //     (uint16 feeInterest,,,,) = creditManager.fees();
+
+        //     CollateralDebtData memory collateralDebtData;
+        //     collateralDebtData.debt = debt;
+        //     collateralDebtData.accruedInterest = interestAccrued;
+        //     collateralDebtData.accruedFees = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR;
+        //     collateralDebtData.totalValue = totalValue;
+        //     collateralDebtData.enabledTokensMask = UNDERLYING_TOKEN_MASK;
+
+        //     vm.expectCall(address(pool), abi.encodeCall(IPoolService.repayCreditAccount, (debt, profit, 0)));
+
+        //     // (remainingFunds, loss) = creditManager.closeCreditAccount({
+        //     //     creditAccount: creditAccount,
+        //     //     closureAction: i == 1 ? ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT : ClosureAction.LIQUIDATE_ACCOUNT,
+        //     //     collateralDebtData: collateralDebtData,
+        //     //     payer: LIQUIDATOR,
+        //     //     to: FRIEND,
+        //     //     skipTokensMask: 0,
+        //     //     convertToETH: false
+        //     // });
+
+        //     assertLe(expectedRemainingFunds - remainingFunds, 2, "Incorrect remaining funds");
+
+        //     assertEq(loss, 0, "Loss can't be positive with remaining funds");
+        // }
+
+        // {
+        //     expectBalance(Tokens.DAI, creditAccount, 1, "Credit account balance != 1");
+        //     expectBalance(Tokens.DAI, USER, remainingFunds, "USER get incorrect amount as remaning funds");
+
+        //     expectBalance(Tokens.DAI, address(pool), poolBalanceBefore + amountToPool, "INCORRECT POOL BALANCE");
+        // }
+
+        // expectBalance(
+        //     Tokens.DAI,
+        //     LIQUIDATOR,
+        //     totalValue + debt - amountToPool - remainingFunds - 1,
+        //     "Incorrect amount were paid to lqiudaidator"
+        // );
+    }
+
+    /// @dev I:[LCA-8]: liquidateCreditAccount sends ETH for WETH creditManger to borrower
+    /// CASE: LIQUIDATION
+    function test_I_LCA_08_liquidate_credit_account_sends_eth_to_liquidator_and_weth_to_borrower() public {
+        // /// Store USER ETH balance
+
+        // // uint256 userBalanceBefore = tokenTestSuite.balanceOf(Tokens.WETH, USER);
+
+        // (,, uint16 liquidationDiscount,,) = creditManager.fees();
+
+        // // It takes "clean" address which doesn't holds any assets
+
+        // // _connectCreditManagerSuite(Tokens.WETH);
+
+        // /// CLOSURE CASE
+        // (uint256 debt,, address creditAccount) = _openCreditAccount();
+
+        // // Transfer additional debt. After that underluying token balance = 2 * debt
+        // tokenTestSuite.mint(Tokens.WETH, creditAccount, debt);
+
+        // uint256 totalValue = debt * 2;
+
+        // uint256 wethTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.WETH));
+        // uint256 daiTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI));
+
+        // CollateralDebtData memory collateralDebtData;
+        // collateralDebtData.debt = debt;
+        // collateralDebtData.accruedInterest = 0;
+        // collateralDebtData.accruedFees = 0;
+        // collateralDebtData.totalValue = totalValue;
+        // collateralDebtData.enabledTokensMask = wethTokenMask | daiTokenMask;
+
+        // creditManager.closeCreditAccount({
+        //     creditAccount: creditAccount,
+        //     closureAction: ClosureAction.LIQUIDATE_ACCOUNT,
+        //     collateralDebtData: collateralDebtData,
+        //     payer: LIQUIDATOR,
+        //     to: FRIEND,
+        //     skipTokensMask: 0,
+        //     convertToETH: true
+        // });
+
+        // // checks that no eth were sent to USER account
+        // expectEthBalance(USER, 0);
+
+        // expectBalance(Tokens.WETH, creditAccount, 1, "Credit account balance != 1");
+
+        // // expectBalance(Tokens.WETH, USER, userBalanceBefore + remainingFunds, "Incorrect amount were paid back");
+
+        // assertEq(
+        //     withdrawalManager.immediateWithdrawals(address(creditFacade), tokenTestSuite.addressOf(Tokens.WETH)),
+        //     (totalValue * (PERCENTAGE_FACTOR - liquidationDiscount)) / PERCENTAGE_FACTOR,
+        //     "Incorrect amount were paid to liqiudator friend address"
+        // );
+    }
+
+    /// @dev I:[LCA-9]: liquidateCreditAccount sends ETH for WETH creditManger to borrower
+    /// CASE: LIQUIDATION
+    /// Underlying token: DAI
+    function test_I_LCA_09_liquidate_dai_credit_account_sends_eth_to_liquidator() public {
+        // /// CLOSURE CASE
+        // (uint256 debt,, address creditAccount) = _openCreditAccount();
+        // // creditManager.transferAccountOwnership(creditAccount, address(this));
+
+        // // Transfer additional debt. After that underluying token balance = 2 * debt
+        // tokenTestSuite.mint(Tokens.DAI, creditAccount, debt);
+
+        // // Adds WETH to test how it would be converted
+        // tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
+
+        // // creditManager.transferAccountOwnership(creditAccount, USER);
+        // uint256 wethTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.WETH));
+        // uint256 daiTokenMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.DAI));
+
+        // CollateralDebtData memory collateralDebtData;
+        // collateralDebtData.debt = debt;
+        // collateralDebtData.accruedInterest = 0;
+        // collateralDebtData.accruedFees = 0;
+        // collateralDebtData.totalValue = debt;
+        // collateralDebtData.enabledTokensMask = wethTokenMask | daiTokenMask;
+
+        // creditManager.closeCreditAccount({
+        //     creditAccount: creditAccount,
+        //     closureAction: ClosureAction.LIQUIDATE_ACCOUNT,
+        //     collateralDebtData: collateralDebtData,
+        //     payer: LIQUIDATOR,
+        //     to: FRIEND,
+        //     skipTokensMask: 0,
+        //     convertToETH: true
+        // });
+
+        // expectBalance(Tokens.WETH, creditAccount, 1);
+
+        // assertEq(
+        //     withdrawalManager.immediateWithdrawals(address(creditFacade), tokenTestSuite.addressOf(Tokens.WETH)),
+        //     WETH_EXCHANGE_AMOUNT - 1,
+        //     "Incorrect amount were paid to liqiudator friend address"
+        // );
     }
 }
