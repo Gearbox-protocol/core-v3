@@ -1279,17 +1279,17 @@ contract CreditConfiguratorIntegrationTest is Test, ICreditManagerV3Events, ICre
         vm.expectCall(
             address(creditManager),
             abi.encodeCall(
-                CreditManagerV3.setCollateralTokenData, (usdc, initialLT, 8900, uint40(block.timestamp), 1000)
+                CreditManagerV3.setCollateralTokenData, (usdc, initialLT, 8900, uint40(block.timestamp + 1), 1000)
             )
         );
 
         vm.expectEmit(true, false, false, true);
         emit ScheduleTokenLiquidationThresholdRamp(
-            usdc, initialLT, 8900, uint40(block.timestamp), uint40(block.timestamp + 1000)
+            usdc, initialLT, 8900, uint40(block.timestamp + 1), uint40(block.timestamp + 1001)
         );
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.rampLiquidationThreshold(usdc, 8900, uint40(block.timestamp), 1000);
+        creditConfigurator.rampLiquidationThreshold(usdc, 8900, uint40(block.timestamp + 1), 1000);
 
         vm.warp(block.timestamp + 1006);
 
