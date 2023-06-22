@@ -4,7 +4,6 @@
 pragma solidity ^0.8.17;
 
 import {BotListV3} from "../../../core/BotListV3.sol";
-
 import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
 
 import {
@@ -16,12 +15,7 @@ import {
 } from "../../../interfaces/ICreditManagerV3.sol";
 
 import "../../../interfaces/ICreditFacadeV3.sol";
-
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
-
-// DATA
-
-// CONSTANTS
 
 // TESTS
 
@@ -34,11 +28,6 @@ import "../../../interfaces/IExceptions.sol";
 
 // MOCKS
 import {AdapterMock} from "../../mocks//core/AdapterMock.sol";
-
-// SUITES
-
-uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
-uint16 constant REFERRAL_CODE = 23;
 
 contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
     /// @dev I:[LCA-1]: functions reverts if borrower has no account
@@ -358,7 +347,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
 
     /// @dev I:[LCA-8]: liquidateCreditAccount sends ETH for WETH creditManger to borrower
     /// CASE: LIQUIDATION
-    function test_I_LCA_08_liquidate_credit_account_sends_eth_to_liquidator_and_weth_to_borrower() public {
+    function test_I_LCA_08_liquidate_credit_account_sends_eth_to_liquidator_and_weth_to_borrower() public creditTest {
         // /// Store USER ETH balance
 
         // // uint256 userBalanceBefore = tokenTestSuite.balanceOf(Tokens.WETH, USER);
@@ -414,7 +403,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
     /// @dev I:[LCA-9]: liquidateCreditAccount sends ETH for WETH creditManger to borrower
     /// CASE: LIQUIDATION
     /// Underlying token: DAI
-    function test_I_LCA_09_liquidate_dai_credit_account_sends_eth_to_liquidator() public {
+    function test_I_LCA_09_liquidate_dai_credit_account_sends_eth_to_liquidator() public creditTest {
         // /// CLOSURE CASE
         // (uint256 debt,, address creditAccount) = _openCreditAccount();
         // // creditManager.transferAccountOwnership(creditAccount, address(this));
@@ -454,4 +443,172 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
         //     "Incorrect amount were paid to liqiudator friend address"
         // );
     }
+
+    /// @dev I:[FA-47]: liquidateExpiredCreditAccount should not work before the CreditFacadeV3 is expired
+    function test_I_FA_47_liquidateExpiredCreditAccount_reverts_before_expiration() public expirableCase creditTest {
+        // _setUp({
+        //     _underlying: Tokens.DAI,
+        //     withDegenNFT: false,
+        //     withExpiration: true,
+        //     supportQuotas: false,
+        //     accountFactoryVer: 1
+        // });
+
+        _openTestCreditAccount();
+
+        // vm.expectRevert(CantLiquidateNonExpiredException.selector);
+
+        // vm.prank(LIQUIDATOR);
+        // creditFacade.liquidateExpiredCreditAccount(USER, LIQUIDATOR, 0, false, MultiCallBuilder.build());
+    }
+
+    /// @dev I:[FA-48]: liquidateExpiredCreditAccount should not work when expiration is set to zero (i.e. CreditFacadeV3 is non-expiring)
+    function test_I_FA_48_liquidateExpiredCreditAccount_reverts_on_CreditFacade_with_no_expiration()
+        public
+        creditTest
+    {
+        _openTestCreditAccount();
+
+        // vm.expectRevert(CantLiquidateNonExpiredException.selector);
+
+        // vm.prank(LIQUIDATOR);
+        // creditFacade.liquidateExpiredCreditAccount(USER, LIQUIDATOR, 0, false, MultiCallBuilder.build());
+    }
+
+    /// @dev I:[FA-49]: liquidateExpiredCreditAccount works correctly and emits events
+    function test_I_FA_49_liquidateExpiredCreditAccount_works_correctly_after_expiration() public creditTest {
+        // _setUp({
+        //     _underlying: Tokens.DAI,
+        //     withDegenNFT: false,
+        //     withExpiration: true,
+        //     supportQuotas: false,
+        //     accountFactoryVer: 1
+        // });
+        // (address creditAccount, uint256 balance) = _openTestCreditAccount();
+
+        // bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
+
+        // MultiCall[] memory calls = MultiCallBuilder.build(
+        //     MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
+        // );
+
+        vm.warp(block.timestamp + 1);
+        vm.roll(block.number + 1);
+
+        // (uint256 borrowedAmount, uint256 borrowedAmountWithInterest,) =
+        //     creditManager.calcAccruedInterestAndFees(creditAccount);
+
+        // (, uint256 remainingFunds,,) = creditManager.calcClosePayments(
+        //     balance, ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT, borrowedAmount, borrowedAmountWithInterest
+        // );
+
+        // // EXPECTED STACK TRACE & EVENTS
+
+        // vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount)));
+
+        // vm.expectEmit(true, false, false, false);
+        // emit StartMultiCall(creditAccount);
+
+        // vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.execute, (DUMB_CALLDATA)));
+
+        // vm.expectEmit(true, false, false, false);
+        // emit Execute(address(targetMock));
+
+        // vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountBase.execute, (address(targetMock), DUMB_CALLDATA)));
+
+        // vm.expectCall(address(targetMock), DUMB_CALLDATA);
+
+        // vm.expectEmit(false, false, false, false);
+        // emit FinishMultiCall();
+
+        // vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (address(1))));
+        // // Total value = 2 * DAI_ACCOUNT_AMOUNT, cause we have x2 leverage
+        // uint256 totalValue = balance;
+
+        // // vm.expectCall(
+        // //     address(creditManager),
+        // //     abi.encodeCall(
+        // //         ICreditManagerV3.closeCreditAccount,
+        // //         (
+        // //             creditAccount,
+        // //             ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT,
+        // //             totalValue,
+        // //             LIQUIDATOR,
+        // //             FRIEND,
+        // //             1,
+        // //             10,
+        // //             DAI_ACCOUNT_AMOUNT,
+        // //             true
+        // //         )
+        // //     )
+        // // );
+
+        // vm.expectEmit(true, true, false, true);
+        // emit LiquidateCreditAccount(
+        //     creditAccount, USER, LIQUIDATOR, FRIEND, ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT, remainingFunds
+        // );
+
+        // vm.prank(LIQUIDATOR);
+        // creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 10, true, calls);
+    }
+
+    // /// @dev I:[FA-56]: liquidateCreditAccount correctly uses BlacklistHelper during liquidations
+    // function test_I_FA_56_liquidateCreditAccount_correctly_handles_blacklisted_borrowers() public creditTest {
+    //     _setUp(Tokens.USDC);
+
+    //     cft.testFacadeWithBlacklistHelper();
+
+    //     creditFacade = cft.creditFacade();
+
+    //     address usdc = tokenTestSuite.addressOf(Tokens.USDC);
+
+    //     address blacklistHelper = creditFacade.blacklistHelper();
+
+    //     _openTestCreditAccount();
+
+    //     uint256 expectedAmount = (
+    //         2 * USDC_ACCOUNT_AMOUNT * (PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM - DEFAULT_FEE_LIQUIDATION)
+    //     ) / PERCENTAGE_FACTOR - USDC_ACCOUNT_AMOUNT - 1 - 1; // second -1 because we add 1 to helper balance
+
+    //     vm.roll(block.number + 1);
+
+    //     vm.prank(address(creditConfigurator));
+    //     CreditManagerV3(address(creditManager)).setLiquidationThreshold(usdc, 1);
+
+    //     ERC20BlacklistableMock(usdc).setBlacklisted(USER, true);
+
+    //     vm.expectCall(blacklistHelper, abi.encodeCall(IWithdrawalManagerV3.isBlacklisted, (usdc, USER)));
+
+    //     vm.expectCall(
+    //         address(creditManager), abi.encodeCall(ICreditManagerV3.transferAccountOwnership, (USER, blacklistHelper))
+    //     );
+
+    //     vm.expectCall(blacklistHelper, abi.encodeCall(IWithdrawalManagerV3.addWithdrawal, (usdc, USER, expectedAmount)));
+
+    //     vm.expectEmit(true, false, false, true);
+    //     emit UnderlyingSentToBlacklistHelper(USER, expectedAmount);
+
+    //     vm.prank(LIQUIDATOR);
+    //     creditFacade.liquidateCreditAccount(USER, FRIEND, 0, true, MultiCallBuilder.build());
+
+    //     assertEq(IWithdrawalManagerV3(blacklistHelper).claimable(usdc, USER), expectedAmount, "Incorrect claimable amount");
+
+    //     vm.prank(USER);
+    //     IWithdrawalManagerV3(blacklistHelper).claim(usdc, FRIEND2);
+
+    //     assertEq(tokenTestSuite.balanceOf(Tokens.USDC, FRIEND2), expectedAmount, "Transferred amount incorrect");
+    // }
+
+    // /// @dev I:[CM-64]: closeCreditAccount reverts when attempting to liquidate while paused,
+    // /// and the payer is not set as emergency liquidator
+
+    // function test_I_CM_64_closeCreditAccount_reverts_when_paused_and_liquidator_not_privileged() public {
+    //     vm.prank(CONFIGURATOR);
+    //     creditManager.pause();
+
+    //     vm.expectRevert("Pausable: paused");
+    //     // creditManager.closeCreditAccount(USER, ClosureAction.LIQUIDATE_ACCOUNT, 0, LIQUIDATOR, FRIEND, 0, false);
+    // }
+
+    // /// @dev I:[CM-65]: Emergency liquidator can't close an account instead of liquidating
 }

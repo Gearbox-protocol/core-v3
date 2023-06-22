@@ -398,7 +398,28 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
                 uint256 warpTime = RAY / rate * SECONDS_PER_YEAR;
 
                 vm.warp(block.timestamp + warpTime);
-            }
+            } // /// @dev I:[CM-64]: closeCreditAccount reverts when attempting to liquidate while paused,
+            // /// and the payer is not set as emergency liquidator
+
+            // function test_I_CM_64_closeCreditAccount_reverts_when_paused_and_liquidator_not_privileged() public creditTest {
+            //     vm.prank(CONFIGURATOR);
+            //     creditManager.pause();
+
+            //     vm.expectRevert("Pausable: paused");
+            //     // creditManager.closeCreditAccount(USER, ClosureAction.LIQUIDATE_ACCOUNT, 0, LIQUIDATOR, FRIEND, 0, false);
+            // }
+
+            // /// @dev I:[CM-65]: Emergency liquidator can't close an account instead of liquidating
+
+            // function test_I_CM_65_closeCreditAccount_reverts_when_paused_and_liquidator_tries_to_close() public creditTest {
+            //     vm.startPrank(CONFIGURATOR);
+            //     creditManager.pause();
+            //     creditManager.addEmergencyLiquidator(LIQUIDATOR);
+            //     vm.stopPrank();
+
+            //     vm.expectRevert("Pausable: paused");
+            //     // creditManager.closeCreditAccount(USER, ClosureAction.CLOSE_ACCOUNT, 0, LIQUIDATOR, FRIEND, 0, false);
+            // }
             vm.roll(block.number + 1);
 
             uint256 cumulativeIndexAtClose = pool.calcLinearCumulative_RAY();
@@ -452,7 +473,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
     /// Remaining funds: >0
     ///
 
-    function test_I_CCA_09_close_credit_account_with_nonzero_skipTokenMask_sends_correct_tokens() public {
+    function test_I_CCA_09_close_credit_account_with_nonzero_skipTokenMask_sends_correct_tokens() public creditTest {
         // (uint256 debt,, address creditAccount) = _openCreditAccount();
 
         // tokenTestSuite.mint(Tokens.DAI, creditAccount, debt);
@@ -494,7 +515,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
     /// @dev I:[CCA-10]: closeCreditAccount sends ETH for WETH creditManger to borrower
     /// CASE: CLOSURE
     /// Underlying token: WETH
-    function test_I_CCA_10_close_weth_credit_account_sends_eth_to_borrower() public {
+    function test_I_CCA_10_close_weth_credit_account_sends_eth_to_borrower() public creditTest {
         // // It takes "clean" address which doesn't holds any assets
 
         // // _connectCreditManagerSuite(Tokens.WETH);
@@ -550,7 +571,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
     /// @dev I:[CCA-11]: closeCreditAccount sends ETH for WETH creditManger to borrower
     /// CASE: CLOSURE
     /// Underlying token: DAI
-    function test_I_CCA_11_close_dai_credit_account_sends_eth_to_borrower() public {
+    function test_I_CCA_11_close_dai_credit_account_sends_eth_to_borrower() public creditTest {
         // /// CLOSURE CASE
         // (uint256 debt,, address creditAccount) = _openCreditAccount();
 
@@ -587,4 +608,14 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         //     "Incorrect amount deposited to withdrawalManager"
         // );
     }
+
+    // function test_I_CM_65_closeCreditAccount_reverts_when_paused_and_liquidator_tries_to_close() public creditTest {
+    //     vm.startPrank(CONFIGURATOR);
+    //     creditManager.pause();
+    //     creditManager.addEmergencyLiquidator(LIQUIDATOR);
+    //     vm.stopPrank();
+
+    //     vm.expectRevert("Pausable: paused");
+    //     // creditManager.closeCreditAccount(USER, ClosureAction.CLOSE_ACCOUNT, 0, LIQUIDATOR, FRIEND, 0, false);
+    // }
 }

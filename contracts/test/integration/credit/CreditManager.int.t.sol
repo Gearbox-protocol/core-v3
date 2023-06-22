@@ -24,15 +24,11 @@ import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 import "../../lib/constants.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 
-// EXCEPTIONS
-
 // MOCKS
-
 import {TargetContractMock} from "../../mocks/core/TargetContractMock.sol";
 import {ERC20ApproveRestrictedRevert, ERC20ApproveRestrictedFalse} from "../../mocks/token/ERC20ApproveRestricted.sol";
 
 // SUITES
-
 import {Tokens} from "../../config/Tokens.sol";
 
 // EXCEPTIONS
@@ -40,19 +36,6 @@ import "../../../interfaces/IExceptions.sol";
 
 contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHelper, IntegrationTestHelper {
     using BitMask for uint256;
-
-    function _baseFullCollateralCheck(address creditAccount) internal {
-        // TODO: CHANGE
-        creditManager.fullCollateralCheck(creditAccount, 0, new uint256[](0), 10000);
-    }
-
-    //
-    // MANAGE DEBT
-    //
-
-    //
-    // ADD COLLATERAL
-    //
 
     //
     // APPROVE CREDIT ACCOUNT
@@ -161,85 +144,6 @@ contract CreditManagerIntegrationTest is Test, ICreditManagerV3Events, BalanceHe
         creditManager.execute(callData);
 
         assertEq0(targetMock.callData(), callData, "Incorrect calldata");
-    }
-
-    // /// @dev I:[CM-64]: closeCreditAccount reverts when attempting to liquidate while paused,
-    // /// and the payer is not set as emergency liquidator
-
-    // function test_I_CM_64_closeCreditAccount_reverts_when_paused_and_liquidator_not_privileged() public {
-    //     vm.prank(CONFIGURATOR);
-    //     creditManager.pause();
-
-    //     vm.expectRevert("Pausable: paused");
-    //     // creditManager.closeCreditAccount(USER, ClosureAction.LIQUIDATE_ACCOUNT, 0, LIQUIDATOR, FRIEND, 0, false);
-    // }
-
-    // /// @dev I:[CM-65]: Emergency liquidator can't close an account instead of liquidating
-
-    // function test_I_CM_65_closeCreditAccount_reverts_when_paused_and_liquidator_tries_to_close() public {
-    //     vm.startPrank(CONFIGURATOR);
-    //     creditManager.pause();
-    //     creditManager.addEmergencyLiquidator(LIQUIDATOR);
-    //     vm.stopPrank();
-
-    //     vm.expectRevert("Pausable: paused");
-    //     // creditManager.closeCreditAccount(USER, ClosureAction.CLOSE_ACCOUNT, 0, LIQUIDATOR, FRIEND, 0, false);
-    // }
-
-    /// @dev I:[CM-66]: calcNewCumulativeIndex works correctly for various values
-    function test_I_CM_66_calcNewCumulativeIndex_is_correct(
-        uint128 debt,
-        uint256 indexAtOpen,
-        uint256 indexNow,
-        uint128 delta,
-        bool isIncrease
-    ) public {
-        // vm.assume(debt > 100);
-        // vm.assume(uint256(debt) + uint256(delta) <= 2 ** 128 - 1);
-
-        // indexNow = indexNow < RAY ? indexNow + RAY : indexNow;
-        // indexAtOpen = indexAtOpen < RAY ? indexAtOpen + RAY : indexNow;
-
-        // vm.assume(indexNow <= 100 * RAY);
-        // vm.assume(indexNow >= indexAtOpen);
-        // vm.assume(indexNow - indexAtOpen < 10 * RAY);
-
-        // uint256 interest = uint256((debt * indexNow) / indexAtOpen - debt);
-
-        // vm.assume(interest > 1);
-
-        // if (!isIncrease && (delta > interest)) delta %= uint128(interest);
-
-        // CreditManagerTestInternal cmi = new CreditManagerTestInternal(
-        //     creditManager.poolService(), address(withdrawalManager)
-        // );
-
-        // if (isIncrease) {
-        //     uint256 newIndex = CreditLogic.calcNewCumulativeIndex(debt, delta, indexNow, indexAtOpen, true);
-
-        //     uint256 newInterestError = ((debt + delta) * indexNow) / newIndex - (debt + delta)
-        //         - ((debt * indexNow) / indexAtOpen - debt);
-
-        //     uint256 newTotalDebt = ((debt + delta) * indexNow) / newIndex;
-
-        //     assertLe((RAY * newInterestError) / newTotalDebt, 10000, "Interest error is larger than 10 ** -23");
-        // } else {
-        //     uint256 newIndex = cmi.calcNewCumulativeIndex(debt, delta, indexNow, indexAtOpen, false);
-
-        //     uint256 newTotalDebt = ((debt * indexNow) / newIndex);
-        //     uint256 newInterestError = newTotalDebt - debt - (interest - delta);
-
-        //     emit log_uint(indexNow);
-        //     emit log_uint(indexAtOpen);
-        //     emit log_uint(interest);
-        //     emit log_uint(delta);
-        //     emit log_uint(interest - delta);
-        //     emit log_uint(newTotalDebt);
-        //     emit log_uint(debt);
-        //     emit log_uint(newInterestError);
-
-        //     assertLe((RAY * newInterestError) / newTotalDebt, 10000, "Interest error is larger than 10 ** -23");
-        // }
     }
 
     /// @dev I:[CM-68]: fullCollateralCheck checks tokens in correct order
