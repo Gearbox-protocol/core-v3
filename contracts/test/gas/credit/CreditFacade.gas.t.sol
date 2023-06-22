@@ -3,86 +3,22 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
-
-import {
-    ICreditFacadeV3, ICreditFacadeV3Multicall, ICreditFacadeV3Events
-} from "../../../interfaces/ICreditFacadeV3.sol";
-import {ICreditManagerV3, ICreditManagerV3Events, ClosureAction} from "../../../interfaces/ICreditManagerV3.sol";
+import {ICreditFacadeV3Multicall} from "../../../interfaces/ICreditFacadeV3.sol";
 
 // DATA
 import {MultiCall, MultiCallOps} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 
-// CONSTANTS
-
 // TESTS
-
 import "../../lib/constants.sol";
-import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
-
-// EXCEPTIONS
 
 // MOCKS
 import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
 
 // SUITES
-
 import {Tokens} from "../../config/Tokens.sol";
 
-uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
-uint16 constant REFERRAL_CODE = 23;
-
-/// @title CreditFacadeTest
-/// @notice Designed for unit test purposes only
-contract CreditFacadeGasTest is
-    Test,
-    BalanceHelper,
-    IntegrationTestHelper,
-    ICreditManagerV3Events,
-    ICreditFacadeV3Events
-{
-    // function setUp() public {
-    //     _setUp(Tokens.DAI, true, false, false);
-    // }
-
-    // function _setUp(Tokens _underlying, bool supportQuotas, bool withDegenNFT, bool withExpiration) internal {
-    //     tokenTestSuite = new TokensTestSuite();
-    //     tokenTestSuite.topUpWETH{value: 100 * WAD}();
-
-    //     CreditConfig creditConfig = new CreditConfig(
-    //         tokenTestSuite,
-    //         _underlying
-    //     );
-
-    //     cft = new CreditFacadeTestSuite({ _creditConfig: creditConfig,
-    //      _supportQuotas: supportQuotas,
-    //      withDegenNFT: withDegenNFT,
-    //      withExpiration:  withExpiration,
-    //      accountFactoryVer: 1});
-
-    //     // testFacadeWithQuotas();
-
-    //     underlying = tokenTestSuite.addressOf(_underlying);
-    //     creditManager = creditManager();
-    //     creditFacade = creditFacade();
-    //     creditConfigurator = creditConfigurator();
-
-    //     accountFactory = af();
-
-    //     targetMock = new TargetContractMock();
-    //     adapterMock = new AdapterMock(
-    //         address(creditManager),
-    //         address(targetMock)
-    //     );
-
-    //     vm.prank(CONFIGURATOR);
-    //     creditConfigurator.allowAdapter(address(adapterMock));
-
-    //     vm.label(address(adapterMock), "AdapterMock");
-    //     vm.label(address(targetMock), "TargetContractMock");
-    // }
-
+contract CreditFacadeGasTest is IntegrationTestHelper {
     function _zeroAllLTs() internal {
         uint256 collateralTokensCount = creditManager.collateralTokensCount();
 
@@ -90,7 +26,7 @@ contract CreditFacadeGasTest is
             (address token,) = creditManager.collateralTokenByMask(1 << i);
 
             vm.prank(address(creditConfigurator));
-            CreditManagerV3(address(creditManager)).setCollateralTokenData(token, 0, 0, type(uint40).max, 0);
+            creditManager.setCollateralTokenData(token, 0, 0, type(uint40).max, 0);
         }
     }
 
@@ -101,7 +37,7 @@ contract CreditFacadeGasTest is
     ///
 
     /// @dev G:[FA-2]: openCreditAccount with just adding collateral
-    function test_G_FA_02_openCreditAccountMulticall_gas_estimate_1() public {
+    function test_G_FA_02_openCreditAccountMulticall_gas_estimate_1() public creditTest {
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
         MultiCall[] memory calls = new MultiCall[](1);
@@ -125,7 +61,7 @@ contract CreditFacadeGasTest is
     }
 
     /// @dev G:[FA-3]: openCreditAccount with adding collateral and single swap
-    function test_G_FA_03_openCreditAccountMulticall_gas_estimate_2() public {
+    function test_G_FA_03_openCreditAccountMulticall_gas_estimate_2() public creditTest {
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
         MultiCall[] memory calls = new MultiCall[](2);
@@ -159,7 +95,7 @@ contract CreditFacadeGasTest is
     }
 
     /// @dev G:[FA-4]: openCreditAccount with adding collateral and two swaps
-    function test_G_FA_04_openCreditAccountMulticall_gas_estimate_3() public {
+    function test_G_FA_04_openCreditAccountMulticall_gas_estimate_3() public creditTest {
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
         MultiCall[] memory calls = new MultiCall[](3);
@@ -201,7 +137,7 @@ contract CreditFacadeGasTest is
     }
 
     /// @dev G:[FA-5]: openCreditAccount with adding quoted collateral and updating quota
-    function test_G_FA_05_openCreditAccountMulticall_gas_estimate_4() public {
+    function test_G_FA_05_openCreditAccountMulticall_gas_estimate_4() public creditTest {
         vm.startPrank(CONFIGURATOR);
         gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
         poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
@@ -267,7 +203,7 @@ contract CreditFacadeGasTest is
     }
 
     /// @dev G:[FA-6]: openCreditAccount with swapping and updating quota
-    function test_G_FA_06_openCreditAccountMulticall_gas_estimate_5() public {
+    function test_G_FA_06_openCreditAccountMulticall_gas_estimate_5() public creditTest {
         vm.startPrank(CONFIGURATOR);
         gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
         poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
@@ -317,7 +253,7 @@ contract CreditFacadeGasTest is
     }
 
     /// @dev G:[FA-7]: multicall with increaseDebt
-    function test_G_FA_07_increaseDebt_gas_estimate_1() public {
+    function test_G_FA_07_increaseDebt_gas_estimate_1() public creditTest {
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
         MultiCall[] memory calls = new MultiCall[](1);
@@ -349,7 +285,7 @@ contract CreditFacadeGasTest is
     }
 
     /// @dev G:[FA-8]: multicall with decreaseDebt
-    function test_G_FA_08_decreaseDebt_gas_estimate_1() public {
+    function test_G_FA_08_decreaseDebt_gas_estimate_1() public creditTest {
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
         MultiCall[] memory calls = new MultiCall[](1);
@@ -381,7 +317,7 @@ contract CreditFacadeGasTest is
     }
 
     /// @dev G:[FA-9]: multicall with decreaseDebt and active quota interest
-    function test_G_FA_09_decreaseDebt_gas_estimate_2() public {
+    function test_G_FA_09_decreaseDebt_gas_estimate_2() public creditTest {
         vm.startPrank(CONFIGURATOR);
         gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
         poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
@@ -431,7 +367,7 @@ contract CreditFacadeGasTest is
     }
 
     /// @dev G:[FA-10]: multicall with enableToken
-    function test_G_FA_10_enableToken_gas_estimate_1() public {
+    function test_G_FA_10_enableToken_gas_estimate_1() public creditTest {
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
         MultiCall[] memory calls = new MultiCall[](1);
@@ -463,7 +399,7 @@ contract CreditFacadeGasTest is
     }
 
     /// @dev G:[FA-11]: multicall with disableToken
-    function test_G_FA_11_disableToken_gas_estimate_1() public {
+    function test_G_FA_11_disableToken_gas_estimate_1() public creditTest {
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
         MultiCall[] memory calls = new MultiCall[](2);
@@ -500,7 +436,7 @@ contract CreditFacadeGasTest is
     }
 
     /// @dev G:[FA-12]: multicall with a single swap
-    function test_G_FA_12_multicall_gas_estimate_1() public {
+    function test_G_FA_12_multicall_gas_estimate_1() public creditTest {
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
         MultiCall[] memory calls = new MultiCall[](1);
@@ -535,7 +471,7 @@ contract CreditFacadeGasTest is
     }
 
     /// @dev G:[FA-12A]: multicall with a single swap
-    function test_G_FA_12A_multicall_gas_estimate_1A() public {
+    function test_G_FA_12A_multicall_gas_estimate_1A() public creditTest {
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
         MultiCall[] memory calls = new MultiCall[](1);
@@ -580,7 +516,7 @@ contract CreditFacadeGasTest is
     }
 
     /// @dev G:[FA-13]: multicall with a single swap into quoted token
-    function test_G_FA_13_multicall_gas_estimate_2() public {
+    function test_G_FA_13_multicall_gas_estimate_2() public creditTest {
         vm.startPrank(CONFIGURATOR);
         gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
         poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
@@ -641,7 +577,7 @@ contract CreditFacadeGasTest is
     }
 
     /// @dev G:[FA-14]: closeCreditAccount with underlying only
-    function test_G_FA_14_closeCreditAccount_gas_estimate_1() public {
+    function test_G_FA_14_closeCreditAccount_gas_estimate_1() public creditTest {
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
         MultiCall[] memory calls = new MultiCall[](1);
@@ -672,7 +608,7 @@ contract CreditFacadeGasTest is
     }
 
     /// @dev G:[FA-15]: closeCreditAccount with two tokens
-    function test_G_FA_15_closeCreditAccount_gas_estimate_2() public {
+    function test_G_FA_15_closeCreditAccount_gas_estimate_2() public creditTest {
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
         tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
         tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
@@ -712,7 +648,7 @@ contract CreditFacadeGasTest is
     }
 
     /// @dev G:[FA-16]: closeCreditAccount with 2 tokens and active quota interest
-    function test_G_FA_16_closeCreditAccount_gas_estimate_3() public {
+    function test_G_FA_16_closeCreditAccount_gas_estimate_3() public creditTest {
         vm.startPrank(CONFIGURATOR);
         gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
         poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
@@ -761,7 +697,7 @@ contract CreditFacadeGasTest is
     }
 
     /// @dev G:[FA-17]: closeCreditAccount with one swap
-    function test_G_FA_17_closeCreditAccount_gas_estimate_4() public {
+    function test_G_FA_17_closeCreditAccount_gas_estimate_4() public creditTest {
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
         MultiCall[] memory calls = new MultiCall[](1);
@@ -798,7 +734,7 @@ contract CreditFacadeGasTest is
     }
 
     /// @dev G:[FA-18]: liquidateCreditAccount with underlying only
-    function test_G_FA_18_liquidateCreditAccount_gas_estimate_1() public {
+    function test_G_FA_18_liquidateCreditAccount_gas_estimate_1() public creditTest {
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
         MultiCall[] memory calls = new MultiCall[](1);
@@ -831,7 +767,7 @@ contract CreditFacadeGasTest is
     }
 
     /// @dev G:[FA-19]: liquidateCreditAccount with two tokens
-    function test_G_FA_19_liquidateCreditAccount_gas_estimate_2() public {
+    function test_G_FA_19_liquidateCreditAccount_gas_estimate_2() public creditTest {
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
         tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
         tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
@@ -876,7 +812,7 @@ contract CreditFacadeGasTest is
     }
 
     /// @dev G:[FA-20]: liquidateCreditAccount with 2 tokens and active quota interest
-    function test_G_FA_20_liquidateCreditAccount_gas_estimate_3() public {
+    function test_G_FA_20_liquidateCreditAccount_gas_estimate_3() public creditTest {
         vm.startPrank(CONFIGURATOR);
         gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
         poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
