@@ -681,10 +681,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             _setMaxCumulativeLoss(_creditFacade, maxCumulativeLoss); // I: [CC-22]
 
             // Migrates array-based parameters
-            _migrateEmergencyLiquidators(_creditFacade); // I:[CC-22c]
+            _migrateEmergencyLiquidators(_creditFacade); // I:[CC-22C]
 
             // Copy forbidden token mask
-            _migrateForbiddenTokens(_creditFacade, prevCreditFacace.forbiddenTokenMask()); // I:[CC-22c]
+            _migrateForbiddenTokens(_creditFacade, prevCreditFacace.forbiddenTokenMask()); // I:[CC-22C]
 
             // Copies the expiration date if the contract is expirable
             if (prevCreditFacace.expirable()) _setExpirationDate(_creditFacade, prevCreditFacace.expirationDate()); // I:[CC-22]
@@ -692,7 +692,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             address botList = prevCreditFacace.botList();
             if (botList != address(0)) _setBotList(_creditFacade, botList); // I:[CC-22A]
         } else {
-            _clearArrayCreditFacadeParams(); // I:[CC-22c]
+            _clearArrayCreditFacadeParams(); // I:[CC-22C]
         }
 
         // If credit facade tracks total debt, it copies it's value and limit if migration is on
