@@ -531,25 +531,33 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         return _calcBaseInterestAccrued(timestampLU);
     }
 
-    /// @dev Adds accrued base interest to expected liquidity, then updates base interest rate and index
+    /// @dev Updates base interest rate based on expected and available liquidity deltas
+    ///      - Adds expected liquidity delta to stored expected liquidity
+    ///      - If time has passed since the last base interest update, adds accrued interest
+    ///        to stored expected liquidity, updates interest index and last update timestamp
+    ///      - If time has passed since the last quota revenue update, adds accrued revenue
+    ///        to stored expected liquidity and updates last update timestamp
     function _updateBaseInterest(
         int256 expectedLiquidityDelta,
         int256 availableLiquidityDelta,
         bool checkOptimalBorrowing
     ) internal {
-        uint256 expectedLiquidity_ = (expectedLiquidityLU().toInt256() + expectedLiquidityDelta).toUint256(); // U:[P4-16]
+        uint256 expectedLiquidity_ = (expectedLiquidity().toInt256() + expectedLiquidityDelta).toUint256();
         uint256 availableLiquidity_ = (availableLiquidity().toInt256() + availableLiquidityDelta).toUint256(); // U:[P4-16]
 
-        uint256 timestampLU = lastBaseInterestUpdate;
-        if (block.timestamp != timestampLU) {
-            expectedLiquidity_ += _calcBaseInterestAccrued(timestampLU); // U:[P4-16]
-            _baseInterestIndexLU = _calcBaseInterestIndex(timestampLU).toUint128(); // U:[P4-16]
+        uint256 lastBaseInterestUpdate_ = lastBaseInterestUpdate;
+        if (block.timestamp != lastBaseInterestUpdate_) {
+            _baseInterestIndexLU = _calcBaseInterestIndex(lastBaseInterestUpdate_).toUint128(); // U:[P4-16]
             lastBaseInterestUpdate = uint40(block.timestamp); // U:[P4-16]
+        }
+
+        if (supportsQuotas && block.timestamp != lastQuotaRevenueUpdate) {
+            lastQuotaRevenueUpdate = uint40(block.timestamp); // U:[P4-16]
         }
 
         _expectedLiquidityLU = expectedLiquidity_.toUint128(); // U:[P4-16]
         _baseInterestRate = IInterestRateModelV3(interestRateModel).calcBorrowRate({
-            expectedLiquidity: expectedLiquidity_ + (supportsQuotas ? _calcQuotaRevenueAccrued() : 0),
+            expectedLiquidity: expectedLiquidity_,
             availableLiquidity: availableLiquidity_,
             checkOptimalBorrowing: checkOptimalBorrowing
         }).toUint128(); // U:[P4-16]
@@ -593,7 +601,9 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         return _calcQuotaRevenueAccrued(timestampLU); // U:[P4-17]
     }
 
-    /// @dev Adds accrued quota revenue to the expected liquidity, then sets new quota revenue
+    /// @dev Sets new quota revenue value
+    ///      - If time has passed since the last quota revenue update, adds accrued revenue
+    ///        to stored expected liquidity and updates last update timestamp
     function _setQuotaRevenue(uint256 newQuotaRevenue) internal {
         uint256 timestampLU = lastQuotaRevenueUpdate;
         if (block.timestamp != timestampLU) {

@@ -1340,8 +1340,10 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
 
             _setUpTestCase(Tokens.DAI, 0, 50_00, addLiquidity, 2 * RAY, 0, supportQuotas);
 
-            vm.prank(address(pqk));
-            pool.setQuotaRevenue(quotaInterestPerYear);
+            if (supportQuotas) {
+                vm.prank(address(pqk));
+                pool.setQuotaRevenue(quotaInterestPerYear);
+            }
 
             uint256 baseInterestRate = pool.baseInterestRate();
             uint256 timeWarp = 365 days;
@@ -1361,11 +1363,9 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
                 _testCaseErr(testName, "Expected liquidity was not updated correctly")
             );
 
-            // should not take quota interest
-
             assertEq(
                 pool.expectedLiquidityLU(),
-                addLiquidity + expectedInterest,
+                expectedLiquidity,
                 _testCaseErr(testName, "ExpectedLU liquidity was not updated correctly")
             );
 
@@ -1373,6 +1373,12 @@ contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Eve
                 uint256(pool.lastBaseInterestUpdate()),
                 block.timestamp,
                 _testCaseErr(testName, "Timestamp was not updated correctly")
+            );
+
+            assertEq(
+                uint256(pool.lastQuotaRevenueUpdate()),
+                supportQuotas ? block.timestamp : 0,
+                _testCaseErr(testName, "Quota revenue update timestamp was not updated correctly")
             );
 
             assertEq(
