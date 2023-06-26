@@ -91,6 +91,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
     bool anyAccountFactory = true;
     uint256 accountFactoryVersion = 1;
 
+    bool installAdapterMock = false;
+
     bool runOnFork;
 
     uint256 creditAccountAmount;
@@ -162,7 +164,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
         supportsQuotas = true;
         _;
         vm.revertTo(snapshot);
-
         supportsQuotas = false;
         _;
     }
@@ -197,8 +198,15 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
         _;
     }
 
+    modifier withAdapterMock() {
+        installAdapterMock = true;
+        _;
+    }
+
     modifier creditTest() {
         _setupCore();
+
+        bool skipTest = false;
 
         if (runOnFork) {
             address creditManagerAddr;
@@ -209,13 +217,22 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
                 revert("Credit manager address not set");
             }
 
-            if (_attachCreditManager(creditManagerAddr)) {
-                _;
-            } else {
+            if (!_attachCreditManager(creditManagerAddr)) {
                 console.log("Skipped");
+                skipTest = true;
             }
         } else {
             _deployCreditAndPool();
+        }
+
+        if (!skipTest) {
+            if (installAdapterMock) {
+                targetMock = new TargetContractMock();
+                adapterMock = new AdapterMock(address(creditManager), address(targetMock));
+
+                vm.prank(CONFIGURATOR);
+                creditConfigurator.allowAdapter(address(adapterMock));
+            }
             _;
         }
     }

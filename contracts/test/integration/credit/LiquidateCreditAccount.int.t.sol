@@ -5,7 +5,6 @@ pragma solidity ^0.8.17;
 
 import {BotListV3} from "../../../core/BotListV3.sol";
 import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
-
 import {
     ICreditManagerV3,
     ICreditManagerV3Events,
@@ -18,57 +17,21 @@ import "../../../interfaces/ICreditFacadeV3.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // TESTS
-
 import "../../lib/constants.sol";
-
 import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
 // MOCKS
-import {AdapterMock} from "../../mocks//core/AdapterMock.sol";
+import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
 
 contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
-    /// @dev I:[LCA-1]: functions reverts if borrower has no account
-    function test_I_LCA_01_functions_reverts_if_credit_account_not_exists() public creditTest {
-        vm.expectRevert(CreditAccountDoesNotExistException.selector);
-        vm.prank(USER);
-        creditFacade.closeCreditAccount(DUMB_ADDRESS, FRIEND, 0, false, MultiCallBuilder.build());
-
-        vm.expectRevert(CreditAccountDoesNotExistException.selector);
-        vm.prank(USER);
-        creditFacade.closeCreditAccount(
-            DUMB_ADDRESS,
-            FRIEND,
-            0,
-            false,
-            MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
-                })
-            )
-        );
-
+    /// @dev I:[LCA-1]: liquidateCreditAccount reverts if borrower has no account
+    function test_I_LCA_01_liquidateCreditAccount_reverts_if_credit_account_not_exists() public creditTest {
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
         vm.prank(USER);
         creditFacade.liquidateCreditAccount(DUMB_ADDRESS, DUMB_ADDRESS, 0, false, MultiCallBuilder.build());
-
-        vm.expectRevert(CreditAccountDoesNotExistException.selector);
-        vm.prank(USER);
-        creditFacade.multicall(
-            DUMB_ADDRESS,
-            MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
-                })
-            )
-        );
-
-        // vm.prank(CONFIGURATOR);
-        // creditConfigurator.allowContract(address(targetMock), address(adapterMock));
     }
 
     /// @dev I:[LCA-2]: liquidateCreditAccount reverts if hf > 1

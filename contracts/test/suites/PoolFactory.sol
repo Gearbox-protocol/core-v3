@@ -19,7 +19,7 @@ contract PoolFactory is Test {
     GaugeV3 public gauge;
 
     constructor(address addressProvider, address underlying, bool supportQuotas) {
-        ///    uint16 U_1,
+        // uint16 U_1,
         // uint16 U_2,
         // uint16 R_base,
         // uint16 R_slope1,
@@ -28,22 +28,22 @@ contract PoolFactory is Test {
         // bool _isBorrowingMoreU2Forbidden
         LinearInterestRateModelV3 irm = new LinearInterestRateModelV3(70_00, 85_00, 0, 15_00, 30_00, 120_00, true);
 
-        // //   address addressProvider_,
-        //     address underlyingToken_,
-        //     address interestRateModel_,
-        //     uint256 totalDebtLimit_,
-        //     bool supportsQuotas_,
-        //     string memory namePrefix_,
-        //     string memory symbolPrefix_
-        pool = new PoolV3(
-            addressProvider,
-            underlying,
-            address(irm),
-            type(uint256).max,
-            supportQuotas,
-            "d",
-            "diesel"
-        );
+        // address addressProvider_,
+        // address underlyingToken_,
+        // address interestRateModel_,
+        // uint256 totalDebtLimit_,
+        // bool supportsQuotas_,
+        // string memory namePrefix_,
+        // string memory symbolPrefix_
+        pool = new PoolV3({
+           addressProvider_: addressProvider,
+           underlyingToken_: underlying,
+           interestRateModel_: address(irm),
+           totalDebtLimit_: type(uint256).max,
+           supportsQuotas_: supportQuotas,
+           namePrefix_: "d",
+           symbolPrefix_: "diesel"
+     } );
 
         if (supportQuotas) {
             address gearStaking = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_GEAR_STAKING, 3_00);

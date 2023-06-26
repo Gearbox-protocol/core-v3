@@ -29,12 +29,7 @@ import {BitMask, UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
 import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 import "../../lib/constants.sol";
 
-// EXCEPTIONS
-
-// MOCKS
-
 // SUITES
-
 import {Tokens} from "../../config/Tokens.sol";
 
 // EXCEPTIONS
