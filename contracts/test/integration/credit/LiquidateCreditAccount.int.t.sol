@@ -45,7 +45,11 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
     }
 
     /// @dev I:[LCA-3]: liquidateCreditAccount executes needed calls and emits events
-    function test_I_LCA_03_liquidateCreditAccount_executes_needed_calls_and_emits_events() public creditTest {
+    function test_I_LCA_03_liquidateCreditAccount_executes_needed_calls_and_emits_events()
+        public
+        withAdapterMock
+        creditTest
+    {
         (address creditAccount,) = _openTestCreditAccount();
 
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
@@ -118,7 +122,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
     }
 
     /// @dev I:[LCA-4]: Borrowing is prohibited after a liquidation with loss
-    function test_I_LCA_04_liquidateCreditAccount_prohibits_borrowing_on_loss() public creditTest {
+    function test_I_LCA_04_liquidateCreditAccount_prohibits_borrowing_on_loss() public withAdapterMock creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
         uint8 maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
@@ -140,7 +144,11 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
     }
 
     /// @dev I:[LCA-5]: CreditFacade is paused after too much cumulative loss from liquidations
-    function test_I_LCA_05_liquidateCreditAccount_pauses_CreditFacade_on_too_much_loss() public creditTest {
+    function test_I_LCA_05_liquidateCreditAccount_pauses_CreditFacade_on_too_much_loss()
+        public
+        withAdapterMock
+        creditTest
+    {
         vm.prank(CONFIGURATOR);
         creditConfigurator.setMaxCumulativeLoss(1);
 

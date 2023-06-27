@@ -110,7 +110,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
     }
 
     /// @dev I:[CCA-3]: closeCreditAccount runs multicall operations in correct order
-    function test_I_CCA_03_closeCreditAccount_runs_operations_in_correct_order() public creditTest {
+    function test_I_CCA_03_closeCreditAccount_runs_operations_in_correct_order() public withAdapterMock creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();

@@ -49,7 +49,7 @@ uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
 /// @notice Designed for unit test purposes only
 contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
     /// @dev I:[BOT-01]: botMulticall works correctly
-    function test_I_BOT_01_botMulticall_works_correctly() public creditTest {
+    function test_I_BOT_01_botMulticall_works_correctly() public withAdapterMock creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
         address bot = address(new GeneralMock());

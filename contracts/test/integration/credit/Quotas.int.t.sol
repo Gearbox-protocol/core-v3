@@ -332,6 +332,8 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
     /// @dev I:[CMQ-07]: calcDebtAndCollateral correctly counts quota interest
     function test_I_CMQ_07_calcDebtAndCollateral_correctly_includes_quota_interest(uint96 quotaLink, uint96 quotaUsdt)
         public
+        withQuotas
+        creditTest
     {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));

@@ -44,14 +44,10 @@ import {CreditConfig} from "../../config/CreditConfig.sol";
 
 import {CollateralTokensItem} from "../../config/CreditConfig.sol";
 
+import "forge-std/console.sol";
+
 contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConfiguratorEvents {
     using AddressList for address[];
-
-    AdapterMock adapter1;
-    AdapterMock adapterDifferentCM;
-
-    address DUMB_COMPARTIBLE_CONTRACT;
-    address TARGET_CONTRACT;
 
     // function setUp() public creditTest {
     //     _setUp(false, false, false);
@@ -74,16 +70,27 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     //     // creditConfigurator = cct.creditConfigurator();
     //     // withdrawalManager = cct.withdrawalManager();
 
-    //     TARGET_CONTRACT = address(new TargetContractMock());
+    //     address(targetMock) = address(new TargetContractMock());
 
-    //     adapter1 = new AdapterMock(address(creditManager), TARGET_CONTRACT);
+    //     adapterMock = new AdapterMock(address(creditManager), address(targetMock));
 
     //     // adapterDifferentCM = new AdapterMock(
-    //     //     address(new CreditFacadeTestSuite(creditConfig, withDegenNFT,  expirable,  supportQuotas,1).creditManager()), TARGET_CONTRACT
+    //     //     address(new CreditFacadeTestSuite(creditConfig, withDegenNFT,  expirable,  supportQuotas,1).creditManager()), address(targetMock)
     //     // );
 
-    //     DUMB_COMPARTIBLE_CONTRACT = address(adapter1);
+    //     address(adapterMock) = address(adapterMock);
     // }
+
+    function getAdapterDifferentCM() internal returns (AdapterMock) {
+        address CM = makeAddr("Different CM");
+
+        vm.mockCall(CM, abi.encodeCall(IAdapter.creditManager, ()), abi.encode(CM));
+        vm.mockCall(CM, abi.encodeCall(ICreditManagerV3.addressProvider, ()), abi.encode((address(addressProvider))));
+
+        address TARGET_CONTRACT = makeAddr("Target Contract");
+
+        return new AdapterMock(CM, TARGET_CONTRACT);
+    }
 
     //
     // HELPERS
@@ -526,22 +533,22 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     //
 
     /// @dev I:[CC-10]: allowAdapter and forbidAdapter reverts for zero address
-    function test_I_CC_10_allowAdapter_and_forbidAdapter_reverts_for_zero_address() public creditTest {
+    function test_I_CC_10_allowAdapter_and_forbidAdapter_reverts_for_zero_address() public withAdapterMock creditTest {
         vm.startPrank(CONFIGURATOR);
 
         vm.expectRevert(ZeroAddressException.selector);
         creditConfigurator.allowAdapter(address(0));
 
-        vm.mockCall(address(adapter1), abi.encodeCall(IAdapter.targetContract, ()), abi.encode(address(0)));
+        vm.mockCall(address(adapterMock), abi.encodeCall(IAdapter.targetContract, ()), abi.encode(address(0)));
 
         vm.expectRevert(TargetContractNotAllowedException.selector);
-        creditConfigurator.allowAdapter(address(adapter1));
+        creditConfigurator.allowAdapter(address(adapterMock));
 
         vm.expectRevert(ZeroAddressException.selector);
         creditConfigurator.forbidAdapter(address(0));
 
         vm.expectRevert(TargetContractNotAllowedException.selector);
-        creditConfigurator.forbidAdapter(address(adapter1));
+        creditConfigurator.forbidAdapter(address(adapterMock));
 
         vm.stopPrank();
     }
@@ -558,6 +565,8 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
     /// @dev I:[CC-10B]: allowAdapter reverts for non compartible adapter contract
     function test_I_CC_10B_allowAdapter_reverts_for_non_compartible_adapter_contract() public creditTest {
+        AdapterMock adapterDifferentCM = getAdapterDifferentCM();
+
         vm.startPrank(CONFIGURATOR);
 
         // Should be reverted, cause it's conncted to another creditManager
@@ -568,22 +577,26 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     }
 
     /// @dev I:[CC-10C]: allowAdapter reverts for creditManager and creditFacade contracts
-    function test_I_CC_10C_allowAdapter_reverts_for_creditManager_and_creditFacade_contracts() public creditTest {
+    function test_I_CC_10C_allowAdapter_reverts_for_creditManager_and_creditFacade_contracts()
+        public
+        withAdapterMock
+        creditTest
+    {
         vm.startPrank(CONFIGURATOR);
 
         vm.mockCall(
-            DUMB_COMPARTIBLE_CONTRACT, abi.encodeCall(IAdapter.targetContract, ()), abi.encode(address(creditManager))
+            address(adapterMock), abi.encodeCall(IAdapter.targetContract, ()), abi.encode(address(creditManager))
         );
 
         vm.expectRevert(TargetContractNotAllowedException.selector);
-        creditConfigurator.allowAdapter(DUMB_COMPARTIBLE_CONTRACT);
+        creditConfigurator.allowAdapter(address(adapterMock));
 
         vm.mockCall(
-            DUMB_COMPARTIBLE_CONTRACT, abi.encodeCall(IAdapter.targetContract, ()), abi.encode(address(creditFacade))
+            address(adapterMock), abi.encodeCall(IAdapter.targetContract, ()), abi.encode(address(creditFacade))
         );
 
         vm.expectRevert(TargetContractNotAllowedException.selector);
-        creditConfigurator.allowAdapter(DUMB_COMPARTIBLE_CONTRACT);
+        creditConfigurator.allowAdapter(address(adapterMock));
 
         vm.stopPrank();
     }
@@ -593,63 +606,70 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         address[] memory allowedAdapters = creditConfigurator.allowedAdapters();
         uint256 allowedAdapterCount = allowedAdapters.length;
 
+        targetMock = new TargetContractMock();
+        adapterMock = new AdapterMock(address(creditManager), address(targetMock));
+
         vm.prank(CONFIGURATOR);
 
         vm.expectEmit(true, true, false, false);
-        emit AllowAdapter(TARGET_CONTRACT, address(adapter1));
+        emit AllowAdapter(address(targetMock), address(adapterMock));
 
-        assertTrue(!allowedAdapters.includes(TARGET_CONTRACT), "Contract already added");
+        assertTrue(!allowedAdapters.includes(address(targetMock)), "Contract already added");
 
-        creditConfigurator.allowAdapter(address(adapter1));
+        creditConfigurator.allowAdapter(address(adapterMock));
 
         assertEq(
-            creditManager.adapterToContract(address(adapter1)), TARGET_CONTRACT, "adapterToContract wasn't udpated"
+            creditManager.adapterToContract(address(adapterMock)),
+            address(targetMock),
+            "adapterToContract wasn't udpated"
         );
 
         assertEq(
-            creditManager.contractToAdapter(TARGET_CONTRACT), address(adapter1), "contractToAdapter wasn't udpated"
+            creditManager.contractToAdapter(address(targetMock)),
+            address(adapterMock),
+            "contractToAdapter wasn't udpated"
         );
 
         allowedAdapters = creditConfigurator.allowedAdapters();
 
         assertEq(allowedAdapters.length, allowedAdapterCount + 1, "Incorrect allowed contracts count");
 
-        assertTrue(allowedAdapters.includes(address(adapter1)), "Target contract wasnt found");
+        assertTrue(allowedAdapters.includes(address(adapterMock)), "Target contract wasnt found");
     }
 
     /// @dev I:[CC-12]: allowAdapter removes existing adapter
-    function test_I_CC_12_allowAdapter_removes_old_adapter_if_it_exists() public creditTest {
+    function test_I_CC_12_allowAdapter_removes_old_adapter_if_it_exists() public withAdapterMock creditTest {
         vm.prank(CONFIGURATOR);
-        creditConfigurator.allowAdapter(address(adapter1));
+        creditConfigurator.allowAdapter(address(adapterMock));
 
         AdapterMock adapter2 = new AdapterMock(
             address(creditManager),
-            TARGET_CONTRACT
+            address(targetMock)
         );
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.allowAdapter(address(adapter2));
 
-        assertEq(creditManager.contractToAdapter(TARGET_CONTRACT), address(adapter2), "Incorrect adapter");
+        assertEq(creditManager.contractToAdapter(address(targetMock)), address(adapter2), "Incorrect adapter");
 
         assertEq(
             creditManager.adapterToContract(address(adapter2)),
-            TARGET_CONTRACT,
+            address(targetMock),
             "Incorrect target contract for new adapter"
         );
 
         address[] memory allowedAdapters = creditConfigurator.allowedAdapters();
-        assertFalse(allowedAdapters.includes(address(adapter1)), "Old adapter was not removed");
+        assertFalse(allowedAdapters.includes(address(adapterMock)), "Old adapter was not removed");
 
-        assertEq(creditManager.adapterToContract(address(adapter1)), address(0), "Old adapter was not removed");
+        assertEq(creditManager.adapterToContract(address(adapterMock)), address(0), "Old adapter was not removed");
     }
 
     /// @dev I:[CC-13]: forbidAdapter reverts for non-connected adapter
-    function test_I_CC_13_forbidAdapter_reverts_for_unknown_contract() public creditTest {
-        AdapterMock adapter2 = new AdapterMock(address(creditManager), TARGET_CONTRACT);
+    function test_I_CC_13_forbidAdapter_reverts_for_unknown_contract() public withAdapterMock creditTest {
+        AdapterMock adapter2 = new AdapterMock(address(creditManager), address(targetMock));
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.allowAdapter(address(adapter1));
+        creditConfigurator.allowAdapter(address(adapterMock));
 
         vm.expectRevert(AdapterIsNotRegisteredException.selector);
 
@@ -658,31 +678,31 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     }
 
     /// @dev I:[CC-14]: forbidAdapter forbids contract and emits event
-    function test_I_CC_14_forbidAdapter_forbids_contract_and_emits_event() public creditTest {
+    function test_I_CC_14_forbidAdapter_forbids_contract_and_emits_event() public withAdapterMock creditTest {
         vm.startPrank(CONFIGURATOR);
-        creditConfigurator.allowAdapter(address(adapter1));
+        creditConfigurator.allowAdapter(address(adapterMock));
 
         address[] memory allowedAdapters = creditConfigurator.allowedAdapters();
 
         uint256 allowedAdapterCount = allowedAdapters.length;
 
-        assertTrue(allowedAdapters.includes(address(adapter1)), "Target contract wasnt found");
+        assertTrue(allowedAdapters.includes(address(adapterMock)), "Target contract wasnt found");
 
         vm.expectEmit(true, true, false, false);
-        emit ForbidAdapter(TARGET_CONTRACT, address(adapter1));
+        emit ForbidAdapter(address(targetMock), address(adapterMock));
 
-        creditConfigurator.forbidAdapter(address(adapter1));
+        creditConfigurator.forbidAdapter(address(adapterMock));
 
         //
         allowedAdapters = creditConfigurator.allowedAdapters();
 
-        assertEq(creditManager.adapterToContract(address(adapter1)), address(0), "CreditManagerV3 wasn't udpated");
+        assertEq(creditManager.adapterToContract(address(adapterMock)), address(0), "CreditManagerV3 wasn't udpated");
 
-        assertEq(creditManager.contractToAdapter(TARGET_CONTRACT), address(0), "CreditFacadeV3 wasn't udpated");
+        assertEq(creditManager.contractToAdapter(address(targetMock)), address(0), "CreditFacadeV3 wasn't udpated");
 
         assertEq(allowedAdapters.length, allowedAdapterCount - 1, "Incorrect allowed contracts count");
 
-        assertTrue(!allowedAdapters.includes(address(adapter1)), "Target contract wasn't removed");
+        assertTrue(!allowedAdapters.includes(address(adapterMock)), "Target contract wasn't removed");
 
         vm.stopPrank();
     }
@@ -842,6 +862,8 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.expectRevert(IncompatibleContractException.selector);
         creditConfigurator.upgradeCreditConfigurator(underlying);
 
+        AdapterMock adapterDifferentCM = getAdapterDifferentCM();
+
         vm.expectRevert(IncompatibleContractException.selector);
         creditConfigurator.setCreditFacade(address(adapterDifferentCM), false);
 
@@ -887,7 +909,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
                 creditConfigurator.setCreditFacade(address(initialCf), migrateSettings);
 
                 vm.prank(CONFIGURATOR);
-                creditConfigurator.setExpirationDate(uint40(block.timestamp + 1));
+                creditConfigurator.setExpirationDate(uint40(block.timestamp + 1 + ms));
 
                 creditFacade = initialCf;
             }
@@ -1080,14 +1102,14 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     }
 
     /// @dev I:[CC-23]: uupgradeCreditConfigurator upgrades creditConfigurator
-    function test_I_CC_23_upgradeCreditConfigurator_upgrades_creditConfigurator() public creditTest {
+    function test_I_CC_23_upgradeCreditConfigurator_upgrades_creditConfigurator() public withAdapterMock creditTest {
         vm.expectEmit(true, false, false, false);
-        emit CreditConfiguratorUpgraded(DUMB_COMPARTIBLE_CONTRACT);
+        emit CreditConfiguratorUpgraded(address(adapterMock));
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.upgradeCreditConfigurator(DUMB_COMPARTIBLE_CONTRACT);
+        creditConfigurator.upgradeCreditConfigurator(address(adapterMock));
 
-        assertEq(address(creditManager.creditConfigurator()), DUMB_COMPARTIBLE_CONTRACT);
+        assertEq(address(creditManager.creditConfigurator()), address(adapterMock));
     }
 
     /// @dev I:[CC-24]: setMaxDebtPerBlockMultiplier and forbidBorrowing work correctly
@@ -1195,9 +1217,9 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     }
 
     /// @dev I:[CC-29]: Array-based parameters are migrated correctly to new CC
-    function test_I_CC_29_arrays_are_migrated_correctly_for_new_CC() public creditTest {
+    function test_I_CC_29_arrays_are_migrated_correctly_for_new_CC() public withAdapterMock creditTest {
         vm.startPrank(CONFIGURATOR);
-        creditConfigurator.allowAdapter(address(adapter1));
+        creditConfigurator.allowAdapter(address(adapterMock));
         creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS);
         creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS2);
         vm.stopPrank();

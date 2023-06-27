@@ -43,20 +43,6 @@ contract MultiCallIntegrationTest is
     ICreditManagerV3Events,
     ICreditFacadeV3Events
 {
-    /// @dev I:[MC-1A]: constructor sets correct values
-    function test_I_MC_01A_constructor_sets_correct_values() public allExpirableCases allDegenNftCases creditTest {
-        assertEq(address(creditFacade.creditManager()), address(creditManager), "Incorrect creditManager");
-        // assertEq(creditFacade.underlying(), underlying, "Incorrect underlying token");
-
-        assertEq(creditFacade.weth(), creditManager.weth(), "Incorrect weth token");
-
-        if (whitelisted) {
-            assertEq(creditFacade.degenNFT(), address(degenNFT), "Incorrect degenNFT");
-        } else {
-            assertEq(creditFacade.degenNFT(), address(0), "Incorrect degenNFT");
-        }
-    }
-
     /// @dev I:[MC-1]: multicall reverts if borrower has no account
     function test_I_MC_01_multicall_reverts_if_credit_account_not_exists() public creditTest {
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
@@ -157,6 +143,7 @@ contract MultiCallIntegrationTest is
     /// @dev I:[MC-6]: multicall addCollateral and oncreaseDebt works with creditFacade calls as expected
     function test_I_MC_06_multicall_addCollateral_and_increase_debt_works_with_creditFacade_calls_as_expected()
         public
+        creditTest
     {
         (address creditAccount,) = _openTestCreditAccount();
 
@@ -296,7 +283,7 @@ contract MultiCallIntegrationTest is
     }
 
     /// @dev I:[MC-9]: multicall works with adapters calls as expected
-    function test_I_MC_09_multicall_works_with_adapters_calls_as_expected() public creditTest {
+    function test_I_MC_09_multicall_works_with_adapters_calls_as_expected() public withAdapterMock creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
@@ -341,8 +328,8 @@ contract MultiCallIntegrationTest is
     // ENABLE TOKEN
     //
 
-    /// @dev I:[MC-39]: enable token works as expected
-    function test_I_MC_39_enable_token_is_correct() public creditTest {
+    /// @dev I:[MC-10]: enable token works as expected
+    function test_I_MC_10_enable_token_is_correct() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
         address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
@@ -364,8 +351,8 @@ contract MultiCallIntegrationTest is
         expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
     }
 
-    /// @dev I:[MC-45]: revertIfGetLessThan during multicalls works correctly
-    function test_I_MC_45_revertIfGetLessThan_works_correctly() public creditTest {
+    /// @dev I:[MC-11]: revertIfGetLessThan during multicalls works correctly
+    function test_I_MC_11_revertIfGetLessThan_works_correctly() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
         uint256 expectedDAI = 1000;
@@ -432,8 +419,8 @@ contract MultiCallIntegrationTest is
         }
     }
 
-    /// @dev I:[MC-45A]: rrevertIfGetLessThan everts if called twice
-    function test_I_MC_45A_revertIfGetLessThan_reverts_if_called_twice() public creditTest {
+    /// @dev I:[MC-12]: rrevertIfGetLessThan everts if called twice
+    function test_I_MC_12_revertIfGetLessThan_reverts_if_called_twice() public creditTest {
         uint256 expectedDAI = 1000;
 
         Balance[] memory expectedBalances = new Balance[](1);
@@ -464,15 +451,13 @@ contract MultiCallIntegrationTest is
     /// ENABLE TOKEN
     ///
 
-    /// @dev I:[MC-53]: enableToken works as expected in a multicall
-    function test_I_MC_53_enableToken_works_as_expected_multicall() public creditTest {
+    /// @dev I:[MC-13]: enableToken works as expected
+    function test_I_MC_13_enableToken_works_as_expected() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
         address token = tokenTestSuite.addressOf(Tokens.USDC);
 
-        // vm.expectCall(
-        //     address(creditManager), abi.encodeCall(ICreditManagerV3.checkAndEnableToken.selector, token)
-        // );
+        expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
 
         vm.prank(USER);
         creditFacade.multicall(
@@ -488,8 +473,8 @@ contract MultiCallIntegrationTest is
         expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
     }
 
-    /// @dev I:[MC-54]: disableToken works as expected in a multicall
-    function test_I_MC_54_disableToken_works_as_expected_multicall() public creditTest {
+    /// @dev I:[MC-14]: disableToken works as expected in a multicall
+    function test_I_MC_14_disableToken_works_as_expected_multicall() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
         address token = tokenTestSuite.addressOf(Tokens.USDC);
@@ -525,12 +510,40 @@ contract MultiCallIntegrationTest is
     // FULL CHECK PARAMS
     //
 
-    /// @dev I:[MC-59]: setFullCheckParams performs correct full check after multicall
-    function test_I_MC_59_setFullCheckParams_correctly_passes_params_to_fullCollateralCheck() public creditTest {
+    /// @dev I:[MC-15]: setFullCheckParams performs correct full check after multicall
+    function test_I_MC_15_setFullCheckParams_correctly_passes_params_to_fullCollateralCheck() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
         uint256[] memory collateralHints = new uint256[](1);
         collateralHints[0] = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.USDC));
+
+        uint256 enabledTokensMap = creditManager.enabledTokensMaskOf(creditAccount);
+
+        vm.expectCall(
+            address(creditManager),
+            abi.encodeCall(
+                ICreditManagerV3.fullCollateralCheck, (creditAccount, enabledTokensMap, collateralHints, 10001)
+            )
+        );
+
+        vm.prank(USER);
+        creditFacade.multicall(
+            creditAccount,
+            MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, 10001))
+                })
+            )
+        );
+    }
+
+    /// @dev I:[CM-16]: fullCollateralCheck reverts when an illegal mask is passed in collateralHints
+    function test_I_CM_16_fullCollateralCheck_reverts_for_illegal_mask_in_hints() public creditTest {
+        (address creditAccount,) = _openTestCreditAccount();
+
+        uint256[] memory collateralHints = new uint256[](1);
+        collateralHints[0] = 3232;
 
         uint256 enabledTokensMap = creditManager.enabledTokensMaskOf(creditAccount);
 
