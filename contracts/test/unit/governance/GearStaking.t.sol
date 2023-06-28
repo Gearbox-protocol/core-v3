@@ -66,7 +66,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         assertEq(gearStaking.getCurrentEpoch(), 2, "First epoch timestamp incorrect");
     }
 
-    /// @dev [GS-02]: deposit performs operations in order and emits events
+    /// @dev U:[GS-02]: deposit performs operations in order and emits events
     function test_U_GS_02_deposit_works_correctly() public {
         MultiVote[] memory votes = new MultiVote[](1);
         votes[0] = MultiVote({
@@ -80,19 +80,19 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
         vm.expectEmit(true, false, false, true);
-        emit DepositGear(USER, WAD);
+        emit DepositGear(FRIEND, WAD);
 
-        vm.expectCall(address(votingContract), abi.encodeCall(IVotingContractV3.vote, (USER, uint96(WAD / 2), "")));
+        vm.expectCall(address(votingContract), abi.encodeCall(IVotingContractV3.vote, (FRIEND, uint96(WAD / 2), "")));
 
         vm.prank(USER);
-        gearStaking.deposit(uint96(WAD), votes);
+        gearStaking.deposit(uint96(WAD), FRIEND, votes);
 
-        assertEq(gearStaking.balanceOf(USER), WAD);
+        assertEq(gearStaking.balanceOf(FRIEND), WAD);
 
-        assertEq(gearStaking.availableBalance(USER), WAD / 2);
+        assertEq(gearStaking.availableBalance(FRIEND), WAD / 2);
     }
 
-    /// @dev [GS-03]: withdraw performs operations in order and emits events
+    /// @dev U:[GS-03]: withdraw performs operations in order and emits events
     function test_U_GS_03_withdraw_works_correctly() public {
         MultiVote[] memory votes = new MultiVote[](1);
         votes[0] = MultiVote({
@@ -106,7 +106,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
         vm.prank(USER);
-        gearStaking.deposit(uint96(WAD), votes);
+        gearStaking.deposit(uint96(WAD), USER, votes);
 
         votes = new MultiVote[](1);
         votes[0] = MultiVote({
@@ -135,7 +135,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         assertEq(withdrawableNow, 0, "Amount withdrawable now instead of scheduled");
     }
 
-    /// @dev [GS-04]: multivote works correctly
+    /// @dev U:[GS-04]: multivote works correctly
     function test_U_GS_04_multivote_works_correctly() public {
         MultiVote[] memory votes = new MultiVote[](0);
 
@@ -143,7 +143,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
         vm.prank(USER);
-        gearStaking.deposit(uint96(WAD), votes);
+        gearStaking.deposit(uint96(WAD), USER, votes);
 
         TargetContractMock votingContract2 = new TargetContractMock();
 
@@ -186,7 +186,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         assertEq(gearStaking.availableBalance(USER), (WAD - WAD / 2 - WAD / 3) + WAD / 4);
     }
 
-    /// @dev [GS-04A]: multivote reverts if voting contract status is incorrect
+    /// @dev U:[GS-04A]: multivote reverts if voting contract status is incorrect
     function test_U_GS_04A_multivote_respects_voting_contract_status() public {
         MultiVote[] memory votes = new MultiVote[](1);
         votes[0] = MultiVote({
@@ -200,7 +200,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
         vm.prank(USER);
-        gearStaking.deposit(uint96(WAD), votes);
+        gearStaking.deposit(uint96(WAD), USER, votes);
 
         vm.prank(CONFIGURATOR);
         gearStaking.setVotingContractStatus(address(votingContract), VotingContractStatus.NOT_ALLOWED);
@@ -259,7 +259,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         gearStaking.multivote(votes);
     }
 
-    /// @dev [GS-05]: claimWithdrawals correctly processes pending withdrawals
+    /// @dev U:[GS-05]: claimWithdrawals correctly processes pending withdrawals
     function test_U_GS_05_claimWithdrawals_works_correctly() public {
         MultiVote[] memory votes = new MultiVote[](0);
 
@@ -267,7 +267,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
         vm.prank(USER);
-        gearStaking.deposit(uint96(WAD), votes);
+        gearStaking.deposit(uint96(WAD), USER, votes);
 
         vm.prank(USER);
         gearStaking.withdraw(1000, FRIEND, votes);
@@ -350,7 +350,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         assertEq(tokenTestSuite.balanceOf(gearToken, FRIEND), 6000);
     }
 
-    /// @dev [GS-06]: setVotingContractStatus respects access control and emits event
+    /// @dev U:[GS-06]: setVotingContractStatus respects access control and emits event
     function test_U_GS_06_setVotingContractStatus_works_correctly() public {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         gearStaking.setVotingContractStatus(DUMB_ADDRESS, VotingContractStatus.ALLOWED);
@@ -360,5 +360,89 @@ contract GearStakingTest is Test, IGearStakingV3Events {
 
         vm.prank(CONFIGURATOR);
         gearStaking.setVotingContractStatus(DUMB_ADDRESS, VotingContractStatus.UNVOTE_ONLY);
+    }
+
+    /// @dev U:[GS-07]: migrate performs operations in order and emits events
+    function test_U_GS_07_migrate_works_correctly() public {
+        GearStakingV3 gearStakingSuccessor = new GearStakingV3(address(addressProvider), block.timestamp + 1);
+
+        {
+            MultiVote[] memory votes = new MultiVote[](1);
+            votes[0] = MultiVote({
+                votingContract: address(votingContract),
+                voteAmount: uint96(WAD / 2),
+                isIncrease: true,
+                extraData: ""
+            });
+
+            tokenTestSuite.mint(gearToken, USER, WAD);
+            tokenTestSuite.approve(gearToken, USER, address(gearStaking));
+
+            vm.prank(USER);
+            gearStaking.deposit(uint96(WAD), USER, votes);
+        }
+
+        vm.expectRevert(ZeroAddressException.selector);
+        vm.prank(USER);
+        gearStaking.migrate(uint96(WAD / 2), USER, new MultiVote[](0), new MultiVote[](0));
+
+        vm.prank(CONFIGURATOR);
+        gearStaking.setSuccessor(address(gearStakingSuccessor));
+
+        address newVotingContract = address(new TargetContractMock());
+
+        vm.prank(CONFIGURATOR);
+        gearStakingSuccessor.setVotingContractStatus(newVotingContract, VotingContractStatus.ALLOWED);
+
+        vm.prank(CONFIGURATOR);
+        gearStaking.setVotingContractStatus(address(votingContract), VotingContractStatus.UNVOTE_ONLY);
+
+        MultiVote[] memory votesBefore = new MultiVote[](1);
+        votesBefore[0] = MultiVote({
+            votingContract: address(votingContract),
+            voteAmount: uint96(WAD / 2),
+            isIncrease: false,
+            extraData: ""
+        });
+
+        MultiVote[] memory votesAfter = new MultiVote[](1);
+        votesAfter[0] =
+            MultiVote({votingContract: newVotingContract, voteAmount: uint96(WAD / 2), isIncrease: true, extraData: ""});
+
+        vm.expectCall(address(votingContract), abi.encodeCall(IVotingContractV3.unvote, (USER, uint96(WAD / 2), "")));
+
+        vm.expectCall(
+            address(gearStakingSuccessor), abi.encodeCall(GearStakingV3.deposit, (uint96(WAD / 2), FRIEND, votesAfter))
+        );
+
+        vm.expectCall(newVotingContract, abi.encodeCall(IVotingContractV3.vote, (FRIEND, uint96(WAD / 2), "")));
+
+        vm.expectEmit(true, true, true, true);
+        emit MigrateGear(USER, FRIEND, address(gearStakingSuccessor), uint96(WAD / 2));
+
+        vm.prank(USER);
+        gearStaking.migrate(uint96(WAD / 2), FRIEND, votesBefore, votesAfter);
+
+        assertEq(gearStaking.balanceOf(USER), WAD / 2);
+
+        assertEq(gearStaking.availableBalance(USER), WAD / 2);
+
+        assertEq(gearStakingSuccessor.balanceOf(FRIEND), WAD / 2);
+
+        assertEq(gearStakingSuccessor.availableBalance(FRIEND), 0);
+    }
+
+    /// @dev U:[GS-08]: setSuccessor respects access control and emits event
+    function test_U_GS_08_setVotingContractStatus_works_correctly() public {
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        gearStaking.setSuccessor(DUMB_ADDRESS);
+
+        vm.expectEmit(true, false, false, false);
+        emit SetSuccessor(DUMB_ADDRESS);
+
+        vm.prank(CONFIGURATOR);
+        gearStaking.setSuccessor(DUMB_ADDRESS);
+
+        assertEq(gearStaking.successor(), DUMB_ADDRESS, "Successor address incorrect");
     }
 }
