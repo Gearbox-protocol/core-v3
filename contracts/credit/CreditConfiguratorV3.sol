@@ -211,7 +211,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         // сreditManager has an additional check that the token is not added yet
         CreditManagerV3(creditManager).addToken({token: token}); // I:[CC-4]
 
-        if (_isQuotedToken(token)) {
+        if (CreditManagerV3(creditManager).supportsQuotas() && _isQuotedToken(token)) {
             _makeTokenQuoted(token);
         }
 

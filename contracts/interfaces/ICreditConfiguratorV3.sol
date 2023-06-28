@@ -3,8 +3,6 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import {CreditManagerV3} from "../credit/CreditManagerV3.sol";
-import {CreditFacadeV3} from "../credit/CreditFacadeV3.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 enum AllowanceAction {

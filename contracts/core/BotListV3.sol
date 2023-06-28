@@ -17,7 +17,6 @@ import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {IBotListV3, BotFunding} from "../interfaces/IBotListV3.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {ICreditFacadeV3} from "../interfaces/ICreditFacadeV3.sol";
-import {ICreditAccountBase} from "../interfaces/ICreditAccountV3.sol";
 
 import "../interfaces/IExceptions.sol";
 

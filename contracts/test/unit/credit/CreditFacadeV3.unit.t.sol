@@ -44,9 +44,6 @@ import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // DATA
 
-import {MultiCall, MultiCallOps} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
-import {Balance, BalanceWithMask} from "../../../libraries/BalancesLogic.sol";
-
 // CONSTANTS
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
@@ -2353,5 +2350,87 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         (currentTotalDebt, totalDebtLimit) = creditFacade.totalDebt();
         assertEq(currentTotalDebt, 100, "incorrect currentTotalDebt");
         assertEq(totalDebtLimit, 200, "incorrect totalDebtLimit");
+    }
+
+    // todo: check
+    /// @dev I:[MC-36]: checkAndUpdateBorrowedBlockLimit doesn't change block limit if maxDebtPerBlock = type(uint128).max
+    function test_I_MC_36_checkAndUpdateBorrowedBlockLimit_doesnt_change_block_limit_if_set_to_max() public {
+        // vm.prank(CONFIGURATOR);
+        // creditConfigurator.setMaxDebtLimitPerBlock(type(uint128).max);
+
+        // (uint64 blockLastUpdate, uint128 borrowedInBlock) = creditFacade.getTotalBorrowedInBlock();
+        // assertEq(blockLastUpdate, 0, "Incorrect currentBlockLimit");
+        // assertEq(borrowedInBlock, 0, "Incorrect currentBlockLimit");
+
+        // _openTestCreditAccount();
+
+        // (blockLastUpdate, borrowedInBlock) = creditFacade.getTotalBorrowedInBlock();
+        // assertEq(blockLastUpdate, 0, "Incorrect currentBlockLimit");
+        // assertEq(borrowedInBlock, 0, "Incorrect currentBlockLimit");
+    }
+
+    /// @dev I:[MC-37]: checkAndUpdateBorrowedBlockLimit doesn't change block limit if maxDebtPerBlock = type(uint128).max
+    function test_I_MC_37_checkAndUpdateBorrowedBlockLimit_updates_block_limit_properly() public {
+        // (uint64 blockLastUpdate, uint128 borrowedInBlock) = creditFacade.getTotalBorrowedInBlock();
+
+        // assertEq(blockLastUpdate, 0, "Incorrect blockLastUpdate");
+        // assertEq(borrowedInBlock, 0, "Incorrect borrowedInBlock");
+
+        // _openTestCreditAccount();
+
+        // (blockLastUpdate, borrowedInBlock) = creditFacade.getTotalBorrowedInBlock();
+
+        // assertEq(blockLastUpdate, block.number, "blockLastUpdate");
+        // assertEq(borrowedInBlock, DAI_ACCOUNT_AMOUNT, "Incorrect borrowedInBlock");
+
+        // vm.prank(USER);
+        // creditFacade.multicall(
+        //     MultiCallBuilder.build(
+        //         MultiCall({
+        //             target: address(creditFacade),
+        //             callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_EXCHANGE_AMOUNT))
+        //         })
+        //     )
+        // );
+
+        // (blockLastUpdate, borrowedInBlock) = creditFacade.getTotalBorrowedInBlock();
+
+        // assertEq(blockLastUpdate, block.number, "blockLastUpdate");
+        // assertEq(borrowedInBlock, DAI_ACCOUNT_AMOUNT + DAI_EXCHANGE_AMOUNT, "Incorrect borrowedInBlock");
+
+        // // switch to new block
+        // vm.roll(block.number + 1);
+
+        // vm.prank(USER);
+        // creditFacade.multicall(
+        //     MultiCallBuilder.build(
+        //         MultiCall({
+        //             target: address(creditFacade),
+        //             callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_EXCHANGE_AMOUNT))
+        //         })
+        //     )
+        // );
+
+        // (blockLastUpdate, borrowedInBlock) = creditFacade.getTotalBorrowedInBlock();
+
+        // assertEq(blockLastUpdate, block.number, "blockLastUpdate");
+        // assertEq(borrowedInBlock, DAI_EXCHANGE_AMOUNT, "Incorrect borrowedInBlock");
+    }
+
+    //
+    // EMERGENCY LIQUIDATIONS
+    //
+
+    /// @dev I:[MC-62]: addEmergencyLiquidator correctly sets value
+    function test_I_MC_62_setEmergencyLiquidator_works_correctly() public {
+        // vm.prank(address(creditConfigurator));
+        // creditFacade.setEmergencyLiquidator(DUMB_ADDRESS, AllowanceAction.ALLOW);
+
+        // assertTrue(creditFacade.canLiquidateWhilePaused(DUMB_ADDRESS), "Value was not set");
+
+        // vm.prank(address(creditConfigurator));
+        // creditFacade.setEmergencyLiquidator(DUMB_ADDRESS, AllowanceAction.FORBID);
+
+        // assertTrue(!creditFacade.canLiquidateWhilePaused(DUMB_ADDRESS), "Value was is still set");
     }
 }

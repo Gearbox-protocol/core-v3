@@ -42,8 +42,6 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {ClaimAction, IWithdrawalManagerV3} from "../../../interfaces/IWithdrawalManagerV3.sol";
 import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-
 // EXCEPTIONS
 
 // MOCKS
@@ -68,8 +66,6 @@ import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 import {TestHelper, Vars, VarU256} from "../../lib/helper.sol";
 
 uint16 constant LT_UNDERLYING = uint16(PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM - DEFAULT_FEE_LIQUIDATION);
-
-import "forge-std/console.sol";
 
 contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceHelper, CreditAccountMockEvents {
     using BitMask for uint256;
