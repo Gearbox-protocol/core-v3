@@ -1591,12 +1591,13 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         });
     }
 
-    /// @dev U:[FA-30]: multicall increase debt if forbid tokens on account
+    /// @dev U:[FA-30]: multicall increase debt / schedule withdrawal if forbid tokens on account
     function test_U_FA_30_multicall_increase_debt_if_forbid_tokens_on_account() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
         address link = tokenTestSuite.addressOf(Tokens.LINK);
         uint256 linkMask = 1 << 8;
+        tokenTestSuite.mint(link, DUMB_ADDRESS, 1000);
 
         creditManagerMock.addToken(link, linkMask);
 
@@ -1613,7 +1614,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             creditAccount: creditAccount,
             calls: MultiCallBuilder.build(),
             enabledTokensMask: linkMask,
-            flags: INCREASE_DEBT_WAS_CALLED
+            flags: REVERT_ON_FORBIDDEN_TOKENS
         });
 
         vm.expectRevert(ForbiddenTokensException.selector);
@@ -1627,6 +1628,19 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 ),
             enabledTokensMask: linkMask,
             flags: INCREASE_DEBT_PERMISSION
+        });
+
+        vm.expectRevert(ForbiddenTokensException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.scheduleWithdrawal, (link, 1000))
+                })
+                ),
+            enabledTokensMask: linkMask,
+            flags: WITHDRAW_PERMISSION
         });
     }
 
@@ -1812,6 +1826,52 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             maskToEnable | UNDERLYING_TOKEN_MASK,
             _testCaseErr("Incorrect enabledTokenMask")
         );
+    }
+
+    /// @dev U:[FA-34A]: multicall updateQuota reverts on trying to increase quota for forbidden token
+    function test_U_FA_34A_multicall_updateQuota_works_properly() public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+
+        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        uint256 linkMask = 1 << 8;
+        tokenTestSuite.mint(link, DUMB_ADDRESS, 1000);
+
+        creditManagerMock.addToken(link, linkMask);
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setTokenAllowance(link, AllowanceAction.FORBID);
+
+        uint96 maxDebt = 443330;
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setDebtLimits(0, maxDebt, type(uint8).max);
+
+        int96 change = 990;
+
+        vm.expectRevert(ForbiddenTokensException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (link, change, 0))
+                })
+                ),
+            enabledTokensMask: linkMask,
+            flags: UPDATE_QUOTA_PERMISSION | FORBIDDEN_TOKENS_ON_ACCOUNT
+        });
+
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (link, -change, 0))
+                })
+                ),
+            enabledTokensMask: linkMask,
+            flags: UPDATE_QUOTA_PERMISSION | FORBIDDEN_TOKENS_ON_ACCOUNT
+        });
     }
 
     /// @dev U:[FA-35]: multicall `scheduleWithdrawal` works properly

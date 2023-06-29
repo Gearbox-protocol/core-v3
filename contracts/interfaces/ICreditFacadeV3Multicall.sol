@@ -24,9 +24,10 @@ uint256 constant ALL_CREDIT_FACADE_CALLS_PERMISSION = ADD_COLLATERAL_PERMISSION 
 uint256 constant ALL_PERMISSIONS = ALL_CREDIT_FACADE_CALLS_PERMISSION | EXTERNAL_CALLS_PERMISSION;
 
 // All flags start from 193rd bit, because bot permissions is uint192
-uint256 constant INCREASE_DEBT_WAS_CALLED = 1 << 193;
+uint256 constant REVERT_ON_FORBIDDEN_TOKENS = 1 << 193;
 uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 1 << 194;
 uint256 constant PRICE_UPDATES_ALREADY_APPLIED = 1 << 195;
+uint256 constant FORBIDDEN_TOKENS_ON_ACCOUNT = 1 << 196;
 
 // pay bot is a flag which is enabled in botMulticall function only to allow one payment operation
 uint256 constant PAY_BOT_CAN_BE_CALLED = 1 << 196;

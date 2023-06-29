@@ -42,8 +42,8 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/C
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
-uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS
-    & ~(INCREASE_DEBT_PERMISSION | DECREASE_DEBT_PERMISSION | WITHDRAW_PERMISSION) | INCREASE_DEBT_WAS_CALLED;
+uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS =
+    ALL_PERMISSIONS & ~(INCREASE_DEBT_PERMISSION | DECREASE_DEBT_PERMISSION | WITHDRAW_PERMISSION);
 
 uint256 constant CLOSE_CREDIT_ACCOUNT_FLAGS = EXTERNAL_CALLS_PERMISSION;
 
@@ -564,7 +564,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             getTokenByMaskFn: _getTokenByMask
         });
 
-        FullCheckParams memory fullCheckParams = _multicall(creditAccount, calls, enabledTokensMaskBefore, permissions);
+        FullCheckParams memory fullCheckParams = _multicall(
+            creditAccount,
+            calls,
+            enabledTokensMaskBefore,
+            permissions | (forbiddenBalances.length > 0 ? FORBIDDEN_TOKENS_ON_ACCOUNT : 0)
+        );
 
         // Performs one fullCollateralCheck at the end of a multicall
         _fullCollateralCheck({
@@ -675,7 +680,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeV3Multicall.updateQuota.selector) {
                         _revertIfNoPermission(flags, UPDATE_QUOTA_PERMISSION); // U:[FA-21]
                         (uint256 tokensToEnable, uint256 tokensToDisable) =
-                            _updateQuota(creditAccount, mcall.callData[4:]); // U:[FA-34]
+                            _updateQuota(creditAccount, mcall.callData[4:], flags & FORBIDDEN_TOKENS_ON_ACCOUNT > 0); // U:[FA-34]
                         enabledTokensMask = enabledTokensMask.enableDisable(tokensToEnable, tokensToDisable); // U:[FA-34]
                     }
                     //
@@ -687,6 +692,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     /// the account owner can claim the withdrawal.
                     else if (method == ICreditFacadeV3Multicall.scheduleWithdrawal.selector) {
                         _revertIfNoPermission(flags, WITHDRAW_PERMISSION); // U:[FA-21]
+
+                        flags = flags.enable(REVERT_ON_FORBIDDEN_TOKENS);
+
                         uint256 tokensToDisable = _scheduleWithdrawal(creditAccount, mcall.callData[4:]); // U:[FA-34]
                         enabledTokensMask = enabledTokensMask.disable({
                             bitsToDisable: tokensToDisable,
@@ -703,7 +711,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeV3Multicall.increaseDebt.selector) {
                         _revertIfNoPermission(flags, INCREASE_DEBT_PERMISSION); // U:[FA-21]
 
-                        flags = flags.enable(INCREASE_DEBT_WAS_CALLED).disable(DECREASE_DEBT_PERMISSION); // U:[FA-29]
+                        flags = flags.enable(REVERT_ON_FORBIDDEN_TOKENS).disable(DECREASE_DEBT_PERMISSION); // U:[FA-29]
 
                         (uint256 tokensToEnable,) = _manageDebt(
                             creditAccount, mcall.callData[4:], enabledTokensMask, ManageDebtAction.INCREASE_DEBT
@@ -837,9 +845,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             if (!success) revert BalanceLessThanMinimumDesiredException(); // U:[FA-23]
         }
 
-        /// If increaseDebt was called during the multicall, all forbidden tokens must be disabled at the end
-        /// otherwise, funds could be borrowed against forbidden token, which is prohibited
-        if ((flags & INCREASE_DEBT_WAS_CALLED != 0) && (enabledTokensMask & forbiddenTokenMask != 0)) {
+        /// If increaseDebt or scheduleWithdrawal was called during the multicall, all forbidden tokens must be disabled at the end
+        /// Otherwise, funds could be borrowed / withdrawn against a forbidden token, which is prohibited
+        if ((flags & REVERT_ON_FORBIDDEN_TOKENS != 0) && (enabledTokensMask & forbiddenTokenMask != 0)) {
             revert ForbiddenTokensException(); // U:[FA-27]
         }
 
@@ -975,11 +983,17 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @notice Requests Credit Manager to update a Credit Account's quota for a certain token
     /// @param creditAccount Credit Account to update the quota for
     /// @param callData Bytes calldata for parsing
-    function _updateQuota(address creditAccount, bytes calldata callData)
+    function _updateQuota(address creditAccount, bytes calldata callData, bool hasForbiddenTokens)
         internal
         returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
         (address token, int96 quotaChange, uint96 minQuota) = abi.decode(callData, (address, int96, uint96)); // U:[FA-34]
+
+        if (hasForbiddenTokens && quotaChange > 0) {
+            uint256 mask = _getTokenMaskOrRevert(token);
+            if (mask & forbiddenTokenMask > 0) revert ForbiddenTokensException();
+        }
+
         (tokensToEnable, tokensToDisable) = ICreditManagerV3(creditManager).updateQuota({
             creditAccount: creditAccount,
             token: token,
