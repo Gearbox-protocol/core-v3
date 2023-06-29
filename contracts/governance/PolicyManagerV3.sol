@@ -65,6 +65,12 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
     /// @dev Mapping from a contract address to its group
     mapping(address => string) internal _group;
 
+    /// @dev Emitted when new policy is set
+    event SetPolicy(bytes32 indexed policyHash, bool enabled);
+
+    /// @dev Emitted when new policy group of the address is set
+    event SetGroup(address indexed contractAddress, string indexed group);
+
     constructor(address _addressProvider) ACLNonReentrantTrait(_addressProvider) {}
 
     /// @notice Sets the policy, using policy UID as key
@@ -77,6 +83,7 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
     {
         initialPolicy.enabled = true; // F: [PM-01]
         _policies[policyHash] = initialPolicy; // F: [PM-01]
+        emit SetPolicy({policyHash: policyHash, enabled: true}); // F: [PM-01]
     }
 
     /// @notice Disables the policy which makes all requested checks for the passed policy hash to auto-fail
@@ -86,6 +93,7 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
         configuratorOnly // F: [PM-02]
     {
         _policies[policyHash].enabled = false; // F: [PM-02]
+        emit SetPolicy({policyHash: policyHash, enabled: false}); // F: [PM-02]
     }
 
     /// @notice Retrieves policy from policy UID
@@ -95,12 +103,13 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
 
     /// @notice Sets the policy group of the address
     function setGroup(address contractAddress, string calldata group) external configuratorOnly {
-        _group[contractAddress] = group;
+        _group[contractAddress] = group; // F: [PM-01]
+        emit SetGroup(contractAddress, group); // F: [PM-01]
     }
 
     /// @notice Retrieves the group associated with a contract
     function getGroup(address contractAddress) external view returns (string memory) {
-        return _group[contractAddress];
+        return _group[contractAddress]; // F: [PM-01]
     }
 
     /// @dev Performs parameter checks, with policy retrieved based on contract and parameter name
@@ -161,14 +170,10 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
                 if (diff > policy.maxChange) return false; // F: [PM-08]
             }
 
-            if (flags & CHECK_MIN_PCT_CHANGE_FLAG != 0) {
+            if (flags & (CHECK_MIN_PCT_CHANGE_FLAG | CHECK_MAX_PCT_CHANGE_FLAG) != 0) {
                 uint256 pctDiff = diff * PERCENTAGE_FACTOR / referencePoint;
-                if (pctDiff < policy.minPctChange) return false; // F: [PM-09]
-            }
-
-            if (flags & CHECK_MAX_PCT_CHANGE_FLAG != 0) {
-                uint256 pctDiff = diff * PERCENTAGE_FACTOR / referencePoint;
-                if (pctDiff > policy.maxPctChange) return false; // F: [PM-10]
+                if (flags & CHECK_MIN_PCT_CHANGE_FLAG != 0 && pctDiff < policy.minPctChange) return false; // F: [PM-09]
+                if (flags & CHECK_MAX_PCT_CHANGE_FLAG != 0 && pctDiff > policy.maxPctChange) return false; // F: [PM-10]
             }
         }
 

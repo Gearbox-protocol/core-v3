@@ -887,6 +887,8 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     {
         CreditManagerV3 cm = CreditManagerV3(creditManager);
 
+        if (maxEnabledTokens == 0) revert IncorrectParameterException(); // I:[CC-26]
+
         // Checks that value is actually changed to avoid redundant events
         if (maxEnabledTokens == cm.maxEnabledTokens()) return;
 
