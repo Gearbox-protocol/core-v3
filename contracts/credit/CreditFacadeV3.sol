@@ -532,10 +532,15 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         whenNotExpired // U:[FA-3]
         nonReentrant // U:[FA-4]
     {
-        (uint256 botPermissions, bool forbidden) =
-            IBotListV3(botList).getBotStatus({bot: msg.sender, creditAccount: creditAccount});
+        uint16 flags = _flagsOf(creditAccount);
+
+        (uint256 botPermissions, bool forbidden) = IBotListV3(botList).getBotStatus({
+            creditManager: creditManager,
+            creditAccount: creditAccount,
+            bot: msg.sender
+        });
         // Checks that the bot is approved by the borrower and is not forbidden
-        if (botPermissions == 0 || forbidden) {
+        if (flags & BOT_PERMISSIONS_SET_FLAG == 0 || botPermissions == 0 || forbidden) {
             revert NotApprovedBotException(); // U:[FA-19]
         }
 
@@ -1033,6 +1038,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         IBotListV3(botList).payBot({
             payer: payer,
+            creditManager: creditManager,
             creditAccount: creditAccount,
             bot: msg.sender,
             paymentAmount: paymentAmount
@@ -1085,6 +1091,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         }
 
         uint256 remainingBots = IBotListV3(botList).setBotPermissions({
+            creditManager: creditManager,
             creditAccount: creditAccount,
             bot: bot,
             permissions: permissions,
@@ -1304,7 +1311,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     }
 
     function _eraseAllBotPermissions(address creditAccount) internal {
-        IBotListV3(botList).eraseAllBotPermissions(creditAccount);
+        IBotListV3(botList).eraseAllBotPermissions(creditManager, creditAccount);
     }
 
     //

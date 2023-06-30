@@ -118,6 +118,7 @@ contract BotListTest is Test, IBotListV3Events {
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         vm.prank(invalidCF);
         botList.setBotPermissions({
+            creditManager: creditManager,
             creditAccount: creditAccount,
             bot: address(bot),
             permissions: type(uint192).max,
@@ -128,6 +129,7 @@ contract BotListTest is Test, IBotListV3Events {
         vm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, DUMB_ADDRESS));
         vm.prank(address(creditFacade));
         botList.setBotPermissions({
+            creditManager: creditManager,
             creditAccount: creditAccount,
             bot: DUMB_ADDRESS,
             permissions: type(uint192).max,
@@ -141,6 +143,7 @@ contract BotListTest is Test, IBotListV3Events {
         vm.expectRevert(InvalidBotException.selector);
         vm.prank(address(creditFacade));
         botList.setBotPermissions({
+            creditManager: creditManager,
             creditAccount: creditAccount,
             bot: address(bot),
             permissions: type(uint192).max,
@@ -151,11 +154,12 @@ contract BotListTest is Test, IBotListV3Events {
         vm.prank(CONFIGURATOR);
         botList.setBotForbiddenStatus(address(bot), false);
 
-        vm.expectEmit(true, true, false, true);
-        emit SetBotPermissions(creditAccount, address(bot), 1, uint72(1 ether), uint72(1 ether / 10));
+        vm.expectEmit(true, true, true, true);
+        emit SetBotPermissions(creditManager, creditAccount, address(bot), 1, uint72(1 ether), uint72(1 ether / 10));
 
         vm.prank(address(creditFacade));
         uint256 activeBotsRemaining = botList.setBotPermissions({
+            creditManager: creditManager,
             creditAccount: creditAccount,
             bot: address(bot),
             permissions: 1,
@@ -165,12 +169,12 @@ contract BotListTest is Test, IBotListV3Events {
 
         assertEq(activeBotsRemaining, 1, "Incorrect number of bots returned");
 
-        assertEq(botList.botPermissions(creditAccount, address(bot)), 1, "Bot permissions were not set");
+        assertEq(botList.botPermissions(creditManager, creditAccount, address(bot)), 1, "Bot permissions were not set");
 
         (uint256 remainingFunds, uint256 maxWeeklyAllowance, uint256 remainingWeeklyAllowance, uint256 allowanceLU) =
-            botList.botFunding(creditAccount, address(bot));
+            botList.botFunding(creditManager, creditAccount, address(bot));
 
-        address[] memory bots = botList.getActiveBots(creditAccount);
+        address[] memory bots = botList.getActiveBots(creditManager, creditAccount);
 
         assertEq(bots.length, 1, "Incorrect active bots array length");
 
@@ -186,6 +190,7 @@ contract BotListTest is Test, IBotListV3Events {
 
         vm.prank(address(creditFacade));
         activeBotsRemaining = botList.setBotPermissions({
+            creditManager: creditManager,
             creditAccount: creditAccount,
             bot: address(bot),
             permissions: 2,
@@ -194,11 +199,11 @@ contract BotListTest is Test, IBotListV3Events {
         });
 
         (remainingFunds, maxWeeklyAllowance, remainingWeeklyAllowance, allowanceLU) =
-            botList.botFunding(creditAccount, address(bot));
+            botList.botFunding(creditManager, creditAccount, address(bot));
 
         assertEq(activeBotsRemaining, 1, "Incorrect number of bots returned");
 
-        assertEq(botList.botPermissions(creditAccount, address(bot)), 2, "Bot permissions were not set");
+        assertEq(botList.botPermissions(creditManager, creditAccount, address(bot)), 2, "Bot permissions were not set");
 
         assertEq(remainingFunds, 2 ether, "Incorrect remaining funds value");
 
@@ -208,17 +213,18 @@ contract BotListTest is Test, IBotListV3Events {
 
         assertEq(allowanceLU, block.timestamp, "Incorrect allowance update timestamp");
 
-        bots = botList.getActiveBots(creditAccount);
+        bots = botList.getActiveBots(creditManager, creditAccount);
 
         assertEq(bots.length, 1, "Incorrect active bots array length");
 
         assertEq(bots[0], address(bot), "Incorrect address added to active bots list");
 
-        vm.expectEmit(true, true, false, false);
-        emit EraseBot(address(creditAccount), address(bot));
+        vm.expectEmit(true, true, true, false);
+        emit EraseBot(address(creditManager), address(creditAccount), address(bot));
 
         vm.prank(address(creditFacade));
         activeBotsRemaining = botList.setBotPermissions({
+            creditManager: creditManager,
             creditAccount: creditAccount,
             bot: address(bot),
             permissions: 0,
@@ -227,11 +233,11 @@ contract BotListTest is Test, IBotListV3Events {
         });
 
         (remainingFunds, maxWeeklyAllowance, remainingWeeklyAllowance, allowanceLU) =
-            botList.botFunding(creditAccount, address(bot));
+            botList.botFunding(creditManager, creditAccount, address(bot));
 
         assertEq(activeBotsRemaining, 0, "Incorrect number of bots returned");
 
-        assertEq(botList.botPermissions(creditAccount, address(bot)), 0, "Bot permissions were not set");
+        assertEq(botList.botPermissions(creditManager, creditAccount, address(bot)), 0, "Bot permissions were not set");
 
         assertEq(remainingFunds, 0, "Incorrect remaining funds value");
 
@@ -241,7 +247,7 @@ contract BotListTest is Test, IBotListV3Events {
 
         assertEq(allowanceLU, 0, "Incorrect allowance update timestamp");
 
-        bots = botList.getActiveBots(creditAccount);
+        bots = botList.getActiveBots(creditManager, creditAccount);
 
         assertEq(bots.length, 0, "Incorrect active bots array length");
     }
@@ -298,6 +304,7 @@ contract BotListTest is Test, IBotListV3Events {
 
         vm.prank(address(creditFacade));
         botList.setBotPermissions({
+            creditManager: creditManager,
             creditAccount: creditAccount,
             bot: address(bot),
             permissions: 1,
@@ -311,6 +318,7 @@ contract BotListTest is Test, IBotListV3Events {
         vm.prank(invalidCF);
         botList.payBot({
             payer: USER,
+            creditManager: creditManager,
             creditAccount: creditAccount,
             bot: address(bot),
             paymentAmount: uint72(1 ether / 20)
@@ -322,13 +330,14 @@ contract BotListTest is Test, IBotListV3Events {
         vm.prank(address(creditFacade));
         botList.payBot({
             payer: USER,
+            creditManager: creditManager,
             creditAccount: creditAccount,
             bot: address(bot),
             paymentAmount: uint72(1 ether / 20)
         });
 
         (uint256 remainingFunds, uint256 maxWeeklyAllowance, uint256 remainingWeeklyAllowance, uint256 allowanceLU) =
-            botList.botFunding(creditAccount, address(bot));
+            botList.botFunding(creditManager, creditAccount, address(bot));
 
         assertEq(remainingFunds, 1 ether - (1 ether / 20) - (1 ether / 40), "Bot funding remaining funds incorrect");
 
@@ -357,13 +366,14 @@ contract BotListTest is Test, IBotListV3Events {
         vm.prank(address(creditFacade));
         botList.payBot({
             payer: USER,
+            creditManager: creditManager,
             creditAccount: creditAccount,
             bot: address(bot),
             paymentAmount: uint72(1 ether / 20)
         });
 
         (remainingFunds, maxWeeklyAllowance, remainingWeeklyAllowance, allowanceLU) =
-            botList.botFunding(creditAccount, address(bot));
+            botList.botFunding(creditManager, creditAccount, address(bot));
 
         assertEq(remainingFunds, 1 ether - (2 ether / 20) - (2 ether / 40), "Bot funding remaining funds incorrect");
 
@@ -392,6 +402,7 @@ contract BotListTest is Test, IBotListV3Events {
     function test_BL_06_eraseAllBotPermissions_works_correctly() public {
         vm.prank(address(creditFacade));
         botList.setBotPermissions({
+            creditManager: creditManager,
             creditAccount: creditAccount,
             bot: address(bot),
             permissions: 1,
@@ -403,6 +414,7 @@ contract BotListTest is Test, IBotListV3Events {
 
         vm.prank(address(creditFacade));
         uint256 activeBotsRemaining = botList.setBotPermissions({
+            creditManager: creditManager,
             creditAccount: creditAccount,
             bot: address(bot2),
             permissions: 2,
@@ -414,24 +426,32 @@ contract BotListTest is Test, IBotListV3Events {
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         vm.prank(invalidCF);
-        botList.eraseAllBotPermissions(creditAccount);
+        botList.eraseAllBotPermissions(creditManager, creditAccount);
 
         // it starts removing bots from the end
-        vm.expectEmit(true, true, false, false);
-        emit EraseBot(creditAccount, address(bot2));
+        vm.expectEmit(true, true, true, false);
+        emit EraseBot(creditManager, creditAccount, address(bot2));
 
-        vm.expectEmit(true, true, false, false);
-        emit EraseBot(creditAccount, address(bot));
+        vm.expectEmit(true, true, true, false);
+        emit EraseBot(creditManager, creditAccount, address(bot));
 
         vm.prank(address(creditFacade));
-        botList.eraseAllBotPermissions(creditAccount);
+        botList.eraseAllBotPermissions(creditManager, creditAccount);
 
-        assertEq(botList.botPermissions(creditAccount, address(bot)), 0, "Permissions were not erased for bot 1");
+        assertEq(
+            botList.botPermissions(creditManager, creditAccount, address(bot)),
+            0,
+            "Permissions were not erased for bot 1"
+        );
 
-        assertEq(botList.botPermissions(creditAccount, address(bot2)), 0, "Permissions were not erased for bot 2");
+        assertEq(
+            botList.botPermissions(creditManager, creditAccount, address(bot2)),
+            0,
+            "Permissions were not erased for bot 2"
+        );
 
         (uint256 remainingFunds, uint256 maxWeeklyAllowance, uint256 remainingWeeklyAllowance, uint256 allowanceLU) =
-            botList.botFunding(creditAccount, address(bot));
+            botList.botFunding(creditManager, creditAccount, address(bot));
 
         assertEq(remainingFunds, 0, "Remaining funds were not zeroed");
 
@@ -440,7 +460,7 @@ contract BotListTest is Test, IBotListV3Events {
         assertEq(remainingWeeklyAllowance, 0, "Remaining funds were not zeroed");
 
         (remainingFunds, maxWeeklyAllowance, remainingWeeklyAllowance, allowanceLU) =
-            botList.botFunding(creditAccount, address(bot2));
+            botList.botFunding(creditManager, creditAccount, address(bot2));
 
         assertEq(remainingFunds, 0, "Remaining funds were not zeroed");
 
@@ -448,7 +468,7 @@ contract BotListTest is Test, IBotListV3Events {
 
         assertEq(remainingWeeklyAllowance, 0, "Remaining funds were not zeroed");
 
-        address[] memory activeBots = botList.getActiveBots(creditAccount);
+        address[] memory activeBots = botList.getActiveBots(creditManager, creditAccount);
 
         assertEq(activeBots.length, 0, "Not all active bots were disabled");
     }

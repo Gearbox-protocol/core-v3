@@ -655,7 +655,9 @@ contract CreditFacadeIntegrationTest is
         vm.expectEmit(false, false, false, true);
         emit FinishMultiCall();
 
-        vm.expectCall(address(botList), abi.encodeCall(BotListV3.eraseAllBotPermissions, (creditAccount)));
+        vm.expectCall(
+            address(botList), abi.encodeCall(BotListV3.eraseAllBotPermissions, (address(creditManager), creditAccount))
+        );
 
         // todo: add withdrawal manager call
 
@@ -752,7 +754,9 @@ contract CreditFacadeIntegrationTest is
         vm.expectEmit(false, false, false, false);
         emit FinishMultiCall();
 
-        vm.expectCall(address(botList), abi.encodeCall(BotListV3.eraseAllBotPermissions, (creditAccount)));
+        vm.expectCall(
+            address(botList), abi.encodeCall(BotListV3.eraseAllBotPermissions, (address(creditManager), creditAccount))
+        );
 
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (address(1))));
 
@@ -1899,7 +1903,7 @@ contract CreditFacadeIntegrationTest is
         vm.prank(USER);
         creditFacade.setBotPermissions(creditAccount, bot, type(uint192).max, uint72(1 ether), uint72(1 ether / 10));
 
-        botList.getBotStatus({bot: bot, creditAccount: creditAccount});
+        botList.getBotStatus({creditManager: address(creditManager), bot: bot, creditAccount: creditAccount});
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
@@ -1952,7 +1956,9 @@ contract CreditFacadeIntegrationTest is
         vm.prank(FRIEND);
         creditFacade.setBotPermissions(creditAccount, bot, type(uint192).max, uint72(1 ether), uint72(1 ether / 10));
 
-        vm.expectCall(address(botList), abi.encodeCall(BotListV3.eraseAllBotPermissions, (creditAccount)));
+        vm.expectCall(
+            address(botList), abi.encodeCall(BotListV3.eraseAllBotPermissions, (address(creditManager), creditAccount))
+        );
 
         vm.expectCall(
             address(creditManager),
