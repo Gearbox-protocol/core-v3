@@ -8,8 +8,6 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 
 import {Test} from "forge-std/Test.sol";
 
-/// @title CreditManagerTestSuite
-/// @notice Deploys contract for unit testing of CreditManagerV3.sol
 contract BalanceEngine is Test {
     function expectBalance(address token, address holder, uint256 expectedBalance) internal {
         expectBalance(token, holder, expectedBalance, "");

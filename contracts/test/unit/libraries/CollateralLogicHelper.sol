@@ -6,7 +6,6 @@ pragma solidity ^0.8.17;
 import {Tokens} from "../../config/Tokens.sol";
 import {TokensData, TestToken} from "../../config/TokensData.sol";
 import {CollateralLogic} from "../../../libraries/CollateralLogic.sol";
-import {CollateralDebtData} from "../../../interfaces/ICreditManagerV3.sol";
 
 import "../../lib/constants.sol";
 

@@ -29,4 +29,16 @@ library MultiCallBuilder {
         calls[1] = call2;
         calls[2] = call3;
     }
+
+    function build(MultiCall memory call1, MultiCall memory call2, MultiCall memory call3, MultiCall memory call4)
+        internal
+        pure
+        returns (MultiCall[] memory calls)
+    {
+        calls = new MultiCall[](4);
+        calls[0] = call1;
+        calls[1] = call2;
+        calls[2] = call3;
+        calls[3] = call4;
+    }
 }

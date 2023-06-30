@@ -7,12 +7,7 @@ import {QuotasLogic} from "../../../libraries/QuotasLogic.sol";
 import {AccountQuota, TokenQuotaParams} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {TestHelper} from "../../lib/helper.sol";
 
-import "../../../interfaces/IExceptions.sol";
-
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/PercentageMath.sol";
 import {RAY, WAD} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-
-import "forge-std/console.sol";
 
 /// @title Quotas logic test
 /// @notice [BM]: Unit tests for QuotasLogic library

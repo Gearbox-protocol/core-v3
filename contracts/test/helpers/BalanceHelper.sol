@@ -36,8 +36,6 @@ struct TransferCheck {
     bool used;
 }
 
-/// @title CreditManagerTestSuite
-/// @notice Deploys contract for unit testing of CreditManagerV3.sol
 contract BalanceHelper is BalanceEngine {
     // Suites
     TokensTestSuite internal tokenTestSuite;
