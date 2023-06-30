@@ -372,7 +372,10 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.rampLiquidationThreshold(DUMB_ADDRESS, 0, 0, 0);
 
         vm.expectRevert(CallerNotControllerException.selector);
-        creditConfigurator.setLimits(0, 0);
+        creditConfigurator.setMinDebtLimit(0);
+
+        vm.expectRevert(CallerNotControllerException.selector);
+        creditConfigurator.setMaxDebtLimit(0);
 
         vm.expectRevert(CallerNotControllerException.selector);
         creditConfigurator.setMaxDebtPerBlockMultiplier(0);
@@ -711,26 +714,37 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     // CREDIT MANAGER MGMT
     //
 
-    /// @dev I:[CC-15]: setLimits reverts if minAmount > maxAmount
-    function test_I_CC_15_setLimits_reverts_if_minAmount_gt_maxAmount() public creditTest {
+    /// @dev I:[CC-15]: setMinDebtLimit and setMaxDebtLimit revert if minAmount > maxAmount
+    function test_I_CC_15_setMinDebtLimit_setMaxDebtLimit_revert_if_minAmount_gt_maxAmount() public creditTest {
         (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
 
         vm.expectRevert(IncorrectLimitsException.selector);
-
         vm.prank(CONFIGURATOR);
-        creditConfigurator.setLimits(maxDebt, minDebt);
+        creditConfigurator.setMinDebtLimit(maxDebt + 1);
+
+        vm.expectRevert(IncorrectLimitsException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setMaxDebtLimit(minDebt - 1);
     }
 
-    /// @dev I:[CC-16]: setLimits sets limits
+    /// @dev I:[CC-16]: setMinDebtLimit and setMaxDebtLimit set limits
     function test_I_CC_16_setLimits_sets_limits() public creditTest {
+        (uint128 minDebtOld, uint128 maxDebtOld) = creditFacade.debtLimits();
+        uint128 newminDebt = minDebtOld + 1000;
+        uint128 newmaxDebt = maxDebtOld + 1000;
+
+        vm.expectEmit(false, false, false, true);
+        emit SetBorrowingLimits(newminDebt, maxDebtOld);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setMinDebtLimit(newminDebt);
         (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
-        uint128 newminDebt = minDebt + 1000;
-        uint128 newmaxDebt = maxDebt + 1000;
+        assertEq(minDebt, newminDebt, "Incorrect minDebt");
+        assertEq(maxDebt, maxDebtOld, "Incorrect maxDebt");
 
         vm.expectEmit(false, false, false, true);
         emit SetBorrowingLimits(newminDebt, newmaxDebt);
         vm.prank(CONFIGURATOR);
-        creditConfigurator.setLimits(newminDebt, newmaxDebt);
+        creditConfigurator.setMaxDebtLimit(newmaxDebt);
         (minDebt, maxDebt) = creditFacade.debtLimits();
         assertEq(minDebt, newminDebt, "Incorrect minDebt");
         assertEq(maxDebt, newmaxDebt, "Incorrect maxDebt");

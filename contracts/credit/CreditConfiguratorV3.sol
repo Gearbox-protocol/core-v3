@@ -495,15 +495,20 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     // CREDIT MANAGER MGMT
     //
 
-    /// @notice Sets borrowed amount limits in Credit Facade
+    /// @notice Sets the minimal borrowed amount limit in Credit Facade
     /// @param minDebt Minimum borrowed amount
+    function setMinDebtLimit(uint128 minDebt) external override controllerOnly {
+        address cf = creditFacade();
+        (, uint128 currentMaxDebt) = CreditFacadeV3(cf).debtLimits();
+        _setLimits(cf, minDebt, currentMaxDebt);
+    }
+
+    /// @notice Sets the maximal borrowed amount limit in Credit Facade
     /// @param maxDebt Maximum borrowed amount
-    function setLimits(uint128 minDebt, uint128 maxDebt)
-        external
-        override
-        controllerOnly // I:[CC-2B]
-    {
-        _setLimits(creditFacade(), minDebt, maxDebt);
+    function setMaxDebtLimit(uint128 maxDebt) external override controllerOnly {
+        address cf = creditFacade();
+        (uint128 currentMinDebt,) = CreditFacadeV3(cf).debtLimits();
+        _setLimits(creditFacade(), currentMinDebt, maxDebt);
     }
 
     /// @dev IMPLEMENTATION: setLimits

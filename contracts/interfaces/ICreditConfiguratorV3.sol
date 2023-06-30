@@ -165,10 +165,13 @@ interface ICreditConfiguratorV3 is ICreditConfiguratorEvents, IVersion {
     /// @param targetContract Address of a contract to be forbidden
     function forbidAdapter(address targetContract) external;
 
-    /// @dev Sets borrowed amount limits in Credit Facade
+    /// @notice Sets the minimal borrowed amount limit in Credit Facade
     /// @param minDebt Minimum borrowed amount
+    function setMinDebtLimit(uint128 minDebt) external;
+
+    /// @notice Sets the maximal borrowed amount limit in Credit Facade
     /// @param maxDebt Maximum borrowed amount
-    function setLimits(uint128 minDebt, uint128 maxDebt) external;
+    function setMaxDebtLimit(uint128 maxDebt) external;
 
     /// @dev Sets fees for creditManager
     /// @param feeInterest Percent which protocol charges additionally for interest rate
