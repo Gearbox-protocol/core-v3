@@ -904,7 +904,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @return quotaTokens An array of address of quoted tokens on the Credit Account
     /// @return outstandingQuotaInterest Quota interest that has not been saved in the Credit Manager
     /// @return quotasPacked Current quotas on quoted tokens packet with their lts
-    /// @return _quotedTokensMask The mask of enabled quoted tokens on the account
+    /// @return _quotedTokensMask The mask of all quoted tokens in the credit manager
     function _getQuotedTokensData(
         address creditAccount,
         uint256 enabledTokensMask,

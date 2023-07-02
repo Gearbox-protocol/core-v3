@@ -63,6 +63,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @notice maxDebt to maxQuota multiplier
     uint256 public constant maxQuotaMultiplier = 8;
 
+    /// @notice Maximum number of approved bots for a credit account
+    uint256 public constant maxApprovedBots = 5;
+
     /// @notice Credit Manager connected to this Credit Facade
     address public immutable creditManager;
 
@@ -1097,6 +1100,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             fundingAmount: fundingAmount,
             weeklyFundingAllowance: weeklyFundingAllowance
         }); // U:[FA-41]
+
+        // Maximum number of approved bots must be bounded to prevent users
+        // from making liquidation costs bigger than the block gas limit
+        if (remainingBots > maxApprovedBots) {
+            revert TooManyApprovedBotsException(); // U:[FA-41]
+        }
 
         if (remainingBots == 0) {
             _setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: false}); // U:[FA-41]

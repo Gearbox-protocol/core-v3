@@ -2157,6 +2157,18 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             weeklyFundingAllowance: 3
         });
 
+        /// It reverts if too many bots approved
+        botListMock.setBotPermissionsReturn(creditFacade.maxApprovedBots() + 1);
+        vm.expectRevert(TooManyApprovedBotsException.selector);
+        vm.prank(USER);
+        creditFacade.setBotPermissions({
+            creditAccount: creditAccount,
+            bot: bot,
+            permissions: 1,
+            fundingAmount: 2,
+            weeklyFundingAllowance: 3
+        });
+
         /// It removes flag if no bots left
         botListMock.setBotPermissionsReturn(0);
         vm.expectCall(

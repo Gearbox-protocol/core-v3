@@ -52,7 +52,7 @@ contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait
     mapping(address => FactoryParams) internal _factoryParams;
 
     /// @dev Mapping credit manager => queued accounts
-    mapping(address => QueuedAccount[]) internal _queuedAccounts;
+    mapping(address => QueuedAccount[2 ** 32]) internal _queuedAccounts;
 
     /// @notice Constructor
     /// @param addressProvider Address provider contract address
@@ -97,9 +97,8 @@ contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait
             revert CallerNotCreditManagerException(); // U:[AF-1]
         }
 
-        _queuedAccounts[msg.sender].push(
-            QueuedAccount({creditAccount: creditAccount, reusableAfter: uint40(block.timestamp) + delay})
-        ); // U:[AF-3]
+        _queuedAccounts[msg.sender][fp.tail] =
+            QueuedAccount({creditAccount: creditAccount, reusableAfter: uint40(block.timestamp) + delay}); // U:[AF-3]
         unchecked {
             ++fp.tail; // U:[AF-3]
         }
