@@ -2114,35 +2114,12 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         botListMock.setBotPermissionsReturn(1);
 
-        /// It erases all previious bot permission and set flag if flag was false before
-
+        /// It sets flag to true if it was false before
         vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.flagsOf, (creditAccount)));
-        vm.expectCall(
-            address(botListMock),
-            abi.encodeCall(IBotListV3.eraseAllBotPermissions, (address(creditManagerMock), creditAccount))
-        );
-
         vm.expectCall(
             address(creditManagerMock),
             abi.encodeCall(ICreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, true))
         );
-
-        vm.expectCall(
-            address(botListMock),
-            abi.encodeCall(IBotListV3.setBotPermissions, (address(creditManagerMock), creditAccount, bot, 1, 2, 3))
-        );
-
-        vm.prank(USER);
-        creditFacade.setBotPermissions({
-            creditAccount: creditAccount,
-            bot: bot,
-            permissions: 1,
-            fundingAmount: 2,
-            weeklyFundingAllowance: 3
-        });
-
-        /// It doesn't erase permission is bot already set
-        botListMock.setRevertOnErase(true);
         vm.expectCall(
             address(botListMock),
             abi.encodeCall(IBotListV3.setBotPermissions, (address(creditManagerMock), creditAccount, bot, 1, 2, 3))

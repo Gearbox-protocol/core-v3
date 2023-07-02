@@ -73,9 +73,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
 
         emit DepositGear(to, amount); // U: [GS-02]
 
-        if (votes.length != 0) {
-            _multivote(to, votes); // U: [GS-02]
-        }
+        _multivote(to, votes); // U: [GS-02]
     }
 
     /// @notice Performs a sequence of vote changes according to the passed array
@@ -100,9 +98,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     ///              * isIncrease - whether to add or remove votes
     ///              * extraData - data specific to the voting contract that is decoded on recipient side
     function withdraw(uint96 amount, address to, MultiVote[] calldata votes) external nonReentrant {
-        if (votes.length != 0) {
-            _multivote(msg.sender, votes); // U: [GS-03]
-        }
+        _multivote(msg.sender, votes); // U: [GS-03]
 
         _processPendingWithdrawals(msg.sender, to);
 
@@ -128,9 +124,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
         nonReentrant
         nonZeroAddress(successor) // U: [GS-07]
     {
-        if (votesBefore.length != 0) {
-            _multivote(msg.sender, votesBefore); // U: [GS-07]
-        }
+        _multivote(msg.sender, votesBefore); // U: [GS-07]
 
         UserVoteLockData storage vld = voteLockData[msg.sender];
 
@@ -185,6 +179,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     /// @dev Performs a sequence of vote changes based on the passed array
     function _multivote(address user, MultiVote[] calldata votes) internal {
         uint256 len = votes.length;
+        if (len == 0) return;
 
         UserVoteLockData storage vld = voteLockData[user];
 
