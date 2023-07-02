@@ -195,6 +195,9 @@ error NotApprovedBotException();
 /// @dev Thrown when attempting to perform a multicall action outside permissions
 error NoPermissionException(uint256 permission);
 
+/// @dev Thrown when user tries to approve more bots than allowed
+error TooManyApprovedBotsException();
+
 ///
 /// ACCESS
 ///

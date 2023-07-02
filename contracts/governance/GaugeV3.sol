@@ -31,9 +31,6 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
     /// @notice Contract version
     uint256 public constant version = 3_00;
 
-    /// @notice Address of the address provider
-    address public immutable addressProvider;
-
     /// @notice Address of the pool
     address public immutable override pool;
 
@@ -60,7 +57,6 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
         ACLNonReentrantTrait(IPoolV3(_pool).addressProvider())
         nonZeroAddress(_gearStaking) // U:[GA-01]
     {
-        addressProvider = IPoolV3(_pool).addressProvider(); // U:[GA-01]
         pool = _pool; // U:[GA-01]
         voter = _gearStaking; // U:[GA-01]
         epochLastUpdate = IGearStakingV3(voter).getCurrentEpoch(); // U:[GA-01]
@@ -220,6 +216,7 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
         nonZeroAddress(newVoter)
         configuratorOnly // U:[GA-03]
     {
+        if (newVoter == voter) return;
         voter = newVoter; // U:[GA-09]
 
         emit SetVoter({newVoter: newVoter}); // U:[GA-09]
@@ -261,6 +258,7 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
         _checkParams(minRate, maxRate); // U:[GA-04]
 
         QuotaRateParams storage qrp = quotaRateParams[token]; // U:[GA-06]
+        if (minRate == qrp.minRate && maxRate == qrp.maxRate) return;
         qrp.minRate = minRate; // U:[GA-06]
         qrp.maxRate = maxRate; // U:[GA-06]
 

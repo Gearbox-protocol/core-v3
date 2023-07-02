@@ -238,6 +238,16 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         _deposit(receiver, assets, assetsReceived, shares); // U:[P4-6,7]
     }
 
+    /// @dev Same as `mint`, but allows to specify the referral code
+    function mintWithReferral(uint256 shares, address receiver, uint16 referralCode)
+        external
+        override
+        returns (uint256 assets)
+    {
+        assets = mint(shares, receiver); // U:[P4-6]
+        emit Refer(receiver, referralCode, assets); // U:[P4-6]
+    }
+
     /// @notice Withdraws pool shares for given amount of underlying tokens
     /// @param assets Amount of underlying to withdraw
     /// @param receiver Account to send underlying to
