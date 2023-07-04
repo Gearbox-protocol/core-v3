@@ -383,9 +383,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
-            abi.encode(
-                admin, creditConfigurator, "setLimits(uint128,uint128)", abi.encode(15, 20), block.timestamp + 1 days
-            )
+            abi.encode(admin, creditConfigurator, "setMinDebtLimit(uint128)", abi.encode(15), block.timestamp + 1 days)
         );
 
         vm.expectEmit(true, false, false, true);
@@ -393,15 +391,15 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
             txHash,
             admin,
             creditConfigurator,
-            "setLimits(uint128,uint128)",
-            abi.encode(15, 20),
+            "setMinDebtLimit(uint128)",
+            abi.encode(15),
             uint40(block.timestamp + 1 days)
         );
 
         vm.prank(admin);
         controllerTimelock.setMinDebtLimit(creditManager, 15);
 
-        vm.expectCall(creditConfigurator, abi.encodeWithSelector(ICreditConfiguratorV3.setLimits.selector, 15, 20));
+        vm.expectCall(creditConfigurator, abi.encodeWithSelector(ICreditConfiguratorV3.setMinDebtLimit.selector, 15));
 
         vm.warp(block.timestamp + 1 days);
 
@@ -457,9 +455,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
-            abi.encode(
-                admin, creditConfigurator, "setLimits(uint128,uint128)", abi.encode(10, 25), block.timestamp + 1 days
-            )
+            abi.encode(admin, creditConfigurator, "setMaxDebtLimit(uint128)", abi.encode(25), block.timestamp + 1 days)
         );
 
         vm.expectEmit(true, false, false, true);
@@ -467,15 +463,15 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControlle
             txHash,
             admin,
             creditConfigurator,
-            "setLimits(uint128,uint128)",
-            abi.encode(10, 25),
+            "setMaxDebtLimit(uint128)",
+            abi.encode(25),
             uint40(block.timestamp + 1 days)
         );
 
         vm.prank(admin);
         controllerTimelock.setMaxDebtLimit(creditManager, 25);
 
-        vm.expectCall(creditConfigurator, abi.encodeWithSelector(ICreditConfiguratorV3.setLimits.selector, 10, 25));
+        vm.expectCall(creditConfigurator, abi.encodeWithSelector(ICreditConfiguratorV3.setMaxDebtLimit.selector, 25));
 
         vm.warp(block.timestamp + 1 days);
 

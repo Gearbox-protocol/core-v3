@@ -88,7 +88,9 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
         vm.expectEmit(false, false, false, false);
         emit FinishMultiCall();
 
-        vm.expectCall(address(botList), abi.encodeCall(BotListV3.eraseAllBotPermissions, (creditAccount)));
+        vm.expectCall(
+            address(botList), abi.encodeCall(BotListV3.eraseAllBotPermissions, (address(creditManager), creditAccount))
+        );
 
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (address(1))));
 

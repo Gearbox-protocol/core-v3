@@ -303,7 +303,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             liquidationThresholdInitial: currentLT,
             liquidationThresholdFinal: liquidationThresholdFinal,
             timestampRampStart: rampStart,
-            timestampRampEnd: uint40(block.timestamp) + rampDuration
+            timestampRampEnd: rampStart + rampDuration
         }); // I:[CC-30]
     }
 
@@ -339,13 +339,14 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         external
         override
         nonZeroAddress(token)
+        nonUnderlyingTokenOnly(token)
         pausableAdminsOnly // I:[CC-2A]
     {
         _forbidToken({_creditFacade: creditFacade(), token: token});
     }
 
     /// @dev IMPLEMENTATION: forbidToken
-    function _forbidToken(address _creditFacade, address token) internal nonUnderlyingTokenOnly(token) {
+    function _forbidToken(address _creditFacade, address token) internal {
         CreditFacadeV3 cf = CreditFacadeV3(_creditFacade);
 
         // Gets token masks. Reverts if the token was not added as collateral
@@ -368,6 +369,9 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         override
         configuratorOnly // I: [CC-2]
     {
+        if (!CreditManagerV3(creditManager).supportsQuotas()) {
+            revert QuotasNotSupportedException();
+        }
         if (!_isQuotedToken(token)) {
             revert TokenIsNotQuotedException();
         }
@@ -390,9 +394,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         emit QuoteToken(token);
     }
 
-    /// @dev Checks whether the quota keeper has a token registered as quotable
+    /// @dev Checks whether the quota keeper (if it is set) has a token registered as quoted
     function _isQuotedToken(address token) internal view returns (bool) {
         address quotaKeeper = CreditManagerV3(creditManager).poolQuotaKeeper();
+        if (quotaKeeper == address(0)) return false;
         return IPoolQuotaKeeperV3(quotaKeeper).isQuotedToken(token);
     }
 
@@ -490,15 +495,20 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     // CREDIT MANAGER MGMT
     //
 
-    /// @notice Sets borrowed amount limits in Credit Facade
+    /// @notice Sets the minimal borrowed amount limit in Credit Facade
     /// @param minDebt Minimum borrowed amount
+    function setMinDebtLimit(uint128 minDebt) external override controllerOnly {
+        address cf = creditFacade();
+        (, uint128 currentMaxDebt) = CreditFacadeV3(cf).debtLimits();
+        _setLimits(cf, minDebt, currentMaxDebt);
+    }
+
+    /// @notice Sets the maximal borrowed amount limit in Credit Facade
     /// @param maxDebt Maximum borrowed amount
-    function setLimits(uint128 minDebt, uint128 maxDebt)
-        external
-        override
-        controllerOnly // I:[CC-2B]
-    {
-        _setLimits(creditFacade(), minDebt, maxDebt);
+    function setMaxDebtLimit(uint128 maxDebt) external override controllerOnly {
+        address cf = creditFacade();
+        (uint128 currentMinDebt,) = CreditFacadeV3(cf).debtLimits();
+        _setLimits(cf, currentMinDebt, maxDebt);
     }
 
     /// @dev IMPLEMENTATION: setLimits
@@ -723,7 +733,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     ///      updating the Credit Facade
     function _migrateForbiddenTokens(address _creditFacade, uint256 forbiddenTokenMask) internal {
         unchecked {
-            for (uint256 mask = 1; mask <= forbiddenTokenMask; mask <<= 1) {
+            for (uint256 mask = 2; mask <= forbiddenTokenMask; mask <<= 1) {
                 if (mask & forbiddenTokenMask != 0) {
                     address token = CreditManagerV3(creditManager).getTokenByMask(mask);
                     _forbidToken(_creditFacade, token);

@@ -355,6 +355,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 amountMinusFeeFn: _amountMinusFee
             }); // U:[CM-8]
         }
+
         {
             uint256 underlyingBalance = IERC20(underlying).safeBalanceOf({account: creditAccount}); // U:[CM-8]
 
@@ -368,6 +369,20 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     }); // U:[CM-8]
                 }
             }
+        }
+
+        // If the creditAccount has non-zero quotas, they need to be reduced to 0;
+        // This is required to both free quota limits for other users and correctly
+        // compute quota interest
+        if (supportsQuotas && collateralDebtData.quotedTokens.length != 0) {
+            /// In case of any loss, PQK sets limits to zero for all quoted tokens
+            bool setLimitsToZero = loss > 0; // U:[CM-8] // I:[CMQ-8]
+
+            IPoolQuotaKeeperV3(collateralDebtData._poolQuotaKeeper).removeQuotas({
+                creditAccount: creditAccount,
+                tokens: collateralDebtData.quotedTokens,
+                setLimitsToZero: setLimitsToZero
+            }); // U:[CM-8] I:[CMQ-6]
         }
 
         // Transfers the due funds to the pool
@@ -387,20 +402,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 amount: remainingFunds,
                 convertToETH: false
             }); // U:[CM-8]
-        }
-
-        // If the creditAccount has non-zero quotas, they need to be reduced to 0;
-        // This is required to both free quota limits for other users and correctly
-        // compute quota interest
-        if (supportsQuotas && collateralDebtData.quotedTokens.length != 0) {
-            /// In case of any loss, PQK sets limits to zero for all quoted tokens
-            bool setLimitsToZero = loss > 0; // U:[CM-8] // I:[CMQ-8]
-
-            IPoolQuotaKeeperV3(collateralDebtData._poolQuotaKeeper).removeQuotas({
-                creditAccount: creditAccount,
-                tokens: collateralDebtData.quotedTokens,
-                setLimitsToZero: setLimitsToZero
-            }); // U:[CM-8] I:[CMQ-6]
         }
 
         // All remaining assets on the account are transferred to the `to` address

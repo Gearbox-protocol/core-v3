@@ -16,13 +16,17 @@ contract GearStakingMock is IGearStakingV3 {
         getCurrentEpoch = epoch;
     }
 
-    function deposit(uint96 amount, MultiVote[] calldata votes) external {}
+    function deposit(uint96 amount, address to, MultiVote[] calldata votes) external {}
 
     function multivote(MultiVote[] calldata votes) external {}
 
     function withdraw(uint96 amount, address to, MultiVote[] calldata votes) external {}
 
     function claimWithdrawals(address to) external {}
+
+    function migrate(uint96 amount, address to, MultiVote[] calldata votesBefore, MultiVote[] calldata votesAfter)
+        external
+    {}
 
     //
     // GETTERS

@@ -46,6 +46,9 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     /// @notice Mapping of address to their status as allowed voting contract
     mapping(address => VotingContractStatus) public allowedVotingContract;
 
+    /// @notice Address of a new GearStaking contract that can be migrated to
+    address public successor;
+
     constructor(address _addressProvider, uint256 _firstEpochTimestamp) ACLNonReentrantTrait(_addressProvider) {
         gear = IAddressProviderV3(_addressProvider).getAddressOrRevert(AP_GEAR_TOKEN, NO_VERSION_CONTROL); // U:[GS-01]
         firstEpochTimestamp = _firstEpochTimestamp; // U:[GS-01]
@@ -54,24 +57,23 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     /// @notice Deposits an amount of GEAR into staked GEAR. Optionally, performs a sequence of vote changes according to
     ///         the passed `votes` array
     /// @param amount Amount of GEAR to deposit into staked GEAR
+    /// @param to Address to add staked GEAR for
     /// @param votes Array of MultVote structs:
     ///              * votingContract - contract to submit a vote to
     ///              * voteAmount - amount of staked GEAR to add to or remove from a vote
     ///              * isIncrease - whether to add or remove votes
     ///              * extraData - data specific to the voting contract that is decoded on recipient side
-    function deposit(uint96 amount, MultiVote[] calldata votes) external nonReentrant {
-        IERC20(gear).safeTransferFrom(msg.sender, address(this), amount);
+    function deposit(uint96 amount, address to, MultiVote[] calldata votes) external nonReentrant {
+        IERC20(gear).safeTransferFrom(msg.sender, address(this), amount); // U: [GS-02]
 
-        UserVoteLockData storage vld = voteLockData[msg.sender];
+        UserVoteLockData storage vld = voteLockData[to];
 
-        vld.totalStaked += amount;
-        vld.available += amount;
+        vld.totalStaked += amount; // U: [GS-02]
+        vld.available += amount; // U: [GS-02]
 
-        emit DepositGear(msg.sender, amount);
+        emit DepositGear(to, amount); // U: [GS-02]
 
-        if (votes.length != 0) {
-            _multivote(msg.sender, votes);
-        }
+        _multivote(to, votes); // U: [GS-02]
     }
 
     /// @notice Performs a sequence of vote changes according to the passed array
@@ -81,7 +83,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     ///              * isIncrease - whether to add or remove votes
     ///              * extraData - data specific to the voting contract that is decoded on recipient side
     function multivote(MultiVote[] calldata votes) external nonReentrant {
-        _multivote(msg.sender, votes);
+        _multivote(msg.sender, votes); // U: [GS-04]
     }
 
     /// @notice Schedules a withdrawal from staked GEAR into GEAR, which can be claimed in 4 epochs.
@@ -96,22 +98,43 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     ///              * isIncrease - whether to add or remove votes
     ///              * extraData - data specific to the voting contract that is decoded on recipient side
     function withdraw(uint96 amount, address to, MultiVote[] calldata votes) external nonReentrant {
-        if (votes.length != 0) {
-            _multivote(msg.sender, votes);
-        }
+        _multivote(msg.sender, votes); // U: [GS-03]
 
         _processPendingWithdrawals(msg.sender, to);
 
-        voteLockData[msg.sender].available -= amount;
-        withdrawalData[msg.sender].withdrawalsPerEpoch[EPOCHS_TO_WITHDRAW - 1] += amount;
+        voteLockData[msg.sender].available -= amount; // U: [GS-03]
+        withdrawalData[msg.sender].withdrawalsPerEpoch[EPOCHS_TO_WITHDRAW - 1] += amount; // U: [GS-03]
 
-        emit ScheduleGearWithdrawal(msg.sender, amount);
+        emit ScheduleGearWithdrawal(msg.sender, amount); // U: [GS-03]
     }
 
     /// @notice Claims all of the caller's withdrawals that are mature
     /// @param to Address to send claimable GEAR, if any
     function claimWithdrawals(address to) external nonReentrant {
-        _processPendingWithdrawals(msg.sender, to);
+        _processPendingWithdrawals(msg.sender, to); // U: [GS-05]
+    }
+
+    /// @notice Migrates the user's staked GEAR to a `successor` GearStaking contract without waiting for the withdrawal delay
+    /// @param amount Amount if staked GEAR to migrate
+    /// @param to Address that will receive staked GEAR in the successor contract
+    /// @param votesBefore Votes to apply before sending GEAR to the successor contract
+    /// @param votesAfter Votes to apply in the new contract after sending GEAR
+    function migrate(uint96 amount, address to, MultiVote[] calldata votesBefore, MultiVote[] calldata votesAfter)
+        external
+        nonReentrant
+        nonZeroAddress(successor) // U: [GS-07]
+    {
+        _multivote(msg.sender, votesBefore); // U: [GS-07]
+
+        UserVoteLockData storage vld = voteLockData[msg.sender];
+
+        vld.available -= amount; // U: [GS-07]
+        vld.totalStaked -= amount; // U: [GS-07]
+
+        IERC20(gear).approve(successor, uint256(amount));
+        IGearStakingV3(successor).deposit(amount, to, votesAfter); // U: [GS-07]
+
+        emit MigrateGear(msg.sender, to, successor, amount); // U: [GS-07]
     }
 
     /// @notice Refreshes the user's withdrawal struct, shifting the withdrawal amounts based
@@ -156,6 +179,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     /// @dev Performs a sequence of vote changes based on the passed array
     function _multivote(address user, MultiVote[] calldata votes) internal {
         uint256 len = votes.length;
+        if (len == 0) return;
 
         UserVoteLockData storage vld = voteLockData[user];
 
@@ -164,14 +188,14 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
 
             if (currentVote.isIncrease) {
                 if (allowedVotingContract[currentVote.votingContract] != VotingContractStatus.ALLOWED) {
-                    revert VotingContractNotAllowedException();
+                    revert VotingContractNotAllowedException(); // U: [GS-04A]
                 }
 
                 IVotingContractV3(currentVote.votingContract).vote(user, currentVote.voteAmount, currentVote.extraData);
                 vld.available -= currentVote.voteAmount;
             } else {
                 if (allowedVotingContract[currentVote.votingContract] == VotingContractStatus.NOT_ALLOWED) {
-                    revert VotingContractNotAllowedException();
+                    revert VotingContractNotAllowedException(); // U: [GS-04A]
                 }
 
                 IVotingContractV3(currentVote.votingContract).unvote(
@@ -241,8 +265,21 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     ///               * UNVOTE_ONLY - can only unvote
     function setVotingContractStatus(address votingContract, VotingContractStatus status) external configuratorOnly {
         if (status == allowedVotingContract[votingContract]) return;
-        allowedVotingContract[votingContract] = status;
+        allowedVotingContract[votingContract] = status; // U: [GS-06]
 
-        emit SetVotingContractStatus(votingContract, status);
+        emit SetVotingContractStatus(votingContract, status); // U: [GS-06]
+    }
+
+    /// @notice Sets a new successor contract
+    /// @dev Successor is a new GearStaking contract where staked GEAR can be migrated to without
+    ///      waiting for the normal withdrawal delay. This is used to upgrade GearStaking contracts
+    ///      when new functionality is added
+    /// @param newSuccessor Address of the new successor contract
+    function setSuccessor(address newSuccessor) external configuratorOnly {
+        if (successor != newSuccessor) {
+            successor = newSuccessor; // U: [GS-08]
+
+            emit SetSuccessor(newSuccessor); // U: [GS-08]
+        }
     }
 }

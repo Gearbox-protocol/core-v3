@@ -27,9 +27,6 @@ interface IGaugeV3Events {
     /// @dev Emits when a user removes a vote
     event Unvote(address indexed user, address indexed token, uint96 votes, bool lpSide);
 
-    /// @dev Emits when the Voter contract is changed
-    event SetVoter(address indexed newVoter);
-
     /// @dev Emits when a new quota token is added in the PoolQuotaKeeper
     event AddQuotaToken(address indexed token, uint16 minRate, uint16 maxRate);
 

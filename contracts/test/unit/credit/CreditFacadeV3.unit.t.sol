@@ -627,7 +627,10 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         }
 
         if (hasBotPermissions) {
-            vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.eraseAllBotPermissions, (creditAccount)));
+            vm.expectCall(
+                address(botListMock),
+                abi.encodeCall(IBotListV3.eraseAllBotPermissions, (address(creditManagerMock), creditAccount))
+            );
         } else {
             botListMock.setRevertOnErase(true);
         }
@@ -967,7 +970,10 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         }
 
         if (hasBotPermissions) {
-            vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.eraseAllBotPermissions, (creditAccount)));
+            vm.expectCall(
+                address(botListMock),
+                abi.encodeCall(IBotListV3.eraseAllBotPermissions, (address(creditManagerMock), creditAccount))
+            );
         } else {
             botListMock.setRevertOnErase(true);
         }
@@ -1087,6 +1093,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         creditManagerMock.setEnabledTokensMask(enabledTokensMaskBefore);
         creditManagerMock.setBorrower(USER);
+        creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, true);
 
         uint256 enabledTokensMaskAfter = enabledTokensMaskBefore;
 
@@ -1116,10 +1123,12 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         }
     }
 
-    /// @dev U:[FA-19]: botMulticall reverts if bot forbidden or has no permission
-    function test_U_FA_19_botMulticall_reverts_if_bot_forbidden_or_has_no_permission() public notExpirableCase {
+    /// @dev U:[FA-19]: botMulticall reverts if 1. bot permissions flag is false 2. no permissions are set 3. bot is forbidden
+    function test_U_FA_19_botMulticall_reverts_for_invalid_bots() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
         MultiCall[] memory calls;
+
+        creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, true);
 
         botListMock.setBotStatusReturns(ALL_PERMISSIONS, true);
 
@@ -1130,11 +1139,20 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.expectRevert(NotApprovedBotException.selector);
         creditFacade.botMulticall(creditAccount, calls);
+
+        creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, false);
+
+        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false);
+
+        vm.expectRevert(NotApprovedBotException.selector);
+        creditFacade.botMulticall(creditAccount, calls);
     }
 
     /// @dev U:[FA-20]: only botMulticall doesn't revert for pay bot call
     function test_U_FA_20_only_botMulticall_doesnt_revert_for_pay_bot_call() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
+
+        creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, true);
 
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(1, 100, 1);
@@ -1588,12 +1606,13 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         });
     }
 
-    /// @dev U:[FA-30]: multicall increase debt if forbid tokens on account
+    /// @dev U:[FA-30]: multicall increase debt / schedule withdrawal if forbid tokens on account
     function test_U_FA_30_multicall_increase_debt_if_forbid_tokens_on_account() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
         address link = tokenTestSuite.addressOf(Tokens.LINK);
         uint256 linkMask = 1 << 8;
+        tokenTestSuite.mint(link, DUMB_ADDRESS, 1000);
 
         creditManagerMock.addToken(link, linkMask);
 
@@ -1610,7 +1629,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             creditAccount: creditAccount,
             calls: MultiCallBuilder.build(),
             enabledTokensMask: linkMask,
-            flags: INCREASE_DEBT_WAS_CALLED
+            flags: REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS
         });
 
         vm.expectRevert(ForbiddenTokensException.selector);
@@ -1624,6 +1643,19 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 ),
             enabledTokensMask: linkMask,
             flags: INCREASE_DEBT_PERMISSION
+        });
+
+        vm.expectRevert(ForbiddenTokensException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.scheduleWithdrawal, (link, 1000))
+                })
+                ),
+            enabledTokensMask: linkMask,
+            flags: WITHDRAW_PERMISSION
         });
     }
 
@@ -1811,6 +1843,52 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         );
     }
 
+    /// @dev U:[FA-34A]: multicall updateQuota reverts on trying to increase quota for forbidden token
+    function test_U_FA_34A_multicall_updateQuota_works_properly() public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+
+        address link = tokenTestSuite.addressOf(Tokens.LINK);
+        uint256 linkMask = 1 << 8;
+        tokenTestSuite.mint(link, DUMB_ADDRESS, 1000);
+
+        creditManagerMock.addToken(link, linkMask);
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setTokenAllowance(link, AllowanceAction.FORBID);
+
+        uint96 maxDebt = 443330;
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setDebtLimits(0, maxDebt, type(uint8).max);
+
+        int96 change = 990;
+
+        vm.expectRevert(ForbiddenTokensException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (link, change, 0))
+                })
+                ),
+            enabledTokensMask: linkMask,
+            flags: UPDATE_QUOTA_PERMISSION | FORBIDDEN_TOKENS_BEFORE_CALLS
+        });
+
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (link, -change, 0))
+                })
+                ),
+            enabledTokensMask: linkMask,
+            flags: UPDATE_QUOTA_PERMISSION | FORBIDDEN_TOKENS_BEFORE_CALLS
+        });
+    }
+
     /// @dev U:[FA-35]: multicall `scheduleWithdrawal` works properly
     function test_U_FA_35_multicall_scheduleWithdrawal_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
@@ -1878,7 +1956,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         address bot = makeAddr("BOT");
         vm.expectCall(
-            address(botListMock), abi.encodeCall(IBotListV3.payBot, (USER, creditAccount, bot, paymentAmount))
+            address(botListMock),
+            abi.encodeCall(IBotListV3.payBot, (USER, address(creditManagerMock), creditAccount, bot, paymentAmount))
         );
 
         vm.prank(bot);
@@ -2035,30 +2114,16 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         botListMock.setBotPermissionsReturn(1);
 
-        /// It erases all previious bot permission and set flag if flag was false before
-
+        /// It sets flag to true if it was false before
         vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.flagsOf, (creditAccount)));
-        vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.eraseAllBotPermissions, (creditAccount)));
-
         vm.expectCall(
             address(creditManagerMock),
             abi.encodeCall(ICreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, true))
         );
-
-        vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.setBotPermissions, (creditAccount, bot, 1, 2, 3)));
-
-        vm.prank(USER);
-        creditFacade.setBotPermissions({
-            creditAccount: creditAccount,
-            bot: bot,
-            permissions: 1,
-            fundingAmount: 2,
-            weeklyFundingAllowance: 3
-        });
-
-        /// It doesn't erase permission is bot already set
-        botListMock.setRevertOnErase(true);
-        vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.setBotPermissions, (creditAccount, bot, 1, 2, 3)));
+        vm.expectCall(
+            address(botListMock),
+            abi.encodeCall(IBotListV3.setBotPermissions, (address(creditManagerMock), creditAccount, bot, 1, 2, 3))
+        );
 
         vm.prank(USER);
         creditFacade.setBotPermissions({
@@ -2083,7 +2148,10 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         /// It removes flag if no bots left
         botListMock.setBotPermissionsReturn(0);
-        vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.setBotPermissions, (creditAccount, bot, 1, 2, 3)));
+        vm.expectCall(
+            address(botListMock),
+            abi.encodeCall(IBotListV3.setBotPermissions, (address(creditManagerMock), creditAccount, bot, 1, 2, 3))
+        );
 
         vm.expectCall(
             address(creditManagerMock),
@@ -2109,7 +2177,10 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         botListMock.setRevertOnErase(false);
         creditManagerMock.setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: true});
-        vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.eraseAllBotPermissions, (creditAccount)));
+        vm.expectCall(
+            address(botListMock),
+            abi.encodeCall(IBotListV3.eraseAllBotPermissions, (address(creditManagerMock), creditAccount))
+        );
         creditFacade.eraseAllBotPermissionsAtClosure(creditAccount);
     }
 

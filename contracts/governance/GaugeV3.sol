@@ -41,7 +41,7 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
     mapping(address => mapping(address => UserVotes)) public override userTokenVotes;
 
     /// @notice GEAR locking and voting contract
-    address public override voter;
+    address public immutable override voter;
 
     /// @notice Epoch when the rates were last recomputed
     uint16 public override epochLastUpdate;
@@ -208,19 +208,6 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
     //
     // CONFIGURATION
     //
-
-    /// @notice Sets the GEAR staking contract, which is the only entity allowed to vote/unvote directly
-    /// @param newVoter The new voter contract
-    function setVoter(address newVoter)
-        external
-        nonZeroAddress(newVoter)
-        configuratorOnly // U:[GA-03]
-    {
-        if (newVoter == voter) return;
-        voter = newVoter; // U:[GA-09]
-
-        emit SetVoter({newVoter: newVoter}); // U:[GA-09]
-    }
 
     /// @dev Adds a new quoted token to the Gauge and PoolQuotaKeeper, and sets the initial rate params
     /// @param token Address of the token to add

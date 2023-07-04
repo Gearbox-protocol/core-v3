@@ -49,20 +49,20 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     ///      Only Credit Facades connected to approved Credit Managers can alter bot permissions
     mapping(address => bool) public approvedCreditManager;
 
-    /// @notice Mapping from (creditAccount, bot) to bit permissions
-    mapping(address => mapping(address => uint192)) public botPermissions;
+    /// @notice Mapping from (creditManager, creditAccount, bot) to bot permissions
+    mapping(address => mapping(address => mapping(address => uint192))) public botPermissions;
+
+    /// @notice Mapping of (creditManager, creditAccount, bot) to bot funding parameters
+    mapping(address => mapping(address => mapping(address => BotFunding))) public botFunding;
 
     /// @notice Mapping from credit account to the set of bots with non-zero permissions
-    mapping(address => EnumerableSet.AddressSet) internal activeBots;
+    mapping(address => mapping(address => EnumerableSet.AddressSet)) internal activeBots;
 
     /// @notice Whether the bot is forbidden system-wide
     mapping(address => bool) public forbiddenBot;
 
     /// @notice Mapping from borrower to their bot funding balance
     mapping(address => uint256) public override balanceOf;
-
-    /// @notice Mapping of (creditAccount, bot) to bot funding parameters
-    mapping(address => mapping(address => BotFunding)) public botFunding;
 
     /// @notice A fee (in PERCENTAGE_FACTOR format) charged by the DAO on bot payments
     uint16 public daoFee = 0;
@@ -73,19 +73,20 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     }
 
     /// @notice Limits access to a function only to Credit Facades connected to approved CMs
-    modifier onlyValidCreditFacade() {
-        _revertIfCallerNotValidCreditFacade();
-
+    modifier onlyValidCreditFacade(address creditManager) {
+        _revertIfCallerNotValidCreditFacade(creditManager);
         _;
     }
 
     /// @notice Sets permissions and funding for (creditAccount, bot). Callable only through CreditFacade
+    /// @param creditManager Credit Manager to set permissions in
     /// @param creditAccount CA to set permissions for
     /// @param bot Bot to set permissions for
     /// @param permissions A bit mask of permissions
     /// @param fundingAmount Total amount of ETH available to the bot for payments
     /// @param weeklyFundingAllowance Amount of ETH available to the bot weekly
     function setBotPermissions(
+        address creditManager,
         address creditAccount,
         address bot,
         uint192 permissions,
@@ -94,7 +95,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     )
         external
         nonZeroAddress(bot)
-        onlyValidCreditFacade // F: [BL-03]
+        onlyValidCreditFacade(creditManager) // F: [BL-03]
         returns (uint256 activeBotsRemaining)
     {
         if (!bot.isContract()) {
@@ -106,11 +107,11 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         }
 
         if (permissions != 0) {
-            activeBots[creditAccount].add(bot); // F: [BL-03]
+            activeBots[creditManager][creditAccount].add(bot); // F: [BL-03]
 
-            botPermissions[creditAccount][bot] = permissions; // F: [BL-03]
+            botPermissions[creditManager][creditAccount][bot] = permissions; // F: [BL-03]
 
-            BotFunding storage bf = botFunding[creditAccount][bot];
+            BotFunding storage bf = botFunding[creditManager][creditAccount][bot];
 
             bf.remainingFunds = fundingAmount; // F: [BL-03]
             bf.maxWeeklyAllowance = weeklyFundingAllowance; // F: [BL-03]
@@ -118,6 +119,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
             bf.allowanceLU = uint40(block.timestamp); // F: [BL-03]
 
             emit SetBotPermissions({
+                creditManager: creditManager,
                 creditAccount: creditAccount,
                 bot: bot,
                 permissions: permissions,
@@ -125,49 +127,51 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
                 weeklyFundingAllowance: weeklyFundingAllowance
             }); // F: [BL-03]
         } else {
-            _eraseBot(creditAccount, bot); // F: [BL-03]
+            _eraseBot(creditManager, creditAccount, bot); // F: [BL-03]
         }
 
-        activeBotsRemaining = activeBots[creditAccount].length(); // F: [BL-03]
+        activeBotsRemaining = activeBots[creditManager][creditAccount].length(); // F: [BL-03]
     }
 
     /// @notice Removes permissions and funding for all bots with non-zero permissions for a credit account
+    /// @param creditManager Credit Manager to erase permissions in
     /// @param creditAccount Credit Account to erase permissions for
-    function eraseAllBotPermissions(address creditAccount)
+    function eraseAllBotPermissions(address creditManager, address creditAccount)
         external
-        onlyValidCreditFacade // F: [BL-06]
+        onlyValidCreditFacade(creditManager) // F: [BL-06]
     {
-        uint256 len = activeBots[creditAccount].length();
+        uint256 len = activeBots[creditManager][creditAccount].length();
 
         unchecked {
             for (uint256 i = 0; i < len; ++i) {
-                address bot = activeBots[creditAccount].at(len - i - 1); // F: [BL-06]
-                _eraseBot({creditAccount: creditAccount, bot: bot});
+                address bot = activeBots[creditManager][creditAccount].at(len - i - 1); // F: [BL-06]
+                _eraseBot({creditManager: creditManager, creditAccount: creditAccount, bot: bot});
             }
         }
     }
 
-    /// @dev Removes all permissions and funding for a (credit account, bot) pair
-    function _eraseBot(address creditAccount, address bot) internal {
-        delete botPermissions[creditAccount][bot]; // F: [BL-06]
-        delete botFunding[creditAccount][bot]; // F: [BL-06]
+    /// @dev Removes all permissions and funding for a (creditManager, credit account, bot) tuple
+    function _eraseBot(address creditManager, address creditAccount, address bot) internal {
+        delete botPermissions[creditManager][creditAccount][bot]; // F: [BL-06]
+        delete botFunding[creditManager][creditAccount][bot]; // F: [BL-06]
 
-        activeBots[creditAccount].remove(bot); // F: [BL-06]
-        emit EraseBot({creditAccount: creditAccount, bot: bot}); // F: [BL-06]
+        activeBots[creditManager][creditAccount].remove(bot); // F: [BL-06]
+        emit EraseBot({creditManager: creditManager, creditAccount: creditAccount, bot: bot}); // F: [BL-06]
     }
 
     /// @notice Takes payment for performed services from the user's balance and sends to the bot
     /// @param payer Address to charge
-    /// @param creditAccount Address of the credit account paid for
+    /// @param creditManager Address of the Credit Manager where the (creditAccount, bot) pair is funded
+    /// @param creditAccount Address of the Credit Account paid for
     /// @param bot Address of the bot to pay
     /// @param paymentAmount Amount to pay
-    function payBot(address payer, address creditAccount, address bot, uint72 paymentAmount)
+    function payBot(address payer, address creditManager, address creditAccount, address bot, uint72 paymentAmount)
         external
-        onlyValidCreditFacade // F: [BL-05]
+        onlyValidCreditFacade(creditManager) // F: [BL-05]
     {
         if (paymentAmount == 0) return;
 
-        BotFunding storage bf = botFunding[creditAccount][bot]; // F: [BL-05]
+        BotFunding storage bf = botFunding[creditManager][creditAccount][bot]; // F: [BL-05]
 
         if (block.timestamp >= bf.allowanceLU + uint40(7 days)) {
             bf.allowanceLU = uint40(block.timestamp); // F: [BL-05]
@@ -216,17 +220,17 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     }
 
     /// @notice Returns all active bots currently on the account
-    function getActiveBots(address creditAccount) external view returns (address[] memory) {
-        return activeBots[creditAccount].values();
+    function getActiveBots(address creditManager, address creditAccount) external view returns (address[] memory) {
+        return activeBots[creditManager][creditAccount].values();
     }
 
     /// @notice Returns information about bot permissions
-    function getBotStatus(address bot, address creditAccount)
+    function getBotStatus(address creditManager, address creditAccount, address bot)
         external
         view
         returns (uint192 permissions, bool forbidden)
     {
-        return (botPermissions[creditAccount][bot], forbiddenBot[bot]);
+        return (botPermissions[creditManager][creditAccount][bot], forbiddenBot[bot]);
     }
 
     //
@@ -262,8 +266,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     }
 
     /// @notice Reverts if caller is not creditFacade
-    function _revertIfCallerNotValidCreditFacade() internal view {
-        address creditManager = ICreditFacadeV3(msg.sender).creditManager();
+    function _revertIfCallerNotValidCreditFacade(address creditManager) internal view {
         if (!approvedCreditManager[creditManager] || ICreditManagerV3(creditManager).creditFacade() != msg.sender) {
             revert CallerNotCreditFacadeException();
         }

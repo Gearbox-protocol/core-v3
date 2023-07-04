@@ -16,12 +16,12 @@ contract BotListMock {
         return_forbidden = forbidden;
     }
 
-    function getBotStatus(address, address) external view returns (uint256 botPermissions, bool forbidden) {
+    function getBotStatus(address, address, address) external view returns (uint256 botPermissions, bool forbidden) {
         botPermissions = return_botPermissions;
         forbidden = return_forbidden;
     }
 
-    function eraseAllBotPermissions(address) external view {
+    function eraseAllBotPermissions(address, address) external view {
         if (revertOnErase) {
             revert("Unexpected call to eraseAllBotPermissions");
         }
@@ -31,13 +31,15 @@ contract BotListMock {
         revertOnErase = _value;
     }
 
-    function payBot(address payer, address creditAccount, address bot, uint72 paymentAmount) external {}
+    function payBot(address payer, address creditManager, address creditAccount, address bot, uint72 paymentAmount)
+        external
+    {}
 
     function setBotPermissionsReturn(uint256 activeBotsRemaining) external {
         return_activeBotsRemaining = activeBotsRemaining;
     }
 
-    function setBotPermissions(address, address, uint192, uint72, uint72)
+    function setBotPermissions(address, address, address, uint192, uint72, uint72)
         external
         view
         returns (uint256 activeBotsRemaining)

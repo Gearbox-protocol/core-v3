@@ -6,6 +6,8 @@ pragma solidity ^0.8.17;
 import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 import {RevocationPair} from "./ICreditManagerV3.sol";
 
+// PERMISSIONS
+
 uint192 constant ADD_COLLATERAL_PERMISSION = 1;
 uint192 constant INCREASE_DEBT_PERMISSION = 1 << 1;
 uint192 constant DECREASE_DEBT_PERMISSION = 1 << 2;
@@ -23,12 +25,21 @@ uint256 constant ALL_CREDIT_FACADE_CALLS_PERMISSION = ADD_COLLATERAL_PERMISSION 
 
 uint256 constant ALL_PERMISSIONS = ALL_CREDIT_FACADE_CALLS_PERMISSION | EXTERNAL_CALLS_PERMISSION;
 
-// All flags start from 193rd bit, because bot permissions is uint192
-uint256 constant INCREASE_DEBT_WAS_CALLED = 1 << 193;
-uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 1 << 194;
-uint256 constant PRICE_UPDATES_ALREADY_APPLIED = 1 << 195;
+// FLAGS
 
-// pay bot is a flag which is enabled in botMulticall function only to allow one payment operation
+/// @dev Indicates that there are enabled forbidden tokens on the account before multicall
+uint256 constant FORBIDDEN_TOKENS_BEFORE_CALLS = 1 << 192;
+/// @dev Indicates that there must be no enabled forbidden tokens on the account after multicall,
+///      set to true when `increaseDebt` or `scheduleWithdrawal` is called
+uint256 constant REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS = 1 << 193;
+/// @dev Indicates that external calls from credit account to adapters were made during multicall,
+///      set to true on the first call to the adapter
+uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 1 << 194;
+/// @dev Indicates that `onDemandPriceUpdate` calls can be skipped since they were already applied,
+///      set to true in `liquidateCreditAccount`
+uint256 constant PRICE_UPDATES_ALREADY_APPLIED = 1 << 195;
+/// @dev Indicates that `payBot` can be called during multicall to fund the bot, set to true when
+///      multicall is initiated in `botMulticall` and reset after the first `payBot` call
 uint256 constant PAY_BOT_CAN_BE_CALLED = 1 << 196;
 
 interface IUpdatablePriceFeed {
