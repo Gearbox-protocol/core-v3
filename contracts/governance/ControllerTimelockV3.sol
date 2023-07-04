@@ -132,7 +132,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         ICreditFacadeV3 creditFacade = ICreditFacadeV3(ICreditManagerV3(creditManager).creditFacade());
         address creditConfigurator = ICreditManagerV3(creditManager).creditConfigurator();
 
-        (uint128 minDebtCurrent, uint128 maxDebtCurrent) = creditFacade.debtLimits();
+        (uint128 minDebtCurrent,) = creditFacade.debtLimits();
 
         if (!_checkPolicy(creditManager, "MIN_DEBT", uint256(minDebtCurrent), uint256(minDebt))) {
             revert ParameterChecksFailedException(); // U: [CT-04A]

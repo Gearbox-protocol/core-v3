@@ -508,7 +508,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function setMaxDebtLimit(uint128 maxDebt) external override controllerOnly {
         address cf = creditFacade();
         (uint128 currentMinDebt,) = CreditFacadeV3(cf).debtLimits();
-        _setLimits(creditFacade(), currentMinDebt, maxDebt);
+        _setLimits(cf, currentMinDebt, maxDebt);
     }
 
     /// @dev IMPLEMENTATION: setLimits

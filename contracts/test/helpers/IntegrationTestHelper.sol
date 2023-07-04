@@ -369,8 +369,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
 
         _deployPool(10 * creditConfig.getAccountAmount());
 
-        uint128 minDebt = creditConfig.minDebt();
-        uint128 maxDebt = creditConfig.maxDebt();
+        // uint128 minDebt = creditConfig.minDebt();
+        // uint128 maxDebt = creditConfig.maxDebt();
 
         creditAccountAmount = creditConfig.getAccountAmount();
 
