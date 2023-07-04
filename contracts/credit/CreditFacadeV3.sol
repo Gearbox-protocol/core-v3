@@ -456,7 +456,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                 creditAccount,
                 calls,
                 collateralDebtData.enabledTokensMask,
-                CLOSE_CREDIT_ACCOUNT_FLAGS | PRICE_UPDATES_ALREADY_APPLIED
+                CLOSE_CREDIT_ACCOUNT_FLAGS.enable(PRICE_UPDATES_ALREADY_APPLIED)
             ); // U:[FA-16]
             collateralDebtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter; // U:[FA-16]
         }
@@ -544,7 +544,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             revert NotApprovedBotException(); // U:[FA-19]
         }
 
-        _multicallFullCollateralCheck(creditAccount, calls, botPermissions | PAY_BOT_CAN_BE_CALLED); // U:[FA-19, 20]
+        _multicallFullCollateralCheck(creditAccount, calls, botPermissions.enable(PAY_BOT_CAN_BE_CALLED)); // U:[FA-19, 20]
     }
 
     /// @notice Convenience internal function that packages a multicall and a fullCheck together,
@@ -573,7 +573,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             creditAccount,
             calls,
             enabledTokensMaskBefore,
-            permissions | (forbiddenBalances.length != 0 ? FORBIDDEN_TOKENS_ON_ACCOUNT : 0)
+            forbiddenBalances.length != 0 ? permissions.enable(FORBIDDEN_TOKENS_ON_ACCOUNT) : permissions
         );
 
         // Performs one fullCollateralCheck at the end of a multicall
