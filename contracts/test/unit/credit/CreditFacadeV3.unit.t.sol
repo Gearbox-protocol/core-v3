@@ -1629,7 +1629,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             creditAccount: creditAccount,
             calls: MultiCallBuilder.build(),
             enabledTokensMask: linkMask,
-            flags: REVERT_ON_FORBIDDEN_TOKENS
+            flags: REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS
         });
 
         vm.expectRevert(ForbiddenTokensException.selector);
@@ -1873,7 +1873,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 })
                 ),
             enabledTokensMask: linkMask,
-            flags: UPDATE_QUOTA_PERMISSION | FORBIDDEN_TOKENS_ON_ACCOUNT
+            flags: UPDATE_QUOTA_PERMISSION | FORBIDDEN_TOKENS_BEFORE_CALLS
         });
 
         creditFacade.multicallInt({
@@ -1885,7 +1885,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 })
                 ),
             enabledTokensMask: linkMask,
-            flags: UPDATE_QUOTA_PERMISSION | FORBIDDEN_TOKENS_ON_ACCOUNT
+            flags: UPDATE_QUOTA_PERMISSION | FORBIDDEN_TOKENS_BEFORE_CALLS
         });
     }
 
