@@ -5,7 +5,6 @@ pragma solidity ^0.8.10;
 
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import {IPriceFeedType} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceFeedType.sol";
-import {PriceFeedType} from "@gearbox-protocol/integration-types/contracts/PriceFeedType.sol";
 
 enum FlagState {
     FALSE,
@@ -23,8 +22,6 @@ contract PriceFeedMock is AggregatorV3Interface, IPriceFeedType {
     uint256 startedAt;
     uint256 updatedAt;
     uint80 internal answerInRound;
-
-    PriceFeedType internal _priceFeedType;
 
     FlagState internal _skipPriceCheck;
 
@@ -95,9 +92,9 @@ contract PriceFeedMock is AggregatorV3Interface, IPriceFeedType {
         return (roundId, price, startedAt, updatedAt, answerInRound);
     }
 
-    function priceFeedType() external view override returns (PriceFeedType) {
-        return _priceFeedType;
-    }
+    // function priceFeedType() external view override returns (PriceFeedType) {
+    //     return _priceFeedType;
+    // }
 
     function skipPriceCheck() external view override returns (bool) {
         return flagState(_skipPriceCheck);

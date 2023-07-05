@@ -3,14 +3,14 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {IAdapter} from "../interfaces/IAdapter.sol";
+import {IAdapterBase} from "../interfaces/IAdapterBase.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {CallerNotCreditFacadeException} from "../interfaces/IExceptions.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
 
 /// @title Abstract adapter
 /// @dev Inheriting adapters MUST use provided internal functions to perform all operations with credit accounts
-abstract contract AbstractAdapter is IAdapter, ACLTrait {
+abstract contract AbstractAdapter is IAdapterBase, ACLTrait {
     /// @notice Credit manager the adapter is connected to
     address public immutable override creditManager;
 

@@ -39,7 +39,6 @@
   },
   "dependencies": {
     "@1inch/solidity-utils": "^2.2.27",
-    "@gearbox-protocol/core-v2": "^1.19.0-base.3",
-    "@gearbox-protocol/integration-types": "^1.2.0"
+    "@gearbox-protocol/core-v2": "1.19.0-base.4"
   }
 }

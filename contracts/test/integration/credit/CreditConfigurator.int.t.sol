@@ -17,7 +17,7 @@ import {
 } from "../../../credit/CreditConfiguratorV3.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import {ICreditConfiguratorEvents} from "../../../interfaces/ICreditConfiguratorV3.sol";
-import {IAdapter} from "@gearbox-protocol/core-v2/contracts/interfaces/adapters/IAdapter.sol";
+import {IAdapterBase} from "../../../interfaces/IAdapterBase.sol";
 
 //
 import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
@@ -84,7 +84,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     function getAdapterDifferentCM() internal returns (AdapterMock) {
         address CM = makeAddr("Different CM");
 
-        vm.mockCall(CM, abi.encodeCall(IAdapter.creditManager, ()), abi.encode(CM));
+        vm.mockCall(CM, abi.encodeCall(IAdapterBase.creditManager, ()), abi.encode(CM));
         vm.mockCall(CM, abi.encodeCall(ICreditManagerV3.addressProvider, ()), abi.encode((address(addressProvider))));
 
         address TARGET_CONTRACT = makeAddr("Target Contract");
@@ -539,7 +539,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.expectRevert(ZeroAddressException.selector);
         creditConfigurator.allowAdapter(address(0));
 
-        vm.mockCall(address(adapterMock), abi.encodeCall(IAdapter.targetContract, ()), abi.encode(address(0)));
+        vm.mockCall(address(adapterMock), abi.encodeCall(IAdapterBase.targetContract, ()), abi.encode(address(0)));
 
         vm.expectRevert(TargetContractNotAllowedException.selector);
         creditConfigurator.allowAdapter(address(adapterMock));
@@ -585,14 +585,14 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.startPrank(CONFIGURATOR);
 
         vm.mockCall(
-            address(adapterMock), abi.encodeCall(IAdapter.targetContract, ()), abi.encode(address(creditManager))
+            address(adapterMock), abi.encodeCall(IAdapterBase.targetContract, ()), abi.encode(address(creditManager))
         );
 
         vm.expectRevert(TargetContractNotAllowedException.selector);
         creditConfigurator.allowAdapter(address(adapterMock));
 
         vm.mockCall(
-            address(adapterMock), abi.encodeCall(IAdapter.targetContract, ()), abi.encode(address(creditFacade))
+            address(adapterMock), abi.encodeCall(IAdapterBase.targetContract, ()), abi.encode(address(creditFacade))
         );
 
         vm.expectRevert(TargetContractNotAllowedException.selector);
