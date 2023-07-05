@@ -3,17 +3,11 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {AdapterType} from "@gearbox-protocol/integration-types/contracts/AdapterType.sol";
-
 /// @title Adapter interface
-interface IAdapter {
+interface IAdapterBase {
     function creditManager() external view returns (address);
 
     function addressProvider() external view returns (address);
 
     function targetContract() external view returns (address);
-
-    function _gearboxAdapterType() external pure returns (AdapterType);
-
-    function _gearboxAdapterVersion() external pure returns (uint16);
 }

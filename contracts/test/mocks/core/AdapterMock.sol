@@ -4,13 +4,9 @@
 pragma solidity ^0.8.17;
 
 import {AbstractAdapter} from "../../../core/AbstractAdapter.sol";
-import {AdapterType} from "../../../interfaces/IAdapter.sol";
 
 /// @title Adapter Mock
 contract AdapterMock is AbstractAdapter {
-    AdapterType public constant override _gearboxAdapterType = AdapterType.ABSTRACT;
-    uint16 public constant override _gearboxAdapterVersion = 1;
-
     /// @notice Constructor
     /// @param _creditManager Credit manager address
     /// @param _targetContract Target contract address

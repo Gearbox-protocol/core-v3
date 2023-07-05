@@ -4,12 +4,8 @@
 pragma solidity ^0.8.17;
 
 import {AbstractAdapter} from "../../../core/AbstractAdapter.sol";
-import {AdapterType} from "../../../interfaces/IAdapter.sol";
 
 contract AbstractAdapterHarness is AbstractAdapter {
-    AdapterType public constant override _gearboxAdapterType = AdapterType.ABSTRACT;
-    uint16 public constant override _gearboxAdapterVersion = 1;
-
     constructor(address _creditManager, address _targetContract) AbstractAdapter(_creditManager, _targetContract) {}
 
     function revertIfCallerNotCreditFacade() external view {

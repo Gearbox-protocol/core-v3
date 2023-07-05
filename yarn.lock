@@ -649,17 +649,12 @@
     "@ethersproject/properties" "^5.7.0"
     "@ethersproject/strings" "^5.7.0"
 
-"@gearbox-protocol/core-v2@^1.19.0-base.3":
-  version "1.19.0-base.3"
-  resolved "https://registry.yarnpkg.com/@gearbox-protocol/core-v2/-/core-v2-1.19.0-base.3.tgz#df94ad2978d20630d39b46f653f0ced88ba8c805"
-  integrity sha512-AQLyerVwgD0FiiL4ynENm79KY315obN2U2HawZTZ34Z+oZjzKrPSjJnIOQhBXAydsN2zk7++KLyWH/CG3k3ctg==
+"@gearbox-protocol/core-v2@1.19.0-base.4":
+  version "1.19.0-base.4"
+  resolved "https://registry.yarnpkg.com/@gearbox-protocol/core-v2/-/core-v2-1.19.0-base.4.tgz#ab62e1320c500eea7917e4eb00068959fc6329ab"
+  integrity sha512-WLEUhcAsDlS8wmxrd6qGMAcWWwyk8+97iJFtLNDfpXFd59iOebhuedsjUzW/a3dB+ngIwSiQWlTFMDUSTcExeg==
   dependencies:
     "@typechain/ethers-v5" "^10.2.1"
-
-"@gearbox-protocol/integration-types@^1.2.0":
-  version "1.2.0"
-  resolved "https://registry.yarnpkg.com/@gearbox-protocol/integration-types/-/integration-types-1.2.0.tgz#865cde63923c5e0e61575b9b808b3f4ec266ebb4"
-  integrity sha512-YSVn5u4G/e7ZSJRe4AD7IZ3C76tdk5bnvChrgNZIsxvEC7LQ3mWHFVn8shADU8PIPLcftnCxVLp2WkVdR6jiNA==
 
 "@gearbox-protocol/prettier-config@^1.5.0":
   version "1.5.0"
