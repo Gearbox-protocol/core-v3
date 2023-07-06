@@ -16,8 +16,7 @@ error AmountCantBeZeroException();
 /// @dev Thrown on incorrect input parameter
 error IncorrectParameterException();
 
-/// @dev Thrown when an address sends ETH to a contract that is not allowed
-///      to send ETH directly
+/// @dev Thrown when an address sends ETH to a contract that is not allowed to send ETH directly
 /// @dev This is only relevant for contracts that have custom `receive()` access;
 ///      most contracts do not have a `receive()` and thus will do a generic revert
 error ReceiveIsNotAllowedException();
@@ -34,9 +33,11 @@ error TokenAlreadyAddedException();
 /// @dev Thrown when attempting to use quota-related logic for a token that is not quoted in PoolQuotaKeeper
 error TokenIsNotQuotedException();
 
-/// @dev Thrown on attempting to interact with an address that is not a valid
-///      target contract
+/// @dev Thrown on attempting to interact with an address that is not a valid target contract
 error TargetContractNotAllowedException();
+
+/// @dev Thrown if function is not implemented
+error NotImplementedException();
 
 //
 // CONTRACTS REGISTER
