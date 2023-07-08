@@ -35,7 +35,7 @@ import {CreditConfig} from "../config/CreditConfig.sol";
 import {TestHelper} from "../lib/helper.sol";
 import {ERC20Mock} from "../mocks/token/ERC20Mock.sol";
 import "../lib/constants.sol";
-import {Tokens} from "../config/Tokens.sol";
+import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
 import {PriceFeedMock} from "../mocks/oracles/PriceFeedMock.sol";
 import {BalanceHelper} from "./BalanceHelper.sol";
 import {BotListV3} from "../../core/BotListV3.sol";

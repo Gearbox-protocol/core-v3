@@ -21,7 +21,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {TokensTestSuiteHelper} from "./TokensTestSuiteHelper.sol";
 import {TokensData, TestToken} from "../config/TokensData.sol";
-import {Tokens} from "../config/Tokens.sol";
+import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
 
 contract TokensTestSuite is Test, TokensData, TokensTestSuiteHelper {
     mapping(Tokens => address) public addressOf;

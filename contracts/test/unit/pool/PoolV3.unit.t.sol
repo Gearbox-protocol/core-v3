@@ -25,7 +25,7 @@ import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
-import {Tokens} from "../../config/Tokens.sol";
+import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 import {ERC20FeeMock} from "../../mocks/token/ERC20FeeMock.sol";
 import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
