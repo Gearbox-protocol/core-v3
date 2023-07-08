@@ -63,6 +63,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @notice maxDebt to maxQuota multiplier
     uint256 public constant maxQuotaMultiplier = 8;
 
+    /// @notice Maximum number of approved bots for a credit account
+    uint256 public constant maxApprovedBots = 5;
+
     /// @notice Credit Manager connected to this Credit Facade
     address public immutable creditManager;
 
@@ -453,7 +456,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                 creditAccount,
                 calls,
                 collateralDebtData.enabledTokensMask,
-                CLOSE_CREDIT_ACCOUNT_FLAGS | PRICE_UPDATES_ALREADY_APPLIED
+                CLOSE_CREDIT_ACCOUNT_FLAGS.enable(PRICE_UPDATES_ALREADY_APPLIED)
             ); // U:[FA-16]
             collateralDebtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter; // U:[FA-16]
         }
@@ -531,8 +534,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         whenNotExpired // U:[FA-3]
         nonReentrant // U:[FA-4]
     {
-        uint16 flags = _flagsOf(creditAccount);
-
         (uint256 botPermissions, bool forbidden, bool hasSpecialPermissions) = IBotListV3(botList).getBotStatus({
             creditManager: creditManager,
             creditAccount: creditAccount,
@@ -540,7 +541,10 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         });
 
         // Checks that the bot is approved by the borrower (or has special permissions from DAO) and is not forbidden
-        if ((!hasSpecialPermissions && (flags & BOT_PERMISSIONS_SET_FLAG == 0)) || botPermissions == 0 || forbidden) {
+        if (
+            (!hasSpecialPermissions && (_flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG == 0)) || botPermissions == 0
+                || forbidden
+        ) {
             revert NotApprovedBotException(); // U:[FA-19]
         }
 
@@ -551,9 +555,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
     /// @notice Convenience internal function that packages a multicall and a fullCheck together,
     ///      since they one is always performed after the other (except for account opening/closing)
-    function _multicallFullCollateralCheck(address creditAccount, MultiCall[] calldata calls, uint256 permissions)
-        internal
-    {
+    function _multicallFullCollateralCheck(address creditAccount, MultiCall[] calldata calls, uint256 flags) internal {
         /// V3 checks forbidden tokens at the end of the multicall. Three conditions have to be fulfilled for
         /// a multicall to be successful:
         /// - No new forbidden tokens can be enabled during the multicall
@@ -575,7 +577,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             creditAccount,
             calls,
             enabledTokensMaskBefore,
-            permissions | (forbiddenBalances.length > 0 ? FORBIDDEN_TOKENS_ON_ACCOUNT : 0)
+            forbiddenBalances.length != 0 ? flags.enable(FORBIDDEN_TOKENS_BEFORE_CALLS) : flags
         );
 
         // Performs one fullCollateralCheck at the end of a multicall
@@ -687,7 +689,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeV3Multicall.updateQuota.selector) {
                         _revertIfNoPermission(flags, UPDATE_QUOTA_PERMISSION); // U:[FA-21]
                         (uint256 tokensToEnable, uint256 tokensToDisable) =
-                            _updateQuota(creditAccount, mcall.callData[4:], flags & FORBIDDEN_TOKENS_ON_ACCOUNT > 0); // U:[FA-34]
+                            _updateQuota(creditAccount, mcall.callData[4:], flags & FORBIDDEN_TOKENS_BEFORE_CALLS != 0); // U:[FA-34]
                         enabledTokensMask = enabledTokensMask.enableDisable(tokensToEnable, tokensToDisable); // U:[FA-34]
                     }
                     //
@@ -700,7 +702,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeV3Multicall.scheduleWithdrawal.selector) {
                         _revertIfNoPermission(flags, WITHDRAW_PERMISSION); // U:[FA-21]
 
-                        flags = flags.enable(REVERT_ON_FORBIDDEN_TOKENS);
+                        flags = flags.enable(REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS);
 
                         uint256 tokensToDisable = _scheduleWithdrawal(creditAccount, mcall.callData[4:]); // U:[FA-34]
                         enabledTokensMask = enabledTokensMask.disable({
@@ -718,7 +720,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeV3Multicall.increaseDebt.selector) {
                         _revertIfNoPermission(flags, INCREASE_DEBT_PERMISSION); // U:[FA-21]
 
-                        flags = flags.enable(REVERT_ON_FORBIDDEN_TOKENS).disable(DECREASE_DEBT_PERMISSION); // U:[FA-29]
+                        flags = flags.enable(REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS).disable(DECREASE_DEBT_PERMISSION); // U:[FA-29]
 
                         (uint256 tokensToEnable,) = _manageDebt(
                             creditAccount, mcall.callData[4:], enabledTokensMask, ManageDebtAction.INCREASE_DEBT
@@ -854,7 +856,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         /// If increaseDebt or scheduleWithdrawal was called during the multicall, all forbidden tokens must be disabled at the end
         /// Otherwise, funds could be borrowed / withdrawn against a forbidden token, which is prohibited
-        if ((flags & REVERT_ON_FORBIDDEN_TOKENS != 0) && (enabledTokensMask & forbiddenTokenMask != 0)) {
+        if ((flags & REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS != 0) && (enabledTokensMask & forbiddenTokenMask != 0)) {
             revert ForbiddenTokensException(); // U:[FA-27]
         }
 
@@ -990,15 +992,20 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @notice Requests Credit Manager to update a Credit Account's quota for a certain token
     /// @param creditAccount Credit Account to update the quota for
     /// @param callData Bytes calldata for parsing
+    /// @param hasForbiddenTokens True if user had enabled forbidden tokens before the multicall
     function _updateQuota(address creditAccount, bytes calldata callData, bool hasForbiddenTokens)
         internal
         returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
         (address token, int96 quotaChange, uint96 minQuota) = abi.decode(callData, (address, int96, uint96)); // U:[FA-34]
 
+        // Ensures that user is not trying to increase quota for a forbidden token. This should be checked
+        // regardless of whether user has enabled forbidden tokens, but the check is implicit in case he
+        // has none: quota increase will fail anyways because we disallow to enable forbidden tokens.
+        // Thus, some gas can be saved by not querying token's mask.
         if (hasForbiddenTokens && quotaChange > 0) {
             uint256 mask = _getTokenMaskOrRevert(token);
-            if (mask & forbiddenTokenMask > 0) revert ForbiddenTokensException();
+            if (mask & forbiddenTokenMask != 0) revert ForbiddenTokensException();
         }
 
         (tokensToEnable, tokensToDisable) = ICreditManagerV3(creditManager).updateQuota({
@@ -1081,17 +1088,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         creditAccountOwnerOnly(creditAccount) // U:[FA-5]
         nonReentrant // U:[FA-4]
     {
-        uint16 flags = _flagsOf(creditAccount);
-
-        if (flags & BOT_PERMISSIONS_SET_FLAG == 0) {
-            _eraseAllBotPermissions({creditAccount: creditAccount}); // U:[FA-41]
-
-            // If flag wasn't enabled before and bot has some permissions, it sets flag
-            if (permissions != 0) {
-                _setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: true}); // U:[FA-41]
-            }
-        }
-
         uint256 remainingBots = IBotListV3(botList).setBotPermissions({
             creditManager: creditManager,
             creditAccount: creditAccount,
@@ -1101,8 +1097,16 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             weeklyFundingAllowance: weeklyFundingAllowance
         }); // U:[FA-41]
 
+        // Maximum number of approved bots must be bounded to prevent users
+        // from making liquidation costs bigger than the block gas limit
+        if (remainingBots > maxApprovedBots) {
+            revert TooManyApprovedBotsException(); // U:[FA-41]
+        }
+
         if (remainingBots == 0) {
             _setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: false}); // U:[FA-41]
+        } else if (_flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG == 0) {
+            _setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: true}); // U:[FA-41]
         }
     }
 

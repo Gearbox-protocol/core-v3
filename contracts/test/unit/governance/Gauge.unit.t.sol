@@ -63,7 +63,6 @@ contract GauageTest is TestHelper, IGaugeV3Events {
 
     /// @dev U:[GA-01]: constructor sets correct values
     function test_U_GA_01_constructor_sets_correct_values() public {
-        assertEq(gauge.addressProvider(), address(addressProvider), "Incorrect addressProvider");
         assertEq(gauge.pool(), address(poolMock), "Incorrect pool");
         assertEq(gauge.voter(), address(gearStakingMock), "Incorrect voter");
         assertEq(gauge.epochLastUpdate(), 900, "Incorrect epoch");

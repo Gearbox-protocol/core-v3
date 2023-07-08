@@ -130,10 +130,6 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         creditFacade.setBotPermissions(creditAccount, bot, type(uint192).max, uint72(1 ether), uint72(1 ether / 10));
 
         vm.expectCall(
-            address(botList), abi.encodeCall(BotListV3.eraseAllBotPermissions, (address(creditManager), creditAccount))
-        );
-
-        vm.expectCall(
             address(creditManager),
             abi.encodeCall(CreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, true))
         );

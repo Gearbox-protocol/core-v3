@@ -221,7 +221,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         assertEq(address(creditManager.priceOracle()), address(priceOracle), "Incorrect creditFacade");
 
         // CREDIT FACADE PARAMS
-        (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
+        // (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
 
         // todo: fix
         // assertEq(minDebt, cct.minDebt(), "Incorrect minDebt");
@@ -1186,6 +1186,10 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.setMaxEnabledTokens(255);
 
         assertEq(creditManager.maxEnabledTokens(), 255, "Credit manager max enabled tokens incorrect");
+
+        vm.expectRevert(IncorrectParameterException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setMaxEnabledTokens(0);
     }
 
     /// @dev I:[CC-27]: addEmergencyLiquidator works correctly and emits event

@@ -1653,7 +1653,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             creditAccount: creditAccount,
             calls: MultiCallBuilder.build(),
             enabledTokensMask: linkMask,
-            flags: REVERT_ON_FORBIDDEN_TOKENS
+            flags: REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS
         });
 
         vm.expectRevert(ForbiddenTokensException.selector);
@@ -1897,7 +1897,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 })
                 ),
             enabledTokensMask: linkMask,
-            flags: UPDATE_QUOTA_PERMISSION | FORBIDDEN_TOKENS_ON_ACCOUNT
+            flags: UPDATE_QUOTA_PERMISSION | FORBIDDEN_TOKENS_BEFORE_CALLS
         });
 
         creditFacade.multicallInt({
@@ -1909,7 +1909,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 })
                 ),
             enabledTokensMask: linkMask,
-            flags: UPDATE_QUOTA_PERMISSION | FORBIDDEN_TOKENS_ON_ACCOUNT
+            flags: UPDATE_QUOTA_PERMISSION | FORBIDDEN_TOKENS_BEFORE_CALLS
         });
     }
 
@@ -2138,19 +2138,12 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         botListMock.setBotPermissionsReturn(1);
 
-        /// It erases all previious bot permission and set flag if flag was false before
-
+        /// It sets flag to true if it was false before
         vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.flagsOf, (creditAccount)));
-        vm.expectCall(
-            address(botListMock),
-            abi.encodeCall(IBotListV3.eraseAllBotPermissions, (address(creditManagerMock), creditAccount))
-        );
-
         vm.expectCall(
             address(creditManagerMock),
             abi.encodeCall(ICreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, true))
         );
-
         vm.expectCall(
             address(botListMock),
             abi.encodeCall(IBotListV3.setBotPermissions, (address(creditManagerMock), creditAccount, bot, 1, 2, 3))
@@ -2165,13 +2158,9 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             weeklyFundingAllowance: 3
         });
 
-        /// It doesn't erase permission is bot already set
-        botListMock.setRevertOnErase(true);
-        vm.expectCall(
-            address(botListMock),
-            abi.encodeCall(IBotListV3.setBotPermissions, (address(creditManagerMock), creditAccount, bot, 1, 2, 3))
-        );
-
+        /// It reverts if too many bots approved
+        botListMock.setBotPermissionsReturn(creditFacade.maxApprovedBots() + 1);
+        vm.expectRevert(TooManyApprovedBotsException.selector);
         vm.prank(USER);
         creditFacade.setBotPermissions({
             creditAccount: creditAccount,

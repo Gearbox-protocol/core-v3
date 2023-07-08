@@ -508,7 +508,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function setMaxDebtLimit(uint128 maxDebt) external override controllerOnly {
         address cf = creditFacade();
         (uint128 currentMinDebt,) = CreditFacadeV3(cf).debtLimits();
-        _setLimits(creditFacade(), currentMinDebt, maxDebt);
+        _setLimits(cf, currentMinDebt, maxDebt);
     }
 
     /// @dev IMPLEMENTATION: setLimits
@@ -891,6 +891,8 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         configuratorOnly // I:[CC-2]
     {
         CreditManagerV3 cm = CreditManagerV3(creditManager);
+
+        if (maxEnabledTokens == 0) revert IncorrectParameterException(); // I:[CC-26]
 
         // Checks that value is actually changed to avoid redundant events
         if (maxEnabledTokens == cm.maxEnabledTokens()) return;

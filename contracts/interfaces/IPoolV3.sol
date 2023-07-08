@@ -77,6 +77,10 @@ interface IPoolV3 is IPoolV3Events, IPoolBase, IERC4626 {
         external
         returns (uint256 shares);
 
+    function mintWithReferral(uint256 shares, address receiver, uint16 referralCode)
+        external
+        returns (uint256 assets);
+
     // --------- //
     // BORROWING //
     // --------- //
