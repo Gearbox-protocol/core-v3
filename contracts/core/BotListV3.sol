@@ -14,7 +14,7 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/C
 
 import "../interfaces/IAddressProviderV3.sol";
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
-import {IBotListV3, BotFunding} from "../interfaces/IBotListV3.sol";
+import {IBotListV3, BotFunding, BotSpecialStatus} from "../interfaces/IBotListV3.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {ICreditFacadeV3} from "../interfaces/ICreditFacadeV3.sol";
 
@@ -49,6 +49,9 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     ///      Only Credit Facades connected to approved Credit Managers can alter bot permissions
     mapping(address => bool) public approvedCreditManager;
 
+    /// @dev Set of all approved Credit Managers
+    EnumerableSet.AddressSet internal approvedCreditManagers;
+
     /// @notice Mapping from (creditManager, creditAccount, bot) to bot permissions
     mapping(address => mapping(address => mapping(address => uint192))) public botPermissions;
 
@@ -58,8 +61,10 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @notice Mapping from credit account to the set of bots with non-zero permissions
     mapping(address => mapping(address => EnumerableSet.AddressSet)) internal activeBots;
 
-    /// @notice Whether the bot is forbidden system-wide
-    mapping(address => bool) public forbiddenBot;
+    /// @notice Mapping from (creditManager, bot) to bot's special status parameters:
+    ///         * Whether the bot is forbidden
+    ///         * Mask of special permissions
+    mapping(address => mapping(address => BotSpecialStatus)) public botSpecialStatus;
 
     /// @notice Mapping from borrower to their bot funding balance
     mapping(address => uint256) public override balanceOf;
@@ -102,7 +107,12 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
             revert AddressIsNotContractException(bot); // F: [BL-03]
         }
 
-        if (forbiddenBot[bot] && permissions != 0) {
+        if (
+            (
+                botSpecialStatus[creditManager][bot].forbidden
+                    || botSpecialStatus[creditManager][bot].specialPermissions != 0
+            ) && permissions != 0
+        ) {
             revert InvalidBotException(); // F: [BL-03]
         }
 
@@ -228,19 +238,51 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     function getBotStatus(address creditManager, address creditAccount, address bot)
         external
         view
-        returns (uint192 permissions, bool forbidden)
+        returns (uint192 permissions, bool forbidden, bool hasSpecialPermissions)
     {
-        return (botPermissions[creditManager][creditAccount][bot], forbiddenBot[bot]);
+        uint192 specialPermissions;
+        (forbidden, specialPermissions) =
+            (botSpecialStatus[creditManager][bot].forbidden, botSpecialStatus[creditManager][bot].specialPermissions); // F: [BL-7]
+
+        hasSpecialPermissions = specialPermissions != 0;
+        permissions = hasSpecialPermissions ? specialPermissions : botPermissions[creditManager][creditAccount][bot];
     }
 
     //
     // CONFIGURATION
     //
 
-    /// @notice Forbids the bot system-wide if it is known to be compromised
-    function setBotForbiddenStatus(address bot, bool status) external configuratorOnly {
-        forbiddenBot[bot] = status;
-        emit SetBotForbiddenStatus(bot, status);
+    /// @notice Sets the bot's forbidden status in a single Credit Manager
+    function setBotForbiddenStatus(address creditManager, address bot, bool status) external configuratorOnly {
+        _setBotForbiddenStatus(creditManager, bot, status);
+    }
+
+    /// @notice Sets the bot's forbidden status in all Credit Managers
+    function setBotForbiddenStatusEverywhere(address bot, bool status) external configuratorOnly {
+        uint256 len = approvedCreditManagers.length();
+
+        for (uint256 i = 0; i < len; ++i) {
+            _setBotForbiddenStatus(approvedCreditManagers.at(i), bot, status);
+        }
+    }
+
+    /// @dev IMPLEMENTATION: setBotForbiddenStatus
+    function _setBotForbiddenStatus(address creditManager, address bot, bool status) internal {
+        botSpecialStatus[creditManager][bot].forbidden = status;
+        emit SetBotForbiddenStatus(creditManager, bot, status);
+    }
+
+    /// @notice Gives special permissions to a bot that extend to all Credit Accounts
+    /// @dev Bots with special permissions are DAO-approved bots
+    ///      which are enabled with a defined set of permissions for all users.
+    ///      Can be used to extend system functionality with additional features
+    ///      without changing the core - such as adding partial liquidations.
+    function setBotSpecialPermissions(address creditManager, address bot, uint192 permissions)
+        external
+        configuratorOnly
+    {
+        botSpecialStatus[creditManager][bot].specialPermissions = permissions; // F: [BL-7]
+        emit SetBotSpecialPermissions(creditManager, bot, permissions); // F: [BL-7]
     }
 
     /// @notice Sets the DAO fee on bot payments
@@ -260,6 +302,12 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @param newStatus The new status
     function setApprovedCreditManagerStatus(address creditManager, bool newStatus) external configuratorOnly {
         if (approvedCreditManager[creditManager] != newStatus) {
+            if (newStatus) {
+                approvedCreditManagers.add(creditManager);
+            } else {
+                approvedCreditManagers.remove(creditManager);
+            }
+
             approvedCreditManager[creditManager] = newStatus;
             emit SetCreditManagerStatus(creditManager, newStatus);
         }

@@ -12,6 +12,11 @@ struct BotFunding {
     uint40 allowanceLU;
 }
 
+struct BotSpecialStatus {
+    bool forbidden;
+    uint192 specialPermissions;
+}
+
 interface IBotListV3Events {
     /// @dev Emits when a borrower enables or disables a bot for their account
     event SetBotPermissions(
@@ -23,8 +28,11 @@ interface IBotListV3Events {
         uint72 weeklyFundingAllowance
     );
 
-    /// @dev Emits when a bot is forbidden system-wide
-    event SetBotForbiddenStatus(address indexed bot, bool status);
+    /// @dev Emits when a bot is forbidden in a Credit Manager
+    event SetBotForbiddenStatus(address indexed creditManager, address indexed bot, bool status);
+
+    /// @dev Emits when a bot is granted special permissions in a Credit Manager
+    event SetBotSpecialPermissions(address indexed creditManager, address indexed bot, uint192 permissions);
 
     /// @dev Emits when the user changes the amount of funds in his bot wallet
     event Deposit(address indexed payer, uint256 amount);
@@ -99,14 +107,11 @@ interface IBotListV3 is IBotListV3Events, IVersion {
     /// @dev Returns whether the bot is approved by the borrower
     function botPermissions(address creditManager, address borrower, address bot) external view returns (uint192);
 
-    /// @dev Returns whether the bot is forbidden by the borrower
-    function forbiddenBot(address bot) external view returns (bool);
-
     /// @notice Returns information about bot permissions
     function getBotStatus(address creditManager, address creditAccount, address bot)
         external
         view
-        returns (uint192 permissions, bool forbidden);
+        returns (uint192 permissions, bool forbidden, bool hasSpecialPermissions);
 
     /// @dev Returns user funcding balance in ETH
     function balanceOf(address payer) external view returns (uint256);

@@ -1089,7 +1089,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         uint256 enabledTokensMaskBefore = 123123123;
 
-        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false);
+        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false, false);
 
         creditManagerMock.setEnabledTokensMask(enabledTokensMaskBefore);
         creditManagerMock.setBorrower(USER);
@@ -1130,21 +1130,25 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, true);
 
-        botListMock.setBotStatusReturns(ALL_PERMISSIONS, true);
+        botListMock.setBotStatusReturns(ALL_PERMISSIONS, true, false);
 
         vm.expectRevert(NotApprovedBotException.selector);
         creditFacade.botMulticall(creditAccount, calls);
 
-        botListMock.setBotStatusReturns(0, false);
+        botListMock.setBotStatusReturns(0, false, false);
 
         vm.expectRevert(NotApprovedBotException.selector);
         creditFacade.botMulticall(creditAccount, calls);
 
         creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, false);
 
-        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false);
+        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false, false);
 
         vm.expectRevert(NotApprovedBotException.selector);
+        creditFacade.botMulticall(creditAccount, calls);
+
+        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false, true);
+
         creditFacade.botMulticall(creditAccount, calls);
     }
 
@@ -1158,7 +1162,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.setDebtLimits(1, 100, 1);
 
         creditManagerMock.setBorrower(USER);
-        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false);
+        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false, false);
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({target: address(creditFacade), callData: abi.encodeCall(ICreditFacadeV3Multicall.payBot, (1))})
@@ -1172,6 +1176,26 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.multicall(creditAccount, calls);
 
         /// Case: it works for bot multicall
+        creditFacade.botMulticall(creditAccount, calls);
+    }
+
+    /// @dev U:[FA-20A]: botMulticall reverts for payBot calls for bots with special permissions
+    function test_U_FA_20A_payBot_reverts_for_special_bots() public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+
+        creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, true);
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setDebtLimits(1, 100, 1);
+
+        creditManagerMock.setBorrower(USER);
+        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false, true);
+
+        MultiCall[] memory calls = MultiCallBuilder.build(
+            MultiCall({target: address(creditFacade), callData: abi.encodeCall(ICreditFacadeV3Multicall.payBot, (1))})
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, PAY_BOT_CAN_BE_CALLED));
         creditFacade.botMulticall(creditAccount, calls);
     }
 

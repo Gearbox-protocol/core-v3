@@ -138,7 +138,7 @@ contract BotListTest is Test, IBotListV3Events {
         });
 
         vm.prank(CONFIGURATOR);
-        botList.setBotForbiddenStatus(address(bot), true);
+        botList.setBotForbiddenStatus(address(creditManager), address(bot), true);
 
         vm.expectRevert(InvalidBotException.selector);
         vm.prank(address(creditFacade));
@@ -152,7 +152,24 @@ contract BotListTest is Test, IBotListV3Events {
         });
 
         vm.prank(CONFIGURATOR);
-        botList.setBotForbiddenStatus(address(bot), false);
+        botList.setBotForbiddenStatus(address(creditManager), address(bot), false);
+
+        vm.prank(CONFIGURATOR);
+        botList.setBotSpecialPermissions(address(creditManager), address(bot), 1);
+
+        vm.expectRevert(InvalidBotException.selector);
+        vm.prank(address(creditFacade));
+        botList.setBotPermissions({
+            creditManager: creditManager,
+            creditAccount: creditAccount,
+            bot: address(bot),
+            permissions: type(uint192).max,
+            fundingAmount: uint72(1 ether),
+            weeklyFundingAllowance: uint72(1 ether / 10)
+        });
+
+        vm.prank(CONFIGURATOR);
+        botList.setBotSpecialPermissions(address(creditManager), address(bot), 0);
 
         vm.expectEmit(true, true, true, true);
         emit SetBotPermissions(creditManager, creditAccount, address(bot), 1, uint72(1 ether), uint72(1 ether / 10));
@@ -218,6 +235,9 @@ contract BotListTest is Test, IBotListV3Events {
         assertEq(bots.length, 1, "Incorrect active bots array length");
 
         assertEq(bots[0], address(bot), "Incorrect address added to active bots list");
+
+        vm.prank(CONFIGURATOR);
+        botList.setBotForbiddenStatus(address(creditManager), address(bot), true);
 
         vm.expectEmit(true, true, true, false);
         emit EraseBot(address(creditManager), address(creditAccount), address(bot));
@@ -471,5 +491,24 @@ contract BotListTest is Test, IBotListV3Events {
         address[] memory activeBots = botList.getActiveBots(creditManager, creditAccount);
 
         assertEq(activeBots.length, 0, "Not all active bots were disabled");
+    }
+
+    /// @dev [BL-7]: setBotSpecialPermissions works correctly
+    function test_BL_07_setBotSpecialPermissions_works_correctly() public {
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        botList.setBotSpecialPermissions(address(creditManager), address(bot), 2);
+
+        vm.expectEmit(true, true, false, true);
+        emit SetBotSpecialPermissions(address(creditManager), address(bot), 2);
+
+        vm.prank(CONFIGURATOR);
+        botList.setBotSpecialPermissions(address(creditManager), address(bot), 2);
+
+        (uint192 permissions,, bool hasSpecialPermissions) =
+            botList.getBotStatus(address(creditManager), address(creditAccount), address(bot));
+
+        assertEq(permissions, 2, "Special permissions are incorrect");
+
+        assertTrue(hasSpecialPermissions, "Special permissions status returned incorrectly");
     }
 }
