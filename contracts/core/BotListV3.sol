@@ -260,9 +260,10 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @notice Sets the bot's forbidden status in all Credit Managers
     function setBotForbiddenStatusEverywhere(address bot, bool status) external configuratorOnly {
         uint256 len = approvedCreditManagers.length();
-
-        for (uint256 i = 0; i < len; ++i) {
-            _setBotForbiddenStatus(approvedCreditManagers.at(i), bot, status);
+        unchecked {
+            for (uint256 i = 0; i < len; ++i) {
+                _setBotForbiddenStatus(approvedCreditManagers.at(i), bot, status);
+            }
         }
     }
 

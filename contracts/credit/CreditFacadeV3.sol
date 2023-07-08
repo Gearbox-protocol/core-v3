@@ -542,13 +542,15 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         // Checks that the bot is approved by the borrower (or has special permissions from DAO) and is not forbidden
         if (
-            (!hasSpecialPermissions && (_flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG == 0)) || botPermissions == 0
-                || forbidden
+            botPermissions == 0 || forbidden
+                || (!hasSpecialPermissions && (_flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG == 0))
         ) {
             revert NotApprovedBotException(); // U:[FA-19]
         }
 
-        botPermissions |= hasSpecialPermissions ? 0 : PAY_BOT_CAN_BE_CALLED;
+        if (!hasSpecialPermissions) {
+            botPermissions = botPermissions.enable(PAY_BOT_CAN_BE_CALLED);
+        }
 
         _multicallFullCollateralCheck(creditAccount, calls, botPermissions); // U:[FA-19, 20]
     }
