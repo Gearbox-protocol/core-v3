@@ -61,8 +61,6 @@ interface IPoolV3 is IPoolV3Events, IPoolBase, IERC4626 {
 
     function creditManagers() external view returns (address[] memory);
 
-    function supplyRate() external view returns (uint256);
-
     function availableLiquidity() external view returns (uint256);
 
     function expectedLiquidity() external view returns (uint256);
@@ -106,6 +104,8 @@ interface IPoolV3 is IPoolV3Events, IPoolBase, IERC4626 {
     function interestRateModel() external view returns (address);
 
     function baseInterestRate() external view returns (uint256);
+
+    function supplyRate() external view returns (uint256);
 
     function baseInterestIndex() external view returns (uint256);
 
