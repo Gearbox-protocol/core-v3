@@ -15,20 +15,8 @@ contract PoolV3Harness is PoolV3 {
         address underlyingToken_,
         address interestRateModel_,
         uint256 totalDebtLimit_,
-        bool supportsQuotas_,
-        string memory namePrefix_,
-        string memory symbolPrefix_
-    )
-        PoolV3(
-            addressProvider_,
-            underlyingToken_,
-            interestRateModel_,
-            totalDebtLimit_,
-            supportsQuotas_,
-            namePrefix_,
-            symbolPrefix_
-        )
-    {}
+        bool supportsQuotas_
+    ) PoolV3(addressProvider_, underlyingToken_, interestRateModel_, totalDebtLimit_, supportsQuotas_) {}
 
     // ------- //
     // GENERAL //
