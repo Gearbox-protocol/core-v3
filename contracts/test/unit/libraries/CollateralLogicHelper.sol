@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
-import {TokensData, TestToken} from "../../config/TokensData.sol";
+import {MockTokensData, MockToken} from "../../config/MockTokensData.sol";
 import {CollateralLogic} from "../../../libraries/CollateralLogic.sol";
 
 import "../../lib/constants.sol";
@@ -23,7 +23,7 @@ struct Q {
     uint256 quota;
 }
 
-contract CollateralLogicHelper is Test, TokensData {
+contract CollateralLogicHelper is Test, MockTokensData {
     uint256 session;
 
     mapping(Tokens => uint256) tokenMask;
@@ -42,7 +42,7 @@ contract CollateralLogicHelper is Test, TokensData {
     mapping(address => bool) revertIsPriceOracleCalled;
 
     constructor() {
-        TestToken[] memory tokens = tokensData();
+        MockToken[] memory tokens = getTokenData();
         uint256 len = tokens.length;
         for (uint256 i; i < len; ++i) {
             deploy(tokens[i].index, tokens[i].symbol, uint8(i));

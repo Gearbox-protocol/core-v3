@@ -7,7 +7,7 @@ import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
 import "../lib/constants.sol";
 // import "../lib/test.sol";
 
-struct TestToken {
+struct MockToken {
     Tokens index;
     string symbol;
     uint8 decimals;
@@ -15,37 +15,37 @@ struct TestToken {
     Tokens underlying;
 }
 
-contract TokensData {
-    function tokensData() internal pure returns (TestToken[] memory result) {
-        TestToken[10] memory testTokensData = [
-            TestToken({index: Tokens.DAI, symbol: "DAI", decimals: 18, price: 10 ** 8, underlying: Tokens.NO_TOKEN}),
-            TestToken({index: Tokens.USDC, symbol: "USDC", decimals: 6, price: 10 ** 8, underlying: Tokens.NO_TOKEN}),
-            TestToken({
+contract MockTokensData {
+    function getTokenData() public pure returns (MockToken[] memory result) {
+        MockToken[10] memory testTokensData = [
+            MockToken({index: Tokens.DAI, symbol: "DAI", decimals: 18, price: 10 ** 8, underlying: Tokens.NO_TOKEN}),
+            MockToken({index: Tokens.USDC, symbol: "USDC", decimals: 6, price: 10 ** 8, underlying: Tokens.NO_TOKEN}),
+            MockToken({
                 index: Tokens.WETH,
                 symbol: "WETH",
                 decimals: 18,
                 price: int256(DAI_WETH_RATE) * 10 ** 8,
                 underlying: Tokens.NO_TOKEN
             }),
-            TestToken({index: Tokens.LINK, symbol: "LINK", decimals: 18, price: 15 * 10 ** 8, underlying: Tokens.NO_TOKEN}),
-            TestToken({
+            MockToken({index: Tokens.LINK, symbol: "LINK", decimals: 18, price: 15 * 10 ** 8, underlying: Tokens.NO_TOKEN}),
+            MockToken({
                 index: Tokens.USDT,
                 symbol: "USDT",
                 decimals: 18,
                 price: 99 * 10 ** 7, // .99 for test purposes
                 underlying: Tokens.NO_TOKEN
             }),
-            TestToken({
+            MockToken({
                 index: Tokens.STETH,
                 symbol: "stETH",
                 decimals: 18,
                 price: 3300 * 10 ** 8,
                 underlying: Tokens.NO_TOKEN
             }),
-            TestToken({index: Tokens.CRV, symbol: "CRV", decimals: 18, price: 14 * 10 ** 7, underlying: Tokens.NO_TOKEN}),
-            TestToken({index: Tokens.CVX, symbol: "CVX", decimals: 18, price: 7 * 10 ** 8, underlying: Tokens.NO_TOKEN}),
-            TestToken({index: Tokens.LUNA, symbol: "LUNA", decimals: 18, price: 1, underlying: Tokens.NO_TOKEN}),
-            TestToken({
+            MockToken({index: Tokens.CRV, symbol: "CRV", decimals: 18, price: 14 * 10 ** 7, underlying: Tokens.NO_TOKEN}),
+            MockToken({index: Tokens.CVX, symbol: "CVX", decimals: 18, price: 7 * 10 ** 8, underlying: Tokens.NO_TOKEN}),
+            MockToken({index: Tokens.LUNA, symbol: "LUNA", decimals: 18, price: 1, underlying: Tokens.NO_TOKEN}),
+            MockToken({
                 index: Tokens.wstETH,
                 symbol: "wstETH",
                 decimals: 18,
@@ -55,7 +55,7 @@ contract TokensData {
         ];
 
         uint256 len = testTokensData.length;
-        result = new TestToken[](len);
+        result = new MockToken[](len);
 
         unchecked {
             for (uint256 i = 0; i < len; ++i) {

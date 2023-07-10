@@ -18,36 +18,76 @@ import {ERC20FeeMock} from "../mocks/token/ERC20FeeMock.sol";
 import {PriceFeedMock} from "../mocks/oracles/PriceFeedMock.sol";
 
 import {Test} from "forge-std/Test.sol";
+import "../lib/constants.sol";
 
 import {TokensTestSuiteHelper} from "./TokensTestSuiteHelper.sol";
-import {TokensData, TestToken} from "../config/TokensData.sol";
+import {MockTokensData, MockToken} from "../config/MockTokensData.sol";
 import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
+import {TokenData, TokensDataLive, TokenType} from "@gearbox-protocol/sdk/contracts/TokensData.sol";
 
-contract TokensTestSuite is Test, TokensData, TokensTestSuiteHelper {
+contract TokensTestSuite is Test, TokensTestSuiteHelper {
     mapping(Tokens => address) public addressOf;
     mapping(Tokens => string) public symbols;
     mapping(Tokens => uint256) public prices;
     mapping(Tokens => address) public priceFeedsMap;
 
-    uint256 public tokenCount;
+    mapping(Tokens => TokenType) public tokenTypes;
 
-    PriceFeedConfig[] public priceFeeds;
     mapping(address => Tokens) public tokenIndexes;
 
+    uint256 public tokenCount;
+
+    bool mockTokens;
+
+    PriceFeedConfig[] public priceFeeds;
+
     constructor() {
-        TestToken[] memory data = tokensData();
+        if (block.chainid == 1337) {
+            uint8 networkId;
 
-        uint256 len = data.length;
-        tokenCount = len;
+            try vm.envInt("ETH_FORK_NETWORK_ID") returns (int256 val) {
+                networkId = uint8(uint256(val));
+            } catch {
+                networkId = 1;
+            }
 
-        unchecked {
-            for (uint256 i; i < len; ++i) {
-                addToken(data[i]);
+            TokensDataLive tdd = new TokensDataLive(networkId);
+            TokenData[] memory td = tdd.getTokenData();
+            mockTokens = false;
+
+            tokenCount = td.length;
+
+            unchecked {
+                for (uint256 i; i < tokenCount; ++i) {
+                    addressOf[td[i].id] = td[i].addr;
+                    tokenIndexes[td[i].addr] = td[i].id;
+                    symbols[td[i].id] = td[i].symbol;
+                    tokenTypes[td[i].id] = td[i].tokenType;
+
+                    _flushAccounts(td[i].addr);
+
+                    vm.label(td[i].addr, td[i].symbol);
+                }
+            }
+        } else {
+            MockTokensData tdd = new MockTokensData();
+            MockToken[] memory data = tdd.getTokenData();
+
+            mockTokens = true;
+
+            tokenCount = data.length;
+
+            unchecked {
+                for (uint256 i; i < tokenCount; ++i) {
+                    addMockToken(data[i]);
+                }
             }
         }
+
+        wethToken = addressOf[Tokens.WETH];
     }
 
-    function addToken(TestToken memory token) internal {
+    function addMockToken(MockToken memory token) internal {
         IERC20 t;
 
         if (token.index == Tokens.WETH) {
@@ -132,5 +172,26 @@ contract TokensTestSuite is Test, TokensData, TokensTestSuiteHelper {
         tokensList[1] = addressOf[t2];
         tokensList[2] = addressOf[t3];
         tokensList[3] = addressOf[t4];
+    }
+
+    function _flushAccounts(address token) internal {
+        _flushAccount(token, DUMB_ADDRESS);
+        _flushAccount(token, DUMB_ADDRESS2);
+        _flushAccount(token, DUMB_ADDRESS3);
+        _flushAccount(token, DUMB_ADDRESS4);
+
+        _flushAccount(token, USER);
+        _flushAccount(token, LIQUIDATOR);
+        _flushAccount(token, FRIEND);
+        _flushAccount(token, FRIEND2);
+    }
+
+    function _flushAccount(address token, address account) internal {
+        uint256 balance = IERC20(token).balanceOf(account);
+
+        if (balance > 0) {
+            vm.prank(account);
+            IERC20(token).transfer(address(type(uint160).max), balance);
+        }
     }
 }
