@@ -94,9 +94,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             addressProvider_: address(addressProvider),
             interestRateModel_: interestRateModel,
             totalDebtLimit_: 2000,
-            supportsQuotas_: supportsQuotas,
-            namePrefix_: "diesel ",
-            symbolPrefix_: "d"
+            supportsQuotas_: supportsQuotas
         });
 
         // setup mocks
@@ -134,9 +132,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             addressProvider_: address(addressProvider),
             interestRateModel_: interestRateModel,
             totalDebtLimit_: type(uint256).max,
-            supportsQuotas_: false,
-            namePrefix_: "",
-            symbolPrefix_: ""
+            supportsQuotas_: false
         });
 
         vm.expectRevert(ZeroAddressException.selector);
@@ -145,9 +141,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             addressProvider_: address(0),
             interestRateModel_: interestRateModel,
             totalDebtLimit_: type(uint256).max,
-            supportsQuotas_: false,
-            namePrefix_: "",
-            symbolPrefix_: ""
+            supportsQuotas_: false
         });
 
         vm.expectRevert(ZeroAddressException.selector);
@@ -156,9 +150,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             addressProvider_: address(addressProvider),
             interestRateModel_: address(0),
             totalDebtLimit_: type(uint256).max,
-            supportsQuotas_: false,
-            namePrefix_: "",
-            symbolPrefix_: ""
+            supportsQuotas_: false
         });
     }
 
@@ -175,9 +167,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             addressProvider_: address(addressProvider),
             interestRateModel_: interestRateModel,
             totalDebtLimit_: 2000,
-            supportsQuotas_: true,
-            namePrefix_: "diesel ",
-            symbolPrefix_: "d"
+            supportsQuotas_: true
         });
 
         assertEq(pool.asset(), address(underlying), "Incorrect asset");

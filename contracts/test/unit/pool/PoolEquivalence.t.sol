@@ -66,9 +66,7 @@ contract PoolEquivalenceTest is Test {
             addressProvider_: address(addressProvider),
             interestRateModel_: address(irm),
             totalDebtLimit_: type(uint256).max,
-            supportsQuotas_: false,
-            namePrefix_: "d",
-            symbolPrefix_: "diesel "
+            supportsQuotas_: false
         });
         poolService = new PoolService({
             _addressProvider: address(addressProvider),

@@ -40,9 +40,7 @@ contract PoolFactory is Test {
            underlyingToken_: underlying,
            interestRateModel_: address(irm),
            totalDebtLimit_: type(uint256).max,
-           supportsQuotas_: supportQuotas,
-           namePrefix_: "d",
-           symbolPrefix_: "diesel"
+           supportsQuotas_: supportQuotas
      } );
 
         if (supportQuotas) {
