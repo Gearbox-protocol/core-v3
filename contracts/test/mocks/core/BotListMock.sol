@@ -8,17 +8,24 @@ contract BotListMock {
 
     uint256 return_botPermissions;
     bool return_forbidden;
+    bool return_hasSpecialPermissions;
 
     uint256 return_activeBotsRemaining;
 
-    function setBotStatusReturns(uint256 botPermissions, bool forbidden) external {
+    function setBotStatusReturns(uint256 botPermissions, bool forbidden, bool hasSpecialPermissions) external {
         return_botPermissions = botPermissions;
         return_forbidden = forbidden;
+        return_hasSpecialPermissions = hasSpecialPermissions;
     }
 
-    function getBotStatus(address, address, address) external view returns (uint256 botPermissions, bool forbidden) {
+    function getBotStatus(address, address, address)
+        external
+        view
+        returns (uint256 botPermissions, bool forbidden, bool hasSpecialPermissions)
+    {
         botPermissions = return_botPermissions;
         forbidden = return_forbidden;
+        hasSpecialPermissions = return_hasSpecialPermissions;
     }
 
     function eraseAllBotPermissions(address, address) external view {
