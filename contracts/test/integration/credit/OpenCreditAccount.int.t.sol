@@ -248,8 +248,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         public
         creditTest
     {
-        // vm.assume(amount > 10000 && amount < DAI_ACCOUNT_AMOUNT);
-        amount = 10000 + amount % (DAI_ACCOUNT_AMOUNT - 10000);
+        amount = bound(amount, 10000, DAI_ACCOUNT_AMOUNT);
         vm.assume(token1 > 0 && token1 < creditManager.collateralTokensCount());
 
         tokenTestSuite.mint(Tokens.DAI, address(creditManager.poolService()), type(uint96).max);

@@ -538,8 +538,8 @@ contract MultiCallIntegrationTest is
         );
     }
 
-    /// @dev I:[CM-16]: fullCollateralCheck reverts when an illegal mask is passed in collateralHints
-    function test_I_CM_16_fullCollateralCheck_reverts_for_illegal_mask_in_hints() public creditTest {
+    /// @dev I:[MC-16]: fullCollateralCheck reverts when an illegal mask is passed in collateralHints
+    function test_I_MC_16_fullCollateralCheck_reverts_for_illegal_mask_in_hints() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
         uint256[] memory collateralHints = new uint256[](1);
