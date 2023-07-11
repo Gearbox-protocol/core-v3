@@ -19,11 +19,8 @@ error IncorrectParameterException();
 /// @dev Thrown if parameter is out of range
 error ValueOutOfRangeException();
 
-/// @dev Thrown on failing sanity checks when setting new bounds
-error IncorrectLimitsException();
-
 /// @dev Thrown when an address sends ETH to a contract that is not allowed to send ETH directly
-/// @dev This is only relevant for contracts that have custom `receive()` access;
+///      This is only relevant for contracts that have custom `receive()` access;
 ///      most contracts do not have a `receive()` and thus will do a generic revert
 error ReceiveIsNotAllowedException();
 
