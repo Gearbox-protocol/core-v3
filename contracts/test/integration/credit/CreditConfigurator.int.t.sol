@@ -38,7 +38,7 @@ import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
-import {Tokens} from "../../config/Tokens.sol";
+import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
 
 import {CreditConfig} from "../../config/CreditConfig.sol";
 

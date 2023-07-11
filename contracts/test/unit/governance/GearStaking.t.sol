@@ -19,7 +19,7 @@ import {TargetContractMock} from "../../mocks/core/TargetContractMock.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
-import {Tokens} from "../../config/Tokens.sol";
+import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";

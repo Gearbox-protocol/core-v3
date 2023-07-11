@@ -30,7 +30,7 @@ import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 import "../../lib/constants.sol";
 
 // SUITES
-import {Tokens} from "../../config/Tokens.sol";
+import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";

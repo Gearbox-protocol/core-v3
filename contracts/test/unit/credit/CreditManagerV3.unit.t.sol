@@ -54,7 +54,7 @@ import {CreditAccountMock, CreditAccountMockEvents} from "../../mocks/credit/Cre
 import {WithdrawalManagerMock} from "../../mocks/core/WithdrawalManagerMock.sol";
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
-import {Tokens} from "../../config/Tokens.sol";
+import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
 import {CreditConfig} from "../../config/CreditConfig.sol";
 
 // EXCEPTIONS

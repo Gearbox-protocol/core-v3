@@ -13,8 +13,12 @@ import {IInterestRateModelV3} from "../../../interfaces/IInterestRateModelV3.sol
 import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
 
+
+import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
+import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
 import {TestHelper} from "../../lib/helper.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
+
 import {ERC20FeeMock} from "../../mocks/token/ERC20FeeMock.sol";
 
 import {PoolV3Harness} from "./PoolV3Harness.sol";

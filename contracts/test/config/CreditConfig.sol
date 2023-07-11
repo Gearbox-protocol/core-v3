@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
-import {Tokens} from "./Tokens.sol";
+import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
 
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 
