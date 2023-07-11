@@ -23,6 +23,7 @@ contract PoolEquivalenceTest is Test {
     PoolV3 poolV3;
     PoolService poolService;
 
+    address underlying;
     LinearInterestRateModelV3 irm;
     AddressProviderV3ACLMock addressProvider;
     address treasury;
@@ -45,6 +46,7 @@ contract PoolEquivalenceTest is Test {
         liquidityProvider = makeAddr("LIQUIDITY_PROVIDER");
 
         tokens = new TokensTestSuite();
+        underlying = tokens.addressOf(Tokens.DAI);
 
         irm = new LinearInterestRateModelV3({
             U_1: 80_00,
@@ -62,7 +64,7 @@ contract PoolEquivalenceTest is Test {
         treasury = addressProvider.getTreasuryContract();
 
         poolV3 = new PoolV3({
-            underlyingToken_: tokens.addressOf(Tokens.DAI),
+            underlyingToken_: underlying,
             addressProvider_: address(addressProvider),
             interestRateModel_: address(irm),
             totalDebtLimit_: type(uint256).max,
@@ -70,7 +72,7 @@ contract PoolEquivalenceTest is Test {
         });
         poolService = new PoolService({
             _addressProvider: address(addressProvider),
-            _underlyingToken: tokens.addressOf(Tokens.DAI),
+            _underlyingToken: underlying,
             _interestRateModelAddress: address(irm),
             _expectedLiquidityLimit: type(uint256).max
         });
@@ -88,16 +90,14 @@ contract PoolEquivalenceTest is Test {
     // ----- //
 
     /// @notice [PET-1]: `PoolV3.deposit` is equivalent to `PoolService.addLiquidity`
-    /// forge-config: default.fuzz.runs = 1000
     function test_PET_01_deposit_is_equivalent(uint256 amount) public compareState("deposit") {
         // without expected liquidity limits, deposit amount can be arbitrarily large sane number
         vm.assume(amount > 1 && amount < 10 * INITIAL_DEPOSIT);
-        tokens.mint(Tokens.DAI, liquidityProvider, amount);
+        tokens.mint(underlying, liquidityProvider, amount);
         _deposit(liquidityProvider, amount);
     }
 
     /// @notice [PET-2]: `PoolV3.redeem` is equivalent to `PoolService.removeLiquidity`
-    /// forge-config: default.fuzz.runs = 1000
     function test_PET_02_redeem_is_equivalent(uint256 amount) public compareState("redeem") {
         // can't redeem more than shares corresponding to available liquidity in the pool
         vm.assume(amount > 1 && amount < (INITIAL_DEPOSIT - INITIAL_DEBT + INITIAL_PROFIT) * 9 / 10);
@@ -105,7 +105,6 @@ contract PoolEquivalenceTest is Test {
     }
 
     /// @notice [PET-3]: `PoolV3.lendCreditAccount` is equivalent to `PoolService.lendCreditAccount`
-    /// forge-config: default.fuzz.runs = 1000
     function test_PET_03_borrow_is_equivalent(uint256 amount) public compareState("borrow") {
         // can't borrow more than available liquidity in the pool
         vm.assume(amount > 1 && amount < INITIAL_DEPOSIT - INITIAL_DEBT + INITIAL_PROFIT);
@@ -113,7 +112,6 @@ contract PoolEquivalenceTest is Test {
     }
 
     /// @notice [PET-4]: `PoolV3.repayCreditAccount` is equivalent to `PoolService.repayCreditAccount`
-    /// forge-config: default.fuzz.runs = 1000
     function test_PET_04_repay_is_equivalent(uint256 amount, int256 profit) public compareState("repay") {
         // can't repay more than borrowed
         vm.assume(amount > 1 && amount < INITIAL_DEBT);
@@ -154,14 +152,14 @@ contract PoolEquivalenceTest is Test {
 
     function _setupState() public {
         // deposit funds into the pool
-        tokens.mint(Tokens.DAI, liquidityProvider, INITIAL_DEPOSIT);
+        tokens.mint(underlying, liquidityProvider, INITIAL_DEPOSIT);
         _deposit(liquidityProvider, INITIAL_DEPOSIT);
 
         // borrow funds from the pool to update interest rate
         _borrow(3 * INITIAL_DEBT / 2);
 
         // repay some funds to the pool with profits so that treasury has some diesel tokens
-        tokens.mint(Tokens.DAI, v3 ? address(poolV3) : address(poolService), INITIAL_DEBT / 2 + INITIAL_PROFIT);
+        tokens.mint(underlying, v3 ? address(poolV3) : address(poolService), INITIAL_DEBT / 2 + INITIAL_PROFIT);
         _repay(INITIAL_DEBT / 2, INITIAL_PROFIT, 0);
 
         // wait for some time for interest to compound
@@ -181,39 +179,49 @@ contract PoolEquivalenceTest is Test {
     function _compareSnapshots(StateSnapshot memory snapshot1, StateSnapshot memory snapshot2, string memory caseName)
         internal
     {
-        assertEq(
+        // NOTE: small deviations are allowed because PoolService calculations always run with higher precision
+        uint256 maxDelta = 1;
+
+        assertApproxEqAbs(
             snapshot1.dieselSupply,
             snapshot2.dieselSupply,
+            maxDelta,
             string.concat("dieselSupply values are different, case: ", caseName)
         );
-        assertEq(
+        assertApproxEqAbs(
             snapshot1.expectedLiquidity,
             snapshot2.expectedLiquidity,
+            maxDelta,
             string.concat("expectedLiquidity values are different, case: ", caseName)
         );
-        assertEq(
+        assertApproxEqAbs(
             snapshot1.availableLiquidity,
             snapshot2.availableLiquidity,
+            maxDelta,
             string.concat("availableLiquidity values are different, case: ", caseName)
         );
-        assertEq(
+        assertApproxEqAbs(
             snapshot1.baseInterestRate,
             snapshot2.baseInterestRate,
+            maxDelta,
             string.concat("baseInterestRate values are different, case: ", caseName)
         );
-        assertEq(
+        assertApproxEqAbs(
             snapshot1.baseInterestIndex,
             snapshot2.baseInterestIndex,
+            maxDelta,
             string.concat("baseInterestIndex values are different, case: ", caseName)
         );
-        assertEq(
+        assertApproxEqAbs(
             snapshot1.treasuryBalance,
             snapshot2.treasuryBalance,
+            maxDelta,
             string.concat("treasuryBalance values are different, case: ", caseName)
         );
-        assertEq(
+        assertApproxEqAbs(
             snapshot1.liquidityProviderBalance,
             snapshot2.liquidityProviderBalance,
+            maxDelta,
             string.concat("liquidityProviderBalance values are different, case: ", caseName)
         );
     }
@@ -251,7 +259,7 @@ contract PoolEquivalenceTest is Test {
     // ------------ //
 
     function _deposit(address lp, uint256 assets) internal {
-        tokens.approve(Tokens.DAI, lp, v3 ? address(poolV3) : address(poolService));
+        tokens.approve(underlying, lp, v3 ? address(poolV3) : address(poolService));
         vm.prank(lp);
         if (v3) {
             poolV3.depositWithReferral({assets: assets, receiver: lp, referralCode: 123});

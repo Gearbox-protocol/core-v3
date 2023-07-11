@@ -20,9 +20,11 @@ contract ERC20FeeMock is ERC20Mock {
     }
 
     function transferFrom(address sender, address recipient, uint256 amount) public virtual override returns (bool) {
+        _spendAllowance(sender, _msgSender(), amount);
         uint256 fee = _computeFee(amount);
         if (fee > 0) _transfer(sender, owner(), fee);
-        return super.transferFrom(sender, recipient, amount - fee);
+        _transfer(sender, recipient, amount - fee);
+        return true;
     }
 
     function _computeFee(uint256 amount) internal view returns (uint256) {
