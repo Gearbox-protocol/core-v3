@@ -344,7 +344,7 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
                 priceOracle: PRICE_ORACLE
             });
 
-            expectTokensOrder({tokens: _case.expectedOrder, debug: false});
+            expectTokensOrder({tokens: _case.expectedOrder, debug: true});
 
             assertEq(totalValueUSD, _case.expectedTotalValueUSD, _testCaseErr("Incorrect totalValueUSD"));
             assertEq(twvUSD, _case.expectedTwvUSD, _testCaseErr("Incorrect weightedValueUSD"));

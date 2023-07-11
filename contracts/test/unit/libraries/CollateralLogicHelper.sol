@@ -9,6 +9,8 @@ import {CollateralLogic} from "../../../libraries/CollateralLogic.sol";
 
 import "../../lib/constants.sol";
 
+import {TestHelper} from "../../lib/helper.sol";
+
 import "forge-std/console.sol";
 
 address constant PRICE_ORACLE = DUMB_ADDRESS4;
@@ -23,7 +25,7 @@ struct Q {
     uint256 quota;
 }
 
-contract CollateralLogicHelper is Test, MockTokensData {
+contract CollateralLogicHelper is TestHelper {
     uint256 session;
 
     mapping(Tokens => uint256) tokenMask;
@@ -42,7 +44,7 @@ contract CollateralLogicHelper is Test, MockTokensData {
     mapping(address => bool) revertIsPriceOracleCalled;
 
     constructor() {
-        MockToken[] memory tokens = getTokenData();
+        MockToken[] memory tokens = MockTokensData.getTokenData();
         uint256 len = tokens.length;
         for (uint256 i; i < len; ++i) {
             deploy(tokens[i].index, tokens[i].symbol, uint8(i));
@@ -131,7 +133,7 @@ contract CollateralLogicHelper is Test, MockTokensData {
 
         for (uint256 i; i < len; ++i) {
             uint256 slot = uint256(reads[i]);
-            if (slot > 100 && slot < 120) {
+            if (slot > 100 && slot <= (100 + uint256(type(Tokens).max))) {
                 callOrder[j] = Tokens(slot - 100);
                 ++j;
             }
@@ -140,6 +142,7 @@ contract CollateralLogicHelper is Test, MockTokensData {
         len = tokens.length;
 
         if (j != len) {
+            console.log(caseName);
             console.log("Different length of expected and called tokens", j, len);
             console.log("Expected: ");
             printTokens(tokens);
@@ -150,6 +153,7 @@ contract CollateralLogicHelper is Test, MockTokensData {
 
         for (uint256 i; i < len; ++i) {
             if (callOrder[i] != tokens[i]) {
+                console.log(caseName);
                 console.log("Incorrect order of tokens calls");
                 console.log("Expected: ");
                 printTokens(tokens);
@@ -160,6 +164,7 @@ contract CollateralLogicHelper is Test, MockTokensData {
         }
 
         if (debug) {
+            console.log(caseName);
             console.log("Tokens were called in correct order");
             printTokens(tokens);
         }

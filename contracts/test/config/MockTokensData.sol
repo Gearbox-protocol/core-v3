@@ -5,7 +5,6 @@ pragma solidity ^0.8.17;
 
 import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
 import "../lib/constants.sol";
-// import "../lib/test.sol";
 
 struct MockToken {
     Tokens index;
@@ -15,8 +14,8 @@ struct MockToken {
     Tokens underlying;
 }
 
-contract MockTokensData {
-    function getTokenData() public pure returns (MockToken[] memory result) {
+library MockTokensData {
+    function getTokenData() internal pure returns (MockToken[] memory result) {
         MockToken[10] memory testTokensData = [
             MockToken({index: Tokens.DAI, symbol: "DAI", decimals: 18, price: 10 ** 8, underlying: Tokens.NO_TOKEN}),
             MockToken({index: Tokens.USDC, symbol: "USDC", decimals: 6, price: 10 ** 8, underlying: Tokens.NO_TOKEN}),

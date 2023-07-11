@@ -70,8 +70,7 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
                 }
             }
         } else {
-            MockTokensData tdd = new MockTokensData();
-            MockToken[] memory data = tdd.getTokenData();
+            MockToken[] memory data = MockTokensData.getTokenData();
 
             mockTokens = true;
 
@@ -117,7 +116,6 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
         priceFeeds.push(PriceFeedConfig({token: address(t), priceFeed: address(priceFeed)}));
         symbols[token.index] = token.symbol;
         priceFeedsMap[token.index] = address(priceFeed);
-        tokenCount++;
     }
 
     function getPriceFeeds() external view returns (PriceFeedConfig[] memory) {
