@@ -755,10 +755,22 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
     /// @notice [LP-11]: `max{Deposit|Mint|Withdraw|Redeem}` functions work as expected
     function test_LP_11_max_functions_work_as_expected() public {
+        // no-fee case is rather trivial, so let's test with both fee types activated
+        _activateTransferFee(500);
+        _activateWithdrawFee(100);
+
         assertEq(pool.maxDeposit(lp), type(uint256).max, "Incorrect maxDeposit");
         assertEq(pool.maxMint(lp), type(uint256).max, "Incorrect maxMint");
-        assertEq(pool.maxWithdraw(lp), 1000, "Incorrect maxWithdraw (insufficient available liquidity)");
-        assertEq(pool.maxWithdraw(treasury), 125, "Incorrect maxWithdraw (sufficient available liquidity)");
+        assertEq(
+            pool.maxWithdraw(lp),
+            940, // = (1000 * 95%) * 99%
+            "Incorrect maxWithdraw (insufficient available liquidity)"
+        );
+        assertEq(
+            pool.maxWithdraw(treasury),
+            116, // = (125 * 95%) * 99%
+            "Incorrect maxWithdraw (sufficient available liquidity)"
+        );
         assertEq(pool.maxRedeem(lp), 800, "Incorrect maxRedeem (insufficient available liquidity)");
         assertEq(pool.maxRedeem(treasury), 100, "Incorrect maxRedeem (sufficient available liquidity)");
 

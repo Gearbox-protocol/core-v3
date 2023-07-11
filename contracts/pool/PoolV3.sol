@@ -302,7 +302,13 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
 
     /// @notice Maximum amount of underlying that can be withdrawn from the pool by `owner`, 0 if pool is on pause
     function maxWithdraw(address owner) public view override(ERC4626, IERC4626) returns (uint256) {
-        return paused() ? 0 : Math.min(availableLiquidity(), _convertToAssets(balanceOf(owner), Math.Rounding.Down)); // U:[LP-11]
+        return paused()
+            ? 0
+            : _amountMinusFee(
+                _amountMinusWithdrawalFee(
+                    Math.min(availableLiquidity(), _convertToAssets(balanceOf(owner), Math.Rounding.Down))
+                )
+            ); // U:[LP-11]
     }
 
     /// @notice Maximum number of shares that can be redeemed for underlying by `owner`, 0 if pool is on pause
