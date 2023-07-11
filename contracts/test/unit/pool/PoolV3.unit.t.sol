@@ -1,1946 +1,1264 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Holdings, 2022
+// (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
-import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
-
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {LinearInterestRateModelV3} from "../../../pool/LinearInterestRateModelV3.sol";
+import {MAX_WITHDRAW_FEE, RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-
-import "../../../core/AddressProviderV3.sol";
-import {PoolV3} from "../../../pool/PoolV3.sol";
-import {PoolV3_USDT} from "../../../pool/PoolV3_USDT.sol";
-import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
-import {IERC4626Events} from "../../interfaces/IERC4626.sol";
-
+import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
+import "../../../interfaces/IExceptions.sol";
 import {IInterestRateModelV3} from "../../../interfaces/IInterestRateModelV3.sol";
 import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
-import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
-import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
+import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
+
 
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
-import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
-import {ERC20FeeMock} from "../../mocks/token/ERC20FeeMock.sol";
-import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
-import {GaugeMock} from "../../mocks//governance/GaugeMock.sol";
-
-// TEST
 import {TestHelper} from "../../lib/helper.sol";
+import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
-import "../../lib/constants.sol";
+import {ERC20FeeMock} from "../../mocks/token/ERC20FeeMock.sol";
 
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {PoolV3Harness} from "./PoolV3Harness.sol";
 
-// EXCEPTIONS
-import "../../../interfaces/IExceptions.sol";
+interface IERC4626Events {
+    event Deposit(address indexed sender, address indexed owner, uint256 assets, uint256 shares);
 
-uint256 constant fee = 6000;
-uint256 constant liquidityProviderInitBalance = 100 ether;
-uint256 constant addLiquidity = 10 ether;
-uint256 constant removeLiquidity = 5 ether;
-uint16 constant referral = 12333;
+    event Withdraw(
+        address indexed sender, address indexed receiver, address indexed owner, uint256 assets, uint256 shares
+    );
+}
 
-contract PoolV3UnitTest is TestHelper, BalanceHelper, IPoolV3Events, IERC4626Events {
-    using Math for uint256;
+/// @title Pool V3 unit test
+/// @notice U:[LP]: Unit tests for lending pool
+contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
+    PoolV3Harness pool;
 
-    AddressProviderV3ACLMock addressProvider;
-    ContractsRegister public cr;
-
-    PoolQuotaKeeperV3 public pqk;
-    GaugeMock public gaugeMock;
-
-    ACL acl;
-    PoolV3 pool;
-    address underlying;
-    CreditManagerMock cmMock;
-    IInterestRateModelV3 irm;
-
+    // accounts
+    address lp;
+    address user;
+    address configurator;
+    address creditAccount;
     address treasury;
-    /*
-     * @dev Emitted when `value` tokens are moved from one account (`from`) to
-     * another (`to`).
-     *
-     * Note that `value` may be zero.
-     */
 
-    event Transfer(address indexed from, address indexed to, uint256 value);
+    // contracts
+    address interestRateModel;
+    address creditManager;
+    address quotaKeeper;
+
+    // mocks
+    ERC20FeeMock underlying;
+    AddressProviderV3ACLMock addressProvider;
+
+    bytes4 constant calcBorrowRateSelector = bytes4(keccak256("calcBorrowRate(uint256,uint256,bool)"));
+
+    // ----- //
+    // SETUP //
+    // ----- //
 
     function setUp() public {
-        _setUp(Tokens.DAI, false);
-    }
+        underlying = new ERC20FeeMock("Test Token", "TEST", 18);
 
-    function _setUp(Tokens t, bool supportQuotas) public {
-        tokenTestSuite = new TokensTestSuite();
-        irm = new LinearInterestRateModelV3(
-            80_00,
-            90_00,
-            2_00,
-            4_00,
-            40_00,
-            75_00,
-            false
-        );
+        user = makeAddr("USER");
+        lp = makeAddr("LIQUIDITY_PROVIDER");
+        configurator = makeAddr("CONFIGURATOR");
+        creditManager = makeAddr("CREDIT_MANAGER");
+        creditAccount = makeAddr("CREDIT_ACCOUNT");
+        interestRateModel = makeAddr("INTEREST_RATE_MODEL");
+        quotaKeeper = makeAddr("QUOTA_KEEPER");
 
-        vm.startPrank(CONFIGURATOR);
-
+        vm.startPrank(configurator);
         addressProvider = new AddressProviderV3ACLMock();
-        addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
-
-        acl = ACL(addressProvider.getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL));
-        cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
-        treasury = addressProvider.getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL);
-
-        underlying = tokenTestSuite.addressOf(t);
-
-        tokenTestSuite.mint(underlying, USER, liquidityProviderInitBalance);
-        tokenTestSuite.mint(underlying, INITIAL_LP, liquidityProviderInitBalance);
-
-        address newPool;
-
-        bool isFeeToken = false;
-
-        try ERC20FeeMock(underlying).basisPointsRate() returns (uint256) {
-            isFeeToken = true;
-        } catch {}
-
-        if (isFeeToken) {
-            pool = new PoolV3_USDT({
-                addressProvider_: address(addressProvider),
-                underlyingToken_: underlying,
-                interestRateModel_: address(irm),
-                totalDebtLimit_: type(uint256).max,
-                supportsQuotas_: supportQuotas,
-                namePrefix_: "diesel ",
-                symbolPrefix_: "d"
-            });
-        } else {
-            pool = new PoolV3({
-                addressProvider_: address(addressProvider),
-                underlyingToken_: underlying,
-                interestRateModel_: address(irm),
-                totalDebtLimit_: type(uint256).max,
-                supportsQuotas_: supportQuotas,
-                namePrefix_: "diesel ",
-                symbolPrefix_: "d"
-            });
-        }
-        newPool = address(pool);
-
-        if (supportQuotas) {
-            _deployAndConnectPoolQuotaKeeper();
-        }
-
+        addressProvider.addPausableAdmin(configurator);
+        addressProvider.addCreditManager(creditManager);
+        treasury = addressProvider.getTreasuryContract();
         vm.stopPrank();
 
-        vm.prank(USER);
-        IERC20(underlying).approve(newPool, type(uint256).max);
-
-        vm.prank(INITIAL_LP);
-        IERC20(underlying).approve(newPool, type(uint256).max);
-
-        vm.startPrank(CONFIGURATOR);
-
-        cmMock = new CreditManagerMock(address(addressProvider), newPool);
-
-        cr.addPool(newPool);
-        cr.addCreditManager(address(cmMock));
-
-        vm.label(newPool, "Pool");
-
-        // vm.label(address(underlying), "UnderlyingToken");
-
-        vm.stopPrank();
+        _setupPool({supportsQuotas: true});
     }
 
-    function _deployAndConnectPoolQuotaKeeper() internal {
-        pqk = new PoolQuotaKeeperV3(address(pool));
-
-        // vm.prank(CONFIGURATOR);
-        pool.setPoolQuotaKeeper(address(pqk));
-
-        gaugeMock = new GaugeMock(address(pool));
-
-        // vm.prank(CONFIGURATOR);
-        pqk.setGauge(address(gaugeMock));
+    modifier repeatWithoutQuotas() {
+        uint256 snapshot = vm.snapshot();
+        _;
+        vm.revertTo(snapshot);
+        _setupPool({supportsQuotas: false});
+        _;
     }
 
-    //
-    // HELPERS
-    //
-    function _setUpTestCase(
-        Tokens t,
-        uint256 feeToken,
-        uint16 utilisation,
-        uint256 availableLiquidity,
-        uint256 dieselRate,
-        uint16 withdrawFee,
-        bool supportQuotas
-    ) internal {
-        _setUp(t, supportQuotas);
-        if (t == Tokens.USDT) {
-            // set 50% fee if fee token
-            ERC20FeeMock(pool.asset()).setMaximumFee(type(uint256).max);
-            ERC20FeeMock(pool.asset()).setBasisPointsRate(feeToken);
-        }
-
-        _initPoolLiquidity(availableLiquidity, dieselRate);
-        _connectAndSetLimit();
-
-        if (utilisation > 0) _borrowToUtilisation(utilisation);
-
-        vm.prank(CONFIGURATOR);
-        pool.setWithdrawFee(withdrawFee);
+    modifier onlyWithoutQuotas() {
+        _setupPool({supportsQuotas: false});
+        _;
     }
 
-    function _connectAndSetLimit() internal {
-        vm.prank(CONFIGURATOR);
-        pool.setCreditManagerDebtLimit(address(cmMock), type(uint128).max);
-    }
-
-    function _borrowToUtilisation(uint16 utilisation) internal {
-        cmMock.lendCreditAccount(pool.expectedLiquidity() * utilisation / PERCENTAGE_FACTOR, DUMB_ADDRESS);
-
-        assertEq(pool.baseInterestRate(), irm.calcBorrowRate(PERCENTAGE_FACTOR, utilisation, false));
-    }
-
-    function _mulFee(uint256 amount, uint256 _fee) internal pure returns (uint256) {
-        return (amount * (PERCENTAGE_FACTOR - _fee)) / PERCENTAGE_FACTOR;
-    }
-
-    function _divFee(uint256 amount, uint256 _fee) internal pure returns (uint256) {
-        return (amount * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR - _fee);
-    }
-
-    function _updateBaseInterest() internal {
-        vm.prank(CONFIGURATOR);
-        pool.setInterestRateModel(address(irm));
-    }
-
-    function _initPoolLiquidity() internal {
-        _initPoolLiquidity(addLiquidity, 2 * RAY);
-    }
-
-    function _initPoolLiquidity(uint256 availableLiquidity, uint256 dieselRate) internal {
-        assertEq(pool.convertToAssets(RAY), RAY, "Incorrect diesel rate!");
-
-        vm.prank(INITIAL_LP);
-        pool.mint(availableLiquidity, INITIAL_LP);
-
-        deal(address(pool), INITIAL_LP, availableLiquidity * RAY / dieselRate, true);
-
-        // assertEq(pool.expectedLiquidityLU(), availableLiquidity * dieselRate / RAY, "ExpectedLU is not correct!");
-        assertEq(pool.convertToAssets(RAY), dieselRate, "Incorrect diesel rate!");
-    }
-
-    //
-    // TESTS
-    //
-
-    // U:[P4-1]: getDieselRate_RAY=RAY, withdrawFee=0 and expectedLiquidityLimit as expected at start
-    function test_U_P4_01_start_parameters_correct() public {
-        assertEq(pool.name(), "diesel DAI", "Symbol incorrectly set up");
-        assertEq(pool.symbol(), "dDAI", "Symbol incorrectly set up");
-        assertEq(address(pool.addressProvider()), address(addressProvider), "Incorrect address provider");
-
-        assertEq(pool.asset(), underlying, "Incorrect underlying provider");
-        assertEq(pool.underlyingToken(), underlying, "Incorrect underlying provider");
-
-        assertEq(pool.decimals(), IERC20Metadata(underlying).decimals(), "Incorrect decimals");
-
-        assertEq(
-            pool.treasury(), addressProvider.getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL), "Incorrect treasury"
-        );
-
-        assertEq(pool.convertToAssets(RAY), RAY, "Incorrect diesel rate!");
-
-        assertEq(address(pool.interestRateModel()), address(irm), "Incorrect interest rate model");
-
-        assertEq(pool.totalDebtLimit(), type(uint256).max);
-    }
-
-    // U:[P4-2]: constructor reverts for zero addresses
-    function test_U_P4_02_constructor_reverts_for_zero_addresses() public {
-        address irmodel = address(irm);
-        address ap = address(addressProvider);
-
-        vm.expectRevert(ZeroAddressException.selector);
-        new PoolV3({
-            addressProvider_: address(0),
-            underlyingToken_: underlying,
-            interestRateModel_: irmodel,
-            totalDebtLimit_: type(uint128).max,
-            supportsQuotas_: false,
+    function _setupPool(bool supportsQuotas) internal {
+        pool = new PoolV3Harness({
+            underlyingToken_: address(underlying),
+            addressProvider_: address(addressProvider),
+            interestRateModel_: interestRateModel,
+            totalDebtLimit_: 2000,
+            supportsQuotas_: supportsQuotas,
             namePrefix_: "diesel ",
             symbolPrefix_: "d"
         });
 
-        // opts.addressProvider = address(addressProvider);
-        // opts.interestRateModel = address(0);
+        // setup mocks
+        vm.mockCall(interestRateModel, abi.encode(calcBorrowRateSelector), abi.encode(RAY / 20)); // 5%
+        vm.mockCall(creditManager, abi.encodeCall(ICreditManagerV3.pool, ()), abi.encode(pool));
+        vm.mockCall(quotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.pool, ()), abi.encode(pool));
+        vm.mockCall(quotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.poolQuotaRevenue, ()), abi.encode(0));
 
+        // connect contracts
+        vm.startPrank(configurator);
+        pool.setCreditManagerDebtLimit(creditManager, 1000);
+        if (supportsQuotas) pool.setPoolQuotaKeeper(quotaKeeper);
+        vm.stopPrank();
+
+        // setup liquidity and borrowing
+        pool.hackExpectedLiquidityLU(2000);
+        deal({token: address(underlying), to: address(pool), give: 1000});
+
+        pool.hackTotalBorrowed(1000);
+        pool.hackCreditManagerBorrowed(creditManager, 500);
+
+        deal({token: address(pool), to: lp, give: 1500, adjust: true});
+        deal({token: address(pool), to: treasury, give: 100, adjust: true});
+    }
+
+    // ------- //
+    // GENERAL //
+    // ------- //
+
+    /// @notice [LP-1A]: Constructor reverts on zero addresses
+    function test_LP_01A_constructor_reverts_on_zero_addresses() public {
         vm.expectRevert(ZeroAddressException.selector);
-        new PoolV3({
-            addressProvider_: ap,
-            underlyingToken_: underlying,
-            interestRateModel_: address(0),
-            totalDebtLimit_: type(uint128).max,
-            supportsQuotas_: false,
-            namePrefix_: "diesel ",
-            symbolPrefix_: "d"
-        });
-
-        // opts.interestRateModel = address(irm);
-        // opts.underlyingToken = address(0);
-
-        vm.expectRevert(ZeroAddressException.selector);
-        new PoolV3({
-            addressProvider_: ap,
+        new PoolV3Harness({
             underlyingToken_: address(0),
-            interestRateModel_: irmodel,
-            totalDebtLimit_: type(uint128).max,
+            addressProvider_: address(addressProvider),
+            interestRateModel_: interestRateModel,
+            totalDebtLimit_: type(uint256).max,
             supportsQuotas_: false,
-            namePrefix_: "diesel ",
-            symbolPrefix_: "d"
+            namePrefix_: "",
+            symbolPrefix_: ""
+        });
+
+        vm.expectRevert(ZeroAddressException.selector);
+        new PoolV3Harness({
+            underlyingToken_: address(underlying),
+            addressProvider_: address(0),
+            interestRateModel_: interestRateModel,
+            totalDebtLimit_: type(uint256).max,
+            supportsQuotas_: false,
+            namePrefix_: "",
+            symbolPrefix_: ""
+        });
+
+        vm.expectRevert(ZeroAddressException.selector);
+        new PoolV3Harness({
+            underlyingToken_: address(underlying),
+            addressProvider_: address(addressProvider),
+            interestRateModel_: address(0),
+            totalDebtLimit_: type(uint256).max,
+            supportsQuotas_: false,
+            namePrefix_: "",
+            symbolPrefix_: ""
         });
     }
 
-    // U:[P4-3]: constructor emits events
-    function test_U_P4_03_constructor_emits_events() public {
-        uint256 limit = 15890;
-
+    /// @notice [LP-1B]: Constructor sets correct values and emits events
+    function test_LP_01B_constructor_sets_correct_values_and_emits_events() public {
         vm.expectEmit(true, false, false, false);
-        emit SetInterestRateModel(address(irm));
+        emit SetInterestRateModel({newInterestRateModel: interestRateModel});
 
         vm.expectEmit(false, false, false, true);
-        emit SetTotalDebtLimit(limit);
+        emit SetTotalDebtLimit({limit: 2000});
 
-        new PoolV3({
+        pool = new PoolV3Harness({
+            underlyingToken_: address(underlying),
             addressProvider_: address(addressProvider),
-            underlyingToken_: underlying,
-            interestRateModel_: address(irm),
-            totalDebtLimit_: limit,
-            supportsQuotas_: false,
+            interestRateModel_: interestRateModel,
+            totalDebtLimit_: 2000,
+            supportsQuotas_: true,
             namePrefix_: "diesel ",
             symbolPrefix_: "d"
         });
+
+        assertEq(pool.asset(), address(underlying), "Incorrect asset");
+        assertEq(pool.symbol(), "dTEST", "Incorrect symbol");
+        assertEq(pool.name(), "diesel Test Token", "Incorrect name");
+        assertEq(pool.addressProvider(), address(addressProvider), "Incorrect addressProvider");
+        assertEq(pool.underlyingToken(), address(underlying), "Incorrect underlyingToken");
+        assertEq(pool.treasury(), treasury, "Incorrect treasury");
+        assertEq(pool.lastBaseInterestUpdate(), block.timestamp, "Incorrect lastBaseInterestUpdate");
+        assertEq(pool.baseInterestIndex(), RAY, "Incorrect baseInterestIndex");
+        assertEq(pool.interestRateModel(), address(interestRateModel), "Incorrect interestRateModel");
+        assertEq(pool.totalDebtLimit(), 2000, "Incorrect totalDebtLimit");
+        assertEq(pool.supportsQuotas(), true, "Incorrect supportsQuotas");
     }
 
-    // U:[P4-4]: addLiquidity, removeLiquidity, lendCreditAccount, repayCreditAccount reverts if contract is paused
-    function test_U_P4_04_cannot_be_used_while_paused() public {
-        vm.startPrank(CONFIGURATOR);
-        acl.addPausableAdmin(CONFIGURATOR);
+    /// @notice [LP-2A]: External functions revert when contract is on pause
+    function test_LP_02A_external_functions_revert_on_pause() public {
+        vm.prank(configurator);
         pool.pause();
-        vm.stopPrank();
 
-        vm.startPrank(USER);
+        vm.expectRevert("Pausable: paused");
+        pool.deposit({assets: 1, receiver: user});
 
-        vm.expectRevert(bytes(PAUSABLE_ERROR));
-        pool.deposit(addLiquidity, FRIEND);
+        vm.expectRevert("Pausable: paused");
+        pool.depositWithReferral({assets: 1, receiver: user, referralCode: 0});
 
-        vm.expectRevert(bytes(PAUSABLE_ERROR));
-        pool.depositWithReferral(addLiquidity, FRIEND, referral);
+        vm.expectRevert("Pausable: paused");
+        pool.mint({shares: 1, receiver: user});
 
-        vm.expectRevert(bytes(PAUSABLE_ERROR));
-        pool.mint(addLiquidity, FRIEND);
+        vm.expectRevert("Pausable: paused");
+        pool.mintWithReferral({shares: 1, receiver: user, referralCode: 0});
 
-        vm.expectRevert(bytes(PAUSABLE_ERROR));
-        pool.withdraw(removeLiquidity, FRIEND, FRIEND);
+        vm.expectRevert("Pausable: paused");
+        pool.redeem({shares: 1, owner: user, receiver: user});
 
-        vm.expectRevert(bytes(PAUSABLE_ERROR));
-        pool.redeem(removeLiquidity, FRIEND, FRIEND);
+        vm.expectRevert("Pausable: paused");
+        pool.withdraw({assets: 1, owner: user, receiver: user});
 
-        vm.expectRevert(bytes(PAUSABLE_ERROR));
-        pool.lendCreditAccount(1, FRIEND);
+        vm.expectRevert("Pausable: paused");
+        pool.lendCreditAccount({borrowedAmount: 0, creditAccount: address(0)});
 
-        vm.expectRevert(bytes(PAUSABLE_ERROR));
-        pool.repayCreditAccount(1, 0, 0);
+        vm.expectRevert("Pausable: paused");
+        pool.repayCreditAccount({repaidAmount: 0, profit: 0, loss: 0});
+    }
 
+    /// @notice [LP-2B]: External functions revert on re-entrancy
+    function test_LP_02B_external_functions_revert_on_reentrancy() public {
+        pool.hackReentrancyStatus(true);
+
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        pool.deposit({assets: 1, receiver: user});
+
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        pool.depositWithReferral({assets: 1, receiver: user, referralCode: 0});
+
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        pool.mint({shares: 1, receiver: user});
+
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        pool.mintWithReferral({shares: 1, receiver: user, referralCode: 0});
+
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        pool.redeem({shares: 1, owner: user, receiver: user});
+
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        pool.withdraw({assets: 1, owner: user, receiver: user});
+
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        pool.lendCreditAccount({borrowedAmount: 0, creditAccount: address(0)});
+
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        pool.repayCreditAccount({repaidAmount: 0, profit: 0, loss: 0});
+
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        vm.prank(quotaKeeper);
+        pool.updateQuotaRevenue({quotaRevenueDelta: 0});
+
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        vm.prank(quotaKeeper);
+        pool.setQuotaRevenue({newQuotaRevenue: 0});
+    }
+
+    /// @notice [LP-2C]: External function have correct access rights
+    function test_LP_02C_external_functions_have_correct_access() public repeatWithoutQuotas {
+        vm.expectRevert(CreditManagerCantBorrowException.selector);
+        pool.lendCreditAccount({borrowedAmount: 1, creditAccount: address(0)});
+
+        vm.expectRevert(CallerNotCreditManagerException.selector);
+        pool.repayCreditAccount({repaidAmount: 1, profit: 0, loss: 0});
+
+        vm.expectRevert(CallerNotPoolQuotaKeeperException.selector);
+        pool.updateQuotaRevenue({quotaRevenueDelta: 0});
+
+        vm.expectRevert(CallerNotPoolQuotaKeeperException.selector);
+        pool.setQuotaRevenue({newQuotaRevenue: 0});
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        pool.setInterestRateModel({newInterestRateModel: address(0)});
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        pool.setPoolQuotaKeeper({newPoolQuotaKeeper: address(0)});
+
+        vm.expectRevert(CallerNotControllerException.selector);
+        pool.setTotalDebtLimit({newLimit: 0});
+
+        vm.expectRevert(CallerNotControllerException.selector);
+        pool.setCreditManagerDebtLimit({creditManager: address(0), newLimit: 0});
+
+        vm.expectRevert(CallerNotControllerException.selector);
+        pool.setWithdrawFee({newWithdrawFee: 0});
+    }
+
+    /// @notice [LP-3]: `availableLiquidity` works as expected
+    function test_LP_03_availableLiquidity_works_as_expected() public {
+        vm.expectCall(address(underlying), abi.encodeCall(IERC20.balanceOf, (address(pool))));
+        assertEq(pool.availableLiquidity(), 1000, "Incorrect availableLiquidity");
+    }
+
+    /// @notice [LP-4]: `expectedLiquidity` works as expected
+    function test_LP_04_expectedLiquidity_works_as_expected() public repeatWithoutQuotas {
+        pool.hackBaseInterestRate(RAY / 10); // 10% yearly
+
+        assertEq(pool.expectedLiquidity(), 2000, "Incorrect expectedLiquidity right after base interest update");
+
+        vm.warp(block.timestamp + 365 days);
+        // 2000 + 1000 * 10%
+        assertEq(pool.expectedLiquidity(), 2100, "Incorrect expectedLiquidity 1 year after base interest update");
+
+        if (pool.supportsQuotas()) {
+            pool.hackQuotaRevenue(100); // 100 units yearly
+
+            assertEq(pool.expectedLiquidity(), 2100, "Incorrect expectedLiquidity right after quota revenue update");
+
+            vm.warp(block.timestamp + 365 days);
+            // 2000 + 1000 * 10% * 2 + 100
+            assertEq(pool.expectedLiquidity(), 2300, "Incorrect expectedLiquidity 1 year after quota revenue update");
+        }
+    }
+
+    // ---------------- //
+    // ERC-4626 LENDING //
+    // ---------------- //
+
+    /// @notice [LP-5]: `{deposit|mint|withdraw|redeem}` functions revert on zero address receiver
+    function test_LP_05_lending_functions_revert_on_zero_address_receiver() public {
+        vm.startPrank(user);
+
+        vm.expectRevert(ZeroAddressException.selector);
+        pool.deposit({assets: 1, receiver: address(0)});
+
+        vm.expectRevert(ZeroAddressException.selector);
+        pool.depositWithReferral({assets: 1, receiver: address(0), referralCode: 0});
+
+        vm.expectRevert(ZeroAddressException.selector);
+        pool.mint({shares: 1, receiver: address(0)});
+
+        vm.expectRevert(ZeroAddressException.selector);
+        pool.mintWithReferral({shares: 1, receiver: address(0), referralCode: 0});
+
+        vm.expectRevert(ZeroAddressException.selector);
+        pool.withdraw({assets: 1, receiver: address(0), owner: user});
+
+        vm.expectRevert(ZeroAddressException.selector);
+        pool.redeem({shares: 1, receiver: address(0), owner: user});
         vm.stopPrank();
     }
 
     struct DepositTestCase {
         string name;
-        /// SETUP
-        Tokens asset;
-        uint256 tokenFee;
-        uint256 initialLiquidity;
-        uint256 dieselRate;
-        uint16 utilisation;
-        uint16 withdrawFee;
-        /// PARAMS
-        uint256 amountToDeposit;
-        /// EXPECTED VALUES
+        // scenario
+        uint256 assets;
+        uint256 transferFee;
+        // outcome
         uint256 expectedShares;
-        uint256 expectedAvailableLiquidity;
-        uint256 expectedLiquidityAfter;
+        uint256 expectedAssetsReceived;
     }
 
-    // U:[P4-5]: deposit adds liquidity correctly
-    function test_U_P4_05_deposit_adds_liquidity_correctly() public {
-        // adds liqudity to mint initial diesel tokens to change 1:1 rate
+    /// @notice [LP-6]: `deposit[WithReferral]` works as expected
+    function test_LP_06_deposit_works_as_expected(address caller) public {
+        vm.assume(caller != address(0) && caller != address(pool));
 
         DepositTestCase[2] memory cases = [
             DepositTestCase({
-                name: "Normal token",
-                // POOL SETUP
-                asset: Tokens.DAI,
-                tokenFee: 0,
-                initialLiquidity: addLiquidity,
-                // 1 dDAI = 2 DAI
-                dieselRate: 2 * RAY,
-                // 50% of available liquidity is borrowed
-                utilisation: 50_00,
-                withdrawFee: 0,
-                // PARAMS
-                amountToDeposit: addLiquidity,
-                // EXPECTED VALUES:
-                //
-                // Depends on dieselRate
-                expectedShares: addLiquidity / 2,
-                // availableLiquidityBefore: addLiqudity /2 (cause 50% utilisation)
-                expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity,
-                expectedLiquidityAfter: addLiquidity * 2
+                name: "deposit with 0% transfer fee",
+                assets: 100,
+                transferFee: 0,
+                expectedShares: 80,
+                expectedAssetsReceived: 100
             }),
             DepositTestCase({
-                name: "Fee token",
-                /// SETUP
-                asset: Tokens.USDT,
-                // transfer fee: 60%, so 40% will be transfer to account
-                tokenFee: 60_00,
-                initialLiquidity: addLiquidity,
-                // 1 dUSDT = 2 USDT
-                dieselRate: 2 * RAY,
-                // 50% of available liquidity is borrowed
-                utilisation: 50_00,
-                withdrawFee: 0,
-                /// PARAMS
-                amountToDeposit: addLiquidity,
-                /// EXPECTED VALUES
-                expectedShares: ((addLiquidity * 40) / 100) / 2,
-                expectedAvailableLiquidity: addLiquidity / 2 + (addLiquidity * 40) / 100,
-                expectedLiquidityAfter: addLiquidity + (addLiquidity * 40) / 100
+                name: "deposit with 5% transfer fee",
+                assets: 100,
+                transferFee: 500,
+                expectedShares: 76,
+                expectedAssetsReceived: 95
             })
         ];
 
+        uint256 snapshot = vm.snapshot();
         for (uint256 i; i < cases.length; ++i) {
-            DepositTestCase memory testCase = cases[i];
-            for (uint256 rc; rc < 2; ++rc) {
-                bool withReferralCode = rc == 0;
+            if (cases[i].transferFee != 0) _activateTransferFee(cases[i].transferFee);
 
-                _setUpTestCase(
-                    testCase.asset,
-                    testCase.tokenFee,
-                    testCase.utilisation,
-                    testCase.initialLiquidity,
-                    testCase.dieselRate,
-                    testCase.withdrawFee,
+            _prepareAssets(caller, cases[i].assets);
+            uint256 sharesBefore = pool.balanceOf(caller);
+
+            // receives udnerlying
+            vm.expectCall(
+                address(underlying), abi.encodeCall(IERC20.transferFrom, (caller, address(pool), cases[i].assets))
+            );
+
+            // implicitly test that `_updateBaseInterest` is called with correct parameters
+            vm.expectCall(
+                interestRateModel,
+                abi.encodeWithSelector(
+                    calcBorrowRateSelector,
+                    2000 + cases[i].expectedAssetsReceived,
+                    1000 + cases[i].expectedAssetsReceived,
                     false
-                );
+                )
+            );
 
-                vm.expectEmit(true, true, false, true);
-                emit Transfer(address(0), FRIEND, testCase.expectedShares);
+            // emits events
+            vm.expectEmit(true, true, false, true);
+            emit Deposit(caller, user, cases[i].assets, cases[i].expectedShares);
 
-                vm.expectEmit(true, true, false, true);
-                emit Deposit(USER, FRIEND, testCase.amountToDeposit, testCase.expectedShares);
+            vm.expectEmit(true, true, false, true);
+            emit Refer(user, 123, cases[i].assets);
 
-                if (withReferralCode) {
-                    vm.expectEmit(true, true, false, true);
-                    emit Refer(FRIEND, referral, testCase.amountToDeposit);
-                }
+            vm.prank(caller);
+            uint256 shares = pool.depositWithReferral({assets: cases[i].assets, receiver: user, referralCode: 123});
 
-                vm.prank(USER);
-                uint256 shares = withReferralCode
-                    ? pool.depositWithReferral(testCase.amountToDeposit, FRIEND, referral)
-                    : pool.deposit(testCase.amountToDeposit, FRIEND);
+            // updates balance
+            assertEq(
+                pool.balanceOf(user),
+                sharesBefore + cases[i].expectedShares,
+                _testCaseErr(cases[i].name, "Incorrect shares minted to caller")
+            );
 
-                expectBalance(
-                    address(pool),
-                    FRIEND,
-                    testCase.expectedShares,
-                    _testCaseErr(testCase.name, "Incorrect diesel tokens on FRIEND account")
-                );
-                expectBalance(underlying, USER, liquidityProviderInitBalance - addLiquidity);
-                assertEq(
-                    pool.expectedLiquidity(),
-                    testCase.expectedLiquidityAfter,
-                    _testCaseErr(testCase.name, "Incorrect expected liquidity")
-                );
-                assertEq(
-                    pool.availableLiquidity(),
-                    testCase.expectedAvailableLiquidity,
-                    _testCaseErr(testCase.name, "Incorrect available liquidity")
-                );
-                assertEq(shares, testCase.expectedShares);
+            // returns correct value
+            assertEq(shares, cases[i].expectedShares, "Incorrect shares returned");
 
-                assertEq(
-                    pool.baseInterestRate(),
-                    irm.calcBorrowRate(pool.expectedLiquidity(), pool.availableLiquidity(), false),
-                    _testCaseErr(testCase.name, "Borrow rate wasn't update correcty")
-                );
-            }
+            vm.revertTo(snapshot);
         }
     }
 
     struct MintTestCase {
         string name;
-        /// SETUP
-        Tokens asset;
-        uint256 tokenFee;
-        uint256 initialLiquidity;
-        uint256 dieselRate;
-        uint16 utilisation;
-        uint16 withdrawFee;
-        /// PARAMS
-        uint256 desiredShares;
-        /// EXPECTED VALUES
-        uint256 expectedAssetsWithdrawal;
-        uint256 expectedAvailableLiquidity;
-        uint256 expectedLiquidityAfter;
+        // scenario
+        uint256 shares;
+        uint256 transferFee;
+        // outcome
+        uint256 expectedAssets;
+        uint256 expectedAssetsReceived;
     }
 
-    // U:[P4-6]: deposit adds liquidity correctly
-    function test_U_P4_06_mint_adds_liquidity_correctly() public {
+    /// @notice [LP-7]: `mint[WithReferral]` works as expected
+    function test_LP_07_mint_works_as_expected(address caller) public {
+        vm.assume(caller != address(0) && caller != address(pool));
+
         MintTestCase[2] memory cases = [
             MintTestCase({
-                name: "Normal token",
-                // POOL SETUP
-                asset: Tokens.DAI,
-                tokenFee: 0,
-                initialLiquidity: addLiquidity,
-                // 1 dDAI = 2 DAI
-                dieselRate: 2 * RAY,
-                // 50% of available liquidity is borrowed
-                utilisation: 50_00,
-                withdrawFee: 0,
-                // PARAMS
-                desiredShares: addLiquidity / 2,
-                // EXPECTED VALUES:
-                //
-                // Depends on dieselRate
-                expectedAssetsWithdrawal: addLiquidity,
-                // availableLiquidityBefore: addLiqudity /2 (cause 50% utilisation)
-                expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity,
-                expectedLiquidityAfter: addLiquidity * 2
+                name: "mint with 0% transfer fee",
+                shares: 80,
+                transferFee: 0,
+                expectedAssets: 100,
+                expectedAssetsReceived: 100
             }),
             MintTestCase({
-                name: "Fee token",
-                /// SETUP
-                asset: Tokens.USDT,
-                // transfer fee: 60%, so 40% will be transfer to account
-                tokenFee: 60_00,
-                initialLiquidity: addLiquidity,
-                // 1 dUSDT = 2 USDT
-                dieselRate: 2 * RAY,
-                // 50% of available liquidity is borrowed
-                utilisation: 50_00,
-                withdrawFee: 0,
-                /// PARAMS
-                desiredShares: addLiquidity / 2,
-                /// EXPECTED VALUES
-                /// fee token makes impact on how much tokens will be wiotdrawn from user
-                expectedAssetsWithdrawal: (addLiquidity * 100) / 40,
-                expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity,
-                expectedLiquidityAfter: addLiquidity * 2
+                name: "mint with 5% transfer fee",
+                shares: 80,
+                transferFee: 500,
+                expectedAssets: 105,
+                expectedAssetsReceived: 100
             })
         ];
 
+        uint256 snapshot = vm.snapshot();
         for (uint256 i; i < cases.length; ++i) {
-            MintTestCase memory testCase = cases[i];
-            for (uint256 rc; rc < 2; ++rc) {
-                bool withReferralCode = rc == 0;
+            if (cases[i].transferFee != 0) _activateTransferFee(cases[i].transferFee);
 
-                _setUpTestCase(
-                    testCase.asset,
-                    testCase.tokenFee,
-                    testCase.utilisation,
-                    testCase.initialLiquidity,
-                    testCase.dieselRate,
-                    testCase.withdrawFee,
-                    false
-                );
+            _prepareAssets(caller, cases[i].expectedAssets);
+            uint256 sharesBefore = pool.balanceOf(caller);
 
-                vm.expectEmit(true, true, false, true);
-                emit Transfer(address(0), FRIEND, testCase.desiredShares);
-
-                vm.expectEmit(true, true, false, true);
-                emit Deposit(USER, FRIEND, testCase.expectedAssetsWithdrawal, testCase.desiredShares);
-
-                if (withReferralCode) {
-                    vm.expectEmit(true, true, false, true);
-                    emit Refer(FRIEND, referral, testCase.expectedAssetsWithdrawal);
-                }
-
-                vm.prank(USER);
-                uint256 assets = withReferralCode
-                    ? pool.mintWithReferral(testCase.desiredShares, FRIEND, referral)
-                    : pool.mint(testCase.desiredShares, FRIEND);
-
-                expectBalance(
-                    address(pool), FRIEND, testCase.desiredShares, _testCaseErr(testCase.name, "Incorrect shares ")
-                );
-                expectBalance(
-                    underlying,
-                    USER,
-                    liquidityProviderInitBalance - testCase.expectedAssetsWithdrawal,
-                    _testCaseErr(testCase.name, "Incorrect USER balance")
-                );
-                assertEq(
-                    pool.expectedLiquidity(),
-                    testCase.expectedLiquidityAfter,
-                    _testCaseErr(testCase.name, "Incorrect expected liquidity")
-                );
-                assertEq(
-                    pool.availableLiquidity(),
-                    testCase.expectedAvailableLiquidity,
-                    _testCaseErr(testCase.name, "Incorrect available liquidity")
-                );
-                assertEq(
-                    assets,
-                    testCase.expectedAssetsWithdrawal,
-                    _testCaseErr(testCase.name, "Incorrect assets return value")
-                );
-
-                assertEq(
-                    pool.baseInterestRate(),
-                    irm.calcBorrowRate(pool.expectedLiquidity(), pool.availableLiquidity(), false),
-                    _testCaseErr(testCase.name, "Borrow rate wasn't update correcty")
-                );
-            }
-        }
-    }
-
-    //
-    // WITHDRAW
-    //
-    struct WithdrawTestCase {
-        string name;
-        /// SETUP
-        Tokens asset;
-        uint256 tokenFee;
-        uint256 initialLiquidity;
-        uint256 dieselRate;
-        uint16 utilisation;
-        uint16 withdrawFee;
-        /// PARAMS
-        uint256 sharesToMint;
-        uint256 assetsToWithdraw;
-        /// EXPECTED VALUES
-        uint256 expectedSharesBurnt;
-        uint256 expectedAvailableLiquidity;
-        uint256 expectedLiquidityAfter;
-        uint256 expectedTreasury;
-    }
-
-    // U:[P4-8]: deposit and mint if assets more than limit
-    function test_U_P4_08_withdraw_works_as_expected() public {
-        WithdrawTestCase[4] memory cases = [
-            WithdrawTestCase({
-                name: "Normal token with 0 withdraw fee",
-                // POOL SETUP
-                asset: Tokens.DAI,
-                tokenFee: 0,
-                initialLiquidity: addLiquidity,
-                // 1 dDAI = 2 DAI
-                dieselRate: 2 * RAY,
-                // 50% of available liquidity is borrowed
-                utilisation: 50_00,
-                withdrawFee: 0,
-                // PARAMS
-                sharesToMint: addLiquidity / 2,
-                assetsToWithdraw: addLiquidity / 4,
-                // EXPECTED VALUES:
-                //
-                // Depends on dieselRate
-                expectedSharesBurnt: addLiquidity / 8,
-                // availableLiquidityBefore: addLiqudity /2 (cause 50% utilisation)
-                expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity - addLiquidity / 4,
-                expectedLiquidityAfter: addLiquidity * 2 - addLiquidity / 4,
-                expectedTreasury: 0
-            }),
-            WithdrawTestCase({
-                name: "Normal token with 1% withdraw fee",
-                // POOL SETUP
-                asset: Tokens.DAI,
-                tokenFee: 0,
-                initialLiquidity: addLiquidity,
-                // 1 dDAI = 2 DAI
-                dieselRate: 2 * RAY,
-                // 50% of available liquidity is borrowed
-                utilisation: 50_00,
-                withdrawFee: 1_00,
-                // PARAMS
-                sharesToMint: addLiquidity / 2,
-                assetsToWithdraw: addLiquidity / 4,
-                // EXPECTED VALUES:
-                //
-                // Depends on dieselRate
-                expectedSharesBurnt: ((addLiquidity / 8) * 100) / 99,
-                expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity - ((addLiquidity / 4) * 100) / 99,
-                expectedLiquidityAfter: addLiquidity * 2 - ((addLiquidity / 4) * 100) / 99,
-                expectedTreasury: ((addLiquidity / 4) * 1) / 99
-            }),
-            WithdrawTestCase({
-                name: "Fee token with 0 withdraw fee",
-                /// SETUP
-                asset: Tokens.USDT,
-                // transfer fee: 60%, so 40% will be transfer to account
-                tokenFee: 60_00,
-                initialLiquidity: addLiquidity,
-                // 1 dUSDT = 2 USDT
-                dieselRate: 2 * RAY,
-                // 50% of available liquidity is borrowed
-                utilisation: 50_00,
-                withdrawFee: 0,
-                // PARAMS
-                sharesToMint: addLiquidity / 2,
-                assetsToWithdraw: addLiquidity / 4,
-                // EXPECTED VALUES:
-                //
-                // Depends on dieselRate
-                expectedSharesBurnt: ((addLiquidity / 8) * 100) / 40,
-                expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity - ((addLiquidity / 4) * 100) / 40,
-                expectedLiquidityAfter: addLiquidity * 2 - ((addLiquidity / 4) * 100) / 40,
-                expectedTreasury: 0
-            }),
-            WithdrawTestCase({
-                name: "Fee token with 1% withdraw fee",
-                /// SETUP
-                asset: Tokens.USDT,
-                // transfer fee: 60%, so 40% will be transfer to account
-                tokenFee: 60_00,
-                initialLiquidity: addLiquidity,
-                // 1 dUSDT = 2 USDT
-                dieselRate: 2 * RAY,
-                // 50% of available liquidity is borrowed
-                utilisation: 50_00,
-                withdrawFee: 1_00,
-                // PARAMS
-                sharesToMint: addLiquidity / 2,
-                assetsToWithdraw: addLiquidity / 4,
-                // EXPECTED VALUES:
-                //
-                // addLiquidity /2 * 1/2 (rate) * 1 / (100%-1%) / feeToken
-                expectedSharesBurnt: ((((addLiquidity / 8) * 100) / 99) * 100) / 40 + 1,
-                // availableLiquidityBefore: addLiqudity /2 (cause 50% utilisation)
-                expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity - ((((addLiquidity / 4) * 100) / 40) * 100) / 99,
-                expectedLiquidityAfter: addLiquidity * 2 - ((((addLiquidity / 4) * 100) / 40) * 100) / 99,
-                expectedTreasury: ((addLiquidity / 4) * 1) / 99 + 1
-            })
-        ];
-
-        for (uint256 i; i < cases.length; ++i) {
-            WithdrawTestCase memory testCase = cases[i];
-            /// @dev a represents allowance, 0 means required amount +1, 1 means inlimited allowance
-            for (uint256 approveCase; approveCase < 2; ++approveCase) {
-                _setUpTestCase(
-                    testCase.asset,
-                    testCase.tokenFee,
-                    testCase.utilisation,
-                    testCase.initialLiquidity,
-                    testCase.dieselRate,
-                    testCase.withdrawFee,
-                    false
-                );
-
-                vm.prank(USER);
-                pool.mint(testCase.sharesToMint, FRIEND);
-
-                vm.prank(FRIEND);
-                pool.approve(USER, approveCase == 0 ? testCase.expectedSharesBurnt + 1 : type(uint256).max);
-
-                vm.expectEmit(true, true, false, true);
-                emit Transfer(FRIEND, address(0), testCase.expectedSharesBurnt);
-
-                vm.expectEmit(true, true, false, true);
-                emit Withdraw(USER, FRIEND2, FRIEND, testCase.assetsToWithdraw, testCase.expectedSharesBurnt);
-
-                vm.prank(USER);
-                uint256 shares = pool.withdraw(testCase.assetsToWithdraw, FRIEND2, FRIEND);
-
-                expectBalance(
-                    underlying,
-                    FRIEND2,
-                    testCase.assetsToWithdraw,
-                    _testCaseErr(testCase.name, "Incorrect assets on FRIEND2 account")
-                );
-
-                expectBalance(
-                    underlying,
-                    pool.treasury(),
-                    testCase.expectedTreasury,
-                    _testCaseErr(testCase.name, "Incorrect DAO fee")
-                );
-                assertEq(
-                    shares, testCase.expectedSharesBurnt, _testCaseErr(testCase.name, "Incorrect shares return value")
-                );
-
-                expectBalance(
-                    address(pool),
-                    FRIEND,
-                    testCase.sharesToMint - testCase.expectedSharesBurnt,
-                    _testCaseErr(testCase.name, "Incorrect FRIEND balance")
-                );
-
-                assertEq(
-                    pool.expectedLiquidity(),
-                    testCase.expectedLiquidityAfter,
-                    _testCaseErr(testCase.name, "Incorrect expected liquidity")
-                );
-                assertEq(
-                    pool.availableLiquidity(),
-                    testCase.expectedAvailableLiquidity,
-                    _testCaseErr(testCase.name, "Incorrect available liquidity")
-                );
-
-                assertEq(
-                    pool.allowance(FRIEND, USER),
-                    approveCase == 0 ? 1 : type(uint256).max,
-                    _testCaseErr(testCase.name, "Incorrect allowance after operation")
-                );
-
-                assertEq(
-                    pool.baseInterestRate(),
-                    irm.calcBorrowRate(pool.expectedLiquidity(), pool.availableLiquidity(), false),
-                    _testCaseErr(testCase.name, "Borrow rate wasn't update correcty")
-                );
-            }
-        }
-    }
-
-    //
-    // REDEEM
-    //
-    struct RedeemTestCase {
-        string name;
-        /// SETUP
-        Tokens asset;
-        uint256 tokenFee;
-        uint256 initialLiquidity;
-        uint256 dieselRate;
-        uint16 utilisation;
-        uint16 withdrawFee;
-        /// PARAMS
-        uint256 sharesToMint;
-        uint256 sharesToRedeem;
-        /// EXPECTED VALUES
-        uint256 expectedAssetsDelivered;
-        uint256 expectedAvailableLiquidity;
-        uint256 expectedLiquidityAfter;
-        uint256 expectedTreasury;
-    }
-
-    // U:[P4-9]: deposit and mint if assets more than limit
-    function test_U_P4_09_redeem_works_as_expected() public {
-        RedeemTestCase[4] memory cases = [
-            RedeemTestCase({
-                name: "Normal token with 0 withdraw fee",
-                // POOL SETUP
-                asset: Tokens.DAI,
-                tokenFee: 0,
-                initialLiquidity: addLiquidity,
-                // 1 dDAI = 2 DAI
-                dieselRate: 2 * RAY,
-                // 50% of available liquidity is borrowed
-                utilisation: 50_00,
-                withdrawFee: 0,
-                // PARAMS
-                sharesToMint: addLiquidity / 2,
-                sharesToRedeem: addLiquidity / 4,
-                // EXPECTED VALUES:
-                //
-                // Depends on dieselRate
-                expectedAssetsDelivered: addLiquidity / 2,
-                // availableLiquidityBefore: addLiqudity /2 (cause 50% utilisation)
-                expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity - addLiquidity / 2,
-                expectedLiquidityAfter: addLiquidity * 2 - addLiquidity / 2,
-                expectedTreasury: 0
-            }),
-            RedeemTestCase({
-                name: "Normal token with 1% withdraw fee",
-                // POOL SETUP
-                asset: Tokens.DAI,
-                tokenFee: 0,
-                initialLiquidity: addLiquidity,
-                // 1 dDAI = 2 DAI
-                dieselRate: 2 * RAY,
-                // 50% of available liquidity is borrowed
-                utilisation: 50_00,
-                withdrawFee: 1_00,
-                // PARAMS
-                sharesToMint: addLiquidity / 2,
-                sharesToRedeem: addLiquidity / 4,
-                // EXPECTED VALUES:
-                //
-                // Depends on dieselRate
-                expectedAssetsDelivered: ((addLiquidity / 2) * 99) / 100,
-                expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity - addLiquidity / 2,
-                expectedLiquidityAfter: addLiquidity * 2 - addLiquidity / 2,
-                expectedTreasury: ((addLiquidity / 2) * 1) / 100
-            }),
-            RedeemTestCase({
-                name: "Fee token with 0 withdraw fee",
-                /// SETUP
-                asset: Tokens.USDT,
-                // transfer fee: 60%, so 40% will be transfer to account
-                tokenFee: 60_00,
-                initialLiquidity: addLiquidity,
-                // 1 dUSDT = 2 USDT
-                dieselRate: 2 * RAY,
-                // 50% of available liquidity is borrowed
-                utilisation: 50_00,
-                withdrawFee: 0,
-                // PARAMS
-                sharesToMint: addLiquidity / 2,
-                sharesToRedeem: addLiquidity / 4,
-                // EXPECTED VALUES:
-                //
-                // Depends on dieselRate
-                expectedAssetsDelivered: ((addLiquidity / 2) * 40) / 100,
-                expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity - addLiquidity / 2,
-                expectedLiquidityAfter: addLiquidity * 2 - addLiquidity / 2,
-                expectedTreasury: 0
-            }),
-            RedeemTestCase({
-                name: "Fee token with 1% withdraw fee",
-                /// SETUP
-                asset: Tokens.USDT,
-                // transfer fee: 60%, so 40% will be transfer to account
-                tokenFee: 60_00,
-                initialLiquidity: addLiquidity,
-                // 1 dUSDT = 2 USDT
-                dieselRate: 2 * RAY,
-                // 50% of available liquidity is borrowed
-                utilisation: 50_00,
-                withdrawFee: 1_00,
-                // PARAMS
-                sharesToMint: addLiquidity / 2,
-                sharesToRedeem: addLiquidity / 4,
-                // EXPECTED VALUES:
-                //
-                // addLiquidity /2 * 1/2 (rate) * 1 / (100%-1%) / feeToken
-                expectedAssetsDelivered: ((((addLiquidity / 2) * 99) / 100) * 40) / 100,
-                // availableLiquidityBefore: addLiqudity /2 (cause 50% utilisation)
-                expectedAvailableLiquidity: addLiquidity / 2 + addLiquidity - addLiquidity / 2,
-                expectedLiquidityAfter: addLiquidity * 2 - addLiquidity / 2,
-                expectedTreasury: ((((addLiquidity / 2) * 40) / 100) * 1) / 100
-            })
-        ];
-        /// @dev a represents allowance, 0 means required amount +1, 1 means inlimited allowance
-
-        for (uint256 i; i < cases.length; ++i) {
-            RedeemTestCase memory testCase = cases[i];
-            for (uint256 approveCase; approveCase < 2; ++approveCase) {
-                _setUpTestCase(
-                    testCase.asset,
-                    testCase.tokenFee,
-                    testCase.utilisation,
-                    testCase.initialLiquidity,
-                    testCase.dieselRate,
-                    testCase.withdrawFee,
-                    false
-                );
-
-                vm.prank(USER);
-                pool.mint(testCase.sharesToMint, FRIEND);
-
-                vm.prank(FRIEND);
-                pool.approve(USER, approveCase == 0 ? testCase.sharesToRedeem + 1 : type(uint256).max);
-
-                vm.expectEmit(true, true, false, true);
-                emit Transfer(FRIEND, address(0), testCase.sharesToRedeem);
-
-                vm.expectEmit(true, true, false, true);
-                emit Withdraw(USER, FRIEND2, FRIEND, testCase.expectedAssetsDelivered, testCase.sharesToRedeem);
-
-                vm.prank(USER);
-                uint256 assets = pool.redeem(testCase.sharesToRedeem, FRIEND2, FRIEND);
-
-                expectBalance(
-                    underlying,
-                    FRIEND2,
-                    testCase.expectedAssetsDelivered,
-                    _testCaseErr(testCase.name, "Incorrect assets on FRIEND2 account ")
-                );
-
-                expectBalance(
-                    underlying,
-                    pool.treasury(),
-                    testCase.expectedTreasury,
-                    _testCaseErr(testCase.name, "Incorrect treasury fee")
-                );
-                assertEq(
-                    assets,
-                    testCase.expectedAssetsDelivered,
-                    _testCaseErr(testCase.name, "Incorrect assets return value")
-                );
-                expectBalance(
-                    address(pool),
-                    FRIEND,
-                    testCase.sharesToMint - testCase.sharesToRedeem,
-                    _testCaseErr(testCase.name, "Incorrect FRIEND balance")
-                );
-
-                assertEq(
-                    pool.expectedLiquidity(),
-                    testCase.expectedLiquidityAfter,
-                    _testCaseErr(testCase.name, "Incorrect expected liquidity")
-                );
-                assertEq(
-                    pool.availableLiquidity(),
-                    testCase.expectedAvailableLiquidity,
-                    _testCaseErr(testCase.name, "Incorrect available liquidity")
-                );
-
-                assertEq(
-                    pool.allowance(FRIEND, USER),
-                    approveCase == 0 ? 1 : type(uint256).max,
-                    _testCaseErr(testCase.name, "Incorrect allowance after operation")
-                );
-
-                assertEq(
-                    pool.baseInterestRate(),
-                    irm.calcBorrowRate(pool.expectedLiquidity(), pool.availableLiquidity(), false),
-                    _testCaseErr(testCase.name, "Borrow rate wasn't update correcty")
-                );
-            }
-        }
-    }
-
-    ///
-    /// LEND CREDIT ACCOUNT
-    // U:[P4-11]: lendCreditAccount works as expected
-    function test_U_P4_11_lendCreditAccount_works_as_expected() public {
-        _setUpTestCase(Tokens.DAI, 0, 0, addLiquidity, 2 * RAY, 0, false);
-
-        address creditAccount = DUMB_ADDRESS;
-        uint256 borrowAmount = addLiquidity / 5;
-
-        expectBalance(pool.asset(), creditAccount, 0, "SETUP: incorrect CA balance");
-        assertEq(pool.baseInterestRate(), irm.R_base_RAY(), "SETUP: incorrect baseInterestRate");
-        assertEq(pool.totalBorrowed(), 0, "SETUP: incorrect totalBorrowed");
-        assertEq(pool.creditManagerBorrowed(address(cmMock)), 0, "SETUP: incorrect CM limit");
-
-        uint256 availableLiquidityBefore = pool.availableLiquidity();
-        uint256 expectedLiquidityBefore = pool.expectedLiquidity();
-
-        vm.expectEmit(true, true, false, true);
-        emit Transfer(address(pool), creditAccount, borrowAmount);
-
-        vm.expectEmit(true, true, false, true);
-        emit Borrow(address(cmMock), creditAccount, borrowAmount);
-
-        cmMock.lendCreditAccount(borrowAmount, creditAccount);
-
-        assertEq(pool.availableLiquidity(), availableLiquidityBefore - borrowAmount, "Incorrect available liquidity");
-        assertEq(pool.expectedLiquidity(), expectedLiquidityBefore, "Incorrect expected liquidity");
-        assertEq(pool.totalBorrowed(), borrowAmount, "Incorrect borrowAmount");
-
-        assertEq(
-            pool.baseInterestRate(),
-            irm.calcBorrowRate(pool.expectedLiquidity(), pool.availableLiquidity(), false),
-            "Borrow rate wasn't update correcty"
-        );
-
-        assertEq(pool.creditManagerBorrowed(address(cmMock)), borrowAmount, "Incorrect CM limit");
-    }
-
-    // U:[P4-12]: lendCreditAccount reverts if it breaches limits
-    function test_U_P4_12_lendCreditAccount_reverts_if_breach_limits() public {
-        address creditAccount = DUMB_ADDRESS;
-
-        _setUpTestCase(Tokens.DAI, 0, 0, addLiquidity, 2 * RAY, 0, false);
-
-        vm.expectRevert(CreditManagerCantBorrowException.selector);
-        cmMock.lendCreditAccount(0, creditAccount);
-
-        vm.startPrank(CONFIGURATOR);
-        pool.setCreditManagerDebtLimit(address(cmMock), type(uint128).max);
-        pool.setTotalDebtLimit(addLiquidity);
-        vm.stopPrank();
-
-        vm.expectRevert(CreditManagerCantBorrowException.selector);
-        cmMock.lendCreditAccount(addLiquidity + 1, creditAccount);
-
-        vm.startPrank(CONFIGURATOR);
-        pool.setCreditManagerDebtLimit(address(cmMock), addLiquidity);
-        pool.setTotalDebtLimit(type(uint128).max);
-        vm.stopPrank();
-
-        vm.expectRevert(CreditManagerCantBorrowException.selector);
-        cmMock.lendCreditAccount(addLiquidity + 1, creditAccount);
-    }
-
-    //
-    // REPAY
-    //
-
-    // U:[P4-13]: repayCreditAccount reverts for incorrect credit managers
-    function test_U_P4_13_repayCreditAccount_reverts_for_incorrect_credit_managers() public {
-        _setUpTestCase(Tokens.DAI, 0, 0, addLiquidity, 2 * RAY, 0, false);
-
-        /// Case for unknown CM
-        vm.expectRevert(CallerNotCreditManagerException.selector);
-        vm.prank(USER);
-        pool.repayCreditAccount(1, 0, 0);
-
-        /// Case for CM with zero debt
-        assertEq(pool.creditManagerBorrowed(address(cmMock)), 0, "SETUP: Incorrect CM limit");
-
-        vm.expectRevert(CallerNotCreditManagerException.selector);
-        cmMock.repayCreditAccount(1, 0, 0);
-    }
-
-    struct RepayTestCase {
-        string name;
-        /// SETUP
-        Tokens asset;
-        uint256 tokenFee;
-        uint256 initialLiquidity;
-        uint256 dieselRate;
-        uint256 sharesInTreasury;
-        uint256 borrowBefore;
-        /// PARAMS
-        uint256 borrowAmount;
-        uint256 profit;
-        uint256 loss;
-        /// EXPECTED VALUES
-        uint256 expectedTotalSupply;
-        uint256 expectedAvailableLiquidity;
-        uint256 expectedLiquidityAfter;
-        uint256 expectedTreasury;
-        uint256 uncoveredLoss;
-    }
-
-    // U:[P4-14]: repayCreditAccount works as expected
-    function test_U_P4_14_repayCreditAccount_works_as_expected() public {
-        address creditAccount = DUMB_ADDRESS;
-        RepayTestCase[5] memory cases = [
-            RepayTestCase({
-                name: "profit: 0, loss: 0",
-                // POOL SETUP
-                asset: Tokens.DAI,
-                tokenFee: 0,
-                initialLiquidity: 2 * addLiquidity,
-                // 1 dDAI = 2 DAI
-                dieselRate: 2 * RAY,
-                // No borrowing on start
-                borrowBefore: addLiquidity,
-                sharesInTreasury: addLiquidity / 4,
-                // PARAMS
-                borrowAmount: addLiquidity / 2,
-                profit: 0,
-                loss: 0,
-                // EXPECTED VALUES:
-                //
-                // Depends on dieselRate
-                expectedTotalSupply: addLiquidity,
-                expectedAvailableLiquidity: 2 * addLiquidity - addLiquidity + addLiquidity / 2,
-                expectedLiquidityAfter: 2 * addLiquidity,
-                expectedTreasury: 0,
-                uncoveredLoss: 0
-            }),
-            RepayTestCase({
-                name: "profit: 10%, loss: 0",
-                // POOL SETUP
-                asset: Tokens.DAI,
-                tokenFee: 0,
-                initialLiquidity: 2 * addLiquidity,
-                // 1 dDAI = 2 DAI
-                dieselRate: 2 * RAY,
-                // No borrowing on start
-                borrowBefore: addLiquidity,
-                sharesInTreasury: addLiquidity / 4,
-                // PARAMS
-                borrowAmount: addLiquidity / 2,
-                profit: (addLiquidity * 1) / 10,
-                loss: 0,
-                // EXPECTED VALUES:
-                //
-                // addLiqudity + new minted diesel tokens for 10% with rate 2:1
-                expectedTotalSupply: addLiquidity + (addLiquidity * 1) / 10 / 2,
-                expectedAvailableLiquidity: 2 * addLiquidity - addLiquidity + addLiquidity / 2 + (addLiquidity * 1) / 10,
-                // added profit here
-                expectedLiquidityAfter: 2 * addLiquidity + (addLiquidity * 1) / 10,
-                expectedTreasury: 0,
-                uncoveredLoss: 0
-            }),
-            RepayTestCase({
-                name: "profit: 0, loss: 10% (covered)",
-                // POOL SETUP
-                asset: Tokens.DAI,
-                tokenFee: 0,
-                initialLiquidity: 2 * addLiquidity,
-                // 1 dDAI = 2 DAI
-                dieselRate: 2 * RAY,
-                // No borrowing on start
-                borrowBefore: addLiquidity,
-                sharesInTreasury: addLiquidity / 4,
-                // PARAMS
-                borrowAmount: addLiquidity / 2,
-                profit: 0,
-                loss: (addLiquidity * 1) / 10,
-                // EXPECTED VALUES:
-                //
-                // with covered loss, the system should burn DAO shares based on current rate
-                expectedTotalSupply: addLiquidity - (addLiquidity * 1) / 10 / 2,
-                expectedAvailableLiquidity: 2 * addLiquidity - addLiquidity + addLiquidity / 2 - (addLiquidity * 1) / 10,
-                expectedLiquidityAfter: 2 * addLiquidity - (addLiquidity * 1) / 10,
-                expectedTreasury: 0,
-                uncoveredLoss: 0
-            }),
-            RepayTestCase({
-                name: "profit: 0, loss: 10% (uncovered)",
-                // POOL SETUP
-                asset: Tokens.DAI,
-                tokenFee: 0,
-                initialLiquidity: 2 * addLiquidity,
-                // 1 dDAI = 2 DAI
-                dieselRate: 2 * RAY,
-                // No borrowing on start
-                borrowBefore: addLiquidity,
-                sharesInTreasury: 0,
-                // PARAMS
-                borrowAmount: addLiquidity / 2,
-                profit: 0,
-                loss: (addLiquidity * 1) / 10,
-                // EXPECTED VALUES:
-                //
-                // Depends on dieselRate
-                expectedTotalSupply: addLiquidity,
-                expectedAvailableLiquidity: 2 * addLiquidity - addLiquidity + addLiquidity / 2 - (addLiquidity * 1) / 10,
-                expectedLiquidityAfter: 2 * addLiquidity - (addLiquidity * 1) / 10,
-                expectedTreasury: 0,
-                uncoveredLoss: (addLiquidity * 1) / 10
-            }),
-            RepayTestCase({
-                name: "profit: 0, loss: 20% (partially covered)",
-                // POOL SETUP
-                asset: Tokens.DAI,
-                tokenFee: 0,
-                initialLiquidity: 2 * addLiquidity,
-                // 1 dDAI = 2 DAI
-                dieselRate: 2 * RAY,
-                // No borrowing on start
-                borrowBefore: addLiquidity,
-                sharesInTreasury: (addLiquidity * 1) / 10 / 2,
-                // PARAMS
-                borrowAmount: addLiquidity / 2,
-                profit: 0,
-                loss: (addLiquidity * 2) / 10,
-                // EXPECTED VALUES:
-                //
-                // Depends on dieselRate
-                expectedTotalSupply: addLiquidity - (addLiquidity * 1) / 10 / 2,
-                expectedAvailableLiquidity: 2 * addLiquidity - addLiquidity + addLiquidity / 2 - (addLiquidity * 2) / 10,
-                expectedLiquidityAfter: 2 * addLiquidity - (addLiquidity * 2) / 10,
-                expectedTreasury: 0,
-                uncoveredLoss: (addLiquidity * 1) / 10
-            })
-        ];
-        for (uint256 i; i < cases.length; ++i) {
-            RepayTestCase memory testCase = cases[i];
-
-            _setUpTestCase(
-                testCase.asset,
-                testCase.tokenFee,
-                // sets utilisation to 0
-                0,
-                testCase.initialLiquidity,
-                testCase.dieselRate,
-                // sets withdrawFee to 0
-                0,
-                false
+            // receives underlying
+            vm.expectCall(
+                address(underlying),
+                abi.encodeCall(IERC20.transferFrom, (caller, address(pool), cases[i].expectedAssets))
             );
 
-            treasury = pool.treasury();
+            // implicitly test that `_updateBaseInterest` is called with correct parameters
+            vm.expectCall(
+                interestRateModel,
+                abi.encodeWithSelector(
+                    calcBorrowRateSelector,
+                    2000 + cases[i].expectedAssetsReceived,
+                    1000 + cases[i].expectedAssetsReceived,
+                    false
+                )
+            );
 
-            vm.prank(INITIAL_LP);
-            pool.transfer(treasury, testCase.sharesInTreasury);
-
-            cmMock.lendCreditAccount(testCase.borrowBefore, creditAccount);
-
-            assertEq(pool.totalBorrowed(), testCase.borrowBefore, "SETUP: incorrect totalBorrowed");
-            assertEq(pool.creditManagerBorrowed(address(cmMock)), testCase.borrowBefore, "SETUP: Incorrect CM limit");
-
-            vm.startPrank(creditAccount);
-            IERC20(pool.asset()).transfer(address(pool), testCase.borrowAmount + testCase.profit - testCase.loss);
-            vm.stopPrank();
-
-            if (testCase.uncoveredLoss > 0) {
-                vm.expectEmit(true, false, false, true);
-                emit IncurUncoveredLoss(address(cmMock), testCase.uncoveredLoss);
-            }
+            // emits events
+            vm.expectEmit(true, true, false, true);
+            emit Deposit(caller, user, cases[i].expectedAssets, cases[i].shares);
 
             vm.expectEmit(true, true, false, true);
-            emit Repay(address(cmMock), testCase.borrowAmount, testCase.profit, testCase.loss);
+            emit Refer(user, 123, cases[i].expectedAssets);
 
-            uint256 dieselRate = pool.convertToAssets(RAY);
+            vm.prank(caller);
+            uint256 assets = pool.mintWithReferral({shares: cases[i].shares, receiver: user, referralCode: 123});
 
-            cmMock.repayCreditAccount(testCase.borrowAmount, testCase.profit, testCase.loss);
-
-            if (testCase.uncoveredLoss == 0) {
-                assertEq(dieselRate, pool.convertToAssets(RAY), "Unexpceted change in borrow rate");
-            }
-
+            // updates balance
             assertEq(
-                pool.totalSupply(), testCase.expectedTotalSupply, _testCaseErr(testCase.name, "Incorrect total supply")
+                pool.balanceOf(user),
+                sharesBefore + cases[i].shares,
+                _testCaseErr(cases[i].name, "Incorrect shares minted to user")
             );
 
-            assertEq(
-                pool.totalBorrowed(),
-                testCase.borrowBefore - testCase.borrowAmount,
-                _testCaseErr(testCase.name, "incorrect totalBorrowed")
-            );
+            // returns correct value
+            assertEq(assets, cases[i].expectedAssets, "Incorrect assets returned");
 
-            assertEq(
-                pool.creditManagerBorrowed(address(cmMock)),
-                testCase.borrowBefore - testCase.borrowAmount,
-                "SETUP: Incorrect CM limit"
-            );
-
-            expectBalance(
-                underlying,
-                pool.treasury(),
-                testCase.expectedTreasury,
-                _testCaseErr(testCase.name, "Incorrect treasury fee")
-            );
-
-            assertEq(
-                pool.expectedLiquidity(),
-                testCase.expectedLiquidityAfter,
-                _testCaseErr(testCase.name, "Incorrect expected liquidity")
-            );
-            assertEq(
-                pool.availableLiquidity(),
-                testCase.expectedAvailableLiquidity,
-                _testCaseErr(testCase.name, "Incorrect available liquidity")
-            );
+            vm.revertTo(snapshot);
         }
     }
 
-    ///
-    ///  CALC LINEAR CUMULATIVE
-    ///
-
-    // U:[P4-15]: calcLinearCumulative_RAY computes correctly
-    function test_U_P4_15_calcLinearCumulative_RAY_correct() public {
-        _setUpTestCase(Tokens.DAI, 0, 50_00, addLiquidity, 2 * RAY, 0, false);
-
-        uint256 timeWarp = 180 days;
-
-        vm.warp(block.timestamp + timeWarp);
-
-        uint256 baseInterestRate = pool.baseInterestRate();
-
-        uint256 expectedLinearRate = RAY + (baseInterestRate * timeWarp) / 365 days;
-
-        assertEq(pool.calcLinearCumulative_RAY(), expectedLinearRate, "Index value was not updated correctly");
+    struct WithdrawTestCase {
+        string name;
+        // scenario
+        uint256 assets;
+        uint256 transferFee;
+        uint256 withdrawFee;
+        // outcome
+        uint256 expectedShares;
+        uint256 expectedAssetsToReceiver;
+        uint256 expectedAssetsToTreasury;
     }
 
-    // U:[P4-16]: _updateBaseInterest correctly updates parameters
-    function test_U_P4_16_updateBaseInterest_correct() public {
-        uint256 quotaInterestPerYear = addLiquidity / 4;
-        for (uint256 i; i < 2; ++i) {
-            bool supportQuotas = i == 1;
-            string memory testName = supportQuotas ? "Test with supportQuotas=true" : "Test with supportQuotas=false";
+    /// @notice [LP-8]: `withdraw` works as expected
+    function test_LP_08_withdraw_works_as_expected(address owner) public {
+        vm.assume(owner != address(0) && owner != address(pool));
 
-            _setUpTestCase(Tokens.DAI, 0, 50_00, addLiquidity, 2 * RAY, 0, supportQuotas);
+        WithdrawTestCase[3] memory cases = [
+            WithdrawTestCase({
+                name: "withdraw with 0% transfer and 0% withdraw fee",
+                assets: 100,
+                transferFee: 0,
+                withdrawFee: 0,
+                expectedShares: 80,
+                expectedAssetsToReceiver: 100,
+                expectedAssetsToTreasury: 0
+            }),
+            WithdrawTestCase({
+                name: "withdraw with 5% transfer and 0% withdraw fee",
+                assets: 100,
+                transferFee: 500,
+                withdrawFee: 0,
+                expectedShares: 84,
+                expectedAssetsToReceiver: 105,
+                expectedAssetsToTreasury: 0
+            }),
+            WithdrawTestCase({
+                name: "withdraw with 5% transfer and 1% withdraw fee",
+                assets: 100,
+                transferFee: 500,
+                withdrawFee: 100,
+                expectedShares: 85,
+                expectedAssetsToReceiver: 105,
+                expectedAssetsToTreasury: 1
+            })
+        ];
 
-            if (supportQuotas) {
-                vm.prank(address(pqk));
-                pool.setQuotaRevenue(quotaInterestPerYear);
+        uint256 snapshot = vm.snapshot();
+        for (uint256 i = 2; i < cases.length; ++i) {
+            if (cases[i].transferFee != 0) _activateTransferFee(cases[i].transferFee);
+            if (cases[i].withdrawFee != 0) _activateWithdrawFee(cases[i].withdrawFee);
+
+            uint256 sharesBefore = pool.balanceOf(owner);
+            _prepareShares(owner, user, cases[i].expectedShares);
+
+            // implicitly test that `_updateBaseInterest` is called with correct parameters
+            vm.expectCall(
+                interestRateModel,
+                abi.encodeWithSelector(
+                    calcBorrowRateSelector,
+                    pool.expectedLiquidity() - cases[i].expectedAssetsToReceiver - cases[i].expectedAssetsToTreasury,
+                    pool.availableLiquidity() - cases[i].expectedAssetsToReceiver - cases[i].expectedAssetsToTreasury,
+                    false
+                )
+            );
+
+            // sends underlying
+            vm.expectCall(
+                address(underlying), abi.encodeCall(IERC20.transfer, (owner, cases[i].expectedAssetsToReceiver))
+            );
+            if (cases[i].expectedAssetsToTreasury != 0) {
+                vm.expectCall(
+                    address(underlying), abi.encodeCall(IERC20.transfer, (treasury, cases[i].expectedAssetsToTreasury))
+                );
             }
 
-            uint256 baseInterestRate = pool.baseInterestRate();
-            uint256 timeWarp = 365 days;
+            // emits event
+            vm.expectEmit(true, true, true, true);
+            emit Withdraw(user, owner, owner, cases[i].assets, cases[i].expectedShares);
 
-            vm.warp(block.timestamp + timeWarp);
+            vm.prank(user);
+            uint256 shares = pool.withdraw({assets: cases[i].assets, receiver: owner, owner: owner});
 
-            uint256 expectedInterest = ((addLiquidity / 2) * baseInterestRate) / RAY;
-            uint256 expectedLiquidity = addLiquidity + expectedInterest + (supportQuotas ? quotaInterestPerYear : 0);
-
-            uint256 expectedBorrowRate = irm.calcBorrowRate(expectedLiquidity, addLiquidity / 2);
-
-            _updateBaseInterest();
-
+            // updates balance and allowance
+            assertEq(pool.allowance(user, owner), 0, _testCaseErr(cases[i].name, "Incorrect shares allowance"));
             assertEq(
-                pool.expectedLiquidity(),
-                expectedLiquidity,
-                _testCaseErr(testName, "Expected liquidity was not updated correctly")
+                pool.balanceOf(owner), sharesBefore, _testCaseErr(cases[i].name, "Incorrect shares burned from owner")
             );
 
-            assertEq(
-                pool.expectedLiquidityLU(),
-                expectedLiquidity,
-                _testCaseErr(testName, "ExpectedLU liquidity was not updated correctly")
-            );
+            // returns correct value
+            assertEq(shares, cases[i].expectedShares, _testCaseErr(cases[i].name, "Incorrect shares returned"));
 
-            assertEq(
-                uint256(pool.lastBaseInterestUpdate()),
-                block.timestamp,
-                _testCaseErr(testName, "Timestamp was not updated correctly")
-            );
-
-            assertEq(
-                uint256(pool.lastQuotaRevenueUpdate()),
-                supportQuotas ? block.timestamp : 0,
-                _testCaseErr(testName, "Quota revenue update timestamp was not updated correctly")
-            );
-
-            assertEq(
-                pool.baseInterestRate(),
-                expectedBorrowRate,
-                _testCaseErr(testName, "Borrow rate was not updated correctly")
-            );
-
-            assertEq(
-                pool.calcLinearCumulative_RAY(),
-                pool.baseInterestIndexLU(),
-                _testCaseErr(testName, "Index value was not updated correctly")
-            );
+            vm.revertTo(snapshot);
         }
     }
 
-    // U:[P4-17]: updateBorrowRate correctly updates parameters
-    function test_U_P4_17_changeQuotaRevenue_and_updateQuotaRevenue_updates_quotaRevenue_correctly() public {
-        _setUp(Tokens.DAI, true);
-        address POOL_QUOTA_KEEPER = address(pqk);
-
-        uint96 qu1 = uint96(WAD * 10);
-
-        assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "SETUP: Incorrect lastQuotaRevenuUpdate");
-
-        assertEq(pool.quotaRevenue(), 0, "SETUP: Incorrect quotaRevenue");
-        assertEq(pool.expectedLiquidityLU(), 0, "SETUP: Incorrect expectedLiquidityLU");
-
-        vm.warp(block.timestamp + 1 days);
-
-        vm.prank(POOL_QUOTA_KEEPER);
-        pool.setQuotaRevenue(qu1);
-
-        assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "#1: Incorrect lastQuotaRevenuUpdate");
-        assertEq(pool.quotaRevenue(), qu1, "#1: Incorrect quotaRevenue");
-
-        assertEq(pool.expectedLiquidityLU(), 0, "#1: Incorrect expectedLiquidityLU");
-
-        uint256 year = 365 days;
-
-        vm.warp(block.timestamp + year);
-
-        uint96 qu2 = uint96(WAD * 15);
-
-        vm.prank(POOL_QUOTA_KEEPER);
-        pool.setQuotaRevenue(qu2);
-
-        assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "#2: Incorrect lastQuotaRevenuUpdate");
-        assertEq(pool.quotaRevenue(), qu2, "#2: Incorrect quotaRevenue");
-
-        assertEq(pool.expectedLiquidityLU(), qu1, "#2: Incorrect expectedLiquidityLU");
-
-        vm.warp(block.timestamp + year);
-
-        uint96 dqu = uint96(WAD * 5);
-
-        vm.prank(POOL_QUOTA_KEEPER);
-        pool.updateQuotaRevenue(-int96(dqu));
-
-        assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "#3: Incorrect lastQuotaRevenuUpdate");
-        assertEq(pool.quotaRevenue(), qu2 - dqu, "#3: Incorrect quotaRevenue");
-
-        assertEq(pool.expectedLiquidityLU(), (qu1 + qu2), "#3: Incorrect expectedLiquidityLU");
+    struct RedeemTestCase {
+        string name;
+        // scenario
+        uint256 shares;
+        uint256 transferFee;
+        uint256 withdrawFee;
+        // outcome
+        uint256 expectedAssets;
+        uint256 expectedAssetsToReceiver;
+        uint256 expectedAssetsToTreasury;
     }
 
-    // U:[P4-18]: connectCreditManager, forbidCreditManagerToBorrow, newInterestRateModel, setExpecetedLiquidityLimit reverts if called with non-configurator
-    function test_U_P4_18_admin_functions_revert_on_non_admin() public {
-        vm.startPrank(USER);
+    /// @notice [LP-9]: `redeem` works as expected
+    function test_LP_09_redeem_works_as_expected(address owner) public {
+        vm.assume(owner != address(0) && owner != address(pool));
 
-        vm.expectRevert(CallerNotControllerException.selector);
-        pool.setCreditManagerDebtLimit(DUMB_ADDRESS, 1);
+        RedeemTestCase[3] memory cases = [
+            RedeemTestCase({
+                name: "redeem with 0% transfer and 0% withdraw fee",
+                shares: 80,
+                transferFee: 0,
+                withdrawFee: 0,
+                expectedAssets: 100,
+                expectedAssetsToReceiver: 100,
+                expectedAssetsToTreasury: 0
+            }),
+            RedeemTestCase({
+                name: "redeem with 5% transfer and 0% withdraw fee",
+                shares: 80,
+                transferFee: 500,
+                withdrawFee: 0,
+                expectedAssets: 95,
+                expectedAssetsToReceiver: 100,
+                expectedAssetsToTreasury: 0
+            }),
+            RedeemTestCase({
+                name: "redeem with 5% transfer and 1% withdraw fee",
+                shares: 80,
+                transferFee: 500,
+                withdrawFee: 100,
+                expectedAssets: 94,
+                expectedAssetsToReceiver: 98,
+                expectedAssetsToTreasury: 2
+            })
+        ];
 
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        pool.setInterestRateModel(DUMB_ADDRESS);
+        uint256 snapshot = vm.snapshot();
+        for (uint256 i; i < cases.length; ++i) {
+            if (cases[i].transferFee != 0) _activateTransferFee(cases[i].transferFee);
+            if (cases[i].withdrawFee != 0) _activateWithdrawFee(cases[i].withdrawFee);
 
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        pool.setPoolQuotaKeeper(DUMB_ADDRESS);
+            uint256 sharesBefore = pool.balanceOf(owner);
+            _prepareShares(owner, user, cases[i].shares);
 
-        vm.expectRevert(CallerNotControllerException.selector);
-        pool.setTotalDebtLimit(0);
+            // implicitly test that `_updateBaseInterest` is called with correct parameters
+            vm.expectCall(
+                interestRateModel,
+                abi.encodeWithSelector(
+                    calcBorrowRateSelector,
+                    pool.expectedLiquidity() - cases[i].expectedAssetsToReceiver - cases[i].expectedAssetsToTreasury,
+                    pool.availableLiquidity() - cases[i].expectedAssetsToReceiver - cases[i].expectedAssetsToTreasury,
+                    false
+                )
+            );
 
-        vm.expectRevert(CallerNotControllerException.selector);
-        pool.setWithdrawFee(0);
+            // sends underlying
+            vm.expectCall(
+                address(underlying), abi.encodeCall(IERC20.transfer, (owner, cases[i].expectedAssetsToReceiver))
+            );
+            if (cases[i].expectedAssetsToTreasury != 0) {
+                vm.expectCall(
+                    address(underlying), abi.encodeCall(IERC20.transfer, (treasury, cases[i].expectedAssetsToTreasury))
+                );
+            }
 
+            // emits event
+            vm.expectEmit(true, true, true, true);
+            emit Withdraw(user, owner, owner, cases[i].expectedAssets, cases[i].shares);
+
+            vm.prank(user);
+            uint256 assets = pool.redeem({shares: cases[i].shares, receiver: owner, owner: owner});
+
+            // updates balance and allowance
+            assertEq(pool.allowance(user, owner), 0, _testCaseErr(cases[i].name, "Incorrect shares allowance"));
+            assertLe(
+                pool.balanceOf(owner), sharesBefore, _testCaseErr(cases[i].name, "Incorrect shares burned from owner")
+            );
+
+            // returns correct value
+            assertEq(assets, cases[i].expectedAssets, _testCaseErr(cases[i].name, "Incorrect assets returned"));
+
+            vm.revertTo(snapshot);
+        }
+    }
+
+    struct PreviewTestCase {
+        string name;
+        // scenario
+        uint256 transferFee;
+        uint256 withdrawFee;
+        // outcome
+        uint256 expectedSharesOut;
+        uint256 expectedAssetsIn;
+        uint256 expectedAssetsOut;
+        uint256 expectedSharesIn;
+    }
+
+    /// @notice [LP-10]: `preview{Deposit|Mint|Withdraw|Redeem}` functions work as exptected
+    function test_LP_10_preview_functions_work_as_expected() public {
+        PreviewTestCase[3] memory cases = [
+            PreviewTestCase({
+                name: "preview with 0% transfer and 0% withdraw fee",
+                transferFee: 0,
+                withdrawFee: 0,
+                expectedSharesOut: 80,
+                expectedAssetsIn: 100,
+                expectedSharesIn: 80,
+                expectedAssetsOut: 100
+            }),
+            PreviewTestCase({
+                name: "preview with 5% transfer and 0% withdraw fee",
+                transferFee: 500,
+                withdrawFee: 0,
+                expectedSharesOut: 76,
+                expectedAssetsIn: 105,
+                expectedSharesIn: 84,
+                expectedAssetsOut: 95
+            }),
+            PreviewTestCase({
+                name: "preview with 5% transfer and 1% withdraw fee",
+                transferFee: 500,
+                withdrawFee: 100,
+                expectedSharesOut: 76,
+                expectedAssetsIn: 105,
+                expectedSharesIn: 85,
+                expectedAssetsOut: 94
+            })
+        ];
+
+        uint256 snapshot = vm.snapshot();
+        for (uint256 i; i < cases.length; ++i) {
+            if (cases[i].transferFee != 0) _activateTransferFee(cases[i].transferFee);
+            if (cases[i].withdrawFee != 0) _activateWithdrawFee(cases[i].withdrawFee);
+
+            assertEq(
+                pool.previewDeposit(100),
+                cases[i].expectedSharesOut,
+                _testCaseErr(cases[i].name, "Incorrect previewDeposit")
+            );
+            assertEq(
+                pool.previewMint(80), cases[i].expectedAssetsIn, _testCaseErr(cases[i].name, "Incorrect previewMint")
+            );
+            assertEq(
+                pool.previewWithdraw(100),
+                cases[i].expectedSharesIn,
+                _testCaseErr(cases[i].name, "Incorrect previewWithdraw")
+            );
+            assertEq(
+                pool.previewRedeem(80),
+                cases[i].expectedAssetsOut,
+                _testCaseErr(cases[i].name, "Incorrect previewRedeem")
+            );
+            vm.revertTo(snapshot);
+        }
+    }
+
+    /// @notice [LP-11]: `max{Deposit|Mint|Withdraw|Redeem}` functions work as expected
+    function test_LP_11_max_functions_work_as_expected() public {
+        assertEq(pool.maxDeposit(lp), type(uint256).max, "Incorrect maxDeposit");
+        assertEq(pool.maxMint(lp), type(uint256).max, "Incorrect maxMint");
+        assertEq(pool.maxWithdraw(lp), 1000, "Incorrect maxWithdraw (insufficient available liquidity)");
+        assertEq(pool.maxWithdraw(treasury), 125, "Incorrect maxWithdraw (sufficient available liquidity)");
+        assertEq(pool.maxRedeem(lp), 800, "Incorrect maxRedeem (insufficient available liquidity)");
+        assertEq(pool.maxRedeem(treasury), 100, "Incorrect maxRedeem (sufficient available liquidity)");
+
+        vm.prank(configurator);
+        pool.pause();
+        assertEq(pool.maxDeposit(lp), 0, "Incorrect maxDeposit on pause");
+        assertEq(pool.maxMint(lp), 0, "Incorrect maxMint on pause");
+        assertEq(pool.maxWithdraw(lp), 0, "Incorrect maxWithdraw on pause");
+        assertEq(pool.maxRedeem(lp), 0, "Incorrect maxRedeem on pause");
+    }
+
+    // --------- //
+    // BORROWING //
+    // --------- //
+
+    /// @notice [LP-12]: `creditManagerBorrowable` works as expected
+    function test_LP_12_creditManagerBorrowable_works_as_expected() public {
+        // for the next two cases, `irm.availableToBorrow` shouldn't be called
+        vm.mockCallRevert(
+            interestRateModel, abi.encode(IInterestRateModelV3.availableToBorrow.selector), "shouldn't be called"
+        );
+
+        // case: total debt limit is fully used
+        pool.hackTotalBorrowed(2000);
+        assertEq(pool.creditManagerBorrowable(creditManager), 0, "Incorrect borrowable (total debt limit fully used)");
+
+        // case: CM debt limit is fully used (total limit is not)
+        pool.hackTotalBorrowed(0);
+        pool.hackCreditManagerBorrowed(creditManager, 1000);
+        assertEq(pool.creditManagerBorrowable(creditManager), 0, "Incorrect borrowable (CM debt limit fully used)");
+
+        // for the next three cases, let `irm.availableToBorrow` always return 500
+        vm.mockCall(interestRateModel, abi.encode(IInterestRateModelV3.availableToBorrow.selector), abi.encode(500));
+
+        // case: `irm.availableToBorrow` is the smallest
+        pool.hackCreditManagerBorrowed(creditManager, 0);
+        assertEq(
+            pool.creditManagerBorrowable(creditManager),
+            500,
+            "Incorrect borrowable (irm.availableToBorrow is the smallest)"
+        );
+
+        // case: unused total debt is the smallest
+        pool.hackTotalBorrowed(1600);
+        assertEq(
+            pool.creditManagerBorrowable(creditManager),
+            400,
+            "Incorrect borrowable (unused total debt limit is the smallest)"
+        );
+
+        // case: unused CM debt limit is the smallest
+        pool.hackCreditManagerBorrowed(creditManager, 700);
+        assertEq(
+            pool.creditManagerBorrowable(creditManager),
+            300,
+            "Incorrect borrowable (unused CM debt limit is the smallest)"
+        );
+    }
+
+    /// @notice [LP-13A]: `lendCreditAccount` reverts on out of debt limits
+    function test_LP_13A_lendCreditAccount_reverts_on_out_of_debt_limits() public {
+        // case: zero amount
+        vm.expectRevert(CreditManagerCantBorrowException.selector);
+        pool.lendCreditAccount({borrowedAmount: 0, creditAccount: address(0)});
+
+        // case: CM debt limit violated
+        pool.hackCreditManagerBorrowed(creditManager, 500);
+        vm.expectRevert(CreditManagerCantBorrowException.selector);
+        vm.prank(creditManager);
+        pool.lendCreditAccount({borrowedAmount: 501, creditAccount: address(0)});
+
+        // case: total debt limit violated
+        pool.hackTotalBorrowed(1600);
+        vm.expectRevert(CreditManagerCantBorrowException.selector);
+        vm.prank(creditManager);
+        pool.lendCreditAccount({borrowedAmount: 401, creditAccount: address(0)});
+    }
+
+    /// @notice [LP-13B]: `lendCreditAccount` works as expected
+    function test_LP_13B_lendCreditAccount_works_as_expected() public {
+        // implicitly test that `_updateBaseInterest` is called with correct parameters
+        vm.expectCall(interestRateModel, abi.encodeWithSelector(calcBorrowRateSelector, 2000, 700, true));
+
+        vm.expectCall(address(underlying), abi.encodeCall(IERC20.transfer, (creditAccount, 300)));
+
+        vm.expectEmit(true, true, false, true);
+        emit Borrow(creditManager, creditAccount, 300);
+
+        vm.prank(creditManager);
+        pool.lendCreditAccount({borrowedAmount: 300, creditAccount: creditAccount});
+
+        assertEq(pool.totalBorrowed(), 1300, "Incorrect totalBorrowed");
+        assertEq(pool.creditManagerBorrowed(creditManager), 800, "Incorrect creditManagerBorrowed");
+    }
+
+    /// @notice [LP-14A]: `repayCreditAccount` reverts on no debt
+    function test_LP_14A_repayCreditAccount_reverts_on_no_debt() public {
+        pool.hackCreditManagerBorrowed(creditManager, 0);
+
+        vm.expectRevert(CallerNotCreditManagerException.selector);
+        vm.prank(creditManager);
+        pool.repayCreditAccount({repaidAmount: 0, profit: 0, loss: 0});
+    }
+
+    /// @notice [LP-14B]: `repayCreditAccount` with profit works as expected
+    function test_LP_14B_repayCreditAccount_with_profit_works_as_expected() public {
+        // implicitly test that `_updateBaseInterest` is called with correct parameters
+        vm.expectCall(interestRateModel, abi.encodeWithSelector(calcBorrowRateSelector, 2100, 1000, false));
+
+        vm.expectEmit(true, true, false, true);
+        emit Repay(creditManager, 300, 100, 0);
+
+        vm.prank(creditManager);
+        pool.repayCreditAccount({repaidAmount: 300, profit: 100, loss: 0});
+
+        assertEq(pool.totalBorrowed(), 700, "Incorrect totalBorrowed");
+        assertEq(pool.creditManagerBorrowed(creditManager), 200, "Incorrect creditManagerBorrowed");
+        assertEq(pool.balanceOf(treasury), 180, "Incorrect treasury balance of diesel token");
+    }
+
+    /// @notice [LP-14C]: `repayCreditAccount` with covered loss works as expected
+    function test_LP_14C_repayCreditAccount_with_covered_loss_works_as_expected() public {
+        // implicitly test that `_updateBaseInterest` is called with correct parameters
+        vm.expectCall(interestRateModel, abi.encodeWithSelector(calcBorrowRateSelector, 1900, 1000, false));
+
+        vm.expectEmit(true, true, false, true);
+        emit Repay(creditManager, 300, 0, 100);
+
+        vm.prank(creditManager);
+        pool.repayCreditAccount({repaidAmount: 300, profit: 0, loss: 100});
+
+        assertEq(pool.totalBorrowed(), 700, "Incorrect totalBorrowed");
+        assertEq(pool.creditManagerBorrowed(creditManager), 200, "Incorrect creditManagerBorrowed");
+        assertEq(pool.balanceOf(treasury), 20, "Incorrect treasury balance of diesel token");
+    }
+
+    /// @notice [LP-14D]: `repayCreditAccount` with uncovered loss works as expected
+    function test_LP_14D_repayCreditAccount_with_uncovered_loss_works_as_expected() public {
+        // implicitly test that `_updateBaseInterest` is called with correct parameters
+        vm.expectCall(interestRateModel, abi.encodeWithSelector(calcBorrowRateSelector, 1800, 1000, false));
+
+        vm.expectEmit(true, false, false, true);
+        // loss is 200 / 1.25 = 160 shares, but treasury only has 100
+        // so, uncovered loss is 75 = (160 - 100) * 1.25
+        emit IncurUncoveredLoss(creditManager, 75);
+
+        vm.expectEmit(true, true, false, true);
+        emit Repay(creditManager, 300, 0, 200);
+
+        vm.prank(creditManager);
+        pool.repayCreditAccount({repaidAmount: 300, profit: 0, loss: 200});
+
+        assertEq(pool.totalBorrowed(), 700, "Incorrect totalBorrowed");
+        assertEq(pool.creditManagerBorrowed(creditManager), 200, "Incorrect creditManagerBorrowed");
+        assertEq(pool.balanceOf(treasury), 0, "Incorrect treasury balance of diesel token");
+    }
+
+    // ------------- //
+    // INTEREST RATE //
+    // ------------- //
+
+    /// @notice [LP-15]: `supplyRate` works as expected
+    function test_LP_15_supplyRate_works_as_expected() public repeatWithoutQuotas {
+        _activateWithdrawFee(100);
+
+        if (pool.supportsQuotas()) {
+            // supply rate now:
+            // 9.9% = (100% - 1%) * (1000 * 10% + 100) / 2000
+            // supply rate in a year:
+            // 9% =  (100% - 1%) * (1000 * 10% + 100) / (2000 + 1000 * 10% + 100)
+            pool.hackBaseInterestRate(RAY / 10);
+            pool.hackQuotaRevenue(100);
+        } else {
+            // supply rate now:
+            // 9.9% = (100% - 1%) * (1000 * 20%) / 2000
+            // supply rate in a year:
+            // 9% = (100% - 1%) * (1000 * 20%) / (2000 + 1000 * 20%)
+            pool.hackBaseInterestRate(RAY / 5);
+        }
+
+        assertEq(pool.supplyRate(), 99 * RAY / 1000, "Incorrect supplyRate right after update");
+
+        vm.warp(block.timestamp + 365 days);
+        assertEq(pool.supplyRate(), 9 * RAY / 100, "Incorrect supplyRate 1 year after update");
+    }
+
+    /// @notice [LP-16]: `baseInterestIndex` works as expected
+    function test_LP_16_baseInterestIndex_works_as_expected() public {
+        pool.hackBaseInterestRate(RAY / 10);
+        pool.hackBaseInterestIndexLU(11 * RAY / 10);
+
+        assertEq(pool.baseInterestIndex(), 11 * RAY / 10, "Incorrect baseInterestIndex right after update");
+
+        vm.warp(block.timestamp + 365 days);
+        assertEq(pool.baseInterestIndex(), 121 * RAY / 100, "Incorrect baseInterestIndex 1 year after update");
+    }
+
+    /// @notice [LP-17]: `_calcBaseInterestAccrued` works as expected
+    function test_LP_17_calcBaseInterestAccrued_works_as_expected() public {
+        pool.hackBaseInterestRate(RAY / 10);
+
+        assertEq(pool.calcBaseInterestAccrued(), 0, "Incorrect baseInterest accrued right after update");
+
+        vm.warp(block.timestamp + 365 days);
+        assertEq(pool.calcBaseInterestAccrued(), 100, "Incorrect baseInterest accrued 1 year after update");
+    }
+
+    /// @notice [LP-18]: `_updateBaseInterest` works as expected
+    function test_LP_18_updateBaseInterest_works_as_expected() public repeatWithoutQuotas {
+        if (pool.supportsQuotas()) {
+            // expected liquidity in a year: 2200 = 2000 + 1000 * 10% + 100
+            // expected base interest index in a year: 1.32 = 1.2 * 1.1
+            pool.hackBaseInterestRate(RAY / 10);
+            pool.hackBaseInterestIndexLU(6 * RAY / 5);
+            pool.hackQuotaRevenue(100);
+        } else {
+            // expected liquidity in a year: 2200 = 2000 + 1000 * 20%
+            // expected base interest index in a year: 1.32 = 1.1 * 1.2
+            pool.hackBaseInterestRate(RAY / 5);
+            pool.hackBaseInterestIndexLU(11 * RAY / 10);
+        }
+
+        vm.warp(block.timestamp + 365 days);
+
+        // let's update base interest with expected liquidity delta of -300 and available liquidity delta of 300
+        vm.expectCall(interestRateModel, abi.encodeWithSelector(calcBorrowRateSelector, 1900, 1300, true));
+
+        pool.updateBaseInterest({
+            expectedLiquidityDelta: -300,
+            availableLiquidityDelta: 300,
+            checkOptimalBorrowing: true
+        });
+
+        assertEq(pool.expectedLiquidity(), 1900, "Incorrect expectedLiquidity");
+        assertEq(pool.expectedLiquidityLU(), 1900, "Incorrect expectedLiquidityLU");
+        assertEq(pool.baseInterestRate(), RAY / 20, "Incorrect baseInterestRate");
+        assertEq(pool.baseInterestIndex(), 132 * RAY / 100, "Incorrect baseInterestIndex");
+        assertEq(pool.lastBaseInterestUpdate(), block.timestamp, "Incorrect lastBaseInterestUpdate");
+        if (pool.supportsQuotas()) {
+            assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "Incorrect lastQuotaRevenueUpdate");
+        }
+    }
+
+    // ------ //
+    // QUOTAS //
+    // ------ //
+
+    /// @notice [LP-19]: `updateQuotaRevenue` works as expected
+    function test_LP_19_updateQuotaRevenue_works_as_expected() public {
+        pool.hackQuotaRevenue(100);
+
+        vm.prank(quotaKeeper);
+        pool.updateQuotaRevenue(10);
+
+        // implicitly test that `_setQuotaRevenue` is called with correct parameters
+        assertEq(pool.quotaRevenue(), 110, "Incorrect quotaRevenue");
+    }
+
+    /// @notice [LP-20]: `setQuotaRevenue` works as expected
+    function test_LP_20_setQuotaRevenue_works_as_expected() public {
+        pool.hackQuotaRevenue(100);
+        vm.warp(block.timestamp + 365 days);
+
+        vm.prank(quotaKeeper);
+        pool.setQuotaRevenue(200);
+        assertEq(pool.expectedLiquidityLU(), 2100, "Incorrect expectedLiquidityLU");
+        assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "Incorrect lastQuotaRevenueUpdate");
+        assertEq(pool.quotaRevenue(), 200, "Incorrect quotaRevenue");
+    }
+
+    /// @notice [LP-21]: `_calcQuotaRevenueAccrued` works as expected
+    function test_LP_21_calcQuotaRevenueAccrued_works_as_expected() public {
+        pool.hackQuotaRevenue(100);
+
+        assertEq(pool.calcQuotaRevenueAccrued(), 0, "Incorrect quotaRevenue accrued right after update");
+
+        vm.warp(block.timestamp + 365 days);
+        assertEq(pool.calcQuotaRevenueAccrued(), 100, "Incorrect quotaRevenue accrued 1 year after update");
+    }
+
+    // ------------- //
+    // CONFIGURATION //
+    // ------------- //
+
+    /// @notice [LP-22A]: `setInterestRateModel` reverts on zero address
+    function test_LP_22A_setInterestRateModel_reverts_on_zero_address() public {
+        vm.expectRevert(ZeroAddressException.selector);
+        vm.prank(configurator);
+        pool.setInterestRateModel(address(0));
+    }
+
+    /// @notice [LP-22B]: `setInterestRateModel` works as expected
+    function test_LP_22B_setInterestRateModel_works_as_expected() public {
+        address newInterestRateModel = makeAddr("NEW_INTEREST_RATE_MODEL");
+        bytes memory irmCallData = abi.encodeWithSelector(calcBorrowRateSelector, 2000, 1000, false);
+        vm.mockCall(newInterestRateModel, irmCallData, abi.encode(0));
+
+        vm.expectEmit(true, false, false, false);
+        emit SetInterestRateModel(newInterestRateModel);
+
+        // implicitly test that `_updateBaseInterest` is called with correct parameters
+        vm.expectCall(newInterestRateModel, irmCallData);
+
+        vm.prank(configurator);
+        pool.setInterestRateModel(newInterestRateModel);
+
+        assertEq(pool.interestRateModel(), newInterestRateModel, "Incorrect interestRateModel");
+    }
+
+    /// @notice [LP-23A]: `setPoolQuotaKeeper` reverts on zero address
+    function test_LP_23A_setPoolQuotaKeeper_reverts_on_zero_address() public {
+        vm.expectRevert(ZeroAddressException.selector);
+        vm.prank(configurator);
+        pool.setPoolQuotaKeeper(address(0));
+    }
+
+    /// @notice [LP-23B]: `setPoolQuotaKeeper` reverts when pool doesn't support quotas
+    function test_LP_23B_setPoolQuotaKeeper_reverts_on_quotas_not_supported() public onlyWithoutQuotas {
+        vm.expectRevert(QuotasNotSupportedException.selector);
+        vm.prank(configurator);
+        pool.setPoolQuotaKeeper(makeAddr("NEW_QUOTA_KEEPER"));
+    }
+
+    /// @notice [LP-23C]: `setPoolQuotaKeeper` reverts on incompatible quota keeper
+    function test_LP_23C_setPoolQuotaKeeper_reverts_on_incompatible_quota_keeper() public {
+        address newQuotaKeeper = makeAddr("NEW_QUOTA_KEEPER");
+        vm.mockCall(newQuotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.pool, ()), abi.encode(makeAddr("WRONG_POOL")));
+
+        vm.expectRevert(IncompatiblePoolQuotaKeeperException.selector);
+        vm.prank(configurator);
+        pool.setPoolQuotaKeeper(newQuotaKeeper);
+    }
+
+    /// @notice [LP-23D]: `setPoolQuotaKeeper` works as expected
+    function test_LP_23D_setPoolQuotaKeeper_works_as_expected() public {
+        address newQuotaKeeper = makeAddr("NEW_QUOTA_KEEPER");
+        vm.mockCall(newQuotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.pool, ()), abi.encode(address(pool)));
+        vm.mockCall(newQuotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.poolQuotaRevenue, ()), abi.encode(100));
+
+        vm.expectEmit(true, false, false, false);
+        emit SetPoolQuotaKeeper(newQuotaKeeper);
+
+        vm.expectCall(newQuotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.poolQuotaRevenue, ()));
+
+        vm.prank(configurator);
+        pool.setPoolQuotaKeeper(newQuotaKeeper);
+
+        assertEq(pool.poolQuotaKeeper(), newQuotaKeeper, "Incorrect poolQuotaKeeper");
+        // implicitly test that `_setQuotaRevenue` is called with correct parameters
+        assertEq(pool.quotaRevenue(), 100, "Incorrect quotaRevenue");
+    }
+
+    /// @notice [LP-24]: `setTotalDebtLimit` works as expected
+    function test_LP_24_setTotalDebtLimit_works_as_expected() public {
+        // case: finite limit
+        vm.expectEmit(false, false, false, false);
+        emit SetTotalDebtLimit(123);
+
+        vm.prank(configurator);
+        pool.setTotalDebtLimit(123);
+
+        assertEq(pool.totalDebtLimit(), 123, "Incorrect totalDebtLimit (case: finite limit)");
+
+        // case: no limit
+        vm.expectEmit(false, false, false, false);
+        emit SetTotalDebtLimit(type(uint256).max);
+
+        vm.prank(configurator);
+        pool.setTotalDebtLimit(type(uint256).max);
+
+        assertEq(pool.totalDebtLimit(), type(uint256).max, "Incorrect totalDebtLimit (case: no limit)");
+    }
+
+    /// @notice [LP-25A]: `setCreditManagerDebtLimit` reverts on zero address
+    function test_LP_25A_setCreditManagerDebtLimit_reverts_on_zero_address() public {
+        vm.expectRevert(ZeroAddressException.selector);
+        vm.prank(configurator);
+        pool.setCreditManagerDebtLimit(address(0), 0);
+    }
+
+    /// @notice [LP-25B]: `setCreditManagerDebtLimit` reverts on non-registered credit manager
+    function test_LP_25B_setCreditManagerDebtLimit_reverts_on_non_registered_credit_manager() public {
+        vm.expectRevert(RegisteredCreditManagerOnlyException.selector);
+        vm.prank(configurator);
+        pool.setCreditManagerDebtLimit(makeAddr("NEW_CREDIT_MANAGER"), 0);
+    }
+
+    /// @notice [LP-25C]: `setCreditManagerDebtLimit` reverts on incompatible credit manager
+    function test_LP_25C_setCreditManagerDebtLimit_reverts_on_incompatible_credit_manager() public {
+        address newCreditManager = makeAddr("NEW_CREDIT_MANAGER");
+
+        vm.prank(configurator);
+        addressProvider.addCreditManager(newCreditManager);
+
+        vm.mockCall(newCreditManager, abi.encodeCall(ICreditManagerV3.pool, ()), abi.encode(makeAddr("WRONG_POOL")));
+
+        vm.expectRevert(IncompatibleCreditManagerException.selector);
+        vm.prank(configurator);
+        pool.setCreditManagerDebtLimit(newCreditManager, 0);
+    }
+
+    /// @notice [LP-25D]: `setCreditManagerDebtLimit` works as expected
+    function test_LP_25D_setCreditManagerDebtLimit_works_as_expected() public {
+        address newCreditManager = makeAddr("NEW_CREDIT_MANAGER");
+
+        vm.prank(configurator);
+        addressProvider.addCreditManager(newCreditManager);
+
+        // when credit manager is not in the credit managers list, it should add it there
+        vm.mockCall(newCreditManager, abi.encodeCall(ICreditManagerV3.pool, ()), abi.encode(address(pool)));
+
+        vm.expectEmit(true, false, false, false);
+        emit AddCreditManager(newCreditManager);
+
+        vm.expectEmit(true, false, false, true);
+        emit SetCreditManagerDebtLimit(newCreditManager, 123);
+
+        vm.prank(configurator);
+        pool.setCreditManagerDebtLimit(newCreditManager, 123);
+
+        assertEq(pool.creditManagers()[0], creditManager, "Incorrect creditManagers[0]");
+        assertEq(pool.creditManagers()[1], newCreditManager, "Incorrect creditManagers[1]");
+        assertEq(
+            pool.creditManagerDebtLimit(newCreditManager), 123, "Incorrect credit manager debt limit after first call"
+        );
+
+        // when credit manager is already added to the list, it should not check compatibility
+        vm.mockCallRevert(newCreditManager, abi.encodeCall(ICreditManagerV3.pool, ()), "already added");
+
+        vm.expectEmit(true, false, false, true);
+        emit SetCreditManagerDebtLimit(newCreditManager, 456);
+
+        vm.prank(configurator);
+        pool.setCreditManagerDebtLimit(newCreditManager, 456);
+
+        assertEq(
+            pool.creditManagerDebtLimit(newCreditManager), 456, "Incorrect credit manager debt limit after second call"
+        );
+    }
+
+    /// @notice [LP-26A]: `setWithdrawFee` reverts on incorrect value
+    function test_LP_26A_setWithdrawFee_reverts_on_incorrect_value() public {
+        vm.expectRevert(IncorrectParameterException.selector);
+        vm.prank(configurator);
+        pool.setWithdrawFee(MAX_WITHDRAW_FEE + 1);
+    }
+
+    /// @notice [LP-26B]: `setWithdrawFee` works as expected
+    function test_LP_26B_setWithdrawFee_works_as_expected() public {
+        uint256 newWithdrawFee = MAX_WITHDRAW_FEE / 2;
+
+        vm.expectEmit(false, false, false, true);
+        emit SetWithdrawFee(newWithdrawFee);
+
+        vm.prank(configurator);
+        pool.setWithdrawFee(newWithdrawFee);
+
+        assertEq(pool.withdrawFee(), newWithdrawFee, "Incorrect withdrawFee");
+    }
+
+    // --------- //
+    // INTERNALS //
+    // --------- //
+
+    function _prepareAssets(address owner, uint256 assets) internal {
+        deal({token: address(underlying), to: owner, give: assets, adjust: true});
+        vm.prank(owner);
+        underlying.approve(address(pool), assets);
+    }
+
+    function _prepareShares(address owner, address spender, uint256 shares) internal {
+        _prepareAssets(owner, pool.previewMint(shares));
+        vm.startPrank(owner);
+        pool.mint(shares, owner);
+        if (spender != owner) pool.approve(spender, shares);
         vm.stopPrank();
     }
 
-    // U:[P4-19]: setCreditManagerDebtLimit reverts if not in register
-    function test_U_P4_19_connectCreditManager_reverts_if_not_in_register() public {
-        vm.expectRevert(RegisteredCreditManagerOnlyException.selector);
-
-        vm.prank(CONFIGURATOR);
-        pool.setCreditManagerDebtLimit(DUMB_ADDRESS, 1);
+    function _activateTransferFee(uint256 fee) internal {
+        pool.hackTransferFee(fee);
+        underlying.setBasisPointsRate(fee);
+        underlying.setMaximumFee(type(uint256).max);
     }
 
-    // U:[P4-20]: setCreditManagerDebtLimit reverts if another pool is setup in CreditManagerV3
-    function test_U_P4_20_connectCreditManager_fails_on_incompatible_CM() public {
-        cmMock.setPoolService(DUMB_ADDRESS);
-
-        vm.expectRevert(IncompatibleCreditManagerException.selector);
-
-        vm.prank(CONFIGURATOR);
-        pool.setCreditManagerDebtLimit(address(cmMock), 1);
+    function _activateWithdrawFee(uint256 fee) internal {
+        vm.prank(configurator);
+        pool.setWithdrawFee(fee);
     }
-
-    // U:[P4-21]: setCreditManagerDebtLimit connects manager first time, then update limit only
-    function test_U_P4_21_setCreditManagerLimit_connects_manager_first_time_then_update_limit_only() public {
-        address[] memory cms = pool.creditManagers();
-        assertEq(cms.length, 0, "Credit manager is already connected!");
-
-        vm.expectEmit(true, true, false, false);
-        emit AddCreditManager(address(cmMock));
-
-        vm.expectEmit(true, true, false, true);
-        emit SetCreditManagerDebtLimit(address(cmMock), 230);
-
-        vm.prank(CONFIGURATOR);
-        pool.setCreditManagerDebtLimit(address(cmMock), 230);
-
-        cms = pool.creditManagers();
-        assertEq(cms.length, 1, "#1: Credit manager is already connected!");
-        assertEq(cms[0], address(cmMock), "#1: Credit manager is not connected!");
-
-        assertEq(pool.creditManagerDebtLimit(address(cmMock)), 230, "#1: Incorrect CM limit");
-
-        vm.expectEmit(true, true, false, true);
-        emit SetCreditManagerDebtLimit(address(cmMock), 150);
-
-        vm.prank(CONFIGURATOR);
-        pool.setCreditManagerDebtLimit(address(cmMock), 150);
-
-        cms = pool.creditManagers();
-        assertEq(cms.length, 1, "#2: Credit manager is already connected!");
-        assertEq(cms[0], address(cmMock), "#2: Credit manager is not connected!");
-        assertEq(pool.creditManagerDebtLimit(address(cmMock)), 150, "#2: Incorrect CM limit");
-
-        vm.prank(CONFIGURATOR);
-        pool.setCreditManagerDebtLimit(address(cmMock), type(uint256).max);
-
-        assertEq(pool.creditManagerDebtLimit(address(cmMock)), type(uint256).max, "#3: Incorrect CM limit");
-    }
-
-    // U:[P4-22]: setInterestRateModel changes interest rate model & emit event
-    function test_U_P4_22_setInterestRateModel_works_correctly_and_emits_event() public {
-        _setUpTestCase(Tokens.DAI, 0, 50_00, addLiquidity, 2 * RAY, 0, false);
-
-        uint256 expectedLiquidity = pool.expectedLiquidity();
-        uint256 availableLiquidity = pool.availableLiquidity();
-
-        LinearInterestRateModelV3 newIR = new LinearInterestRateModelV3(
-            8000,
-            9000,
-            200,
-            500,
-            4000,
-            7500,
-            false
-        );
-
-        vm.expectEmit(true, false, false, false);
-        emit SetInterestRateModel(address(newIR));
-
-        vm.prank(CONFIGURATOR);
-        pool.setInterestRateModel(address(newIR));
-
-        assertEq(address(pool.interestRateModel()), address(newIR), "Interest rate model was not set correctly");
-
-        // Add elUpdate
-
-        vm.prank(CONFIGURATOR);
-        pool.setInterestRateModel(address(newIR));
-
-        assertEq(
-            newIR.calcBorrowRate(expectedLiquidity, availableLiquidity),
-            pool.baseInterestRate(),
-            "Borrow rate does not match"
-        );
-    }
-
-    /// @dev U:[P4-23A]: `setPoolQuotaKeeper` reverts if quotas are not supported
-    function test_U_P4_23A_setPoolQuotaKeeper_reverts_if_quotas_not_supported() public {
-        address keeper = makeAddr("POOL_QUOTA_KEEPER");
-        vm.expectRevert(QuotasNotSupportedException.selector);
-        vm.prank(CONFIGURATOR);
-        pool.setPoolQuotaKeeper(keeper);
-    }
-
-    /// @dev U:[P4-23B]: `setPoolQuotaKeeper` reverts on incompatible keeper
-    function test_U_P4_23B_setPoolQuotaKeeper_reverts_on_incompatible_keeper() public {
-        pool = new PoolV3({
-            addressProvider_: address(addressProvider),
-            underlyingToken_: tokenTestSuite.addressOf(Tokens.DAI),
-            interestRateModel_: address(irm),
-            totalDebtLimit_: type(uint256).max,
-            supportsQuotas_: true,
-            namePrefix_: "diesel ",
-            symbolPrefix_: "d"
-        });
-
-        address keeper = makeAddr("POOL_QUOTA_KEEPER");
-        vm.mockCall(keeper, abi.encodeCall(IPoolQuotaKeeperV3.pool, ()), abi.encode(DUMB_ADDRESS));
-
-        vm.expectRevert(IncompatiblePoolQuotaKeeperException.selector);
-        vm.prank(CONFIGURATOR);
-        pool.setPoolQuotaKeeper(keeper);
-    }
-
-    /// @dev U:[P4-23C]: setPoolQuotaKeeper updates quotaRevenue and emits event
-    function test_U_P4_23C_setPoolQuotaKeeper_updates_quotaRevenue_and_emits_event() public {
-        pool = new PoolV3({
-            addressProvider_: address(addressProvider),
-            underlyingToken_: tokenTestSuite.addressOf(Tokens.DAI),
-            interestRateModel_: address(irm),
-            totalDebtLimit_: type(uint256).max,
-            supportsQuotas_: true,
-            namePrefix_: "diesel ",
-            symbolPrefix_: "d"
-        });
-
-        pqk = new PoolQuotaKeeperV3(address(pool));
-
-        address POOL_QUOTA_KEEPER = address(pqk);
-
-        vm.expectEmit(true, true, false, false);
-        emit SetPoolQuotaKeeper(POOL_QUOTA_KEEPER);
-
-        vm.prank(CONFIGURATOR);
-        pool.setPoolQuotaKeeper(POOL_QUOTA_KEEPER);
-
-        uint96 qu = uint96(WAD * 10);
-
-        assertEq(pool.poolQuotaKeeper(), POOL_QUOTA_KEEPER, "Incorrect Pool QuotaKeeper");
-
-        vm.prank(POOL_QUOTA_KEEPER);
-        pool.setQuotaRevenue(qu);
-
-        uint256 year = 365 days;
-
-        vm.warp(block.timestamp + year);
-
-        PoolQuotaKeeperV3 pqk2 = new PoolQuotaKeeperV3(address(pool));
-
-        address POOL_QUOTA_KEEPER2 = address(pqk2);
-
-        vm.mockCall(POOL_QUOTA_KEEPER2, abi.encodeCall(PoolQuotaKeeperV3.poolQuotaRevenue, ()), abi.encode(2 * qu));
-
-        vm.expectCall(POOL_QUOTA_KEEPER2, abi.encodeCall(PoolQuotaKeeperV3.poolQuotaRevenue, ()));
-
-        vm.expectEmit(true, true, false, false);
-        emit SetPoolQuotaKeeper(POOL_QUOTA_KEEPER2);
-
-        vm.prank(CONFIGURATOR);
-        pool.setPoolQuotaKeeper(POOL_QUOTA_KEEPER2);
-
-        assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "Incorrect lastQuotaRevenuUpdate");
-        assertEq(pool.quotaRevenue(), 2 * qu, "#1: Incorrect quotaRevenue");
-
-        assertEq(pool.expectedLiquidityLU(), qu, "Incorrect expectedLiquidityLU");
-    }
-
-    // U:[P4-25]: setTotalDebtLimit sets limit & emits event
-    function test_U_P4_25_setTotalBorrowedLimit_correct_and_emits_event() public {
-        vm.expectEmit(false, false, false, true);
-        emit SetTotalDebtLimit(10005);
-
-        vm.prank(CONFIGURATOR);
-        pool.setTotalDebtLimit(10005);
-
-        assertEq(pool.totalDebtLimit(), 10005, "totalDebtLimit not set correctly");
-    }
-
-    // U:[P4-26]: setWithdrawFee works correctly
-    function test_U_P4_26_setWithdrawFee_works_correctly() public {
-        vm.expectRevert(IncorrectParameterException.selector);
-
-        vm.prank(CONFIGURATOR);
-        pool.setWithdrawFee(101);
-
-        vm.expectEmit(false, false, false, true);
-        emit SetWithdrawFee(50);
-
-        vm.prank(CONFIGURATOR);
-        pool.setWithdrawFee(50);
-
-        assertEq(pool.withdrawFee(), 50, "withdrawFee not set correctly");
-    }
-
-    struct CreditManagerBorrowTestCase {
-        string name;
-        /// SETUP
-        uint16 u2;
-        bool isBorrowingMoreU2Forbidden;
-        uint256 borrowBefore1;
-        uint256 borrowBefore2;
-        /// PARAMS
-        uint256 totalBorrowLimit;
-        uint256 cmBorrowLimit;
-        /// EXPECTED VALUES
-        uint256 expectedBorrowable;
-    }
-
-    // U:[P4-27]: creditManagerBorrowable computes availabel borrow correctly
-    function test_U_P4_27_creditManagerBorrowable_computes_available_borrow_amount_correctly() public {
-        uint256 initialLiquidity = 10 * addLiquidity;
-        CreditManagerBorrowTestCase[5] memory cases = [
-            CreditManagerBorrowTestCase({
-                name: "Non-limit linear model, totalBorrowed > totalLimit",
-                // POOL SETUP
-                u2: 9000,
-                isBorrowingMoreU2Forbidden: false,
-                borrowBefore1: addLiquidity,
-                borrowBefore2: addLiquidity,
-                totalBorrowLimit: addLiquidity,
-                cmBorrowLimit: 5 * addLiquidity,
-                /// EXPECTED VALUES
-                expectedBorrowable: 0
-            }),
-            CreditManagerBorrowTestCase({
-                name: "Non-limit linear model, cmBorrowLimit < totalLimit",
-                // POOL SETUP
-                u2: 9000,
-                isBorrowingMoreU2Forbidden: false,
-                borrowBefore1: addLiquidity,
-                borrowBefore2: addLiquidity,
-                totalBorrowLimit: 10 * addLiquidity,
-                cmBorrowLimit: 5 * addLiquidity,
-                /// EXPECTED VALUES
-                expectedBorrowable: 4 * addLiquidity
-            }),
-            CreditManagerBorrowTestCase({
-                name: "Non-limit linear model, cmBorrowLimit > totalLimit",
-                // POOL SETUP
-                u2: 9000,
-                isBorrowingMoreU2Forbidden: false,
-                borrowBefore1: addLiquidity,
-                borrowBefore2: addLiquidity,
-                totalBorrowLimit: 4 * addLiquidity,
-                cmBorrowLimit: 5 * addLiquidity,
-                /// EXPECTED VALUES
-                expectedBorrowable: 2 * addLiquidity
-            }),
-            CreditManagerBorrowTestCase({
-                name: "Limit linear model",
-                // POOL SETUP
-                u2: 6000,
-                isBorrowingMoreU2Forbidden: true,
-                borrowBefore1: 4 * addLiquidity,
-                borrowBefore2: addLiquidity,
-                totalBorrowLimit: 8 * addLiquidity,
-                cmBorrowLimit: 5 * addLiquidity,
-                /// EXPECTED VALUES
-                expectedBorrowable: addLiquidity
-            }),
-            CreditManagerBorrowTestCase({
-                name: "Non-limit linear model, cmBorrowed < cmBorrowLimit",
-                // POOL SETUP
-                u2: 9000,
-                isBorrowingMoreU2Forbidden: false,
-                borrowBefore1: addLiquidity,
-                borrowBefore2: 5 * addLiquidity,
-                totalBorrowLimit: 10 * addLiquidity,
-                cmBorrowLimit: addLiquidity,
-                /// EXPECTED VALUES
-                expectedBorrowable: 0
-            })
-        ];
-
-        for (uint256 i; i < cases.length; ++i) {
-            CreditManagerBorrowTestCase memory testCase = cases[i];
-
-            _setUp(Tokens.DAI, false);
-
-            _initPoolLiquidity(initialLiquidity, RAY);
-
-            LinearInterestRateModelV3 newIR = new LinearInterestRateModelV3(
-                5000,
-                testCase.u2,
-                200,
-                500,
-                4000,
-                7500,
-                testCase.isBorrowingMoreU2Forbidden
-            );
-
-            CreditManagerMock cmMock2 = new CreditManagerMock(
-               address( addressProvider),
-                    address(pool)
-                );
-
-            vm.startPrank(CONFIGURATOR);
-            cr.addCreditManager(address(cmMock2));
-
-            pool.setInterestRateModel(address(newIR));
-            pool.setTotalDebtLimit(type(uint256).max);
-            pool.setCreditManagerDebtLimit(address(cmMock), type(uint128).max);
-            pool.setCreditManagerDebtLimit(address(cmMock2), type(uint128).max);
-
-            cmMock.lendCreditAccount(testCase.borrowBefore1, DUMB_ADDRESS);
-            cmMock2.lendCreditAccount(testCase.borrowBefore2, DUMB_ADDRESS);
-
-            pool.setTotalDebtLimit(testCase.totalBorrowLimit);
-
-            pool.setCreditManagerDebtLimit(address(cmMock2), testCase.cmBorrowLimit);
-
-            vm.stopPrank();
-
-            assertEq(
-                pool.creditManagerBorrowable(address(cmMock2)),
-                testCase.expectedBorrowable,
-                _testCaseErr(testCase.name, "Incorrect creditManagerBorrowable return value")
-            );
-        }
-    }
-
-    struct SupplyRateTestCase {
-        string name;
-        /// SETUP
-        uint256 initialLiquidity;
-        uint16 utilisation;
-        uint16 withdrawFee;
-        // supportQuotas is true of quotaRevenue >0
-        uint96 quotaRevenue;
-        uint256 expectedSupplyRate;
-    }
-
-    // U:[P4-28]: supplyRate computes rates correctly
-    function test_U_P4_28_supplyRate_computes_rates_correctly() public {
-        SupplyRateTestCase[5] memory cases = [
-            SupplyRateTestCase({
-                name: "normal pool with zero debt and zero supply",
-                /// SETUP
-                initialLiquidity: 0,
-                utilisation: 0,
-                withdrawFee: 0,
-                quotaRevenue: 0,
-                expectedSupplyRate: irm.calcBorrowRate(0, 0, false)
-            }),
-            SupplyRateTestCase({
-                name: "normal pool with zero debt and non-zero supply",
-                /// SETUP
-                initialLiquidity: addLiquidity,
-                utilisation: 0,
-                withdrawFee: 0,
-                quotaRevenue: 0,
-                expectedSupplyRate: 0
-            }),
-            SupplyRateTestCase({
-                name: "normal pool with 50% utilisation debt",
-                /// SETUP
-                initialLiquidity: addLiquidity,
-                utilisation: 50_00,
-                withdrawFee: 0,
-                quotaRevenue: 0,
-                // borrow rate will be distributed to all LPs (dieselRate =1), so supply is a half
-                expectedSupplyRate: irm.calcBorrowRate(200, 100, false) / 2
-            }),
-            SupplyRateTestCase({
-                name: "normal pool with 50% utilisation debt and withdrawFee",
-                /// SETUP
-                initialLiquidity: addLiquidity,
-                utilisation: 50_00,
-                withdrawFee: 50,
-                quotaRevenue: 0,
-                // borrow rate will be distributed to all LPs (dieselRate =1), so supply is a half and -1% for withdrawFee
-                expectedSupplyRate: ((irm.calcBorrowRate(200, 100, false) / 2) * 995) / 1000
-            }),
-            SupplyRateTestCase({
-                name: "normal pool with 50% utilisation debt, withdrawFee and quotas",
-                /// SETUP
-                initialLiquidity: addLiquidity,
-                utilisation: 50_00,
-                withdrawFee: 1_00,
-                quotaRevenue: uint96(addLiquidity) * 45_50 / 10_000,
-                // borrow rate will be distributed to all LPs (dieselRate =1), so supply is a half and -1% for withdrawFee
-                expectedSupplyRate: (((irm.calcBorrowRate(200, 100, false) / 2 + (45_50 * RAY) / PERCENTAGE_FACTOR)) * 99) / 100
-            })
-        ];
-
-        for (uint256 i; i < cases.length; ++i) {
-            SupplyRateTestCase memory testCase = cases[i];
-
-            bool supportQuotas = testCase.quotaRevenue > 0;
-            _setUpTestCase(
-                Tokens.DAI, 0, testCase.utilisation, testCase.initialLiquidity, RAY, testCase.withdrawFee, supportQuotas
-            );
-
-            if (supportQuotas) {
-                address POOL_QUOTA_KEEPER = address(pqk);
-
-                vm.prank(CONFIGURATOR);
-                pool.setPoolQuotaKeeper(POOL_QUOTA_KEEPER);
-
-                vm.prank(POOL_QUOTA_KEEPER);
-                pool.setQuotaRevenue(testCase.quotaRevenue);
-            }
-
-            assertEq(
-                pool.supplyRate(), testCase.expectedSupplyRate, _testCaseErr(testCase.name, "Incorrect supply rate")
-            );
-
-            if (pool.totalSupply() > 0) {
-                uint256 depositAmount = addLiquidity / 10;
-                uint256 sharesGot = pool.previewDeposit(depositAmount);
-
-                vm.warp(block.timestamp + 365 days);
-
-                uint256 depositInAYear = pool.previewRedeem(sharesGot);
-
-                // assertEq(
-                //     pool.supplyRate(),
-                //     testCase.expectedSupplyRate,
-                //     _testCaseErr(testCase.name, "Incorrect supply rate after a year")
-                // );
-
-                uint256 expectedDepositInAYear = (depositAmount * (PERCENTAGE_FACTOR - testCase.withdrawFee))
-                    / PERCENTAGE_FACTOR + (depositAmount * testCase.expectedSupplyRate) / RAY;
-
-                assertEq(
-                    depositInAYear, expectedDepositInAYear, _testCaseErr(testCase.name, "Incorrect deposit growth")
-                );
-            }
-        }
-    }
-
-    // // U:[P4-28]: expectedLiquidity() computes correctly
-    // function test_PX_28_expectedLiquidity_correct() public {
-    //     _connectAndSetLimit();
-
-    //     vm.prank(USER);
-    //     pool.deposit(addLiquidity, USER);
-
-    //     address ca = cmMock.getCreditAccountOrRevert(DUMB_ADDRESS);
-
-    //     cmMock.lendCreditAccount(addLiquidity / 2, ca);
-
-    //     uint256 baseInterestRate = pool.baseInterestRate();
-    //     uint256 timeWarp = 365 days;
-
-    //     vm.warp(block.timestamp + timeWarp);
-
-    //     uint256 expectedInterest = ((addLiquidity / 2) * baseInterestRate) / RAY;
-    //     uint256 expectedLiquidity = pool.expectedLiquidityLU() + expectedInterest;
-
-    //     assertEq(pool.expectedLiquidity(), expectedLiquidity, "Index value was not updated correctly");
-    // }
-
-    // // U:[P4-35]: setInterestRateModel reverts on zero address
-    // function test_PX_35_setInterestRateModel_reverts_on_zero_address() public {
-    //     vm.expectRevert(ZeroAddressException.selector);
-    //     vm.prank(CONFIGURATOR);
-    //     pool.setInterestRateModel(address(0));
-    // }
 }

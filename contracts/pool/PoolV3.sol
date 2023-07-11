@@ -107,7 +107,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     }
 
     function _revertIfCallerIsNotPoolQuotaKeeper() internal view {
-        if (msg.sender != poolQuotaKeeper) revert CallerNotPoolQuotaKeeperException(); // U:[P4-5]
+        if (msg.sender != poolQuotaKeeper) revert CallerNotPoolQuotaKeeperException(); // U:[LP-2C]
     }
 
     /// @notice Constructor
@@ -127,30 +127,30 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         string memory namePrefix_,
         string memory symbolPrefix_
     )
-        ACLNonReentrantTrait(addressProvider_)
+        ACLNonReentrantTrait(addressProvider_) // U:[LP-1A]
         ContractsRegisterTrait(addressProvider_)
-        ERC4626(IERC20(underlyingToken_))
+        ERC4626(IERC20(underlyingToken_)) // U:[LP-1B]
         ERC20(
             string(abi.encodePacked(namePrefix_, underlyingToken_ != address(0) ? ERC20(underlyingToken_).name() : "")),
             string(abi.encodePacked(symbolPrefix_, underlyingToken_ != address(0) ? ERC20(underlyingToken_).symbol() : ""))
-        ) // U:[P4-1]
-        nonZeroAddress(underlyingToken_) // U:[P4-2]
-        nonZeroAddress(interestRateModel_) // U:[P4-2]
+        ) // U:[LP-1B]
+        nonZeroAddress(underlyingToken_) // U:[LP-1A]
+        nonZeroAddress(interestRateModel_) // U:[LP-1A]
     {
-        addressProvider = addressProvider_; // U:[P4-1]
-        underlyingToken = underlyingToken_; // U:[P4-1]
+        addressProvider = addressProvider_; // U:[LP-1B]
+        underlyingToken = underlyingToken_; // U:[LP-1B]
 
         treasury =
-            IAddressProviderV3(addressProvider_).getAddressOrRevert({key: AP_TREASURY, _version: NO_VERSION_CONTROL}); // U:[P4-1]
+            IAddressProviderV3(addressProvider_).getAddressOrRevert({key: AP_TREASURY, _version: NO_VERSION_CONTROL}); // U:[LP-1B]
 
-        lastBaseInterestUpdate = uint40(block.timestamp); // U:[P4-1]
-        _baseInterestIndexLU = uint128(RAY); // U:[P4-1]
+        lastBaseInterestUpdate = uint40(block.timestamp); // U:[LP-1B]
+        _baseInterestIndexLU = uint128(RAY); // U:[LP-1B]
 
-        interestRateModel = interestRateModel_;
-        emit SetInterestRateModel(interestRateModel_); // U:[P4-3]
+        interestRateModel = interestRateModel_; // U:[LP-1B]
+        emit SetInterestRateModel(interestRateModel_); // U:[LP-1B]
 
-        _setTotalDebtLimit(totalDebtLimit_); // U:[P4-3]
-        supportsQuotas = supportsQuotas_; // U:[P4-1]
+        _setTotalDebtLimit(totalDebtLimit_); // U:[LP-1B]
+        supportsQuotas = supportsQuotas_; // U:[LP-1B]
     }
 
     /// @notice Addresses of all connected credit managers
@@ -158,25 +158,15 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         return _creditManagerSet.values();
     }
 
-    /// @notice Annual interest rate in ray that liquidity providers receive per unit of deposited capital,
-    ///         consists of base interest and quota revenue
-    function supplyRate() external view override returns (uint256) {
-        uint256 assets = expectedLiquidity();
-        uint256 baseInterestRate_ = baseInterestRate();
-        if (assets == 0) return baseInterestRate_;
-        return (baseInterestRate_ * _totalDebt.borrowed + quotaRevenue() * RAY) * (PERCENTAGE_FACTOR - withdrawFee)
-            / PERCENTAGE_FACTOR / assets; // U:[P4-28]
-    }
-
     /// @notice Available liquidity in the pool
     function availableLiquidity() public view override returns (uint256) {
-        return IERC20(underlyingToken).balanceOf(address(this));
+        return IERC20(underlyingToken).balanceOf(address(this)); // U:[LP-3]
     }
 
     /// @notice Amount of underlying that would be in the pool if debt principal, base interest
     ///         and quota revenue were fully repaid
     function expectedLiquidity() public view override returns (uint256) {
-        return _expectedLiquidityLU + _calcBaseInterestAccrued() + (supportsQuotas ? _calcQuotaRevenueAccrued() : 0);
+        return _expectedLiquidityLU + _calcBaseInterestAccrued() + (supportsQuotas ? _calcQuotaRevenueAccrued() : 0); // U:[LP-4]
     }
 
     /// @notice Expected liquidity stored as of last update
@@ -201,14 +191,14 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     function deposit(uint256 assets, address receiver)
         public
         override(ERC4626, IERC4626)
-        whenNotPaused // U:[P4-4]
-        nonReentrant
-        nonZeroAddress(receiver)
+        whenNotPaused // U:[LP-2A]
+        nonReentrant // U:[LP-2B]
+        nonZeroAddress(receiver) // U:[LP-5]
         returns (uint256 shares)
     {
-        uint256 assetsReceived = _amountMinusFee(assets); // U:[P4-5,7]
-        shares = _convertToShares(assetsReceived, Math.Rounding.Down); // U:[P4-5,7]
-        _deposit(receiver, assets, assetsReceived, shares); // U:[P4-5]
+        uint256 assetsReceived = _amountMinusFee(assets); // U:[LP-6]
+        shares = _convertToShares(assetsReceived, Math.Rounding.Down); // U:[LP-6]
+        _deposit(receiver, assets, assetsReceived, shares); // U:[LP-6]
     }
 
     /// @dev Same as `deposit`, but allows to specify the referral code
@@ -217,8 +207,8 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         override
         returns (uint256 shares)
     {
-        shares = deposit(assets, receiver); // U:[P4-5]
-        emit Refer(receiver, referralCode, assets); // U:[P4-5]
+        shares = deposit(assets, receiver); // U:[LP-2A,2B,5,6]
+        emit Refer(receiver, referralCode, assets); // U:[LP-6]
     }
 
     /// @notice Deposits underlying tokens to the pool in exhcange for given number of pool shares
@@ -228,14 +218,14 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     function mint(uint256 shares, address receiver)
         public
         override(ERC4626, IERC4626)
-        whenNotPaused // U:[P4-4]
-        nonReentrant
-        nonZeroAddress(receiver)
+        whenNotPaused // U:[LP-2A]
+        nonReentrant // U:[LP-2B]
+        nonZeroAddress(receiver) // U:[LP-5]
         returns (uint256 assets)
     {
-        uint256 assetsReceived = _convertToAssets(shares, Math.Rounding.Up); // U:[P4-6,7]
-        assets = _amountWithFee(assetsReceived); // U:[P4-6,7]
-        _deposit(receiver, assets, assetsReceived, shares); // U:[P4-6,7]
+        uint256 assetsReceived = _convertToAssets(shares, Math.Rounding.Up); // U:[LP-7]
+        assets = _amountWithFee(assetsReceived); // U:[LP-7]
+        _deposit(receiver, assets, assetsReceived, shares); // U:[LP-7]
     }
 
     /// @dev Same as `mint`, but allows to specify the referral code
@@ -244,8 +234,8 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         override
         returns (uint256 assets)
     {
-        assets = mint(shares, receiver); // U:[P4-6]
-        emit Refer(receiver, referralCode, assets); // U:[P4-6]
+        assets = mint(shares, receiver); // U:[LP-2A,2B,5,7]
+        emit Refer(receiver, referralCode, assets); // U:[LP-7]
     }
 
     /// @notice Withdraws pool shares for given amount of underlying tokens
@@ -256,14 +246,14 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     function withdraw(uint256 assets, address receiver, address owner)
         public
         override(ERC4626, IERC4626)
-        whenNotPaused // U:[P4-4]
-        nonReentrant
-        nonZeroAddress(receiver)
+        whenNotPaused // U:[LP-2A]
+        nonReentrant // U:[LP-2B]
+        nonZeroAddress(receiver) // U:[LP-5]
         returns (uint256 shares)
     {
-        uint256 assetsSent = _amountWithWithdrawalFee(_amountWithFee(assets));
-        shares = _convertToShares(assetsSent, Math.Rounding.Up); // U:[P4-8]
-        _withdraw(receiver, owner, assetsSent, assets, shares); // U:[P4-8]
+        uint256 assetsSent = _amountWithWithdrawalFee(_amountWithFee(assets)); // U:[LP-8]
+        shares = _convertToShares(assetsSent, Math.Rounding.Up); // U:[LP-8]
+        _withdraw(receiver, owner, assetsSent, assets, shares); // U:[LP-8]
     }
 
     /// @notice Redeems given number of pool shares for underlying tokens
@@ -274,54 +264,54 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     function redeem(uint256 shares, address receiver, address owner)
         public
         override(ERC4626, IERC4626)
-        whenNotPaused // U:[P4-4]
-        nonReentrant
-        nonZeroAddress(receiver)
+        whenNotPaused // U:[LP-2A]
+        nonReentrant // U:[LP-2B]
+        nonZeroAddress(receiver) // U:[LP-5]
         returns (uint256 assets)
     {
-        uint256 assetsSent = _convertToAssets(shares, Math.Rounding.Down); // U:[P4-9]
-        assets = _amountMinusFee(_amountMinusWithdrawalFee(assetsSent)); // U:[P4-9]
-        _withdraw(receiver, owner, assetsSent, assets, shares); // U:[P4-9]
+        uint256 assetsSent = _convertToAssets(shares, Math.Rounding.Down); // U:[LP-9]
+        assets = _amountMinusFee(_amountMinusWithdrawalFee(assetsSent)); // U:[LP-9]
+        _withdraw(receiver, owner, assetsSent, assets, shares); // U:[LP-9]
     }
 
     /// @notice Number of pool shares that would be minted on depositing `assets`
     function previewDeposit(uint256 assets) public view override(ERC4626, IERC4626) returns (uint256 shares) {
-        shares = _convertToShares(_amountMinusFee(assets), Math.Rounding.Down);
+        shares = _convertToShares(_amountMinusFee(assets), Math.Rounding.Down); // U:[LP-10]
     }
 
     /// @notice Amount of underlying that would be spent to mint `shares`
     function previewMint(uint256 shares) public view override(ERC4626, IERC4626) returns (uint256) {
-        return _amountWithFee(_convertToAssets(shares, Math.Rounding.Up));
+        return _amountWithFee(_convertToAssets(shares, Math.Rounding.Up)); // U:[LP-10]
     }
 
     /// @notice Number of pool shares that would be burned on withdrawing `assets`
     function previewWithdraw(uint256 assets) public view override(ERC4626, IERC4626) returns (uint256) {
-        return _convertToShares(_amountWithWithdrawalFee(_amountWithFee(assets)), Math.Rounding.Up);
+        return _convertToShares(_amountWithWithdrawalFee(_amountWithFee(assets)), Math.Rounding.Up); // U:[LP-10]
     }
 
     /// @notice Amount of underlying that would be received after redeeming `shares`
     function previewRedeem(uint256 shares) public view override(ERC4626, IERC4626) returns (uint256) {
-        return _amountMinusFee(_amountMinusWithdrawalFee(_convertToAssets(shares, Math.Rounding.Down)));
+        return _amountMinusFee(_amountMinusWithdrawalFee(_convertToAssets(shares, Math.Rounding.Down))); // U:[LP-10]
     }
 
     /// @notice Maximum amount of underlying that can be deposited to the pool, 0 if pool is on pause
     function maxDeposit(address) public view override(ERC4626, IERC4626) returns (uint256) {
-        return paused() ? 0 : type(uint256).max;
+        return paused() ? 0 : type(uint256).max; // U:[LP-11]
     }
 
     /// @notice Maximum number of pool shares that can be minted, 0 if pool is on pause
     function maxMint(address) public view override(ERC4626, IERC4626) returns (uint256) {
-        return paused() ? 0 : type(uint256).max;
+        return paused() ? 0 : type(uint256).max; // U:[LP-11]
     }
 
     /// @notice Maximum amount of underlying that can be withdrawn from the pool by `owner`, 0 if pool is on pause
     function maxWithdraw(address owner) public view override(ERC4626, IERC4626) returns (uint256) {
-        return paused() ? 0 : Math.min(availableLiquidity(), _convertToAssets(balanceOf(owner), Math.Rounding.Down));
+        return paused() ? 0 : Math.min(availableLiquidity(), _convertToAssets(balanceOf(owner), Math.Rounding.Down)); // U:[LP-11]
     }
 
     /// @notice Maximum number of shares that can be redeemed for underlying by `owner`, 0 if pool is on pause
     function maxRedeem(address owner) public view override(ERC4626, IERC4626) returns (uint256) {
-        return paused() ? 0 : Math.min(balanceOf(owner), _convertToShares(availableLiquidity(), Math.Rounding.Down));
+        return paused() ? 0 : Math.min(balanceOf(owner), _convertToShares(availableLiquidity(), Math.Rounding.Down)); // U:[LP-11]
     }
 
     /// @dev `deposit` / `mint` implementation
@@ -329,16 +319,16 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     ///      - updates base interest rate and index
     ///      - mints pool shares to `receiver`
     function _deposit(address receiver, uint256 assetsSent, uint256 assetsReceived, uint256 shares) internal {
-        IERC20(underlyingToken).safeTransferFrom({from: msg.sender, to: address(this), amount: assetsSent}); // U:[P4-5,6]
+        IERC20(underlyingToken).safeTransferFrom({from: msg.sender, to: address(this), amount: assetsSent}); // U:[LP-6,7]
 
         _updateBaseInterest({
             expectedLiquidityDelta: assetsReceived.toInt256(),
             availableLiquidityDelta: 0,
             checkOptimalBorrowing: false
-        }); // U:[P4-5,6]
+        }); // U:[LP-6,7]
 
-        _mint(receiver, shares); // U:[P4-5,6]
-        emit Deposit(msg.sender, receiver, assetsSent, shares); // U:[P4-5,6]
+        _mint(receiver, shares); // U:[LP-6,7]
+        emit Deposit(msg.sender, receiver, assetsSent, shares); // U:[LP-6,7]
     }
 
     /// @dev `withdraw` / `redeem` implementation
@@ -348,23 +338,23 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     function _withdraw(address receiver, address owner, uint256 assetsSent, uint256 assetsReceived, uint256 shares)
         internal
     {
-        if (msg.sender != owner) _spendAllowance({owner: owner, spender: msg.sender, amount: shares}); // U:[P4-8,9]
-        _burn(owner, shares); // U:[P4-8,9]
+        if (msg.sender != owner) _spendAllowance({owner: owner, spender: msg.sender, amount: shares}); // U:[LP-8,9]
+        _burn(owner, shares); // U:[LP-8,9]
 
         _updateBaseInterest({
             expectedLiquidityDelta: -assetsSent.toInt256(),
             availableLiquidityDelta: -assetsSent.toInt256(),
             checkOptimalBorrowing: false
-        }); // U:[P4-8,9]
+        }); // U:[LP-8,9]
 
         uint256 amountToUser = _amountWithFee(assetsReceived);
-        IERC20(underlyingToken).safeTransfer({to: receiver, value: amountToUser}); // U:[P4-8,9]
+        IERC20(underlyingToken).safeTransfer({to: receiver, value: amountToUser}); // U:[LP-8,9]
         if (assetsSent > amountToUser) {
             unchecked {
-                IERC20(underlyingToken).safeTransfer({to: treasury, value: assetsSent - amountToUser}); // U:[P4-8,9]
+                IERC20(underlyingToken).safeTransfer({to: treasury, value: assetsSent - amountToUser}); // U:[LP-8,9]
             }
         }
-        emit Withdraw(msg.sender, receiver, owner, assetsReceived, shares); // U:[P4-8, 9]
+        emit Withdraw(msg.sender, receiver, owner, assetsReceived, shares); // U:[LP-8,9]
     }
 
     // --------- //
@@ -388,23 +378,23 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
 
     /// @notice Debt limit for a given credit manager, `type(uint256).max` means no limit
     function creditManagerDebtLimit(address creditManager) external view override returns (uint256) {
-        return _convertToU256(_creditManagerDebt[creditManager].limit); // U:[P4-21]
+        return _convertToU256(_creditManagerDebt[creditManager].limit);
     }
 
     /// @notice Amount available to borrow for a given credit manager
     function creditManagerBorrowable(address creditManager) external view override returns (uint256 borrowable) {
-        borrowable = _borrowable(_totalDebt); // U:[P4-27]
-        if (borrowable == 0) return 0; // U:[P4-27]
+        borrowable = _borrowable(_totalDebt); // U:[LP-12]
+        if (borrowable == 0) return 0; // U:[LP-12]
 
-        borrowable = Math.min(borrowable, _borrowable(_creditManagerDebt[creditManager])); // U:[P4-27]
-        if (borrowable == 0) return 0; // U:[P4-27]
+        borrowable = Math.min(borrowable, _borrowable(_creditManagerDebt[creditManager])); // U:[LP-12]
+        if (borrowable == 0) return 0; // U:[LP-12]
 
         uint256 available = IInterestRateModelV3(interestRateModel).availableToBorrow({
             expectedLiquidity: expectedLiquidity(),
             availableLiquidity: availableLiquidity()
-        }); // U:[P4-27]
+        }); // U:[LP-12]
 
-        borrowable = Math.min(borrowable, available); // U:[P4-27]
+        borrowable = Math.min(borrowable, available); // U:[LP-12]
     }
 
     /// @notice Lends funds to a credit account, can only be called by credit managers
@@ -413,8 +403,8 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     function lendCreditAccount(uint256 borrowedAmount, address creditAccount)
         external
         override
-        whenNotPaused // U:[P4-4]
-        nonReentrant
+        whenNotPaused // U:[LP-2A]
+        nonReentrant // U:[LP-2B]
     {
         uint128 borrowedAmountU128 = borrowedAmount.toUint128();
 
@@ -422,20 +412,20 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         uint128 totalBorrowed_ = _totalDebt.borrowed + borrowedAmountU128;
         uint128 cmBorrowed_ = cmDebt.borrowed + borrowedAmountU128;
         if (borrowedAmount == 0 || cmBorrowed_ > cmDebt.limit || totalBorrowed_ > _totalDebt.limit) {
-            revert CreditManagerCantBorrowException(); // U:[P4-12]
+            revert CreditManagerCantBorrowException(); // U:[LP-2C,13A]
         }
 
         _updateBaseInterest({
             expectedLiquidityDelta: 0,
             availableLiquidityDelta: -borrowedAmount.toInt256(),
             checkOptimalBorrowing: true
-        }); // U:[P4-11]
+        }); // U:[LP-13B]
 
-        cmDebt.borrowed = cmBorrowed_; // U:[P4-11]
-        _totalDebt.borrowed = totalBorrowed_; // U:[P4-11]
+        cmDebt.borrowed = cmBorrowed_; // U:[LP-13B]
+        _totalDebt.borrowed = totalBorrowed_; // U:[LP-13B]
 
-        IERC20(underlyingToken).safeTransfer({to: creditAccount, value: borrowedAmount}); // U:[P4-11]
-        emit Borrow(msg.sender, creditAccount, borrowedAmount); // U:[P4-11]
+        IERC20(underlyingToken).safeTransfer({to: creditAccount, value: borrowedAmount}); // U:[LP-13B]
+        emit Borrow(msg.sender, creditAccount, borrowedAmount); // U:[LP-13B]
     }
 
     /// @notice Updates pool state to indicate debt repayment, can only be called by credit managers
@@ -454,19 +444,19 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     function repayCreditAccount(uint256 repaidAmount, uint256 profit, uint256 loss)
         external
         override
-        whenNotPaused // U:[P4-4]
-        nonReentrant
+        whenNotPaused // U:[LP-2A]
+        nonReentrant // U:[LP-2B]
     {
         uint128 repaidAmountU128 = repaidAmount.toUint128();
 
         DebtParams storage cmDebt = _creditManagerDebt[msg.sender];
         uint128 cmBorrowed = cmDebt.borrowed;
         if (cmBorrowed == 0) {
-            revert CallerNotCreditManagerException(); // U:[P4-13]
+            revert CallerNotCreditManagerException(); // U:[LP-2C,14A]
         }
 
         if (profit > 0) {
-            _mint(treasury, convertToShares(profit)); // U:[P4-14]
+            _mint(treasury, convertToShares(profit)); // U:[LP-14B]
         } else if (loss > 0) {
             address treasury_ = treasury;
             uint256 sharesInTreasury = balanceOf(treasury_);
@@ -476,23 +466,23 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
                     emit IncurUncoveredLoss({
                         creditManager: msg.sender,
                         loss: convertToAssets(sharesToBurn - sharesInTreasury)
-                    }); // U:[P4-14]
+                    }); // U:[LP-14D]
                 }
                 sharesToBurn = sharesInTreasury;
             }
-            _burn(treasury_, sharesToBurn); // U:[P4-14]
+            _burn(treasury_, sharesToBurn); // U:[LP-14C,14D]
         }
 
         _updateBaseInterest({
             expectedLiquidityDelta: profit.toInt256() - loss.toInt256(),
             availableLiquidityDelta: 0,
             checkOptimalBorrowing: false
-        }); // U:[P4-14]
+        }); // U:[LP-14B,14C,14D]
 
-        _totalDebt.borrowed -= repaidAmountU128; // U:[P4-14]
-        cmDebt.borrowed = cmBorrowed - repaidAmountU128; // U:[P4-14]
+        _totalDebt.borrowed -= repaidAmountU128; // U:[LP-14B,14C,14D]
+        cmDebt.borrowed = cmBorrowed - repaidAmountU128; // U:[LP-14B,14C,14D]
 
-        emit Repay(msg.sender, repaidAmount, profit, loss); // U:[P4-14]
+        emit Repay(msg.sender, repaidAmount, profit, loss); // U:[LP-14B,14C,14D]
     }
 
     /// @dev Returns borrowable amount based on debt limit and current borrowed amount
@@ -517,16 +507,26 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         return _baseInterestRate;
     }
 
+    /// @notice Annual interest rate in ray that liquidity providers receive per unit of deposited capital,
+    ///         consists of base interest and quota revenue
+    function supplyRate() external view override returns (uint256) {
+        uint256 assets = expectedLiquidity();
+        uint256 baseInterestRate_ = baseInterestRate();
+        if (assets == 0) return baseInterestRate_;
+        return (baseInterestRate_ * _totalDebt.borrowed + quotaRevenue() * RAY) * (PERCENTAGE_FACTOR - withdrawFee)
+            / PERCENTAGE_FACTOR / assets; // U:[LP-15]
+    }
+
     /// @notice Current cumulative base interest index in ray
     function baseInterestIndex() public view override returns (uint256) {
         uint256 timestampLU = lastBaseInterestUpdate;
-        if (block.timestamp == timestampLU) return _baseInterestIndexLU; // U:[P4-15]
-        return _calcBaseInterestIndex(timestampLU); // U:[P4-15]
+        if (block.timestamp == timestampLU) return _baseInterestIndexLU; // U:[LP-16]
+        return _calcBaseInterestIndex(timestampLU); // U:[LP-16]
     }
 
     /// @dev Same as `baseInterestIndex`, kept for backward compatibility
     function calcLinearCumulative_RAY() external view override returns (uint256) {
-        return baseInterestIndex(); // U:[P4-15]
+        return baseInterestIndex();
     }
 
     /// @notice Cumulative base interest index stored as of last update in ray
@@ -537,8 +537,8 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     /// @dev Computes base interest accrued since the last update
     function _calcBaseInterestAccrued() internal view returns (uint256) {
         uint256 timestampLU = lastBaseInterestUpdate;
-        if (block.timestamp == timestampLU) return 0;
-        return _calcBaseInterestAccrued(timestampLU);
+        if (block.timestamp == timestampLU) return 0; // U:[LP-17]
+        return _calcBaseInterestAccrued(timestampLU); // U:[LP-17]
     }
 
     /// @dev Updates base interest rate based on expected and available liquidity deltas
@@ -553,24 +553,24 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         bool checkOptimalBorrowing
     ) internal {
         uint256 expectedLiquidity_ = (expectedLiquidity().toInt256() + expectedLiquidityDelta).toUint256();
-        uint256 availableLiquidity_ = (availableLiquidity().toInt256() + availableLiquidityDelta).toUint256(); // U:[P4-16]
+        uint256 availableLiquidity_ = (availableLiquidity().toInt256() + availableLiquidityDelta).toUint256();
 
         uint256 lastBaseInterestUpdate_ = lastBaseInterestUpdate;
         if (block.timestamp != lastBaseInterestUpdate_) {
-            _baseInterestIndexLU = _calcBaseInterestIndex(lastBaseInterestUpdate_).toUint128(); // U:[P4-16]
-            lastBaseInterestUpdate = uint40(block.timestamp); // U:[P4-16]
+            _baseInterestIndexLU = _calcBaseInterestIndex(lastBaseInterestUpdate_).toUint128(); // U:[LP-18]
+            lastBaseInterestUpdate = uint40(block.timestamp); // U:[LP-18]
         }
 
         if (supportsQuotas && block.timestamp != lastQuotaRevenueUpdate) {
-            lastQuotaRevenueUpdate = uint40(block.timestamp); // U:[P4-16]
+            lastQuotaRevenueUpdate = uint40(block.timestamp); // U:[LP-18]
         }
 
-        _expectedLiquidityLU = expectedLiquidity_.toUint128(); // U:[P4-16]
+        _expectedLiquidityLU = expectedLiquidity_.toUint128(); // U:[LP-18]
         _baseInterestRate = IInterestRateModelV3(interestRateModel).calcBorrowRate({
             expectedLiquidity: expectedLiquidity_,
             availableLiquidity: availableLiquidity_,
             checkOptimalBorrowing: checkOptimalBorrowing
-        }).toUint128(); // U:[P4-16]
+        }).toUint128(); // U:[LP-18]
     }
 
     /// @dev Computes base interest accrued since given timestamp
@@ -594,21 +594,31 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
 
     /// @notice Updates quota revenue value by given delta
     /// @param quotaRevenueDelta Quota revenue delta
-    function updateQuotaRevenue(int256 quotaRevenueDelta) external override nonReentrant poolQuotaKeeperOnly {
-        _setQuotaRevenue((quotaRevenue().toInt256() + quotaRevenueDelta).toUint256()); // U:[P4-17]
+    function updateQuotaRevenue(int256 quotaRevenueDelta)
+        external
+        override
+        nonReentrant // U:[LP-2B]
+        poolQuotaKeeperOnly // U:[LP-2C]
+    {
+        _setQuotaRevenue((quotaRevenue().toInt256() + quotaRevenueDelta).toUint256()); // U:[LP-19]
     }
 
     /// @notice Sets new quota revenue value
     /// @param newQuotaRevenue New quota revenue value
-    function setQuotaRevenue(uint256 newQuotaRevenue) external override nonReentrant poolQuotaKeeperOnly {
-        _setQuotaRevenue(newQuotaRevenue); // U:[P4-17]
+    function setQuotaRevenue(uint256 newQuotaRevenue)
+        external
+        override
+        nonReentrant // U:[LP-2B]
+        poolQuotaKeeperOnly // U:[LP-2C]
+    {
+        _setQuotaRevenue(newQuotaRevenue); // U:[LP-20]
     }
 
     /// @dev Computes quota revenue accrued since the last update
     function _calcQuotaRevenueAccrued() internal view returns (uint256) {
         uint256 timestampLU = lastQuotaRevenueUpdate;
-        if (block.timestamp == timestampLU) return 0; // U:[P4-17]
-        return _calcQuotaRevenueAccrued(timestampLU); // U:[P4-17]
+        if (block.timestamp == timestampLU) return 0; // U:[LP-21]
+        return _calcQuotaRevenueAccrued(timestampLU); // U:[LP-21]
     }
 
     /// @dev Sets new quota revenue value
@@ -617,10 +627,10 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     function _setQuotaRevenue(uint256 newQuotaRevenue) internal {
         uint256 timestampLU = lastQuotaRevenueUpdate;
         if (block.timestamp != timestampLU) {
-            _expectedLiquidityLU += _calcQuotaRevenueAccrued(timestampLU).toUint128(); // U:[P4-17]
-            lastQuotaRevenueUpdate = uint40(block.timestamp); // U:[P4-17]
+            _expectedLiquidityLU += _calcQuotaRevenueAccrued(timestampLU).toUint128(); // U:[LP-20]
+            lastQuotaRevenueUpdate = uint40(block.timestamp); // U:[LP-20]
         }
-        _quotaRevenue = newQuotaRevenue.toUint96(); // U:[P4-17]
+        _quotaRevenue = newQuotaRevenue.toUint96(); // U:[LP-20]
     }
 
     /// @dev Computes quota revenue accrued since given timestamp
@@ -637,12 +647,12 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     function setInterestRateModel(address newInterestRateModel)
         external
         override
-        configuratorOnly // U:[P4-18]
-        nonZeroAddress(newInterestRateModel)
+        configuratorOnly // U:[LP-2C]
+        nonZeroAddress(newInterestRateModel) // U:[LP-22A]
     {
-        interestRateModel = newInterestRateModel; // U:[P4-22]
-        _updateBaseInterest(0, 0, false); // U:[P4-22]
-        emit SetInterestRateModel(newInterestRateModel); // U:[P4-22]
+        interestRateModel = newInterestRateModel; // U:[LP-22B]
+        _updateBaseInterest(0, 0, false); // U:[LP-22B]
+        emit SetInterestRateModel(newInterestRateModel); // U:[LP-22B]
     }
 
     /// @notice Sets new pool quota keeper, can only be called by configurator
@@ -650,22 +660,22 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     function setPoolQuotaKeeper(address newPoolQuotaKeeper)
         external
         override
-        configuratorOnly // U:[P4-18]
-        nonZeroAddress(newPoolQuotaKeeper)
+        configuratorOnly // U:[LP-2C]
+        nonZeroAddress(newPoolQuotaKeeper) // U:[LP-23A]
     {
         if (!supportsQuotas) {
-            revert QuotasNotSupportedException(); // U:[P4-23A]
+            revert QuotasNotSupportedException(); // U:[LP-23B]
         }
         if (IPoolQuotaKeeperV3(newPoolQuotaKeeper).pool() != address(this)) {
-            revert IncompatiblePoolQuotaKeeperException(); // U:[P4-23B]
+            revert IncompatiblePoolQuotaKeeperException(); // U:[LP-23C]
         }
 
-        poolQuotaKeeper = newPoolQuotaKeeper; // U:[P4-23C]
+        poolQuotaKeeper = newPoolQuotaKeeper; // U:[LP-23D]
 
         uint256 newQuotaRevenue = IPoolQuotaKeeperV3(poolQuotaKeeper).poolQuotaRevenue();
-        _setQuotaRevenue(newQuotaRevenue); // U:[P4-23C]
+        _setQuotaRevenue(newQuotaRevenue); // U:[LP-23D]
 
-        emit SetPoolQuotaKeeper(newPoolQuotaKeeper); // U:[P4-23C]
+        emit SetPoolQuotaKeeper(newPoolQuotaKeeper); // U:[LP-23D]
     }
 
     /// @notice Sets new total debt limit, can only be called by controller
@@ -673,9 +683,9 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     function setTotalDebtLimit(uint256 newLimit)
         external
         override
-        controllerOnly // U:[P4-18]
+        controllerOnly // U:[LP-2C]
     {
-        _setTotalDebtLimit(newLimit); // U:[P4-25]
+        _setTotalDebtLimit(newLimit); // U:[LP-24]
     }
 
     /// @notice Sets new debt limit for a given credit manager, can only be called by controller
@@ -685,19 +695,19 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     function setCreditManagerDebtLimit(address creditManager, uint256 newLimit)
         external
         override
-        controllerOnly // U:[P4-18]
-        nonZeroAddress(creditManager)
-        registeredCreditManagerOnly(creditManager)
+        controllerOnly // U:[LP-2C]
+        nonZeroAddress(creditManager) // U:[LP-25A]
+        registeredCreditManagerOnly(creditManager) // U:[LP-25B]
     {
         if (!_creditManagerSet.contains(creditManager)) {
             if (address(this) != ICreditManagerV3(creditManager).pool()) {
-                revert IncompatibleCreditManagerException(); // U:[P4-20]
+                revert IncompatibleCreditManagerException(); // U:[LP-25C]
             }
-            _creditManagerSet.add(creditManager); // U:[P4-21]
-            emit AddCreditManager(creditManager); // U:[P4-21]
+            _creditManagerSet.add(creditManager); // U:[LP-25D]
+            emit AddCreditManager(creditManager); // U:[LP-25D]
         }
-        _creditManagerDebt[creditManager].limit = _convertToU128(newLimit); // U:[P4-21]
-        emit SetCreditManagerDebtLimit(creditManager, newLimit); // U:[P4-21]
+        _creditManagerDebt[creditManager].limit = _convertToU128(newLimit); // U:[LP-25D]
+        emit SetCreditManagerDebtLimit(creditManager, newLimit); // U:[LP-25D]
     }
 
     /// @notice Sets new withdrawal fee, can only be called by controller
@@ -705,19 +715,19 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     function setWithdrawFee(uint256 newWithdrawFee)
         external
         override
-        controllerOnly // U:[P4-18]
+        controllerOnly // U:[LP-2C]
     {
         if (newWithdrawFee > MAX_WITHDRAW_FEE) {
-            revert IncorrectParameterException(); // U:[P4-26]
+            revert IncorrectParameterException(); // U:[LP-26A]
         }
-        withdrawFee = newWithdrawFee.toUint16(); // U:[P4-26]
-        emit SetWithdrawFee(newWithdrawFee); // U:[P4-26]
+        withdrawFee = newWithdrawFee.toUint16(); // U:[LP-26B]
+        emit SetWithdrawFee(newWithdrawFee); // U:[LP-26B]
     }
 
     /// @dev Sets new total debt limit
     function _setTotalDebtLimit(uint256 limit) internal {
-        _totalDebt.limit = _convertToU128(limit); // U:[P4-25]
-        emit SetTotalDebtLimit(limit); // U:[P4-3,25]
+        _totalDebt.limit = _convertToU128(limit); // U:[LP-1B,24]
+        emit SetTotalDebtLimit(limit); // U:[LP-1B,24]
     }
 
     // --------- //
