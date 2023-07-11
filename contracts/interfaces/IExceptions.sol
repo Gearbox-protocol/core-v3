@@ -16,6 +16,9 @@ error AmountCantBeZeroException();
 /// @dev Thrown on incorrect input parameter
 error IncorrectParameterException();
 
+/// @dev Thrown if parameter is out of range
+error ValueOutOfRangeException();
+
 /// @dev Thrown when an address sends ETH to a contract that is not allowed to send ETH directly
 /// @dev This is only relevant for contracts that have custom `receive()` access;
 ///      most contracts do not have a `receive()` and thus will do a generic revert
