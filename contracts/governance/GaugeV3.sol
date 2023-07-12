@@ -78,17 +78,17 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
 
     /// @dev IMPLEMENTATION: updateEpoch()
     function _checkAndUpdateEpoch() internal {
-        if (epochFrozen) return;
-
         uint16 epochNow = IGearStakingV3(voter).getCurrentEpoch(); // U:[GA-14]
 
         if (epochNow > epochLastUpdate) {
             epochLastUpdate = epochNow; // U:[GA-14]
 
-            /// The PQK retrieves all rates from the Gauge on its own and saves them
-            /// Since this function is only callable by the Gauge, active rates can only
-            /// be updated once per epoch at most
-            _poolQuotaKeeper().updateRates(); // U:[GA-14]
+            if (!epochFrozen) {
+                /// The PQK retrieves all rates from the Gauge on its own and saves them
+                /// Since this function is only callable by the Gauge, active rates can only
+                /// be updated once per epoch at most
+                _poolQuotaKeeper().updateRates(); // U:[GA-14]
+            }
 
             emit UpdateEpoch(epochNow); // U:[GA-14]
         }

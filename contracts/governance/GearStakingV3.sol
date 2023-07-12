@@ -134,6 +134,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     /// @param votesAfter Votes to apply in the new contract after sending GEAR
     function migrate(uint96 amount, MultiVote[] calldata votesBefore, MultiVote[] calldata votesAfter)
         external
+        override
         nonReentrant
         nonZeroAddress(successor) // U: [GS-07]
     {
@@ -152,14 +153,15 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
 
     /// @notice Performs a deposit on user's behalf from the migrator (usually the previous GearStaking contract)
     /// @param amount Amount of GEAR to deposit
-    /// @param to Address to deposit to
+    /// @param onBehalfOf User on whose behalf to deposit
     /// @param votes Array of votes to apply after migrating
-    function depositOnMigration(uint96 amount, address to, MultiVote[] calldata votes)
+    function depositOnMigration(uint96 amount, address onBehalfOf, MultiVote[] calldata votes)
         external
+        override
         nonReentrant
         migratorOnly // U: [GS-07]
     {
-        _deposit(amount, to, votes); // U: [GS-07]
+        _deposit(amount, onBehalfOf, votes); // U: [GS-07]
     }
 
     /// @notice Refreshes the user's withdrawal struct, shifting the withdrawal amounts based

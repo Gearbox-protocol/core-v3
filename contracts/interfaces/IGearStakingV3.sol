@@ -102,9 +102,10 @@ interface IGearStakingV3 is IGearStakingV3Events, IVersion {
 
     /// @notice Performs a deposit on user's behalf from the migrator (usually the previous GearStaking contract)
     /// @param amount Amount of GEAR to deposit
-    /// @param to Address to deposit to
+    /// @param onBehalfOf Address to deposit to
+    /// @param onBehalfOf User on whose behalf to deposit
     /// @param votes Array of votes to apply after migrating
-    function depositOnMigration(uint96 amount, address to, MultiVote[] calldata votes) external;
+    function depositOnMigration(uint96 amount, address onBehalfOf, MultiVote[] calldata votes) external;
 
     //
     // GETTERS

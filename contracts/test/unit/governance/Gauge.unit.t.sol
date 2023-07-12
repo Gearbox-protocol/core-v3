@@ -327,7 +327,7 @@ contract GauageTest is TestHelper, IGaugeV3Events {
     }
 
     // @dev U:[GA-14]: updateEpoch updates epoch
-    function test_U_GA_14_updateEpoch_cupdates_epoch() public {
+    function test_U_GA_14_updateEpoch_updates_epoch() public {
         for (uint16 i = 0; i < 2; ++i) {
             uint16 epochNow = i + gauge.epochLastUpdate();
 
@@ -407,9 +407,12 @@ contract GauageTest is TestHelper, IGaugeV3Events {
         assertTrue(gauge.epochFrozen(), "Epoch was not frozen");
 
         gearStakingMock.setCurrentEpoch(1000);
+        vm.mockCallRevert(
+            address(poolQuotaKeeperMock), abi.encodeCall(IPoolQuotaKeeperV3.updateRates, ()), "should not be called"
+        );
 
         gauge.updateEpoch();
 
-        assertEq(gauge.epochLastUpdate(), 900);
+        assertEq(gauge.epochLastUpdate(), 1000);
     }
 }
