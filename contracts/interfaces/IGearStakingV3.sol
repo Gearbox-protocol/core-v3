@@ -37,7 +37,7 @@ interface IGearStakingV3Events {
     event DepositGear(address indexed user, uint256 amount);
 
     /// @dev Emits when the user migrates GEAR into a successor contract
-    event MigrateGear(address indexed user, address indexed to, address indexed successor, uint256 amount);
+    event MigrateGear(address indexed user, address indexed successor, uint256 amount);
 
     /// @dev Emits when the user starts a withdrawal from staked GEAR
     event ScheduleGearWithdrawal(address indexed user, uint256 amount);
@@ -96,11 +96,9 @@ interface IGearStakingV3 is IGearStakingV3Events, IVersion {
 
     /// @notice Migrates the user's staked GEAR to a `successor` GearStaking contract without waiting for the withdrawal delay
     /// @param amount Amount if staked GEAR to migrate
-    /// @param to Address that will receive staked GEAR in the successor contract
     /// @param votesBefore Votes to apply before sending GEAR to the successor contract
     /// @param votesAfter Votes to apply in the new contract after sending GEAR
-    function migrate(uint96 amount, address to, MultiVote[] calldata votesBefore, MultiVote[] calldata votesAfter)
-        external;
+    function migrate(uint96 amount, MultiVote[] calldata votesBefore, MultiVote[] calldata votesAfter) external;
 
     /// @notice Performs a deposit on user's behalf from the migrator (usually the previous GearStaking contract)
     /// @param amount Amount of GEAR to deposit

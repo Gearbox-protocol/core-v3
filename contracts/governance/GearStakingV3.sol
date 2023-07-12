@@ -130,10 +130,9 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     /// @notice Migrates the user's staked GEAR to a `successor` GearStaking contract without waiting for the withdrawal delay
     /// @dev Assumes that this contract is set as `migrator` in the successor contract, otherwise this would revert
     /// @param amount Amount of staked GEAR to migrate
-    /// @param to Address that will receive staked GEAR in the successor contract
     /// @param votesBefore Votes to apply before sending GEAR to the successor contract
     /// @param votesAfter Votes to apply in the new contract after sending GEAR
-    function migrate(uint96 amount, address to, MultiVote[] calldata votesBefore, MultiVote[] calldata votesAfter)
+    function migrate(uint96 amount, MultiVote[] calldata votesBefore, MultiVote[] calldata votesAfter)
         external
         nonReentrant
         nonZeroAddress(successor) // U: [GS-07]
@@ -146,9 +145,9 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
         vld.totalStaked -= amount; // U: [GS-07]
 
         IERC20(gear).approve(successor, uint256(amount));
-        IGearStakingV3(successor).depositOnMigration(amount, to, votesAfter); // U: [GS-07]
+        IGearStakingV3(successor).depositOnMigration(amount, msg.sender, votesAfter); // U: [GS-07]
 
-        emit MigrateGear(msg.sender, to, successor, amount); // U: [GS-07]
+        emit MigrateGear(msg.sender, successor, amount); // U: [GS-07]
     }
 
     /// @notice Performs a deposit on user's behalf from the migrator (usually the previous GearStaking contract)

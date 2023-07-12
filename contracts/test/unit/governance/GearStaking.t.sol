@@ -384,14 +384,14 @@ contract GearStakingTest is Test, IGearStakingV3Events {
 
         vm.expectRevert(ZeroAddressException.selector);
         vm.prank(USER);
-        gearStaking.migrate(uint96(WAD / 2), USER, new MultiVote[](0), new MultiVote[](0));
+        gearStaking.migrate(uint96(WAD / 2), new MultiVote[](0), new MultiVote[](0));
 
         vm.prank(CONFIGURATOR);
         gearStaking.setSuccessor(address(gearStakingSuccessor));
 
         vm.expectRevert(CallerNotMigratorException.selector);
         vm.prank(USER);
-        gearStaking.migrate(uint96(WAD / 2), USER, new MultiVote[](0), new MultiVote[](0));
+        gearStaking.migrate(uint96(WAD / 2), new MultiVote[](0), new MultiVote[](0));
 
         vm.prank(CONFIGURATOR);
         gearStakingSuccessor.setMigrator(address(gearStaking));
@@ -420,24 +420,24 @@ contract GearStakingTest is Test, IGearStakingV3Events {
 
         vm.expectCall(
             address(gearStakingSuccessor),
-            abi.encodeCall(GearStakingV3.depositOnMigration, (uint96(WAD / 2), FRIEND, votesAfter))
+            abi.encodeCall(GearStakingV3.depositOnMigration, (uint96(WAD / 2), USER, votesAfter))
         );
 
-        vm.expectCall(newVotingContract, abi.encodeCall(IVotingContractV3.vote, (FRIEND, uint96(WAD / 2), "")));
+        vm.expectCall(newVotingContract, abi.encodeCall(IVotingContractV3.vote, (USER, uint96(WAD / 2), "")));
 
         vm.expectEmit(true, true, true, true);
-        emit MigrateGear(USER, FRIEND, address(gearStakingSuccessor), uint96(WAD / 2));
+        emit MigrateGear(USER, address(gearStakingSuccessor), uint96(WAD / 2));
 
         vm.prank(USER);
-        gearStaking.migrate(uint96(WAD / 2), FRIEND, votesBefore, votesAfter);
+        gearStaking.migrate(uint96(WAD / 2), votesBefore, votesAfter);
 
         assertEq(gearStaking.balanceOf(USER), WAD / 2);
 
         assertEq(gearStaking.availableBalance(USER), WAD / 2);
 
-        assertEq(gearStakingSuccessor.balanceOf(FRIEND), WAD / 2);
+        assertEq(gearStakingSuccessor.balanceOf(USER), WAD / 2);
 
-        assertEq(gearStakingSuccessor.availableBalance(FRIEND), 0);
+        assertEq(gearStakingSuccessor.availableBalance(USER), 0);
     }
 
     /// @dev U:[GS-08]: setSuccessor respects access control and emits event

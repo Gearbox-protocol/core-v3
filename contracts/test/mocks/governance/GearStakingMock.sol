@@ -24,9 +24,7 @@ contract GearStakingMock is IGearStakingV3 {
 
     function claimWithdrawals(address to) external {}
 
-    function migrate(uint96 amount, address to, MultiVote[] calldata votesBefore, MultiVote[] calldata votesAfter)
-        external
-    {}
+    function migrate(uint96 amount, MultiVote[] calldata votesBefore, MultiVote[] calldata votesAfter) external {}
 
     function depositOnMigration(uint96 amount, address to, MultiVote[] calldata votes) external {}
 
