@@ -50,6 +50,9 @@ interface IGearStakingV3Events {
 
     /// @dev Emits when the new successor contract is set
     event SetSuccessor(address indexed successor);
+
+    /// @dev Emits when the new migrator contract is set
+    event SetMigrator(address indexed migrator);
 }
 
 interface IGearStakingV3 is IGearStakingV3Events, IVersion {
@@ -59,13 +62,12 @@ interface IGearStakingV3 is IGearStakingV3Events, IVersion {
     /// @dev Deposits an amount of GEAR into staked GEAR. Optionally, performs a sequence of vote changes according to
     ///      the passed `votes` array
     /// @param amount Amount of GEAR to deposit into staked GEAR
-    /// @param to Address to add staked GEAR for
     /// @param votes Array of MultVote structs:
     ///              * votingContract - contract to submit a vote to
     ///              * voteAmount - amount of staked GEAR to add to or remove from a vote
     ///              * isIncrease - whether to add or remove votes
     ///              * extraData - data specific to the voting contract that is decoded on recipient side
-    function deposit(uint96 amount, address to, MultiVote[] calldata votes) external;
+    function deposit(uint96 amount, MultiVote[] calldata votes) external;
 
     /// @dev Performs a sequence of vote changes according to the passed array
     /// @param votes Array of MultVote structs:
@@ -99,6 +101,12 @@ interface IGearStakingV3 is IGearStakingV3Events, IVersion {
     /// @param votesAfter Votes to apply in the new contract after sending GEAR
     function migrate(uint96 amount, address to, MultiVote[] calldata votesBefore, MultiVote[] calldata votesAfter)
         external;
+
+    /// @notice Performs a deposit on user's behalf from the migrator (usually the previous GearStaking contract)
+    /// @param amount Amount of GEAR to deposit
+    /// @param to Address to deposit to
+    /// @param votes Array of votes to apply after migrating
+    function depositOnMigration(uint96 amount, address to, MultiVote[] calldata votes) external;
 
     //
     // GETTERS

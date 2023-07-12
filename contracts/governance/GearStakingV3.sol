@@ -49,31 +49,44 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     /// @notice Address of a new GearStaking contract that can be migrated to
     address public successor;
 
+    /// @notice Address of the previous GearStaking contract that is migrated from
+    address public migrator;
+
     constructor(address _addressProvider, uint256 _firstEpochTimestamp) ACLNonReentrantTrait(_addressProvider) {
         gear = IAddressProviderV3(_addressProvider).getAddressOrRevert(AP_GEAR_TOKEN, NO_VERSION_CONTROL); // U:[GS-01]
         firstEpochTimestamp = _firstEpochTimestamp; // U:[GS-01]
     }
 
+    /// @dev Reverts on the function being called by non-migrator
+    modifier migratorOnly() {
+        if (msg.sender != migrator) revert CallerNotMigratorException();
+        _;
+    }
+
     /// @notice Deposits an amount of GEAR into staked GEAR. Optionally, performs a sequence of vote changes according to
     ///         the passed `votes` array
     /// @param amount Amount of GEAR to deposit into staked GEAR
-    /// @param to Address to add staked GEAR for
     /// @param votes Array of MultVote structs:
     ///              * votingContract - contract to submit a vote to
     ///              * voteAmount - amount of staked GEAR to add to or remove from a vote
     ///              * isIncrease - whether to add or remove votes
     ///              * extraData - data specific to the voting contract that is decoded on recipient side
-    function deposit(uint96 amount, address to, MultiVote[] calldata votes) external nonReentrant {
-        IERC20(gear).safeTransferFrom(msg.sender, address(this), amount); // U: [GS-02]
+    function deposit(uint96 amount, MultiVote[] calldata votes) external nonReentrant {
+        _deposit(amount, msg.sender, msg.sender, votes); // U: [GS-02]
+    }
+
+    /// @dev Internal implementation for deposits. Used in `deposit` and `depositOnMigration`
+    function _deposit(uint96 amount, address from, address to, MultiVote[] calldata votes) internal {
+        IERC20(gear).safeTransferFrom(from, address(this), amount);
 
         UserVoteLockData storage vld = voteLockData[to];
 
-        vld.totalStaked += amount; // U: [GS-02]
-        vld.available += amount; // U: [GS-02]
+        vld.totalStaked += amount;
+        vld.available += amount;
 
-        emit DepositGear(to, amount); // U: [GS-02]
+        emit DepositGear(to, amount);
 
-        _multivote(to, votes); // U: [GS-02]
+        _multivote(to, votes);
     }
 
     /// @notice Performs a sequence of vote changes according to the passed array
@@ -115,7 +128,8 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     }
 
     /// @notice Migrates the user's staked GEAR to a `successor` GearStaking contract without waiting for the withdrawal delay
-    /// @param amount Amount if staked GEAR to migrate
+    /// @dev Assumes that this contract is set as `migrator` in the successor contract, otherwise this would revert
+    /// @param amount Amount of staked GEAR to migrate
     /// @param to Address that will receive staked GEAR in the successor contract
     /// @param votesBefore Votes to apply before sending GEAR to the successor contract
     /// @param votesAfter Votes to apply in the new contract after sending GEAR
@@ -132,9 +146,21 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
         vld.totalStaked -= amount; // U: [GS-07]
 
         IERC20(gear).approve(successor, uint256(amount));
-        IGearStakingV3(successor).deposit(amount, to, votesAfter); // U: [GS-07]
+        IGearStakingV3(successor).depositOnMigration(amount, to, votesAfter); // U: [GS-07]
 
         emit MigrateGear(msg.sender, to, successor, amount); // U: [GS-07]
+    }
+
+    /// @notice Performs a deposit on user's behalf from the migrator (usually the previous GearStaking contract)
+    /// @param amount Amount of GEAR to deposit
+    /// @param to Address to deposit to
+    /// @param votes Array of votes to apply after migrating
+    function depositOnMigration(uint96 amount, address to, MultiVote[] calldata votes)
+        external
+        nonReentrant
+        migratorOnly // U: [GS-07]
+    {
+        _deposit(amount, msg.sender, to, votes); // U: [GS-07]
     }
 
     /// @notice Refreshes the user's withdrawal struct, shifting the withdrawal amounts based
@@ -280,6 +306,18 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
             successor = newSuccessor; // U: [GS-08]
 
             emit SetSuccessor(newSuccessor); // U: [GS-08]
+        }
+    }
+
+    /// @notice Sets a new migrator contract
+    /// @dev Migrator is a contract that can deposit GEAR on behalf of the user. This is usually set to the old GearStaking
+    ///      contract when updating GearStaking, in order for users to carry over their staked GEAR without waiting for withdrawal delay
+    /// @param newMigrator Address of the new successor contract
+    function setMigrator(address newMigrator) external configuratorOnly {
+        if (migrator != newMigrator) {
+            migrator = newMigrator; // U: [GS-09]
+
+            emit SetMigrator(newMigrator); // U: [GS-09]
         }
     }
 }

@@ -240,6 +240,9 @@ error CallerNotVoterException();
 ///      the connected Credit Facade, or an allowed adapter
 error CallerNotAdapterException();
 
+/// @dev Thrown if a migration function is called by non-migrator in GearStaking
+error CallerNotMigratorException();
+
 ///
 /// BOT LIST
 ///
