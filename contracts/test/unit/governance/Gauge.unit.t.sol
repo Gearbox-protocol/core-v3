@@ -348,7 +348,7 @@ contract GauageTest is TestHelper, IGaugeV3Events {
     }
 
     // @dev U:[GA-15]: updateEpoch updates epoch
-    function test_U_GA_15_updateEpoch_cupdates_epoch() public {
+    function test_U_GA_15_updateEpoch_updates_epoch() public {
         address link = makeAddr("LINK");
         address pepe = makeAddr("PEPE");
         address inch = makeAddr("INCH");
@@ -390,5 +390,26 @@ contract GauageTest is TestHelper, IGaugeV3Events {
 
         vm.expectRevert(TokenNotAllowedException.selector);
         gauge.getRates(arrayOf(inch, pepe, link, DUMB_ADDRESS));
+    }
+
+    /// @dev U:[GA-16]: updateEpoch does not update epoch and rates if `epochFrozen` is true
+    function test_U_GA_16_updateEpoch_respects_frozen_epoch() public {
+        gauge.updateEpoch();
+
+        assertEq(gauge.epochLastUpdate(), 900);
+
+        vm.expectEmit(false, false, false, true);
+        emit SetFrozenEpoch(true);
+
+        vm.prank(CONFIGURATOR);
+        gauge.setFrozenEpoch(true);
+
+        assertTrue(gauge.epochFrozen(), "Epoch was not frozen");
+
+        gearStakingMock.setCurrentEpoch(1000);
+
+        gauge.updateEpoch();
+
+        assertEq(gauge.epochLastUpdate(), 900);
     }
 }

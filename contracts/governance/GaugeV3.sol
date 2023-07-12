@@ -46,6 +46,9 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
     /// @notice Epoch when the rates were last recomputed
     uint16 public override epochLastUpdate;
 
+    /// @notice Whether the epoch is frozen and cannot be updated
+    bool public epochFrozen;
+
     //
     // CONSTRUCTOR
     //
@@ -75,6 +78,8 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
 
     /// @dev IMPLEMENTATION: updateEpoch()
     function _checkAndUpdateEpoch() internal {
+        if (epochFrozen) return;
+
         uint16 epochNow = IGearStakingV3(voter).getCurrentEpoch(); // U:[GA-14]
 
         if (epochNow > epochLastUpdate) {
@@ -208,6 +213,18 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
     //
     // CONFIGURATION
     //
+
+    /// @dev Sets the frozen epoch status
+    /// @param status The new status
+    /// @dev The epoch can be frozen to prevent rate updates during periods of instability,
+    ///      e.g., when the Gauges / GearStaking contracts are being migrated
+    function setFrozenEpoch(bool status) external configuratorOnly {
+        if (status != epochFrozen) {
+            epochFrozen = status;
+
+            emit SetFrozenEpoch(status);
+        }
+    }
 
     /// @dev Adds a new quoted token to the Gauge and PoolQuotaKeeper, and sets the initial rate params
     /// @param token Address of the token to add
