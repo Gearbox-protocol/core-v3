@@ -72,12 +72,12 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     ///              * isIncrease - whether to add or remove votes
     ///              * extraData - data specific to the voting contract that is decoded on recipient side
     function deposit(uint96 amount, MultiVote[] calldata votes) external nonReentrant {
-        _deposit(amount, msg.sender, msg.sender, votes); // U: [GS-02]
+        _deposit(amount, msg.sender, votes); // U: [GS-02]
     }
 
     /// @dev Internal implementation for deposits. Used in `deposit` and `depositOnMigration`
-    function _deposit(uint96 amount, address from, address to, MultiVote[] calldata votes) internal {
-        IERC20(gear).safeTransferFrom(from, address(this), amount);
+    function _deposit(uint96 amount, address to, MultiVote[] calldata votes) internal {
+        IERC20(gear).safeTransferFrom(msg.sender, address(this), amount);
 
         UserVoteLockData storage vld = voteLockData[to];
 
@@ -159,7 +159,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
         nonReentrant
         migratorOnly // U: [GS-07]
     {
-        _deposit(amount, msg.sender, to, votes); // U: [GS-07]
+        _deposit(amount, to, votes); // U: [GS-07]
     }
 
     /// @notice Refreshes the user's withdrawal struct, shifting the withdrawal amounts based
