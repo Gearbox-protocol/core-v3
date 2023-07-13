@@ -63,6 +63,7 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
         pool = _pool; // U:[GA-01]
         voter = _gearStaking; // U:[GA-01]
         epochLastUpdate = IGearStakingV3(voter).getCurrentEpoch(); // U:[GA-01]
+        epochFrozen = true; // U:[GA-01]
     }
 
     /// @dev Reverts if the function is called by an address other than the voter
@@ -235,12 +236,18 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
         nonZeroAddress(token) // U:[GA-04]
         configuratorOnly // U:[GA-03]
     {
+        if (isTokenAdded(token) || token == IPoolV3(pool).underlyingToken()) {
+            revert TokenNotAllowedException(); // U:[GA-04]
+        }
         _checkParams({minRate: minRate, maxRate: maxRate}); // U:[GA-04]
 
         quotaRateParams[token] =
-            QuotaRateParams({minRate: minRate, maxRate: maxRate, totalVotesLpSide: 0, totalVotesCaSide: 0}); // U:[GA-05
+            QuotaRateParams({minRate: minRate, maxRate: maxRate, totalVotesLpSide: 0, totalVotesCaSide: 0}); // U:[GA-05]
 
-        _poolQuotaKeeper().addQuotaToken({token: token}); // U:[GA-05]
+        IPoolQuotaKeeperV3 quotaKeeper = _poolQuotaKeeper();
+        if (!quotaKeeper.isQuotedToken(token)) {
+            quotaKeeper.addQuotaToken({token: token}); // U:[GA-05]
+        }
 
         emit AddQuotaToken({token: token, minRate: minRate, maxRate: maxRate}); // U:[GA-05]
     }
