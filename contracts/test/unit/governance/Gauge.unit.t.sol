@@ -253,7 +253,6 @@ contract GauageTest is TestHelper, IGaugeV3Events {
             bytes memory voteData = abi.encode(token, true);
 
             vm.expectCall(address(gearStakingMock), abi.encodeCall(IGearStakingV3.getCurrentEpoch, ()));
-            vm.expectCall(address(poolQuotaKeeperMock), abi.encodeCall(IPoolQuotaKeeperV3.updateRates, ()));
 
             if (i == 0) {
                 gauge.vote(USER, 2, voteData);
@@ -348,6 +347,9 @@ contract GauageTest is TestHelper, IGaugeV3Events {
 
     // @dev U:[GA-14]: updateEpoch updates epoch
     function test_U_GA_14_updateEpoch_updates_epoch() public {
+        vm.prank(CONFIGURATOR);
+        gauge.setFrozenEpoch(false);
+
         for (uint16 i = 0; i < 2; ++i) {
             uint16 epochNow = i + gauge.epochLastUpdate();
 
@@ -414,6 +416,9 @@ contract GauageTest is TestHelper, IGaugeV3Events {
 
     /// @dev U:[GA-16]: updateEpoch does not update epoch and rates if `epochFrozen` is true
     function test_U_GA_16_updateEpoch_respects_frozen_epoch() public {
+        vm.prank(CONFIGURATOR);
+        gauge.setFrozenEpoch(false);
+
         gauge.updateEpoch();
 
         assertEq(gauge.epochLastUpdate(), 900);
