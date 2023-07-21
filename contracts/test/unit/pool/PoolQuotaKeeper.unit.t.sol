@@ -287,23 +287,11 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
 
         assertEq(pqk.gauge(), address(0), "SETUP: incorrect address at start");
 
-        vm.warp(block.timestamp + 2 days);
-
         vm.expectEmit(true, true, false, false);
         emit SetGauge(address(gaugeMock));
 
         pqk.setGauge(address(gaugeMock));
-
-        uint256 gaugeUpdateTimestamp = block.timestamp;
-
-        vm.warp(block.timestamp + 2 days);
-
         assertEq(pqk.gauge(), address(gaugeMock), "gauge address wasnt updated");
-        assertEq(pqk.lastQuotaRateUpdate(), gaugeUpdateTimestamp, "lastQuotaRateUpdate wasnt updated");
-
-        // IF address the same, the function updates nothing
-        pqk.setGauge(address(gaugeMock));
-        assertEq(pqk.lastQuotaRateUpdate(), gaugeUpdateTimestamp, "lastQuotaRateUpdate was unexpectedly updated");
     }
 
     // U:[PQK-9]: addCreditManager works as expected

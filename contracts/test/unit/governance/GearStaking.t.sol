@@ -80,16 +80,16 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
         vm.expectEmit(true, false, false, true);
-        emit DepositGear(FRIEND, WAD);
+        emit DepositGear(USER, WAD);
 
-        vm.expectCall(address(votingContract), abi.encodeCall(IVotingContractV3.vote, (FRIEND, uint96(WAD / 2), "")));
+        vm.expectCall(address(votingContract), abi.encodeCall(IVotingContractV3.vote, (USER, uint96(WAD / 2), "")));
 
         vm.prank(USER);
-        gearStaking.deposit(uint96(WAD), FRIEND, votes);
+        gearStaking.deposit(uint96(WAD), votes);
 
-        assertEq(gearStaking.balanceOf(FRIEND), WAD);
+        assertEq(gearStaking.balanceOf(USER), WAD);
 
-        assertEq(gearStaking.availableBalance(FRIEND), WAD / 2);
+        assertEq(gearStaking.availableBalance(USER), WAD / 2);
     }
 
     /// @dev U:[GS-03]: withdraw performs operations in order and emits events
@@ -106,7 +106,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
         vm.prank(USER);
-        gearStaking.deposit(uint96(WAD), USER, votes);
+        gearStaking.deposit(uint96(WAD), votes);
 
         votes = new MultiVote[](1);
         votes[0] = MultiVote({
@@ -143,7 +143,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
         vm.prank(USER);
-        gearStaking.deposit(uint96(WAD), USER, votes);
+        gearStaking.deposit(uint96(WAD), votes);
 
         TargetContractMock votingContract2 = new TargetContractMock();
 
@@ -200,7 +200,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
         vm.prank(USER);
-        gearStaking.deposit(uint96(WAD), USER, votes);
+        gearStaking.deposit(uint96(WAD), votes);
 
         vm.prank(CONFIGURATOR);
         gearStaking.setVotingContractStatus(address(votingContract), VotingContractStatus.NOT_ALLOWED);
@@ -267,7 +267,7 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
         vm.prank(USER);
-        gearStaking.deposit(uint96(WAD), USER, votes);
+        gearStaking.deposit(uint96(WAD), votes);
 
         vm.prank(USER);
         gearStaking.withdraw(1000, FRIEND, votes);
@@ -362,8 +362,8 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         gearStaking.setVotingContractStatus(DUMB_ADDRESS, VotingContractStatus.UNVOTE_ONLY);
     }
 
-    /// @dev U:[GS-07]: migrate performs operations in order and emits events
-    function test_U_GS_07_migrate_works_correctly() public {
+    /// @dev U:[GS-07]: migrate and depositOnMigration perform operations in order and emits events
+    function test_U_GS_07_migrate_and_depositOnMigration_work_correctly() public {
         GearStakingV3 gearStakingSuccessor = new GearStakingV3(address(addressProvider), block.timestamp + 1);
 
         {
@@ -379,15 +379,22 @@ contract GearStakingTest is Test, IGearStakingV3Events {
             tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
             vm.prank(USER);
-            gearStaking.deposit(uint96(WAD), USER, votes);
+            gearStaking.deposit(uint96(WAD), votes);
         }
 
         vm.expectRevert(ZeroAddressException.selector);
         vm.prank(USER);
-        gearStaking.migrate(uint96(WAD / 2), USER, new MultiVote[](0), new MultiVote[](0));
+        gearStaking.migrate(uint96(WAD / 2), new MultiVote[](0), new MultiVote[](0));
 
         vm.prank(CONFIGURATOR);
         gearStaking.setSuccessor(address(gearStakingSuccessor));
+
+        vm.expectRevert(CallerNotMigratorException.selector);
+        vm.prank(USER);
+        gearStaking.migrate(uint96(WAD / 2), new MultiVote[](0), new MultiVote[](0));
+
+        vm.prank(CONFIGURATOR);
+        gearStakingSuccessor.setMigrator(address(gearStaking));
 
         address newVotingContract = address(new TargetContractMock());
 
@@ -412,28 +419,29 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         vm.expectCall(address(votingContract), abi.encodeCall(IVotingContractV3.unvote, (USER, uint96(WAD / 2), "")));
 
         vm.expectCall(
-            address(gearStakingSuccessor), abi.encodeCall(GearStakingV3.deposit, (uint96(WAD / 2), FRIEND, votesAfter))
+            address(gearStakingSuccessor),
+            abi.encodeCall(GearStakingV3.depositOnMigration, (uint96(WAD / 2), USER, votesAfter))
         );
 
-        vm.expectCall(newVotingContract, abi.encodeCall(IVotingContractV3.vote, (FRIEND, uint96(WAD / 2), "")));
+        vm.expectCall(newVotingContract, abi.encodeCall(IVotingContractV3.vote, (USER, uint96(WAD / 2), "")));
 
         vm.expectEmit(true, true, true, true);
-        emit MigrateGear(USER, FRIEND, address(gearStakingSuccessor), uint96(WAD / 2));
+        emit MigrateGear(USER, address(gearStakingSuccessor), uint96(WAD / 2));
 
         vm.prank(USER);
-        gearStaking.migrate(uint96(WAD / 2), FRIEND, votesBefore, votesAfter);
+        gearStaking.migrate(uint96(WAD / 2), votesBefore, votesAfter);
 
         assertEq(gearStaking.balanceOf(USER), WAD / 2);
 
         assertEq(gearStaking.availableBalance(USER), WAD / 2);
 
-        assertEq(gearStakingSuccessor.balanceOf(FRIEND), WAD / 2);
+        assertEq(gearStakingSuccessor.balanceOf(USER), WAD / 2);
 
-        assertEq(gearStakingSuccessor.availableBalance(FRIEND), 0);
+        assertEq(gearStakingSuccessor.availableBalance(USER), 0);
     }
 
     /// @dev U:[GS-08]: setSuccessor respects access control and emits event
-    function test_U_GS_08_setVotingContractStatus_works_correctly() public {
+    function test_U_GS_08_setSuccessor_works_correctly() public {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         gearStaking.setSuccessor(DUMB_ADDRESS);
 
@@ -444,5 +452,19 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         gearStaking.setSuccessor(DUMB_ADDRESS);
 
         assertEq(gearStaking.successor(), DUMB_ADDRESS, "Successor address incorrect");
+    }
+
+    /// @dev U:[GS-09]: setMigrator respects access control and emits event
+    function test_U_GS_09_setMigrator_works_correctly() public {
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        gearStaking.setMigrator(DUMB_ADDRESS);
+
+        vm.expectEmit(true, false, false, false);
+        emit SetMigrator(DUMB_ADDRESS);
+
+        vm.prank(CONFIGURATOR);
+        gearStaking.setMigrator(DUMB_ADDRESS);
+
+        assertEq(gearStaking.migrator(), DUMB_ADDRESS, "Migrator address incorrect");
     }
 }

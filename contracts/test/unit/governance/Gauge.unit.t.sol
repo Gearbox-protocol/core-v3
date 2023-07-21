@@ -29,6 +29,7 @@ import "../../../interfaces/IExceptions.sol";
 
 contract GauageTest is TestHelper, IGaugeV3Events {
     address gearToken;
+    address underlying;
 
     AddressProviderV3ACLMock public addressProvider;
 
@@ -45,7 +46,7 @@ contract GauageTest is TestHelper, IGaugeV3Events {
 
         tokenTestSuite.topUpWETH{value: 100 * WAD}();
 
-        address underlying = tokenTestSuite.addressOf(Tokens.DAI);
+        underlying = tokenTestSuite.addressOf(Tokens.DAI);
 
         vm.prank(CONFIGURATOR);
         addressProvider = new AddressProviderV3ACLMock();
@@ -66,6 +67,7 @@ contract GauageTest is TestHelper, IGaugeV3Events {
         assertEq(gauge.pool(), address(poolMock), "Incorrect pool");
         assertEq(gauge.voter(), address(gearStakingMock), "Incorrect voter");
         assertEq(gauge.epochLastUpdate(), 900, "Incorrect epoch");
+        assertTrue(gauge.epochFrozen(), "Epoch not frozen");
 
         vm.expectRevert(ZeroAddressException.selector);
         new GaugeV3Harness(address(poolMock), address(0));
@@ -97,8 +99,8 @@ contract GauageTest is TestHelper, IGaugeV3Events {
         vm.expectRevert(ZeroAddressException.selector);
         gauge.addQuotaToken(address(0), 0, 0);
 
-        vm.expectRevert(ZeroAddressException.selector);
-        gauge.changeQuotaTokenRateParams(address(0), 0, 0);
+        vm.expectRevert(TokenNotAllowedException.selector);
+        gauge.addQuotaToken(underlying, 0, 0);
 
         vm.expectRevert(IncorrectParameterException.selector);
         gauge.addQuotaToken(token, 0, 0);
@@ -107,6 +109,12 @@ contract GauageTest is TestHelper, IGaugeV3Events {
         gauge.addQuotaToken(token, 5, 2);
 
         gauge.setQuotaRateParams({token: token, minRate: 0, maxRate: 1, totalVotesLpSide: 0, totalVotesCaSide: 0});
+
+        vm.expectRevert(TokenNotAllowedException.selector);
+        gauge.addQuotaToken(token, 0, 0);
+
+        vm.expectRevert(ZeroAddressException.selector);
+        gauge.changeQuotaTokenRateParams(address(0), 0, 0);
 
         vm.expectRevert(IncorrectParameterException.selector);
         gauge.changeQuotaTokenRateParams(token, 0, 0);
@@ -127,6 +135,7 @@ contract GauageTest is TestHelper, IGaugeV3Events {
 
         poolMock.setPoolQuotaKeeper(poolQuotaKeeper);
 
+        vm.mockCall(poolQuotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.isQuotedToken, (token)), abi.encode(false));
         vm.expectCall(poolQuotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.addQuotaToken, (token)));
 
         vm.expectEmit(true, true, false, true);
@@ -143,6 +152,17 @@ contract GauageTest is TestHelper, IGaugeV3Events {
 
         assertEq(totalVotesLpSide, 0, "Incorrect totalVotesLpSide");
         assertEq(totalVotesCaSide, 0, "Incorrect totalVotesCaSide");
+
+        // must not try to add token to quota keeper in case it's already quoted
+        address token2 = makeAddr("TOKEN2");
+
+        vm.mockCall(poolQuotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.isQuotedToken, (token2)), abi.encode(true));
+        vm.mockCallRevert(
+            poolQuotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.addQuotaToken, (token2)), "should not be called"
+        );
+
+        vm.prank(CONFIGURATOR);
+        gauge.addQuotaToken(token2, minRate, maxRate);
     }
 
     /// @dev U:[GA-06]: changeQuotaTokenRateParams works as expected
@@ -233,7 +253,6 @@ contract GauageTest is TestHelper, IGaugeV3Events {
             bytes memory voteData = abi.encode(token, true);
 
             vm.expectCall(address(gearStakingMock), abi.encodeCall(IGearStakingV3.getCurrentEpoch, ()));
-            vm.expectCall(address(poolQuotaKeeperMock), abi.encodeCall(IPoolQuotaKeeperV3.updateRates, ()));
 
             if (i == 0) {
                 gauge.vote(USER, 2, voteData);
@@ -327,7 +346,10 @@ contract GauageTest is TestHelper, IGaugeV3Events {
     }
 
     // @dev U:[GA-14]: updateEpoch updates epoch
-    function test_U_GA_14_updateEpoch_cupdates_epoch() public {
+    function test_U_GA_14_updateEpoch_updates_epoch() public {
+        vm.prank(CONFIGURATOR);
+        gauge.setFrozenEpoch(false);
+
         for (uint16 i = 0; i < 2; ++i) {
             uint16 epochNow = i + gauge.epochLastUpdate();
 
@@ -348,7 +370,7 @@ contract GauageTest is TestHelper, IGaugeV3Events {
     }
 
     // @dev U:[GA-15]: updateEpoch updates epoch
-    function test_U_GA_15_updateEpoch_cupdates_epoch() public {
+    function test_U_GA_15_updateEpoch_updates_epoch() public {
         address link = makeAddr("LINK");
         address pepe = makeAddr("PEPE");
         address inch = makeAddr("INCH");
@@ -390,5 +412,32 @@ contract GauageTest is TestHelper, IGaugeV3Events {
 
         vm.expectRevert(TokenNotAllowedException.selector);
         gauge.getRates(arrayOf(inch, pepe, link, DUMB_ADDRESS));
+    }
+
+    /// @dev U:[GA-16]: updateEpoch does not update epoch and rates if `epochFrozen` is true
+    function test_U_GA_16_updateEpoch_respects_frozen_epoch() public {
+        vm.prank(CONFIGURATOR);
+        gauge.setFrozenEpoch(false);
+
+        gauge.updateEpoch();
+
+        assertEq(gauge.epochLastUpdate(), 900);
+
+        vm.expectEmit(false, false, false, true);
+        emit SetFrozenEpoch(true);
+
+        vm.prank(CONFIGURATOR);
+        gauge.setFrozenEpoch(true);
+
+        assertTrue(gauge.epochFrozen(), "Epoch was not frozen");
+
+        gearStakingMock.setCurrentEpoch(1000);
+        vm.mockCallRevert(
+            address(poolQuotaKeeperMock), abi.encodeCall(IPoolQuotaKeeperV3.updateRates, ()), "should not be called"
+        );
+
+        gauge.updateEpoch();
+
+        assertEq(gauge.epochLastUpdate(), 1000);
     }
 }

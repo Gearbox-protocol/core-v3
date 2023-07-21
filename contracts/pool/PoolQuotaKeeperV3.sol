@@ -465,7 +465,6 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     {
         if (gauge != _gauge) {
             gauge = _gauge; // U:[PQK-8]
-            lastQuotaRateUpdate = uint40(block.timestamp); // U:[PQK-8]
             emit SetGauge(_gauge); // U:[PQK-8]
         }
     }

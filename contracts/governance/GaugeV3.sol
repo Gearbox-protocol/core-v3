@@ -46,6 +46,9 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
     /// @notice Epoch when the rates were last recomputed
     uint16 public override epochLastUpdate;
 
+    /// @notice Whether the epoch is frozen and cannot be updated
+    bool public epochFrozen;
+
     //
     // CONSTRUCTOR
     //
@@ -60,6 +63,7 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
         pool = _pool; // U:[GA-01]
         voter = _gearStaking; // U:[GA-01]
         epochLastUpdate = IGearStakingV3(voter).getCurrentEpoch(); // U:[GA-01]
+        epochFrozen = true; // U:[GA-01]
     }
 
     /// @dev Reverts if the function is called by an address other than the voter
@@ -80,10 +84,12 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
         if (epochNow > epochLastUpdate) {
             epochLastUpdate = epochNow; // U:[GA-14]
 
-            /// The PQK retrieves all rates from the Gauge on its own and saves them
-            /// Since this function is only callable by the Gauge, active rates can only
-            /// be updated once per epoch at most
-            _poolQuotaKeeper().updateRates(); // U:[GA-14]
+            if (!epochFrozen) {
+                /// The PQK retrieves all rates from the Gauge on its own and saves them
+                /// Since this function is only callable by the Gauge, active rates can only
+                /// be updated once per epoch at most
+                _poolQuotaKeeper().updateRates(); // U:[GA-14]
+            }
 
             emit UpdateEpoch(epochNow); // U:[GA-14]
         }
@@ -209,6 +215,18 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
     // CONFIGURATION
     //
 
+    /// @dev Sets the frozen epoch status
+    /// @param status The new status
+    /// @dev The epoch can be frozen to prevent rate updates during periods of instability,
+    ///      e.g., when the Gauges / GearStaking contracts are being migrated
+    function setFrozenEpoch(bool status) external configuratorOnly {
+        if (status != epochFrozen) {
+            epochFrozen = status;
+
+            emit SetFrozenEpoch(status);
+        }
+    }
+
     /// @dev Adds a new quoted token to the Gauge and PoolQuotaKeeper, and sets the initial rate params
     /// @param token Address of the token to add
     /// @param minRate The minimal interest rate paid on token's quotas
@@ -218,12 +236,18 @@ contract GaugeV3 is IGaugeV3, IVotingContractV3, ACLNonReentrantTrait {
         nonZeroAddress(token) // U:[GA-04]
         configuratorOnly // U:[GA-03]
     {
+        if (isTokenAdded(token) || token == IPoolV3(pool).underlyingToken()) {
+            revert TokenNotAllowedException(); // U:[GA-04]
+        }
         _checkParams({minRate: minRate, maxRate: maxRate}); // U:[GA-04]
 
         quotaRateParams[token] =
-            QuotaRateParams({minRate: minRate, maxRate: maxRate, totalVotesLpSide: 0, totalVotesCaSide: 0}); // U:[GA-05
+            QuotaRateParams({minRate: minRate, maxRate: maxRate, totalVotesLpSide: 0, totalVotesCaSide: 0}); // U:[GA-05]
 
-        _poolQuotaKeeper().addQuotaToken({token: token}); // U:[GA-05]
+        IPoolQuotaKeeperV3 quotaKeeper = _poolQuotaKeeper();
+        if (!quotaKeeper.isQuotedToken(token)) {
+            quotaKeeper.addQuotaToken({token: token}); // U:[GA-05]
+        }
 
         emit AddQuotaToken({token: token, minRate: minRate, maxRate: maxRate}); // U:[GA-05]
     }

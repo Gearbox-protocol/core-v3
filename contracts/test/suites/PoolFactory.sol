@@ -47,6 +47,8 @@ contract PoolFactory is Test {
             address gearStaking = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_GEAR_STAKING, 3_00);
 
             gauge = new GaugeV3(address(pool), gearStaking);
+            vm.prank(CONFIGURATOR);
+            gauge.setFrozenEpoch(false);
 
             vm.label(address(gauge), "Gauge");
 

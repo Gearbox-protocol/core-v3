@@ -32,6 +32,9 @@ interface IGaugeV3Events {
 
     /// @dev Emits when quota interest rate parameters are changed
     event SetQuotaTokenParams(address indexed token, uint16 minRate, uint16 maxRate);
+
+    /// @dev Emits when the frozen epoch status changes
+    event SetFrozenEpoch(bool status);
 }
 
 /// @title IGaugeV3
