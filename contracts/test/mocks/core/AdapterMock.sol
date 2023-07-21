@@ -3,48 +3,34 @@
 // (c) Gearbox Holdings, 2023
 pragma solidity ^0.8.17;
 
-import {AbstractAdapter} from "../../../core/AbstractAdapter.sol";
+import {IAdapterBase} from "../../../interfaces/IAdapterBase.sol";
+import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 
 /// @title Adapter Mock
-contract AdapterMock is AbstractAdapter {
-    /// @notice Constructor
-    /// @param _creditManager Credit manager address
-    /// @param _targetContract Target contract address
-    constructor(address _creditManager, address _targetContract) AbstractAdapter(_creditManager, _targetContract) {}
+contract AdapterMock is IAdapterBase {
+    address public immutable override creditManager;
+    address public immutable override addressProvider;
+    address public immutable override targetContract;
 
-    function creditAccount() external view returns (address) {
-        return _creditAccount();
-    }
-
-    function getMaskOrRevert(address token) external view returns (uint256 tokenMask) {
-        return _getMaskOrRevert(token);
-    }
-
-    function approveToken(address token, uint256 amount) external {
-        _approveToken(token, amount);
-    }
-
-    function execute(bytes memory callData) external returns (bytes memory result) {
-        result = _execute(callData);
-    }
-
-    function executeSwapNoApprove(address tokenIn, address tokenOut, bytes memory callData, bool disableTokenIn)
-        external
-        returns (uint256 tokensToEnable, uint256 tokensToDisable, bytes memory result)
-    {
-        return _executeSwapNoApprove(tokenIn, tokenOut, callData, disableTokenIn);
+    constructor(address _creditManager, address _targetContract) {
+        creditManager = _creditManager;
+        addressProvider = ICreditManagerV3(_creditManager).addressProvider();
+        targetContract = _targetContract;
     }
 
     function executeSwapSafeApprove(address tokenIn, address tokenOut, bytes memory callData, bool disableTokenIn)
         external
         returns (uint256 tokensToEnable, uint256 tokensToDisable, bytes memory result)
     {
-        return _executeSwapSafeApprove(tokenIn, tokenOut, callData, disableTokenIn);
+        tokensToEnable = _getMaskOrRevert(tokenOut);
+        if (disableTokenIn) tokensToDisable = _getMaskOrRevert(tokenIn);
+        _approveToken(tokenIn, type(uint256).max);
+        result = _execute(callData);
+        _approveToken(tokenIn, 1);
     }
 
     function dumbCall(uint256 _tokensToEnable, uint256 _tokensToDisable)
         external
-        creditFacadeOnly
         returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
         _execute(dumbCallData());
@@ -56,7 +42,19 @@ contract AdapterMock is AbstractAdapter {
         return abi.encodeWithSignature("hello(string)", "world");
     }
 
-    fallback() external creditFacadeOnly {
+    fallback() external {
         _execute(msg.data);
+    }
+
+    function _getMaskOrRevert(address token) internal view returns (uint256 tokenMask) {
+        tokenMask = ICreditManagerV3(creditManager).getTokenMaskOrRevert(token);
+    }
+
+    function _execute(bytes memory data) internal returns (bytes memory result) {
+        result = ICreditManagerV3(creditManager).execute(data);
+    }
+
+    function _approveToken(address token, uint256 amount) internal {
+        ICreditManagerV3(creditManager).approveCreditAccount(token, amount);
     }
 }
