@@ -64,6 +64,13 @@ interface IGearStakingV3Events {
     event SetMigrator(address indexed migrator);
 }
 
+/// @title Voting contract V3 interface
+interface IVotingContractV3 {
+    function vote(address user, uint96 votes, bytes calldata extraData) external;
+
+    function unvote(address user, uint96 votes, bytes calldata extraData) external;
+}
+
 /// @title Gear staking V3 interface
 interface IGearStakingV3 is IGearStakingV3Events, IVersion {
     function gear() external view returns (address);

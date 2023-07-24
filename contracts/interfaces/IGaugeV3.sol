@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
-import {IVotingContractV3} from "./IVotingContractV3.sol";
+import {IVotingContractV3} from "./IGearStakingV3.sol";
 
 struct QuotaRateParams {
     uint16 minRate;
