@@ -9,6 +9,10 @@ uint256 constant EPOCH_LENGTH = 7 days;
 
 uint256 constant EPOCHS_TO_WITHDRAW = 4;
 
+/// @notice Voting contract status
+///         * NOT_ALLOWED - cannot vote or unvote
+///         * ALLOWED - can both vote and unvote
+///         * UNVOTE_ONLY - can only unvote
 enum VotingContractStatus {
     NOT_ALLOWED,
     ALLOWED,
@@ -25,6 +29,11 @@ struct WithdrawalData {
     uint16 epochLastUpdate;
 }
 
+/// @notice Multi vote
+/// @param votingContract Contract to submit a vote to
+/// @param voteAmount Amount of staked GEAR to vote with
+/// @param isIncrease Whether to add or remove votes
+/// @param extraData Data to pass to the voting contract
 struct MultiVote {
     address votingContract;
     uint96 voteAmount;
@@ -33,99 +42,70 @@ struct MultiVote {
 }
 
 interface IGearStakingV3Events {
-    /// @dev Emits when the user deposits GEAR into staked GEAR
+    /// @notice Emitted when the user deposits GEAR into staked GEAR
     event DepositGear(address indexed user, uint256 amount);
 
-    /// @dev Emits when the user migrates GEAR into a successor contract
+    /// @notice Emitted Emits when the user migrates GEAR into a successor contract
     event MigrateGear(address indexed user, address indexed successor, uint256 amount);
 
-    /// @dev Emits when the user starts a withdrawal from staked GEAR
+    /// @notice Emitted Emits when the user starts a withdrawal from staked GEAR
     event ScheduleGearWithdrawal(address indexed user, uint256 amount);
 
-    /// @dev Emits when the user claims a mature withdrawal from staked GEAR
+    /// @notice Emitted Emits when the user claims a mature withdrawal from staked GEAR
     event ClaimGearWithdrawal(address indexed user, address to, uint256 amount);
 
-    /// @dev Emits when the configurator adds or removes a voting contract
+    /// @notice Emitted Emits when the configurator adds or removes a voting contract
     event SetVotingContractStatus(address indexed votingContract, VotingContractStatus status);
 
-    /// @dev Emits when the new successor contract is set
+    /// @notice Emitted Emits when the new successor contract is set
     event SetSuccessor(address indexed successor);
 
-    /// @dev Emits when the new migrator contract is set
+    /// @notice Emitted Emits when the new migrator contract is set
     event SetMigrator(address indexed migrator);
 }
 
+/// @title Gear staking V3 interface
 interface IGearStakingV3 is IGearStakingV3Events, IVersion {
-    /// @dev Returns the current global voting epoch
-    function getCurrentEpoch() external view returns (uint16);
-
-    /// @dev Deposits an amount of GEAR into staked GEAR. Optionally, performs a sequence of vote changes according to
-    ///      the passed `votes` array
-    /// @param amount Amount of GEAR to deposit into staked GEAR
-    /// @param votes Array of MultVote structs:
-    ///              * votingContract - contract to submit a vote to
-    ///              * voteAmount - amount of staked GEAR to add to or remove from a vote
-    ///              * isIncrease - whether to add or remove votes
-    ///              * extraData - data specific to the voting contract that is decoded on recipient side
-    function deposit(uint96 amount, MultiVote[] calldata votes) external;
-
-    /// @dev Performs a sequence of vote changes according to the passed array
-    /// @param votes Array of MultVote structs:
-    ///              * votingContract - contract to submit a vote to
-    ///              * voteAmount - amount of staked GEAR to add to or remove from a vote
-    ///              * isIncrease - whether to add or remove votes
-    ///              * extraData - data specific to the voting contract that is decoded on recipient side
-    function multivote(MultiVote[] calldata votes) external;
-
-    /// @dev Schedules a withdrawal from staked GEAR into GEAR, which can be claimed in 4 epochs.
-    ///      If there are any withdrawals available to claim, they are also claimed.
-    ///      Optionally, performs a sequence of vote changes according to
-    ///      the passed `votes` array.
-    /// @param amount Amount of staked GEAR to withdraw into GEAR
-    /// @param to Address to send claimable GEAR, if any
-    /// @param votes Array of MultVote structs:
-    ///              * votingContract - contract to submit a vote to
-    ///              * voteAmount - amount of staked GEAR to add to or remove from a vote
-    ///              * isIncrease - whether to add or remove votes
-    ///              * extraData - data specific to the voting contract that is decoded on recipient side
-    function withdraw(uint96 amount, address to, MultiVote[] calldata votes) external;
-
-    /// @dev Claims all of the caller's withdrawals that are mature
-    /// @param to Address to send claimable GEAR, if any
-    function claimWithdrawals(address to) external;
-
-    /// @notice Migrates the user's staked GEAR to a `successor` GearStaking contract without waiting for the withdrawal delay
-    /// @param amount Amount if staked GEAR to migrate
-    /// @param votesBefore Votes to apply before sending GEAR to the successor contract
-    /// @param votesAfter Votes to apply in the new contract after sending GEAR
-    function migrate(uint96 amount, MultiVote[] calldata votesBefore, MultiVote[] calldata votesAfter) external;
-
-    /// @notice Performs a deposit on user's behalf from the migrator (usually the previous GearStaking contract)
-    /// @param amount Amount of GEAR to deposit
-    /// @param onBehalfOf Address to deposit to
-    /// @param onBehalfOf User on whose behalf to deposit
-    /// @param votes Array of votes to apply after migrating
-    function depositOnMigration(uint96 amount, address onBehalfOf, MultiVote[] calldata votes) external;
-
-    //
-    // GETTERS
-    //
-
-    /// @dev GEAR token address
     function gear() external view returns (address);
 
-    /// @dev The total amount staked by the user in staked GEAR
+    function firstEpochTimestamp() external view returns (uint256);
+
+    function getCurrentEpoch() external view returns (uint16);
+
     function balanceOf(address user) external view returns (uint256);
 
-    /// @dev The amount available to the user for voting or withdrawal
     function availableBalance(address user) external view returns (uint256);
 
-    /// @dev Returns the amounts withdrawable now and over the next 4 epochs
     function getWithdrawableAmounts(address user)
         external
         view
         returns (uint256 withdrawableNow, uint256[EPOCHS_TO_WITHDRAW] memory withdrawableInEpochs);
 
-    /// @dev Mapping of address to their status as allowed voting contract
-    function allowedVotingContract(address c) external view returns (VotingContractStatus);
+    function deposit(uint96 amount, MultiVote[] calldata votes) external;
+
+    function multivote(MultiVote[] calldata votes) external;
+
+    function withdraw(uint96 amount, address to, MultiVote[] calldata votes) external;
+
+    function claimWithdrawals(address to) external;
+
+    function migrate(uint96 amount, MultiVote[] calldata votesBefore, MultiVote[] calldata votesAfter) external;
+
+    function depositOnMigration(uint96 amount, address onBehalfOf, MultiVote[] calldata votes) external;
+
+    // ------------- //
+    // CONFIGURATION //
+    // ------------- //
+
+    function allowedVotingContract(address) external view returns (VotingContractStatus);
+
+    function setVotingContractStatus(address votingContract, VotingContractStatus status) external;
+
+    function successor() external view returns (address);
+
+    function setSuccessor(address newSuccessor) external;
+
+    function migrator() external view returns (address);
+
+    function setMigrator(address newMigrator) external;
 }

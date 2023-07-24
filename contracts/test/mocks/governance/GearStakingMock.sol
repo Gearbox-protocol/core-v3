@@ -16,6 +16,8 @@ contract GearStakingMock is IGearStakingV3 {
         getCurrentEpoch = epoch;
     }
 
+    function firstEpochTimestamp() external view returns (uint256) {}
+
     function deposit(uint96 amount, MultiVote[] calldata votes) external {}
 
     function multivote(MultiVote[] calldata votes) external {}
@@ -48,6 +50,15 @@ contract GearStakingMock is IGearStakingV3 {
         returns (uint256 withdrawableNow, uint256[EPOCHS_TO_WITHDRAW] memory withdrawableInEpochs)
     {}
 
-    /// @dev Mapping of address to their status as allowed voting contract
-    function allowedVotingContract(address c) external view returns (VotingContractStatus) {}
+    function allowedVotingContract(address) external view returns (VotingContractStatus) {}
+
+    function setVotingContractStatus(address votingContract, VotingContractStatus status) external {}
+
+    function successor() external view returns (address) {}
+
+    function setSuccessor(address newSuccessor) external {}
+
+    function migrator() external view returns (address) {}
+
+    function setMigrator(address newMigrator) external {}
 }
