@@ -18,7 +18,7 @@ struct BotSpecialStatus {
 }
 
 interface IBotListV3Events {
-    /// @dev Emits when a borrower enables or disables a bot for their account
+    /// @notice Emitted when credit account owner changes bot permissions and/or funding parameters
     event SetBotPermissions(
         address indexed creditManager,
         address indexed creditAccount,
@@ -28,19 +28,19 @@ interface IBotListV3Events {
         uint72 weeklyFundingAllowance
     );
 
-    /// @dev Emits when a bot is forbidden in a Credit Manager
+    /// @notice Emitted when a bot is forbidden in a Credit Manager
     event SetBotForbiddenStatus(address indexed creditManager, address indexed bot, bool status);
 
-    /// @dev Emits when a bot is granted special permissions in a Credit Manager
+    /// @notice Emitted when a bot is granted special permissions in a Credit Manager
     event SetBotSpecialPermissions(address indexed creditManager, address indexed bot, uint192 permissions);
 
-    /// @dev Emits when the user changes the amount of funds in his bot wallet
+    /// @notice Emitted when the user deposits funds to their bot wallet
     event Deposit(address indexed payer, uint256 amount);
 
-    /// @dev Emits when the user changes the amount of funds in his bot wallet
+    /// @notice Emitted when the user withdraws funds from their bot wallet
     event Withdraw(address indexed payer, uint256 amount);
 
-    /// @dev Emits when the bot is paid for performed services
+    /// @notice Emitted when the bot is paid for performed services
     event PayBot(
         address indexed payer,
         address indexed creditAccount,
@@ -49,25 +49,26 @@ interface IBotListV3Events {
         uint72 daoFeeAmount
     );
 
-    /// @dev Emits when the DAO sets a new fee on bot payments
+    /// @notice Emitted when the DAO sets a new fee on bot payments
     event SetBotDAOFee(uint16 newFee);
 
-    /// @dev Emits when all bot permissions for a Credit Account are erased
+    /// @notice Emitted when all bot permissions for a Credit Account are erased
     event EraseBot(address indexed creditManager, address indexed creditAccount, address indexed bot);
 
-    /// @dev Emits when Credit Manager's status in BotList is changed
+    /// @notice Emitted when Credit Manager's status in the bot list is changed
     event SetCreditManagerStatus(address indexed creditManager, bool newStatus);
 }
 
-/// @title IBotListV3
+/// @title Bot list V3 interface
 interface IBotListV3 is IBotListV3Events, IVersion {
-    /// @dev Sets permissions and funding for (creditAccount, bot). Callable only through CreditFacade
-    /// @param creditManager Credit Manager to set permissions in
-    /// @param creditAccount CA to set permissions for
-    /// @param bot Bot to set permissions for
-    /// @param permissions A bit mask of permissions
-    /// @param fundingAmount Total amount of ETH available to the bot for payments
-    /// @param weeklyFundingAllowance Amount of ETH available to the bot weekly
+    function weth() external view returns (address);
+
+    function treasury() external view returns (address);
+
+    // ----------- //
+    // PERMISSIONS //
+    // ----------- //
+
     function setBotPermissions(
         address creditManager,
         address creditAccount,
@@ -77,42 +78,62 @@ interface IBotListV3 is IBotListV3Events, IVersion {
         uint72 weeklyFundingAllowance
     ) external returns (uint256 activeBotsRemaining);
 
-    /// @notice Removes permissions and funding for all bots with non-zero permissions for a credit account
-    /// @param creditManager Credit Manager to erase permissions in
-    /// @param creditAccount Credit Account to erase permissions for
     function eraseAllBotPermissions(address creditManager, address creditAccount) external;
 
-    /// @dev Adds funds to the borrower's bot payment wallet
-    function deposit() external payable;
-
-    /// @dev Removes funds from the borrower's bot payment wallet
-    function withdraw(uint256 amount) external;
-
-    /// @dev Takes payment for performed services from the user's balance and sends to the bot
-    /// @param payer Address to charge
-    /// @param creditManager Address of the Credit Manager where the (creditAccount, bot) pair is funded
-    /// @param creditAccount Address of the Credit Account paid for
-    /// @param bot Address of the bot to pay
-    /// @param paymentAmount Amount to pay
-    function payBot(address payer, address creditManager, address creditAccount, address bot, uint72 paymentAmount)
-        external;
-
-    //
-    // GETTERS
-    //
-
-    /// @notice Returns all active bots currently on the account
     function getActiveBots(address creditManager, address creditAccount) external view returns (address[] memory);
 
-    /// @dev Returns whether the bot is approved by the borrower
-    function botPermissions(address creditManager, address borrower, address bot) external view returns (uint192);
+    function botPermissions(address creditManager, address creditAccount, address bot)
+        external
+        view
+        returns (uint192);
 
-    /// @notice Returns information about bot permissions
+    function botFunding(address creditManager, address creditAccount, address bot)
+        external
+        view
+        returns (uint72 remainingFunds, uint72 maxWeeklyAllowance, uint72 remainingWeeklyAllowance, uint40 allowanceLU);
+
     function getBotStatus(address creditManager, address creditAccount, address bot)
         external
         view
         returns (uint192 permissions, bool forbidden, bool hasSpecialPermissions);
 
-    /// @dev Returns user funcding balance in ETH
+    // ------- //
+    // FUNDING //
+    // ------- //
+
+    function name() external view returns (string memory);
+
+    function symbol() external view returns (string memory);
+
     function balanceOf(address payer) external view returns (uint256);
+
+    function deposit() external payable;
+
+    function withdraw(uint256 amount) external;
+
+    function payBot(address payer, address creditManager, address creditAccount, address bot, uint72 paymentAmount)
+        external;
+
+    // ------------- //
+    // CONFIGURATION //
+    // ------------- //
+
+    function daoFee() external view returns (uint16);
+
+    function approvedCreditManager(address) external view returns (bool);
+
+    function botSpecialStatus(address creditManager, address bot)
+        external
+        view
+        returns (bool forbidden, uint192 specialPermissions);
+
+    function setBotForbiddenStatus(address creditManager, address bot, bool status) external;
+
+    function setBotForbiddenStatusEverywhere(address bot, bool status) external;
+
+    function setBotSpecialPermissions(address creditManager, address bot, uint192 permissions) external;
+
+    function setDAOFee(uint16 newFee) external;
+
+    function setApprovedCreditManagerStatus(address creditManager, bool newStatus) external;
 }
