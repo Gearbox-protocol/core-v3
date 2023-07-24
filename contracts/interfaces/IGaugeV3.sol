@@ -5,6 +5,8 @@ pragma solidity ^0.8.17;
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
+import {IVotingContractV3} from "./IVotingContractV3.sol";
+
 struct QuotaRateParams {
     uint16 minRate;
     uint16 maxRate;
@@ -18,58 +20,36 @@ struct UserVotes {
 }
 
 interface IGaugeV3Events {
-    /// @dev Emits when epoch is updated
+    /// @notice Emitted when epoch is updated
     event UpdateEpoch(uint16 epochNow);
 
-    /// @dev Emits when a user submits a vote
+    /// @notice Emitted when a user submits a vote
     event Vote(address indexed user, address indexed token, uint96 votes, bool lpSide);
 
-    /// @dev Emits when a user removes a vote
+    /// @notice Emitted when a user removes a vote
     event Unvote(address indexed user, address indexed token, uint96 votes, bool lpSide);
 
-    /// @dev Emits when a new quota token is added in the PoolQuotaKeeper
+    /// @notice Emitted when a new quota token is added in the PoolQuotaKeeper
     event AddQuotaToken(address indexed token, uint16 minRate, uint16 maxRate);
 
-    /// @dev Emits when quota interest rate parameters are changed
+    /// @notice Emitted when quota interest rate parameters are changed
     event SetQuotaTokenParams(address indexed token, uint16 minRate, uint16 maxRate);
 
-    /// @dev Emits when the frozen epoch status changes
+    /// @notice Emitted when the frozen epoch status changes
     event SetFrozenEpoch(bool status);
 }
 
-/// @title IGaugeV3
-interface IGaugeV3 is IGaugeV3Events, IVersion {
-    /// @dev Rolls the new epoch and updates all quota rates
+/// @title Gauge V3 interface
+interface IGaugeV3 is IGaugeV3Events, IVotingContractV3, IVersion {
+    function pool() external view returns (address);
+
+    function voter() external view returns (address);
+
     function updateEpoch() external;
-
-    /// @dev Submits a vote to move the quota rate for a token
-    /// @param user The user that submitted a vote
-    /// @param votes Amount of staked GEAR the user voted with
-    /// @param extraData Gauge specific parameters (encoded into extraData to adhere to a general VotingContract interface)
-    ///                  * token - address of the token to vote for
-    ///                  * lpSide - votes in favor of LPs (increasing rate) if true, or in favor of CAs (decreasing rate) if false
-    function vote(address user, uint96 votes, bytes calldata extraData) external;
-
-    /// @dev Removes the user's existing vote from the provided token and side
-    /// @param user The user that submitted a vote
-    /// @param votes Amount of staked GEAR to remove
-    /// @param extraData Gauge specific parameters (encoded into extraData to adhere to a general VotingContract interface)
-    ///                  * token - address of the token to unvote from
-    ///                  * lpSide - whether the side unvoted from is LP side
-    function unvote(address user, uint96 votes, bytes calldata extraData) external;
-
-    //
-    // GETTERS
-    //
-    function getRates(address[] calldata tokens) external view returns (uint16[] memory rates);
 
     function epochLastUpdate() external view returns (uint16);
 
-    /// @dev Returns pool gauge is connected to
-    function pool() external view returns (address);
-
-    /// @dev Returns the main voting contract
-    function voter() external view returns (address);
+    function getRates(address[] calldata tokens) external view returns (uint16[] memory rates);
 
     function userTokenVotes(address user, address token)
         external
@@ -80,4 +60,18 @@ interface IGaugeV3 is IGaugeV3Events, IVersion {
         external
         view
         returns (uint16 minRate, uint16 maxRate, uint96 totalVotesLpSide, uint96 totalVotesCaSide);
+
+    // ------------- //
+    // CONFIGURATION //
+    // ------------- //
+
+    function epochFrozen() external view returns (bool);
+
+    function setFrozenEpoch(bool status) external;
+
+    function isTokenAdded(address token) external view returns (bool);
+
+    function addQuotaToken(address token, uint16 minRate, uint16 maxRate) external;
+
+    function changeQuotaTokenRateParams(address token, uint16 minRate, uint16 maxRate) external;
 }
