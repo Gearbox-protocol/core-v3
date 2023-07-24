@@ -3,24 +3,27 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-import "../interfaces/IAddressProviderV3.sol";
 import {IACL} from "@gearbox-protocol/core-v2/contracts/interfaces/IACL.sol";
+
+import "../interfaces/IAddressProviderV3.sol";
 import {AddressNotFoundException, CallerNotConfiguratorException} from "../interfaces/IExceptions.sol";
 
-/// @title AddressRepository
-/// @notice Stores addresses of deployed contracts
+/// @title Address provider V3
+/// @notice Stores addresses of important contracts
 contract AddressProviderV3 is IAddressProviderV3 {
-    /// @notice Mapping from (contract key, version) to the respective contract address
-    mapping(bytes32 => mapping(uint256 => address)) public addresses;
+    /// @notice Contract version
+    uint256 public constant override version = 3_00;
 
-    /// @inheritdoc IVersion
-    uint256 public constant override(IVersion) version = 3_00;
+    /// @notice Mapping from (contract key, version) to contract addresses
+    mapping(bytes32 => mapping(uint256 => address)) public override addresses;
 
+    /// @dev Ensures that function caller is configurator
     modifier configuratorOnly() {
         _revertIfNotConfigurator();
         _;
     }
 
+    /// @dev Reverts if `msg.sender` is not configurator
     function _revertIfNotConfigurator() internal view {
         if (!IACL(getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL)).isConfigurator(msg.sender)) {
             revert CallerNotConfiguratorException();
@@ -28,80 +31,83 @@ contract AddressProviderV3 is IAddressProviderV3 {
     }
 
     constructor(address _acl) {
-        /// The first event is emitted for the AP itself, to aid in contract discovery
-        emit AddressSet("ADDRESS_PROVIDER", address(this), version);
+        // The first event is emitted for the address provider itself to aid in contract discovery
+        emit SetAddress("ADDRESS_PROVIDER", address(this), version);
+
         _setAddress(AP_ACL, _acl, NO_VERSION_CONTROL);
     }
 
-    /// @notice Returns the address associated with the passed key/version
+    /// @notice Returns the address of a contract with a given key and version
     function getAddressOrRevert(bytes32 key, uint256 _version) public view virtual override returns (address result) {
         result = addresses[key][_version];
         if (result == address(0)) revert AddressNotFoundException();
     }
 
-    /// @notice Sets the address for the passed key, and optionally records the contract version
-    /// @param key Key in string format
-    /// @param value Address to save
-    /// @param saveVersion Whether to save
+    /// @notice Sets the address for the passed contract key
+    /// @param key Contract key
+    /// @param value Contract address
+    /// @param saveVersion Whether to save contract's version
     function setAddress(bytes32 key, address value, bool saveVersion) external override configuratorOnly {
         _setAddress(key, value, saveVersion ? IVersion(value).version() : NO_VERSION_CONTROL);
     }
 
-    /// @notice Internal function to set the address mapping value
+    /// @dev Implementation of `setAddress`
     function _setAddress(bytes32 key, address value, uint256 _version) internal virtual {
         addresses[key][_version] = value;
-        emit AddressSet(key, value, _version); // F:[AP-2]
+        emit SetAddress(key, value, _version);
     }
 
-    /// KEPT FOR BACKWARD COMPATABILITY
+    // ---------------------- //
+    // BACKWARD COMPATIBILITY //
+    // ---------------------- //
 
-    /// @return Address of ACL contract
+    /// @notice ACL contract address
     function getACL() external view returns (address) {
-        return getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL); // F:[AP-3]
+        return getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL);
     }
 
-    /// @return Address of ContractsRegister
+    /// @notice Contracts register contract address
     function getContractsRegister() external view returns (address) {
-        return getAddressOrRevert(AP_CONTRACTS_REGISTER, 1); // F:[AP-4]
+        return getAddressOrRevert(AP_CONTRACTS_REGISTER, 1);
     }
 
-    /// @return Address of PriceOracle
+    /// @notice Price oracle contract address
     function getPriceOracle() external view returns (address) {
-        return getAddressOrRevert(AP_PRICE_ORACLE, 2); // F:[AP-5]
+        return getAddressOrRevert(AP_PRICE_ORACLE, 2);
     }
 
-    /// @return Address of AccountFactory
+    /// @notice Account factory contract address
     function getAccountFactory() external view returns (address) {
-        return getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL); // F:[AP-6]
+        return getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL);
     }
 
-    /// @return Address of DataCompressor
+    /// @notice Data compressor contract address
     function getDataCompressor() external view returns (address) {
-        return getAddressOrRevert(AP_DATA_COMPRESSOR, 2); // F:[AP-7]
+        return getAddressOrRevert(AP_DATA_COMPRESSOR, 2);
     }
 
-    /// @return Address of Treasury contract
+    /// @notice Treasury contract address
     function getTreasuryContract() external view returns (address) {
-        return getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL); // F:[AP-8]
+        return getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL);
     }
 
-    /// @return Address of GEAR token
+    /// @notice GEAR token address
     function getGearToken() external view returns (address) {
-        return getAddressOrRevert(AP_GEAR_TOKEN, NO_VERSION_CONTROL); // F:[AP-9]
+        return getAddressOrRevert(AP_GEAR_TOKEN, NO_VERSION_CONTROL);
     }
 
-    /// @return Address of WETH token
+    /// @notice WETH token address
     function getWethToken() external view returns (address) {
-        return getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // F:[AP-10]
+        return getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL);
     }
 
-    /// @return Address of WETH token
+    /// @notice WETH gateway contract address
     function getWETHGateway() external view returns (address) {
-        return getAddressOrRevert(AP_WETH_GATEWAY, 1); // F:[AP-11]
+        return getAddressOrRevert(AP_WETH_GATEWAY, 1);
     }
 
-    /// @return Address of Router
+    /// @notice Router contract address
     function getLeveragedActions() external view returns (address) {
-        return getAddressOrRevert(AP_ROUTER, 1); // T:[AP-7]
+        return getAddressOrRevert(AP_ROUTER, 1);
     }
 }
