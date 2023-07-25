@@ -9,10 +9,9 @@ import {MAX_WITHDRAW_FEE, RAY} from "@gearbox-protocol/core-v2/contracts/librari
 
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import "../../../interfaces/IExceptions.sol";
-import {IInterestRateModelV3} from "../../../interfaces/IInterestRateModelV3.sol";
+import {ILinearInterestRateModelV3} from "../../../interfaces/ILinearInterestRateModelV3.sol";
 import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
-
 
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
@@ -794,7 +793,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
     function test_LP_12_creditManagerBorrowable_works_as_expected() public {
         // for the next two cases, `irm.availableToBorrow` shouldn't be called
         vm.mockCallRevert(
-            interestRateModel, abi.encode(IInterestRateModelV3.availableToBorrow.selector), "shouldn't be called"
+            interestRateModel, abi.encode(ILinearInterestRateModelV3.availableToBorrow.selector), "shouldn't be called"
         );
 
         // case: total debt limit is fully used
@@ -807,7 +806,9 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         assertEq(pool.creditManagerBorrowable(creditManager), 0, "Incorrect borrowable (CM debt limit fully used)");
 
         // for the next three cases, let `irm.availableToBorrow` always return 500
-        vm.mockCall(interestRateModel, abi.encode(IInterestRateModelV3.availableToBorrow.selector), abi.encode(500));
+        vm.mockCall(
+            interestRateModel, abi.encode(ILinearInterestRateModelV3.availableToBorrow.selector), abi.encode(500)
+        );
 
         // case: `irm.availableToBorrow` is the smallest
         pool.hackCreditManagerBorrowed(creditManager, 0);
