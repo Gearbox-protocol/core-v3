@@ -143,4 +143,14 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     {
         return (0, 0, 0, 0, 0);
     }
+
+    function addCreditManager(address _creditManager) external {}
+
+    function creditManagers() external view returns (address[] memory) {}
+
+    function setGauge(address _gauge) external {}
+
+    function setTokenLimit(address token, uint96 limit) external {}
+
+    function setTokenQuotaIncreaseFee(address token, uint16 fee) external {}
 }

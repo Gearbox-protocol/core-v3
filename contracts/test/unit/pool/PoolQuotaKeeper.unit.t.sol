@@ -154,7 +154,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
         assertEq(tokens.length, 0, "SETUP: tokens set unexpectedly has tokens");
 
         vm.expectEmit(true, true, false, false);
-        emit NewQuotaTokenAdded(DUMB_ADDRESS);
+        emit AddQuotaToken(DUMB_ADDRESS);
 
         vm.prank(pqk.gauge());
         pqk.addQuotaToken(DUMB_ADDRESS);
