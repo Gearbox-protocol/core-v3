@@ -18,7 +18,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 // INTERFACES
 import {IAddressProviderV3, AP_TREASURY, NO_VERSION_CONTROL} from "../interfaces/IAddressProviderV3.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
-import {IInterestRateModelV3} from "../interfaces/IInterestRateModelV3.sol";
+import {ILinearInterestRateModelV3} from "../interfaces/ILinearInterestRateModelV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 
@@ -391,7 +391,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         borrowable = Math.min(borrowable, _borrowable(_creditManagerDebt[creditManager])); // U:[LP-12]
         if (borrowable == 0) return 0; // U:[LP-12]
 
-        uint256 available = IInterestRateModelV3(interestRateModel).availableToBorrow({
+        uint256 available = ILinearInterestRateModelV3(interestRateModel).availableToBorrow({
             expectedLiquidity: expectedLiquidity(),
             availableLiquidity: availableLiquidity()
         }); // U:[LP-12]
@@ -568,7 +568,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         }
 
         _expectedLiquidityLU = expectedLiquidity_.toUint128(); // U:[LP-18]
-        _baseInterestRate = IInterestRateModelV3(interestRateModel).calcBorrowRate({
+        _baseInterestRate = ILinearInterestRateModelV3(interestRateModel).calcBorrowRate({
             expectedLiquidity: expectedLiquidity_,
             availableLiquidity: availableLiquidity_,
             checkOptimalBorrowing: checkOptimalBorrowing
