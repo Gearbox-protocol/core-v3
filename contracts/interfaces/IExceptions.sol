@@ -3,280 +3,282 @@
 // (c) Gearbox Holdings, 2022
 pragma solidity ^0.8.17;
 
-//
-// GENERAL
-//
+// ------- //
+// GENERAL //
+// ------- //
 
-/// @dev Thrown on attempting to set an important address to zero address
+/// @notice Thrown on attempting to set an important address to zero address
 error ZeroAddressException();
 
-/// @dev Thrown when attempting to pass a zero amount to a funding-related operation
+/// @notice Thrown when attempting to pass a zero amount to a funding-related operation
 error AmountCantBeZeroException();
 
-/// @dev Thrown on incorrect input parameter
+/// @notice Thrown on incorrect input parameter
 error IncorrectParameterException();
 
-/// @dev Thrown if parameter is out of range
+/// @notice Thrown if parameter is out of range
 error ValueOutOfRangeException();
 
-/// @dev Thrown when an address sends ETH to a contract that is not allowed to send ETH directly
-///      This is only relevant for contracts that have custom `receive()` access;
-///      most contracts do not have a `receive()` and thus will do a generic revert
+/// @notice Thrown when trying to send ETH to a contract that is not allowed to receive ETH directly
 error ReceiveIsNotAllowedException();
 
-/// @dev Thrown on attempting to set an EOA as an important contract in the system
+/// @notice Thrown on attempting to set an EOA as an important contract in the system
 error AddressIsNotContractException(address);
 
-/// @dev Thrown on attempting to receive a token that is not a collateral token or was forbidden
+/// @notice Thrown on attempting to receive a token that is not a collateral token or was forbidden
 error TokenNotAllowedException();
 
-/// @dev Thrown on attempting to add a token that is already in a collateral list
+/// @notice Thrown on attempting to add a token that is already in a collateral list
 error TokenAlreadyAddedException();
 
-/// @dev Thrown when attempting to use quota-related logic for a token that is not quoted in PoolQuotaKeeper
+/// @notice Thrown when attempting to use quota-related logic for a token that is not quoted in quota keeper
 error TokenIsNotQuotedException();
 
-/// @dev Thrown on attempting to interact with an address that is not a valid target contract
+/// @notice Thrown on attempting to interact with an address that is not a valid target contract
 error TargetContractNotAllowedException();
 
-/// @dev Thrown if function is not implemented
+/// @notice Thrown if function is not implemented
 error NotImplementedException();
 
-//
-// CONTRACTS REGISTER
-//
+// ------------------ //
+// CONTRACTS REGISTER //
+// ------------------ //
 
-/// @dev Thrown when an address that expected to be a registered CM, is not
+/// @notice Thrown when an address is expected to be a registered credit manager, but is not
 error RegisteredCreditManagerOnlyException();
 
-/// @dev Thrown when an address that expected to be a registered pool, is not
+/// @notice Thrown when an address is expected to be a registered pool, but is not
 error RegisteredPoolOnlyException();
 
-//
-// ADDRESS PROVIDER
-//
+// ---------------- //
+// ADDRESS PROVIDER //
+// ---------------- //
 
-/// @dev Reverts if address isn't found in address provider
+/// @notice Reverts if address key isn't found in address provider
 error AddressNotFoundException();
 
-//
-// POOL, PQK, GAUGES
-//
+// ----------------- //
+// POOL, PQK, GAUGES //
+// ----------------- //
 
-/// @dev Thrown by pool-adjacent contracts when a Credit Manager being connected
-///      has a wrong pool address
+/// @notice Thrown by pool-adjacent contracts when a credit manager being connected has a wrong pool address
 error IncompatibleCreditManagerException();
 
-/// @dev Thrown when attempting to vote in a non-approved contract
+/// @notice Thrown when attempting to vote in a non-approved contract
 error VotingContractNotAllowedException();
 
-/// @dev Thrown when attempting to borrow more than the second point,
-///      on a two point curve, if the corresponding option is enabled
+/// @notice Thrown when attempting to borrow more than the second point on a two-point curve
 error BorrowingMoreThanU2ForbiddenException();
 
-/// @dev Thrown when a Credit Manager is attempting to borrow more
-///      than its limit in the current block, or in general
+/// @notice Thrown when a credit manager attempts to borrow more than its limit in the current block, or in general
 error CreditManagerCantBorrowException();
 
-/// @dev Thrown when attempting to perform a quota-specific action in a pool
-///      that does not support quotas
+/// @notice Thrown when attempting to perform a quota-specific action in a pool that does not support quotas
 error QuotasNotSupportedException();
 
-/// @dev Thrown when attempting to connect a PQK to a pool thas does not
-///      mathh the one in the PQK
+/// @notice Thrown when attempting to connect a quota keeper to an incompatible pool
 error IncompatiblePoolQuotaKeeperException();
 
-/// @dev Thrown when the received quota is outside of min/max bounds
+/// @notice Thrown when the quota is outside of min/max bounds
 error QuotaIsOutOfBoundsException();
 
-//
-// CREDIT MANAGER
-//
+// -------------- //
+// CREDIT MANAGER //
+// -------------- //
 
-/// @dev Thrown on failing a full collateral check after an operation
+/// @notice Thrown on failing a full collateral check after multicall
 error NotEnoughCollateralException();
 
-/// @dev Thrown if an attempt to approve a collateral token to a target contract failed
+/// @notice Thrown if an attempt to approve a collateral token to adapter's target contract fails
 error AllowanceFailedException();
 
-/// @dev Thrown on attempting to perform an action for an address that owns no Credit Account
+/// @notice Thrown on attempting to perform an action for a credit account that does not exist
 error CreditAccountDoesNotExistException();
 
-/// @dev Thrown on configurator attempting to add more than 255 collateral tokens
+/// @notice Thrown on configurator attempting to add more than 255 collateral tokens
 error TooManyTokensException();
 
-/// @dev Thrown if more than the maximal number of tokens were enabled on a Credit Account,
-///      and there are not enough unused token to disable
+/// @notice Thrown if more than the maximum number of tokens were enabled on a credit account
 error TooManyEnabledTokensException();
 
-/// @dev Thrown when a custom HF parameter lower than 10000 is passed into a full collateral check
+/// @notice Thrown when a custom HF parameter lower than 10000 is passed into the full collateral check
 error CustomHealthFactorTooLowException();
 
-/// @dev Thrown when attempting to execute a protocol interaction without a
-///      set active Credit Account
+/// @notice Thrown when attempting to execute a protocol interaction without active credit account set
 error ActiveCreditAccountNotSetException();
 
-/// @dev Thrown when an account is opened and closed in the same block
+/// @notice Thrown when an account is opened and closed in the same block
 error OpenCloseAccountInOneBlockException();
 
-//
-// CREDIT CONFIGURATOR
-//
+// ------------------- //
+// CREDIT CONFIGURATOR //
+// ------------------- //
 
-/// @dev Thrown on attempting to use a non-ERC20 contract or an EOA as a token
+/// @notice Thrown on attempting to use a non-ERC20 contract or an EOA as a token
 error IncorrectTokenContractException();
 
-/// @dev Thrown on attempting to set a token price feed to an address that is not a
-///      correct price feed
+/// @notice Thrown on attempting to set a token price feed to an address that is not a correct price feed
 error IncorrectPriceFeedException();
 
-/// @dev Thrown if the newly set LT if zero or greater than the underlying's LT
+/// @notice Thrown if the newly set LT if zero or greater than the underlying's LT
 error IncorrectLiquidationThresholdException();
 
-/// @dev Thrown if borrowing limits are incorrect: minLimit > maxLimit or maxLimit > blockLimit
+/// @notice Thrown if borrowing limits are incorrect: minLimit > maxLimit or maxLimit > blockLimit
 error IncorrectLimitsException();
 
-/// @dev Thrown if the new expiration date is less than the current expiration date or block.timestamp
+/// @notice Thrown if the new expiration date is less than the current expiration date or current timestamp
 error IncorrectExpirationDateException();
 
-/// @dev Thrown if a contract (adapter or Credit Facade) set in a Credit Configurator returns a wrong Credit Manager
-///      or retrieving the Credit Manager from it fails
+/// @notice Thrown if a contract returns a wrong credit manager or reverts when trying to retrieve it
 error IncompatibleContractException();
 
-/// @dev Thrown if attempting to forbid an adapter that is not allowed for the Credit Manager
+/// @notice Thrown if attempting to forbid an adapter that is not registered in the credit manager
 error AdapterIsNotRegisteredException();
 
-/// @dev Thrown when trying to manually set total debt parameters in a CF that doesn't track them
+/// @notice Thrown when trying to manually set total debt parameters in a credit facade that doesn't track them
 error TotalDebtNotTrackedException();
 
-//
-// CREDIT FACADE
-//
+// ------------- //
+// CREDIT FACADE //
+// ------------- //
 
-/// @dev Thrown on attempting to interact with a price feed for a token not added
-///      to PriceOracle
+/// @notice Thrown on attempting to interact with a price feed for a token not added to price oracle
 error PriceFeedDoesNotExistException();
 
-/// @dev Thrown when attempting to perform an action
-///      that cannot be done when whitelisted mode is on
-///      for the CM
+/// @notice Thrown when attempting to perform an action that is forbidden in whitelisted mode
 error ForbiddenInWhitelistedModeException();
 
-/// @dev Thrown if the CreditFacadeV3 is not expirable, and an aciton is attempted that
-///      requires expirability
+/// @notice Thrown if credit facade is not expirable, and attempted aciton requires expirability
 error NotAllowedWhenNotExpirableException();
 
-/// @dev Thrown if a selector that doesn't match any allowed function is passed to the Credit Facade
-///      during a multicall
+/// @notice Thrown if a selector that doesn't match any allowed function is passed to the credit facade in a multicall
 error UnknownMethodException();
 
-/// @dev Thrown if a liquidator tries to liquidate an account with a health factor above 1
+/// @notice Thrown if a liquidator tries to liquidate an account with a health factor above 1
 error CreditAccountNotLiquidatableException();
 
-/// @dev Thrown if too much new debt was taken within a single block
+/// @notice Thrown if too much new debt was taken within a single block
 error BorrowedBlockLimitException();
 
-/// @dev Thrown if the new debt principal for a CA falls outside of borrowing limits
+/// @notice Thrown if the new debt principal for a credit account falls outside of borrowing limits
 error BorrowAmountOutOfLimitsException();
 
-/// @dev Thrown if one of the balances on a Credit Account is less than expected
-///      at the end of a multicall, if revertIfReceivedLessThan was called
+/// @notice Thrown if one of the balances on a credit account is less than expected after the end of a multicall
 error BalanceLessThanMinimumDesiredException();
 
-/// @dev Thrown if a user attempts to open an account on a Credit Facade that has expired
+/// @notice Thrown if a user attempts to open an account via an expired credit facade
 error NotAllowedAfterExpirationException();
 
-/// @dev Thrown if expected balances are attempted to be set through revertIfReceivedLessThan twice
+/// @notice Thrown if expected balances are attempted to be set through `revertIfReceivedLessThan` twice
 error ExpectedBalancesAlreadySetException();
 
-/// @dev Thrown if a Credit Account has enabled forbidden tokens and the owner attempts to perform an action
-///      that is not allowed with any forbidden tokens enabled
+/// @notice Thrown when trying to perform an action that is forbidden when credit account has enabled forbidden tokens
 error ForbiddenTokensException();
 
-/// @dev Thrown if botMulticall is called by an address that is not approved by the borrower, or is forbidden
+/// @notice Thrown if `botMulticall` is called by an address that is not approved by account owner or is forbidden
 error NotApprovedBotException();
 
-/// @dev Thrown when attempting to perform a multicall action outside permissions
+/// @notice Thrown when attempting to perform a multicall action with no permission for it
 error NoPermissionException(uint256 permission);
 
-/// @dev Thrown when user tries to approve more bots than allowed
+/// @notice Thrown when user tries to approve more bots than allowed
 error TooManyApprovedBotsException();
 
-///
-/// ACCESS
-///
+// ------ //
+// ACCESS //
+// ------ //
 
-/// @dev Thrown on attempting to perform an action for an address that owns no Credit Account
+/// @notice Thrown on attempting to call an access restricted function not as credit account owner
 error CallerNotCreditAccountOwnerException();
 
-/// @dev Thrown on attempting to call an access restricted function as a non-Configurator
+/// @notice Thrown on attempting to call an access restricted function not as configurator
 error CallerNotConfiguratorException();
 
-/// @dev Thrown on attempting to call an access-restructed function not as account factory
+/// @notice Thrown on attempting to call an access-restructed function not as account factory
 error CallerNotAccountFactoryException();
 
-/// @dev Thrown on attempting to call an access restricted function as a non-CreditManager
+/// @notice Thrown on attempting to call an access restricted function not as credit manager
 error CallerNotCreditManagerException();
 
-/// @dev Thrown if an access-restricted function is called by an address that is not
-///      the connected Credit Facade
+/// @notice Thrown on attempting to call an access restricted function not as credit facade
 error CallerNotCreditFacadeException();
 
-/// @dev Thrown on attempting to call an access restricted function as a non-Configurator
+/// @notice Thrown on attempting to call an access restricted function not as controller or configurator
 error CallerNotControllerException();
 
-/// @dev Thrown on attempting to pause a contract as a non-Pausable admin
+/// @notice Thrown on attempting to pause a contract without pausable admin rights
 error CallerNotPausableAdminException();
 
-/// @dev Thrown on attempting to pause a contract as a non-Unpausable admin
+/// @notice Thrown on attempting to unpause a contract without unpausable admin rights
 error CallerNotUnpausableAdminException();
 
-/// @dev Thrown when a gauge-only function is called by non-gauge
+/// @notice Thrown on attempting to call an access restricted function not as gauge
 error CallerNotGaugeException();
 
-/// @dev Thrown when a poolQuotaKeeper function is called by non-pqk
+/// @notice Thrown on attempting to call an access restricted function not as quota keeper
 error CallerNotPoolQuotaKeeperException();
 
-/// @dev Thrown when `vote` or `unvote` are called from non-voter address
+/// @notice Thrown on attempting to call an access restricted function not as voter
 error CallerNotVoterException();
 
-/// @dev Thrown if an access-restricted function is called by an address that is not
-///      the connected Credit Facade, or an allowed adapter
+/// @notice Thrown on attempting to call an access restricted function not as allowed adapter
 error CallerNotAdapterException();
 
-/// @dev Thrown if a migration function is called by non-migrator in GearStaking
+/// @notice Thrown on attempting to call an access restricted function not as migrator
 error CallerNotMigratorException();
 
-///
-/// BOT LIST
-///
+/// @notice Thrown when an address that is not the designated executor attempts to execute a transaction
+error CallerNotExecutorException();
 
-/// @dev Thrown when attempting to set non-zero permissions for a forbidden bot
+/// @notice Thrown on attempting to call an access restricted function not as veto admin
+error CallerNotVetoAdminException();
+
+// ------------------- //
+// CONTROLLER TIMELOCK //
+// ------------------- //
+
+/// @notice Thrown when the new parameter values do not satisfy required conditions
+error ParameterChecksFailedException();
+
+/// @notice Thrown when attempting to execute a non-queued transaction
+error TxNotQueuedException();
+
+/// @notice Thrown when attempting to execute a transaction that is either immature or stale
+error TxExecutedOutsideTimeWindowException();
+
+/// @notice Thrown when execution of a transaction fails
+error TxExecutionRevertedException();
+
+// -------- //
+// BOT LIST //
+// -------- //
+
+/// @notice Thrown when attempting to set non-zero permissions for a forbidden bot
 error InvalidBotException();
 
-///
-/// WITHDRAWAL MANAGER
-///
+// ------------------ //
+// WITHDRAWAL MANAGER //
+// ------------------ //
 
-/// @dev Thrown when attempting to claim funds without having anything claimable
+/// @notice Thrown when attempting to claim funds without having anything claimable
 error NothingToClaimException();
 
-/// @dev Thrown when attempting to schedule withdrawal from a credit account that has no free withdrawal slots
+/// @notice Thrown when attempting to schedule withdrawal from a credit account that has no free withdrawal slots
 error NoFreeWithdrawalSlotsException();
 
-///
-/// ACCOUNT FACTORY
-///
+// --------------- //
+// ACCOUNT FACTORY //
+// --------------- //
 
-/// @dev Thrown when trying to deploy second master credit account for a credit manager
+/// @notice Thrown when trying to deploy second master credit account for a credit manager
 error MasterCreditAccountAlreadyDeployedException();
 
-/// @dev Thrown when trying to rescue funds from a credit account that is currently in use
+/// @notice Thrown when trying to rescue funds from a credit account that is currently in use
 error CreditAccountIsInUseException();
 
-///
-/// DEGEN NFT
-///
+// --------- //
+// DEGEN NFT //
+// --------- //
 
-/// @dev Thrown by DegenNFT when attempting to burn on opening an account with 0 balance
+/// @notice Thrown by Degen NFT when attempting to burn on opening an account with 0 balance
 error InsufficientBalanceException();

@@ -33,28 +33,8 @@ interface IControllerTimelockV3Events {
     event CancelTransaction(bytes32 indexed txHash);
 }
 
-interface IControllerTimelockV3Errors {
-    /// @notice Thrown when an address that is not the designated executor attempts to execute a transaction
-    error CallerNotExecutorException();
-
-    /// @notice Thrown when the access-restricted function is called by other than the veto admin
-    error CallerNotVetoAdminException();
-
-    /// @notice Thrown when the new parameter values do not satisfy required conditions
-    error ParameterChecksFailedException();
-
-    /// @notice Thrown when attempting to execute a non-queued transaction
-    error TxNotQueuedException();
-
-    /// @notice Thrown when attempting to execute a transaction that is either immature or stale
-    error TxExecutedOutsideTimeWindowException();
-
-    /// @notice Thrown when execution of a transaction fails
-    error TxExecutionRevertedException();
-}
-
 /// @title Controller timelock V3 interface
-interface IControllerTimelockV3 is IControllerTimelockV3Errors, IControllerTimelockV3Events, IVersion {
+interface IControllerTimelockV3 is IControllerTimelockV3Events, IVersion {
     // -------- //
     // QUEUEING //
     // -------- //

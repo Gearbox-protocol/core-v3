@@ -17,7 +17,7 @@ import {PoolV3} from "../../../pool/PoolV3.sol";
 import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
 import {GaugeV3} from "../../../governance/GaugeV3.sol";
 import {ILPPriceFeedV2} from "@gearbox-protocol/core-v2/contracts/interfaces/ILPPriceFeedV2.sol";
-import {IControllerTimelockV3Events, IControllerTimelockV3Errors} from "../../../interfaces/IControllerTimelockV3.sol";
+import {IControllerTimelockV3Events} from "../../../interfaces/IControllerTimelockV3.sol";
 
 // TEST
 import "../../lib/constants.sol";
@@ -28,7 +28,7 @@ import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMoc
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
-contract ControllerTimelockTest is Test, IControllerTimelockV3Events, IControllerTimelockV3Errors {
+contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
     AddressProviderV3ACLMock public addressProvider;
 
     ControllerTimelockV3 public controllerTimelock;
