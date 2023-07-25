@@ -11,6 +11,7 @@ import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IGaugeV3} from "../interfaces/IGaugeV3.sol";
 import {ILPPriceFeedV2} from "@gearbox-protocol/core-v2/contracts/interfaces/ILPPriceFeedV2.sol";
+import "../interfaces/IExceptions.sol";
 
 /// @title Controller timelock V3
 /// @notice Controller timelock is a governance contract that allows special actors less trusted than Gearbox Governance
