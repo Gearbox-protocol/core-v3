@@ -39,6 +39,7 @@ contract CreditAccountV3 is ICreditAccountV3 {
         _;
     }
 
+    /// @dev Reverts if `msg.sender` is not credit manager
     function _revertIfNotCreditManager() internal view {
         if (msg.sender != creditManager) {
             revert CallerNotCreditManagerException();

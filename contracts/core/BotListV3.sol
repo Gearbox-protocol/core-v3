@@ -44,11 +44,10 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @notice Name, added for ERC-20 compatibility so that bot funding could be monitored in wallets
     string public constant override name = "Gearbox bot funding";
 
-    /// @notice Mapping from account address to its status as an approved Credit Manager
-    ///         Only Credit Facades connected to approved Credit Managers can alter bot permissions
+    /// @notice Mapping from account address to its status as an approved credit manager
     mapping(address => bool) public override approvedCreditManager;
 
-    /// @dev Set of all approved Credit Managers
+    /// @dev Set of all approved credit managers
     EnumerableSet.AddressSet internal approvedCreditManagers;
 
     /// @notice Mapping from (creditManager, creditAccount, bot) to bot permissions
@@ -76,15 +75,15 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL);
     }
 
-    /// @dev Limits access to a function only to Credit Facades connected to approved CMs
+    /// @dev Limits access to a function only to credit facades connected to approved credit managers
     modifier onlyValidCreditFacade(address creditManager) {
         _revertIfCallerNotValidCreditFacade(creditManager);
         _;
     }
 
-    /// @notice Sets permissions and funding for (creditAccount, bot). Callable only through CreditFacade
-    /// @param creditManager Credit Manager to set permissions in
-    /// @param creditAccount CA to set permissions for
+    /// @notice Sets permissions and funding for (creditAccount, bot)
+    /// @param creditManager Credit manager to set permissions in
+    /// @param creditAccount Credit account to set permissions for
     /// @param bot Bot to set permissions for
     /// @param permissions A bit mask of permissions
     /// @param fundingAmount Total amount of ETH available to the bot for payments
@@ -144,8 +143,8 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     }
 
     /// @notice Removes permissions and funding for all bots with non-zero permissions for a credit account
-    /// @param creditManager Credit Manager to erase permissions in
-    /// @param creditAccount Credit Account to erase permissions for
+    /// @param creditManager Credit manager to erase permissions in
+    /// @param creditAccount Credit account to erase permissions for
     function eraseAllBotPermissions(address creditManager, address creditAccount)
         external
         override
@@ -172,8 +171,8 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
 
     /// @notice Takes payment for performed services from the user's balance and sends to the bot
     /// @param payer Address to charge
-    /// @param creditManager Address of the Credit Manager where the (creditAccount, bot) pair is funded
-    /// @param creditAccount Address of the Credit Account paid for
+    /// @param creditManager Address of the credit manager where the (creditAccount, bot) pair is funded
+    /// @param creditAccount Address of the credit account paid for
     /// @param bot Address of the bot to pay
     /// @param paymentAmount Amount of WETH to pay
     function payBot(address payer, address creditManager, address creditAccount, address bot, uint72 paymentAmount)
@@ -190,7 +189,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
             bf.remainingWeeklyAllowance = bf.maxWeeklyAllowance; // F: [BL-5]
         }
 
-        // feeAmount is always < paymentAmount, however uint256 conversation adds more space for computations
+        // feeAmount is always < paymentAmount, however `uint256` conversion adds more space for computations
         uint72 feeAmount = uint72(uint256(daoFee) * paymentAmount / PERCENTAGE_FACTOR); // F: [BL-5]
 
         uint72 totalAmount = paymentAmount + feeAmount;
@@ -260,7 +259,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     // CONFIGURATION //
     // ------------- //
 
-    /// @notice Sets the bot's forbidden status in a single Credit Manager
+    /// @notice Sets the bot's forbidden status in a given credit manager
     function setBotForbiddenStatus(address creditManager, address bot, bool status)
         external
         override
@@ -269,7 +268,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         _setBotForbiddenStatus(creditManager, bot, status);
     }
 
-    /// @notice Sets the bot's forbidden status in all Credit Managers
+    /// @notice Sets the bot's forbidden status in all credit managers
     function setBotForbiddenStatusEverywhere(address bot, bool status) external override configuratorOnly {
         uint256 len = approvedCreditManagers.length();
         unchecked {
@@ -285,11 +284,10 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         emit SetBotForbiddenStatus(creditManager, bot, status);
     }
 
-    /// @notice Gives special permissions to a bot that extend to all Credit Accounts
-    /// @dev Bots with special permissions are DAO-approved bots
-    ///      which are enabled with a defined set of permissions for all users.
-    ///      Can be used to extend system functionality with additional features
-    ///      without changing the core - such as adding partial liquidations.
+    /// @notice Gives special permissions to a bot that extend to all credit accounts
+    /// @dev Bots with special permissions are DAO-approved bots which are enabled with a defined set of permissions for
+    ///      all users. Can be used to extend system functionality with additional features without changing the core,
+    ///      such as adding partial liquidations.
     function setBotSpecialPermissions(address creditManager, address bot, uint192 permissions)
         external
         override
@@ -311,8 +309,8 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         emit SetBotDAOFee(newFee); // F: [BL-2]
     }
 
-    /// @notice Sets an address' status as an approved Credit Manager
-    /// @param creditManager Address of the Credit Manager to change status for
+    /// @notice Sets an address' status as an approved credit manager
+    /// @param creditManager Address of the credit manager to change status for
     /// @param newStatus The new status
     function setApprovedCreditManagerStatus(address creditManager, bool newStatus) external override configuratorOnly {
         if (approvedCreditManager[creditManager] != newStatus) {
@@ -327,7 +325,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         }
     }
 
-    /// @dev Reverts if caller is not creditFacade
+    /// @dev Reverts if caller is not credit facade
     function _revertIfCallerNotValidCreditFacade(address creditManager) internal view {
         if (!approvedCreditManager[creditManager] || ICreditManagerV3(creditManager).creditFacade() != msg.sender) {
             revert CallerNotCreditFacadeException();

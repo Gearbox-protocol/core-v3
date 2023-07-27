@@ -8,15 +8,12 @@ import {RAY, SECONDS_PER_YEAR, PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v
 
 uint192 constant RAY_DIVIDED_BY_PERCENTAGE = uint192(RAY / PERCENTAGE_FACTOR);
 
-/// @title Quota Library
+/// @title Quotas logic library
 library QuotasLogic {
     using SafeCast for uint256;
 
     /// @dev Computes the new interest index value, given the previous value, the interest rate, and time delta
-    /// @dev Unlike base pool interest, the interest on quotas is not compounding, so an additive index is used
-    /// @param cumulativeIndexLU Cumulative index that was last written to storage
-    /// @param rate The current interest rate on the token's quota
-    /// @param lastQuotaRateUpdate Timestamp of the last time quota rates were updated
+    /// @dev Unlike pool's base interest, interest on quotas is not compounding, so additive index is used
     function cumulativeIndexSince(uint192 cumulativeIndexLU, uint16 rate, uint256 lastQuotaRateUpdate)
         internal
         view
@@ -25,40 +22,25 @@ library QuotasLogic {
         return uint192(
             uint256(cumulativeIndexLU)
                 + (RAY_DIVIDED_BY_PERCENTAGE * (block.timestamp - lastQuotaRateUpdate) * rate) / SECONDS_PER_YEAR
-        ); // U: [QL-1]
+        ); // U:[QL-1]
     }
 
-    /// @dev Computes the accrued quota interest based on the additive index
-    /// @param quoted The quota amount
-    /// @param cumulativeIndexNow The current value of the index
-    /// @param cumulativeIndexLU Value of the index on last update
+    /// @dev Computes interest accrued on the quota since the last update
     function calcAccruedQuotaInterest(uint96 quoted, uint192 cumulativeIndexNow, uint192 cumulativeIndexLU)
         internal
         pure
         returns (uint128)
     {
-        // Downcasting to uint128 should be safe, since quoted is uint96, and cumulativeIndex / RAY cannot grow
-        // beyond 2 ** 32 in any reasonable time
-        return uint128(uint256(quoted) * (cumulativeIndexNow - cumulativeIndexLU) / RAY); // U: [QL-2]
+        // `quoted` is `uint96`, and `cumulativeIndex / RAY` won't reach `2 ** 32` in reasonable time, so casting is safe
+        return uint128(uint256(quoted) * (cumulativeIndexNow - cumulativeIndexLU) / RAY); // U:[QL-2]
     }
 
-    /// @dev Computes the pool quota revenue change given the current rate and the
-    ///      actual quota change
-    /// @param rate Rate for current token
-    /// @param change Real change in quota
+    /// @dev Computes the pool quota revenue change given the current rate and the quota change
     function calcQuotaRevenueChange(uint16 rate, int256 change) internal pure returns (int256) {
         return change * int256(uint256(rate)) / int16(PERCENTAGE_FACTOR);
     }
 
-    /// @dev Computes the actual quota change with respect to total limit on quotas
-    /// When the quota is increased, the new amount is checked against the global limit on quotas
-    /// If the amount is larger than the existing capacity, then the quota is only increased
-    /// by capacity. This is done instead of reverting to avoid unexpected reverts due to race conditions
-    /// @param totalQuoted Sum of all quotas for a token
-    /// @param limit Quota limit for a token
-    /// @param requestedChange The requested quota increase
-    /// @return quotaChange Amount the quota actually changed by after taking
-    ///                         capacity into account
+    /// @dev Upper-bounds requested quota increase such that the resulting total quota doesn't exceed the limit
     function calcActualQuotaChange(uint96 totalQuoted, uint96 limit, int96 requestedChange)
         internal
         pure
@@ -70,10 +52,9 @@ library QuotasLogic {
 
         unchecked {
             uint96 maxQuotaCapacity = limit - totalQuoted;
-
-            // Since limit should be less than int96.max under correct configuration, downcasting maxQuotaCapacity should
-            // be safe
-            return uint96(requestedChange) > maxQuotaCapacity ? int96(maxQuotaCapacity) : requestedChange; // I:[CMQ-08,10]
+            // The function is never called with `requestedChange < 0`, so casting it to `uint96` is safe
+            // With correct configuration, `limit < type(int96).max`, so casting `maxQuotaCapacity` to `int96` is safe
+            return uint96(requestedChange) > maxQuotaCapacity ? int96(maxQuotaCapacity) : requestedChange;
         }
     }
 }
