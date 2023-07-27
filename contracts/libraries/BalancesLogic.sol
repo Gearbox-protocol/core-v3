@@ -17,14 +17,14 @@ struct BalanceWithMask {
 }
 
 /// @title Balances logic library
-/// @notice Implements functions that used for before-and-after balance comparisons
+/// @notice Implements functions for before-and-after balance comparisons
 library BalancesLogic {
     using BitMask for uint256;
     using SafeERC20 for IERC20;
 
-    /// @dev Returns an array of balances that are expected after operations
-    /// @param creditAccount Credit Account to compute new balances for
-    /// @param deltas The array of (token, amount) objects that contain expected balance increases
+    /// @dev Returns an array of expected token balances after operations
+    /// @param creditAccount Credit account to compute expected balances for
+    /// @param deltas The array of (token, amount) structs that contain expected balance increases
     function storeBalances(address creditAccount, Balance[] memory deltas)
         internal
         view
@@ -40,9 +40,9 @@ library BalancesLogic {
         }
     }
 
-    /// @dev Compares current balances to previously saved expected balances.
-    /// @param creditAccount Credit Account to check
-    /// @param expected Expected balances after all operations
+    /// @dev Compares current balances to previously saved expected balances
+    /// @param creditAccount Credit account to compare balances for
+    /// @param expected Expected balances after all operations (from `storeBalances`)
     /// @return success False if at least one balance is lower than expected, true otherwise
     function compareBalances(address creditAccount, Balance[] memory expected) internal view returns (bool success) {
         uint256 len = expected.length;
@@ -56,11 +56,11 @@ library BalancesLogic {
         return true; // U:[BLL-2]
     }
 
-    /// @dev Computes balances of forbidden tokens and returns them for later checks
-    /// @param creditAccount Credit Account to store balances for
-    /// @param enabledTokensMask Current mask of enabled tokens
-    /// @param forbiddenTokenMask Mask of forbidden tokens
-    /// @param getTokenByMaskFn A function that returns the token's address by its mask
+    /// @dev Returns balances of enabled forbidden tokens on the credit account
+    /// @param creditAccount Credit account to compute balances for
+    /// @param enabledTokensMask Current mask of enabled tokens on the credit account
+    /// @param forbiddenTokenMask Mask of forbidden tokens in the credit facade
+    /// @param getTokenByMaskFn A function that returns a token's address by its mask
     function storeForbiddenBalances(
         address creditAccount,
         uint256 enabledTokensMask,
@@ -86,13 +86,13 @@ library BalancesLogic {
         }
     }
 
-    /// @dev Checks that no new forbidden tokens were enabled and that balances of existing forbidden tokens didn't increase
-    /// @param creditAccount Credit Account to check
+    /// @dev Compares current balances of forbidden tokens to previously saved
+    /// @param creditAccount Credit account to compare balances for
     /// @param enabledTokensMaskBefore Mask of enabled tokens on the account before operations
     /// @param enabledTokensMaskAfter Mask of enabled tokens on the account after operations
-    /// @param forbiddenBalances Array of balances of forbidden tokens (received from `storeForbiddenBalances`)
-    /// @param forbiddenTokenMask Mask of forbidden tokens
-    /// @return success False if new forbidden tokens were enabled or balance of at least one forbidden token has increased, true otherwise
+    /// @param forbiddenBalances Balances of forbidden tokens before operations (from `storeForbiddenBalances`)
+    /// @param forbiddenTokenMask Mask of forbidden tokens in the credit facade
+    /// @return success False if balance of at least one forbidden token increased, true otherwise
     function checkForbiddenBalances(
         address creditAccount,
         uint256 enabledTokensMaskBefore,
@@ -103,12 +103,11 @@ library BalancesLogic {
         uint256 forbiddenTokensOnAccount = enabledTokensMaskAfter & forbiddenTokenMask;
         if (forbiddenTokensOnAccount == 0) return true; // U:[BLL-4]
 
-        // A diff between the forbidden tokens before and after is computed
-        // If there are forbidden tokens enabled during operations, the function would return false
+        // Ensure that no new forbidden tokens were enabled
         uint256 forbiddenTokensOnAccountBefore = enabledTokensMaskBefore & forbiddenTokenMask;
         if (forbiddenTokensOnAccount & ~forbiddenTokensOnAccountBefore != 0) return false; // U:[BLL-4]
 
-        // Then, the function checks that any remaining forbidden tokens didn't have their balances increased
+        // Then, check that any remaining forbidden tokens didn't have their balances increased
         unchecked {
             uint256 len = forbiddenBalances.length;
             for (uint256 i = 0; i < len; ++i) {
