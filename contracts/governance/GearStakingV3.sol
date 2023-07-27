@@ -8,9 +8,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 import {AP_GEAR_TOKEN, IAddressProviderV3, NO_VERSION_CONTROL} from "../interfaces/IAddressProviderV3.sol";
+import {IVotingContractV3} from "../interfaces/IVotingContractV3.sol";
 import {
     IGearStakingV3,
-    IVotingContractV3,
     UserVoteLockData,
     WithdrawalData,
     MultiVote,

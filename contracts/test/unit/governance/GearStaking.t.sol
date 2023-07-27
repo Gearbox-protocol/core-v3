@@ -4,12 +4,8 @@
 pragma solidity ^0.8.17;
 
 import {GearStakingV3, EPOCH_LENGTH} from "../../../governance/GearStakingV3.sol";
-import {
-    IGearStakingV3Events,
-    MultiVote,
-    VotingContractStatus,
-    IVotingContractV3
-} from "../../../interfaces/IGearStakingV3.sol";
+import {IGearStakingV3Events, MultiVote, VotingContractStatus} from "../../../interfaces/IGearStakingV3.sol";
+import {IVotingContractV3} from "../../../interfaces/IVotingContractV3.sol";
 
 import "../../../interfaces/IAddressProviderV3.sol";
 
