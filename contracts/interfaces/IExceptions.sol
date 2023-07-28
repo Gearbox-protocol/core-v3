@@ -280,7 +280,7 @@ error IncorrectPriceFeedException();
 /// @notice Thrown on attempting to interact with a price feed for a token not added to the price oracle
 error PriceFeedDoesNotExistException();
 
-/// @notice Thrown when price feed returns incorrect or stale price for a token
+/// @notice Thrown when price feed returns incorrect price for a token
 error IncorrectPriceException();
 
 /// @notice Thrown when token's price feed becomes stale
