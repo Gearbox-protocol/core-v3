@@ -42,11 +42,11 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
     PriceFeedConfig[] public priceFeeds;
 
     constructor() {
-        if (block.chainid == 1337) {
-            uint8 networkId;
+        if (block.chainid == 1337 || block.chainid == 31337) {
+            uint16 networkId;
 
             try vm.envInt("ETH_FORK_NETWORK_ID") returns (int256 val) {
-                networkId = uint8(uint256(val));
+                networkId = uint16(uint256(val));
             } catch {
                 networkId = 1;
             }

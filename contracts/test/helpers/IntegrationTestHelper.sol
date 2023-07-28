@@ -239,7 +239,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
 
     function _setupCore() internal {
         new Roles();
-        if (block.chainid == 1337) {
+        if (block.chainid == 1337 || block.chainid == 31337) {
             uint8 networkId;
             bool useExisting;
 
