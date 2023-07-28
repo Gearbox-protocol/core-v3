@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {IAdapterBase} from "../../../interfaces/IAdapterBase.sol";
+import {IAdapterBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IAdapterBase.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 
 /// @title Adapter Mock

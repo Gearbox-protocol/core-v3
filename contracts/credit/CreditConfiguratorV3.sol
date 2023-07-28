@@ -26,14 +26,14 @@ import {CreditFacadeV3} from "./CreditFacadeV3.sol";
 import {CreditManagerV3} from "./CreditManagerV3.sol";
 
 // INTERFACES
-import {IAdapterBase} from "../interfaces/IAdapterBase.sol";
+import {IAdapterBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IAdapterBase.sol";
 import {
     ICreditConfiguratorV3,
     CollateralToken,
     CreditManagerOpts,
     AllowanceAction
 } from "../interfaces/ICreditConfiguratorV3.sol";
-import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
+import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import "../interfaces/IAddressProviderV3.sol";
 
@@ -203,7 +203,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         }
 
         // Checks that the token has a correct priceFeed in priceOracle
-        try IPriceOracleV2(CreditManagerV3(creditManager).priceOracle()).convertToUSD({amount: WAD, token: token})
+        try IPriceOracleBase(CreditManagerV3(creditManager).priceOracle()).convertToUSD({amount: WAD, token: token})
         returns (uint256) {} catch {
             revert IncorrectPriceFeedException(); // I:[CC-3]
         }

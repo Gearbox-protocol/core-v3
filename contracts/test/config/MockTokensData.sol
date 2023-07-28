@@ -16,7 +16,7 @@ struct MockToken {
 
 library MockTokensData {
     function getTokenData() internal pure returns (MockToken[] memory result) {
-        MockToken[10] memory testTokensData = [
+        MockToken[9] memory testTokensData = [
             MockToken({index: Tokens.DAI, symbol: "DAI", decimals: 18, price: 10 ** 8, underlying: Tokens.NO_TOKEN}),
             MockToken({index: Tokens.USDC, symbol: "USDC", decimals: 6, price: 10 ** 8, underlying: Tokens.NO_TOKEN}),
             MockToken({
@@ -43,7 +43,6 @@ library MockTokensData {
             }),
             MockToken({index: Tokens.CRV, symbol: "CRV", decimals: 18, price: 14 * 10 ** 7, underlying: Tokens.NO_TOKEN}),
             MockToken({index: Tokens.CVX, symbol: "CVX", decimals: 18, price: 7 * 10 ** 8, underlying: Tokens.NO_TOKEN}),
-            MockToken({index: Tokens.LUNA, symbol: "LUNA", decimals: 18, price: 1, underlying: Tokens.NO_TOKEN}),
             MockToken({
                 index: Tokens.wstETH,
                 symbol: "wstETH",

@@ -32,8 +32,9 @@ contract PriceFeedMock is AggregatorV3Interface, IPriceFeedType {
         decimals = _decimals;
         roundId = 80;
         answerInRound = 80;
-        startedAt = uint256(block.timestamp) + 1;
-        updatedAt = uint256(block.timestamp) + 1;
+        // set to quite far into the future
+        startedAt = block.timestamp + 36500 days;
+        updatedAt = block.timestamp + 36500 days;
     }
 
     function setParams(uint80 _roundId, uint256 _startedAt, uint256 _updatedAt, uint80 _answerInRound) external {
@@ -50,7 +51,7 @@ contract PriceFeedMock is AggregatorV3Interface, IPriceFeedType {
     }
 
     function version() external pure override returns (uint256) {
-        return 1;
+        return 3_00;
     }
 
     function setPrice(int256 newPrice) external {
