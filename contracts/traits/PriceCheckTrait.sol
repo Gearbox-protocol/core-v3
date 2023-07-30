@@ -7,14 +7,14 @@ import {IncorrectPriceException, StalePriceException} from "../interfaces/IExcep
 
 /// @title Price check trait
 abstract contract PriceCheckTrait {
-    /// @dev Period since the last update after which the price is considered stale
-    uint256 internal constant STALENESS_PERIOD = 8 hours;
-
     /// @dev Ensures that price is positive and not stale
-    function _checkAnswer(int256 price, uint256 updatedAt) internal view {
+    function _checkAnswer(int256 price, uint256 updatedAt, uint32 stalenessPeriod) internal view {
         if (price <= 0) revert IncorrectPriceException();
-        if (block.timestamp > updatedAt + STALENESS_PERIOD) {
-            revert StalePriceException();
-        }
+        if (_isStale(updatedAt, stalenessPeriod)) revert StalePriceException();
+    }
+
+    /// @dev Checks whether price is stale
+    function _isStale(uint256 updatedAt, uint32 stalenessPeriod) internal view returns (bool) {
+        return block.timestamp >= updatedAt + stalenessPeriod;
     }
 }

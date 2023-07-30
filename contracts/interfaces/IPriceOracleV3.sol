@@ -8,33 +8,43 @@ import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/I
 struct PriceFeedConfig {
     address token;
     address priceFeed;
+    uint32 stalenessPeriod;
 }
 
 struct PriceFeedParams {
     address priceFeed;
+    uint32 stalenessPeriod;
     bool skipCheck;
+}
+
+struct TokenParams {
+    PriceFeedParams mainFeedParams;
     uint8 decimals;
+    bool useReserve;
 }
 
 interface IPriceOracleV3Events {
     /// @notice Emitted when new price feed is set for token
     event SetPriceFeed(address indexed token, address indexed priceFeed);
+
+    /// @notice Emitted when new reserve price feed is set for token
+    event SetReservePriceFeed(address indexed token, address indexed priceFeed);
 }
 
 /// @title Price oracle V3 interface
 interface IPriceOracleV3 is IPriceOracleBase, IPriceOracleV3Events {
-    function priceFeedParams(address token) external view returns (PriceFeedParams memory);
+    function DEFAULT_STALENESS_PERIOD() external view returns (uint32);
 
-    function getPriceFeedOrRevert(address token) external view returns (address priceFeed);
-
-    function getPriceFeedParamsOrRevert(address token)
+    function priceFeedParams(address token)
         external
         view
-        returns (address priceFeed, bool skipCheck, uint8 decimals);
+        returns (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals);
 
     // ------------- //
     // CONFIGURATION //
     // ------------- //
 
-    function setPriceFeeds(PriceFeedConfig[] memory feeds) external;
+    function setPriceFeeds(PriceFeedConfig[] calldata feeds) external;
+
+    function setReservePriceFeeds(PriceFeedConfig[] calldata feeds) external;
 }
