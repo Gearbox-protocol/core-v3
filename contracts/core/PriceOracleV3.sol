@@ -12,7 +12,8 @@ import {
     AddressIsNotContractException,
     IncorrectPriceFeedException,
     IncorrectTokenContractException,
-    PriceFeedDoesNotExistException
+    PriceFeedDoesNotExistException,
+    ReservePriceFeedStatusNotAllowedException
 } from "../interfaces/IExceptions.sol";
 import {IPriceOracleV3, PriceFeedConfig, PriceFeedParams, TokenParams} from "../interfaces/IPriceOracleV3.sol";
 import {IPriceFeedType} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceFeedType.sol";
@@ -45,7 +46,12 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceCheckTrait, IPriceOracleV3 
     /// @param addressProvider Address provider contract address
     /// @param feeds Array of (token, priceFeed, stalenessPeriod) tuples
     constructor(address addressProvider, PriceFeedConfig[] memory feeds) ACLNonReentrantTrait(addressProvider) {
-        _setPriceFeeds(feeds);
+        uint256 len = feeds.length;
+        unchecked {
+            for (uint256 i; i < len; ++i) {
+                _setPriceFeed(feeds[i].token, feeds[i].priceFeed, feeds[i].stalenessPeriod);
+            }
+        }
     }
 
     /// @notice Returns `token`'s price in USD (with 8 decimals)
@@ -90,7 +96,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceCheckTrait, IPriceOracleV3 
     /// @dev Returns `token`'s price according to the price feed (either main or reserve) and decimals
     /// @dev Optionally performs price sanity and staleness checks
     function _getPrice(address token) internal view returns (uint256, uint256) {
-        (PriceFeedParams storage params, uint8 decimals) = _getPriceFeedParams(token);
+        (PriceFeedParams memory params, uint8 decimals) = _getPriceFeedParams(token);
         (, int256 answer,, uint256 updatedAt,) = AggregatorV3Interface(params.priceFeed).latestRoundData();
         if (!params.skipCheck) _checkAnswer(answer, updatedAt, params.stalenessPeriod);
         // answer should not be negative (price feeds with `skipCheck = true` must ensure that!)
@@ -119,13 +125,16 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceCheckTrait, IPriceOracleV3 
     }
 
     /// @notice Sets price feeds for multiple tokens in batch
-    /// @param feeds Array of (token, priceFeed, stalenessPeriod) tuples
     function setPriceFeeds(PriceFeedConfig[] calldata feeds) external override configuratorOnly {
-        _setPriceFeeds(feeds);
+        uint256 len = feeds.length;
+        unchecked {
+            for (uint256 i; i < len; ++i) {
+                _setPriceFeed(feeds[i].token, feeds[i].priceFeed, feeds[i].stalenessPeriod);
+            }
+        }
     }
 
     /// @notice Sets reserve price feeds for multiple tokens in batch
-    /// @param feeds Array of (token, priceFeed, stalenessPeriod) tuples
     /// @dev Main price feeds for all tokens must already be set
     function setReservePriceFeeds(PriceFeedConfig[] calldata feeds) external override configuratorOnly {
         uint256 len = feeds.length;
@@ -136,14 +145,14 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceCheckTrait, IPriceOracleV3 
         }
     }
 
-    /// @dev `setPriceFeeds` implementation
-    function _setPriceFeeds(PriceFeedConfig[] memory feeds) internal {
-        uint256 len = feeds.length;
-        unchecked {
-            for (uint256 i; i < len; ++i) {
-                _setPriceFeed(feeds[i].token, feeds[i].priceFeed, feeds[i].stalenessPeriod);
-            }
-        }
+    /// @notice Sets `token`'s reserve price feed status as `active`, performing a check for main price feed staleness
+    function setReservePriceFeedStatus(address token, bool active) external override controllerOnly {
+        _setReservePriceFeedStatus({token: token, active: active, force: false});
+    }
+
+    /// @notice Force-sets `tokens` reserve price feed status as `active`, bypassing a check for main price feed staleness
+    function forceReservePriceFeedStatus(address token, bool active) external override controllerOnly {
+        _setReservePriceFeedStatus({token: token, active: active, force: true});
     }
 
     /// @dev `setPriceFeed` implementation
@@ -173,7 +182,27 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceCheckTrait, IPriceOracleV3 
         emit SetReservePriceFeed(token, priceFeed);
     }
 
-    /// @dev Validates that token is a contract that returns `decimals` within allowed range
+    /// @dev `setReservePriceFeedStatus` implementation
+    function _setReservePriceFeedStatus(address token, bool active, bool force) internal {
+        PriceFeedParams memory reserveFeedParams = _reserveFeedParams[token];
+        if (reserveFeedParams.priceFeed == address(0)) revert PriceFeedDoesNotExistException();
+
+        TokenParams storage tokenParams = _tokenParams[token];
+        if (tokenParams.useReserve == active) return;
+
+        if (!force) {
+            PriceFeedParams memory mainFeedParams = tokenParams.mainFeedParams;
+            (,,, uint256 updatedAt,) = AggregatorV3Interface(mainFeedParams.priceFeed).latestRoundData();
+            if (active != _isStale(updatedAt, mainFeedParams.stalenessPeriod)) {
+                revert ReservePriceFeedStatusNotAllowedException();
+            }
+        }
+
+        tokenParams.useReserve = active;
+        emit SetReservePriceFeedStatus(token, active);
+    }
+
+    /// @dev Validates that `token` is a contract that returns `decimals` within allowed range
     function _validateToken(address token) internal view returns (uint8 decimals) {
         if (token == address(0)) revert ZeroAddressException();
         if (!Address.isContract(token)) revert AddressIsNotContractException(token);
@@ -185,6 +214,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceCheckTrait, IPriceOracleV3 
         }
     }
 
+    /// @dev Valites that `priceFeed` is a contract that adheres to Chainlink interface and passes sanity checks
     function _validatePriceFeed(address priceFeed, uint32 stalenessPeriod) internal view returns (bool skipCheck) {
         if (priceFeed == address(0)) revert ZeroAddressException();
         if (!Address.isContract(priceFeed)) revert AddressIsNotContractException(priceFeed);

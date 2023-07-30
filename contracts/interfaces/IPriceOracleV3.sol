@@ -29,6 +29,9 @@ interface IPriceOracleV3Events {
 
     /// @notice Emitted when new reserve price feed is set for token
     event SetReservePriceFeed(address indexed token, address indexed priceFeed);
+
+    /// @notice Emitted when new reserve price feed status is set for a token
+    event SetReservePriceFeedStatus(address indexed token, bool active);
 }
 
 /// @title Price oracle V3 interface
@@ -47,4 +50,8 @@ interface IPriceOracleV3 is IPriceOracleBase, IPriceOracleV3Events {
     function setPriceFeeds(PriceFeedConfig[] calldata feeds) external;
 
     function setReservePriceFeeds(PriceFeedConfig[] calldata feeds) external;
+
+    function setReservePriceFeedStatus(address token, bool active) external;
+
+    function forceReservePriceFeedStatus(address token, bool active) external;
 }
