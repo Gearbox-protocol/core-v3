@@ -30,6 +30,7 @@ import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfigurato
 import {PoolFactory} from "../suites/PoolFactory.sol";
 
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
+import {NetworkDetector} from "@gearbox-protocol/sdk/contracts/NetworkDetector.sol";
 
 // import { TokensTestSuite, Tokens } from "../suites/TokensTestSuite.sol";
 import {CreditConfig} from "../config/CreditConfig.sol";
@@ -50,6 +51,7 @@ import "forge-std/console.sol";
 
 contract IntegrationTestHelper is TestHelper, BalanceHelper {
     uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
+    uint256 chainId;
 
     // CORE
     IAddressProviderV3 addressProvider;
@@ -77,8 +79,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
 
     bool public anyUnderlying = true;
     Tokens public underlyingT = Tokens.DAI;
-
-    uint16 networkId;
 
     address public underlying;
 
@@ -242,29 +242,14 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
 
     function _setupCore() internal {
         new Roles();
+        NetworkDetector nd = new NetworkDetector();
+
+        chainId = nd.chainId();
+
         tokenTestSuite = new TokensTestSuite();
         tokenTestSuite.topUpWETH{value: 100 * WAD}();
-        networkId = tokenTestSuite.networkId();
 
-        if (block.chainid == 1337 || block.chainid == 31337) {
-            bool useExisting;
-
-            try vm.envBool("ETH_FORK_USE_EXISTING") returns (bool val) {
-                useExisting = val;
-            } catch {
-                useExisting = false;
-            }
-
-            try vm.envAddress("ETH_FORK_ADDRESS_PROVIDER") returns (address val) {
-                addressProvider = IAddressProviderV3(val);
-            } catch {
-                revert("ETH_FORK_ADDRESS_PROVIDER is not provided");
-            }
-
-            console.log("Starting mainnet test with address provider: %s", address(addressProvider));
-
-            /// TRANSFER OWNERSHIP TO CONFIGURATOR
-        } else {
+        if (chainId == 1337 || chainId == 31337) {
             weth = tokenTestSuite.addressOf(Tokens.WETH);
 
             CreditConfig creditConfig = new CreditConfig(
@@ -289,6 +274,24 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
             addressProvider = gp.addressProvider();
 
             vm.stopPrank();
+        } else {
+            bool useExisting;
+
+            try vm.envBool("ETH_FORK_USE_EXISTING") returns (bool val) {
+                useExisting = val;
+            } catch {
+                useExisting = false;
+            }
+
+            try vm.envAddress("ETH_FORK_ADDRESS_PROVIDER") returns (address val) {
+                addressProvider = IAddressProviderV3(val);
+            } catch {
+                revert("ETH_FORK_ADDRESS_PROVIDER is not provided");
+            }
+
+            console.log("Starting mainnet test with address provider: %s", address(addressProvider));
+
+            /// TRANSFER OWNERSHIP TO CONFIGURATOR\
         }
 
         cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));

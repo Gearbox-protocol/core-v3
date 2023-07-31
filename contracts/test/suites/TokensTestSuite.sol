@@ -24,10 +24,9 @@ import {TokensTestSuiteHelper} from "./TokensTestSuiteHelper.sol";
 import {MockTokensData, MockToken} from "../config/MockTokensData.sol";
 import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
 import {TokenData, TokensDataLive, TokenType} from "@gearbox-protocol/sdk/contracts/TokensData.sol";
+import {NetworkDetector} from "@gearbox-protocol/sdk/contracts/NetworkDetector.sol";
 
 contract TokensTestSuite is Test, TokensTestSuiteHelper {
-    uint16 public immutable networkId;
-
     mapping(Tokens => address) public addressOf;
     mapping(Tokens => string) public symbols;
     mapping(Tokens => uint256) public prices;
@@ -44,12 +43,24 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
     PriceFeedConfig[] public priceFeeds;
 
     constructor() {
-        uint16 _networkId = 1;
+        NetworkDetector nd = new NetworkDetector();
+        uint256 chainId = nd.chainId();
 
-        if (block.chainid == 1337 || block.chainid == 31337) {
+        if (chainId == 1337 || chainId == 31337) {
+            MockToken[] memory data = MockTokensData.getTokenData();
+
+            mockTokens = true;
+
+            tokenCount = data.length;
+
+            unchecked {
+                for (uint256 i; i < tokenCount; ++i) {
+                    addMockToken(data[i]);
+                }
+            }
+        } else {
             TokensDataLive tdd = new TokensDataLive();
-            _networkId = tdd.networkId();
-            TokenData[] memory td = tdd.getTokenData();
+            TokenData[] memory td = tdd.getTokenData(chainId);
             mockTokens = false;
 
             tokenCount = td.length;
@@ -66,20 +77,7 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
                     vm.label(td[i].addr, td[i].symbol);
                 }
             }
-        } else {
-            MockToken[] memory data = MockTokensData.getTokenData();
-
-            mockTokens = true;
-
-            tokenCount = data.length;
-
-            unchecked {
-                for (uint256 i; i < tokenCount; ++i) {
-                    addMockToken(data[i]);
-                }
-            }
         }
-        networkId = _networkId;
         wethToken = addressOf[Tokens.WETH];
     }
 

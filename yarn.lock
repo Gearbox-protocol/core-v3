@@ -662,10 +662,10 @@
   integrity sha512-FUoprSsBdZyBjgxXCKL6mTkbeUJytaLzPJqIOoQpDmBRTX0seCc2o5I9PI9tySoRIlNnd/XXnKCXq1xHDEGbxw==
 
 
-"@gearbox-protocol/sdk@^2.1.0":
-  version "2.1.0"
-  resolved "https://registry.yarnpkg.com/@gearbox-protocol/sdk/-/sdk-2.1.0.tgz#625a0e7e1a55e37ac1d67e214e277da16d4fdb35"
-  integrity sha512-YKkaa1BGdwK3P8rIWxlegvFQ7zkG10iSuk9v4EfdnXPgpfAcVPtiEfQt1zkxWilpWDXkLznRaJFRWJNEdtMg0w==
+"@gearbox-protocol/sdk@^2.1.7":
+  version "2.1.7"
+  resolved "https://registry.yarnpkg.com/@gearbox-protocol/sdk/-/sdk-2.1.7.tgz#0ec35a1b4a014c1994a433c46163868f63c96991"
+  integrity sha512-AGg5JvNVAi7G0GNazQomGaZNA6Z9FXk7ponanhL5h8sQHy0qUDme4WJMpJpkhEZznKQFKiHEd3s5LUxbvsyDOQ==
 
   dependencies:
     "@types/deep-eql" "^4.0.0"
