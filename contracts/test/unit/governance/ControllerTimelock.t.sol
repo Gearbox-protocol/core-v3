@@ -10,6 +10,7 @@ import {GeneralMock} from "../../mocks/GeneralMock.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import {ICreditFacadeV3} from "../../../interfaces/ICreditFacadeV3.sol";
 import {ICreditConfiguratorV3} from "../../../interfaces/ICreditConfiguratorV3.sol";
+import {IPriceOracleV3} from "../../../interfaces/IPriceOracleV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {IGaugeV3} from "../../../interfaces/IGaugeV3.sol";
@@ -1393,6 +1394,84 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         controllerTimelock.setMaxQuotaRate(pool, token, 25);
 
         vm.expectCall(gauge, abi.encodeCall(GaugeV3.changeQuotaTokenRateParams, (token, 10, 25)));
+
+        vm.warp(block.timestamp + 1 days);
+
+        vm.prank(admin);
+        controllerTimelock.executeTransaction(txHash);
+
+        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
+
+        assertTrue(!queued, "Transaction is still queued after execution");
+    }
+
+    /// @dev U:[CT-16]: setReservePriceFeedStatus works correctly
+    function test_U_CT_16_setReservePriceFeedStatus_works_correctly() public {
+        address token = makeAddr("TOKEN");
+        address priceOracle = makeAddr("PRICE_ORACLE");
+        vm.mockCall(priceOracle, abi.encodeCall(IPriceOracleV3.setReservePriceFeedStatus, (token, true)), "");
+
+        vm.startPrank(CONFIGURATOR);
+        controllerTimelock.setGroup(priceOracle, "PRICE_ORACLE");
+        controllerTimelock.setGroup(token, "TOKEN");
+        vm.stopPrank();
+
+        bytes32 POLICY_CODE = keccak256(abi.encode("PRICE_ORACLE", "TOKEN", "RESERVE_PRICE_FEED_STATUS"));
+
+        Policy memory policy = Policy({
+            enabled: false,
+            admin: admin,
+            flags: 0,
+            exactValue: 0,
+            minValue: 0,
+            maxValue: 0,
+            referencePoint: 0,
+            referencePointUpdatePeriod: 0,
+            referencePointTimestampLU: 0,
+            minPctChange: 0,
+            maxPctChange: 0,
+            minChange: 0,
+            maxChange: 0
+        });
+
+        // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setReservePriceFeedStatus(priceOracle, token, true);
+
+        vm.prank(CONFIGURATOR);
+        controllerTimelock.setPolicy(POLICY_CODE, policy);
+
+        // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(USER);
+        controllerTimelock.setReservePriceFeedStatus(priceOracle, token, true);
+
+        // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
+        bytes32 txHash = keccak256(
+            abi.encode(
+                admin,
+                priceOracle,
+                "setReservePriceFeedStatus(address,bool)",
+                abi.encode(token, true),
+                block.timestamp + 1 days
+            )
+        );
+
+        vm.expectEmit(true, false, false, true);
+        emit QueueTransaction(
+            txHash,
+            admin,
+            priceOracle,
+            "setReservePriceFeedStatus(address,bool)",
+            abi.encode(token, true),
+            uint40(block.timestamp + 1 days)
+        );
+
+        vm.prank(admin);
+        controllerTimelock.setReservePriceFeedStatus(priceOracle, token, true);
+
+        vm.expectCall(priceOracle, abi.encodeCall(IPriceOracleV3.setReservePriceFeedStatus, (token, true)));
 
         vm.warp(block.timestamp + 1 days);
 

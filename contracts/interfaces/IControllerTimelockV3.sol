@@ -73,6 +73,8 @@ interface IControllerTimelockV3 is IControllerTimelockV3Events, IVersion {
 
     function setLPPriceFeedLimiter(address priceFeed, uint256 lowerBound) external;
 
+    function setReservePriceFeedStatus(address priceOracle, address token, bool active) external;
+
     // --------- //
     // EXECUTION //
     // --------- //
