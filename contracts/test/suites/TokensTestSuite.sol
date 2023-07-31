@@ -9,7 +9,7 @@ import {WETHMock} from "../mocks/token/WETHMock.sol";
 import {ERC20BlacklistableMock} from "../mocks/token/ERC20Blacklistable.sol";
 
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
-import {PriceFeedConfig} from "../../interfaces/IPriceOracleV3.sol";
+import {PriceFeedConfig} from "../../core/PriceOracleV3.sol";
 
 // MOCKS
 import {ERC20Mock} from "../mocks/token/ERC20Mock.sol";

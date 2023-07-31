@@ -65,7 +65,10 @@ contract GenesisFactory is Ownable {
     }
 
     function addPriceFeeds(PriceFeedConfig[] memory priceFeeds) external onlyOwner {
-        priceOracle.setPriceFeeds(priceFeeds);
+        uint256 len = priceFeeds.length;
+        for (uint256 i; i < len; ++i) {
+            priceOracle.setPriceFeed(priceFeeds[i].token, priceFeeds[i].priceFeed, priceFeeds[i].stalenessPeriod);
+        }
         acl.transferOwnership(msg.sender);
     }
 

@@ -286,9 +286,6 @@ error IncorrectPriceException();
 /// @notice Thrown when token's price feed becomes stale
 error StalePriceException();
 
-/// @notice Thrown when trying to set reserve price feed status which does not pass main feed staleness check
-error ReservePriceFeedStatusNotAllowedException();
-
 // --------- //
 // DEGEN NFT //
 // --------- //
