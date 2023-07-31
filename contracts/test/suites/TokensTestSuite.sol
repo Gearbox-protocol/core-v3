@@ -26,6 +26,8 @@ import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
 import {TokenData, TokensDataLive, TokenType} from "@gearbox-protocol/sdk/contracts/TokensData.sol";
 
 contract TokensTestSuite is Test, TokensTestSuiteHelper {
+    uint16 public immutable networkId;
+
     mapping(Tokens => address) public addressOf;
     mapping(Tokens => string) public symbols;
     mapping(Tokens => uint256) public prices;
@@ -42,16 +44,11 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
     PriceFeedConfig[] public priceFeeds;
 
     constructor() {
+        uint16 _networkId = 1;
+
         if (block.chainid == 1337 || block.chainid == 31337) {
-            uint16 networkId;
-
-            try vm.envInt("ETH_FORK_NETWORK_ID") returns (int256 val) {
-                networkId = uint16(uint256(val));
-            } catch {
-                networkId = 1;
-            }
-
-            TokensDataLive tdd = new TokensDataLive(networkId);
+            TokensDataLive tdd = new TokensDataLive();
+            _networkId = tdd.networkId();
             TokenData[] memory td = tdd.getTokenData();
             mockTokens = false;
 
@@ -82,7 +79,7 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
                 }
             }
         }
-
+        networkId = _networkId;
         wethToken = addressOf[Tokens.WETH];
     }
 

@@ -77,6 +77,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
     bool public anyUnderlying = true;
     Tokens public underlyingT = Tokens.DAI;
 
+    uint16 networkId;
+
     address public underlying;
 
     bool anyDegenNFT = true;
@@ -239,15 +241,12 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
 
     function _setupCore() internal {
         new Roles();
-        if (block.chainid == 1337 || block.chainid == 31337) {
-            uint8 networkId;
-            bool useExisting;
+        tokenTestSuite = new TokensTestSuite();
+        tokenTestSuite.topUpWETH{value: 100 * WAD}();
+        networkId = tokenTestSuite.networkId();
 
-            try vm.envInt("ETH_FORK_NETWORK_ID") returns (int256 val) {
-                networkId = uint8(uint256(val));
-            } catch {
-                networkId = 1;
-            }
+        if (block.chainid == 1337 || block.chainid == 31337) {
+            bool useExisting;
 
             try vm.envBool("ETH_FORK_USE_EXISTING") returns (bool val) {
                 useExisting = val;
@@ -265,9 +264,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
 
             /// TRANSFER OWNERSHIP TO CONFIGURATOR
         } else {
-            tokenTestSuite = new TokensTestSuite();
-            tokenTestSuite.topUpWETH{value: 100 * WAD}();
-
             weth = tokenTestSuite.addressOf(Tokens.WETH);
 
             CreditConfig creditConfig = new CreditConfig(
