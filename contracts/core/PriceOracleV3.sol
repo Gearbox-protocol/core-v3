@@ -36,9 +36,6 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     /// @notice Contract version
     uint256 public constant override version = 3_00;
 
-    /// @notice Default staleness period
-    uint32 public constant override DEFAULT_STALENESS_PERIOD = 2 hours;
-
     /// @dev Mapping from token address to price feed parameters
     mapping(address => PriceFeedParams) internal _priceFeedsParams;
 
@@ -161,11 +158,6 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     // CONFIGURATION //
     // ------------- //
 
-    /// @notice Sets price feed for a given token with default staleness period
-    function addPriceFeed(address token, address priceFeed) external override configuratorOnly {
-        _setPriceFeed(token, priceFeed, DEFAULT_STALENESS_PERIOD);
-    }
-
     /// @notice Sets price feed for a given token
     function setPriceFeed(address token, address priceFeed, uint32 stalenessPeriod)
         external
@@ -175,6 +167,23 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
         _setPriceFeed(token, priceFeed, stalenessPeriod);
     }
 
+    /// @dev `setPriceFeed` implementation
+    function _setPriceFeed(address token, address priceFeed, uint32 stalenessPeriod) internal {
+        uint8 decimals = _priceFeedsParams[token].decimals;
+        decimals = decimals == 0 ? _validateToken(token) : decimals;
+
+        bool skipCheck = _validatePriceFeed(priceFeed, stalenessPeriod);
+        _priceFeedsParams[token] = PriceFeedParams({
+            priceFeed: priceFeed,
+            stalenessPeriod: stalenessPeriod,
+            skipCheck: skipCheck,
+            decimals: decimals,
+            useReserve: false
+        });
+
+        emit SetPriceFeed(token, priceFeed, stalenessPeriod, skipCheck);
+    }
+
     /// @notice Sets reserve price feed for a given token
     /// @dev Main price feed for the token must already be set
     function setReservePriceFeed(address token, address priceFeed, uint32 stalenessPeriod)
@@ -182,33 +191,6 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
         override
         configuratorOnly
     {
-        _setReservePriceFeed(token, priceFeed, stalenessPeriod);
-    }
-
-    /// @notice Sets `token`'s reserve price feed status to `active`
-    /// @dev Reserve price feed for the token must already be set
-    function setReservePriceFeedStatus(address token, bool active) external override controllerOnly {
-        _setReservePriceFeedStatus(token, active);
-    }
-
-    /// @dev `setPriceFeed` implementation
-    function _setPriceFeed(address token, address priceFeed, uint32 stalenessPeriod) internal {
-        uint8 decimals = _priceFeedsParams[token].decimals;
-
-        bool skipCheck = _validatePriceFeed(priceFeed, stalenessPeriod);
-        _priceFeedsParams[token] = PriceFeedParams({
-            priceFeed: priceFeed,
-            stalenessPeriod: stalenessPeriod,
-            skipCheck: skipCheck,
-            decimals: decimals == 0 ? _validateToken(token) : decimals,
-            useReserve: false
-        });
-
-        emit SetPriceFeed(token, priceFeed, stalenessPeriod, skipCheck);
-    }
-
-    /// @dev `setReservePriceFeed` implementation
-    function _setReservePriceFeed(address token, address priceFeed, uint32 stalenessPeriod) internal {
         uint8 decimals = _priceFeedsParams[token].decimals;
         if (decimals == 0) revert PriceFeedDoesNotExistException();
 
@@ -223,8 +205,9 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
         emit SetReservePriceFeed(token, priceFeed, stalenessPeriod, skipCheck);
     }
 
-    /// @dev `setReservePriceFeedStatus` implementation
-    function _setReservePriceFeedStatus(address token, bool active) internal {
+    /// @notice Sets `token`'s reserve price feed status to `active`
+    /// @dev Reserve price feed for the token must already be set
+    function setReservePriceFeedStatus(address token, bool active) external override controllerOnly {
         if (_priceFeedsParams[_getTokenReserveKey(token)].priceFeed == address(0)) {
             revert PriceFeedDoesNotExistException();
         }

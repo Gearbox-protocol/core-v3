@@ -24,6 +24,7 @@ import {ICreditFacadeV3Multicall} from "../../interfaces/ICreditFacadeV3.sol";
 
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
+import {IPriceOracleV3} from "../../interfaces/IPriceOracleV3.sol";
 import {IWithdrawalManagerV3} from "../../interfaces/IWithdrawalManagerV3.sol";
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 import {PoolFactory} from "../suites/PoolFactory.sol";
@@ -474,7 +475,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
 
             vm.startPrank(CONFIGURATOR);
             creditManager.addToken(address(t));
-            IPriceOracleBase(address(priceOracle)).addPriceFeed(address(t), address(pf));
+            IPriceOracleV3(address(priceOracle)).setPriceFeed(address(t), address(pf), 1 hours);
             creditManager.setCollateralTokenData(address(t), 8000, 8000, type(uint40).max, 0);
             vm.stopPrank();
 

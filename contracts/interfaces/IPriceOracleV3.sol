@@ -26,8 +26,6 @@ interface IPriceOracleV3Events {
 
 /// @title Price oracle V3 interface
 interface IPriceOracleV3 is IPriceOracleBase, IPriceOracleV3Events {
-    function DEFAULT_STALENESS_PERIOD() external view returns (uint32);
-
     function getPriceRaw(address token, bool reserve) external view returns (uint256);
 
     function priceFeedsRaw(address token, bool reserve) external view returns (address);

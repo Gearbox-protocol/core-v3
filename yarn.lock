@@ -649,10 +649,10 @@
     "@ethersproject/properties" "^5.7.0"
     "@ethersproject/strings" "^5.7.0"
 
-"@gearbox-protocol/core-v2@^1.19.0-base.6":
-  version "1.19.0-base.6"
-  resolved "https://registry.yarnpkg.com/@gearbox-protocol/core-v2/-/core-v2-1.19.0-base.6.tgz#2e569814ce68436110fc17135190952bc66e6513"
-  integrity sha512-iXE28V16nQrssdRcfh8Ekz/bvdAY9flaYrjpZfttLMQ9o0dteN6w5eznV7Pc06+S6lkIcN9sPCE51BQrvnqnLA==
+"@gearbox-protocol/core-v2@^1.19.0-base.7":
+  version "1.19.0-base.7"
+  resolved "https://registry.yarnpkg.com/@gearbox-protocol/core-v2/-/core-v2-1.19.0-base.7.tgz#547cbf15f4ebc4dc13941998890ba041b6e108f0"
+  integrity sha512-UcwkIUwWKTz7ocC+UXSNYXc9zrOhSwhDgGKGb0cQRqP8yYHiwwudFt7nzPAHI1elS8YyuzcXarqaSLH5nZU2XA==
   dependencies:
     "@typechain/ethers-v5" "^10.2.1"
 
@@ -662,9 +662,9 @@
   integrity sha512-FUoprSsBdZyBjgxXCKL6mTkbeUJytaLzPJqIOoQpDmBRTX0seCc2o5I9PI9tySoRIlNnd/XXnKCXq1xHDEGbxw==
 
 "@gearbox-protocol/sdk@^1.27.6":
-  version "1.27.6"
-  resolved "https://registry.yarnpkg.com/@gearbox-protocol/sdk/-/sdk-1.27.6.tgz#4d98f20300163ab5cc3e163c9d2a9fd1c2260b71"
-  integrity sha512-lP8YBqdNcQLXxIoWhUFOdbGTHuHhjMb3h2t7+hSaBgMgmEw9IcNFMNXLM4h/AMYHWeQSWFW+OoDAQVGCYZ38eQ==
+  version "1.27.12"
+  resolved "https://registry.yarnpkg.com/@gearbox-protocol/sdk/-/sdk-1.27.12.tgz#f5a04f38d58329364fe8434c49e2e8ed384a107b"
+  integrity sha512-oSSFppG3ybzFL5l9POIKvi34e9+DL6SQC5Uc1sHSQAzygdN6NcpZjhnOS1BM+T41bxxgYGArSoPo88NtZVRFbg==
   dependencies:
     "@types/deep-eql" "^4.0.0"
     axios "^1.2.6"
