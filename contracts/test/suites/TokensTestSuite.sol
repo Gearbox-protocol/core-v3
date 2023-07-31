@@ -26,8 +26,6 @@ import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
 import {TokenData, TokensDataLive, TokenType} from "@gearbox-protocol/sdk/contracts/TokensData.sol";
 
 contract TokensTestSuite is Test, TokensTestSuiteHelper {
-    uint256 public immutable networkId;
-
     mapping(Tokens => address) public addressOf;
     mapping(Tokens => string) public symbols;
     mapping(Tokens => uint256) public prices;
@@ -44,10 +42,20 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
     PriceFeedConfig[] public priceFeeds;
 
     constructor() {
-        TokensDataLive tdd = new TokensDataLive();
-        uint256 _networkId = tdd.getNetworkId();
+        if (block.chainid == 1337 || block.chainid == 31337) {
+            MockToken[] memory data = MockTokensData.getTokenData();
 
-        if (_networkId != 1337 && _networkId != 31337) {
+            mockTokens = true;
+
+            tokenCount = data.length;
+
+            unchecked {
+                for (uint256 i; i < tokenCount; ++i) {
+                    addMockToken(data[i]);
+                }
+            }
+        } else {
+            TokensDataLive tdd = new TokensDataLive();
             TokenData[] memory td = tdd.getTokenData();
             mockTokens = false;
 
@@ -65,20 +73,7 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
                     vm.label(td[i].addr, td[i].symbol);
                 }
             }
-        } else {
-            MockToken[] memory data = MockTokensData.getTokenData();
-
-            mockTokens = true;
-
-            tokenCount = data.length;
-
-            unchecked {
-                for (uint256 i; i < tokenCount; ++i) {
-                    addMockToken(data[i]);
-                }
-            }
         }
-        networkId = _networkId;
         wethToken = addressOf[Tokens.WETH];
     }
 
