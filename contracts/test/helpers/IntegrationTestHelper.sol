@@ -50,6 +50,7 @@ import "forge-std/console.sol";
 
 contract IntegrationTestHelper is TestHelper, BalanceHelper {
     uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
+    uint256 chainId;
 
     // CORE
     IAddressProviderV3 addressProvider;
@@ -77,8 +78,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
 
     bool public anyUnderlying = true;
     Tokens public underlyingT = Tokens.DAI;
-
-    uint16 networkId;
 
     address public underlying;
 
@@ -242,12 +241,14 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
 
     function _setupCore() internal {
         new Roles();
-        new NetworkDetector();
+        NetworkDetector nd = new NetworkDetector();
+
+        chainId = nd.chainId();
 
         tokenTestSuite = new TokensTestSuite();
         tokenTestSuite.topUpWETH{value: 100 * WAD}();
 
-        if (block.chainid == 1337 || block.chainid == 31337) {
+        if (chainId == 1337 || chainId == 31337) {
             weth = tokenTestSuite.addressOf(Tokens.WETH);
 
             CreditConfig creditConfig = new CreditConfig(

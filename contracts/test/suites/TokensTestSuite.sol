@@ -24,6 +24,7 @@ import {TokensTestSuiteHelper} from "./TokensTestSuiteHelper.sol";
 import {MockTokensData, MockToken} from "../config/MockTokensData.sol";
 import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
 import {TokenData, TokensDataLive, TokenType} from "@gearbox-protocol/sdk/contracts/TokensData.sol";
+import {NetworkDetector} from "@gearbox-protocol/sdk/contracts/NetworkDetector.sol";
 
 contract TokensTestSuite is Test, TokensTestSuiteHelper {
     mapping(Tokens => address) public addressOf;
@@ -42,7 +43,10 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
     PriceFeedConfig[] public priceFeeds;
 
     constructor() {
-        if (block.chainid == 1337 || block.chainid == 31337) {
+        NetworkDetector nd = new NetworkDetector();
+        uint256 chainId = nd.chainId();
+
+        if (chainId == 1337 || chainId == 31337) {
             MockToken[] memory data = MockTokensData.getTokenData();
 
             mockTokens = true;
@@ -56,7 +60,7 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
             }
         } else {
             TokensDataLive tdd = new TokensDataLive();
-            TokenData[] memory td = tdd.getTokenData();
+            TokenData[] memory td = tdd.getTokenData(chainId);
             mockTokens = false;
 
             tokenCount = td.length;
