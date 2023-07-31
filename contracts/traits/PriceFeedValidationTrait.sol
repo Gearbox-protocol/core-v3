@@ -19,7 +19,9 @@ import {IPriceFeedType} from "@gearbox-protocol/core-v2/contracts/interfaces/IPr
 
 /// @title Price feed validation trait
 abstract contract PriceFeedValidationTrait {
+    using Address for address;
     /// @dev Ensures that price is positive and not stale
+
     function _checkAnswer(int256 price, uint256 updatedAt, uint32 stalenessPeriod) internal view {
         if (price <= 0) revert IncorrectPriceException();
         if (_isStale(updatedAt, stalenessPeriod)) revert StalePriceException();
@@ -33,7 +35,8 @@ abstract contract PriceFeedValidationTrait {
     /// @dev Valites that `priceFeed` is a contract that adheres to Chainlink interface and passes sanity checks
     function _validatePriceFeed(address priceFeed, uint32 stalenessPeriod) internal view returns (bool skipCheck) {
         if (priceFeed == address(0)) revert ZeroAddressException();
-        if (!Address.isContract(priceFeed)) revert AddressIsNotContractException(priceFeed);
+
+        if (!priceFeed.isContract()) revert AddressIsNotContractException(priceFeed);
 
         try AggregatorV3Interface(priceFeed).decimals() returns (uint8 _decimals) {
             if (_decimals != 8) revert IncorrectPriceFeedException();

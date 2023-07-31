@@ -18,12 +18,6 @@ import {IPriceOracleV3, PriceFeedParams} from "../interfaces/IPriceOracleV3.sol"
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {PriceFeedValidationTrait} from "../traits/PriceFeedValidationTrait.sol";
 
-struct PriceFeedConfig {
-    address token;
-    address priceFeed;
-    uint32 stalenessPeriod;
-}
-
 /// @title Price oracle V3
 /// @notice Acts as router that dispatches calls to corresponding price feeds.
 ///         Underlying price feeds can be arbitrary, but they must adhere to Chainlink interface,
@@ -41,15 +35,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
 
     /// @notice Constructor
     /// @param addressProvider Address provider contract address
-    /// @param feeds Array of (token, priceFeed, stalenessPeriod) tuples
-    constructor(address addressProvider, PriceFeedConfig[] memory feeds) ACLNonReentrantTrait(addressProvider) {
-        uint256 len = feeds.length;
-        unchecked {
-            for (uint256 i; i < len; ++i) {
-                _setPriceFeed(feeds[i].token, feeds[i].priceFeed, feeds[i].stalenessPeriod);
-            }
-        }
-    }
+    constructor(address addressProvider) ACLNonReentrantTrait(addressProvider) {}
 
     /// @notice Returns `token`'s price in USD (with 8 decimals)
     function getPrice(address token) external view override returns (uint256 price) {
@@ -162,6 +148,8 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     function setPriceFeed(address token, address priceFeed, uint32 stalenessPeriod)
         external
         override
+        nonZeroAddress(token) // U:[PO-2]
+        nonZeroAddress(priceFeed) // U:[PO-2]
         configuratorOnly
     {
         _setPriceFeed(token, priceFeed, stalenessPeriod);
@@ -189,6 +177,8 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     function setReservePriceFeed(address token, address priceFeed, uint32 stalenessPeriod)
         external
         override
+        nonZeroAddress(token)
+        nonZeroAddress(priceFeed)
         configuratorOnly
     {
         uint8 decimals = _priceFeedsParams[token].decimals;

@@ -11,11 +11,12 @@ import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
 import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
 import {GearStakingV3} from "../../governance/GearStakingV3.sol";
+import {PriceFeedConfig} from "../interfaces/ICreditConfig.sol";
 
 import "../../interfaces/IAddressProviderV3.sol";
 import {WithdrawalManagerV3} from "../../core/WithdrawalManagerV3.sol";
 import {BotListV3} from "../../core/BotListV3.sol";
-import {PriceOracleV3, PriceFeedConfig} from "../../core/PriceOracleV3.sol";
+import {PriceOracleV3} from "../../core/PriceOracleV3.sol";
 import {GearToken} from "@gearbox-protocol/core-v2/contracts/tokens/GearToken.sol";
 
 contract GenesisFactory is Ownable {
@@ -32,7 +33,7 @@ contract GenesisFactory is Ownable {
         ContractsRegister contractsRegister = new ContractsRegister(address(addressProvider));
         addressProvider.setAddress(AP_CONTRACTS_REGISTER, address(contractsRegister), true);
 
-        priceOracle = new PriceOracleV3(address(addressProvider), new PriceFeedConfig[](0));
+        priceOracle = new PriceOracleV3(address(addressProvider));
         addressProvider.setAddress(AP_PRICE_ORACLE, address(priceOracle), true);
 
         address accountFactory;
