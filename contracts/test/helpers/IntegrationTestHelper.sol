@@ -243,9 +243,9 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
         new Roles();
         tokenTestSuite = new TokensTestSuite();
         tokenTestSuite.topUpWETH{value: 100 * WAD}();
-        networkId = tokenTestSuite.networkId();
+        vm.chainId(tokenTestSuite.networkId());
 
-        if (block.chainid == 1337 || block.chainid == 31337) {
+        if (block.chainid != 1337 && block.chainid != 31337) {
             bool useExisting;
 
             try vm.envBool("ETH_FORK_USE_EXISTING") returns (bool val) {

@@ -26,7 +26,7 @@ import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
 import {TokenData, TokensDataLive, TokenType} from "@gearbox-protocol/sdk/contracts/TokensData.sol";
 
 contract TokensTestSuite is Test, TokensTestSuiteHelper {
-    uint16 public immutable networkId;
+    uint256 public immutable networkId;
 
     mapping(Tokens => address) public addressOf;
     mapping(Tokens => string) public symbols;
@@ -44,11 +44,10 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
     PriceFeedConfig[] public priceFeeds;
 
     constructor() {
-        uint16 _networkId = 1;
+        TokensDataLive tdd = new TokensDataLive();
+        uint256 _networkId = tdd.getNetworkId();
 
-        if (block.chainid == 1337 || block.chainid == 31337) {
-            TokensDataLive tdd = new TokensDataLive();
-            _networkId = tdd.networkId();
+        if (_networkId != 1337 && _networkId != 31337) {
             TokenData[] memory td = tdd.getTokenData();
             mockTokens = false;
 

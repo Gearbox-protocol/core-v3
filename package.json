@@ -40,6 +40,6 @@
   "dependencies": {
     "@1inch/solidity-utils": "^2.2.27",
     "@gearbox-protocol/core-v2": "1.19.0-base.5",
-    "@gearbox-protocol/sdk": "^2.1.0"
+    "@gearbox-protocol/sdk": "^2.1.5"
   }
 }
