@@ -8,7 +8,6 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
 import {
-    ZeroAddressException,
     AddressIsNotContractException,
     IncorrectTokenContractException,
     PriceFeedDoesNotExistException
@@ -148,15 +147,10 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     function setPriceFeed(address token, address priceFeed, uint32 stalenessPeriod)
         external
         override
-        nonZeroAddress(token) // U:[PO-2]
-        nonZeroAddress(priceFeed) // U:[PO-2]
+        nonZeroAddress(token)
+        nonZeroAddress(priceFeed)
         configuratorOnly
     {
-        _setPriceFeed(token, priceFeed, stalenessPeriod);
-    }
-
-    /// @dev `setPriceFeed` implementation
-    function _setPriceFeed(address token, address priceFeed, uint32 stalenessPeriod) internal {
         uint8 decimals = _priceFeedsParams[token].decimals;
         decimals = decimals == 0 ? _validateToken(token) : decimals;
 
@@ -210,7 +204,6 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
 
     /// @dev Validates that `token` is a contract that returns `decimals` within allowed range
     function _validateToken(address token) internal view returns (uint8 decimals) {
-        if (token == address(0)) revert ZeroAddressException();
         if (!Address.isContract(token)) revert AddressIsNotContractException(token);
         try ERC20(token).decimals() returns (uint8 _decimals) {
             if (_decimals == 0 || _decimals > 18) revert IncorrectTokenContractException();

@@ -3,8 +3,7 @@
 // // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {IPriceOracleV3Events} from "../../../interfaces/IPriceOracleV3.sol";
-import {PriceOracleV3} from "../../../core/PriceOracleV3.sol";
+import {IPriceOracleV3Events, PriceFeedParams} from "../../../interfaces/IPriceOracleV3.sol";
 import {AddressProviderV3ACLMock, AP_PRICE_ORACLE} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
 // // TEST
@@ -23,10 +22,12 @@ import "../../../interfaces/IExceptions.sol";
 
 import {TestHelper} from "../../lib/helper.sol";
 
-contract PriceOracleV3Test is TestHelper, IPriceOracleV3Events {
+import {PriceOracleV3Harness} from "./PriceOracleV3Harness.sol";
+
+contract PriceOracleV3UnitTest is TestHelper, IPriceOracleV3Events {
     TokensTestSuite tokenTestSuite;
     AddressProviderV3ACLMock ap;
-    PriceOracleV3 public priceOracle;
+    PriceOracleV3Harness public priceOracle;
 
     function setUp() public {
         tokenTestSuite = new TokensTestSuite();
@@ -34,7 +35,7 @@ contract PriceOracleV3Test is TestHelper, IPriceOracleV3Events {
 
         vm.startPrank(CONFIGURATOR);
         ap = new AddressProviderV3ACLMock();
-        priceOracle = new PriceOracleV3(address(ap));
+        priceOracle = new PriceOracleV3Harness(address(ap));
 
         vm.stopPrank();
     }
@@ -276,5 +277,28 @@ contract PriceOracleV3Test is TestHelper, IPriceOracleV3Events {
         //     100 * WAD,
         //     "Incorrect USDC/DAI conversation"
         // );
+    }
+
+    /// @notice U:[PO-9]: `_getPriceFeedParams` works as expected
+    /// forge-config: default.fuzz.runs = 5000
+    function test_U_PO_09_getPriceFeedParams_works_as_expected(address token, PriceFeedParams memory expectedParams)
+        public
+    {
+        priceOracle.hackPriceFeedParams(token, expectedParams);
+
+        PriceFeedParams memory params = priceOracle.getPriceFeedParams(token);
+
+        assertEq(params.priceFeed, expectedParams.priceFeed, "Incorrect priceFeed");
+        assertEq(params.stalenessPeriod, expectedParams.stalenessPeriod, "Incorrect stalenessPeriod");
+        assertEq(params.decimals, expectedParams.decimals, "Incorrect decimals");
+        assertEq(params.skipCheck, expectedParams.skipCheck, "Incorrect skipCheck");
+        assertEq(params.useReserve, expectedParams.useReserve, "Incorrect useReserve");
+    }
+
+    /// @notice U:[PO-10]: `_getTokenReserveKey` works as expected
+    /// forge-config: default.fuzz.runs = 5000
+    function test_U_PO_10_getTokenReserveKey_works_as_expected(address token) public {
+        address expectedKey = address(uint160(uint256(keccak256(abi.encodePacked("RESERVE", token)))));
+        assertEq(priceOracle.getTokenReserveKey(token), expectedKey);
     }
 }
