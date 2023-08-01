@@ -23,7 +23,8 @@ import {CreditManagerFactory} from "../suites/CreditManagerFactory.sol";
 import {ICreditFacadeV3Multicall} from "../../interfaces/ICreditFacadeV3.sol";
 
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
-import {IPriceOracleV2, IPriceOracleV2Ext} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
+import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
+import {IPriceOracleV3} from "../../interfaces/IPriceOracleV3.sol";
 import {IWithdrawalManagerV3} from "../../interfaces/IWithdrawalManagerV3.sol";
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 import {PoolFactory} from "../suites/PoolFactory.sol";
@@ -56,7 +57,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
     IAddressProviderV3 addressProvider;
     ContractsRegister cr;
     AccountFactory accountFactory;
-    IPriceOracleV2 priceOracle;
+    IPriceOracleBase priceOracle;
     IWithdrawalManagerV3 withdrawalManager;
     BotListV3 botList;
 
@@ -295,7 +296,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
 
         cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
         accountFactory = AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL));
-        priceOracle = IPriceOracleV2(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 2));
+        priceOracle = IPriceOracleBase(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00));
         withdrawalManager = IWithdrawalManagerV3(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00));
         botList = BotListV3(payable(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00)));
     }
@@ -473,7 +474,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
 
             vm.startPrank(CONFIGURATOR);
             creditManager.addToken(address(t));
-            IPriceOracleV2Ext(address(priceOracle)).addPriceFeed(address(t), address(pf));
+            IPriceOracleV3(address(priceOracle)).setPriceFeed(address(t), address(pf), 1 hours);
             creditManager.setCollateralTokenData(address(t), 8000, 8000, type(uint40).max, 0);
             vm.stopPrank();
 

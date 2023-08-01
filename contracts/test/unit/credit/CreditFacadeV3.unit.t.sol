@@ -7,7 +7,7 @@ import "../../../interfaces/IAddressProviderV3.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
 import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
-import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
+import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
 
 /// LIBS
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -145,7 +145,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         withdrawalManagerMock = WithdrawalManagerMock(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00));
 
-        priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 2));
+        priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00));
 
         AddressProviderV3ACLMock(address(addressProvider)).addPausableAdmin(CONFIGURATOR);
 
@@ -1220,7 +1220,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         address priceFeedOnDemandMock = address(new PriceFeedOnDemandMock());
 
-        priceOracleMock.setPriceFeed(token, priceFeedOnDemandMock);
+        priceOracleMock.addPriceFeed(token, priceFeedOnDemandMock);
 
         creditManagerMock.setBorrower(USER);
 
@@ -1418,7 +1418,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         address priceFeedOnDemandMock = address(new PriceFeedOnDemandMock());
 
-        priceOracleMock.setPriceFeed(token, priceFeedOnDemandMock);
+        priceOracleMock.addPriceFeed(token, priceFeedOnDemandMock);
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
@@ -1427,7 +1427,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             })
         );
 
-        vm.expectCall(address(priceOracleMock), abi.encodeCall(IPriceOracleV2.priceFeeds, (token)));
+        vm.expectCall(address(priceOracleMock), abi.encodeCall(IPriceOracleBase.priceFeeds, (token)));
         vm.expectCall(address(priceFeedOnDemandMock), abi.encodeCall(PriceFeedOnDemandMock.updatePrice, (cd)));
         creditFacade.multicallInt({creditAccount: creditAccount, calls: calls, enabledTokensMask: 0, flags: 0});
 

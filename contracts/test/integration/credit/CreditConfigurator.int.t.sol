@@ -17,7 +17,7 @@ import {
 } from "../../../credit/CreditConfiguratorV3.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import {ICreditConfiguratorEvents} from "../../../interfaces/ICreditConfiguratorV3.sol";
-import {IAdapterBase} from "../../../interfaces/IAdapterBase.sol";
+import {IAdapterBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IAdapterBase.sol";
 
 //
 import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
@@ -419,23 +419,23 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     function test_I_CC_04_addCollateralToken_adds_new_token_to_creditManager_and_set_lt() public creditTest {
         uint256 tokensCountBefore = creditManager.collateralTokensCount();
 
-        address cLINKToken = tokenTestSuite.addressOf(Tokens.LUNA);
+        address newToken = tokenTestSuite.addressOf(Tokens.wstETH);
 
         vm.expectEmit(true, false, false, false);
-        emit AllowToken(cLINKToken);
+        emit AllowToken(newToken);
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.addCollateralToken(cLINKToken, 8800);
+        creditConfigurator.addCollateralToken(newToken, 8800);
 
         assertEq(creditManager.collateralTokensCount(), tokensCountBefore + 1, "Incorrect tokens count");
 
         (address token,) = creditManager.collateralTokenByMask(1 << tokensCountBefore);
 
-        assertEq(token, cLINKToken, "Token is not added to list");
+        assertEq(token, newToken, "Token is not added to list");
 
-        assertTrue(creditManager.getTokenMaskOrRevert(cLINKToken) > 0, "Incorrect token mask");
+        assertTrue(creditManager.getTokenMaskOrRevert(newToken) > 0, "Incorrect token mask");
 
-        assertEq(creditManager.liquidationThresholds(cLINKToken), 8800, "Threshold wasn't set");
+        assertEq(creditManager.liquidationThresholds(newToken), 8800, "Threshold wasn't set");
     }
 
     /// @dev I:[CC-5]: setLiquidationThreshold reverts for underling token and incorrect values
@@ -950,7 +950,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             vm.prank(CONFIGURATOR);
             creditConfigurator.setCreditFacade(address(cf), migrateSettings);
 
-            assertEq(address(creditManager.priceOracle()), addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 2));
+            assertEq(address(creditManager.priceOracle()), addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00));
 
             assertEq(address(creditManager.creditFacade()), address(cf));
             assertEq(address(creditConfigurator.creditFacade()), address(cf));

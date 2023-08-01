@@ -34,7 +34,7 @@ import {
     WITHDRAWAL_FLAG
 } from "../interfaces/ICreditManagerV3.sol";
 import "../interfaces/IAddressProviderV3.sol";
-import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
+import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 
 // CONSTANTS
@@ -207,7 +207,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         weth =
             IAddressProviderV3(addressProvider).getAddressOrRevert({key: AP_WETH_TOKEN, _version: NO_VERSION_CONTROL}); // U:[CM-1]
-        priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert({key: AP_PRICE_ORACLE, _version: 2}); // U:[CM-1]
+        priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert({key: AP_PRICE_ORACLE, _version: 3_00}); // U:[CM-1]
         accountFactory = IAddressProviderV3(addressProvider).getAddressOrRevert({
             key: AP_ACCOUNT_FACTORY,
             _version: NO_VERSION_CONTROL
@@ -1613,7 +1613,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         view
         returns (uint256 amountInUSD)
     {
-        amountInUSD = IPriceOracleV2(_priceOracle).convertToUSD(amountInToken, token);
+        amountInUSD = IPriceOracleBase(_priceOracle).convertToUSD(amountInToken, token);
     }
 
     /// @notice Returns amount of token after converting from a provided USD amount
@@ -1625,7 +1625,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         view
         returns (uint256 amountInToken)
     {
-        amountInToken = IPriceOracleV2(_priceOracle).convertFromUSD(amountInUSD, token);
+        amountInToken = IPriceOracleBase(_priceOracle).convertFromUSD(amountInUSD, token);
     }
 
     //

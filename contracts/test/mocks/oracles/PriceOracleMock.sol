@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 //pragma abicoder v1;
 
-import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
+import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
 
 // EXCEPTIONS
 
@@ -12,10 +12,10 @@ import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 /// @title Disposable credit accounts factory
-contract PriceOracleMock is Test, IPriceOracleV2 {
+contract PriceOracleMock is Test, IPriceOracleBase {
     mapping(address => uint256) public priceInUSD;
 
-    uint256 public constant override version = 2;
+    uint256 public constant override version = 3_00;
 
     mapping(address => bool) revertsOnGetPrice;
     mapping(address => address) public priceFeeds;
@@ -32,7 +32,7 @@ contract PriceOracleMock is Test, IPriceOracleV2 {
         priceInUSD[token] = price;
     }
 
-    function setPriceFeed(address token, address priceFeed) external {
+    function addPriceFeed(address token, address priceFeed) external {
         priceFeeds[token] = priceFeed;
     }
 
@@ -77,20 +77,4 @@ contract PriceOracleMock is Test, IPriceOracleV2 {
         priceFeed = priceFeeds[token];
         require(priceFeed != address(0), "Price feed is not set");
     }
-
-    /// @dev Returns the price feed for the passed token,
-    ///      with additional parameters
-    /// @param token Token to get the price feed for
-    function priceFeedsWithFlags(address token)
-        external
-        view
-        returns (address priceFeed, bool skipCheck, uint256 decimals)
-    {}
-
-    /// OUTDATED!
-    function fastCheck(uint256 amountFrom, address tokenFrom, uint256 amountTo, address tokenTo)
-        external
-        view
-        returns (uint256 collateralFrom, uint256 collateralTo)
-    {}
 }

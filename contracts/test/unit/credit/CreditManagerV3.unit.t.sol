@@ -142,7 +142,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         accountFactory = AccountFactoryMock(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL));
         withdrawalManagerMock = WithdrawalManagerMock(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00));
 
-        priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 2));
+        priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00));
 
         /// Inits all state
         supportsQuotas = false;
@@ -342,7 +342,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         assertEq(
             address(creditManager.priceOracle()),
-            addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 2),
+            addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00),
             _testCaseErr("Incorrect Price oracle")
         );
 

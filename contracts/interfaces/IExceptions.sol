@@ -117,9 +117,6 @@ error OpenCloseAccountInOneBlockException();
 /// @notice Thrown on attempting to use a non-ERC20 contract or an EOA as a token
 error IncorrectTokenContractException();
 
-/// @notice Thrown on attempting to set a token price feed to an address that is not a correct price feed
-error IncorrectPriceFeedException();
-
 /// @notice Thrown if the newly set LT if zero or greater than the underlying's LT
 error IncorrectLiquidationThresholdException();
 
@@ -141,9 +138,6 @@ error TotalDebtNotTrackedException();
 // ------------- //
 // CREDIT FACADE //
 // ------------- //
-
-/// @notice Thrown on attempting to interact with a price feed for a token not added to price oracle
-error PriceFeedDoesNotExistException();
 
 /// @notice Thrown when attempting to perform an action that is forbidden in whitelisted mode
 error ForbiddenInWhitelistedModeException();
@@ -275,6 +269,22 @@ error MasterCreditAccountAlreadyDeployedException();
 
 /// @notice Thrown when trying to rescue funds from a credit account that is currently in use
 error CreditAccountIsInUseException();
+
+// ------------ //
+// PRICE ORACLE //
+// ------------ //
+
+/// @notice Thrown on attempting to set a token price feed to an address that is not a correct price feed
+error IncorrectPriceFeedException();
+
+/// @notice Thrown on attempting to interact with a price feed for a token not added to the price oracle
+error PriceFeedDoesNotExistException();
+
+/// @notice Thrown when price feed returns incorrect price for a token
+error IncorrectPriceException();
+
+/// @notice Thrown when token's price feed becomes stale
+error StalePriceException();
 
 // --------- //
 // DEGEN NFT //

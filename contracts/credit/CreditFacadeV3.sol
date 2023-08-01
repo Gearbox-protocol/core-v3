@@ -28,7 +28,7 @@ import {
 } from "../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
 import {ClaimAction, ETH_ADDRESS, IWithdrawalManagerV3} from "../interfaces/IWithdrawalManagerV3.sol";
-import {IPriceOracleV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleV2.sol";
+import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
 
 import {IPoolV3, IPoolBase} from "../interfaces/IPoolV3.sol";
 import {IDegenNFTV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFTV2.sol";
@@ -926,7 +926,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     function _onDemandPriceUpdate(bytes calldata callData) internal {
         (address token, bytes memory data) = abi.decode(callData, (address, bytes)); // U:[FA-25]
 
-        address priceFeed = IPriceOracleV2(ICreditManagerV3(creditManager).priceOracle()).priceFeeds(token); // U:[FA-25]
+        address priceFeed = IPriceOracleBase(ICreditManagerV3(creditManager).priceOracle()).priceFeeds(token); // U:[FA-25]
         if (priceFeed == address(0)) revert PriceFeedDoesNotExistException(); // U:[FA-25]
 
         IUpdatablePriceFeed(priceFeed).updatePrice(data); // U:[FA-25]

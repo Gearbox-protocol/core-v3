@@ -394,6 +394,26 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         }); // U: [CT-15B]
     }
 
+    /// @notice Queues a transaction to activate or deactivate reserve price feed for a token in price oracle
+    /// @dev Requires the policy for keccak(group(priceOracle), group(token), "RESERVE_PRICE_FEED_STATUS")
+    ///      to be enabled, otherwise auto-fails the check
+    /// @param priceOracle Price oracle to change reserve price feed status for
+    /// @param token Token to change reserve price feed status for
+    /// @param active New reserve price feed status (`true` to activate, `false` to deactivate)
+    function setReservePriceFeedStatus(address priceOracle, address token, bool active) external override {
+        bytes32 policyHash = keccak256(abi.encode(_group[priceOracle], _group[token], "RESERVE_PRICE_FEED_STATUS"));
+
+        if (!_checkPolicy(policyHash, 0, 0)) {
+            revert ParameterChecksFailedException(); // U:[CT-16]
+        }
+
+        _queueTransaction({
+            target: priceOracle,
+            signature: "setReservePriceFeedStatus(address,bool)",
+            data: abi.encode(token, active)
+        }); // U:[CT-16]
+    }
+
     /// @dev Internal function that stores the transaction in the queued tx map
     /// @param target The contract to call
     /// @param signature The signature of the called function

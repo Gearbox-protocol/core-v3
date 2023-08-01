@@ -8,8 +8,7 @@ import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
 
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 
-import {PriceFeedConfig} from "@gearbox-protocol/core-v2/contracts/oracles/PriceOracleV2.sol";
-import {ICreditConfig} from "../interfaces/ICreditConfig.sol";
+import {ICreditConfig, PriceFeedConfig} from "../interfaces/ICreditConfig.sol";
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 
 import "../lib/constants.sol";

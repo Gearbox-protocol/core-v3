@@ -9,7 +9,7 @@ import {WETHMock} from "../mocks/token/WETHMock.sol";
 import {ERC20BlacklistableMock} from "../mocks/token/ERC20Blacklistable.sol";
 
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
-import {PriceFeedConfig} from "@gearbox-protocol/core-v2/contracts/oracles/PriceOracleV2.sol";
+import {PriceFeedConfig} from "../interfaces/ICreditConfig.sol";
 
 // MOCKS
 import {ERC20Mock} from "../mocks/token/ERC20Mock.sol";
@@ -108,7 +108,7 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
 
         tokenIndexes[address(t)] = token.index;
 
-        priceFeeds.push(PriceFeedConfig({token: address(t), priceFeed: address(priceFeed)}));
+        priceFeeds.push(PriceFeedConfig({token: address(t), priceFeed: address(priceFeed), stalenessPeriod: 2 hours}));
         symbols[token.index] = token.symbol;
         priceFeedsMap[token.index] = address(priceFeed);
     }
