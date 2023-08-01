@@ -33,29 +33,29 @@ abstract contract PriceFeedValidationTrait {
 
     /// @dev Valites that `priceFeed` is a contract that adheres to Chainlink interface and passes sanity checks
     function _validatePriceFeed(address priceFeed, uint32 stalenessPeriod) internal view returns (bool skipCheck) {
-        if (!priceFeed.isContract()) revert AddressIsNotContractException(priceFeed);
+        if (!priceFeed.isContract()) revert AddressIsNotContractException(priceFeed); // U:[PO-5]
 
         try AggregatorV3Interface(priceFeed).decimals() returns (uint8 _decimals) {
-            if (_decimals != 8) revert IncorrectPriceFeedException();
+            if (_decimals != 8) revert IncorrectPriceFeedException(); // U:[PO-5]
         } catch {
-            revert IncorrectPriceFeedException();
+            revert IncorrectPriceFeedException(); // U:[PO-5]
         }
 
         try IPriceFeedType(priceFeed).skipPriceCheck() returns (bool _skipCheck) {
-            skipCheck = _skipCheck;
+            skipCheck = _skipCheck; // U:[PO-5]
         } catch {}
 
         try AggregatorV3Interface(priceFeed).latestRoundData() returns (
             uint80, int256 answer, uint256, uint256 updatedAt, uint80
         ) {
             if (skipCheck) {
-                if (stalenessPeriod > 0) revert IncorrectParameterException();
+                if (stalenessPeriod > 0) revert IncorrectParameterException(); // U:[PO-5]
             } else {
                 // this would ensure that `stalenessPeriod > 0` unless somehow `updatedAt > block.timestamp`
-                _checkAnswer(answer, updatedAt, stalenessPeriod);
+                _checkAnswer(answer, updatedAt, stalenessPeriod); // U:[PO-5]
             }
         } catch {
-            revert IncorrectPriceFeedException();
+            revert IncorrectPriceFeedException(); // U:[PO-5]
         }
     }
 }

@@ -54,24 +54,24 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     function convertToUSD(uint256 amount, address token) public view override returns (uint256) {
         (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals) = priceFeedParams(token);
         (uint256 price, uint256 scale) = _getPrice(priceFeed, stalenessPeriod, skipCheck, decimals);
-        return amount * price / scale;
+        return amount * price / scale; // U:[PO-9]
     }
 
     /// @notice Converts `amount` of USD (with 8 decimals) into `token` amount
     function convertFromUSD(uint256 amount, address token) public view override returns (uint256) {
         (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals) = priceFeedParams(token);
         (uint256 price, uint256 scale) = _getPrice(priceFeed, stalenessPeriod, skipCheck, decimals);
-        return amount * scale / price;
+        return amount * scale / price; // U:[PO-9]
     }
 
     /// @notice Converts `amount` of `tokenFrom` into `tokenTo` amount
     function convert(uint256 amount, address tokenFrom, address tokenTo) external view override returns (uint256) {
-        return convertFromUSD(convertToUSD(amount, tokenFrom), tokenTo);
+        return convertFromUSD(convertToUSD(amount, tokenFrom), tokenTo); // U:[PO-10]
     }
 
     /// @notice Returns the price feed for `token` or reverts if price feed is not set
     function priceFeeds(address token) external view override returns (address priceFeed) {
-        (priceFeed,,,) = priceFeedParams(token);
+        (priceFeed,,,) = priceFeedParams(token); // U:[PO-8]
     }
 
     /// @notice Returns the price feed for `token` with explicitly specified price feed
@@ -100,15 +100,15 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
         view
         returns (uint256 price, uint256 scale)
     {
-        (, int256 answer,, uint256 updatedAt,) = AggregatorV3Interface(priceFeed).latestRoundData();
-        if (!skipCheck) _checkAnswer(answer, updatedAt, stalenessPeriod);
+        (, int256 answer,, uint256 updatedAt,) = AggregatorV3Interface(priceFeed).latestRoundData(); // U:[PO-1]
+        if (!skipCheck) _checkAnswer(answer, updatedAt, stalenessPeriod); // U:[PO-1]
 
         // answer should not be negative (price feeds with `skipCheck = true` must ensure that!)
-        price = uint256(answer);
+        price = uint256(answer); // U:[PO-1]
 
         // 1 <= decimals <= 18, so the operation is safe
         unchecked {
-            scale = 10 ** decimals;
+            scale = 10 ** decimals; // U:[PO-1]
         }
     }
 
@@ -126,7 +126,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
             skipCheck := and(shr(192, data), 0xFF)
             decimals := and(shr(200, data), 0xFF)
             useReserve := and(shr(208, data), 0xFF)
-        }
+        } // U:[PO-2]
     }
 
     /// @dev Returns key that is used to store `token`'s reserve feed in `_priceFeedParams`
@@ -136,7 +136,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
             let ptr := mload(0x40)
             mstore(ptr, or("RESERVE", shl(0x28, token)))
             key := keccak256(ptr, 0x1b)
-        }
+        } // U:[PO-3]
     }
 
     // ------------- //
@@ -147,23 +147,22 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     function setPriceFeed(address token, address priceFeed, uint32 stalenessPeriod)
         external
         override
-        nonZeroAddress(token)
-        nonZeroAddress(priceFeed)
-        configuratorOnly
+        nonZeroAddress(token) // U:[PO-6]
+        nonZeroAddress(priceFeed) // U:[PO-6]
+        configuratorOnly // U:[PO-6]
     {
         uint8 decimals = _priceFeedsParams[token].decimals;
-        decimals = decimals == 0 ? _validateToken(token) : decimals;
+        decimals = decimals == 0 ? _validateToken(token) : decimals; // U:[PO-6]
 
-        bool skipCheck = _validatePriceFeed(priceFeed, stalenessPeriod);
+        bool skipCheck = _validatePriceFeed(priceFeed, stalenessPeriod); // U:[PO-6]
         _priceFeedsParams[token] = PriceFeedParams({
             priceFeed: priceFeed,
             stalenessPeriod: stalenessPeriod,
             skipCheck: skipCheck,
             decimals: decimals,
             useReserve: false
-        });
-
-        emit SetPriceFeed(token, priceFeed, stalenessPeriod, skipCheck);
+        }); // U:[PO-6]
+        emit SetPriceFeed(token, priceFeed, stalenessPeriod, skipCheck); // U:[PO-6]
     }
 
     /// @notice Sets reserve price feed for a given token
@@ -171,45 +170,49 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     function setReservePriceFeed(address token, address priceFeed, uint32 stalenessPeriod)
         external
         override
-        nonZeroAddress(token)
-        nonZeroAddress(priceFeed)
-        configuratorOnly
+        nonZeroAddress(token) // U:[PO-7]
+        nonZeroAddress(priceFeed) // U:[PO-7]
+        configuratorOnly // U:[PO-7]
     {
         uint8 decimals = _priceFeedsParams[token].decimals;
-        if (decimals == 0) revert PriceFeedDoesNotExistException();
+        if (decimals == 0) revert PriceFeedDoesNotExistException(); // U:[PO-7]
 
-        bool skipCheck = _validatePriceFeed(priceFeed, stalenessPeriod);
+        bool skipCheck = _validatePriceFeed(priceFeed, stalenessPeriod); // U:[PO-7]
         _priceFeedsParams[_getTokenReserveKey(token)] = PriceFeedParams({
             priceFeed: priceFeed,
             stalenessPeriod: stalenessPeriod,
             skipCheck: skipCheck,
             decimals: decimals,
             useReserve: false
-        });
-        emit SetReservePriceFeed(token, priceFeed, stalenessPeriod, skipCheck);
+        }); // U:[PO-7]
+        emit SetReservePriceFeed(token, priceFeed, stalenessPeriod, skipCheck); // U:[PO-7]
     }
 
     /// @notice Sets `token`'s reserve price feed status to `active`
     /// @dev Reserve price feed for the token must already be set
-    function setReservePriceFeedStatus(address token, bool active) external override controllerOnly {
+    function setReservePriceFeedStatus(address token, bool active)
+        external
+        override
+        controllerOnly // U:[PO-8]
+    {
         if (_priceFeedsParams[_getTokenReserveKey(token)].priceFeed == address(0)) {
-            revert PriceFeedDoesNotExistException();
+            revert PriceFeedDoesNotExistException(); // U:[PO-8]
         }
 
         if (_priceFeedsParams[token].useReserve != active) {
-            _priceFeedsParams[token].useReserve = active;
-            emit SetReservePriceFeedStatus(token, active);
+            _priceFeedsParams[token].useReserve = active; // U:[PO-8]
+            emit SetReservePriceFeedStatus(token, active); // U:[PO-8]
         }
     }
 
     /// @dev Validates that `token` is a contract that returns `decimals` within allowed range
     function _validateToken(address token) internal view returns (uint8 decimals) {
-        if (!Address.isContract(token)) revert AddressIsNotContractException(token);
+        if (!Address.isContract(token)) revert AddressIsNotContractException(token); // U:[PO-4]
         try ERC20(token).decimals() returns (uint8 _decimals) {
-            if (_decimals == 0 || _decimals > 18) revert IncorrectTokenContractException();
-            decimals = _decimals;
+            if (_decimals == 0 || _decimals > 18) revert IncorrectTokenContractException(); // U:[PO-4]
+            decimals = _decimals; // U:[PO-4]
         } catch {
-            revert IncorrectTokenContractException();
+            revert IncorrectTokenContractException(); // U:[PO-4]
         }
     }
 }
