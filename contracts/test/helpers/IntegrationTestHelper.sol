@@ -621,4 +621,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
 
         vm.stopPrank();
     }
+
+    function executeOneLineMulticall(address creditAccount, address target, bytes memory callData) internal {
+        creditFacade.multicall(creditAccount, MultiCallBuilder.build(MultiCall({target: target, callData: callData})));
+    }
 }
