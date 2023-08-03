@@ -23,7 +23,6 @@ import {CreditManagerFactory} from "../suites/CreditManagerFactory.sol";
 import {ICreditFacadeV3Multicall} from "../../interfaces/ICreditFacadeV3.sol";
 
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
-import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
 import {IPriceOracleV3} from "../../interfaces/IPriceOracleV3.sol";
 import {IWithdrawalManagerV3} from "../../interfaces/IWithdrawalManagerV3.sol";
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
@@ -57,7 +56,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
     IAddressProviderV3 addressProvider;
     ContractsRegister cr;
     AccountFactory accountFactory;
-    IPriceOracleBase priceOracle;
+    IPriceOracleV3 priceOracle;
     IWithdrawalManagerV3 withdrawalManager;
     BotListV3 botList;
 
@@ -291,12 +290,12 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
 
             console.log("Starting mainnet test with address provider: %s", address(addressProvider));
 
-            /// TRANSFER OWNERSHIP TO CONFIGURATOR\
+            /// TRANSFER OWNERSHIP TO CONFIGURATOR
         }
 
         cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
         accountFactory = AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL));
-        priceOracle = IPriceOracleBase(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00));
+        priceOracle = IPriceOracleV3(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00));
         withdrawalManager = IWithdrawalManagerV3(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00));
         botList = BotListV3(payable(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00)));
     }
