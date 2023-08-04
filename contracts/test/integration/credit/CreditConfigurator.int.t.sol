@@ -248,7 +248,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             maxDebt: uint128(150000 * WAD),
             collateralTokens: cTokens,
             degenNFT: address(0),
-            withdrawalManager: address(0),
             expirable: false
         });
 
@@ -1249,7 +1248,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             maxDebt: uint128(150000 * WAD),
             collateralTokens: cTokens,
             degenNFT: address(0),
-            withdrawalManager: address(0),
             expirable: false
         });
 

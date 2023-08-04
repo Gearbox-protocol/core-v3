@@ -53,7 +53,6 @@ contract CreditConfig is Test, ICreditConfig {
             maxDebt: maxDebt,
             collateralTokens: getCollateralTokens(),
             degenNFT: address(0),
-            withdrawalManager: address(0),
             expirable: false
         });
     }
