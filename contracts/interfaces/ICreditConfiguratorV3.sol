@@ -28,8 +28,6 @@ struct CreditManagerOpts {
     CollateralToken[] collateralTokens;
     /// @dev Address of IDegenNFTV2, address(0) if whitelisted mode is not used
     address degenNFT;
-    /// @dev Address of BlacklistHelper, address(0) if the underlying is not blacklistable
-    address withdrawalManager;
     /// @dev Whether the Credit Manager is connected to an expirable pool (and the CreditFacadeV3 is expirable)
     bool expirable;
 }

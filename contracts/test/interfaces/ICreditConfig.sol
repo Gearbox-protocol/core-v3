@@ -19,13 +19,9 @@ interface ICreditConfig {
 
     function getAccountAmount() external view returns (uint256);
 
-    function getPriceFeeds() external view returns (PriceFeedConfig[] memory);
-
     function underlying() external view returns (address);
 
     function wethToken() external view returns (address);
-
-    function tokenTestSuite() external view returns (ITokenTestSuite);
 
     function minDebt() external view returns (uint128);
 

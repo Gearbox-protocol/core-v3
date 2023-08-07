@@ -32,8 +32,8 @@ import {PoolFactory} from "../suites/PoolFactory.sol";
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
 import {NetworkDetector} from "@gearbox-protocol/sdk/contracts/NetworkDetector.sol";
 
-// import { TokensTestSuite, Tokens } from "../suites/TokensTestSuite.sol";
-import {CreditConfig} from "../config/CreditConfig.sol";
+import {ICreditConfig} from "../interfaces/ICreditConfig.sol";
+import {MockCreditConfig} from "../config/MockCreditConfig.sol";
 import {TestHelper} from "../lib/helper.sol";
 import {ERC20Mock} from "../mocks/token/ERC20Mock.sol";
 import "../lib/constants.sol";
@@ -209,33 +209,38 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
     modifier creditTest() {
         _setupCore();
 
+        _deployCreditAndPool();
+
+        if (installAdapterMock) {
+            targetMock = new TargetContractMock();
+            adapterMock = new AdapterMock(address(creditManager), address(targetMock));
+
+            vm.prank(CONFIGURATOR);
+            creditConfigurator.allowAdapter(address(adapterMock));
+        }
+
+        _;
+    }
+
+    modifier attachTest() {
+        _attachCore();
+
+        address creditManagerAddr;
+
         bool skipTest = false;
 
-        if (runOnFork) {
-            address creditManagerAddr;
+        try vm.envAddress("ETH_FORK_CREDIT_MANAGER") returns (address) {
+            creditManagerAddr = vm.envAddress("ETH_FORK_CREDIT_MANAGER");
+        } catch {
+            revert("Credit manager address not set");
+        }
 
-            try vm.envAddress("ETH_FORK_CREDIT_MANAGER") returns (address) {
-                creditManagerAddr = vm.envAddress("ETH_FORK_CREDIT_MANAGER");
-            } catch {
-                revert("Credit manager address not set");
-            }
-
-            if (!_attachCreditManager(creditManagerAddr)) {
-                console.log("Skipped");
-                skipTest = true;
-            }
-        } else {
-            _deployCreditAndPool();
+        if (!_attachCreditManager(creditManagerAddr)) {
+            console.log("Skipped");
+            skipTest = true;
         }
 
         if (!skipTest) {
-            if (installAdapterMock) {
-                targetMock = new TargetContractMock();
-                adapterMock = new AdapterMock(address(creditManager), address(targetMock));
-
-                vm.prank(CONFIGURATOR);
-                creditConfigurator.allowAdapter(address(adapterMock));
-            }
             _;
         }
     }
@@ -249,51 +254,42 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
         tokenTestSuite = new TokensTestSuite();
         tokenTestSuite.topUpWETH{value: 100 * WAD}();
 
-        if (chainId == 1337 || chainId == 31337) {
-            weth = tokenTestSuite.addressOf(Tokens.WETH);
+        weth = tokenTestSuite.addressOf(Tokens.WETH);
 
-            CreditConfig creditConfig = new CreditConfig(
-            tokenTestSuite,
-            underlyingT
-        );
+        vm.startPrank(CONFIGURATOR);
+        GenesisFactory gp = new GenesisFactory(weth, DUMB_ADDRESS, accountFactoryVersion);
 
-            vm.startPrank(CONFIGURATOR);
-            GenesisFactory gp = new GenesisFactory(weth, DUMB_ADDRESS, accountFactoryVersion);
+        gp.acl().claimOwnership();
 
-            gp.acl().claimOwnership();
+        gp.acl().addPausableAdmin(CONFIGURATOR);
+        gp.acl().addUnpausableAdmin(CONFIGURATOR);
 
-            gp.acl().addPausableAdmin(CONFIGURATOR);
-            gp.acl().addUnpausableAdmin(CONFIGURATOR);
+        gp.acl().transferOwnership(address(gp));
+        gp.claimACLOwnership();
 
-            gp.acl().transferOwnership(address(gp));
-            gp.claimACLOwnership();
+        if (chainId == 1337 || chainId == 31337) gp.addPriceFeeds(tokenTestSuite.getPriceFeeds());
 
-            gp.addPriceFeeds(creditConfig.getPriceFeeds());
-            gp.acl().claimOwnership();
+        gp.acl().claimOwnership();
 
-            addressProvider = gp.addressProvider();
+        addressProvider = gp.addressProvider();
 
-            vm.stopPrank();
-        } else {
-            bool useExisting;
+        vm.stopPrank();
 
-            try vm.envBool("ETH_FORK_USE_EXISTING") returns (bool val) {
-                useExisting = val;
-            } catch {
-                useExisting = false;
-            }
+        _initCoreContracts();
+    }
 
-            try vm.envAddress("ETH_FORK_ADDRESS_PROVIDER") returns (address val) {
-                addressProvider = IAddressProviderV3(val);
-            } catch {
-                revert("ETH_FORK_ADDRESS_PROVIDER is not provided");
-            }
-
-            console.log("Starting mainnet test with address provider: %s", address(addressProvider));
-
-            /// TRANSFER OWNERSHIP TO CONFIGURATOR\
+    function _attachCore() internal {
+        try vm.envAddress("ETH_FORK_ADDRESS_PROVIDER") returns (address val) {
+            addressProvider = IAddressProviderV3(val);
+        } catch {
+            revert("ETH_FORK_ADDRESS_PROVIDER is not provided");
         }
 
+        console.log("Starting mainnet test with address provider: %s", address(addressProvider));
+        _initCoreContracts();
+    }
+
+    function _initCoreContracts() internal {
         cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
         accountFactory = AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL));
         priceOracle = IPriceOracleBase(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00));
@@ -362,15 +358,16 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
     }
 
     function _deployCreditAndPool() internal {
-        CreditConfig creditConfig = new CreditConfig(
+        MockCreditConfig creditConfig = new MockCreditConfig(
             tokenTestSuite,
             underlyingT
         );
 
-        _deployPool(10 * creditConfig.getAccountAmount());
+        _deployCreditAndPool(creditConfig);
+    }
 
-        // uint128 minDebt = creditConfig.minDebt();
-        // uint128 maxDebt = creditConfig.maxDebt();
+    function _deployCreditAndPool(ICreditConfig creditConfig) internal {
+        _deployPool(10 * creditConfig.getAccountAmount());
 
         creditAccountAmount = creditConfig.getAccountAmount();
 

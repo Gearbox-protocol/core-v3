@@ -18,7 +18,7 @@ struct CollateralTokensItem {
     uint16 liquidationThreshold;
 }
 
-contract CreditConfig is Test, ICreditConfig {
+contract MockCreditConfig is Test, ICreditConfig {
     uint128 public minDebt;
     uint128 public maxDebt;
 
@@ -38,7 +38,7 @@ contract CreditConfig is Test, ICreditConfig {
 
         uint256 accountAmount = getAccountAmount();
 
-        minDebt = getMinBorrowAmount();
+        minDebt = getMinDebt();
         maxDebt = uint128(10 * accountAmount);
 
         _tokenTestSuite = tokenTestSuite_;
@@ -53,7 +53,6 @@ contract CreditConfig is Test, ICreditConfig {
             maxDebt: maxDebt,
             collateralTokens: getCollateralTokens(),
             degenNFT: address(0),
-            withdrawalManager: address(0),
             expirable: false
         });
     }
@@ -88,7 +87,7 @@ contract CreditConfig is Test, ICreditConfig {
         }
     }
 
-    function getMinBorrowAmount() internal view returns (uint128) {
+    function getMinDebt() internal view returns (uint128) {
         return (underlyingSymbol == Tokens.USDC) ? uint128(10 ** 6) : uint128(WAD);
     }
 
@@ -98,11 +97,7 @@ contract CreditConfig is Test, ICreditConfig {
             : (underlyingSymbol == Tokens.USDC) ? USDC_ACCOUNT_AMOUNT : WETH_ACCOUNT_AMOUNT;
     }
 
-    function getPriceFeeds() external view override returns (PriceFeedConfig[] memory) {
-        return _tokenTestSuite.getPriceFeeds();
-    }
-
-    function tokenTestSuite() external view override returns (ITokenTestSuite) {
-        return _tokenTestSuite;
-    }
+    // function tokenTestSuite() external view override returns (ITokenTestSuite) {
+    //     return _tokenTestSuite;
+    // }
 }

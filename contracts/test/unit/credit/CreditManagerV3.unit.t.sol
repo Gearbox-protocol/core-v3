@@ -55,7 +55,7 @@ import {WithdrawalManagerMock} from "../../mocks/core/WithdrawalManagerMock.sol"
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
-import {CreditConfig} from "../../config/CreditConfig.sol";
+import {MockCreditConfig} from "../../config/MockCreditConfig.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
@@ -88,7 +88,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     address underlying;
     bool supportsQuotas;
 
-    CreditConfig creditConfig;
+    MockCreditConfig creditConfig;
 
     // Fee token settings
     bool isFeeToken;

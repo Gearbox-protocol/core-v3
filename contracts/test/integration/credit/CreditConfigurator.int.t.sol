@@ -40,9 +40,9 @@ import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
 
-import {CreditConfig} from "../../config/CreditConfig.sol";
+import {MockCreditConfig} from "../../config/MockCreditConfig.sol";
 
-import {CollateralTokensItem} from "../../config/CreditConfig.sol";
+import {CollateralTokensItem} from "../../config/MockCreditConfig.sol";
 
 import "forge-std/console.sol";
 
@@ -57,7 +57,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     //     tokenTestSuite = new TokensTestSuite();
     //     tokenTestSuite.topUpWETH{value: 100 * WAD}();
 
-    //     CreditConfig creditConfig = new CreditConfig(
+    //     MockCreditConfig creditConfig = new MockCreditConfig(
     //         tokenTestSuite,
     //         Tokens.DAI
     //     );
@@ -248,7 +248,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             maxDebt: uint128(150000 * WAD),
             collateralTokens: cTokens,
             degenNFT: address(0),
-            withdrawalManager: address(0),
             expirable: false
         });
 
@@ -1249,7 +1248,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             maxDebt: uint128(150000 * WAD),
             collateralTokens: cTokens,
             degenNFT: address(0),
-            withdrawalManager: address(0),
             expirable: false
         });
 
