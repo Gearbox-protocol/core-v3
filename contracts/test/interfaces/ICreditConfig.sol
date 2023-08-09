@@ -21,8 +21,6 @@ interface ICreditConfig {
 
     function underlying() external view returns (address);
 
-    function wethToken() external view returns (address);
-
     function minDebt() external view returns (uint128);
 
     function maxDebt() external view returns (uint128);

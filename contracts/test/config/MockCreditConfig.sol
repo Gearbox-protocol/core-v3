@@ -28,8 +28,6 @@ contract MockCreditConfig is Test, ICreditConfig {
 
     address public override underlying;
 
-    address public override wethToken;
-
     Tokens public underlyingSymbol;
 
     constructor(TokensTestSuite tokenTestSuite_, Tokens _underlying) {
@@ -43,7 +41,6 @@ contract MockCreditConfig is Test, ICreditConfig {
 
         _tokenTestSuite = tokenTestSuite_;
 
-        wethToken = tokenTestSuite_.addressOf(Tokens.WETH);
         underlyingSymbol = _underlying;
     }
 
