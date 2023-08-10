@@ -846,11 +846,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         /// and any extra collateral on top of that is not included into the account's value
         address _priceOracle = priceOracle;
 
-        collateralDebtData.totalDebtUSD = _convertToUSD({
-            _priceOracle: _priceOracle,
-            amountInToken: collateralDebtData.calcTotalDebt(),
-            token: underlying
-        }); // U:[CM-22]
+        uint256 totalDebt = collateralDebtData.calcTotalDebt();
+
+        collateralDebtData.totalDebtUSD = totalDebt <= 1
+            ? 0
+            : _convertToUSD({_priceOracle: _priceOracle, amountInToken: totalDebt, token: underlying}); // U:[CM-22]
 
         /// The logic for computing collateral is isolated into the `CreditLogic` library. See `CreditLogic.calcCollateral` for details.
         uint256 tokensToDisable;
@@ -862,17 +862,23 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             ? collateralDebtData.totalDebtUSD * minHealthFactor / PERCENTAGE_FACTOR
             : type(uint256).max;
 
-        (collateralDebtData.totalValueUSD, collateralDebtData.twvUSD, tokensToDisable) = collateralDebtData
-            .calcCollateral({
-            creditAccount: creditAccount,
-            underlying: underlying,
-            twvUSDTarget: target,
-            collateralHints: collateralHints,
-            quotasPacked: quotasPacked,
-            priceOracle: _priceOracle,
-            collateralTokenByMaskFn: _collateralTokenByMask,
-            convertToUSDFn: _convertToUSD
-        }); // U:[CM-22]
+        if ((task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) && (target == 0)) {
+            // If the user has zero total debt, we can safely skip all collateral computations during a
+            // full collateral check
+            (collateralDebtData.totalValueUSD, collateralDebtData.twvUSD, tokensToDisable) = (0, 0, 0); // U: [CM-18A]
+        } else {
+            (collateralDebtData.totalValueUSD, collateralDebtData.twvUSD, tokensToDisable) = collateralDebtData
+                .calcCollateral({
+                creditAccount: creditAccount,
+                underlying: underlying,
+                twvUSDTarget: target,
+                collateralHints: collateralHints,
+                quotasPacked: quotasPacked,
+                priceOracle: _priceOracle,
+                collateralTokenByMaskFn: _collateralTokenByMask,
+                convertToUSDFn: _convertToUSD
+            }); // U:[CM-22]
+        }
 
         collateralDebtData.enabledTokensMask = enabledTokensMask.disable(tokensToDisable); // U:[CM-22]
 

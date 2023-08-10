@@ -240,7 +240,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         // the current total debt amount
         // Only in `trackTotalDebt` mode
         if (trackTotalDebt) {
-            _revertIfOutOfTotalDebtLimit(debt, ManageDebtAction.INCREASE_DEBT); // U:[FA-8,10]
+            _revertIfOutOfTotalDebtLimit(debt, ManageDebtAction.INCREASE_DEBT); // U:[FA-8,8A,10]
         }
 
         /// Attempts to burn the IDegenNFTV2 - if onBehalfOf has none, this will fail
@@ -981,7 +981,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             ICreditManagerV3(creditManager).manageDebt(creditAccount, amount, enabledTokensMask, action); // U:[FA-27,31]
 
         // Checks that the new total borrowed amount is within bounds
-        _revertIfOutOfDebtLimits(newDebt); // U:[FA-28, 32]
+        _revertIfOutOfDebtLimits(newDebt); // U:[FA-28, 32, 33, 33A]
 
         // Emits event
         if (action == ManageDebtAction.INCREASE_DEBT) {
@@ -1164,7 +1164,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             minDebt := and(data, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
         }
 
-        if ((debt < minDebt) || (debt > maxDebt)) {
+        if (debt != 0 && ((debt < minDebt) || (debt > maxDebt))) {
             revert BorrowAmountOutOfLimitsException(); // U:[FA-44]
         }
     }
