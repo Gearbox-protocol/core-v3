@@ -263,18 +263,11 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
         vm.startPrank(CONFIGURATOR);
         GenesisFactory gp = new GenesisFactory(weth, DUMB_ADDRESS, accountFactoryVersion);
-
+        if (chainId == 1337 || chainId == 31337) gp.addPriceFeeds(tokenTestSuite.getPriceFeeds());
         gp.acl().claimOwnership();
 
         gp.acl().addPausableAdmin(CONFIGURATOR);
         gp.acl().addUnpausableAdmin(CONFIGURATOR);
-
-        gp.acl().transferOwnership(address(gp));
-        gp.claimACLOwnership();
-
-        if (chainId == 1337 || chainId == 31337) gp.addPriceFeeds(tokenTestSuite.getPriceFeeds());
-
-        gp.acl().claimOwnership();
 
         addressProvider = gp.addressProvider();
 
