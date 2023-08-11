@@ -40,9 +40,7 @@ import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
 
-import {MockCreditConfig} from "../../config/MockCreditConfig.sol";
-
-import {CollateralTokensItem} from "../../config/MockCreditConfig.sol";
+import {MockCreditConfig, CollateralTokenHuman} from "../../config/MockCreditConfig.sol";
 
 import "forge-std/console.sol";
 
@@ -192,15 +190,15 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
         assertEq(address(creditConfigurator.addressProvider()), address(addressProvider), "Incorrect address provider");
 
-        CollateralTokensItem[8] memory collateralTokenOpts = [
-            CollateralTokensItem({token: Tokens.DAI, liquidationThreshold: DEFAULT_UNDERLYING_LT}),
-            CollateralTokensItem({token: Tokens.USDC, liquidationThreshold: 9000}),
-            CollateralTokensItem({token: Tokens.USDT, liquidationThreshold: 8800}),
-            CollateralTokensItem({token: Tokens.WETH, liquidationThreshold: 8300}),
-            CollateralTokensItem({token: Tokens.LINK, liquidationThreshold: 7300}),
-            CollateralTokensItem({token: Tokens.CRV, liquidationThreshold: 7300}),
-            CollateralTokensItem({token: Tokens.CVX, liquidationThreshold: 7300}),
-            CollateralTokensItem({token: Tokens.STETH, liquidationThreshold: 7300})
+        CollateralTokenHuman[8] memory collateralTokenOpts = [
+            CollateralTokenHuman({token: Tokens.DAI, lt: DEFAULT_UNDERLYING_LT}),
+            CollateralTokenHuman({token: Tokens.USDC, lt: 9000}),
+            CollateralTokenHuman({token: Tokens.USDT, lt: 8800}),
+            CollateralTokenHuman({token: Tokens.WETH, lt: 8300}),
+            CollateralTokenHuman({token: Tokens.LINK, lt: 7300}),
+            CollateralTokenHuman({token: Tokens.CRV, lt: 7300}),
+            CollateralTokenHuman({token: Tokens.CVX, lt: 7300}),
+            CollateralTokenHuman({token: Tokens.STETH, lt: 7300})
         ];
 
         uint256 len = collateralTokenOpts.length;
@@ -213,7 +211,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
             assertEq(token, tokenTestSuite.addressOf(collateralTokenOpts[i].token), "Incorrect token address");
 
-            assertEq(lt, collateralTokenOpts[i].liquidationThreshold, "Incorrect liquidation threshold");
+            assertEq(lt, collateralTokenOpts[i].lt, "Incorrect liquidation threshold");
         }
 
         assertEq(address(creditManager.creditFacade()), address(creditFacade), "Incorrect creditFacade");

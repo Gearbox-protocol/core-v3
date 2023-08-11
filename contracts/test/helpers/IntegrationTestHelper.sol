@@ -31,7 +31,7 @@ import {PoolFactory} from "../suites/PoolFactory.sol";
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
 import {NetworkDetector} from "@gearbox-protocol/sdk/contracts/NetworkDetector.sol";
 
-import {ICreditConfig} from "../interfaces/ICreditConfig.sol";
+import {IPoolV3DeployConfig, CreditManagerV3DeployParams, CollateralTokenHuman} from "../interfaces/ICreditConfig.sol";
 import {MockCreditConfig} from "../config/MockCreditConfig.sol";
 import {TestHelper} from "../lib/helper.sol";
 import {ERC20Mock} from "../mocks/token/ERC20Mock.sol";
@@ -46,9 +46,11 @@ import {AdapterMock} from "../mocks/core/AdapterMock.sol";
 import {TargetContractMock} from "../mocks/core/TargetContractMock.sol";
 
 import {GenesisFactory} from "../suites/GenesisFactory.sol";
+
+import {ConfigManager} from "../config/ConfigManager.sol";
 import "forge-std/console.sol";
 
-contract IntegrationTestHelper is TestHelper, BalanceHelper {
+contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
     uint256 chainId;
 
@@ -70,6 +72,10 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
     CreditManagerV3 public creditManager;
     CreditFacadeV3 public creditFacade;
     CreditConfiguratorV3 public creditConfigurator;
+
+    CreditManagerV3[] public creditManagers;
+    CreditFacadeV3[] public creditFacades;
+    CreditConfiguratorV3[] public creditConfigurators;
 
     TargetContractMock targetMock;
     AdapterMock adapterMock;
@@ -208,7 +214,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
     modifier creditTest() {
         _setupCore();
 
-        _deployCreditAndPool();
+        _deployMockCreditAndPool();
 
         if (installAdapterMock) {
             targetMock = new TargetContractMock();
@@ -335,8 +341,13 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
         (, creditAccountAmount) = creditFacade.debtLimits();
     }
 
-    function _deployPool(uint256 initialBalance) internal {
+    function _deployPool(IPoolV3DeployConfig config) internal {
+        uint256 initialBalance = 10 * config.getAccountAmount();
+        underlyingT = config.underlying();
+
         underlying = tokenTestSuite.addressOf(underlyingT);
+
+        supportsQuotas = anySupportsQuotas ? config.supportsQuotas() : supportsQuotas;
 
         PoolFactory pf = new PoolFactory(address(addressProvider), underlying, supportsQuotas);
 
@@ -356,8 +367,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
         vm.label(address(pool), "Pool");
     }
 
-    function _deployCreditAndPool() internal {
-        MockCreditConfig creditConfig = new MockCreditConfig(
+    function _deployMockCreditAndPool() internal {
+        IPoolV3DeployConfig creditConfig = new MockCreditConfig(
             tokenTestSuite,
             underlyingT
         );
@@ -365,80 +376,106 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
         _deployCreditAndPool(creditConfig);
     }
 
-    function _deployCreditAndPool(ICreditConfig creditConfig) internal {
-        _deployPool(10 * creditConfig.getAccountAmount());
+    function _deployCreditAndPool(string memory configSymbol) internal {
+        IPoolV3DeployConfig config = getDeployConfig(configSymbol);
+        _deployCreditAndPool(config);
+    }
 
-        creditAccountAmount = creditConfig.getAccountAmount();
+    function _deployCreditAndPool(IPoolV3DeployConfig config) internal {
+        _deployPool(config);
 
-        CreditManagerOpts memory cmOpts = creditConfig.getCreditOpts();
+        creditAccountAmount = config.getAccountAmount();
+        CreditManagerV3DeployParams[] memory allCms = config.creditManagers();
 
-        cmOpts.expirable = expirable;
-
-        if (whitelisted) {
-            degenNFT = new DegenNFTV2(
+        degenNFT = new DegenNFTV2(
             address(addressProvider),
             "DegenNFTV2",
             "Gear-Degen"
         );
 
-            vm.prank(CONFIGURATOR);
-            degenNFT.setMinter(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
+        degenNFT.setMinter(CONFIGURATOR);
 
-            cmOpts.degenNFT = address(degenNFT);
-        }
+        uint256 len = allCms.length;
 
-        CreditManagerFactory cmf = new CreditManagerFactory(
+        for (uint256 i; i < len; ++i) {
+            CreditManagerV3DeployParams memory cmParams = allCms[i];
+
+            if (anyDegenNFT) {
+                whitelisted = cmParams.whitelisted;
+            }
+
+            CreditManagerOpts memory cmOpts = CreditManagerOpts({
+                minDebt: cmParams.minDebt,
+                maxDebt: cmParams.maxDebt,
+                collateralTokens: _convertCollateral(cmParams.collateralTokens),
+                degenNFT: (whitelisted) ? address(degenNFT) : address(0),
+                expirable: (anyExpirable) ? cmParams.expirable : expirable
+            });
+
+            CreditManagerFactory cmf = new CreditManagerFactory(
             address(addressProvider),
             address(pool),
             cmOpts,
             0
         );
 
-        creditManager = cmf.creditManager();
-        creditFacade = cmf.creditFacade();
-        creditConfigurator = cmf.creditConfigurator();
+            creditManager = cmf.creditManager();
+            creditFacade = cmf.creditFacade();
+            creditConfigurator = cmf.creditConfigurator();
 
-        vm.prank(CONFIGURATOR);
-        cr.addCreditManager(address(creditManager));
-
-        if (whitelisted) {
             vm.prank(CONFIGURATOR);
-            degenNFT.addCreditFacade(address(creditFacade));
+            cr.addCreditManager(address(creditManager));
+
+            if (whitelisted) {
+                vm.prank(CONFIGURATOR);
+                degenNFT.addCreditFacade(address(creditFacade));
+            }
+
+            if (expirable) {
+                vm.prank(CONFIGURATOR);
+                creditConfigurator.setExpirationDate(uint40(block.timestamp + 1));
+            }
+
+            if (accountFactoryVersion == 3_00) {
+                vm.prank(CONFIGURATOR);
+                AccountFactoryV3(address(accountFactory)).addCreditManager(address(creditManager));
+            }
+
+            if (supportsQuotas) {
+                vm.prank(CONFIGURATOR);
+                poolQuotaKeeper.addCreditManager(address(creditManager));
+            }
+
+            vm.prank(CONFIGURATOR);
+            pool.setCreditManagerDebtLimit(address(creditManager), cmParams.poolLimit);
+
+            vm.prank(CONFIGURATOR);
+            botList.setApprovedCreditManagerStatus(address(creditManager), true);
+
+            vm.label(address(creditFacade), "CreditFacadeV3");
+            vm.label(address(creditManager), "CreditManagerV3");
+            vm.label(address(creditConfigurator), "CreditConfiguratorV3");
+
+            tokenTestSuite.mint(underlying, USER, creditAccountAmount);
+            tokenTestSuite.mint(underlying, FRIEND, creditAccountAmount);
+
+            vm.prank(USER);
+            IERC20(underlying).approve(address(creditManager), type(uint256).max);
+
+            vm.prank(FRIEND);
+            IERC20(underlying).approve(address(creditManager), type(uint256).max);
+
+            creditManagers.push(creditManager);
+            creditFacades.push(creditFacade);
+            creditConfigurators.push(creditConfigurator);
         }
 
-        if (expirable) {
-            vm.prank(CONFIGURATOR);
-            creditConfigurator.setExpirationDate(uint40(block.timestamp + 1));
+        if (len > 1) {
+            creditManager = creditManagers[0];
+            creditFacade = creditFacades[0];
+            creditConfigurator = creditConfigurators[0];
         }
-
-        if (accountFactoryVersion == 3_00) {
-            vm.prank(CONFIGURATOR);
-            AccountFactoryV3(address(accountFactory)).addCreditManager(address(creditManager));
-        }
-
-        if (supportsQuotas) {
-            vm.prank(CONFIGURATOR);
-            poolQuotaKeeper.addCreditManager(address(creditManager));
-        }
-
-        vm.prank(CONFIGURATOR);
-        pool.setCreditManagerDebtLimit(address(creditManager), type(uint256).max);
-
-        vm.prank(CONFIGURATOR);
-        botList.setApprovedCreditManagerStatus(address(creditManager), true);
-
-        vm.label(address(creditFacade), "CreditFacadeV3");
-        vm.label(address(creditManager), "CreditManagerV3");
-        vm.label(address(creditConfigurator), "CreditConfiguratorV3");
-
-        tokenTestSuite.mint(underlying, USER, creditAccountAmount);
-        tokenTestSuite.mint(underlying, FRIEND, creditAccountAmount);
-
-        vm.prank(USER);
-        IERC20(underlying).approve(address(creditManager), type(uint256).max);
-
-        vm.prank(FRIEND);
-        IERC20(underlying).approve(address(creditManager), type(uint256).max);
     }
 
     /// @dev Opens credit account for testing management functions
@@ -621,5 +658,17 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper {
 
     function executeOneLineMulticall(address creditAccount, address target, bytes memory callData) internal {
         creditFacade.multicall(creditAccount, MultiCallBuilder.build(MultiCall({target: target, callData: callData})));
+    }
+
+    function _convertCollateral(CollateralTokenHuman[] memory clts)
+        internal
+        returns (CollateralToken[] memory result)
+    {
+        uint256 len = clts.length;
+        result = new CollateralToken[](len);
+        for (uint256 i = 0; i < len; i++) {
+            result[i] =
+                CollateralToken({token: tokenTestSuite.addressOf(clts[i].token), liquidationThreshold: clts[i].lt});
+        }
     }
 }
