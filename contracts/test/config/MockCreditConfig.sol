@@ -103,10 +103,6 @@ contract MockCreditConfig is Test, IPoolV3DeployConfig {
         }
     }
 
-    function underlyingDecimals() internal view returns (uint128) {
-        return (underlying == Tokens.USDC) ? uint128(10 ** 6) : uint128(WAD);
-    }
-
     function getAccountAmount() public view override returns (uint256) {
         return (underlying == Tokens.DAI)
             ? DAI_ACCOUNT_AMOUNT
