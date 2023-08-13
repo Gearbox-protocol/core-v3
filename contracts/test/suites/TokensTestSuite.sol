@@ -44,7 +44,7 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
 
     constructor() {
         NetworkDetector nd = new NetworkDetector();
-        uint256 chainId = nd.chainId();
+        chainId = nd.chainId();
 
         if (chainId == 1337 || chainId == 31337) {
             MockToken[] memory data = MockTokensData.getTokenData();

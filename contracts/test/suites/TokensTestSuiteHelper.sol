@@ -15,6 +15,7 @@ import {ERC20Mock} from "../mocks/token/ERC20Mock.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract TokensTestSuiteHelper is Test, ITokenTestSuite {
+    uint256 chainId;
     address public wethToken;
 
     function topUpWETH() public payable override {
@@ -32,7 +33,10 @@ contract TokensTestSuiteHelper is Test, ITokenTestSuite {
             IWETH(wethToken).deposit{value: amount}();
             IERC20(token).transfer(to, amount);
         } else {
-            ERC20Mock(token).mint(to, amount);
+            // ERC20Mock(token).mint(to, amount);
+            if (chainId == 1337 || chainId == 31337) ERC20Mock(token).mint(to, amount);
+            // Live test case
+            else deal(token, to, amount, false);
         }
     }
 

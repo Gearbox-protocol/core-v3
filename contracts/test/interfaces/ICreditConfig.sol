@@ -68,6 +68,7 @@ struct CollateralTokenHuman {
 }
 
 interface IPoolV3DeployConfig {
+    function id() external view returns (string memory);
     function symbol() external view returns (string memory);
     function name() external view returns (string memory);
 

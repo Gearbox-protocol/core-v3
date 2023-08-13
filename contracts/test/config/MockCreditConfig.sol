@@ -26,6 +26,7 @@ import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 import "../lib/constants.sol";
 
 contract MockCreditConfig is Test, IPoolV3DeployConfig {
+    string public id;
     string public symbol;
     string public name;
 
@@ -58,7 +59,7 @@ contract MockCreditConfig is Test, IPoolV3DeployConfig {
 
         underlying = _underlying;
         // underlying = tokenTestSuite_.addressOf(_underlying);
-
+        id = string(abi.encodePacked("mock-test-", tokenTestSuite_.symbols(_underlying)));
         symbol = string(abi.encodePacked("d", tokenTestSuite_.symbols(_underlying)));
         name = string(abi.encodePacked("diesel", tokenTestSuite_.symbols(_underlying)));
 
