@@ -4,10 +4,10 @@
 pragma solidity ^0.8.17;
 
 import {Test} from "forge-std/Test.sol";
-import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-import {IPriceFeedType} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceFeedType.sol";
+import {IPriceFeed, IUpdatablePriceFeed} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceFeed.sol";
+
 import {IPriceOracleV3Events, PriceFeedParams} from "../../../interfaces/IPriceOracleV3.sol";
 import "../../../interfaces/IExceptions.sol";
 
@@ -53,11 +53,11 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
 
         vm.mockCall(
             priceFeed,
-            abi.encodeCall(AggregatorV3Interface.latestRoundData, ()),
+            abi.encodeCall(IPriceFeed.latestRoundData, ()),
             abi.encode(uint80(0), answer, uint256(0), updatedAt, uint80(0))
         );
 
-        vm.expectCall(priceFeed, abi.encodeCall(AggregatorV3Interface.latestRoundData, ()));
+        vm.expectCall(priceFeed, abi.encodeCall(IPriceFeed.latestRoundData, ()));
 
         bool mustRevert;
         if (answer <= 0) {
@@ -130,46 +130,64 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
     function test_U_PO_05_validatePriceFeed_works_as_expected() public {
         address priceFeed = makeAddr("PRICE_FEED");
 
+        // not a contract
         vm.etch(priceFeed, "");
         vm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, priceFeed));
         priceOracle.validatePriceFeed(priceFeed, 0);
 
         vm.etch(priceFeed, "CODE");
 
-        vm.mockCallRevert(priceFeed, abi.encodeCall(AggregatorV3Interface.decimals, ()), "");
+        // does not implement `decimals()`
+        vm.mockCallRevert(priceFeed, abi.encodeCall(IPriceFeed.decimals, ()), "");
         vm.expectRevert(IncorrectPriceFeedException.selector);
         priceOracle.validatePriceFeed(priceFeed, 0);
 
-        vm.mockCall(priceFeed, abi.encodeCall(AggregatorV3Interface.decimals, ()), abi.encode(uint8(6)));
+        // wrong decimals
+        vm.mockCall(priceFeed, abi.encodeCall(IPriceFeed.decimals, ()), abi.encode(uint8(6)));
         vm.expectRevert(IncorrectPriceFeedException.selector);
         priceOracle.validatePriceFeed(priceFeed, 0);
 
-        vm.mockCall(priceFeed, abi.encodeCall(AggregatorV3Interface.decimals, ()), abi.encode(uint8(8)));
+        vm.mockCall(priceFeed, abi.encodeCall(IPriceFeed.decimals, ()), abi.encode(uint8(8)));
 
-        vm.mockCallRevert(priceFeed, abi.encodeCall(AggregatorV3Interface.latestRoundData, ()), "");
+        // does not implement `latestRoundData()`
+        vm.mockCallRevert(priceFeed, abi.encodeCall(IPriceFeed.latestRoundData, ()), "");
         vm.expectRevert(IncorrectPriceFeedException.selector);
         priceOracle.validatePriceFeed(priceFeed, 0);
 
+        // zero staleness period while shipCheck = false
         vm.mockCall(
             priceFeed,
-            abi.encodeCall(AggregatorV3Interface.latestRoundData, ()),
+            abi.encodeCall(IPriceFeed.latestRoundData, ()),
+            abi.encode(uint80(0), int256(42), uint256(0), block.timestamp, uint80(0))
+        );
+        vm.expectRevert(IncorrectParameterException.selector);
+        priceOracle.validatePriceFeed(priceFeed, 0);
+
+        // negative price
+        vm.mockCall(
+            priceFeed,
+            abi.encodeCall(IPriceFeed.latestRoundData, ()),
             abi.encode(uint80(0), int256(-1), uint256(0), block.timestamp, uint80(0))
         );
         vm.expectRevert(IncorrectPriceException.selector);
-        priceOracle.validatePriceFeed(priceFeed, 0);
+        priceOracle.validatePriceFeed(priceFeed, 3600);
 
+        // stale price
         vm.mockCall(
             priceFeed,
-            abi.encodeCall(AggregatorV3Interface.latestRoundData, ()),
-            abi.encode(uint80(0), int256(42), uint256(0), block.timestamp, uint80(0))
+            abi.encodeCall(IPriceFeed.latestRoundData, ()),
+            abi.encode(uint80(0), int256(42), uint256(0), block.timestamp - 7200, uint80(0))
         );
         vm.expectRevert(StalePriceException.selector);
-        priceOracle.validatePriceFeed(priceFeed, 0);
+        priceOracle.validatePriceFeed(priceFeed, 3600);
 
+        // staleness check is skipped for updatable feed
+        vm.mockCall(priceFeed, abi.encodeCall(IUpdatablePriceFeed.updatable, ()), abi.encode(true));
         bool skipCheck = priceOracle.validatePriceFeed(priceFeed, 3600);
         assertFalse(skipCheck, "skipCheck is unexpectedly true");
 
-        vm.mockCall(priceFeed, abi.encodeCall(IPriceFeedType.skipPriceCheck, ()), abi.encode(true));
+        // non-zero staleness period while skipCheck = true
+        vm.mockCall(priceFeed, abi.encodeCall(IPriceFeed.skipPriceCheck, ()), abi.encode(true));
         vm.expectRevert(IncorrectParameterException.selector);
         priceOracle.validatePriceFeed(priceFeed, 3600);
 

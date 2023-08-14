@@ -26,7 +26,7 @@ import {CreditFacadeV3} from "./CreditFacadeV3.sol";
 import {CreditManagerV3} from "./CreditManagerV3.sol";
 
 // INTERFACES
-import {IAdapterBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IAdapterBase.sol";
+import {IAdapter} from "@gearbox-protocol/core-v2/contracts/interfaces/IAdapter.sol";
 import {
     ICreditConfiguratorV3,
     CollateralToken,
@@ -482,7 +482,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function _getTargetContractOrRevert(address adapter) internal view returns (address targetContract) {
         _revertIfContractIncompatible(adapter); // I: [CC-10, CC-10B]
 
-        try IAdapterBase(adapter).targetContract() returns (address tc) {
+        try IAdapter(adapter).targetContract() returns (address tc) {
             targetContract = tc;
         } catch {
             revert IncompatibleContractException();

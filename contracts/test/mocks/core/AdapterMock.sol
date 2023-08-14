@@ -3,11 +3,16 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {IAdapterBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IAdapterBase.sol";
+import {AdapterType} from "@gearbox-protocol/sdk/contracts/AdapterType.sol";
+import {IAdapter} from "@gearbox-protocol/core-v2/contracts/interfaces/IAdapter.sol";
+
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 
 /// @title Adapter Mock
-contract AdapterMock is IAdapterBase {
+contract AdapterMock is IAdapter {
+    AdapterType public constant override _gearboxAdapterType = AdapterType.ABSTRACT;
+    uint16 public constant override _gearboxAdapterVersion = 1;
+
     address public immutable override creditManager;
     address public immutable override addressProvider;
     address public immutable override targetContract;
