@@ -6,8 +6,6 @@ pragma solidity ^0.8.17;
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-import {IPriceFeed} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceFeed.sol";
-
 import {
     AddressIsNotContractException,
     IncorrectTokenContractException,
