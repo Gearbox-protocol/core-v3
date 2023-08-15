@@ -1216,6 +1216,127 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         );
     }
 
+    /// @dev U:[CM-11A]: manageDebt fully removes debt with MAX_INT passed as amount
+    function test_U_CM_11A_manageDebt_fully_repays_correctly(uint256 _amount) public withFeeTokenCase allQuotaCases {
+        vm.assume(_amount < 10 ** 10 * (10 ** _decimals(underlying)));
+        vm.assume(_amount > 1);
+
+        /// @notice for stack optimisation
+        uint256 amount = _amount;
+
+        address creditAccount = accountFactory.usedAccount();
+
+        CollateralDebtData memory collateralDebtData;
+
+        collateralDebtData.debt = amount * (amount % 5 + 1);
+        collateralDebtData.cumulativeIndexNow = RAY * (10 + amount % 5) / 10;
+        collateralDebtData.cumulativeIndexLastUpdate = RAY;
+
+        collateralDebtData.accruedInterest = CreditLogic.calcAccruedInterest(
+            collateralDebtData.debt, collateralDebtData.cumulativeIndexLastUpdate, collateralDebtData.cumulativeIndexNow
+        );
+
+        if (supportsQuotas) {
+            collateralDebtData.cumulativeQuotaInterest = uint128(amount / (amount % 5 + 1));
+            collateralDebtData.accruedInterest += collateralDebtData.cumulativeQuotaInterest;
+        }
+
+        {
+            (uint16 feeInterest,,,,) = creditManager.fees();
+
+            collateralDebtData.accruedFees += (collateralDebtData.accruedInterest * feeInterest) / PERCENTAGE_FACTOR;
+        }
+
+        poolMock.setCumulativeIndexNow(collateralDebtData.cumulativeIndexNow);
+
+        uint256 initialCQI = collateralDebtData.cumulativeQuotaInterest + 1;
+        creditManager
+            /// @notice enabledTokensMask is read directly from function parameters, not from this function
+            .setCreditAccountInfoMap({
+            creditAccount: creditAccount,
+            debt: collateralDebtData.debt,
+            cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
+            cumulativeQuotaInterest: uint128(initialCQI),
+            quotaFees: 0,
+            enabledTokensMask: 0,
+            flags: 0,
+            borrower: USER
+        });
+
+        {
+            uint256 amountOnAccount = _amountWithFee(collateralDebtData.calcTotalDebt()) + 1;
+            tokenTestSuite.mint(underlying, creditAccount, amountOnAccount);
+        }
+        /// @notice this test doesn't check math - it's focused on tranfers only
+        (
+            uint256 expectedNewDebt,
+            uint256 expectedCumulativeIndex,
+            uint256 expectedProfit,
+            uint256 expectedCumulativeQuotaInterest
+        ) = (0, collateralDebtData.cumulativeIndexNow, collateralDebtData.accruedFees, 0);
+
+        caseName = string.concat(caseName, "full repayment");
+
+        startTokenTrackingSession(caseName);
+
+        expectTokenTransfer({
+            reason: "transfer from user to pool",
+            token: underlying,
+            from: creditAccount,
+            to: address(poolMock),
+            amount: collateralDebtData.calcTotalDebt()
+        });
+
+        if (supportsQuotas) {
+            vm.expectCall(
+                address(poolQuotaKeeperMock),
+                abi.encodeCall(IPoolQuotaKeeperV3.accrueQuotaInterest, (creditAccount, collateralDebtData.quotedTokens))
+            );
+        }
+
+        /// @notice enabledTokesMask is set to zero, because it has no impact
+        (uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable) = creditManager.manageDebt({
+            creditAccount: creditAccount,
+            amount: type(uint256).max,
+            enabledTokensMask: 0,
+            action: ManageDebtAction.DECREASE_DEBT
+        });
+
+        checkTokenTransfers({debug: false});
+
+        assertEq(newDebt, expectedNewDebt, _testCaseErr("Incorrect new debt"));
+
+        assertEq(poolMock.repayAmount(), collateralDebtData.debt - newDebt, _testCaseErr("Incorrect repay amount"));
+        assertEq(poolMock.repayProfit(), expectedProfit, _testCaseErr("Incorrect repay profit"));
+        assertEq(poolMock.repayLoss(), 0, _testCaseErr("Incorrect repay loss"));
+
+        /// @notice checking creditAccountInf update
+        {
+            (uint256 debt, uint256 cumulativeIndexLastUpdate, uint256 cumulativeQuotaInterest,,,,,) =
+                creditManager.creditAccountInfo(creditAccount);
+
+            assertEq(debt, expectedNewDebt, _testCaseErr("Incorrect debt update in creditAccountInfo"));
+            assertEq(
+                cumulativeIndexLastUpdate,
+                expectedCumulativeIndex,
+                _testCaseErr("Incorrect cumulativeIndexLastUpdate update in creditAccountInfo")
+            );
+
+            /// @notice cumulativeQuotaInterest should not be changed if supportsQuotas  == false
+
+            assertEq(
+                cumulativeQuotaInterest,
+                supportsQuotas ? (expectedCumulativeQuotaInterest + 1) : initialCQI,
+                _testCaseErr("Incorrect cumulativeQuotaInterest update in creditAccountInfo")
+            );
+        }
+
+        assertEq(tokensToEnable, 0, _testCaseErr("Incorrect tokensToEnable"));
+
+        /// @notice it should disable token mask with 0 or 1 balance after
+        assertEq(tokensToDisable, UNDERLYING_TOKEN_MASK, _testCaseErr("Incorrect tokensToDisable"));
+    }
+
     /// @dev U:[CM-12]: manageDebt with 0 amount doesn't change anythig
     function test_U_CM_12_manageDebt_with_0_amount_doesn_t_change_anythig() public withFeeTokenCase allQuotaCases {
         uint256 debt = 10000;
@@ -1458,7 +1579,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
     }
 
-    // /// @dev U:[CM-18]: fullCollateralCheck reverts if not enough collateral otherwise saves enabledTokensMask
+    /// @dev U:[CM-18]: fullCollateralCheck reverts if not enough collateral otherwise saves enabledTokensMask
     function test_U_CM_18_fullCollateralCheck_reverts_if_not_enough_collateral_otherwise_saves_enabledTokensMask(
         uint256 amount
     ) public withFeeTokenCase withoutSupportQuotas {
@@ -1561,10 +1682,12 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         assertEq(enabledTokensMaskAfter, enabledTokenMaskWithDisableTokens, "enabledTokensMask wasn't set correctly");
     }
 
-    // /// @dev U:[CM-18A]: fullCollateralCheck always succeeds for 0 total debt
-    function test_U_CM_18A_fullCollateralCheck_reverts_if_not_enough_collateral_otherwise_saves_enabledTokensMask(
-        uint256 amount
-    ) public withFeeTokenCase withoutSupportQuotas {
+    /// @dev U:[CM-18A]: fullCollateralCheck always succeeds for 0 total debt
+    function test_U_CM_18A_fullCollateralCheck_succeeds_for_zero_debt(uint256 amount)
+        public
+        withFeeTokenCase
+        withoutSupportQuotas
+    {
         /// @notice This test doesn't check collateral calculation, it proves that function
         /// reverts if it's not enough collateral otherwise it stores enabledTokensMask to storage
 
@@ -1627,6 +1750,46 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         uint256 enabledTokensMaskAfter = creditManager.enabledTokensMaskOf(creditAccount);
 
         assertEq(enabledTokensMaskAfter, enabledTokenMaskWithDisableTokens, "enabledTokensMask wasn't set correctly");
+    }
+
+    /// @dev U:[CM-18B]: fullCollateralCheck fails with 0 debt and non-zero quotas
+    function test_U_CM_18B_fullCollateralCheck_reverts_if_0_debt_and_non_zero_quotas()
+        public
+        withFeeTokenCase
+        withSupportQuotas
+    {
+        // uint256 amount = DAI_ACCOUNT_AMOUNT;
+        address creditAccount = DUMB_ADDRESS;
+
+        /// @notice sets price 1 USD for underlying
+        priceOracleMock.setPrice(underlying, 10 ** 8);
+
+        _addQuotedToken({token: Tokens.LINK, lt: 80_00, quoted: 5, outstandingInterest: 0});
+        _addQuotedToken({token: Tokens.STETH, lt: 30_00, quoted: 10, outstandingInterest: 0});
+
+        uint256 LINK_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.LINK});
+
+        vm.prank(CONFIGURATOR);
+        creditManager.setQuotedMask(LINK_TOKEN_MASK);
+
+        creditManager.setCreditAccountInfoMap({
+            creditAccount: creditAccount,
+            debt: 0,
+            cumulativeIndexLastUpdate: RAY,
+            cumulativeQuotaInterest: 1,
+            quotaFees: 0,
+            enabledTokensMask: LINK_TOKEN_MASK,
+            flags: 0,
+            borrower: USER
+        });
+
+        vm.expectRevert(ActiveQuotasOnZeroDebtAccountException.selector);
+        creditManager.fullCollateralCheck({
+            creditAccount: creditAccount,
+            enabledTokensMask: LINK_TOKEN_MASK,
+            collateralHints: new uint256[](0),
+            minHealthFactor: PERCENTAGE_FACTOR
+        });
     }
 
     //

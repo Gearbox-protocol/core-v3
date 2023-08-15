@@ -14,7 +14,8 @@ enum ClosureAction {
 
 enum ManageDebtAction {
     INCREASE_DEBT,
-    DECREASE_DEBT
+    DECREASE_DEBT,
+    FULL_REPAYMENT
 }
 
 uint8 constant WITHDRAWAL_FLAG = 1;

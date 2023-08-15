@@ -479,6 +479,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         } else {
             // DECREASE DEBT
 
+            // Passed amount being equal to MAX_INT signals the Credit Manager that the user
+            // wants to repay the entire current debt. This is not possible to do by passing the
+            // exact total debt value, since it increases every block
+            if (amount == type(uint256).max) {
+                amount = _amountWithFee(collateralDebtData.calcTotalDebt());
+                action = ManageDebtAction.FULL_REPAYMENT;
+            }
+
             // Pays the entire amount back to the pool
             ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amount}); // U:[CM-11]
 
@@ -487,18 +495,26 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             {
                 uint256 profit;
 
-                uint128 quotaFees = (supportsQuotas) ? currentCreditAccountInfo.quotaFees : 0;
+                if (action == ManageDebtAction.FULL_REPAYMENT) {
+                    newDebt = 0;
+                    newCumulativeIndex = collateralDebtData.cumulativeIndexNow;
+                    profit = collateralDebtData.accruedFees;
+                    newCumulativeQuotaInterest = 0;
+                    newQuotaFees = 0;
+                } else {
+                    uint128 quotaFees = (supportsQuotas) ? currentCreditAccountInfo.quotaFees : 0;
 
-                (newDebt, newCumulativeIndex, profit, newCumulativeQuotaInterest, newQuotaFees) = CreditLogic
-                    .calcDecrease({
-                    amount: _amountMinusFee(amount),
-                    debt: collateralDebtData.debt,
-                    cumulativeIndexNow: collateralDebtData.cumulativeIndexNow,
-                    cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
-                    cumulativeQuotaInterest: collateralDebtData.cumulativeQuotaInterest,
-                    quotaFees: quotaFees,
-                    feeInterest: feeInterest
-                }); // U:[CM-11]
+                    (newDebt, newCumulativeIndex, profit, newCumulativeQuotaInterest, newQuotaFees) = CreditLogic
+                        .calcDecrease({
+                        amount: _amountMinusFee(amount),
+                        debt: collateralDebtData.debt,
+                        cumulativeIndexNow: collateralDebtData.cumulativeIndexNow,
+                        cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
+                        cumulativeQuotaInterest: collateralDebtData.cumulativeQuotaInterest,
+                        quotaFees: quotaFees,
+                        feeInterest: feeInterest
+                    }); // U:[CM-11]
+                }
 
                 /// @dev The amount of principal repaid is what is left after repaying all interest and fees
                 ///      and is the difference between newDebt and debt
@@ -698,11 +714,18 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             revert NotEnoughCollateralException(); // U:[CM-18]
         }
 
+        /// If a user enables quotas on a zero-debt account, they can remove all collateral
+        /// and immediately go into bad debt on the next block. This check aims to prevent that.
+        if (collateralDebtData.quotedTokens.length != 0 && collateralDebtData.debt == 0) {
+            revert ActiveQuotasOnZeroDebtAccountException();
+        }
+
         uint256 enabledTokensMaskAfter = collateralDebtData.enabledTokensMask;
         /// During a multicall, all changes to enabledTokenMask are stored in-memory
         /// to avoid redundant storage writes. Saving to storage is only done at the end
         /// of a full collateral check, which is performed after every multicall
         _saveEnabledTokensMask(creditAccount, enabledTokensMaskAfter); // U:[CM-18]
+
         return enabledTokensMaskAfter;
     }
 
