@@ -17,7 +17,7 @@
   },
   "license": "BUSL-1.1",
   "scripts": {
-    "types": "typechain --target ethers-v5 --discriminate-types --out-dir types \"./forge-out/**/!(*.t|test).sol/!(*.abi).json\"",
+    "types": "rm -rf ./types && typechain --target ethers-v5 --discriminate-types --out-dir types \"./forge-out/**/!(*.t|test|*Mock|*Test).sol/!(*.abi).json\"",
     "prepare": "husky install",
     "prettier": "forge fmt",
     "prettier:ci": "forge fmt",
@@ -33,6 +33,7 @@
     "lint-staged": "^13.0.3",
     "prettier": "^2.7.1",
     "prettier-plugin-solidity": "^1.0.0-beta.24",
+    "rimraf": "^5.0.1",
     "typechain": "^8.3.1"
   },
   "prettier": "@gearbox-protocol/prettier-config",
