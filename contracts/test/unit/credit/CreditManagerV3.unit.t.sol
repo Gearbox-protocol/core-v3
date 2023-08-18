@@ -993,7 +993,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         checkTokenTransfers({debug: true});
     }
 
-    /// @dev U:[CM-9A]: close credit account works as expected
+    /// @dev U:[CM-9A]: close credit account transfers tokens correctly with zero debt
     function test_U_CM_09A_close_credit_transfers_tokens_correctly_with_zero_debt(uint256 skipTokenMask)
         public
         withFeeTokenCase
@@ -1422,6 +1422,109 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         /// @notice it should disable token mask with 0 or 1 balance after
         assertEq(tokensToDisable, UNDERLYING_TOKEN_MASK, _testCaseErr("Incorrect tokensToDisable"));
+    }
+
+    /// @dev U:[CM-11B]: manageDebt with full repayment is equivalent to closeCreditAccount
+    function test_U_CM_11B_manageDebt_full_repayment_equivalent_to_close_credit_account(uint256 _amount)
+        public
+        withFeeTokenCase
+        allQuotaCases
+    {
+        vm.assume(_amount < 10 ** 10 * (10 ** _decimals(underlying)));
+        vm.assume(_amount > 1);
+
+        /// @notice for stack optimisation
+        uint256 amount = _amount;
+
+        address creditAccount = accountFactory.usedAccount();
+
+        CollateralDebtData memory collateralDebtData;
+
+        collateralDebtData.debt = amount * (amount % 5 + 1);
+        collateralDebtData.cumulativeIndexNow = RAY * (10 + amount % 5) / 10;
+        collateralDebtData.cumulativeIndexLastUpdate = RAY;
+
+        collateralDebtData.accruedInterest = CreditLogic.calcAccruedInterest(
+            collateralDebtData.debt, collateralDebtData.cumulativeIndexLastUpdate, collateralDebtData.cumulativeIndexNow
+        );
+
+        if (supportsQuotas) {
+            collateralDebtData.cumulativeQuotaInterest = uint128(amount / (amount % 5 + 1));
+            collateralDebtData.accruedInterest += collateralDebtData.cumulativeQuotaInterest;
+
+            /// Quota fees
+            collateralDebtData.accruedFees += amount / (amount % 10 + 1);
+        }
+
+        {
+            (uint16 feeInterest,,,,) = creditManager.fees();
+
+            collateralDebtData.accruedFees += (collateralDebtData.accruedInterest * feeInterest) / PERCENTAGE_FACTOR;
+        }
+
+        poolMock.setCumulativeIndexNow(collateralDebtData.cumulativeIndexNow);
+
+        uint256 initialCQI = collateralDebtData.cumulativeQuotaInterest + 1;
+        creditManager
+            /// @notice enabledTokensMask is read directly from function parameters, not from this function
+            .setCreditAccountInfoMap({
+            creditAccount: creditAccount,
+            debt: collateralDebtData.debt,
+            cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
+            cumulativeQuotaInterest: uint128(initialCQI),
+            quotaFees: supportsQuotas ? uint128(amount / (amount % 10 + 1)) : 0,
+            enabledTokensMask: 0,
+            flags: 0,
+            borrower: USER
+        });
+
+        {
+            uint256 amountOnAccount = _amountWithFee(collateralDebtData.calcTotalDebt()) + 1;
+            tokenTestSuite.mint(underlying, creditAccount, amountOnAccount);
+        }
+
+        for (uint256 caseId = 0; caseId <= 1; ++caseId) {
+            uint256 ss = vm.snapshot();
+
+            caseName = string.concat(caseName, caseId == 0 ? "full repayment" : "close account");
+
+            startTokenTrackingSession(caseName);
+
+            expectTokenTransfer({
+                reason: "transfer from user to pool",
+                token: underlying,
+                from: creditAccount,
+                to: address(poolMock),
+                amount: collateralDebtData.calcTotalDebt()
+            });
+
+            if (caseId == 0) {
+                (uint256 newDebt,,) = creditManager.manageDebt({
+                    creditAccount: creditAccount,
+                    amount: type(uint256).max,
+                    enabledTokensMask: 0,
+                    action: ManageDebtAction.DECREASE_DEBT
+                });
+            } else {
+                creditManager.closeCreditAccount({
+                    creditAccount: creditAccount,
+                    closureAction: ClosureAction.CLOSE_ACCOUNT,
+                    collateralDebtData: collateralDebtData,
+                    payer: USER,
+                    to: USER,
+                    skipTokensMask: 0,
+                    convertToETH: false
+                });
+            }
+
+            checkTokenTransfers({debug: false});
+
+            assertEq(poolMock.repayAmount(), collateralDebtData.debt, _testCaseErr("Incorrect repay amount"));
+            assertEq(poolMock.repayProfit(), collateralDebtData.accruedFees, _testCaseErr("Incorrect repay profit"));
+            assertEq(poolMock.repayLoss(), 0, _testCaseErr("Incorrect repay loss"));
+
+            vm.revertTo(ss);
+        }
     }
 
     /// @dev U:[CM-12]: manageDebt with 0 amount doesn't change anythig
