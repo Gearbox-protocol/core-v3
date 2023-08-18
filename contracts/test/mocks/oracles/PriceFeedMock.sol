@@ -3,8 +3,8 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.10;
 
-import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
-import {IPriceFeedType} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceFeedType.sol";
+import {PriceFeedType} from "@gearbox-protocol/sdk/contracts/PriceFeedType.sol";
+import {IPriceFeed} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceFeed.sol";
 
 enum FlagState {
     FALSE,
@@ -14,7 +14,9 @@ enum FlagState {
 
 /// @title Price feed mock
 /// @notice Used for test purposes only
-contract PriceFeedMock is AggregatorV3Interface, IPriceFeedType {
+contract PriceFeedMock is IPriceFeed {
+    PriceFeedType public constant override priceFeedType = PriceFeedType.CHAINLINK_ORACLE;
+
     int256 private price;
     uint8 public immutable override decimals;
 
@@ -56,24 +58,6 @@ contract PriceFeedMock is AggregatorV3Interface, IPriceFeedType {
 
     function setPrice(int256 newPrice) external {
         price = newPrice;
-    }
-
-    // getRoundData and latestRoundData should both raise "No data present"
-    // if they do not have data to report, instead of returning unset values
-    // which could be misinterpreted as actual reported values.
-    function getRoundData(uint80)
-        external
-        view
-        override
-        returns (
-            uint80, // roundId,
-            int256, // answer,
-            uint256, // startedAt,
-            uint256, // updatedAt,
-            uint80 // answeredInRound
-        )
-    {
-        return (roundId, price, startedAt, updatedAt, answerInRound);
     }
 
     function latestRoundData()

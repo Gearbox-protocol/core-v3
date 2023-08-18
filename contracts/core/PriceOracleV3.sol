@@ -5,7 +5,6 @@ pragma solidity ^0.8.17;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
 import {
     AddressIsNotContractException,
@@ -100,8 +99,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
         view
         returns (uint256 price, uint256 scale)
     {
-        (, int256 answer,, uint256 updatedAt,) = AggregatorV3Interface(priceFeed).latestRoundData(); // U:[PO-1]
-        if (!skipCheck) _checkAnswer(answer, updatedAt, stalenessPeriod); // U:[PO-1]
+        (int256 answer,) = _getValidatedPrice(priceFeed, stalenessPeriod, skipCheck); // U:[PO-1]
 
         // answer should not be negative (price feeds with `skipCheck = true` must ensure that!)
         price = uint256(answer); // U:[PO-1]
@@ -122,10 +120,10 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
         assembly {
             let data := sload(params.slot)
             priceFeed := data
-            stalenessPeriod := and(shr(160, data), 0xFFFFFFFF)
-            skipCheck := and(shr(192, data), 0xFF)
-            decimals := and(shr(200, data), 0xFF)
-            useReserve := and(shr(208, data), 0xFF)
+            stalenessPeriod := shr(160, data)
+            skipCheck := shr(192, data)
+            decimals := shr(200, data)
+            useReserve := shr(208, data)
         } // U:[PO-2]
     }
 

@@ -42,10 +42,6 @@ uint256 constant PRICE_UPDATES_ALREADY_APPLIED = 1 << 195;
 ///      multicall is initiated in `botMulticall` and reset after the first `payBot` call
 uint256 constant PAY_BOT_CAN_BE_CALLED = 1 << 196;
 
-interface IUpdatablePriceFeed {
-    function updatePrice(bytes calldata data) external;
-}
-
 interface ICreditFacadeV3Multicall {
     /// @dev Instructs CreditFacadeV3 to check token balances at the end
     /// Used to control slippage after the entire sequence of operations, since tracking slippage

@@ -8,7 +8,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {WETHMock} from "../mocks/token/WETHMock.sol";
 import {ERC20BlacklistableMock} from "../mocks/token/ERC20Blacklistable.sol";
 
-import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import {PriceFeedConfig} from "../interfaces/ICreditConfig.sol";
 
 // MOCKS
@@ -44,7 +43,7 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
 
     constructor() {
         NetworkDetector nd = new NetworkDetector();
-        uint256 chainId = nd.chainId();
+        chainId = nd.chainId();
 
         if (chainId == 1337 || chainId == 31337) {
             MockToken[] memory data = MockTokensData.getTokenData();
@@ -101,16 +100,16 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
 
         vm.label(address(t), token.symbol);
 
-        AggregatorV3Interface priceFeed = new PriceFeedMock(token.price, 8);
+        address priceFeed = address(new PriceFeedMock(token.price, 8));
 
         addressOf[token.index] = address(t);
         prices[token.index] = uint256(token.price);
 
         tokenIndexes[address(t)] = token.index;
 
-        priceFeeds.push(PriceFeedConfig({token: address(t), priceFeed: address(priceFeed), stalenessPeriod: 2 hours}));
+        priceFeeds.push(PriceFeedConfig({token: address(t), priceFeed: priceFeed, stalenessPeriod: 2 hours}));
         symbols[token.index] = token.symbol;
-        priceFeedsMap[token.index] = address(priceFeed);
+        priceFeedsMap[token.index] = priceFeed;
     }
 
     function getPriceFeeds() external view returns (PriceFeedConfig[] memory) {
