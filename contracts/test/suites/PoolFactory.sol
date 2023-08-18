@@ -11,6 +11,7 @@ import {LinearInterestRateModelV3} from "../../pool/LinearInterestRateModelV3.so
 
 import {GaugeV3} from "../../governance/GaugeV3.sol";
 import {PoolQuotaKeeperV3} from "../../pool/PoolQuotaKeeperV3.sol";
+import {IPoolV3DeployConfig, LinearIRMV3DeployParams} from "../interfaces/ICreditConfig.sol";
 
 import "../lib/constants.sol";
 
@@ -19,7 +20,7 @@ contract PoolFactory is Test {
     PoolQuotaKeeperV3 public poolQuotaKeeper;
     GaugeV3 public gauge;
 
-    constructor(address addressProvider, address underlying, bool supportQuotas) {
+    constructor(address addressProvider, IPoolV3DeployConfig config, address underlying, bool supportQuotas) {
         // uint16 U_1,
         // uint16 U_2,
         // uint16 R_base,
@@ -27,7 +28,16 @@ contract PoolFactory is Test {
         // uint16 R_slope2,
         // uint16 R_slope3,
         // bool _isBorrowingMoreU2Forbidden
-        LinearInterestRateModelV3 irm = new LinearInterestRateModelV3(70_00, 85_00, 0, 15_00, 30_00, 120_00, true);
+        LinearIRMV3DeployParams memory irmParams = config.irm();
+        LinearInterestRateModelV3 irm = new LinearInterestRateModelV3(
+            irmParams.U_1,
+            irmParams.U_2,
+            irmParams.R_base,
+            irmParams.R_slope1,
+            irmParams.R_slope2,
+            irmParams.R_slope3,
+            irmParams._isBorrowingMoreU2Forbidden
+        );
 
         // address addressProvider_,
         // address underlyingToken_,
@@ -42,8 +52,8 @@ contract PoolFactory is Test {
            interestRateModel_: address(irm),
            totalDebtLimit_: type(uint256).max,
            supportsQuotas_: supportQuotas,
-           name_: string(abi.encodePacked("Test diesel ", IERC20Metadata(underlying).name())),
-           symbol_: string(abi.encodePacked("d", IERC20Metadata(underlying).symbol()))
+           name_: config.name(),
+           symbol_: config.symbol()
      } );
 
         if (supportQuotas) {
@@ -53,7 +63,7 @@ contract PoolFactory is Test {
             vm.prank(CONFIGURATOR);
             gauge.setFrozenEpoch(false);
 
-            vm.label(address(gauge), "Gauge");
+            vm.label(address(gauge), string.concat("GaugeV3-", config.symbol()));
 
             poolQuotaKeeper = new PoolQuotaKeeperV3(payable(address(pool)));
 
@@ -63,7 +73,7 @@ contract PoolFactory is Test {
             vm.prank(CONFIGURATOR);
             pool.setPoolQuotaKeeper(address(poolQuotaKeeper));
 
-            vm.label(address(poolQuotaKeeper), "PoolQuotaKeeper");
+            vm.label(address(poolQuotaKeeper), string.concat("PoolQuotaKeeperV3-", config.symbol()));
         }
     }
 }

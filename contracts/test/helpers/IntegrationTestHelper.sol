@@ -342,7 +342,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
         supportsQuotas = anySupportsQuotas ? config.supportsQuotas() : supportsQuotas;
 
-        PoolFactory pf = new PoolFactory(address(addressProvider), underlying, supportsQuotas);
+        PoolFactory pf = new PoolFactory(address(addressProvider),  config, underlying, supportsQuotas);
 
         pool = pf.pool();
         gauge = pf.gauge();
@@ -403,7 +403,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 maxDebt: cmParams.maxDebt,
                 collateralTokens: _convertCollateral(cmParams.collateralTokens),
                 degenNFT: (whitelisted) ? address(degenNFT) : address(0),
-                expirable: (anyExpirable) ? cmParams.expirable : expirable
+                expirable: (anyExpirable) ? cmParams.expirable : expirable,
+                description: cmParams.description
             });
 
             CreditManagerFactory cmf = new CreditManagerFactory(
@@ -655,6 +656,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
     function _convertCollateral(CollateralTokenHuman[] memory clts)
         internal
+        view
         returns (CollateralToken[] memory result)
     {
         uint256 len = clts.length;
