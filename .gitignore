@@ -21,3 +21,4 @@ forge-out/
 .eslintcache
 .eslint.local.json
 .favorites.json
+dist/
