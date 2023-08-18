@@ -6,8 +6,8 @@ import {IPoolBase} from "../../../interfaces/IPoolV3.sol";
 /// @title Credit Manager
 
 contract CreditManagerV3Harness_USDT is CreditManagerV3Harness, USDT_Transfer {
-    constructor(address _addressProvider, address _pool)
-        CreditManagerV3Harness(_addressProvider, _pool)
+    constructor(address _addressProvider, address _pool, string memory _description)
+        CreditManagerV3Harness(_addressProvider, _pool, _description)
         USDT_Transfer(IPoolBase(_pool).underlyingToken())
     {}
 

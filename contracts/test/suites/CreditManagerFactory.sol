@@ -18,7 +18,7 @@ contract CreditManagerFactory {
     CreditConfiguratorV3 public creditConfigurator;
 
     constructor(address _ap, address _pool, CreditManagerOpts memory opts, bytes32 salt) {
-        creditManager = new CreditManagerV3(_ap, _pool);
+        creditManager = new CreditManagerV3(_ap, _pool, opts.description);
         creditFacade = new CreditFacadeV3(
             address(creditManager),
             opts.degenNFT,

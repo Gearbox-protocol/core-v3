@@ -60,6 +60,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     // IMMUTABLE PARAMS
 
+    /// @notice Name and additional information
+    /// @dev Technically not immutable, but is set once and only
+    ///      used offchain
+    string public description;
+
     /// @inheritdoc IVersion
     uint256 public constant override version = 3_00;
 
@@ -192,7 +197,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Constructor
     /// @param _addressProvider Address of the repository to get system-level contracts from
     /// @param _pool Address of the pool to borrow funds from
-    constructor(address _addressProvider, address _pool) {
+    constructor(address _addressProvider, address _pool, string memory _description) {
         addressProvider = _addressProvider;
         pool = _pool; // U:[CM-1]
 
@@ -218,6 +223,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditConfigurator = msg.sender; // U:[CM-1]
 
         _activeCreditAccount = address(1);
+
+        description = _description;
     }
 
     //

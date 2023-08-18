@@ -75,6 +75,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     using USDTFees for uint256;
     using Vars for VarU256;
 
+    string constant description = "Test Credit Manager";
+
     IAddressProviderV3 addressProvider;
 
     AccountFactoryMock accountFactory;
@@ -168,8 +170,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         }
 
         creditManager = (isFeeToken)
-            ? new CreditManagerV3Harness_USDT(address(addressProvider), address(poolMock))
-            : new CreditManagerV3Harness(address(addressProvider), address(poolMock));
+            ? new CreditManagerV3Harness_USDT(address(addressProvider), address(poolMock), description)
+            : new CreditManagerV3Harness(address(addressProvider), address(poolMock), description);
         creditManager.setCreditFacade(address(this));
 
         creditManager.setFees(
@@ -355,6 +357,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             address(CONFIGURATOR),
             _testCaseErr("Incorrect creditConfigurator")
         );
+
+        assertEq(creditManager.description(), description, _testCaseErr("Incorrect description"));
     }
 
     //
@@ -963,6 +967,89 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                         from: creditAccount,
                         to: FRIEND,
                         amount: collateralDebtData.debt - 1
+                    });
+                } else {
+                    expectTokenTransfer({
+                        reason: string.concat("transfer token ", IERC20Metadata(token).symbol()),
+                        token: token,
+                        from: creditAccount,
+                        to: (convertToEth && token == weth) ? address(withdrawalManagerMock) : FRIEND,
+                        amount: balance - 1
+                    });
+                }
+            }
+        }
+
+        creditManager.closeCreditAccount({
+            creditAccount: creditAccount,
+            closureAction: ClosureAction.CLOSE_ACCOUNT,
+            collateralDebtData: collateralDebtData,
+            payer: USER,
+            to: FRIEND,
+            skipTokensMask: skipTokenMask,
+            convertToETH: convertToEth
+        });
+
+        checkTokenTransfers({debug: true});
+    }
+
+    /// @dev U:[CM-9A]: close credit account works as expected
+    function test_U_CM_09A_close_credit_transfers_tokens_correctly_with_zero_debt(uint256 skipTokenMask)
+        public
+        withFeeTokenCase
+        withoutSupportQuotas
+    {
+        bool convertToEth = (skipTokenMask % 2) != 0;
+        uint8 numberOfTokens = uint8(skipTokenMask % 253);
+
+        CollateralDebtData memory collateralDebtData;
+        collateralDebtData.debt = 0;
+
+        /// @notice `+2` for underlying and WETH token
+        collateralDebtData.enabledTokensMask = getHash(skipTokenMask, 2) & ((1 << (numberOfTokens + 2)) - 1);
+
+        address creditAccount = accountFactory.usedAccount();
+
+        creditManager.setBorrower(creditAccount, USER);
+        tokenTestSuite.mint({token: underlying, to: creditAccount, amount: DAI_ACCOUNT_AMOUNT});
+
+        address weth = tokenTestSuite.addressOf(Tokens.WETH);
+
+        vm.startPrank(CONFIGURATOR);
+        creditManager.addToken(weth);
+        creditManager.setCollateralTokenData(weth, 8000, 8000, type(uint40).max, 0);
+
+        vm.stopPrank();
+
+        {
+            uint256 randomAmount = skipTokenMask % DAI_ACCOUNT_AMOUNT;
+            tokenTestSuite.mint({token: weth, to: creditAccount, amount: randomAmount});
+            _addTokensBatch({creditAccount: creditAccount, numberOfTokens: numberOfTokens, balance: randomAmount});
+        }
+
+        caseName = string.concat(caseName, "token transfer with ", Strings.toString(numberOfTokens), " on account");
+
+        startTokenTrackingSession(caseName);
+
+        uint8 len = creditManager.collateralTokensCount();
+
+        /// @notice it starts from 1, because underlying token has index 0
+        for (uint8 i = 0; i < len; ++i) {
+            uint256 tokenMask = 1 << i;
+            address token = creditManager.getTokenByMask(tokenMask);
+            uint256 balance = IERC20(token).balanceOf(creditAccount);
+
+            if (
+                (collateralDebtData.enabledTokensMask & tokenMask != 0) && (tokenMask & skipTokenMask == 0)
+                    && (balance > 1)
+            ) {
+                if (i == 0) {
+                    expectTokenTransfer({
+                        reason: "transfer underlying token ",
+                        token: underlying,
+                        from: creditAccount,
+                        to: FRIEND,
+                        amount: _amountMinusFee(DAI_ACCOUNT_AMOUNT - 1)
                     });
                 } else {
                     expectTokenTransfer({

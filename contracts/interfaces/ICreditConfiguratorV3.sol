@@ -30,6 +30,8 @@ struct CreditManagerOpts {
     address degenNFT;
     /// @dev Whether the Credit Manager is connected to an expirable pool (and the CreditFacadeV3 is expirable)
     bool expirable;
+    /// @dev Description for the Credit Manager
+    string description;
 }
 
 interface ICreditConfiguratorEvents {

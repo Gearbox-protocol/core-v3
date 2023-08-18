@@ -4,6 +4,7 @@
 pragma solidity ^0.8.17;
 
 import "../../interfaces/IAddressProviderV3.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {PoolV3} from "../../pool/PoolV3.sol";
 import {LinearInterestRateModelV3} from "../../pool/LinearInterestRateModelV3.sol";
@@ -40,7 +41,9 @@ contract PoolFactory is Test {
            underlyingToken_: underlying,
            interestRateModel_: address(irm),
            totalDebtLimit_: type(uint256).max,
-           supportsQuotas_: supportQuotas
+           supportsQuotas_: supportQuotas,
+           name_: string(abi.encodePacked("Test diesel ", IERC20Metadata(underlying).name())),
+           symbol_: string(abi.encodePacked("d", IERC20Metadata(underlying).symbol()))
      } );
 
         if (supportQuotas) {
