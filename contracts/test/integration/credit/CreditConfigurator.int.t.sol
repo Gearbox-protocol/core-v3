@@ -246,10 +246,11 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             maxDebt: uint128(150000 * WAD),
             collateralTokens: cTokens,
             degenNFT: address(0),
-            expirable: false
+            expirable: false,
+            description: "Test Credit Manager"
         });
 
-        creditManager = new CreditManagerV3(address(addressProvider), address(pool));
+        creditManager = new CreditManagerV3(address(addressProvider), address(pool), "Test Credit Manager");
         creditFacade = new CreditFacadeV3(
             address(creditManager),
             creditOpts.degenNFT,
@@ -1246,7 +1247,8 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             maxDebt: uint128(150000 * WAD),
             collateralTokens: cTokens,
             degenNFT: address(0),
-            expirable: false
+            expirable: false,
+            description: "Test Credit Manager"
         });
 
         CreditConfiguratorV3 newCC = new CreditConfiguratorV3(

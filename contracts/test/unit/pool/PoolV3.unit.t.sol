@@ -4,6 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {MAX_WITHDRAW_FEE, RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
@@ -97,7 +98,9 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             addressProvider_: address(addressProvider),
             interestRateModel_: interestRateModel,
             totalDebtLimit_: 2000,
-            supportsQuotas_: supportsQuotas
+            supportsQuotas_: supportsQuotas,
+            name_: string(abi.encodePacked("diesel ", IERC20Metadata(underlying).name())),
+            symbol_: string(abi.encodePacked("d", IERC20Metadata(underlying).symbol()))
         });
 
         // setup mocks
@@ -135,7 +138,9 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             addressProvider_: address(addressProvider),
             interestRateModel_: interestRateModel,
             totalDebtLimit_: type(uint256).max,
-            supportsQuotas_: false
+            supportsQuotas_: false,
+            name_: "",
+            symbol_: ""
         });
 
         vm.expectRevert(ZeroAddressException.selector);
@@ -144,7 +149,9 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             addressProvider_: address(0),
             interestRateModel_: interestRateModel,
             totalDebtLimit_: type(uint256).max,
-            supportsQuotas_: false
+            supportsQuotas_: false,
+            name_: "",
+            symbol_: ""
         });
 
         vm.expectRevert(ZeroAddressException.selector);
@@ -153,7 +160,9 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             addressProvider_: address(addressProvider),
             interestRateModel_: address(0),
             totalDebtLimit_: type(uint256).max,
-            supportsQuotas_: false
+            supportsQuotas_: false,
+            name_: "",
+            symbol_: ""
         });
     }
 
@@ -170,7 +179,9 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             addressProvider_: address(addressProvider),
             interestRateModel_: interestRateModel,
             totalDebtLimit_: 2000,
-            supportsQuotas_: true
+            supportsQuotas_: true,
+            name_: string(abi.encodePacked("diesel ", IERC20Metadata(underlying).name())),
+            symbol_: string(abi.encodePacked("d", IERC20Metadata(underlying).symbol()))
         });
 
         assertEq(pool.asset(), address(underlying), "Incorrect asset");

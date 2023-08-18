@@ -32,6 +32,8 @@ struct PoolV3DeployParams {
 
 /// @dev A struct representing the initial Credit Manager configuration parameters
 struct CreditManagerV3DeployParams {
+    /// @dev The Credit Manager's name
+    string description;
     /// @dev The minimal debt principal amount
     uint128 minDebt;
     /// @dev The maximal debt principal amount

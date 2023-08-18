@@ -75,6 +75,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     using USDTFees for uint256;
     using Vars for VarU256;
 
+    string constant description = "Test Credit Manager";
+
     IAddressProviderV3 addressProvider;
 
     AccountFactoryMock accountFactory;
@@ -168,8 +170,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         }
 
         creditManager = (isFeeToken)
-            ? new CreditManagerV3Harness_USDT(address(addressProvider), address(poolMock))
-            : new CreditManagerV3Harness(address(addressProvider), address(poolMock));
+            ? new CreditManagerV3Harness_USDT(address(addressProvider), address(poolMock), description)
+            : new CreditManagerV3Harness(address(addressProvider), address(poolMock), description);
         creditManager.setCreditFacade(address(this));
 
         creditManager.setFees(
@@ -355,6 +357,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             address(CONFIGURATOR),
             _testCaseErr("Incorrect creditConfigurator")
         );
+
+        assertEq(creditManager.description(), description, _testCaseErr("Incorrect description"));
     }
 
     //
@@ -989,6 +993,89 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         checkTokenTransfers({debug: true});
     }
 
+    /// @dev U:[CM-9A]: close credit account transfers tokens correctly with zero debt
+    function test_U_CM_09A_close_credit_transfers_tokens_correctly_with_zero_debt(uint256 skipTokenMask)
+        public
+        withFeeTokenCase
+        withoutSupportQuotas
+    {
+        bool convertToEth = (skipTokenMask % 2) != 0;
+        uint8 numberOfTokens = uint8(skipTokenMask % 253);
+
+        CollateralDebtData memory collateralDebtData;
+        collateralDebtData.debt = 0;
+
+        /// @notice `+2` for underlying and WETH token
+        collateralDebtData.enabledTokensMask = getHash(skipTokenMask, 2) & ((1 << (numberOfTokens + 2)) - 1);
+
+        address creditAccount = accountFactory.usedAccount();
+
+        creditManager.setBorrower(creditAccount, USER);
+        tokenTestSuite.mint({token: underlying, to: creditAccount, amount: DAI_ACCOUNT_AMOUNT});
+
+        address weth = tokenTestSuite.addressOf(Tokens.WETH);
+
+        vm.startPrank(CONFIGURATOR);
+        creditManager.addToken(weth);
+        creditManager.setCollateralTokenData(weth, 8000, 8000, type(uint40).max, 0);
+
+        vm.stopPrank();
+
+        {
+            uint256 randomAmount = skipTokenMask % DAI_ACCOUNT_AMOUNT;
+            tokenTestSuite.mint({token: weth, to: creditAccount, amount: randomAmount});
+            _addTokensBatch({creditAccount: creditAccount, numberOfTokens: numberOfTokens, balance: randomAmount});
+        }
+
+        caseName = string.concat(caseName, "token transfer with ", Strings.toString(numberOfTokens), " on account");
+
+        startTokenTrackingSession(caseName);
+
+        uint8 len = creditManager.collateralTokensCount();
+
+        /// @notice it starts from 1, because underlying token has index 0
+        for (uint8 i = 0; i < len; ++i) {
+            uint256 tokenMask = 1 << i;
+            address token = creditManager.getTokenByMask(tokenMask);
+            uint256 balance = IERC20(token).balanceOf(creditAccount);
+
+            if (
+                (collateralDebtData.enabledTokensMask & tokenMask != 0) && (tokenMask & skipTokenMask == 0)
+                    && (balance > 1)
+            ) {
+                if (i == 0) {
+                    expectTokenTransfer({
+                        reason: "transfer underlying token ",
+                        token: underlying,
+                        from: creditAccount,
+                        to: FRIEND,
+                        amount: _amountMinusFee(DAI_ACCOUNT_AMOUNT - 1)
+                    });
+                } else {
+                    expectTokenTransfer({
+                        reason: string.concat("transfer token ", IERC20Metadata(token).symbol()),
+                        token: token,
+                        from: creditAccount,
+                        to: (convertToEth && token == weth) ? address(withdrawalManagerMock) : FRIEND,
+                        amount: balance - 1
+                    });
+                }
+            }
+        }
+
+        creditManager.closeCreditAccount({
+            creditAccount: creditAccount,
+            closureAction: ClosureAction.CLOSE_ACCOUNT,
+            collateralDebtData: collateralDebtData,
+            payer: USER,
+            to: FRIEND,
+            skipTokensMask: skipTokenMask,
+            convertToETH: convertToEth
+        });
+
+        checkTokenTransfers({debug: true});
+    }
+
     //
     //
     // MANAGE DEBT
@@ -1214,6 +1301,230 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         assertEq(
             tokensToDisable, (testCase != 2) ? UNDERLYING_TOKEN_MASK : 0, _testCaseErr("Incorrect tokensToDisable")
         );
+    }
+
+    /// @dev U:[CM-11A]: manageDebt fully removes debt with MAX_INT passed as amount
+    function test_U_CM_11A_manageDebt_fully_repays_correctly(uint256 _amount) public withFeeTokenCase allQuotaCases {
+        vm.assume(_amount < 10 ** 10 * (10 ** _decimals(underlying)));
+        vm.assume(_amount > 1);
+
+        /// @notice for stack optimisation
+        uint256 amount = _amount;
+
+        address creditAccount = accountFactory.usedAccount();
+
+        CollateralDebtData memory collateralDebtData;
+
+        collateralDebtData.debt = amount * (amount % 5 + 1);
+        collateralDebtData.cumulativeIndexNow = RAY * (10 + amount % 5) / 10;
+        collateralDebtData.cumulativeIndexLastUpdate = RAY;
+
+        collateralDebtData.accruedInterest = CreditLogic.calcAccruedInterest(
+            collateralDebtData.debt, collateralDebtData.cumulativeIndexLastUpdate, collateralDebtData.cumulativeIndexNow
+        );
+
+        if (supportsQuotas) {
+            collateralDebtData.cumulativeQuotaInterest = uint128(amount / (amount % 5 + 1));
+            collateralDebtData.accruedInterest += collateralDebtData.cumulativeQuotaInterest;
+        }
+
+        {
+            (uint16 feeInterest,,,,) = creditManager.fees();
+
+            collateralDebtData.accruedFees += (collateralDebtData.accruedInterest * feeInterest) / PERCENTAGE_FACTOR;
+        }
+
+        poolMock.setCumulativeIndexNow(collateralDebtData.cumulativeIndexNow);
+
+        uint256 initialCQI = collateralDebtData.cumulativeQuotaInterest + 1;
+        creditManager
+            /// @notice enabledTokensMask is read directly from function parameters, not from this function
+            .setCreditAccountInfoMap({
+            creditAccount: creditAccount,
+            debt: collateralDebtData.debt,
+            cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
+            cumulativeQuotaInterest: uint128(initialCQI),
+            quotaFees: 0,
+            enabledTokensMask: 0,
+            flags: 0,
+            borrower: USER
+        });
+
+        {
+            uint256 amountOnAccount = _amountWithFee(collateralDebtData.calcTotalDebt()) + 1;
+            tokenTestSuite.mint(underlying, creditAccount, amountOnAccount);
+        }
+        /// @notice this test doesn't check math - it's focused on tranfers only
+        (
+            uint256 expectedNewDebt,
+            uint256 expectedCumulativeIndex,
+            uint256 expectedProfit,
+            uint256 expectedCumulativeQuotaInterest
+        ) = (0, collateralDebtData.cumulativeIndexNow, collateralDebtData.accruedFees, 0);
+
+        caseName = string.concat(caseName, "full repayment");
+
+        startTokenTrackingSession(caseName);
+
+        expectTokenTransfer({
+            reason: "transfer from user to pool",
+            token: underlying,
+            from: creditAccount,
+            to: address(poolMock),
+            amount: collateralDebtData.calcTotalDebt()
+        });
+
+        if (supportsQuotas) {
+            vm.expectCall(
+                address(poolQuotaKeeperMock),
+                abi.encodeCall(IPoolQuotaKeeperV3.accrueQuotaInterest, (creditAccount, collateralDebtData.quotedTokens))
+            );
+        }
+
+        /// @notice enabledTokesMask is set to zero, because it has no impact
+        (uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable) = creditManager.manageDebt({
+            creditAccount: creditAccount,
+            amount: type(uint256).max,
+            enabledTokensMask: 0,
+            action: ManageDebtAction.DECREASE_DEBT
+        });
+
+        checkTokenTransfers({debug: false});
+
+        assertEq(newDebt, expectedNewDebt, _testCaseErr("Incorrect new debt"));
+
+        assertEq(poolMock.repayAmount(), collateralDebtData.debt - newDebt, _testCaseErr("Incorrect repay amount"));
+        assertEq(poolMock.repayProfit(), expectedProfit, _testCaseErr("Incorrect repay profit"));
+        assertEq(poolMock.repayLoss(), 0, _testCaseErr("Incorrect repay loss"));
+
+        /// @notice checking creditAccountInf update
+        {
+            (uint256 debt, uint256 cumulativeIndexLastUpdate, uint256 cumulativeQuotaInterest,,,,,) =
+                creditManager.creditAccountInfo(creditAccount);
+
+            assertEq(debt, expectedNewDebt, _testCaseErr("Incorrect debt update in creditAccountInfo"));
+            assertEq(
+                cumulativeIndexLastUpdate,
+                expectedCumulativeIndex,
+                _testCaseErr("Incorrect cumulativeIndexLastUpdate update in creditAccountInfo")
+            );
+
+            /// @notice cumulativeQuotaInterest should not be changed if supportsQuotas  == false
+
+            assertEq(
+                cumulativeQuotaInterest,
+                supportsQuotas ? (expectedCumulativeQuotaInterest + 1) : initialCQI,
+                _testCaseErr("Incorrect cumulativeQuotaInterest update in creditAccountInfo")
+            );
+        }
+
+        assertEq(tokensToEnable, 0, _testCaseErr("Incorrect tokensToEnable"));
+
+        /// @notice it should disable token mask with 0 or 1 balance after
+        assertEq(tokensToDisable, UNDERLYING_TOKEN_MASK, _testCaseErr("Incorrect tokensToDisable"));
+    }
+
+    /// @dev U:[CM-11B]: manageDebt with full repayment is equivalent to closeCreditAccount
+    function test_U_CM_11B_manageDebt_full_repayment_equivalent_to_close_credit_account(uint256 _amount)
+        public
+        withFeeTokenCase
+        allQuotaCases
+    {
+        vm.assume(_amount < 10 ** 10 * (10 ** _decimals(underlying)));
+        vm.assume(_amount > 1);
+
+        /// @notice for stack optimisation
+        uint256 amount = _amount;
+
+        address creditAccount = accountFactory.usedAccount();
+
+        CollateralDebtData memory collateralDebtData;
+
+        collateralDebtData.debt = amount * (amount % 5 + 1);
+        collateralDebtData.cumulativeIndexNow = RAY * (10 + amount % 5) / 10;
+        collateralDebtData.cumulativeIndexLastUpdate = RAY;
+
+        collateralDebtData.accruedInterest = CreditLogic.calcAccruedInterest(
+            collateralDebtData.debt, collateralDebtData.cumulativeIndexLastUpdate, collateralDebtData.cumulativeIndexNow
+        );
+
+        if (supportsQuotas) {
+            collateralDebtData.cumulativeQuotaInterest = uint128(amount / (amount % 5 + 1));
+            collateralDebtData.accruedInterest += collateralDebtData.cumulativeQuotaInterest;
+
+            /// Quota fees
+            collateralDebtData.accruedFees += amount / (amount % 10 + 1);
+        }
+
+        {
+            (uint16 feeInterest,,,,) = creditManager.fees();
+
+            collateralDebtData.accruedFees += (collateralDebtData.accruedInterest * feeInterest) / PERCENTAGE_FACTOR;
+        }
+
+        poolMock.setCumulativeIndexNow(collateralDebtData.cumulativeIndexNow);
+
+        uint256 initialCQI = collateralDebtData.cumulativeQuotaInterest + 1;
+        creditManager
+            /// @notice enabledTokensMask is read directly from function parameters, not from this function
+            .setCreditAccountInfoMap({
+            creditAccount: creditAccount,
+            debt: collateralDebtData.debt,
+            cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
+            cumulativeQuotaInterest: uint128(initialCQI),
+            quotaFees: supportsQuotas ? uint128(amount / (amount % 10 + 1)) : 0,
+            enabledTokensMask: 0,
+            flags: 0,
+            borrower: USER
+        });
+
+        {
+            uint256 amountOnAccount = _amountWithFee(collateralDebtData.calcTotalDebt()) + 1;
+            tokenTestSuite.mint(underlying, creditAccount, amountOnAccount);
+        }
+
+        for (uint256 caseId = 0; caseId <= 1; ++caseId) {
+            uint256 ss = vm.snapshot();
+
+            caseName = string.concat(caseName, caseId == 0 ? "full repayment" : "close account");
+
+            startTokenTrackingSession(caseName);
+
+            expectTokenTransfer({
+                reason: "transfer from user to pool",
+                token: underlying,
+                from: creditAccount,
+                to: address(poolMock),
+                amount: collateralDebtData.calcTotalDebt()
+            });
+
+            if (caseId == 0) {
+                (uint256 newDebt,,) = creditManager.manageDebt({
+                    creditAccount: creditAccount,
+                    amount: type(uint256).max,
+                    enabledTokensMask: 0,
+                    action: ManageDebtAction.DECREASE_DEBT
+                });
+            } else {
+                creditManager.closeCreditAccount({
+                    creditAccount: creditAccount,
+                    closureAction: ClosureAction.CLOSE_ACCOUNT,
+                    collateralDebtData: collateralDebtData,
+                    payer: USER,
+                    to: USER,
+                    skipTokensMask: 0,
+                    convertToETH: false
+                });
+            }
+
+            checkTokenTransfers({debug: false});
+
+            assertEq(poolMock.repayAmount(), collateralDebtData.debt, _testCaseErr("Incorrect repay amount"));
+            assertEq(poolMock.repayProfit(), collateralDebtData.accruedFees, _testCaseErr("Incorrect repay profit"));
+            assertEq(poolMock.repayLoss(), 0, _testCaseErr("Incorrect repay loss"));
+
+            vm.revertTo(ss);
+        }
     }
 
     /// @dev U:[CM-12]: manageDebt with 0 amount doesn't change anythig
@@ -1458,7 +1769,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
     }
 
-    // /// @dev U:[CM-18]: fullCollateralCheck reverts if not enough collateral otherwise saves enabledTokensMask
+    /// @dev U:[CM-18]: fullCollateralCheck reverts if not enough collateral otherwise saves enabledTokensMask
     function test_U_CM_18_fullCollateralCheck_reverts_if_not_enough_collateral_otherwise_saves_enabledTokensMask(
         uint256 amount
     ) public withFeeTokenCase withoutSupportQuotas {
@@ -1559,6 +1870,116 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         uint256 enabledTokensMaskAfter = creditManager.enabledTokensMaskOf(creditAccount);
 
         assertEq(enabledTokensMaskAfter, enabledTokenMaskWithDisableTokens, "enabledTokensMask wasn't set correctly");
+    }
+
+    /// @dev U:[CM-18A]: fullCollateralCheck always succeeds for 0 total debt
+    function test_U_CM_18A_fullCollateralCheck_succeeds_for_zero_debt(uint256 amount)
+        public
+        withFeeTokenCase
+        withoutSupportQuotas
+    {
+        /// @notice This test doesn't check collateral calculation, it proves that function
+        /// reverts if it's not enough collateral otherwise it stores enabledTokensMask to storage
+
+        vm.assume(amount > 0 && amount < 1e20 * WAD);
+
+        // uint256 amount = DAI_ACCOUNT_AMOUNT;
+        address creditAccount = DUMB_ADDRESS;
+        uint8 numberOfTokens = uint8(amount % 253);
+
+        /// @notice `+1` for underlying token
+        uint256 enabledTokensMask = uint256(keccak256(abi.encode(amount))) & ((1 << (numberOfTokens + 1)) - 1);
+
+        vm.prank(CONFIGURATOR);
+        creditManager.setMaxEnabledTokens(numberOfTokens + 1);
+
+        tokenTestSuite.mint({token: underlying, to: creditAccount, amount: amount});
+
+        /// @notice sets price 1 USD for underlying
+        priceOracleMock.setPrice(underlying, 10 ** 8);
+
+        _addTokensBatch({creditAccount: creditAccount, numberOfTokens: numberOfTokens, balance: amount});
+
+        creditManager.setCreditAccountInfoMap({
+            creditAccount: creditAccount,
+            debt: 0,
+            cumulativeIndexLastUpdate: RAY,
+            cumulativeQuotaInterest: 0,
+            quotaFees: 0,
+            enabledTokensMask: enabledTokensMask,
+            flags: 0,
+            borrower: USER
+        });
+
+        CollateralDebtData memory collateralDebtData =
+            creditManager.calcDebtAndCollateralFC(creditAccount, CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS);
+
+        /// @notice fuzzler could find a combination which enabled tokens with zero balances,
+        /// which cause to twvUSD == 0 and arithmetic errr later
+        vm.assume(collateralDebtData.twvUSD > 0);
+
+        collateralDebtData =
+            creditManager.calcDebtAndCollateralFC(creditAccount, CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY);
+
+        assertEq(collateralDebtData.twvUSD, 0, "TWV computation was not skipped for 0 debt");
+
+        uint256 enabledTokenMaskWithDisableTokens = collateralDebtData.enabledTokensMask;
+
+        assertTrue(
+            !creditManager.isLiquidatable(creditAccount, PERCENTAGE_FACTOR),
+            "isLiquidatable returns true for non-liqudatable acc"
+        );
+
+        creditManager.fullCollateralCheck({
+            creditAccount: creditAccount,
+            enabledTokensMask: enabledTokensMask,
+            collateralHints: new uint256[](0),
+            minHealthFactor: PERCENTAGE_FACTOR
+        });
+
+        uint256 enabledTokensMaskAfter = creditManager.enabledTokensMaskOf(creditAccount);
+
+        assertEq(enabledTokensMaskAfter, enabledTokenMaskWithDisableTokens, "enabledTokensMask wasn't set correctly");
+    }
+
+    /// @dev U:[CM-18B]: fullCollateralCheck fails with 0 debt and non-zero quotas
+    function test_U_CM_18B_fullCollateralCheck_reverts_if_0_debt_and_non_zero_quotas()
+        public
+        withFeeTokenCase
+        withSupportQuotas
+    {
+        // uint256 amount = DAI_ACCOUNT_AMOUNT;
+        address creditAccount = DUMB_ADDRESS;
+
+        /// @notice sets price 1 USD for underlying
+        priceOracleMock.setPrice(underlying, 10 ** 8);
+
+        _addQuotedToken({token: Tokens.LINK, lt: 80_00, quoted: 5, outstandingInterest: 0});
+        _addQuotedToken({token: Tokens.STETH, lt: 30_00, quoted: 10, outstandingInterest: 0});
+
+        uint256 LINK_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.LINK});
+
+        vm.prank(CONFIGURATOR);
+        creditManager.setQuotedMask(LINK_TOKEN_MASK);
+
+        creditManager.setCreditAccountInfoMap({
+            creditAccount: creditAccount,
+            debt: 0,
+            cumulativeIndexLastUpdate: RAY,
+            cumulativeQuotaInterest: 1,
+            quotaFees: 0,
+            enabledTokensMask: LINK_TOKEN_MASK,
+            flags: 0,
+            borrower: USER
+        });
+
+        vm.expectRevert(ActiveQuotasOnZeroDebtAccountException.selector);
+        creditManager.fullCollateralCheck({
+            creditAccount: creditAccount,
+            enabledTokensMask: LINK_TOKEN_MASK,
+            collateralHints: new uint256[](0),
+            minHealthFactor: PERCENTAGE_FACTOR
+        });
     }
 
     //

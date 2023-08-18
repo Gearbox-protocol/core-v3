@@ -9,8 +9,8 @@ import {IPoolBase} from "../interfaces/IPoolV3.sol";
 /// @title Credit Manager
 
 contract CreditManagerV3_USDT is CreditManagerV3, USDT_Transfer {
-    constructor(address _addressProvider, address _pool)
-        CreditManagerV3(_addressProvider, _pool)
+    constructor(address _addressProvider, address _pool, string memory _description)
+        CreditManagerV3(_addressProvider, _pool, _description)
         USDT_Transfer(IPoolBase(_pool).underlyingToken())
     {}
 

@@ -60,6 +60,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     // IMMUTABLE PARAMS
 
+    /// @notice Name and additional information
+    /// @dev Technically not immutable, but is set once and only
+    ///      used offchain
+    string public description;
+
     /// @inheritdoc IVersion
     uint256 public constant override version = 3_00;
 
@@ -192,7 +197,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Constructor
     /// @param _addressProvider Address of the repository to get system-level contracts from
     /// @param _pool Address of the pool to borrow funds from
-    constructor(address _addressProvider, address _pool) {
+    constructor(address _addressProvider, address _pool, string memory _description) {
         addressProvider = _addressProvider;
         pool = _pool; // U:[CM-1]
 
@@ -218,6 +223,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditConfigurator = msg.sender; // U:[CM-1]
 
         _activeCreditAccount = address(1);
+
+        description = _description;
     }
 
     //
@@ -479,6 +486,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         } else {
             // DECREASE DEBT
 
+            // Passed amount being equal to MAX_INT signals the Credit Manager that the user
+            // wants to repay the entire current debt. This is not possible to do by passing the
+            // exact total debt value, since it increases every block
+            if (amount == type(uint256).max) {
+                amount = _amountWithFee(collateralDebtData.calcTotalDebt());
+                action = ManageDebtAction.FULL_REPAYMENT;
+            }
+
             // Pays the entire amount back to the pool
             ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amount}); // U:[CM-11]
 
@@ -487,18 +502,26 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             {
                 uint256 profit;
 
-                uint128 quotaFees = (supportsQuotas) ? currentCreditAccountInfo.quotaFees : 0;
+                if (action == ManageDebtAction.FULL_REPAYMENT) {
+                    newDebt = 0;
+                    newCumulativeIndex = collateralDebtData.cumulativeIndexNow;
+                    profit = collateralDebtData.accruedFees;
+                    newCumulativeQuotaInterest = 0;
+                    newQuotaFees = 0;
+                } else {
+                    uint128 quotaFees = (supportsQuotas) ? currentCreditAccountInfo.quotaFees : 0;
 
-                (newDebt, newCumulativeIndex, profit, newCumulativeQuotaInterest, newQuotaFees) = CreditLogic
-                    .calcDecrease({
-                    amount: _amountMinusFee(amount),
-                    debt: collateralDebtData.debt,
-                    cumulativeIndexNow: collateralDebtData.cumulativeIndexNow,
-                    cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
-                    cumulativeQuotaInterest: collateralDebtData.cumulativeQuotaInterest,
-                    quotaFees: quotaFees,
-                    feeInterest: feeInterest
-                }); // U:[CM-11]
+                    (newDebt, newCumulativeIndex, profit, newCumulativeQuotaInterest, newQuotaFees) = CreditLogic
+                        .calcDecrease({
+                        amount: _amountMinusFee(amount),
+                        debt: collateralDebtData.debt,
+                        cumulativeIndexNow: collateralDebtData.cumulativeIndexNow,
+                        cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
+                        cumulativeQuotaInterest: collateralDebtData.cumulativeQuotaInterest,
+                        quotaFees: quotaFees,
+                        feeInterest: feeInterest
+                    }); // U:[CM-11]
+                }
 
                 /// @dev The amount of principal repaid is what is left after repaying all interest and fees
                 ///      and is the difference between newDebt and debt
@@ -698,11 +721,18 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             revert NotEnoughCollateralException(); // U:[CM-18]
         }
 
+        /// If a user enables quotas on a zero-debt account, they can remove all collateral
+        /// and immediately go into bad debt on the next block. This check aims to prevent that.
+        if (collateralDebtData.quotedTokens.length != 0 && collateralDebtData.debt == 0) {
+            revert ActiveQuotasOnZeroDebtAccountException();
+        }
+
         uint256 enabledTokensMaskAfter = collateralDebtData.enabledTokensMask;
         /// During a multicall, all changes to enabledTokenMask are stored in-memory
         /// to avoid redundant storage writes. Saving to storage is only done at the end
         /// of a full collateral check, which is performed after every multicall
         _saveEnabledTokensMask(creditAccount, enabledTokensMaskAfter); // U:[CM-18]
+
         return enabledTokensMaskAfter;
     }
 
@@ -846,11 +876,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         /// and any extra collateral on top of that is not included into the account's value
         address _priceOracle = priceOracle;
 
-        collateralDebtData.totalDebtUSD = _convertToUSD({
-            _priceOracle: _priceOracle,
-            amountInToken: collateralDebtData.calcTotalDebt(),
-            token: underlying
-        }); // U:[CM-22]
+        uint256 totalDebt = collateralDebtData.calcTotalDebt();
+
+        collateralDebtData.totalDebtUSD = totalDebt <= 1
+            ? 0
+            : _convertToUSD({_priceOracle: _priceOracle, amountInToken: totalDebt, token: underlying}); // U:[CM-22]
 
         /// The logic for computing collateral is isolated into the `CreditLogic` library. See `CreditLogic.calcCollateral` for details.
         uint256 tokensToDisable;
@@ -862,17 +892,23 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             ? collateralDebtData.totalDebtUSD * minHealthFactor / PERCENTAGE_FACTOR
             : type(uint256).max;
 
-        (collateralDebtData.totalValueUSD, collateralDebtData.twvUSD, tokensToDisable) = collateralDebtData
-            .calcCollateral({
-            creditAccount: creditAccount,
-            underlying: underlying,
-            twvUSDTarget: target,
-            collateralHints: collateralHints,
-            quotasPacked: quotasPacked,
-            priceOracle: _priceOracle,
-            collateralTokenByMaskFn: _collateralTokenByMask,
-            convertToUSDFn: _convertToUSD
-        }); // U:[CM-22]
+        if ((task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) && (target == 0)) {
+            // If the user has zero total debt, we can safely skip all collateral computations during a
+            // full collateral check
+            (collateralDebtData.totalValueUSD, collateralDebtData.twvUSD, tokensToDisable) = (0, 0, 0); // U: [CM-18A]
+        } else {
+            (collateralDebtData.totalValueUSD, collateralDebtData.twvUSD, tokensToDisable) = collateralDebtData
+                .calcCollateral({
+                creditAccount: creditAccount,
+                underlying: underlying,
+                twvUSDTarget: target,
+                collateralHints: collateralHints,
+                quotasPacked: quotasPacked,
+                priceOracle: _priceOracle,
+                collateralTokenByMaskFn: _collateralTokenByMask,
+                convertToUSDFn: _convertToUSD
+            }); // U:[CM-22]
+        }
 
         collateralDebtData.enabledTokensMask = enabledTokensMask.disable(tokensToDisable); // U:[CM-22]
 

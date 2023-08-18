@@ -407,7 +407,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         withV1PoolTest
         notExpirableCase
     {
-        vm.assume(a > 0 && b > 0);
+        vm.assume(a > 1 && b > 1);
 
         uint128 minDebt = uint128(Math.min(a, b));
         uint128 maxDebt = uint128(Math.max(a, b));
@@ -418,8 +418,15 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(minDebt, maxDebt, 0);
 
-        vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
-        creditFacade.openCreditAccount({debt: minDebt - 1, onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
+        if (minDebt != 1) {
+            vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
+            creditFacade.openCreditAccount({
+                debt: minDebt - 1,
+                onBehalfOf: USER,
+                calls: new MultiCall[](0),
+                referralCode: 0
+            });
+        }
 
         vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
         creditFacade.openCreditAccount({debt: maxDebt + 1, onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
@@ -439,6 +446,14 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             vm.expectRevert(CreditManagerCantBorrowException.selector);
             creditFacade.openCreditAccount({debt: minDebt, onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
         }
+    }
+
+    /// @dev U:[FA-8A]: openCreditAccount suceeds for 0 debt
+    function test_U_FA_08A_openCreditAccount_does_not_revert_for_0_debt() public withV1PoolTest notExpirableCase {
+        vm.prank(CONFIGURATOR);
+        creditFacade.setDebtLimits(200, 400, 0);
+
+        creditFacade.openCreditAccount({debt: 0, onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
     }
 
     /// @dev U:[FA-9]: openCreditAccount reverts in whitelisted if user has no rights
@@ -1756,6 +1771,32 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         });
 
         vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (1))
+                })
+                ),
+            enabledTokensMask: mask,
+            flags: DECREASE_DEBT_PERMISSION
+        });
+    }
+
+    /// @dev U:[FA-33A]: multicall decreaseDebt allows zero debt
+    function test_U_FA_33A_multicall_decreaseDebt_allows_zero_debt() public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+
+        uint128 minDebt = 100;
+
+        uint256 mask = 1232322;
+
+        vm.prank(CONFIGURATOR);
+        creditFacade.setDebtLimits(minDebt, minDebt + 100, 1);
+
+        creditManagerMock.setManageDebt({newDebt: 0, tokensToEnable: 0, tokensToDisable: UNDERLYING_TOKEN_MASK});
+
         creditFacade.multicallInt({
             creditAccount: creditAccount,
             calls: MultiCallBuilder.build(

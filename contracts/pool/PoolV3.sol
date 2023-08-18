@@ -116,20 +116,21 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     /// @param interestRateModel_ Interest rate model contract address
     /// @param totalDebtLimit_ Initial total debt limit, `type(uint256).max` for no limit
     /// @param supportsQuotas_ Whether pool should support quotas
+    /// @param name_ Name of the pool
+    /// @param symbol_ Symbol of the pool's LP token
     constructor(
         address addressProvider_,
         address underlyingToken_,
         address interestRateModel_,
         uint256 totalDebtLimit_,
-        bool supportsQuotas_
+        bool supportsQuotas_,
+        string memory name_,
+        string memory symbol_
     )
         ACLNonReentrantTrait(addressProvider_) // U:[LP-1A]
         ContractsRegisterTrait(addressProvider_)
         ERC4626(IERC20(underlyingToken_)) // U:[LP-1B]
-        ERC20(
-            string(abi.encodePacked("diesel ", underlyingToken_ != address(0) ? ERC20(underlyingToken_).name() : "")),
-            string(abi.encodePacked("d", underlyingToken_ != address(0) ? ERC20(underlyingToken_).symbol() : ""))
-        ) // U:[LP-1B]
+        ERC20(name_, symbol_) // U:[LP-1B]
         nonZeroAddress(underlyingToken_) // U:[LP-1A]
         nonZeroAddress(interestRateModel_) // U:[LP-1A]
     {
