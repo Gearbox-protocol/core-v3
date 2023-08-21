@@ -17,7 +17,7 @@ import {
 } from "../../../credit/CreditConfiguratorV3.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import {ICreditConfiguratorEvents} from "../../../interfaces/ICreditConfiguratorV3.sol";
-import {IAdapterBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IAdapterBase.sol";
+import {IAdapter} from "@gearbox-protocol/core-v2/contracts/interfaces/IAdapter.sol";
 
 //
 import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
@@ -40,9 +40,7 @@ import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
 
-import {MockCreditConfig} from "../../config/MockCreditConfig.sol";
-
-import {CollateralTokensItem} from "../../config/MockCreditConfig.sol";
+import {MockCreditConfig, CollateralTokenHuman} from "../../config/MockCreditConfig.sol";
 
 import "forge-std/console.sol";
 
@@ -84,7 +82,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     function getAdapterDifferentCM() internal returns (AdapterMock) {
         address CM = makeAddr("Different CM");
 
-        vm.mockCall(CM, abi.encodeCall(IAdapterBase.creditManager, ()), abi.encode(CM));
+        vm.mockCall(CM, abi.encodeCall(IAdapter.creditManager, ()), abi.encode(CM));
         vm.mockCall(CM, abi.encodeCall(ICreditManagerV3.addressProvider, ()), abi.encode((address(addressProvider))));
 
         address TARGET_CONTRACT = makeAddr("Target Contract");
@@ -192,15 +190,15 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
         assertEq(address(creditConfigurator.addressProvider()), address(addressProvider), "Incorrect address provider");
 
-        CollateralTokensItem[8] memory collateralTokenOpts = [
-            CollateralTokensItem({token: Tokens.DAI, liquidationThreshold: DEFAULT_UNDERLYING_LT}),
-            CollateralTokensItem({token: Tokens.USDC, liquidationThreshold: 9000}),
-            CollateralTokensItem({token: Tokens.USDT, liquidationThreshold: 8800}),
-            CollateralTokensItem({token: Tokens.WETH, liquidationThreshold: 8300}),
-            CollateralTokensItem({token: Tokens.LINK, liquidationThreshold: 7300}),
-            CollateralTokensItem({token: Tokens.CRV, liquidationThreshold: 7300}),
-            CollateralTokensItem({token: Tokens.CVX, liquidationThreshold: 7300}),
-            CollateralTokensItem({token: Tokens.STETH, liquidationThreshold: 7300})
+        CollateralTokenHuman[8] memory collateralTokenOpts = [
+            CollateralTokenHuman({token: Tokens.DAI, lt: DEFAULT_UNDERLYING_LT}),
+            CollateralTokenHuman({token: Tokens.USDC, lt: 9000}),
+            CollateralTokenHuman({token: Tokens.USDT, lt: 8800}),
+            CollateralTokenHuman({token: Tokens.WETH, lt: 8300}),
+            CollateralTokenHuman({token: Tokens.LINK, lt: 7300}),
+            CollateralTokenHuman({token: Tokens.CRV, lt: 7300}),
+            CollateralTokenHuman({token: Tokens.CVX, lt: 7300}),
+            CollateralTokenHuman({token: Tokens.STETH, lt: 7300})
         ];
 
         uint256 len = collateralTokenOpts.length;
@@ -213,7 +211,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
             assertEq(token, tokenTestSuite.addressOf(collateralTokenOpts[i].token), "Incorrect token address");
 
-            assertEq(lt, collateralTokenOpts[i].liquidationThreshold, "Incorrect liquidation threshold");
+            assertEq(lt, collateralTokenOpts[i].lt, "Incorrect liquidation threshold");
         }
 
         assertEq(address(creditManager.creditFacade()), address(creditFacade), "Incorrect creditFacade");
@@ -542,7 +540,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.expectRevert(ZeroAddressException.selector);
         creditConfigurator.allowAdapter(address(0));
 
-        vm.mockCall(address(adapterMock), abi.encodeCall(IAdapterBase.targetContract, ()), abi.encode(address(0)));
+        vm.mockCall(address(adapterMock), abi.encodeCall(IAdapter.targetContract, ()), abi.encode(address(0)));
 
         vm.expectRevert(TargetContractNotAllowedException.selector);
         creditConfigurator.allowAdapter(address(adapterMock));
@@ -588,14 +586,14 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.startPrank(CONFIGURATOR);
 
         vm.mockCall(
-            address(adapterMock), abi.encodeCall(IAdapterBase.targetContract, ()), abi.encode(address(creditManager))
+            address(adapterMock), abi.encodeCall(IAdapter.targetContract, ()), abi.encode(address(creditManager))
         );
 
         vm.expectRevert(TargetContractNotAllowedException.selector);
         creditConfigurator.allowAdapter(address(adapterMock));
 
         vm.mockCall(
-            address(adapterMock), abi.encodeCall(IAdapterBase.targetContract, ()), abi.encode(address(creditFacade))
+            address(adapterMock), abi.encodeCall(IAdapter.targetContract, ()), abi.encode(address(creditFacade))
         );
 
         vm.expectRevert(TargetContractNotAllowedException.selector);
