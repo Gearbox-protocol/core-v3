@@ -38,16 +38,15 @@
     "prettier": "^2.7.1",
     "prettier-plugin-solidity": "^1.0.0-beta.24",
     "rimraf": "^5.0.1",
-    "typechain": "^8.3.1"
+    "typechain": "^8.3.1",
+    "@1inch/solidity-utils": "^2.2.27",
+    "@gearbox-protocol/core-v2": "^1.19.0-base.10",
+    "@gearbox-protocol/sdk-gov": "^1.4.6"
   },
   "prettier": "@gearbox-protocol/prettier-config",
   "lint-staged": {
     "*.sol": "forge fmt",
     "*.{json,md}": "prettier --write"
   },
-  "dependencies": {
-    "@1inch/solidity-utils": "^2.2.27",
-    "@gearbox-protocol/core-v2": "^1.19.0-base.10",
-    "@gearbox-protocol/sdk-gov": "^1.4.6"
-  }
+  "dependencies": {}
 }
