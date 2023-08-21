@@ -1463,15 +1463,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 to: address(poolMock),
                 amount: collateralDebtData.calcTotalDebt()
             });
-
-            if (supportsQuotas) {
-                vm.expectCall(
-                    address(poolQuotaKeeperMock),
-                    abi.encodeCall(
-                        IPoolQuotaKeeperV3.accrueQuotaInterest, (creditAccount, collateralDebtData.quotedTokens)
-                    )
-                );
-            }
         }
 
         /// @notice enabledTokesMask is set to zero, because it has no impact

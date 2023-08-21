@@ -551,10 +551,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             /// quota interest indexes in PQK and cumulativeQuotaInterest in Credit Manager consistent
             /// with each other, since this action caches all quota interest in Credit Manager
             if (supportsQuotas) {
-                IPoolQuotaKeeperV3(collateralDebtData._poolQuotaKeeper).accrueQuotaInterest({
-                    creditAccount: creditAccount,
-                    tokens: collateralDebtData.quotedTokens
-                });
+                // Full repayment is only available if there are no active quotas, which means
+                // that all quota interest should already be accrued
+
+                if (action != ManageDebtAction.FULL_REPAYMENT) {
+                    IPoolQuotaKeeperV3(collateralDebtData._poolQuotaKeeper).accrueQuotaInterest({
+                        creditAccount: creditAccount,
+                        tokens: collateralDebtData.quotedTokens
+                    });
+                }
 
                 currentCreditAccountInfo.cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // U:[CM-11]
                 currentCreditAccountInfo.quotaFees = newQuotaFees;
