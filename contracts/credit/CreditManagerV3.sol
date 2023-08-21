@@ -272,7 +272,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
 
         // Requests the pool to transfer tokens the Credit Account
-        _poolLendCreditAccount(debt, creditAccount); // U:[CM-6]
+        if (debt != 0) _poolLendCreditAccount(debt, creditAccount); // U:[CM-6]
         creditAccountsSet.add(creditAccount); // U:[CM-6]
     }
 
@@ -392,13 +392,17 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             }); // U:[CM-8] I:[CMQ-6]
         }
 
-        // Transfers the due funds to the pool
-        ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amountToPool}); // U:[CM-8]
+        if (amountToPool != 0) {
+            // Transfers the due funds to the pool
+            ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amountToPool}); // U:[CM-8]
+        }
 
-        // Signals to the pool that debt has been repaid. The pool relies
-        // on the Credit Manager to repay the debt correctly, and does not
-        // check internally whether the underlying was actually transferred
-        _poolRepayCreditAccount(collateralDebtData.debt, profit, loss); // U:[CM-8]
+        if (collateralDebtData.debt + profit + loss != 0) {
+            // Signals to the pool that debt has been repaid. The pool relies
+            // on the Credit Manager to repay the debt correctly, and does not
+            // check internally whether the underlying was actually transferred
+            _poolRepayCreditAccount(collateralDebtData.debt, profit, loss); // U:[CM-8]
+        }
 
         // transfer remaining funds to the borrower [liquidations only]
         if (remainingFunds > 1) {
@@ -459,6 +463,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         uint256[] memory collateralHints;
         CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
 
+        if (amount == 0) return (currentCreditAccountInfo.debt, 0, 0);
+
         CollateralDebtData memory collateralDebtData = _calcDebtAndCollateral({
             creditAccount: creditAccount,
             enabledTokensMask: enabledTokensMask,
@@ -486,12 +492,17 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         } else {
             // DECREASE DEBT
 
-            // Passed amount being equal to MAX_INT signals the Credit Manager that the user
-            // wants to repay the entire current debt. This is not possible to do by passing the
-            // exact total debt value, since it increases every block
-            if (amount == type(uint256).max) {
-                amount = _amountWithFee(collateralDebtData.calcTotalDebt());
-                action = ManageDebtAction.FULL_REPAYMENT;
+            {
+                uint256 maxRepayment = _amountWithFee(collateralDebtData.calcTotalDebt());
+
+                // Passed amount being larger than total debt signals the Credit Manager that the user
+                // wants to repay the entire current debt. This is hard to do offchain by passing the exact
+                // amount, since total debt increases every block. Typically, the user would pass MAX_INT
+                // in this case
+                if (amount >= maxRepayment) {
+                    amount = maxRepayment;
+                    action = ManageDebtAction.FULL_REPAYMENT;
+                }
             }
 
             // Pays the entire amount back to the pool
