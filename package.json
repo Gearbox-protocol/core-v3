@@ -28,20 +28,20 @@
     "build": "tsc --p tsconfig.build.json"
   },
   "devDependencies": {
+    "@1inch/solidity-utils": "^2.2.27",
     "@chainlink/contracts": "^0.6.1",
     "@commitlint/cli": "^17.6.3",
     "@commitlint/config-conventional": "17.6.0",
+    "@gearbox-protocol/core-v2": "1.19.0-base.10",
     "@gearbox-protocol/prettier-config": "^1.5.0",
+    "@gearbox-protocol/sdk-gov": "^1.4.6",
     "@openzeppelin/contracts": "^4.8.1",
     "husky": "^8.0.3",
     "lint-staged": "^13.0.3",
     "prettier": "^2.7.1",
     "prettier-plugin-solidity": "^1.0.0-beta.24",
     "rimraf": "^5.0.1",
-    "typechain": "^8.3.1",
-    "@1inch/solidity-utils": "^2.2.27",
-    "@gearbox-protocol/core-v2": "^1.19.0-base.10",
-    "@gearbox-protocol/sdk-gov": "^1.4.6"
+    "typechain": "^8.3.1"
   },
   "prettier": "@gearbox-protocol/prettier-config",
   "lint-staged": {
