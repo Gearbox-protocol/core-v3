@@ -3,11 +3,11 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
+import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
 import {ITokenTestSuite} from "./ITokenTestSuite.sol";
 import {CreditManagerOpts, CollateralToken} from "../../interfaces/ICreditConfiguratorV3.sol";
-import {Contracts} from "@gearbox-protocol/sdk/contracts/SupportedContracts.sol";
+import {Contracts} from "@gearbox-protocol/sdk-gov/contracts/SupportedContracts.sol";
 
 struct PriceFeedConfig {
     address token;

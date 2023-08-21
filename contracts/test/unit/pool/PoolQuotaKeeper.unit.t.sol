@@ -20,7 +20,7 @@ import {PoolMock} from "../../mocks/pool/PoolMock.sol";
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
-import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
+import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {BalanceHelper} from "../../helpers/BalanceHelper.sol";
 
 import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";

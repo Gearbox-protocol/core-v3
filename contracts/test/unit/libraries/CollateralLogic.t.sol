@@ -12,7 +12,7 @@ import {TestHelper} from "../../lib/helper.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 import "../../lib/constants.sol";
-import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
+import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {CollateralLogicHelper, PRICE_ORACLE, B, Q} from "./CollateralLogicHelper.sol";
 
 /// @title CollateralLogic unit test

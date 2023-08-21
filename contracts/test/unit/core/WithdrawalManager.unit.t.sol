@@ -20,7 +20,7 @@ import {
     ZeroAddressException
 } from "../../../interfaces/IExceptions.sol";
 
-import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
+import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {USER} from "../../lib/constants.sol";
 import {TestHelper} from "../../lib/helper.sol";
 import {AddressProviderV3ACLMock, AP_WETH_TOKEN} from "../../mocks/core/AddressProviderV3ACLMock.sol";

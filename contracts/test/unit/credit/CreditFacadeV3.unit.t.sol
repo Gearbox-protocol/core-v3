@@ -58,7 +58,7 @@ import "../../../interfaces/IExceptions.sol";
 
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
-import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
+import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
 uint16 constant REFERRAL_CODE = 23;
 
