@@ -342,7 +342,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
         supportsQuotas = anySupportsQuotas ? config.supportsQuotas() : supportsQuotas;
 
-        PoolFactory pf = new PoolFactory(address(addressProvider),  config, underlying, supportsQuotas);
+        PoolFactory pf = new PoolFactory(address(addressProvider),  config, underlying, supportsQuotas, tokenTestSuite);
 
         pool = pf.pool();
         gauge = pf.gauge();

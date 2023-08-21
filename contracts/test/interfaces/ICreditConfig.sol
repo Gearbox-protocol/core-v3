@@ -60,8 +60,8 @@ struct GaugeRate {
 
 struct PoolQuotaLimit {
     Tokens token;
-    uint256 quotaIncreaseFee;
-    uint256 limit;
+    uint16 quotaIncreaseFee;
+    uint96 limit;
 }
 
 struct CollateralTokenHuman {

@@ -11,7 +11,10 @@ import {LinearInterestRateModelV3} from "../../pool/LinearInterestRateModelV3.so
 
 import {GaugeV3} from "../../governance/GaugeV3.sol";
 import {PoolQuotaKeeperV3} from "../../pool/PoolQuotaKeeperV3.sol";
-import {IPoolV3DeployConfig, LinearIRMV3DeployParams} from "../interfaces/ICreditConfig.sol";
+import {
+    IPoolV3DeployConfig, LinearIRMV3DeployParams, GaugeRate, PoolQuotaLimit
+} from "../interfaces/ICreditConfig.sol";
+import {TokensTestSuite} from "./TokensTestSuite.sol";
 
 import "../lib/constants.sol";
 
@@ -20,7 +23,13 @@ contract PoolFactory is Test {
     PoolQuotaKeeperV3 public poolQuotaKeeper;
     GaugeV3 public gauge;
 
-    constructor(address addressProvider, IPoolV3DeployConfig config, address underlying, bool supportQuotas) {
+    constructor(
+        address addressProvider,
+        IPoolV3DeployConfig config,
+        address underlying,
+        bool supportQuotas,
+        TokensTestSuite tokensTestSuite
+    ) {
         // uint16 U_1,
         // uint16 U_2,
         // uint16 R_base,
@@ -74,6 +83,35 @@ contract PoolFactory is Test {
             pool.setPoolQuotaKeeper(address(poolQuotaKeeper));
 
             vm.label(address(poolQuotaKeeper), string.concat("PoolQuotaKeeperV3-", config.symbol()));
+
+            GaugeRate[] memory gaugeRates = config.gaugeRates();
+
+            uint256 len = gaugeRates.length;
+
+            unchecked {
+                for (uint256 i; i < len; ++i) {
+                    GaugeRate memory gaugeRate = gaugeRates[i];
+                    address token = tokensTestSuite.addressOf(gaugeRate.token);
+
+                    vm.prank(CONFIGURATOR);
+                    gauge.addQuotaToken(token, gaugeRate.minRate, gaugeRate.maxRate);
+                }
+            }
+
+            PoolQuotaLimit[] memory quotaLimits = config.quotaLimits();
+            len = quotaLimits.length;
+
+            unchecked {
+                for (uint256 i; i < len; ++i) {
+                    address token = tokensTestSuite.addressOf(quotaLimits[i].token);
+
+                    vm.startPrank(CONFIGURATOR);
+                    poolQuotaKeeper.addQuotaToken(token);
+                    poolQuotaKeeper.setTokenLimit(token, quotaLimits[i].limit);
+                    poolQuotaKeeper.setTokenQuotaIncreaseFee(token, quotaLimits[i].quotaIncreaseFee);
+                    vm.stopPrank();
+                }
+            }
         }
     }
 }
