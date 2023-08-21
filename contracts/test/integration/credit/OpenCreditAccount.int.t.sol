@@ -15,8 +15,7 @@ import {
     ClosureAction,
     CollateralTokenData,
     ManageDebtAction,
-    CollateralDebtData,
-    ZERO_DEBT_FLAG
+    CollateralDebtData
 } from "../../../interfaces/ICreditManagerV3.sol";
 
 import "../../../interfaces/ICreditFacadeV3.sol";
@@ -412,7 +411,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         _checkForWETHTest();
     }
 
-    /// @dev I:[OCA-13]: openCreditAccount sets ZERO_DEBT_FLAG to true for 0 debt
+    /// @dev I:[OCA-13]: openCreditAccount with zero debt works correctly
     function test_I_OCA_14_openCreditAccount_sets_zero_debt_flag() public creditTest {
         address expectedCreditAccount =
             AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL)).head();
@@ -439,7 +438,5 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         expectBalance(Tokens.DAI, creditAccount, 0);
 
         assertEq(creditManager.enabledTokensMaskOf(creditAccount), 0, "Incorrect enabled token mask");
-
-        assertTrue(creditManager.flagsOf(creditAccount) & ZERO_DEBT_FLAG > 0, "Zero debt flag was not set");
     }
 }

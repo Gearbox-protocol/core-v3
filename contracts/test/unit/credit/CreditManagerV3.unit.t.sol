@@ -1620,6 +1620,49 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         }
     }
 
+    /// @dev U:[CM-11C]: manageDebt reverts on full repayment with non-zero quotas
+    function test_U_CM_11C_manageDebt_reverts_on_full_repayment_with_quotas()
+        public
+        withFeeTokenCase
+        withSupportQuotas
+    {
+        /// @notice for stack optimisation
+        uint256 amount = DAI_ACCOUNT_AMOUNT;
+
+        address creditAccount = accountFactory.usedAccount();
+
+        _addQuotedToken({token: Tokens.LINK, lt: 80_00, quoted: 10000, outstandingInterest: 0});
+
+        uint256 LINK_MASK = _getTokenMaskOrRevert({token: Tokens.LINK});
+
+        vm.prank(CONFIGURATOR);
+        creditManager.setQuotedMask(LINK_MASK);
+
+        uint256 initialCQI = 1;
+        creditManager
+            /// @notice enabledTokensMask is read directly from function parameters, not from this function
+            .setCreditAccountInfoMap({
+            creditAccount: creditAccount,
+            debt: amount,
+            cumulativeIndexLastUpdate: RAY,
+            cumulativeQuotaInterest: uint128(initialCQI),
+            quotaFees: 0,
+            enabledTokensMask: LINK_MASK,
+            flags: 0,
+            borrower: USER
+        });
+
+        vm.expectRevert(DebtToZeroWithActiveQuotasException.selector);
+
+        /// @notice enabledTokesMask is set to zero, because it has no impact
+        (uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable) = creditManager.manageDebt({
+            creditAccount: creditAccount,
+            amount: type(uint256).max,
+            enabledTokensMask: LINK_MASK,
+            action: ManageDebtAction.DECREASE_DEBT
+        });
+    }
+
     /// @dev U:[CM-12]: manageDebt with 0 amount doesn't change anythig
     function test_U_CM_12_manageDebt_with_0_amount_doesn_t_change_anythig() public withFeeTokenCase allQuotaCases {
         uint256 debt = 10000;
@@ -2031,46 +2074,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         uint256 enabledTokensMaskAfter = creditManager.enabledTokensMaskOf(creditAccount);
 
         assertEq(enabledTokensMaskAfter, enabledTokenMaskWithDisableTokens, "enabledTokensMask wasn't set correctly");
-    }
-
-    /// @dev U:[CM-18B]: fullCollateralCheck fails with 0 debt and non-zero quotas
-    function test_U_CM_18B_fullCollateralCheck_reverts_if_0_debt_and_non_zero_quotas()
-        public
-        withFeeTokenCase
-        withSupportQuotas
-    {
-        // uint256 amount = DAI_ACCOUNT_AMOUNT;
-        address creditAccount = DUMB_ADDRESS;
-
-        /// @notice sets price 1 USD for underlying
-        priceOracleMock.setPrice(underlying, 10 ** 8);
-
-        _addQuotedToken({token: Tokens.LINK, lt: 80_00, quoted: 5, outstandingInterest: 0});
-        _addQuotedToken({token: Tokens.STETH, lt: 30_00, quoted: 10, outstandingInterest: 0});
-
-        uint256 LINK_TOKEN_MASK = _getTokenMaskOrRevert({token: Tokens.LINK});
-
-        vm.prank(CONFIGURATOR);
-        creditManager.setQuotedMask(LINK_TOKEN_MASK);
-
-        creditManager.setCreditAccountInfoMap({
-            creditAccount: creditAccount,
-            debt: 0,
-            cumulativeIndexLastUpdate: RAY,
-            cumulativeQuotaInterest: 1,
-            quotaFees: 0,
-            enabledTokensMask: LINK_TOKEN_MASK,
-            flags: 0,
-            borrower: USER
-        });
-
-        vm.expectRevert(ActiveQuotasOnZeroDebtAccountException.selector);
-        creditManager.fullCollateralCheck({
-            creditAccount: creditAccount,
-            enabledTokensMask: LINK_TOKEN_MASK,
-            collateralHints: new uint256[](0),
-            minHealthFactor: PERCENTAGE_FACTOR
-        });
     }
 
     //
@@ -2643,7 +2646,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         creditManager.setCreditAccountInfoMap({
             creditAccount: creditAccount,
-            debt: 0,
+            debt: 100,
             cumulativeIndexLastUpdate: 0,
             cumulativeQuotaInterest: INITIAL_INTEREST,
             quotaFees: 0,

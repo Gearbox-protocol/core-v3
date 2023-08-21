@@ -24,8 +24,7 @@ import {
     RevocationPair,
     CollateralDebtData,
     CollateralCalcTask,
-    BOT_PERMISSIONS_SET_FLAG,
-    ZERO_DEBT_FLAG
+    BOT_PERMISSIONS_SET_FLAG
 } from "../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
 import {ClaimAction, ETH_ADDRESS, IWithdrawalManagerV3} from "../interfaces/IWithdrawalManagerV3.sol";
@@ -253,9 +252,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         // Requests the Credit Manager to open a Credit Account
         creditAccount = ICreditManagerV3(creditManager).openCreditAccount({debt: debt, onBehalfOf: onBehalfOf}); // U:[FA-10]
-
-        // If debt is zero, we need to set the flag to make some special exceptions for this status
-        if (debt == 0) _setFlagFor({creditAccount: creditAccount, flag: ZERO_DEBT_FLAG, value: true});
 
         // Emits an event for Credit Account opening
         emit OpenCreditAccount(creditAccount, onBehalfOf, msg.sender, debt, referralCode); // U:[FA-10]
@@ -988,12 +984,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         // Checks that the new total borrowed amount is within bounds
         _revertIfOutOfDebtLimits(newDebt); // U:[FA-28, 32, 33, 33A]
 
-        if (action == ManageDebtAction.DECREASE_DEBT && newDebt == 0 && amount > 0) {
-            _setFlagFor({creditAccount: creditAccount, flag: ZERO_DEBT_FLAG, value: true});
-        } else if (action == ManageDebtAction.INCREASE_DEBT && newDebt == amount) {
-            _setFlagFor({creditAccount: creditAccount, flag: ZERO_DEBT_FLAG, value: false});
-        }
-
         // Emits event
         if (action == ManageDebtAction.INCREASE_DEBT) {
             emit IncreaseDebt({creditAccount: creditAccount, amount: amount}); // U:[FA-27]
@@ -1019,14 +1009,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         if (hasForbiddenTokens && quotaChange > 0) {
             uint256 mask = _getTokenMaskOrRevert(token);
             if (mask & forbiddenTokenMask != 0) revert ForbiddenTokensException();
-        }
-
-        // A zero-debt account increasing its quota can lead to small amount
-        // of debt on an account if a one-time quota activation fee is enabled,
-        // which can be used for small-scale bad debt griefing. Thus, this action
-        // is prohibited
-        if (quotaChange > 0 && (_flagsOf(creditAccount) & ZERO_DEBT_FLAG != 0)) {
-            revert IncreaseQuotaOnZeroDebtAccountException();
         }
 
         (tokensToEnable, tokensToDisable) = ICreditManagerV3(creditManager).updateQuota({

@@ -48,6 +48,8 @@ import {
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
+import "forge-std/console.sol";
+
 /// @title Credit Manager
 /// @dev Encapsulates the business logic for managing Credit Accounts
 contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardTrait {
@@ -500,6 +502,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 // amount, since total debt increases every block. Typically, the user would pass MAX_INT
                 // in this case
                 if (amount >= maxRepayment) {
+                    /// If a user has active quotas on a zero-debt account, they can remove all collateral
+                    /// and immediately go into bad debt on the next block due to quota interest. This check aims to prevent that.
+                    if (collateralDebtData.quotedTokens.length != 0) {
+                        revert DebtToZeroWithActiveQuotasException();
+                    }
+
                     amount = maxRepayment;
                     action = ManageDebtAction.FULL_REPAYMENT;
                 }
@@ -730,12 +738,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         /// total debt, the full collateral check has failed
         if (collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD) {
             revert NotEnoughCollateralException(); // U:[CM-18]
-        }
-
-        /// If a user enables quotas on a zero-debt account, they can remove all collateral
-        /// and immediately go into bad debt on the next block. This check aims to prevent that.
-        if (collateralDebtData.quotedTokens.length != 0 && collateralDebtData.debt == 0) {
-            revert ActiveQuotasOnZeroDebtAccountException();
         }
 
         uint256 enabledTokensMaskAfter = collateralDebtData.enabledTokensMask;
@@ -971,6 +973,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         uint256 tokensToCheckMask = enabledTokensMask & _quotedTokensMask; // U:[CM-24]
 
+        console.log(enabledTokensMask);
+        console.log(_quotedTokensMask);
+
         // If there are not quoted tokens on the account, then zero-length arrays are returned
         // This is desirable, as it makes it simple to check whether there are any quoted tokens
         if (tokensToCheckMask != 0) {
@@ -1025,6 +1030,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacadeOnly // U:[CM-2]
         returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
+        // A zero-debt account increasing its quota can lead to small amount
+        // of debt on an account if a one-time quota activation fee is enabled,
+        // which can be used to break the minimal debt limit. Thus, this action
+        // is prohibited
+        if (quotaChange > 0 && creditAccountInfo[creditAccount].debt == 0) {
+            revert IncreaseQuotaOnZeroDebtAccountException();
+        }
+
         /// The PoolQuotaKeeper returns the interest to be cached (quota interest is computed dynamically,
         /// so the cumulative index inside PQK needs to be updated before setting the new quota value).
         /// PQK also reports whether the quota was changed from zero to non-zero and vice versa, in order to
