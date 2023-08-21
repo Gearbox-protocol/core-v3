@@ -8,7 +8,8 @@ import {
     ICreditManagerV3Events,
     ClosureAction,
     ManageDebtAction,
-    BOT_PERMISSIONS_SET_FLAG
+    BOT_PERMISSIONS_SET_FLAG,
+    ZERO_DEBT_FLAG
 } from "../../../interfaces/ICreditManagerV3.sol";
 import "../../../interfaces/ICreditFacadeV3.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
@@ -320,5 +321,54 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
         //         "Incorrect cumulativeIndexLastUpdate"
         //     );
         // }
+    }
+
+    /// @dev I:[MD-10]:decreaseDebt to zero sets ZERO_DEBT_FLAG
+    function test_I_MD_10_decreaseDebt_to_zero_sets_flag() public creditTest {
+        (address creditAccount,) = _openTestCreditAccount();
+
+        vm.prank(USER);
+        creditFacade.multicall(
+            creditAccount,
+            MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (type(uint256).max))
+                })
+            )
+        );
+
+        assertTrue(creditManager.flagsOf(creditAccount) & ZERO_DEBT_FLAG > 0, "Flag was not set to true");
+    }
+
+    /// @dev I:[MD-11]:increaseDebt from zero sets ZERO_DEBT_FLAG
+    function test_I_MD_11_increaseDebt_from_zero_sets_flag() public creditTest {
+        address creditAccount = _openCreditAccount(0, USER, 0, 0);
+
+        assertTrue(
+            creditManager.flagsOf(creditAccount) & ZERO_DEBT_FLAG > 0, "Flag was not set to true on account opening"
+        );
+
+        (uint128 minDebt,) = creditFacade.debtLimits();
+
+        tokenTestSuite.mint(underlying, address(pool), minDebt);
+        tokenTestSuite.mint(underlying, USER, minDebt);
+
+        vm.prank(USER);
+        creditFacade.multicall(
+            creditAccount,
+            MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (minDebt))
+                }),
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, minDebt))
+                })
+            )
+        );
+
+        assertTrue(creditManager.flagsOf(creditAccount) & ZERO_DEBT_FLAG == 0, "Flag was not set to false");
     }
 }

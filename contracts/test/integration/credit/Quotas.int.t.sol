@@ -432,4 +432,28 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
             assertEq(limit, 1, "Limit was not zeroed");
         }
     }
+
+    /// @dev I:[CMQ-09]: positive updateQuotas reverts on zero debt
+    function test_I_CMQ_09_updateQuotas_with_positive_value_reverts_on_zero_debt() public withQuotas creditTest {
+        _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
+
+        address creditAccount = _openCreditAccount(0, USER, 0, 0);
+
+        (, uint256 maxDebt) = creditFacade.debtLimits();
+        uint96 maxQuota = uint96(creditFacade.maxQuotaMultiplier() * maxDebt);
+
+        MultiCall[] memory calls = MultiCallBuilder.build(
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(
+                    ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.LINK), 100_000, 0)
+                    )
+            })
+        );
+
+        vm.expectRevert(IncreaseQuotaOnZeroDebtAccountException.selector);
+
+        vm.prank(USER);
+        creditFacade.multicall(creditAccount, calls);
+    }
 }

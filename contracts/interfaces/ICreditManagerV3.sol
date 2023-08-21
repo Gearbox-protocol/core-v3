@@ -20,6 +20,7 @@ enum ManageDebtAction {
 
 uint8 constant WITHDRAWAL_FLAG = 1;
 uint8 constant BOT_PERMISSIONS_SET_FLAG = 1 << 1;
+uint8 constant ZERO_DEBT_FLAG = 1 << 2;
 
 struct CreditAccountInfo {
     uint256 debt;
