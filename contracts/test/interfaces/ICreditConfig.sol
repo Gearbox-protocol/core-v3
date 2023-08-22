@@ -30,6 +30,23 @@ struct PoolV3DeployParams {
     uint256 expectedLiquidityLimit;
 }
 
+struct BalancerPool {
+    bytes32 poolId;
+    uint8 status;
+}
+
+struct UniswapV2Pair {
+    Contracts router;
+    Tokens token0;
+    Tokens token1;
+}
+
+struct UniswapV3Pair {
+    Tokens token0;
+    Tokens token1;
+    uint24 fee;
+}
+
 /// @dev A struct representing the initial Credit Manager configuration parameters
 struct CreditManagerV3DeployParams {
     /// @dev The Credit Manager's name
@@ -50,6 +67,11 @@ struct CreditManagerV3DeployParams {
     Contracts[] contracts;
     /// @dev Pool limit
     uint256 poolLimit;
+    //
+    // ADAPTER CIONFIGURATION
+    BalancerPool[] balancerPools;
+    UniswapV3Pair[] uniswapV3Pairs;
+    UniswapV2Pair[] uniswapV2Pairs;
 }
 
 struct GaugeRate {
