@@ -48,8 +48,6 @@ import {
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
-import "forge-std/console.sol";
-
 /// @title Credit Manager
 /// @dev Encapsulates the business logic for managing Credit Accounts
 contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardTrait {
@@ -977,9 +975,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         _quotedTokensMask = quotedTokensMask; // U:[CM-24]
 
         uint256 tokensToCheckMask = enabledTokensMask & _quotedTokensMask; // U:[CM-24]
-
-        console.log(enabledTokensMask);
-        console.log(_quotedTokensMask);
 
         // If there are not quoted tokens on the account, then zero-length arrays are returned
         // This is desirable, as it makes it simple to check whether there are any quoted tokens
