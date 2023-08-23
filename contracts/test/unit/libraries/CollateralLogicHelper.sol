@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
+import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {MockTokensData, MockToken} from "../../config/MockTokensData.sol";
 import {CollateralLogic} from "../../../libraries/CollateralLogic.sol";
 

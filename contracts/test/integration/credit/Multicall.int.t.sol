@@ -32,7 +32,7 @@ import "../../../interfaces/IExceptions.sol";
 import {AdapterMock} from "../../mocks//core/AdapterMock.sol";
 
 // SUITES
-import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
+import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
 /// @title CreditFacadeTest
 /// @notice Designed for unit test purposes only

@@ -29,14 +29,14 @@ import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfigurato
 import {PoolFactory} from "../suites/PoolFactory.sol";
 
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
-import {NetworkDetector} from "@gearbox-protocol/sdk/contracts/NetworkDetector.sol";
+import {NetworkDetector} from "@gearbox-protocol/sdk-gov/contracts/NetworkDetector.sol";
 
 import {IPoolV3DeployConfig, CreditManagerV3DeployParams, CollateralTokenHuman} from "../interfaces/ICreditConfig.sol";
 import {MockCreditConfig} from "../config/MockCreditConfig.sol";
 import {TestHelper} from "../lib/helper.sol";
 import {ERC20Mock} from "../mocks/token/ERC20Mock.sol";
 import "../lib/constants.sol";
-import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
+import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {PriceFeedMock} from "../mocks/oracles/PriceFeedMock.sol";
 import {BalanceHelper} from "./BalanceHelper.sol";
 import {BotListV3} from "../../core/BotListV3.sol";
@@ -342,7 +342,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
         supportsQuotas = anySupportsQuotas ? config.supportsQuotas() : supportsQuotas;
 
-        PoolFactory pf = new PoolFactory(address(addressProvider),  config, underlying, supportsQuotas);
+        PoolFactory pf = new PoolFactory(address(addressProvider),  config, underlying, supportsQuotas, tokenTestSuite);
 
         pool = pf.pool();
         gauge = pf.gauge();

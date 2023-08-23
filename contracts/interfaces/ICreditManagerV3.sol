@@ -294,6 +294,8 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @notice Returns the full set of currently active Credit Accounts
     function creditAccounts() external view returns (address[] memory);
 
+    function creditAccounts(uint256 offset, uint256 limit) external view returns (address[] memory);
+
     function calcDebtAndCollateral(address creditAccount, CollateralCalcTask task)
         external
         view

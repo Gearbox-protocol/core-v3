@@ -3,11 +3,11 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
+import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
 import {ITokenTestSuite} from "./ITokenTestSuite.sol";
 import {CreditManagerOpts, CollateralToken} from "../../interfaces/ICreditConfiguratorV3.sol";
-import {Contracts} from "@gearbox-protocol/sdk/contracts/SupportedContracts.sol";
+import {Contracts} from "@gearbox-protocol/sdk-gov/contracts/SupportedContracts.sol";
 
 struct PriceFeedConfig {
     address token;
@@ -30,6 +30,23 @@ struct PoolV3DeployParams {
     uint256 expectedLiquidityLimit;
 }
 
+struct BalancerPool {
+    bytes32 poolId;
+    uint8 status;
+}
+
+struct UniswapV2Pair {
+    Contracts router;
+    Tokens token0;
+    Tokens token1;
+}
+
+struct UniswapV3Pair {
+    Tokens token0;
+    Tokens token1;
+    uint24 fee;
+}
+
 /// @dev A struct representing the initial Credit Manager configuration parameters
 struct CreditManagerV3DeployParams {
     /// @dev The Credit Manager's name
@@ -50,6 +67,11 @@ struct CreditManagerV3DeployParams {
     Contracts[] contracts;
     /// @dev Pool limit
     uint256 poolLimit;
+    //
+    // ADAPTER CIONFIGURATION
+    BalancerPool[] balancerPools;
+    UniswapV3Pair[] uniswapV3Pairs;
+    UniswapV2Pair[] uniswapV2Pairs;
 }
 
 struct GaugeRate {
@@ -60,8 +82,8 @@ struct GaugeRate {
 
 struct PoolQuotaLimit {
     Tokens token;
-    uint256 quotaIncreaseFee;
-    uint256 limit;
+    uint16 quotaIncreaseFee;
+    uint96 limit;
 }
 
 struct CollateralTokenHuman {

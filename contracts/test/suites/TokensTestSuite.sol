@@ -21,9 +21,9 @@ import "../lib/constants.sol";
 
 import {TokensTestSuiteHelper} from "./TokensTestSuiteHelper.sol";
 import {MockTokensData, MockToken} from "../config/MockTokensData.sol";
-import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
-import {TokenData, TokensDataLive, TokenType} from "@gearbox-protocol/sdk/contracts/TokensData.sol";
-import {NetworkDetector} from "@gearbox-protocol/sdk/contracts/NetworkDetector.sol";
+import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import {TokenData, TokensDataLive, TokenType} from "@gearbox-protocol/sdk-gov/contracts/TokensData.sol";
+import {NetworkDetector} from "@gearbox-protocol/sdk-gov/contracts/NetworkDetector.sol";
 
 contract TokensTestSuite is Test, TokensTestSuiteHelper {
     mapping(Tokens => address) public addressOf;

@@ -44,7 +44,7 @@ import {GeneralMock} from "../../mocks//GeneralMock.sol";
 
 // SUITES
 
-import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
+import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
 import {IPoolBase} from "../../../interfaces/IPoolV3.sol";
 

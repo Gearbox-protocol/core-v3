@@ -5,9 +5,9 @@ pragma solidity ^0.8.17;
 
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {Tokens} from "@gearbox-protocol/sdk/contracts/Tokens.sol";
-import {NetworkDetector} from "@gearbox-protocol/sdk/contracts/NetworkDetector.sol";
-import {Contracts} from "@gearbox-protocol/sdk/contracts/SupportedContracts.sol";
+import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
+import {NetworkDetector} from "@gearbox-protocol/sdk-gov/contracts/NetworkDetector.sol";
+import {Contracts} from "@gearbox-protocol/sdk-gov/contracts/SupportedContracts.sol";
 import "forge-std/console.sol";
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 
