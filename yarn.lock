@@ -960,17 +960,17 @@
     "@ethersproject/properties" "^5.7.0"
     "@ethersproject/strings" "^5.7.0"
 
+"@gearbox-protocol/core-v2@1.19.0-base.11":
+  version "1.19.0-base.11"
+  resolved "https://registry.yarnpkg.com/@gearbox-protocol/core-v2/-/core-v2-1.19.0-base.11.tgz#d88df077f5be9689bcd183d487ea31188cab49d7"
+  integrity sha512-cJdB/OGIpoEnVRZbs8VFfEK4iaWKHApQe4rJ+s+oZ9P4Wh1Ens3dZ8GDvUxWfrv01bTzFUbqU4S9+Va7xJ0a/g==
+
 "@gearbox-protocol/core-v2@^1.16.2", "@gearbox-protocol/core-v2@^1.19.0-base.8", "@gearbox-protocol/core-v2@^1.21.0":
   version "1.21.0"
   resolved "https://registry.yarnpkg.com/@gearbox-protocol/core-v2/-/core-v2-1.21.0.tgz#5a899c4f96200a28e6516f8416cfd2d39ce20695"
   integrity sha512-9pv8K2gdoGMByVkdbT9OWRnn2Xp5p+zanoOCghzTgcC245UZabEfmm3ZrWIo9rqMNZZY64W7RH1Pbt1TU7hqHw==
   dependencies:
     "@typechain/ethers-v5" "^10.2.1"
-
-"@gearbox-protocol/core-v2@^1.19.0-base.11":
-  version "1.19.0-base.11"
-  resolved "https://registry.yarnpkg.com/@gearbox-protocol/core-v2/-/core-v2-1.19.0-base.11.tgz#d88df077f5be9689bcd183d487ea31188cab49d7"
-  integrity sha512-cJdB/OGIpoEnVRZbs8VFfEK4iaWKHApQe4rJ+s+oZ9P4Wh1Ens3dZ8GDvUxWfrv01bTzFUbqU4S9+Va7xJ0a/g==
 
 "@gearbox-protocol/core-v3@^1.34.1":
   version "1.36.2"
