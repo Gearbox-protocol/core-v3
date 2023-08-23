@@ -111,7 +111,10 @@ error ActiveCreditAccountNotSetException();
 error OpenCloseAccountInOneBlockException();
 
 /// @notice Thrown when a zero-debt account has non-zero quotas during a full check
-error ActiveQuotasOnZeroDebtAccountException();
+error DebtToZeroWithActiveQuotasException();
+
+/// @notice Thrown when a zero-debt account attempts to increase quota
+error IncreaseQuotaOnZeroDebtAccountException();
 
 // ------------------- //
 // CREDIT CONFIGURATOR //

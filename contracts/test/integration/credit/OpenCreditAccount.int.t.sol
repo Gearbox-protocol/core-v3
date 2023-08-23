@@ -410,4 +410,33 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         );
         _checkForWETHTest();
     }
+
+    /// @dev I:[OCA-13]: openCreditAccount with zero debt works correctly
+    function test_I_OCA_14_openCreditAccount_sets_zero_debt_flag() public creditTest {
+        address expectedCreditAccount =
+            AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL)).head();
+
+        uint256 blockAtOpen = block.number;
+        uint256 cumulativeAtOpen = pool.calcLinearCumulative_RAY();
+        // pool.setCumulativeIndexNow(cumulativeAtOpen);
+
+        MultiCall[] memory calls = MultiCallBuilder.build();
+
+        // Existing address case
+        vm.prank(USER);
+        address creditAccount = creditFacade.openCreditAccount(0, USER, calls, 0);
+
+        assertEq(creditAccount, expectedCreditAccount, "Incorrecct credit account address");
+
+        (uint256 debt, uint256 cumulativeIndexLastUpdate,,,,,,) = creditManager.creditAccountInfo(creditAccount);
+
+        assertEq(debt, 0, "Incorrect borrowed amount set in CA");
+        assertEq(cumulativeIndexLastUpdate, cumulativeAtOpen, "Incorrect cumulativeIndexLastUpdate set in CA");
+
+        assertEq(ICreditAccount(creditAccount).since(), blockAtOpen, "Incorrect since set in CA");
+
+        expectBalance(Tokens.DAI, creditAccount, 0);
+
+        assertEq(creditManager.enabledTokensMaskOf(creditAccount), 0, "Incorrect enabled token mask");
+    }
 }

@@ -263,7 +263,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         FullCheckParams memory fullCheckParams = _multicall({
             creditAccount: creditAccount,
             calls: calls,
-            enabledTokensMask: UNDERLYING_TOKEN_MASK,
+            enabledTokensMask: debt == 0 ? 0 : UNDERLYING_TOKEN_MASK,
             flags: OPEN_CREDIT_ACCOUNT_FLAGS
         }); // U:[FA-10]
 
