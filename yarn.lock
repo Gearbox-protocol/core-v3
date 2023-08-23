@@ -960,10 +960,10 @@
     "@ethersproject/properties" "^5.7.0"
     "@ethersproject/strings" "^5.7.0"
 
-"@gearbox-protocol/core-v2@1.19.0-base.10":
-  version "1.19.0-base.10"
-  resolved "https://registry.yarnpkg.com/@gearbox-protocol/core-v2/-/core-v2-1.19.0-base.10.tgz#a21bce9eac4ca1783f5fcb4322b1c1257158d2de"
-  integrity sha512-S9reS5zGt+cKxEdQppVCU0cZEmnSqx8DaoloY6KXqCsAedVJvwNUoCHnLjh9s/oWyOHa37qExN1QohntNQyB2Q==
+"@gearbox-protocol/core-v2@1.19.0-base.11":
+  version "1.19.0-base.11"
+  resolved "https://registry.yarnpkg.com/@gearbox-protocol/core-v2/-/core-v2-1.19.0-base.11.tgz#d88df077f5be9689bcd183d487ea31188cab49d7"
+  integrity sha512-cJdB/OGIpoEnVRZbs8VFfEK4iaWKHApQe4rJ+s+oZ9P4Wh1Ens3dZ8GDvUxWfrv01bTzFUbqU4S9+Va7xJ0a/g==
 
 "@gearbox-protocol/core-v2@^1.16.2", "@gearbox-protocol/core-v2@^1.19.0-base.8", "@gearbox-protocol/core-v2@^1.21.0":
   version "1.21.0"
@@ -1163,10 +1163,10 @@
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-4.8.2.tgz#d815ade0027b50beb9bcca67143c6bcc3e3923d6"
   integrity sha512-kEUOgPQszC0fSYWpbh2kT94ltOJwj1qfT2DWo+zVttmGmf97JZ99LspePNaeeaLhCImaHVeBbjaQFZQn7+Zc5g==
 
-"@openzeppelin/contracts@^4.8.1":
-  version "4.9.3"
-  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-4.9.3.tgz#00d7a8cf35a475b160b3f0293a6403c511099364"
-  integrity sha512-He3LieZ1pP2TNt5JbkPA4PNT9WC3gOTOlDcFGJW4Le4QKqwmiNJCRt44APfxMxvq7OugU/cqYuPcSBzOw38DAg==
+"@openzeppelin/contracts@4.8.3":
+  version "4.8.3"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-4.8.3.tgz#cbef3146bfc570849405f59cba18235da95a252a"
+  integrity sha512-bQHV8R9Me8IaJoJ2vPG4rXcL7seB7YVuskr4f+f5RyOStSZetwzkWtoqDMl5erkBJy0lDRUnIR2WIkPiC0GJlg==
 
 "@openzeppelin/contracts@~4.3.3":
   version "4.3.3"
