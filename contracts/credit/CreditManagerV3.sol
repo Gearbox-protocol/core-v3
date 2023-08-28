@@ -1471,6 +1471,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
     }
 
+    function creditAccountsLegth() external view override returns (uint256) {
+        return creditAccountsSet.length();
+    }
+
     //
     // CONFIGURATION
     //

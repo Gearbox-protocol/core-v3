@@ -296,6 +296,8 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
 
     function creditAccounts(uint256 offset, uint256 limit) external view returns (address[] memory);
 
+    function creditAccountsLegth() external view returns (uint256);
+
     function calcDebtAndCollateral(address creditAccount, CollateralCalcTask task)
         external
         view
