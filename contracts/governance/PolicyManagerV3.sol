@@ -120,12 +120,12 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
         return _policies[policyHash].delay;
     }
 
-    /// @dev Returns policy transaction delay, with policy retrieved based on contract and parameter name
+    /// @dev Returns policy transaction delay, with policy retrieved based on policy UID
     function _getPolicyDelay(bytes32 policyHash) internal view returns (uint256) {
         return _policies[policyHash].delay;
     }
 
-    /// @dev Performs parameter checks, with policy retrieved based on policy UID
+    /// @dev Performs parameter checks, with policy retrieved based on contract and parameter name
     function _checkPolicy(address contractAddress, string memory paramName, uint256 oldValue, uint256 newValue)
         internal
         returns (bool)
