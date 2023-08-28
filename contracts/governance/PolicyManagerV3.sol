@@ -11,6 +11,7 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/C
 ///         identifier for a set of contracts
 /// @param enabled Determines whether the policy is enabled. A disabled policy will auto-fail the policy check.
 /// @param admin The admin that can change the parameter under the given policy
+/// @param delay The delay before the transaction can be triggered under a given policy
 /// @param flags Bitmask of flags that determine which policy checks to apply on parameter change:
 ///        * 0 - check exact value
 ///        * 1 - check min value
@@ -36,6 +37,7 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/C
 struct Policy {
     bool enabled;
     address admin;
+    uint40 delay;
     uint8 flags;
     uint256 exactValue;
     uint256 minValue;
@@ -112,7 +114,18 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
         return _group[contractAddress]; // U:[PM-1]
     }
 
-    /// @dev Performs parameter checks, with policy retrieved based on contract and parameter name
+    /// @dev Returns policy transaction delay, with policy retrieved based on contract and parameter name
+    function _getPolicyDelay(address contractAddress, string memory paramName) internal view returns (uint256) {
+        bytes32 policyHash = keccak256(abi.encode(_group[contractAddress], paramName));
+        return _policies[policyHash].delay;
+    }
+
+    /// @dev Returns policy transaction delay, with policy retrieved based on contract and parameter name
+    function _getPolicyDelay(bytes32 policyHash) internal view returns (uint256) {
+        return _policies[policyHash].delay;
+    }
+
+    /// @dev Performs parameter checks, with policy retrieved based on policy UID
     function _checkPolicy(address contractAddress, string memory paramName, uint256 oldValue, uint256 newValue)
         internal
         returns (bool)

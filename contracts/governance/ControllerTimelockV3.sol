@@ -31,9 +31,6 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @notice Admin address that can cancel transactions
     address public override vetoAdmin;
 
-    /// @notice Delay before a risk-related transaction can be executed
-    uint256 public override delay = 1 days;
-
     /// @notice Mapping from transaction hashes to their data
     mapping(bytes32 => QueuedTransactionData) public override queuedTransactions;
 
@@ -84,7 +81,8 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         _queueTransaction({
             target: creditConfigurator,
             signature: "setExpirationDate(uint40)",
-            data: abi.encode(expirationDate)
+            data: abi.encode(expirationDate),
+            delay: _getPolicyDelay(creditManager, "EXPIRATION_DATE")
         }); // U:[CT-1]
     }
 
@@ -100,7 +98,12 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
             revert ParameterChecksFailedException(); // U:[CT-2]
         }
 
-        _queueTransaction({target: priceFeed, signature: "setLimiter(uint256)", data: abi.encode(lowerBound)}); // U:[CT-2]
+        _queueTransaction({
+            target: priceFeed,
+            signature: "setLimiter(uint256)",
+            data: abi.encode(lowerBound),
+            delay: _getPolicyDelay(priceFeed, "LP_PRICE_FEED_LIMITER")
+        }); // U:[CT-2]
     }
 
     /// @notice Queues a transaction to set a new max debt per block multiplier
@@ -125,7 +128,8 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         _queueTransaction({
             target: creditConfigurator,
             signature: "setMaxDebtPerBlockMultiplier(uint8)",
-            data: abi.encode(multiplier)
+            data: abi.encode(multiplier),
+            delay: _getPolicyDelay(creditManager, "MAX_DEBT_PER_BLOCK_MULTIPLIER")
         }); // U:[CT-3]
     }
 
@@ -144,7 +148,12 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
             revert ParameterChecksFailedException(); // U:[CT-4A]
         }
 
-        _queueTransaction({target: creditConfigurator, signature: "setMinDebtLimit(uint128)", data: abi.encode(minDebt)}); // U:[CT-4A]
+        _queueTransaction({
+            target: creditConfigurator,
+            signature: "setMinDebtLimit(uint128)",
+            data: abi.encode(minDebt),
+            delay: _getPolicyDelay(creditManager, "MIN_DEBT")
+        }); // U:[CT-4A]
     }
 
     /// @notice Queues a transaction to set a new max debt per account
@@ -162,7 +171,12 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
             revert ParameterChecksFailedException(); // U:[CT-4B]
         }
 
-        _queueTransaction({target: creditConfigurator, signature: "setMaxDebtLimit(uint128)", data: abi.encode(maxDebt)}); // U:[CT-4B]
+        _queueTransaction({
+            target: creditConfigurator,
+            signature: "setMaxDebtLimit(uint128)",
+            data: abi.encode(maxDebt),
+            delay: _getPolicyDelay(creditManager, "MAX_DEBT")
+        }); // U:[CT-4B]
     }
 
     /// @notice Queues a transaction to set a new debt limit for a Credit Manager
@@ -187,7 +201,8 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
             _queueTransaction({
                 target: address(creditConfigurator),
                 signature: "setTotalDebtLimit(uint128)",
-                data: abi.encode(uint128(debtLimit))
+                data: abi.encode(uint128(debtLimit)),
+                delay: _getPolicyDelay(creditManager, "CREDIT_MANAGER_DEBT_LIMIT")
             }); // U:[CT-5A]
         } else {
             IPoolV3 pool = IPoolV3(ICreditManagerV3(creditManager).pool());
@@ -203,7 +218,8 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
             _queueTransaction({
                 target: address(pool),
                 signature: "setCreditManagerDebtLimit(address,uint256)",
-                data: abi.encode(address(creditManager), debtLimit)
+                data: abi.encode(address(creditManager), debtLimit),
+                delay: _getPolicyDelay(creditManager, "CREDIT_MANAGER_DEBT_LIMIT")
             }); // U:[CT-5]
         }
     }
@@ -227,6 +243,8 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         address creditConfigurator = ICreditManagerV3(creditManager).creditConfigurator();
         uint256 ltCurrent = ICreditManagerV3(creditManager).liquidationThresholds(token);
 
+        uint256 delay = _getPolicyDelay(policyHash);
+
         if (
             !_checkPolicy(policyHash, uint256(ltCurrent), uint256(liquidationThresholdFinal)) || rampDuration < 7 days
                 || rampStart < block.timestamp + delay
@@ -237,7 +255,8 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         _queueTransaction({
             target: creditConfigurator,
             signature: "rampLiquidationThreshold(address,uint16,uint40,uint24)",
-            data: abi.encode(token, liquidationThresholdFinal, rampStart, rampDuration)
+            data: abi.encode(token, liquidationThresholdFinal, rampStart, rampDuration),
+            delay: delay
         }); // U: [CT-6]
     }
 
@@ -257,7 +276,12 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
             revert ParameterChecksFailedException(); // U: [CT-10]
         }
 
-        _queueTransaction({target: creditConfigurator, signature: "forbidAdapter(address)", data: abi.encode(adapter)}); // U: [CT-10]
+        _queueTransaction({
+            target: creditConfigurator,
+            signature: "forbidAdapter(address)",
+            data: abi.encode(adapter),
+            delay: _getPolicyDelay(policyHash)
+        }); // U: [CT-10]
     }
 
     /// @notice Queues a transaction to set a new limit on quotas for particular pool and token
@@ -280,7 +304,8 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         _queueTransaction({
             target: poolQuotaKeeper,
             signature: "setTokenLimit(address,uint96)",
-            data: abi.encode(token, limit)
+            data: abi.encode(token, limit),
+            delay: _getPolicyDelay(policyHash)
         }); // U: [CT-11]
     }
 
@@ -304,7 +329,8 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         _queueTransaction({
             target: poolQuotaKeeper,
             signature: "setTokenQuotaIncreaseFee(address,uint16)",
-            data: abi.encode(token, quotaIncreaseFee)
+            data: abi.encode(token, quotaIncreaseFee),
+            delay: _getPolicyDelay(policyHash)
         }); // U: [CT-12]
     }
 
@@ -322,7 +348,12 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
             revert ParameterChecksFailedException(); // U: [CT-13]
         }
 
-        _queueTransaction({target: pool, signature: "setTotalDebtLimit(uint256)", data: abi.encode(newLimit)}); // U: [CT-13]
+        _queueTransaction({
+            target: pool,
+            signature: "setTotalDebtLimit(uint256)",
+            data: abi.encode(newLimit),
+            delay: _getPolicyDelay(policyHash)
+        }); // U: [CT-13]
     }
 
     /// @notice Queues a transaction to set a new withdrawal fee in a pool
@@ -339,7 +370,12 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
             revert ParameterChecksFailedException(); // U: [CT-14]
         }
 
-        _queueTransaction({target: pool, signature: "setWithdrawFee(uint256)", data: abi.encode(newFee)}); // U: [CT-14]
+        _queueTransaction({
+            target: pool,
+            signature: "setWithdrawFee(uint256)",
+            data: abi.encode(newFee),
+            delay: _getPolicyDelay(policyHash)
+        }); // U: [CT-14]
     }
 
     /// @notice Queues a transaction to set a new minimal quota interest rate for particular pool and token
@@ -364,7 +400,8 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         _queueTransaction({
             target: gauge,
             signature: "changeQuotaMinRate(address,uint16)",
-            data: abi.encode(token, rate)
+            data: abi.encode(token, rate),
+            delay: _getPolicyDelay(policyHash)
         }); // U: [CT-15A]
     }
 
@@ -390,7 +427,8 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         _queueTransaction({
             target: gauge,
             signature: "changeQuotaMaxRate(address,uint16)",
-            data: abi.encode(token, rate)
+            data: abi.encode(token, rate),
+            delay: _getPolicyDelay(policyHash)
         }); // U: [CT-15B]
     }
 
@@ -410,7 +448,8 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         _queueTransaction({
             target: priceOracle,
             signature: "setReservePriceFeedStatus(address,bool)",
-            data: abi.encode(token, active)
+            data: abi.encode(token, active),
+            delay: _getPolicyDelay(policyHash)
         }); // U:[CT-16]
     }
 
@@ -419,7 +458,10 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @param signature The signature of the called function
     /// @param data The call data
     /// @return Hash of the queued transaction
-    function _queueTransaction(address target, string memory signature, bytes memory data) internal returns (bytes32) {
+    function _queueTransaction(address target, string memory signature, bytes memory data, uint256 delay)
+        internal
+        returns (bytes32)
+    {
         uint256 eta = block.timestamp + delay;
 
         bytes32 txHash = keccak256(abi.encode(msg.sender, target, signature, data, eta));
@@ -514,18 +556,6 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         if (vetoAdmin != newAdmin) {
             vetoAdmin = newAdmin; // U: [CT-8]
             emit SetVetoAdmin(newAdmin); // U: [CT-8]
-        }
-    }
-
-    /// @notice Sets a new execution delay
-    function setDelay(uint256 newDelay)
-        external
-        override
-        configuratorOnly // U: [CT-0]
-    {
-        if (delay != newDelay) {
-            delay = newDelay; // U: [CT-8]
-            emit SetDelay(newDelay); // U: [CT-8]
         }
     }
 }
