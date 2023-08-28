@@ -244,9 +244,31 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
         external
         override
         nonZeroAddress(token) // U:[GA-04]
-        controllerOnly // U:[GA-03]
+        configuratorOnly // U:[GA-03]
     {
         _changeQuotaTokenRateParams(token, minRate, maxRate);
+    }
+
+    /// @dev Changes the min rate for a quoted token
+    /// @param minRate The minimal interest rate paid on token's quotas
+    function changeQuotaMinRate(address token, uint16 minRate)
+        external
+        override
+        nonZeroAddress(token) // U: TODO
+        controllerOnly // U: TODO
+    {
+        _changeQuotaTokenRateParams(token, minRate, quotaRateParams[token].maxRate);
+    }
+
+    /// @dev Changes the max rate for a quoted token
+    /// @param maxRate The maximal interest rate paid on token's quotas
+    function changeQuotaMaxRate(address token, uint16 maxRate)
+        external
+        override
+        nonZeroAddress(token) // U: TODO
+        controllerOnly // U: TODO
+    {
+        _changeQuotaTokenRateParams(token, quotaRateParams[token].minRate, maxRate);
     }
 
     /// @dev Implementation of `changeQuotaTokenRateParams`

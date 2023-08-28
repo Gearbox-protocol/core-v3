@@ -1283,8 +1283,8 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             abi.encode(
                 admin,
                 gauge,
-                "changeQuotaTokenRateParams(address,uint16,uint16)",
-                abi.encode(token, uint16(15), uint16(20)),
+                "changeQuotaMinRate(address,uint16)",
+                abi.encode(token, uint16(15)),
                 block.timestamp + 1 days
             )
         );
@@ -1294,15 +1294,15 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             txHash,
             admin,
             gauge,
-            "changeQuotaTokenRateParams(address,uint16,uint16)",
-            abi.encode(token, uint16(15), uint16(20)),
+            "changeQuotaMinRate(address,uint16)",
+            abi.encode(token, uint16(15)),
             uint40(block.timestamp + 1 days)
         );
 
         vm.prank(admin);
         controllerTimelock.setMinQuotaRate(pool, token, 15);
 
-        vm.expectCall(gauge, abi.encodeCall(GaugeV3.changeQuotaTokenRateParams, (token, 15, 20)));
+        vm.expectCall(gauge, abi.encodeCall(GaugeV3.changeQuotaMinRate, (token, 15)));
 
         vm.warp(block.timestamp + 1 days);
 
@@ -1374,8 +1374,8 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             abi.encode(
                 admin,
                 gauge,
-                "changeQuotaTokenRateParams(address,uint16,uint16)",
-                abi.encode(token, uint16(10), uint16(25)),
+                "changeQuotaMaxRate(address,uint16)",
+                abi.encode(token, uint16(25)),
                 block.timestamp + 1 days
             )
         );
@@ -1385,15 +1385,15 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             txHash,
             admin,
             gauge,
-            "changeQuotaTokenRateParams(address,uint16,uint16)",
-            abi.encode(token, uint16(10), uint16(25)),
+            "changeQuotaMaxRate(address,uint16)",
+            abi.encode(token, uint16(25)),
             uint40(block.timestamp + 1 days)
         );
 
         vm.prank(admin);
         controllerTimelock.setMaxQuotaRate(pool, token, 25);
 
-        vm.expectCall(gauge, abi.encodeCall(GaugeV3.changeQuotaTokenRateParams, (token, 10, 25)));
+        vm.expectCall(gauge, abi.encodeCall(GaugeV3.changeQuotaMaxRate, (token, 25)));
 
         vm.warp(block.timestamp + 1 days);
 

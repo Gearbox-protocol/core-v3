@@ -355,7 +355,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
 
         address gauge = IPoolQuotaKeeperV3(poolQuotaKeeper).gauge();
 
-        (uint16 minRateCurrent, uint16 maxRateCurrent,,) = IGaugeV3(gauge).quotaRateParams(token);
+        (uint16 minRateCurrent,,,) = IGaugeV3(gauge).quotaRateParams(token);
 
         if (!_checkPolicy(policyHash, uint256(minRateCurrent), uint256(rate))) {
             revert ParameterChecksFailedException(); // U: [CT-15A]
@@ -363,8 +363,8 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
 
         _queueTransaction({
             target: gauge,
-            signature: "changeQuotaTokenRateParams(address,uint16,uint16)",
-            data: abi.encode(token, rate, maxRateCurrent)
+            signature: "changeQuotaMinRate(address,uint16)",
+            data: abi.encode(token, rate)
         }); // U: [CT-15A]
     }
 
@@ -381,7 +381,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
 
         address gauge = IPoolQuotaKeeperV3(poolQuotaKeeper).gauge();
 
-        (uint16 minRateCurrent, uint16 maxRateCurrent,,) = IGaugeV3(gauge).quotaRateParams(token);
+        (, uint16 maxRateCurrent,,) = IGaugeV3(gauge).quotaRateParams(token);
 
         if (!_checkPolicy(policyHash, uint256(maxRateCurrent), uint256(rate))) {
             revert ParameterChecksFailedException(); // U: [CT-15B]
@@ -389,8 +389,8 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
 
         _queueTransaction({
             target: gauge,
-            signature: "changeQuotaTokenRateParams(address,uint16,uint16)",
-            data: abi.encode(token, minRateCurrent, rate)
+            signature: "changeQuotaMaxRate(address,uint16)",
+            data: abi.encode(token, rate)
         }); // U: [CT-15B]
     }
 

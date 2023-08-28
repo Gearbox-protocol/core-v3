@@ -87,8 +87,14 @@ contract GauageTest is TestHelper, IGaugeV3Events {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         gauge.addQuotaToken(DUMB_ADDRESS, 0, 0);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         gauge.changeQuotaTokenRateParams(DUMB_ADDRESS, 0, 0);
+
+        vm.expectRevert(CallerNotControllerException.selector);
+        gauge.changeQuotaMinRate(DUMB_ADDRESS, 0);
+
+        vm.expectRevert(CallerNotControllerException.selector);
+        gauge.changeQuotaMaxRate(DUMB_ADDRESS, 0);
     }
 
     /// @dev U:[GA-04]: addQuotaToken and changeQuotaTokenRateParams reverts for incorrect params
@@ -121,6 +127,12 @@ contract GauageTest is TestHelper, IGaugeV3Events {
 
         vm.expectRevert(IncorrectParameterException.selector);
         gauge.changeQuotaTokenRateParams(token, 5, 2);
+
+        vm.expectRevert(ZeroAddressException.selector);
+        gauge.changeQuotaMinRate(address(0), 0);
+
+        vm.expectRevert(ZeroAddressException.selector);
+        gauge.changeQuotaMaxRate(address(0), 0);
 
         vm.stopPrank();
     }
