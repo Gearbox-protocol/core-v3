@@ -65,7 +65,13 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
 
     /// @notice Converts `amount` of `tokenFrom` into `tokenTo` amount
     function convert(uint256 amount, address tokenFrom, address tokenTo) external view override returns (uint256) {
-        return convertFromUSD(convertToUSD(amount, tokenFrom), tokenTo); // U:[PO-10]
+        (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals) = priceFeedParams(tokenFrom);
+        (uint256 priceFrom, uint256 scaleFrom) = _getPrice(priceFeed, stalenessPeriod, skipCheck, decimals);
+
+        (priceFeed, stalenessPeriod, skipCheck, decimals) = priceFeedParams(tokenTo);
+        (uint256 priceTo, uint256 scaleTo) = _getPrice(priceFeed, stalenessPeriod, skipCheck, decimals);
+
+        return amount * priceFrom * scaleTo / (priceTo * scaleFrom); // U:[PO-10]
     }
 
     /// @notice Returns the price feed for `token` or reverts if price feed is not set
@@ -131,9 +137,8 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     function _getTokenReserveKey(address token) internal pure returns (address key) {
         // address(uint160(uint256(keccak256(abi.encodePacked("RESERVE", token)))))
         assembly {
-            let ptr := mload(0x40)
-            mstore(ptr, or("RESERVE", shl(0x28, token)))
-            key := keccak256(ptr, 0x1b)
+            mstore(0x0, or("RESERVE", shl(0x28, token)))
+            key := keccak256(0x0, 0x1b)
         } // U:[PO-3]
     }
 
