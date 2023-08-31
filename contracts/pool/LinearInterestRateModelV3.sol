@@ -29,7 +29,7 @@ contract LinearInterestRateModelV3 is ILinearInterestRateModelV3 {
     /// @notice The second slope change point (intermediate -> steep region)
     uint256 public immutable U_2_WAD;
 
-    /// @notice Base interest rate in WAD
+    /// @notice Base interest rate in RAY format
     uint256 public immutable R_base_RAY;
 
     /// @notice Slope of the obtuse region
