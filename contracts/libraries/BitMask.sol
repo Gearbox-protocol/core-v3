@@ -40,8 +40,8 @@ library BitMask {
     function calcEnabledTokens(uint256 enabledTokensMask) internal pure returns (uint256 totalTokensEnabled) {
         unchecked {
             while (enabledTokensMask > 0) {
-                totalTokensEnabled += enabledTokensMask & 1; // U:[BM-3]
-                enabledTokensMask >>= 1; // U:[BM-3]
+                enabledTokensMask &= enabledTokensMask - 1; // U:[BM-3]
+                ++totalTokensEnabled; // U:[BM-3]
             }
         }
     }

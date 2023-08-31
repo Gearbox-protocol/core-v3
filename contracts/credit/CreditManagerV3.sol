@@ -1184,27 +1184,23 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     function _batchTokensTransfer(address creditAccount, address to, bool convertToETH, uint256 tokensToTransferMask)
         internal
     {
-        // Since tokensToTransferMask encodes all enabled tokens as 1, tokenMask > enabledTokensMask is equivalent
-        // to the last 1 bit being passed. The loop can be ended at this point
         unchecked {
-            for (
-                uint256 tokenMask = UNDERLYING_TOKEN_MASK; tokenMask <= tokensToTransferMask; tokenMask = tokenMask << 1
-            ) {
-                // enabledTokensMask & tokenMask == tokenMask when the token is enabled, and 0 otherwise
-                if (tokensToTransferMask & tokenMask != 0) {
-                    address token = getTokenByMask(tokenMask); // U:[CM-31]
-                    uint256 amount = IERC20(token).safeBalanceOf({account: creditAccount}); // U:[CM-31]
-                    if (amount > 1) {
-                        // 1 is subtracted from amount to leave a non-zero value in the balance mapping, optimizing future writes
-                        // Since the amount is checked to be more than 1, the block can be marked as unchecked
-                        _safeTokenTransfer({
-                            creditAccount: creditAccount,
-                            token: token,
-                            to: to,
-                            amount: amount - 1,
-                            convertToETH: convertToETH
-                        }); // U:[CM-31]
-                    }
+            while (tokensToTransferMask > 0) {
+                uint256 tokenMask = tokensToTransferMask & uint256(-int256(tokensToTransferMask));
+                tokensToTransferMask &= tokensToTransferMask - 1;
+
+                address token = getTokenByMask(tokenMask); // U:[CM-31]
+                uint256 amount = IERC20(token).safeBalanceOf({account: creditAccount}); // U:[CM-31]
+                if (amount > 1) {
+                    // 1 is subtracted from amount to leave a non-zero value in the balance mapping, optimizing future writes
+                    // Since the amount is checked to be more than 1, the block can be marked as unchecked
+                    _safeTokenTransfer({
+                        creditAccount: creditAccount,
+                        token: token,
+                        to: to,
+                        amount: amount - 1,
+                        convertToETH: convertToETH
+                    }); // U:[CM-31]
                 }
             }
         }
