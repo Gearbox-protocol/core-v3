@@ -120,8 +120,10 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             referencePoint: 0,
             referencePointUpdatePeriod: 0,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
@@ -212,8 +214,10 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             referencePoint: 0,
             referencePointUpdatePeriod: 0,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
@@ -281,8 +285,10 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             referencePoint: 0,
             referencePointUpdatePeriod: 0,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
@@ -362,8 +368,10 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             referencePoint: 0,
             referencePointUpdatePeriod: 0,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
@@ -435,8 +443,10 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             referencePoint: 0,
             referencePointUpdatePeriod: 0,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
@@ -512,8 +522,10 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             referencePoint: 0,
             referencePointUpdatePeriod: 0,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
@@ -593,8 +605,10 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             referencePoint: 0,
             referencePointUpdatePeriod: 0,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
@@ -679,8 +693,10 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             referencePoint: 0,
             referencePointUpdatePeriod: 0,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
@@ -792,8 +808,10 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             referencePoint: 0,
             referencePointUpdatePeriod: 0,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
@@ -875,8 +893,10 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             referencePoint: 0,
             referencePointUpdatePeriod: 0,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
@@ -950,8 +970,10 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             referencePoint: 0,
             referencePointUpdatePeriod: 0,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
@@ -1031,8 +1053,10 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             referencePoint: 0,
             referencePointUpdatePeriod: 0,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
@@ -1110,8 +1134,10 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             referencePoint: 0,
             referencePointUpdatePeriod: 0,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
@@ -1177,8 +1203,10 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             referencePoint: 0,
             referencePointUpdatePeriod: 0,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
@@ -1257,8 +1285,10 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             referencePoint: 0,
             referencePointUpdatePeriod: 0,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
@@ -1349,8 +1379,10 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             referencePoint: 0,
             referencePointUpdatePeriod: 0,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
@@ -1433,8 +1465,10 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             referencePoint: 0,
             referencePointUpdatePeriod: 0,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });

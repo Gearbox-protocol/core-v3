@@ -30,8 +30,10 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/C
 /// @param referencePointUpdatePeriod The minimal time period after which the RP can be updated
 /// @param referencePointTimestampLU  Last timestamp at which the reference point was updated
 ///        NB: Should not be changed manually in most cases
-/// @param minPctChange Min absolute percentage changes for new values, relative to reference point
-/// @param maxPctChange Max absolute percentage changes for new values, relative to reference point
+/// @param minPctChangeDown Min percentage decrease for new values, relative to reference point
+/// @param minPctChangeUp Min percentage increase for new values, relative to reference point
+/// @param maxPctChangeDown Max percentage decrease for new values, relative to reference point
+/// @param maxPctChangeUp Max percentage increase for new values, relative to reference point
 /// @param minChange Min absolute changes for new values, relative to reference point
 /// @param maxChange Max absolute changes for new values, relative to reference point
 struct Policy {
@@ -45,8 +47,10 @@ struct Policy {
     uint256 referencePoint;
     uint40 referencePointUpdatePeriod;
     uint40 referencePointTimestampLU;
-    uint16 minPctChange;
-    uint16 maxPctChange;
+    uint16 minPctChangeDown;
+    uint16 minPctChangeUp;
+    uint16 maxPctChangeDown;
+    uint16 maxPctChangeUp;
     uint256 minChange;
     uint256 maxChange;
 }
@@ -173,7 +177,7 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
             }
 
             referencePoint = policy.referencePoint;
-            uint256 diff = absDiff(newValue, referencePoint);
+            (uint256 diff, bool isIncrease) = calcDiff(newValue, referencePoint);
 
             if (flags & CHECK_MIN_CHANGE_FLAG != 0) {
                 if (diff < policy.minChange) return false; // U:[PM-7]
@@ -185,15 +189,21 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
 
             if (flags & (CHECK_MIN_PCT_CHANGE_FLAG | CHECK_MAX_PCT_CHANGE_FLAG) != 0) {
                 uint256 pctDiff = diff * PERCENTAGE_FACTOR / referencePoint;
-                if (flags & CHECK_MIN_PCT_CHANGE_FLAG != 0 && pctDiff < policy.minPctChange) return false; // U:[PM-9]
-                if (flags & CHECK_MAX_PCT_CHANGE_FLAG != 0 && pctDiff > policy.maxPctChange) return false; // U:[PM-10]
+                if (
+                    flags & CHECK_MIN_PCT_CHANGE_FLAG != 0
+                        && pctDiff < (isIncrease ? policy.minPctChangeUp : policy.minPctChangeDown)
+                ) return false; // U:[PM-9]
+                if (
+                    flags & CHECK_MAX_PCT_CHANGE_FLAG != 0
+                        && pctDiff > (isIncrease ? policy.maxPctChangeUp : policy.maxPctChangeDown)
+                ) return false; // U:[PM-10]
             }
         }
 
         return true;
     }
 
-    function absDiff(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a > b ? a - b : b - a;
+    function calcDiff(uint256 a, uint256 b) internal pure returns (uint256, bool) {
+        return a > b ? (a - b, true) : (b - a, false);
     }
 }
