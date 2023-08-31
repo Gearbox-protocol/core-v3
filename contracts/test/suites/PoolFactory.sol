@@ -106,7 +106,6 @@ contract PoolFactory is Test {
                     address token = tokensTestSuite.addressOf(quotaLimits[i].token);
 
                     vm.startPrank(CONFIGURATOR);
-                    poolQuotaKeeper.addQuotaToken(token);
                     poolQuotaKeeper.setTokenLimit(token, quotaLimits[i].limit);
                     poolQuotaKeeper.setTokenQuotaIncreaseFee(token, quotaLimits[i].quotaIncreaseFee);
                     vm.stopPrank();

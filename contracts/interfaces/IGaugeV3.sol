@@ -73,5 +73,7 @@ interface IGaugeV3 is IGaugeV3Events, IVotingContractV3, IVersion {
 
     function addQuotaToken(address token, uint16 minRate, uint16 maxRate) external;
 
-    function changeQuotaTokenRateParams(address token, uint16 minRate, uint16 maxRate) external;
+    function changeQuotaMinRate(address token, uint16 minRate) external;
+
+    function changeQuotaMaxRate(address token, uint16 maxRate) external;
 }

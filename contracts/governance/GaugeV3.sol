@@ -237,30 +237,40 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
         emit AddQuotaToken({token: token, minRate: minRate, maxRate: maxRate}); // U:[GA-05]
     }
 
-    /// @dev Changes the rate params for a quoted token
+    /// @dev Changes the min rate for a quoted token
     /// @param minRate The minimal interest rate paid on token's quotas
-    /// @param maxRate The maximal interest rate paid on token's quotas
-    function changeQuotaTokenRateParams(address token, uint16 minRate, uint16 maxRate)
+    function changeQuotaMinRate(address token, uint16 minRate)
         external
         override
-        nonZeroAddress(token) // U:[GA-04]
-        controllerOnly // U:[GA-03]
+        nonZeroAddress(token) // U: [GA-04]
+        controllerOnly // U: [GA-03]
     {
-        _changeQuotaTokenRateParams(token, minRate, maxRate);
+        _changeQuotaTokenRateParams(token, minRate, quotaRateParams[token].maxRate);
+    }
+
+    /// @dev Changes the max rate for a quoted token
+    /// @param maxRate The maximal interest rate paid on token's quotas
+    function changeQuotaMaxRate(address token, uint16 maxRate)
+        external
+        override
+        nonZeroAddress(token) // U: [GA-04]
+        controllerOnly // U: [GA-03]
+    {
+        _changeQuotaTokenRateParams(token, quotaRateParams[token].minRate, maxRate);
     }
 
     /// @dev Implementation of `changeQuotaTokenRateParams`
     function _changeQuotaTokenRateParams(address token, uint16 minRate, uint16 maxRate) internal {
-        if (!isTokenAdded(token)) revert TokenNotAllowedException(); // U:[GA-06]
+        if (!isTokenAdded(token)) revert TokenNotAllowedException(); // U:[GA-06A, GA-06B]
 
         _checkParams(minRate, maxRate); // U:[GA-04]
 
-        QuotaRateParams storage qrp = quotaRateParams[token]; // U:[GA-06]
+        QuotaRateParams storage qrp = quotaRateParams[token]; // U:[GA-06A, GA-06B]
         if (minRate == qrp.minRate && maxRate == qrp.maxRate) return;
-        qrp.minRate = minRate; // U:[GA-06]
-        qrp.maxRate = maxRate; // U:[GA-06]
+        qrp.minRate = minRate; // U:[GA-06A, GA-06B]
+        qrp.maxRate = maxRate; // U:[GA-06A, GA-06B]
 
-        emit SetQuotaTokenParams({token: token, minRate: minRate, maxRate: maxRate}); // U:[GA-06]
+        emit SetQuotaTokenParams({token: token, minRate: minRate, maxRate: maxRate}); // U:[GA-06A, GA-06B]
     }
 
     /// @dev Checks that given min and max rate are correct (`0 < minRate <= maxRate`)

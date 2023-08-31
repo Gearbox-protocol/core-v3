@@ -18,9 +18,6 @@ interface IControllerTimelockV3Events {
     /// @notice Emitted when the veto admin of the controller is updated
     event SetVetoAdmin(address indexed newAdmin);
 
-    /// @notice Emitted when the delay is changed
-    event SetDelay(uint256 newDelay);
-
     /// @notice Emitted when a transaction is queued
     event QueueTransaction(
         bytes32 indexed txHash, address indexed executor, address target, string signature, bytes data, uint40 eta
@@ -96,9 +93,5 @@ interface IControllerTimelockV3 is IControllerTimelockV3Events, IVersion {
 
     function vetoAdmin() external view returns (address);
 
-    function delay() external view returns (uint256);
-
     function setVetoAdmin(address newAdmin) external;
-
-    function setDelay(uint256 newDelay) external;
 }

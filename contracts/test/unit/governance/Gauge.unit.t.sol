@@ -88,11 +88,14 @@ contract GauageTest is TestHelper, IGaugeV3Events {
         gauge.addQuotaToken(DUMB_ADDRESS, 0, 0);
 
         vm.expectRevert(CallerNotControllerException.selector);
-        gauge.changeQuotaTokenRateParams(DUMB_ADDRESS, 0, 0);
+        gauge.changeQuotaMinRate(DUMB_ADDRESS, 0);
+
+        vm.expectRevert(CallerNotControllerException.selector);
+        gauge.changeQuotaMaxRate(DUMB_ADDRESS, 0);
     }
 
-    /// @dev U:[GA-04]: addQuotaToken and changeQuotaTokenRateParams reverts for incorrect params
-    function test_U_GA_04_addQuotaToken_and_changeQuotaTokenRateParams_reverts_for_incorrect_params() public {
+    /// @dev U:[GA-04]: addQuotaToken and quota rate function revert for incorrect params
+    function test_U_GA_04_addQuotaToken_reverts_for_incorrect_params() public {
         address token = DUMB_ADDRESS;
         vm.startPrank(CONFIGURATOR);
 
@@ -114,13 +117,19 @@ contract GauageTest is TestHelper, IGaugeV3Events {
         gauge.addQuotaToken(token, 0, 0);
 
         vm.expectRevert(ZeroAddressException.selector);
-        gauge.changeQuotaTokenRateParams(address(0), 0, 0);
+        gauge.changeQuotaMinRate(address(0), 0);
+
+        vm.expectRevert(ZeroAddressException.selector);
+        gauge.changeQuotaMaxRate(address(0), 0);
 
         vm.expectRevert(IncorrectParameterException.selector);
-        gauge.changeQuotaTokenRateParams(token, 0, 0);
+        gauge.changeQuotaMinRate(token, 0);
 
         vm.expectRevert(IncorrectParameterException.selector);
-        gauge.changeQuotaTokenRateParams(token, 5, 2);
+        gauge.changeQuotaMaxRate(token, 0);
+
+        vm.expectRevert(IncorrectParameterException.selector);
+        gauge.changeQuotaMinRate(token, 5);
 
         vm.stopPrank();
     }
@@ -165,16 +174,15 @@ contract GauageTest is TestHelper, IGaugeV3Events {
         gauge.addQuotaToken(token2, minRate, maxRate);
     }
 
-    /// @dev U:[GA-06]: changeQuotaTokenRateParams works as expected
-    function test_U_GA_06_changeQuotaTokenRateParams_works_as_expected() public {
+    /// @dev U:[GA-06A]: changeQuotaMinRate works as expected
+    function test_U_GA_06A_changeQuotaMinRate_works_as_expected() public {
         address token = makeAddr("TOKEN");
         uint16 minRate = 100;
-        uint16 maxRate = 500;
 
         // Case: it reverts if token is not added before
         vm.expectRevert(TokenNotAllowedException.selector);
         vm.prank(CONFIGURATOR);
-        gauge.changeQuotaTokenRateParams(token, minRate, maxRate);
+        gauge.changeQuotaMinRate(token, minRate);
 
         // Case: it updates rates only if token added
 
@@ -184,25 +192,56 @@ contract GauageTest is TestHelper, IGaugeV3Events {
         gauge.setQuotaRateParams({
             token: token,
             minRate: minRate + 1312,
-            maxRate: maxRate + 1923,
+            maxRate: 2000,
             totalVotesLpSide: totalVotesLpSide,
             totalVotesCaSide: totalVotesCaSide
         });
 
         vm.expectEmit(true, true, false, true);
-        emit SetQuotaTokenParams({token: token, minRate: minRate, maxRate: maxRate});
+        emit SetQuotaTokenParams({token: token, minRate: minRate, maxRate: 2000});
 
         vm.prank(CONFIGURATOR);
-        gauge.changeQuotaTokenRateParams(token, minRate, maxRate);
+        gauge.changeQuotaMinRate(token, minRate);
 
         (uint16 _minRate, uint16 _maxRate, uint96 _totalVotesLpSide, uint96 _totalVotesCaSide) =
             gauge.quotaRateParams(token);
 
         assertEq(_minRate, minRate, "Incorrect minRate");
-        assertEq(_maxRate, maxRate, "Incorrect maxRate");
+    }
 
-        assertEq(_totalVotesLpSide, totalVotesLpSide, "Incorrect totalVotesLpSide");
-        assertEq(_totalVotesCaSide, totalVotesCaSide, "Incorrect totalVotesCaSide");
+    /// @dev U:[GA-06B]: changeQuotaMaxRate works as expected
+    function test_U_GA_06B_changeQuotaMaxRate_works_as_expected() public {
+        address token = makeAddr("TOKEN");
+        uint16 maxRate = 3000;
+
+        // Case: it reverts if token is not added before
+        vm.expectRevert(TokenNotAllowedException.selector);
+        vm.prank(CONFIGURATOR);
+        gauge.changeQuotaMaxRate(token, maxRate);
+
+        // Case: it updates rates only if token added
+
+        uint96 totalVotesLpSide = 9323;
+        uint96 totalVotesCaSide = 12323;
+
+        gauge.setQuotaRateParams({
+            token: token,
+            minRate: 500,
+            maxRate: maxRate + 1000,
+            totalVotesLpSide: totalVotesLpSide,
+            totalVotesCaSide: totalVotesCaSide
+        });
+
+        vm.expectEmit(true, true, false, true);
+        emit SetQuotaTokenParams({token: token, minRate: 500, maxRate: maxRate});
+
+        vm.prank(CONFIGURATOR);
+        gauge.changeQuotaMaxRate(token, maxRate);
+
+        (uint16 _minRate, uint16 _maxRate, uint96 _totalVotesLpSide, uint96 _totalVotesCaSide) =
+            gauge.quotaRateParams(token);
+
+        assertEq(_maxRate, maxRate, "Incorrect maxRate");
     }
 
     /// @dev U:[GA-08]: isTokenAdded works as expected

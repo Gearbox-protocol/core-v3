@@ -112,6 +112,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
+            delay: 1 days,
             flags: 1,
             exactValue: block.timestamp + 5,
             minValue: 0,
@@ -203,6 +204,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
+            delay: 1 days,
             flags: 1,
             exactValue: 7,
             minValue: 0,
@@ -271,6 +273,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
+            delay: 2 days,
             flags: 1,
             exactValue: 4,
             minValue: 0,
@@ -309,7 +312,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
                 creditConfigurator,
                 "setMaxDebtPerBlockMultiplier(uint8)",
                 abi.encode(4),
-                block.timestamp + 1 days
+                block.timestamp + 2 days
             )
         );
 
@@ -320,7 +323,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             creditConfigurator,
             "setMaxDebtPerBlockMultiplier(uint8)",
             abi.encode(4),
-            uint40(block.timestamp + 1 days)
+            uint40(block.timestamp + 2 days)
         );
 
         vm.prank(admin);
@@ -330,7 +333,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             creditConfigurator, abi.encodeWithSelector(ICreditConfiguratorV3.setMaxDebtPerBlockMultiplier.selector, 4)
         );
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(block.timestamp + 2 days);
 
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
@@ -351,6 +354,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
+            delay: 3 days,
             flags: 1,
             exactValue: 15,
             minValue: 0,
@@ -384,7 +388,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
-            abi.encode(admin, creditConfigurator, "setMinDebtLimit(uint128)", abi.encode(15), block.timestamp + 1 days)
+            abi.encode(admin, creditConfigurator, "setMinDebtLimit(uint128)", abi.encode(15), block.timestamp + 3 days)
         );
 
         vm.expectEmit(true, false, false, true);
@@ -394,7 +398,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             creditConfigurator,
             "setMinDebtLimit(uint128)",
             abi.encode(15),
-            uint40(block.timestamp + 1 days)
+            uint40(block.timestamp + 3 days)
         );
 
         vm.prank(admin);
@@ -402,7 +406,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
 
         vm.expectCall(creditConfigurator, abi.encodeWithSelector(ICreditConfiguratorV3.setMinDebtLimit.selector, 15));
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(block.timestamp + 3 days);
 
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
@@ -423,6 +427,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
+            delay: 1 days,
             flags: 1,
             exactValue: 25,
             minValue: 0,
@@ -499,6 +504,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
+            delay: 1 days,
             flags: 1,
             exactValue: 2e18,
             minValue: 0,
@@ -579,6 +585,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
+            delay: 1 days,
             flags: 1,
             exactValue: 2e18,
             minValue: 0,
@@ -664,6 +671,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
+            delay: 1 days,
             flags: 1,
             exactValue: 6000,
             minValue: 0,
@@ -776,6 +784,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
+            delay: 1 days,
             flags: 1,
             exactValue: block.timestamp + 5,
             minValue: 0,
@@ -832,10 +841,6 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(USER);
         controllerTimelock.setVetoAdmin(DUMB_ADDRESS);
 
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        vm.prank(USER);
-        controllerTimelock.setDelay(5);
-
         vm.expectEmit(true, false, false, false);
         emit SetVetoAdmin(DUMB_ADDRESS);
 
@@ -843,14 +848,6 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         controllerTimelock.setVetoAdmin(DUMB_ADDRESS);
 
         assertEq(controllerTimelock.vetoAdmin(), DUMB_ADDRESS, "Veto admin address was not set");
-
-        vm.expectEmit(false, false, false, true);
-        emit SetDelay(5);
-
-        vm.prank(CONFIGURATOR);
-        controllerTimelock.setDelay(5);
-
-        assertEq(controllerTimelock.delay(), 5, "Delay was not set");
     }
 
     /// @dev U:[CT-9]: executeTransaction works correctly
@@ -871,6 +868,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             enabled: false,
             admin: FRIEND,
             flags: 1,
+            delay: 2 days,
             exactValue: expirationDate,
             minValue: 0,
             maxValue: 0,
@@ -893,7 +891,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
                 creditConfigurator,
                 "setExpirationDate(uint40)",
                 abi.encode(expirationDate),
-                block.timestamp + 1 days
+                block.timestamp + 2 days
             )
         );
 
@@ -944,6 +942,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
+            delay: 1 days,
             flags: 0,
             exactValue: 0,
             minValue: 0,
@@ -1024,6 +1023,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
+            delay: 1 days,
             flags: 1,
             exactValue: 20,
             minValue: 0,
@@ -1102,6 +1102,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
+            delay: 1 days,
             flags: 1,
             exactValue: 2e18,
             minValue: 0,
@@ -1168,6 +1169,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
+            delay: 1 days,
             flags: 1,
             exactValue: 20,
             minValue: 0,
@@ -1247,6 +1249,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
+            delay: 1 days,
             flags: 1,
             exactValue: 15,
             minValue: 0,
@@ -1283,8 +1286,8 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             abi.encode(
                 admin,
                 gauge,
-                "changeQuotaTokenRateParams(address,uint16,uint16)",
-                abi.encode(token, uint16(15), uint16(20)),
+                "changeQuotaMinRate(address,uint16)",
+                abi.encode(token, uint16(15)),
                 block.timestamp + 1 days
             )
         );
@@ -1294,15 +1297,15 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             txHash,
             admin,
             gauge,
-            "changeQuotaTokenRateParams(address,uint16,uint16)",
-            abi.encode(token, uint16(15), uint16(20)),
+            "changeQuotaMinRate(address,uint16)",
+            abi.encode(token, uint16(15)),
             uint40(block.timestamp + 1 days)
         );
 
         vm.prank(admin);
         controllerTimelock.setMinQuotaRate(pool, token, 15);
 
-        vm.expectCall(gauge, abi.encodeCall(GaugeV3.changeQuotaTokenRateParams, (token, 15, 20)));
+        vm.expectCall(gauge, abi.encodeCall(GaugeV3.changeQuotaMinRate, (token, 15)));
 
         vm.warp(block.timestamp + 1 days);
 
@@ -1338,6 +1341,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
+            delay: 1 days,
             flags: 1,
             exactValue: 25,
             minValue: 0,
@@ -1374,8 +1378,8 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             abi.encode(
                 admin,
                 gauge,
-                "changeQuotaTokenRateParams(address,uint16,uint16)",
-                abi.encode(token, uint16(10), uint16(25)),
+                "changeQuotaMaxRate(address,uint16)",
+                abi.encode(token, uint16(25)),
                 block.timestamp + 1 days
             )
         );
@@ -1385,15 +1389,15 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             txHash,
             admin,
             gauge,
-            "changeQuotaTokenRateParams(address,uint16,uint16)",
-            abi.encode(token, uint16(10), uint16(25)),
+            "changeQuotaMaxRate(address,uint16)",
+            abi.encode(token, uint16(25)),
             uint40(block.timestamp + 1 days)
         );
 
         vm.prank(admin);
         controllerTimelock.setMaxQuotaRate(pool, token, 25);
 
-        vm.expectCall(gauge, abi.encodeCall(GaugeV3.changeQuotaTokenRateParams, (token, 10, 25)));
+        vm.expectCall(gauge, abi.encodeCall(GaugeV3.changeQuotaMaxRate, (token, 25)));
 
         vm.warp(block.timestamp + 1 days);
 
@@ -1421,6 +1425,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
+            delay: 1 days,
             flags: 0,
             exactValue: 0,
             minValue: 0,

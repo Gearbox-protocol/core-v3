@@ -42,6 +42,7 @@ contract PolicyManagerTest is Test {
         Policy memory policy = Policy({
             enabled: false,
             admin: FRIEND,
+            delay: 1 days,
             flags: 2 + 4 + 16,
             exactValue: 15,
             minValue: 10,
@@ -111,6 +112,7 @@ contract PolicyManagerTest is Test {
         Policy memory policy = Policy({
             enabled: false,
             admin: FRIEND,
+            delay: 1 days,
             flags: 2 + 4 + 16,
             exactValue: 15,
             minValue: 10,
@@ -142,6 +144,7 @@ contract PolicyManagerTest is Test {
         Policy memory policy = Policy({
             enabled: false,
             admin: FRIEND,
+            delay: 1 days,
             flags: 1,
             exactValue: 15,
             minValue: 0,
@@ -167,6 +170,7 @@ contract PolicyManagerTest is Test {
         Policy memory policy = Policy({
             enabled: false,
             admin: FRIEND,
+            delay: 1 days,
             flags: 2,
             exactValue: 0,
             minValue: minValue,
@@ -192,6 +196,7 @@ contract PolicyManagerTest is Test {
         Policy memory policy = Policy({
             enabled: false,
             admin: FRIEND,
+            delay: 1 days,
             flags: 4,
             exactValue: 0,
             minValue: 0,
@@ -217,6 +222,7 @@ contract PolicyManagerTest is Test {
         Policy memory policy = Policy({
             enabled: false,
             admin: FRIEND,
+            delay: 1 days,
             flags: 8,
             exactValue: 0,
             minValue: 0,
@@ -254,6 +260,7 @@ contract PolicyManagerTest is Test {
         Policy memory policy = Policy({
             enabled: false,
             admin: FRIEND,
+            delay: 1 days,
             flags: 8,
             exactValue: 0,
             minValue: 0,
@@ -307,6 +314,7 @@ contract PolicyManagerTest is Test {
         Policy memory policy = Policy({
             enabled: false,
             admin: FRIEND,
+            delay: 1 days,
             flags: 16,
             exactValue: 0,
             minValue: 0,
@@ -368,6 +376,7 @@ contract PolicyManagerTest is Test {
         Policy memory policy = Policy({
             enabled: false,
             admin: FRIEND,
+            delay: 1 days,
             flags: 32,
             exactValue: 0,
             minValue: 0,
@@ -430,6 +439,7 @@ contract PolicyManagerTest is Test {
         Policy memory policy = Policy({
             enabled: false,
             admin: FRIEND,
+            delay: 1 days,
             flags: 64,
             exactValue: 0,
             minValue: 0,
@@ -478,6 +488,7 @@ contract PolicyManagerTest is Test {
         Policy memory policy = Policy({
             enabled: false,
             admin: FRIEND,
+            delay: 1 days,
             flags: 0,
             exactValue: 0,
             minValue: 0,
