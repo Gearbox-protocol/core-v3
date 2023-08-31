@@ -50,8 +50,10 @@ contract PolicyManagerTest is Test {
             referencePoint: 0,
             referencePointUpdatePeriod: 1 days,
             referencePointTimestampLU: 0,
-            minPctChange: 1,
-            maxPctChange: 2,
+            minPctChangeDown: 1,
+            minPctChangeUp: 1,
+            maxPctChangeDown: 2,
+            maxPctChangeUp: 2,
             minChange: 3,
             maxChange: 4
         });
@@ -86,9 +88,13 @@ contract PolicyManagerTest is Test {
 
         assertEq(policy2.referencePointTimestampLU, 0, "referencePointTimestampLU is incorrect");
 
-        assertEq(policy2.minPctChange, 1, "minPctChange is incorrect");
+        assertEq(policy2.minPctChangeDown, 1, "minPctChangeDown is incorrect");
 
-        assertEq(policy2.maxPctChange, 2, "maxPctChange is incorrect");
+        assertEq(policy2.minPctChangeUp, 1, "minPctChangeUp is incorrect");
+
+        assertEq(policy2.maxPctChangeDown, 2, "maxPctChangeDown is incorrect");
+
+        assertEq(policy2.maxPctChangeDown, 2, "maxPctChangeDown is incorrect");
 
         assertEq(policy2.minChange, 3, "minChange is incorrect");
 
@@ -120,8 +126,10 @@ contract PolicyManagerTest is Test {
             referencePoint: 0,
             referencePointUpdatePeriod: 1 days,
             referencePointTimestampLU: 0,
-            minPctChange: 1,
-            maxPctChange: 2,
+            minPctChangeDown: 1,
+            minPctChangeUp: 1,
+            maxPctChangeDown: 2,
+            maxPctChangeUp: 2,
             minChange: 3,
             maxChange: 4
         });
@@ -152,8 +160,10 @@ contract PolicyManagerTest is Test {
             referencePoint: 0,
             referencePointUpdatePeriod: 0,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
@@ -178,8 +188,10 @@ contract PolicyManagerTest is Test {
             referencePoint: 0,
             referencePointUpdatePeriod: 0,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
@@ -204,8 +216,10 @@ contract PolicyManagerTest is Test {
             referencePoint: 0,
             referencePointUpdatePeriod: 0,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
@@ -230,8 +244,10 @@ contract PolicyManagerTest is Test {
             referencePoint: 0,
             referencePointUpdatePeriod: 1 days,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
@@ -268,8 +284,10 @@ contract PolicyManagerTest is Test {
             referencePoint: 0,
             referencePointUpdatePeriod: 1 days,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: minChange,
             maxChange: 0
         });
@@ -322,8 +340,10 @@ contract PolicyManagerTest is Test {
             referencePoint: 0,
             referencePointUpdatePeriod: 1 days,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: maxChange
         });
@@ -363,7 +383,8 @@ contract PolicyManagerTest is Test {
         uint256 newValue1,
         uint256 newValue2,
         uint256 newValue3,
-        uint16 minPctChange
+        uint16 minPctChangeDown,
+        uint16 minPctChangeUp
     ) public {
         vm.assume(oldValue > 0);
         vm.assume(newValue2 > 0);
@@ -384,8 +405,10 @@ contract PolicyManagerTest is Test {
             referencePoint: 0,
             referencePointUpdatePeriod: 1 days,
             referencePointTimestampLU: 0,
-            minPctChange: minPctChange,
-            maxPctChange: 0,
+            minPctChangeDown: minPctChangeDown,
+            minPctChangeUp: minPctChangeUp,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
@@ -397,13 +420,19 @@ contract PolicyManagerTest is Test {
             (newValue1 > oldValue ? newValue1 - oldValue : oldValue - newValue1) * PERCENTAGE_FACTOR / oldValue;
 
         vm.prank(FRIEND);
-        assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), oldValue, newValue1) || pctDiff >= minPctChange);
+        assertTrue(
+            !policyManager.checkPolicy(bytes32(uint256(1)), oldValue, newValue1)
+                || (newValue1 > oldValue ? pctDiff >= minPctChangeUp : pctDiff >= minPctChangeDown)
+        );
         vm.warp(block.timestamp + 1);
 
         pctDiff = (newValue2 > oldValue ? newValue2 - oldValue : oldValue - newValue2) * PERCENTAGE_FACTOR / oldValue;
 
         vm.prank(FRIEND);
-        assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), newValue1, newValue2) || pctDiff >= minPctChange);
+        assertTrue(
+            !policyManager.checkPolicy(bytes32(uint256(1)), newValue1, newValue2)
+                || (newValue2 > oldValue ? pctDiff >= minPctChangeUp : pctDiff >= minPctChangeDown)
+        );
 
         vm.warp(block.timestamp + 1 days);
 
@@ -411,7 +440,10 @@ contract PolicyManagerTest is Test {
             (newValue3 > newValue2 ? newValue3 - newValue2 : newValue2 - newValue3) * PERCENTAGE_FACTOR / newValue2;
 
         vm.prank(FRIEND);
-        assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), newValue2, newValue3) || pctDiff >= minPctChange);
+        assertTrue(
+            !policyManager.checkPolicy(bytes32(uint256(1)), newValue2, newValue3)
+                || (newValue3 > newValue2 ? pctDiff >= minPctChangeUp : pctDiff >= minPctChangeDown)
+        );
 
         Policy memory policy2 = policyManager.getPolicy(bytes32(uint256(1)));
 
@@ -426,7 +458,8 @@ contract PolicyManagerTest is Test {
         uint256 newValue1,
         uint256 newValue2,
         uint256 newValue3,
-        uint16 maxPctChange
+        uint16 maxPctChangeDown,
+        uint16 maxPctChangeUp
     ) public {
         vm.assume(oldValue > 0);
         vm.assume(newValue2 > 0);
@@ -447,8 +480,10 @@ contract PolicyManagerTest is Test {
             referencePoint: 0,
             referencePointUpdatePeriod: 1 days,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: maxPctChange,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: maxPctChangeDown,
+            maxPctChangeUp: maxPctChangeUp,
             minChange: 0,
             maxChange: 0
         });
@@ -460,13 +495,19 @@ contract PolicyManagerTest is Test {
             (newValue1 > oldValue ? newValue1 - oldValue : oldValue - newValue1) * PERCENTAGE_FACTOR / oldValue;
 
         vm.prank(FRIEND);
-        assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), oldValue, newValue1) || pctDiff <= maxPctChange);
+        assertTrue(
+            !policyManager.checkPolicy(bytes32(uint256(1)), oldValue, newValue1)
+                || (newValue1 > oldValue ? pctDiff <= maxPctChangeUp : pctDiff <= maxPctChangeDown)
+        );
         vm.warp(block.timestamp + 1);
 
         pctDiff = (newValue2 > oldValue ? newValue2 - oldValue : oldValue - newValue2) * PERCENTAGE_FACTOR / oldValue;
 
         vm.prank(FRIEND);
-        assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), newValue1, newValue2) || pctDiff <= maxPctChange);
+        assertTrue(
+            !policyManager.checkPolicy(bytes32(uint256(1)), newValue1, newValue2)
+                || (newValue2 > oldValue ? pctDiff <= maxPctChangeUp : pctDiff <= maxPctChangeDown)
+        );
 
         vm.warp(block.timestamp + 1 days);
 
@@ -474,7 +515,10 @@ contract PolicyManagerTest is Test {
             (newValue3 > newValue2 ? newValue3 - newValue2 : newValue2 - newValue3) * PERCENTAGE_FACTOR / newValue2;
 
         vm.prank(FRIEND);
-        assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), newValue2, newValue3) || pctDiff <= maxPctChange);
+        assertTrue(
+            !policyManager.checkPolicy(bytes32(uint256(1)), newValue2, newValue3)
+                || (newValue3 > newValue2 ? pctDiff <= maxPctChangeUp : pctDiff <= maxPctChangeDown)
+        );
 
         Policy memory policy2 = policyManager.getPolicy(bytes32(uint256(1)));
 
@@ -496,8 +540,10 @@ contract PolicyManagerTest is Test {
             referencePoint: 0,
             referencePointUpdatePeriod: 0,
             referencePointTimestampLU: 0,
-            minPctChange: 0,
-            maxPctChange: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
             minChange: 0,
             maxChange: 0
         });
