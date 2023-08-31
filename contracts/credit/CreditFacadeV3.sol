@@ -466,6 +466,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         /// so they need to be erased on account closure
         _eraseAllBotPermissionsAtClosure({creditAccount: creditAccount}); // U:[FA-16]
 
+        /// @dev In this case only the liquidator's funds are sent to `to`, while the remaining
+        ///      funds are sent to the original borrower
         (uint256 remainingFunds, uint256 reportedLoss) = _closeCreditAccount({
             creditAccount: creditAccount,
             closureAction: closeAction,
