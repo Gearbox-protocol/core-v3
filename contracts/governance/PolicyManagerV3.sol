@@ -81,7 +81,7 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
     constructor(address _addressProvider) ACLNonReentrantTrait(_addressProvider) {}
 
     /// @notice Sets the policy, using policy UID as key
-    /// @param policyHash A unique identifier for a policy, generally, should be a hash of (PARAMETER_NAME, GROUP_NAME)
+    /// @param policyHash A unique identifier for a policy, generally, should be a hash of (GROUP_NAME, PARAMETER_NAME)
     /// @param initialPolicy The initial policy values
     function setPolicy(bytes32 policyHash, Policy memory initialPolicy)
         external

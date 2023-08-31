@@ -69,12 +69,14 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         IPoolV3 pool = IPoolV3(ICreditManagerV3(creditManager).pool());
 
         uint40 oldExpirationDate = creditFacade.expirationDate();
+
+        if (!_checkPolicy(creditManager, "EXPIRATION_DATE", uint256(oldExpirationDate), uint256(expirationDate))) {
+            revert ParameterChecksFailedException(); // U:[CT-1]
+        }
+
         uint256 totalBorrowed = pool.creditManagerBorrowed(address(creditManager));
 
-        if (
-            !_checkPolicy(creditManager, "EXPIRATION_DATE", uint256(oldExpirationDate), uint256(expirationDate))
-                || totalBorrowed != 0
-        ) {
+        if (totalBorrowed != 0) {
             revert ParameterChecksFailedException(); // U:[CT-1]
         }
 
