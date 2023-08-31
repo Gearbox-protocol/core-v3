@@ -15,6 +15,7 @@ uint256 constant UNDERLYING_TOKEN_MASK = 1;
 ///         can be checked by checking tokenMask & setMask != 0.
 library BitMask {
     /// @dev Calculates an index of an item based on its mask (using a binary search)
+    /// @dev The input should always have only 1 bit set, otherwise the result may be unpredictable
     function calcIndex(uint256 mask) internal pure returns (uint8 index) {
         if (mask == 0) revert IncorrectParameterException(); // U:[BM-1]
         uint16 lb = 0; // U:[BM-2]
@@ -60,6 +61,7 @@ library BitMask {
     }
 
     /// @dev Computes a new mask with sets of new enabled and disabled bits
+    /// @dev bitsToEnable and bitsToDisable are applied sequentially to original mask
     /// @param enabledTokensMask The initial mask
     /// @param bitsToEnable Mask with bits to enable
     /// @param bitsToDisable Mask with bits to disable
@@ -96,6 +98,7 @@ library BitMask {
     }
 
     /// @dev Computes a new mask with sets of new enabled and disabled bits, skipping some bits
+    /// @dev bitsToEnable and bitsToDisable are applied sequentially to original mask. Skipmask is applied in both cases.
     /// @param enabledTokensMask The initial mask
     /// @param bitsToEnable Mask with bits to enable
     /// @param bitsToDisable Mask with bits to disable
