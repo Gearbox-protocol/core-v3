@@ -99,6 +99,15 @@ library CollateralLogic {
     }
 
     /// @dev Computes USD value of quoted tokens on a credit account
+    /// @param quotedTokens Array of quoted tokens on the account
+    /// @param quotasPacked Array of (quota, LT) tuples packed into uint256
+    /// @param creditAccount Address of the credit account
+    /// @param underlyingPriceRAY USD price of 1 RAY of underlying
+    /// @param twvUSDTarget The twvUSD threshold to stop the computation at
+    /// @param convertToUSDFn Function to convert asset amounts to USD
+    /// @param priceOracle Address of the price oracle
+    /// @return totalValueUSD Total value of credit account's quoted assets
+    /// @return twvUSD Total LT-weighted value of credit account's quoted assets
     function calcQuotedTokensCollateral(
         address[] memory quotedTokens,
         uint256[] memory quotasPacked,
@@ -143,6 +152,16 @@ library CollateralLogic {
     }
 
     /// @dev Computes USD value of non-quoted tokens on a credit account
+    /// @param creditAccount Address of the credit account
+    /// @param twvUSDTarget The twvUSD threshold to stop the computation at
+    /// @param collateralHints Array of token masks for order of priority during collateral computation
+    /// @param convertToUSDFn Function to convert asset amounts to USD
+    /// @param collateralTokenByMaskFn Function to retrieve the token's address and LT by its mask
+    /// @param tokensToCheckMask Mask of tokens that need to be included into the computation
+    /// @param priceOracle Address of the price oracle
+    /// @return totalValueUSD Total value of credit account's quoted assets
+    /// @return twvUSD Total LT-weighted value of credit account's quoted assets
+    /// @return tokensToDisable Mask of non-quoted tokens that have zero balances and can be disabled
     function calcNonQuotedTokensCollateral(
         address creditAccount,
         uint256 twvUSDTarget,
@@ -198,6 +217,14 @@ library CollateralLogic {
     }
 
     /// @dev Computes value of a single non-quoted asset on a credit account
+    /// @param creditAccount Address of the credit account
+    /// @param convertToUSDFn Function to convert asset amounts to USD
+    /// @param collateralTokenByMaskFn Function to retrieve the token's address and LT by its mask
+    /// @param tokenMask Mask of the token
+    /// @param priceOracle Address of the price oracle
+    /// @return valueUSD Value of the token
+    /// @return weightedValueUSD LT-weighted value of the token
+    /// @return nonZeroBalance Whether the token has a zero balance
     function calcOneNonQuotedCollateral(
         address creditAccount,
         function (address, uint256, address) view returns(uint256) convertToUSDFn,
@@ -218,6 +245,15 @@ library CollateralLogic {
     }
 
     /// @dev Computes USD value of a single asset on a credit account
+    /// @param creditAccount Address of the credit account
+    /// @param convertToUSDFn Function to convert asset amounts to USD
+    /// @param priceOracle Address of the price oracle
+    /// @param token Address of the token
+    /// @param liquidationThreshold LT of the token
+    /// @param quotaUSD Quota of the token converted to USD
+    /// @return valueUSD Value of the token
+    /// @return weightedValueUSD LT-weighted value of the token
+    /// @return nonZeroBalance Whether the token has a zero balance
     function calcOneTokenCollateral(
         address creditAccount,
         function (address, uint256, address) view returns(uint256) convertToUSDFn,
