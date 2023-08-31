@@ -670,7 +670,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     /// but there is attested off-chain price data.
                     else if (method == ICreditFacadeV3Multicall.onDemandPriceUpdate.selector) {
                         if (flags & PRICE_UPDATES_ALREADY_APPLIED == 0) {
-                            _onDemandPriceUpdate(mcall.callData[4:]); // U:[FA-25]
+                            _onDemandPriceUpdate(mcall.callData[4:], fullCheckParams); // U:[FA-25]
                         }
                     }
                     //
@@ -882,6 +882,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     ///      `onDemandPriceUpdate` calls are expected to be placed before all other calls in the multicall
     function _applyOnDemandPriceUpdates(MultiCall[] calldata calls) internal returns (uint256 remainingCalls) {
         uint256 len = calls.length;
+        FullCheckParams memory fcp;
         unchecked {
             for (uint256 i; i < len; ++i) {
                 MultiCall calldata mcall = calls[i];
@@ -889,7 +890,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     mcall.target == address(this)
                         && bytes4(mcall.callData) == ICreditFacadeV3Multicall.onDemandPriceUpdate.selector
                 ) {
-                    _onDemandPriceUpdate(mcall.callData[4:]);
+                    _onDemandPriceUpdate(mcall.callData[4:], fcp);
                 } else {
                     return len - i;
                 }
@@ -926,10 +927,14 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @dev Should generally be called only when interacting with tokens
     ///         that use on-demand price feeds
     /// @param callData Bytes calldata for parsing
-    function _onDemandPriceUpdate(bytes calldata callData) internal {
+    function _onDemandPriceUpdate(bytes calldata callData, FullCheckParams memory fullCheckParams) internal {
         (address token, bytes memory data) = abi.decode(callData, (address, bytes)); // U:[FA-25]
 
-        address priceFeed = IPriceOracleBase(ICreditManagerV3(creditManager).priceOracle()).priceFeeds(token); // U:[FA-25]
+        if (fullCheckParams.priceOracle == address(0)) {
+            fullCheckParams.priceOracle = ICreditManagerV3(creditManager).priceOracle();
+        }
+
+        address priceFeed = IPriceOracleBase(fullCheckParams.priceOracle).priceFeeds(token); // U:[FA-25]
         if (priceFeed == address(0)) revert PriceFeedDoesNotExistException(); // U:[FA-25]
 
         IUpdatablePriceFeed(priceFeed).updatePrice(data); // U:[FA-25]

@@ -27,6 +27,7 @@ struct FullCheckParams {
     uint256[] collateralHints;
     uint16 minHealthFactor;
     uint256 enabledTokensMaskAfter;
+    address priceOracle;
 }
 
 struct TotalDebt {
