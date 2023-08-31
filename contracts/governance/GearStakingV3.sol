@@ -156,9 +156,9 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     function _processPendingWithdrawals(address user, address to) internal {
         uint16 epochNow = getCurrentEpoch();
 
-        WithdrawalData memory wd = withdrawalData[user];
+        if (epochNow > withdrawalData[user].epochLastUpdate) {
+            WithdrawalData memory wd = withdrawalData[user];
 
-        if (epochNow > wd.epochLastUpdate) {
             uint16 epochDiff = epochNow - wd.epochLastUpdate;
             uint256 totalClaimable;
 
