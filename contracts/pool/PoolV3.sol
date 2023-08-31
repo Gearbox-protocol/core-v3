@@ -248,9 +248,10 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         nonZeroAddress(receiver) // U:[LP-5]
         returns (uint256 shares)
     {
-        uint256 assetsSent = _amountWithWithdrawalFee(_amountWithFee(assets)); // U:[LP-8]
+        uint256 assetsToUser = _amountWithFee(assets);
+        uint256 assetsSent = _amountWithWithdrawalFee(assetsToUser); // U:[LP-8]
         shares = _convertToShares(assetsSent, Math.Rounding.Up); // U:[LP-8]
-        _withdraw(receiver, owner, assetsSent, assets, shares); // U:[LP-8]
+        _withdraw(receiver, owner, assetsSent, assets, assetsToUser, shares); // U:[LP-8]
     }
 
     /// @notice Redeems given number of pool shares for underlying tokens
@@ -267,8 +268,9 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         returns (uint256 assets)
     {
         uint256 assetsSent = _convertToAssets(shares, Math.Rounding.Down); // U:[LP-9]
-        assets = _amountMinusFee(_amountMinusWithdrawalFee(assetsSent)); // U:[LP-9]
-        _withdraw(receiver, owner, assetsSent, assets, shares); // U:[LP-9]
+        uint256 assetsToUser = _amountMinusWithdrawalFee(assetsSent);
+        assets = _amountMinusFee(assetsToUser); // U:[LP-9]
+        _withdraw(receiver, owner, assetsSent, assets, assetsToUser, shares); // U:[LP-9]
     }
 
     /// @notice Number of pool shares that would be minted on depositing `assets`
@@ -338,9 +340,14 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     ///      - burns pool shares from `owner`
     ///      - updates base interest rate and index
     ///      - transfers underlying to `receiver` and, if withdrawal fee is activated, to the treasury
-    function _withdraw(address receiver, address owner, uint256 assetsSent, uint256 assetsReceived, uint256 shares)
-        internal
-    {
+    function _withdraw(
+        address receiver,
+        address owner,
+        uint256 assetsSent,
+        uint256 assetsReceived,
+        uint256 amountToUser,
+        uint256 shares
+    ) internal {
         if (msg.sender != owner) _spendAllowance({owner: owner, spender: msg.sender, amount: shares}); // U:[LP-8,9]
         _burn(owner, shares); // U:[LP-8,9]
 
@@ -350,7 +357,6 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
             checkOptimalBorrowing: false
         }); // U:[LP-8,9]
 
-        uint256 amountToUser = _amountWithFee(assetsReceived);
         IERC20(underlyingToken).safeTransfer({to: receiver, value: amountToUser}); // U:[LP-8,9]
         if (assetsSent > amountToUser) {
             unchecked {

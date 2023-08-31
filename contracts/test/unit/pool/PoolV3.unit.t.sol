@@ -642,8 +642,8 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
                 transferFee: 500,
                 withdrawFee: 100,
                 expectedAssets: 94,
-                expectedAssetsToReceiver: 98,
-                expectedAssetsToTreasury: 2
+                expectedAssetsToReceiver: 99,
+                expectedAssetsToTreasury: 1
             })
         ];
 
