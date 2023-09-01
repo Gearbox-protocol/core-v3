@@ -64,8 +64,9 @@ abstract contract PriceFeedValidationTrait {
     function _getValidatedPrice(address priceFeed, uint32 stalenessPeriod, bool skipCheck)
         internal
         view
-        returns (int256 answer, uint256 updatedAt)
+        returns (int256 answer)
     {
+        uint256 updatedAt;
         (, answer,, updatedAt,) = IPriceFeed(priceFeed).latestRoundData(); // U:[PO-1]
         if (!skipCheck) _checkAnswer(answer, updatedAt, stalenessPeriod); // U:[PO-1]
     }
