@@ -105,7 +105,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
         view
         returns (uint256 price, uint256 scale)
     {
-        (int256 answer,) = _getValidatedPrice(priceFeed, stalenessPeriod, skipCheck); // U:[PO-1]
+        int256 answer = _getValidatedPrice(priceFeed, stalenessPeriod, skipCheck); // U:[PO-1]
 
         // answer should not be negative (price feeds with `skipCheck = true` must ensure that!)
         price = uint256(answer); // U:[PO-1]
