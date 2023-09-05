@@ -1462,7 +1462,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
             assertEq(
                 cumulativeQuotaInterest,
-                initialCQI,
+                expectedCumulativeQuotaInterest + 1,
                 _testCaseErr("Incorrect cumulativeQuotaInterest update in creditAccountInfo")
             );
         }
