@@ -508,42 +508,42 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
             uint128 newCumulativeQuotaInterest;
             uint128 newQuotaFees;
-            {
-                uint256 profit;
 
-                if (action == ManageDebtAction.FULL_REPAYMENT) {
-                    newDebt = 0;
-                    newCumulativeIndex = collateralDebtData.cumulativeIndexNow;
-                    profit = collateralDebtData.accruedFees;
-                    newCumulativeQuotaInterest = 0;
-                    newQuotaFees = 0;
-                } else {
-                    (newDebt, newCumulativeIndex, profit, newCumulativeQuotaInterest, newQuotaFees) = CreditLogic
-                        .calcDecrease({
-                        amount: _amountMinusFee(amount),
-                        debt: collateralDebtData.debt,
-                        cumulativeIndexNow: collateralDebtData.cumulativeIndexNow,
-                        cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
-                        cumulativeQuotaInterest: collateralDebtData.cumulativeQuotaInterest,
-                        quotaFees: currentCreditAccountInfo.quotaFees,
-                        feeInterest: feeInterest
-                    }); // U:[CM-11]
-                }
+            uint256 profit;
 
-                /// @dev The amount of principal repaid is what is left after repaying all interest and fees
-                ///      and is the difference between newDebt and debt
-                _poolRepayCreditAccount(collateralDebtData.debt - newDebt, profit, 0); // U:[CM-11]
+            if (action == ManageDebtAction.FULL_REPAYMENT) {
+                newDebt = 0;
+                newCumulativeIndex = collateralDebtData.cumulativeIndexNow;
+                profit = collateralDebtData.accruedFees;
+                newCumulativeQuotaInterest = 0;
+                newQuotaFees = 0;
+            } else {
+                (newDebt, newCumulativeIndex, profit, newCumulativeQuotaInterest, newQuotaFees) = CreditLogic
+                    .calcDecrease({
+                    amount: _amountMinusFee(amount),
+                    debt: collateralDebtData.debt,
+                    cumulativeIndexNow: collateralDebtData.cumulativeIndexNow,
+                    cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
+                    cumulativeQuotaInterest: collateralDebtData.cumulativeQuotaInterest,
+                    quotaFees: currentCreditAccountInfo.quotaFees,
+                    feeInterest: feeInterest
+                }); // U:[CM-11]
 
-                /// If quota logic is supported, we need to accrue quota interest in order to keep
-                /// quota interest indexes in PQK and cumulativeQuotaInterest in Credit Manager consistent
-                /// with each other, since this action caches all quota interest in Credit Manager
-                // Full repayment is only available if there are no active quotas, which means
-                // that all quota interest should already be accrued
+                /// We need to accrue quota interest in order to keep  quota interest indexes in PQK
+                /// and cumulativeQuotaInterest in Credit Manager consistent with each other,
+                /// since this action caches all quota interest in Credit Manager
+                /// Full repayment is only available if there are no active quotas, which means
+                /// that all quota interest should already be accrued
+
                 IPoolQuotaKeeperV3(collateralDebtData._poolQuotaKeeper).accrueQuotaInterest({
                     creditAccount: creditAccount,
                     tokens: collateralDebtData.quotedTokens
                 });
             }
+
+            /// @dev The amount of principal repaid is what is left after repaying all interest and fees
+            ///      and is the difference between newDebt and debt
+            _poolRepayCreditAccount(collateralDebtData.debt - newDebt, profit, 0); // U:[CM-11]
 
             currentCreditAccountInfo.cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // U:[CM-11]
             currentCreditAccountInfo.quotaFees = newQuotaFees;
