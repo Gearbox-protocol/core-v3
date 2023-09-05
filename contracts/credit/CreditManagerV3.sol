@@ -533,23 +533,20 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 /// @dev The amount of principal repaid is what is left after repaying all interest and fees
                 ///      and is the difference between newDebt and debt
                 _poolRepayCreditAccount(collateralDebtData.debt - newDebt, profit, 0); // U:[CM-11]
-            }
 
-            /// If quota logic is supported, we need to accrue quota interest in order to keep
-            /// quota interest indexes in PQK and cumulativeQuotaInterest in Credit Manager consistent
-            /// with each other, since this action caches all quota interest in Credit Manager
-            // Full repayment is only available if there are no active quotas, which means
-            // that all quota interest should already be accrued
-
-            if (action != ManageDebtAction.FULL_REPAYMENT) {
+                /// If quota logic is supported, we need to accrue quota interest in order to keep
+                /// quota interest indexes in PQK and cumulativeQuotaInterest in Credit Manager consistent
+                /// with each other, since this action caches all quota interest in Credit Manager
+                // Full repayment is only available if there are no active quotas, which means
+                // that all quota interest should already be accrued
                 IPoolQuotaKeeperV3(collateralDebtData._poolQuotaKeeper).accrueQuotaInterest({
                     creditAccount: creditAccount,
                     tokens: collateralDebtData.quotedTokens
                 });
-
-                currentCreditAccountInfo.cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // U:[CM-11]
-                currentCreditAccountInfo.quotaFees = newQuotaFees;
             }
+
+            currentCreditAccountInfo.cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // U:[CM-11]
+            currentCreditAccountInfo.quotaFees = newQuotaFees;
 
             /// If the entire underlying balance was spent on repayment, it is disabled
             if (IERC20(underlying).safeBalanceOf({account: creditAccount}) <= 1) {
