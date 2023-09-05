@@ -202,10 +202,7 @@ interface ICreditFacadeV3 is ICreditFacadeV3Events, IVersion {
     /// @return minDebt Minimal borrowed amount per credit account
     function debtLimits() external view returns (uint128 minDebt, uint128 maxDebt);
 
-    /// @return currentTotalDebt The current total debt of Credit Manager (if tracked in Credit Facade)
-    /// @return totalDebtLimit The current total debt limit of Credit Manager
-    function totalDebt() external view returns (uint128 currentTotalDebt, uint128 totalDebtLimit);
-
+    // TODO: add comment
     function maxDebtPerBlockMultiplier() external view returns (uint8);
 
     /// @return currentCumulativeLoss The total amount of loss accumulated since last reset
@@ -225,7 +222,4 @@ interface ICreditFacadeV3 is ICreditFacadeV3Events, IVersion {
 
     /// @dev Timestamp at which accounts on an expirable CM will be liquidated
     function expirationDate() external view returns (uint40);
-
-    /// @dev Returns whether the Credit Facade tracks the total debt on its own
-    function trackTotalDebt() external view returns (bool);
 }

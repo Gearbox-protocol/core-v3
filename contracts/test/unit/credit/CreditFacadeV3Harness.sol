@@ -60,10 +60,6 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
         return _isExpired();
     }
 
-    function revertIfOutOfTotalDebtLimit(uint256 delta, ManageDebtAction action) external {
-        _revertIfOutOfTotalDebtLimit(delta, action);
-    }
-
     function setCurrentCumulativeLoss(uint128 _currentCumulativeLoss) external {
         lossParams.currentCumulativeLoss = _currentCumulativeLoss;
     }

@@ -383,9 +383,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
         vm.expectRevert(CallerNotControllerException.selector);
         creditConfigurator.forbidAdapter(DUMB_ADDRESS);
-
-        vm.expectRevert(CallerNotControllerException.selector);
-        creditConfigurator.setTotalDebtLimit(0);
     }
 
     //
@@ -1012,48 +1009,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         }
     }
 
-    /// @dev I:[CC-22B]: setCreditFacade migrates totalDebt
-    function test_I_CC_22B_setCreditFacade_migrates_totalDebt() public creditTest {
-        for (uint256 ms = 0; ms < 2; ms++) {
-            uint256 snapshot = vm.snapshot();
-
-            bool migrateSettings = ms != 0;
-
-            vm.mockCall(creditManager.pool(), abi.encodeCall(IVersion.version, ()), abi.encode(1));
-
-            CreditFacadeV3 initialCf = new CreditFacadeV3(
-                        address(creditManager),
-                        address(0),
-                        false
-                    );
-
-            vm.prank(CONFIGURATOR);
-            creditConfigurator.setCreditFacade(address(initialCf), migrateSettings);
-
-            vm.prank(address(creditConfigurator));
-            initialCf.setTotalDebtParams(1000, 2000);
-
-            creditFacade = initialCf;
-
-            CreditFacadeV3 cf = new CreditFacadeV3(
-                        address(creditManager),
-                        address(0),
-                        false
-                    );
-
-            vm.prank(CONFIGURATOR);
-            creditConfigurator.setCreditFacade(address(cf), migrateSettings);
-
-            (uint256 totalDebt, uint256 totalDebtLimit) = cf.totalDebt();
-
-            assertEq(totalDebt, 1000, "Incorrect total debt");
-
-            assertEq(totalDebtLimit, migrateSettings ? 2000 : 0, "Incorrect total debt limit");
-
-            vm.revertTo(snapshot);
-        }
-    }
-
     /// @dev I:[CC-22C]: setCreditFacade correctly migrates array parameters
     function test_I_CC_22C_setCreditFacade_correctly_migrates_array_parameters() public creditTest {
         for (uint256 ms = 0; ms < 2; ms++) {
@@ -1390,31 +1345,5 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
         assertEq(creditFacade.botList(), DUMB_ADDRESS);
         vm.stopPrank();
-    }
-
-    /// @dev I:[CC-34] setTotalDebtLimit works correctly
-    function test_I_CC_34_setTotalDebtLimit_works_correctly() public creditTest {
-        vm.mockCall(creditManager.pool(), abi.encodeCall(IVersion.version, ()), abi.encode(1));
-
-        CreditFacadeV3 initialCf = new CreditFacadeV3(
-                    address(creditManager),
-                    address(0),
-                    false
-                );
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setCreditFacade(address(initialCf), true);
-
-        creditFacade = initialCf;
-
-        vm.expectEmit(false, false, false, true);
-        emit SetTotalDebtLimit(100);
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setTotalDebtLimit(100);
-
-        (, uint128 totalDebtLimit) = creditFacade.totalDebt();
-
-        assertEq(totalDebtLimit, 100, "Total debt limit set incorrectly");
     }
 }

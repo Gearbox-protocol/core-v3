@@ -297,14 +297,9 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
     function _attachPool(address _pool) internal returns (bool isCompartible) {
         pool = PoolV3(_pool);
-        if (!anySupportsQuotas && pool.supportsQuotas() != supportsQuotas) {
-            return false;
-        }
 
-        if (supportsQuotas) {
-            poolQuotaKeeper = PoolQuotaKeeperV3(pool.poolQuotaKeeper());
-            gauge = GaugeV3(poolQuotaKeeper.gauge());
-        }
+        poolQuotaKeeper = PoolQuotaKeeperV3(pool.poolQuotaKeeper());
+        gauge = GaugeV3(poolQuotaKeeper.gauge());
 
         underlying = pool.asset();
 

@@ -245,9 +245,6 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @dev Returns the current pool quota keeper connected to the pool
     function poolQuotaKeeper() external view returns (address);
 
-    /// @dev Whether the Credit Manager supports quotas
-    function supportsQuotas() external view returns (bool);
-
     /// @dev Address of the connected Credit Configurator
     function creditConfigurator() external view returns (address);
 

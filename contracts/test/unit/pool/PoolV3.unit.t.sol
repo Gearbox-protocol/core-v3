@@ -194,7 +194,6 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         assertEq(pool.baseInterestIndex(), RAY, "Incorrect baseInterestIndex");
         assertEq(pool.interestRateModel(), address(interestRateModel), "Incorrect interestRateModel");
         assertEq(pool.totalDebtLimit(), 2000, "Incorrect totalDebtLimit");
-        assertEq(pool.supportsQuotas(), true, "Incorrect supportsQuotas");
     }
 
     /// @notice [LP-2A]: External functions revert when contract is on pause
@@ -310,15 +309,13 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         // 2000 + 1000 * 10%
         assertEq(pool.expectedLiquidity(), 2100, "Incorrect expectedLiquidity 1 year after base interest update");
 
-        if (pool.supportsQuotas()) {
-            pool.hackQuotaRevenue(100); // 100 units yearly
+        pool.hackQuotaRevenue(100); // 100 units yearly
 
-            assertEq(pool.expectedLiquidity(), 2100, "Incorrect expectedLiquidity right after quota revenue update");
+        assertEq(pool.expectedLiquidity(), 2100, "Incorrect expectedLiquidity right after quota revenue update");
 
-            vm.warp(block.timestamp + 365 days);
-            // 2000 + 1000 * 10% * 2 + 100
-            assertEq(pool.expectedLiquidity(), 2300, "Incorrect expectedLiquidity 1 year after quota revenue update");
-        }
+        vm.warp(block.timestamp + 365 days);
+        // 2000 + 1000 * 10% * 2 + 100
+        assertEq(pool.expectedLiquidity(), 2300, "Incorrect expectedLiquidity 1 year after quota revenue update");
     }
 
     // ---------------- //
@@ -952,20 +949,12 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
     function test_LP_15_supplyRate_works_as_expected() public repeatWithoutQuotas {
         _activateWithdrawFee(100);
 
-        if (pool.supportsQuotas()) {
-            // supply rate now:
-            // 9.9% = (100% - 1%) * (1000 * 10% + 100) / 2000
-            // supply rate in a year:
-            // 9% =  (100% - 1%) * (1000 * 10% + 100) / (2000 + 1000 * 10% + 100)
-            pool.hackBaseInterestRate(RAY / 10);
-            pool.hackQuotaRevenue(100);
-        } else {
-            // supply rate now:
-            // 9.9% = (100% - 1%) * (1000 * 20%) / 2000
-            // supply rate in a year:
-            // 9% = (100% - 1%) * (1000 * 20%) / (2000 + 1000 * 20%)
-            pool.hackBaseInterestRate(RAY / 5);
-        }
+        // supply rate now:
+        // 9.9% = (100% - 1%) * (1000 * 10% + 100) / 2000
+        // supply rate in a year:
+        // 9% =  (100% - 1%) * (1000 * 10% + 100) / (2000 + 1000 * 10% + 100)
+        pool.hackBaseInterestRate(RAY / 10);
+        pool.hackQuotaRevenue(100);
 
         assertEq(pool.supplyRate(), 99 * RAY / 1000, "Incorrect supplyRate right after update");
 
@@ -996,18 +985,11 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
     /// @notice [LP-18]: `_updateBaseInterest` works as expected
     function test_LP_18_updateBaseInterest_works_as_expected() public repeatWithoutQuotas {
-        if (pool.supportsQuotas()) {
-            // expected liquidity in a year: 2200 = 2000 + 1000 * 10% + 100
-            // expected base interest index in a year: 1.32 = 1.2 * 1.1
-            pool.hackBaseInterestRate(RAY / 10);
-            pool.hackBaseInterestIndexLU(6 * RAY / 5);
-            pool.hackQuotaRevenue(100);
-        } else {
-            // expected liquidity in a year: 2200 = 2000 + 1000 * 20%
-            // expected base interest index in a year: 1.32 = 1.1 * 1.2
-            pool.hackBaseInterestRate(RAY / 5);
-            pool.hackBaseInterestIndexLU(11 * RAY / 10);
-        }
+        // expected liquidity in a year: 2200 = 2000 + 1000 * 10% + 100
+        // expected base interest index in a year: 1.32 = 1.2 * 1.1
+        pool.hackBaseInterestRate(RAY / 10);
+        pool.hackBaseInterestIndexLU(6 * RAY / 5);
+        pool.hackQuotaRevenue(100);
 
         vm.warp(block.timestamp + 365 days);
 
@@ -1025,9 +1007,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         assertEq(pool.baseInterestRate(), RAY / 20, "Incorrect baseInterestRate");
         assertEq(pool.baseInterestIndex(), 132 * RAY / 100, "Incorrect baseInterestIndex");
         assertEq(pool.lastBaseInterestUpdate(), block.timestamp, "Incorrect lastBaseInterestUpdate");
-        if (pool.supportsQuotas()) {
-            assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "Incorrect lastQuotaRevenueUpdate");
-        }
+        assertEq(pool.lastQuotaRevenueUpdate(), block.timestamp, "Incorrect lastQuotaRevenueUpdate");
     }
 
     // ------ //
@@ -1101,13 +1081,6 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         vm.expectRevert(ZeroAddressException.selector);
         vm.prank(configurator);
         pool.setPoolQuotaKeeper(address(0));
-    }
-
-    /// @notice [LP-23B]: `setPoolQuotaKeeper` reverts when pool doesn't support quotas
-    function test_LP_23B_setPoolQuotaKeeper_reverts_on_quotas_not_supported() public onlyWithoutQuotas {
-        vm.expectRevert(QuotasNotSupportedException.selector);
-        vm.prank(configurator);
-        pool.setPoolQuotaKeeper(makeAddr("NEW_QUOTA_KEEPER"));
     }
 
     /// @notice [LP-23C]: `setPoolQuotaKeeper` reverts on incompatible quota keeper

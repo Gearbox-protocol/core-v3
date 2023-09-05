@@ -211,7 +211,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         // сreditManager has an additional check that the token is not added yet
         CreditManagerV3(creditManager).addToken({token: token}); // I:[CC-4]
 
-        if (CreditManagerV3(creditManager).supportsQuotas() && _isQuotedToken(token)) {
+        if (_isQuotedToken(token)) {
             _makeTokenQuoted(token);
         }
 
@@ -369,9 +369,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         override
         configuratorOnly // I: [CC-2]
     {
-        if (!CreditManagerV3(creditManager).supportsQuotas()) {
-            revert QuotasNotSupportedException();
-        }
         if (!_isQuotedToken(token)) {
             revert TokenIsNotQuotedException();
         }
@@ -705,16 +702,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             _clearArrayCreditFacadeParams(); // I:[CC-22С]
         }
 
-        // If credit facade tracks total debt, it copies it's value and limit if migration is on
-        if (prevCreditFacace.trackTotalDebt()) {
-            (uint128 currentTotalDebt, uint128 totalDebtLimit) = prevCreditFacace.totalDebt();
-            _setTotalDebtParams({
-                _creditFacade: _creditFacade,
-                newCurrentTotalDebt: currentTotalDebt,
-                newLimit: migrateParams ? totalDebtLimit : 0
-            }); // I:[CC-22B]
-        }
-
         emit SetCreditFacade(_creditFacade); // I:[CC-22]
     }
 
@@ -963,47 +950,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         cf.setEmergencyLiquidator(liquidator, AllowanceAction.FORBID); // I:[CC-28]
         emergencyLiquidatorsSet.remove(liquidator); // I:[CC-28]
         emit RemoveEmergencyLiquidator(liquidator); // I:[CC-28]
-    }
-
-    /// @notice Sets a new total debt limit
-    /// @dev Only works for Credit Facades that track total debt limit
-    /// @param newLimit New total debt limit
-    function setTotalDebtLimit(uint128 newLimit)
-        external
-        override
-        controllerOnly // I: [CC-2]
-    {
-        CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
-        if (!cf.trackTotalDebt()) revert TotalDebtNotTrackedException(); // I:[CC-34]
-        _setTotalDebtLimit(address(cf), newLimit); // I:[CC-34]
-    }
-
-    /// @notice Sets both current total debt and total debt limit, only used during Credit Facade migration
-    /// @dev Only works for Credit Facades that track total debt limit
-    /// @param newCurrentTotalDebt New current total debt
-    /// @param newLimit New total debt limit
-    function setTotalDebtParams(uint128 newCurrentTotalDebt, uint128 newLimit)
-        external
-        override
-        configuratorOnly // I: [CC-2]
-    {
-        CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
-        if (!cf.trackTotalDebt()) revert TotalDebtNotTrackedException(); // I:[CC-34]
-        _setTotalDebtParams(address(cf), newCurrentTotalDebt, newLimit); // I:[CC-34]
-    }
-
-    /// @dev IMPLEMENTATION: setTotalDebtLimit
-    function _setTotalDebtLimit(address _creditFacade, uint128 newLimit) internal {
-        (uint128 totalDebtCurrent, uint128 totalDebtLimitCurrent) = CreditFacadeV3(_creditFacade).totalDebt(); // I:[CC-34]
-        if (newLimit != totalDebtLimitCurrent) {
-            _setTotalDebtParams(_creditFacade, totalDebtCurrent, newLimit); // I:[CC-34]
-        }
-    }
-
-    /// @dev IMPLEMENTATION: setTotalDebtParams
-    function _setTotalDebtParams(address _creditFacade, uint128 newCurrentTotalDebt, uint128 newLimit) internal {
-        CreditFacadeV3(_creditFacade).setTotalDebtParams({newCurrentTotalDebt: newCurrentTotalDebt, newLimit: newLimit});
-        emit SetTotalDebtLimit(newLimit);
     }
 
     //

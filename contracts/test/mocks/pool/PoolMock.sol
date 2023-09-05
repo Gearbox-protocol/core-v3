@@ -72,7 +72,6 @@ contract PoolMock is IPoolService {
     // Paused flag
     bool public paused = false;
 
-    bool public supportsQuotas = false;
     address public poolQuotaKeeper;
 
     modifier poolQuotaKeeperOnly() {
@@ -94,10 +93,6 @@ contract PoolMock is IPoolService {
 
     function setPoolQuotaKeeper(address _poolQuotaKeeper) external {
         poolQuotaKeeper = _poolQuotaKeeper;
-    }
-
-    function setSupportsQuotas(bool val) external {
-        supportsQuotas = val;
     }
 
     function setCumulativeIndexNow(uint256 cumulativeIndex_RAY) external {

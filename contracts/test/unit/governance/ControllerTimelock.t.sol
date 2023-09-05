@@ -503,7 +503,8 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
     function test_U_CT_05_setCreditManagerDebtLimit_works_correctly() public {
         (address creditManager, address creditFacade,, address pool,) = _makeMocks();
 
-        vm.mockCall(creditFacade, abi.encodeCall(ICreditFacadeV3.trackTotalDebt, ()), abi.encode(false));
+        // TODO: double check
+        // vm.mockCall(creditFacade, abi.encodeCall(ICreditFacadeV3.trackTotalDebt, ()), abi.encode(false));
 
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "CREDIT_MANAGER_DEBT_LIMIT"));
 
@@ -584,88 +585,90 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         assertTrue(!queued, "Transaction is still queued after execution");
     }
 
-    /// @dev U:[CT-5A]: setCreditManagerDebtLimit works correctly, Credit Facade tracks debt
-    function test_U_CT_05A_setCreditManagerDebtLimit_works_correctly_CF_totalDebt() public {
-        (address creditManager, address creditFacade, address creditConfigurator,,) = _makeMocks();
+    // TODO: looks obsolete, can we remove it?
+    // /// @dev U:[CT-5A]: setCreditManagerDebtLimit works correctly, Credit Facade tracks debt
+    // function test_U_CT_05A_setCreditManagerDebtLimit_works_correctly_CF_totalDebt() public {
+    //     (address creditManager, address creditFacade, address creditConfigurator,,) = _makeMocks();
 
-        vm.mockCall(creditFacade, abi.encodeCall(ICreditFacadeV3.trackTotalDebt, ()), abi.encode(true));
+    //     // TODO: double check
+    //     // vm.mockCall(creditFacade, abi.encodeCall(ICreditFacadeV3.trackTotalDebt, ()), abi.encode(true));
 
-        bytes32 POLICY_CODE = keccak256(abi.encode("CM", "CREDIT_MANAGER_DEBT_LIMIT"));
+    //     bytes32 POLICY_CODE = keccak256(abi.encode("CM", "CREDIT_MANAGER_DEBT_LIMIT"));
 
-        vm.mockCall(creditFacade, abi.encodeCall(ICreditFacadeV3.totalDebt, ()), abi.encode(uint128(0), uint128(1e18)));
+    //     vm.mockCall(creditFacade, abi.encodeCall(ICreditFacadeV3.totalDebt, ()), abi.encode(uint128(0), uint128(1e18)));
 
-        Policy memory policy = Policy({
-            enabled: false,
-            admin: admin,
-            delay: 1 days,
-            flags: 1,
-            exactValue: 2e18,
-            minValue: 0,
-            maxValue: 0,
-            referencePoint: 0,
-            referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
-            minPctChangeDown: 0,
-            minPctChangeUp: 0,
-            maxPctChangeDown: 0,
-            maxPctChangeUp: 0,
-            minChange: 0,
-            maxChange: 0
-        });
+    //     Policy memory policy = Policy({
+    //         enabled: false,
+    //         admin: admin,
+    //         delay: 1 days,
+    //         flags: 1,
+    //         exactValue: 2e18,
+    //         minValue: 0,
+    //         maxValue: 0,
+    //         referencePoint: 0,
+    //         referencePointUpdatePeriod: 0,
+    //         referencePointTimestampLU: 0,
+    //         minPctChangeDown: 0,
+    //         minPctChangeUp: 0,
+    //         maxPctChangeDown: 0,
+    //         maxPctChangeUp: 0,
+    //         minChange: 0,
+    //         maxChange: 0
+    //     });
 
-        // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
-        vm.expectRevert(ParameterChecksFailedException.selector);
-        vm.prank(admin);
-        controllerTimelock.setCreditManagerDebtLimit(creditManager, 2e18);
+    //     // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
+    //     vm.expectRevert(ParameterChecksFailedException.selector);
+    //     vm.prank(admin);
+    //     controllerTimelock.setCreditManagerDebtLimit(creditManager, 2e18);
 
-        vm.prank(CONFIGURATOR);
-        controllerTimelock.setPolicy(POLICY_CODE, policy);
+    //     vm.prank(CONFIGURATOR);
+    //     controllerTimelock.setPolicy(POLICY_CODE, policy);
 
-        // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
-        vm.expectRevert(ParameterChecksFailedException.selector);
-        vm.prank(USER);
-        controllerTimelock.setCreditManagerDebtLimit(creditManager, 2e18);
+    //     // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
+    //     vm.expectRevert(ParameterChecksFailedException.selector);
+    //     vm.prank(USER);
+    //     controllerTimelock.setCreditManagerDebtLimit(creditManager, 2e18);
 
-        // VERIFY THAT POLICY CHECKS ARE PERFORMED
-        vm.expectRevert(ParameterChecksFailedException.selector);
-        vm.prank(admin);
-        controllerTimelock.setCreditManagerDebtLimit(creditManager, 1e18);
+    //     // VERIFY THAT POLICY CHECKS ARE PERFORMED
+    //     vm.expectRevert(ParameterChecksFailedException.selector);
+    //     vm.prank(admin);
+    //     controllerTimelock.setCreditManagerDebtLimit(creditManager, 1e18);
 
-        // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash = keccak256(
-            abi.encode(
-                admin,
-                creditConfigurator,
-                "setTotalDebtLimit(uint128)",
-                abi.encode(uint128(2e18)),
-                block.timestamp + 1 days
-            )
-        );
+    //     // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
+    //     bytes32 txHash = keccak256(
+    //         abi.encode(
+    //             admin,
+    //             creditConfigurator,
+    //             "setTotalDebtLimit(uint128)",
+    //             abi.encode(uint128(2e18)),
+    //             block.timestamp + 1 days
+    //         )
+    //     );
 
-        vm.expectEmit(true, false, false, true);
-        emit QueueTransaction(
-            txHash,
-            admin,
-            creditConfigurator,
-            "setTotalDebtLimit(uint128)",
-            abi.encode(uint128(2e18)),
-            uint40(block.timestamp + 1 days)
-        );
+    //     vm.expectEmit(true, false, false, true);
+    //     emit QueueTransaction(
+    //         txHash,
+    //         admin,
+    //         creditConfigurator,
+    //         "setTotalDebtLimit(uint128)",
+    //         abi.encode(uint128(2e18)),
+    //         uint40(block.timestamp + 1 days)
+    //     );
 
-        vm.prank(admin);
-        controllerTimelock.setCreditManagerDebtLimit(creditManager, 2e18);
+    //     vm.prank(admin);
+    //     controllerTimelock.setCreditManagerDebtLimit(creditManager, 2e18);
 
-        vm.expectCall(creditConfigurator, abi.encodeCall(ICreditConfiguratorV3.setTotalDebtLimit, (2e18)));
+    //     vm.expectCall(creditConfigurator, abi.encodeCall(ICreditConfiguratorV3.setTotalDebtLimit, (2e18)));
 
-        vm.warp(block.timestamp + 1 days);
+    //     vm.warp(block.timestamp + 1 days);
 
-        vm.prank(admin);
-        controllerTimelock.executeTransaction(txHash);
+    //     vm.prank(admin);
+    //     controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
+    //     (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
-        assertTrue(!queued, "Transaction is still queued after execution");
-    }
+    //     assertTrue(!queued, "Transaction is still queued after execution");
+    // }
 
     /// @dev U:[CT-6]: rampLiquidationThreshold works correctly
     function test_U_CT_06_rampLiquidationThreshold_works_correctly() public {

@@ -66,9 +66,6 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     /// @notice Protocol treasury address
     address public immutable override treasury;
 
-    /// @notice Whether pool supports quotas
-    bool public immutable override supportsQuotas;
-
     /// @notice Interest rate model contract address
     address public override interestRateModel;
     /// @notice Timestamp of the last base interest rate and index update
@@ -147,7 +144,6 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         emit SetInterestRateModel(interestRateModel_); // U:[LP-1B]
 
         _setTotalDebtLimit(totalDebtLimit_); // U:[LP-1B]
-        supportsQuotas = supportsQuotas_; // U:[LP-1B]
     }
 
     /// @notice Addresses of all connected credit managers
@@ -163,7 +159,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     /// @notice Amount of underlying that would be in the pool if debt principal, base interest
     ///         and quota revenue were fully repaid
     function expectedLiquidity() public view override returns (uint256) {
-        return _expectedLiquidityLU + _calcBaseInterestAccrued() + (supportsQuotas ? _calcQuotaRevenueAccrued() : 0); // U:[LP-4]
+        return _expectedLiquidityLU + _calcBaseInterestAccrued() + _calcQuotaRevenueAccrued(); // U:[LP-4]
     }
 
     /// @notice Expected liquidity stored as of last update
@@ -570,7 +566,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
             lastBaseInterestUpdate = uint40(block.timestamp); // U:[LP-18]
         }
 
-        if (supportsQuotas && block.timestamp != lastQuotaRevenueUpdate) {
+        if (block.timestamp != lastQuotaRevenueUpdate) {
             lastQuotaRevenueUpdate = uint40(block.timestamp); // U:[LP-18]
         }
 
@@ -672,9 +668,6 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         configuratorOnly // U:[LP-2C]
         nonZeroAddress(newPoolQuotaKeeper) // U:[LP-23A]
     {
-        if (!supportsQuotas) {
-            revert QuotasNotSupportedException(); // U:[LP-23B]
-        }
         if (IPoolQuotaKeeperV3(newPoolQuotaKeeper).pool() != address(this)) {
             revert IncompatiblePoolQuotaKeeperException(); // U:[LP-23C]
         }

@@ -47,6 +47,7 @@ import {
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
+import "forge-std/console.sol";
 
 /// @title Credit Manager
 /// @dev Encapsulates the business logic for managing Credit Accounts
@@ -84,9 +85,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     /// @notice Address of WETH
     address public immutable override weth;
-
-    /// @notice Whether the CM supports quota-related logic
-    bool public immutable override supportsQuotas;
 
     /// @notice Contract that handles withdrawals
     address public immutable override withdrawalManager;
@@ -203,10 +201,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         underlying = IPoolBase(_pool).underlyingToken(); // U:[CM-1]
 
-        try IPoolV3(_pool).supportsQuotas() returns (bool sq) {
-            supportsQuotas = sq; // I:[CMQ-1]
-        } catch {}
-
         // The underlying is the first token added as collateral
         _addToken(underlying); // U:[CM-1]
 
@@ -262,14 +256,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             sstore(slot, value)
         }
 
-        if (supportsQuotas) {
-            //     newCreditAccountInfo.cumulativeQuotaInterest = 1;
-            //     newCreditAccountInfo.quotaFees = 0;
-            assembly {
-                let slot := add(newCreditAccountInfo.slot, 2)
-                sstore(slot, 1)
-            } // U:[CM-6]
-        }
+        //     newCreditAccountInfo.cumulativeQuotaInterest = 1;
+        //     newCreditAccountInfo.quotaFees = 0;
+        assembly {
+            let slot := add(newCreditAccountInfo.slot, 2)
+            sstore(slot, 1)
+        } // U:[CM-6]
 
         // Requests the pool to transfer tokens the Credit Account
         if (debt != 0) _poolLendCreditAccount(debt, creditAccount); // U:[CM-6]
@@ -381,7 +373,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         // If the creditAccount has non-zero quotas, they need to be reduced to 0;
         // This is required to both free quota limits for other users and correctly
         // compute quota interest
-        if (supportsQuotas && collateralDebtData.quotedTokens.length != 0) {
+        if (collateralDebtData.quotedTokens.length != 0) {
             /// In case of any loss, PQK sets limits to zero for all quoted tokens
             bool setLimitsToZero = loss > 0; // U:[CM-8] // I:[CMQ-8]
 
@@ -526,8 +518,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     newCumulativeQuotaInterest = 0;
                     newQuotaFees = 0;
                 } else {
-                    uint128 quotaFees = (supportsQuotas) ? currentCreditAccountInfo.quotaFees : 0;
-
                     (newDebt, newCumulativeIndex, profit, newCumulativeQuotaInterest, newQuotaFees) = CreditLogic
                         .calcDecrease({
                         amount: _amountMinusFee(amount),
@@ -535,7 +525,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                         cumulativeIndexNow: collateralDebtData.cumulativeIndexNow,
                         cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
                         cumulativeQuotaInterest: collateralDebtData.cumulativeQuotaInterest,
-                        quotaFees: quotaFees,
+                        quotaFees: currentCreditAccountInfo.quotaFees,
                         feeInterest: feeInterest
                     }); // U:[CM-11]
                 }
@@ -548,16 +538,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             /// If quota logic is supported, we need to accrue quota interest in order to keep
             /// quota interest indexes in PQK and cumulativeQuotaInterest in Credit Manager consistent
             /// with each other, since this action caches all quota interest in Credit Manager
-            if (supportsQuotas) {
-                // Full repayment is only available if there are no active quotas, which means
-                // that all quota interest should already be accrued
+            // Full repayment is only available if there are no active quotas, which means
+            // that all quota interest should already be accrued
 
-                if (action != ManageDebtAction.FULL_REPAYMENT) {
-                    IPoolQuotaKeeperV3(collateralDebtData._poolQuotaKeeper).accrueQuotaInterest({
-                        creditAccount: creditAccount,
-                        tokens: collateralDebtData.quotedTokens
-                    });
-                }
+            if (action != ManageDebtAction.FULL_REPAYMENT) {
+                IPoolQuotaKeeperV3(collateralDebtData._poolQuotaKeeper).accrueQuotaInterest({
+                    creditAccount: creditAccount,
+                    tokens: collateralDebtData.quotedTokens
+                });
 
                 currentCreditAccountInfo.cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // U:[CM-11]
                 currentCreditAccountInfo.quotaFees = newQuotaFees;
@@ -854,26 +842,24 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         // uint16[] memory quotaLts;
         uint256[] memory quotasPacked;
-        if (supportsQuotas) {
-            collateralDebtData._poolQuotaKeeper = poolQuotaKeeper(); // U:[CM-21]
+        collateralDebtData._poolQuotaKeeper = poolQuotaKeeper(); // U:[CM-21]
 
-            (
-                collateralDebtData.quotedTokens,
-                collateralDebtData.cumulativeQuotaInterest,
-                quotasPacked,
-                collateralDebtData.quotedTokensMask
-            ) = _getQuotedTokensData({
-                creditAccount: creditAccount,
-                enabledTokensMask: enabledTokensMask,
-                collateralHints: collateralHints,
-                _poolQuotaKeeper: collateralDebtData._poolQuotaKeeper
-            }); // U:[CM-21]
+        (
+            collateralDebtData.quotedTokens,
+            collateralDebtData.cumulativeQuotaInterest,
+            quotasPacked,
+            collateralDebtData.quotedTokensMask
+        ) = _getQuotedTokensData({
+            creditAccount: creditAccount,
+            enabledTokensMask: enabledTokensMask,
+            collateralHints: collateralHints,
+            _poolQuotaKeeper: collateralDebtData._poolQuotaKeeper
+        }); // U:[CM-21]
 
-            collateralDebtData.cumulativeQuotaInterest += currentCreditAccountInfo.cumulativeQuotaInterest - 1; // U:[CM-21]
+        collateralDebtData.cumulativeQuotaInterest += currentCreditAccountInfo.cumulativeQuotaInterest - 1; // U:[CM-21]
 
-            collateralDebtData.accruedInterest = collateralDebtData.cumulativeQuotaInterest;
-            collateralDebtData.accruedFees = currentCreditAccountInfo.quotaFees;
-        }
+        collateralDebtData.accruedInterest = collateralDebtData.cumulativeQuotaInterest;
+        collateralDebtData.accruedFees = currentCreditAccountInfo.quotaFees;
 
         collateralDebtData.accruedInterest += CreditLogic.calcAccruedInterest({
             amount: collateralDebtData.debt,

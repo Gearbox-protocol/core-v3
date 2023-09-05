@@ -189,41 +189,20 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     function setCreditManagerDebtLimit(address creditManager, uint256 debtLimit) external override {
         ICreditFacadeV3 creditFacade = ICreditFacadeV3(ICreditManagerV3(creditManager).creditFacade());
 
-        if (creditFacade.trackTotalDebt()) {
-            (, uint256 debtLimitCurrent) = creditFacade.totalDebt();
+        IPoolV3 pool = IPoolV3(ICreditManagerV3(creditManager).pool());
 
-            if (
-                !_checkPolicy(creditManager, "CREDIT_MANAGER_DEBT_LIMIT", uint256(debtLimitCurrent), uint256(debtLimit))
-            ) {
-                revert ParameterChecksFailedException(); // U:[CT-5A]
-            }
+        uint256 debtLimitCurrent = pool.creditManagerDebtLimit(address(creditManager));
 
-            address creditConfigurator = ICreditManagerV3(creditManager).creditConfigurator();
-
-            _queueTransaction({
-                target: address(creditConfigurator),
-                signature: "setTotalDebtLimit(uint128)",
-                data: abi.encode(uint128(debtLimit)),
-                delay: _getPolicyDelay(creditManager, "CREDIT_MANAGER_DEBT_LIMIT")
-            }); // U:[CT-5A]
-        } else {
-            IPoolV3 pool = IPoolV3(ICreditManagerV3(creditManager).pool());
-
-            uint256 debtLimitCurrent = pool.creditManagerDebtLimit(address(creditManager));
-
-            if (
-                !_checkPolicy(creditManager, "CREDIT_MANAGER_DEBT_LIMIT", uint256(debtLimitCurrent), uint256(debtLimit))
-            ) {
-                revert ParameterChecksFailedException(); // U:[CT-5]
-            }
-
-            _queueTransaction({
-                target: address(pool),
-                signature: "setCreditManagerDebtLimit(address,uint256)",
-                data: abi.encode(address(creditManager), debtLimit),
-                delay: _getPolicyDelay(creditManager, "CREDIT_MANAGER_DEBT_LIMIT")
-            }); // U:[CT-5]
+        if (!_checkPolicy(creditManager, "CREDIT_MANAGER_DEBT_LIMIT", uint256(debtLimitCurrent), uint256(debtLimit))) {
+            revert ParameterChecksFailedException(); // U:[CT-5]
         }
+
+        _queueTransaction({
+            target: address(pool),
+            signature: "setCreditManagerDebtLimit(address,uint256)",
+            data: abi.encode(address(creditManager), debtLimit),
+            delay: _getPolicyDelay(creditManager, "CREDIT_MANAGER_DEBT_LIMIT")
+        }); // U:[CT-5]
     }
 
     /// @notice Queues a transaction to start a liquidation threshold ramp

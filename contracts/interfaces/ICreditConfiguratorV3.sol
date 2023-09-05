@@ -243,17 +243,6 @@ interface ICreditConfiguratorV3 is ICreditConfiguratorEvents, IVersion {
     ///                The contract address is retrieved from addressProvider
     function setBotList(uint256 version) external;
 
-    /// @notice Sets a new total debt limit
-    /// @dev Only works for Credit Facades that track total debt limit
-    /// @param newLimit New total debt limit for Credit Manager
-    function setTotalDebtLimit(uint128 newLimit) external;
-
-    /// @notice Sets both current total debt and total debt limit, only used during Credit Facade migration
-    /// @dev Only works for Credit Facades that track total debt limit
-    /// @param newCurrentTotalDebt New current total debt
-    /// @param newLimit New total debt limit
-    function setTotalDebtParams(uint128 newCurrentTotalDebt, uint128 newLimit) external;
-
     /// @notice Marks the token as limited, which enables quota logic and additional interest for it
     /// @param token Token to make limited
     /// @dev This action is irreversible!

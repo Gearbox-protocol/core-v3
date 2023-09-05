@@ -73,10 +73,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @notice Whether the Credit Facade implements expirable logic
     bool public immutable expirable;
 
-    /// @notice Whether to track total debt on Credit Facade
-    /// @dev Only true for older pool versions that do not track total debt themselves
-    bool public immutable trackTotalDebt;
-
     /// @notice Address of WETH
     address public immutable weth;
 
@@ -85,8 +81,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
     /// @notice Address of the IDegenNFTV2 that gatekeeps account openings in whitelisted mode
     address public immutable override degenNFT;
-
-    bool immutable supportsQuotas;
 
     /// @notice Date of the next Credit Account expiration (for CF's with expirable logic)
     uint40 public expirationDate;
@@ -111,10 +105,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
     /// @notice Keeps parameters that are used to pause the system after too much bad debt over a short period
     CumulativeLossParams public override lossParams;
-
-    /// @notice Keeps the current total debt and the total debt cap
-    /// @dev Only used with pools that do not track total debt of the CM themselves
-    TotalDebt public override totalDebt;
 
     /// @notice Maps addresses to their status as emergency liquidator.
     /// @dev Emergency liquidators are trusted addresses
@@ -192,13 +182,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         IPoolBase pool = IPoolBase(ICreditManagerV3(_creditManager).pool());
 
-        trackTotalDebt = pool.version() < 3_00;
-
         degenNFT = _degenNFT; // U:[FA-1]  // F:[FA-1A]
 
         expirable = _expirable; // U:[FA-1] // F:[FA-1A]
-
-        supportsQuotas = ICreditManagerV3(_creditManager).supportsQuotas();
     }
 
     // Notice: ETH interactions
@@ -236,13 +222,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         // Checks whether the new borrowed amount does not violate the block limit
         _revertIfOutOfBorrowingLimit(debt); // F:[FA-11]
-
-        // Checks whether the total debt amount does not exceed the limit and updates
-        // the current total debt amount
-        // Only in `trackTotalDebt` mode
-        if (trackTotalDebt) {
-            _revertIfOutOfTotalDebtLimit(debt, ManageDebtAction.INCREASE_DEBT); // U:[FA-8,8A,10]
-        }
 
         /// Attempts to burn the IDegenNFTV2 - if onBehalfOf has none, this will fail
         if (degenNFT != address(0)) {
@@ -350,12 +329,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         if (convertToETH) {
             _wethWithdrawTo(to); // U:[FA-11]
-        }
-
-        // Updates the current total debt amount
-        // Only in `trackTotalDebt` mode
-        if (trackTotalDebt) {
-            _revertIfOutOfTotalDebtLimit(debtData.debt, ManageDebtAction.DECREASE_DEBT); // U:[FA-11]
         }
 
         // Emits an event
@@ -477,12 +450,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             skipTokensMask: skipTokenMask,
             convertToETH: convertToETH
         }); // U:[FA-16]
-
-        // Updates the current total debt amount
-        // Only in `trackTotalDebt` mode
-        if (trackTotalDebt) {
-            _revertIfOutOfTotalDebtLimit(collateralDebtData.debt, ManageDebtAction.DECREASE_DEBT); // U:[FA-16]
-        }
 
         /// If there is non-zero loss, then borrowing is forbidden in
         /// case this is an attack and there is risk of copycats afterwards
@@ -620,8 +587,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     {
         /// Inverted mask of quoted tokens is pre-compute to avoid
         /// enabling or disabling them outside `updateQuota`
-        uint256 quotedTokensMaskInverted =
-            supportsQuotas ? ~ICreditManagerV3(creditManager).quotedTokensMask() : type(uint256).max;
+        // TODO: make it lazy
+        uint256 quotedTokensMaskInverted = ~ICreditManagerV3(creditManager).quotedTokensMask();
 
         // Emits event for multicall start - used in analytics to track actions within multicalls
         emit StartMultiCall({creditAccount: creditAccount, caller: msg.sender}); // U:[FA-18]
@@ -976,13 +943,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             _revertIfOutOfBorrowingLimit(amount); // U:[FA-28]
         }
 
-        // Checks whether the total debt amount does not exceed the limit and updates
-        // the current total debt amount
-        // Only in `trackTotalDebt` mode
-        if (trackTotalDebt) {
-            _revertIfOutOfTotalDebtLimit(amount, action); // U:[FA-27, 31]
-        }
-
         uint256 newDebt;
         // Requests the Credit Manager to borrow additional funds from the pool
         (newDebt, tokensToEnable, tokensToDisable) =
@@ -1210,36 +1170,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         isExpired = (expirable) && (block.timestamp >= expirationDate); // U:[FA-46]
     }
 
-    /// @notice Updates total debt and checks that it does not exceed the limit
-    function _revertIfOutOfTotalDebtLimit(uint256 delta, ManageDebtAction action) internal {
-        if (delta != 0) {
-            uint256 currentTotalDebt; // U:[FA-47]
-            uint256 totalDebtLimit; // U:[FA-47]
-
-            // currentTotalDebt = totalDebt.currentTotalDebt, totalDebtLimit = totalDebt.currentTotalDebt
-            assembly {
-                let data := sload(totalDebt.slot)
-                totalDebtLimit := shr(128, data)
-                currentTotalDebt := and(data, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
-            }
-
-            if (action == ManageDebtAction.INCREASE_DEBT) {
-                currentTotalDebt += delta; // U:[FA-47]
-                if (currentTotalDebt > totalDebtLimit) {
-                    revert CreditManagerCantBorrowException(); // U:[FA-47]
-                }
-
-                // it's safe, because currentTotalDebt <= totalDebtLimit which is uint128
-                totalDebt.currentTotalDebt = uint128(currentTotalDebt); // U:[FA-47]
-            } else {
-                unchecked {
-                    /// It's safe to downcast to uint128m because currentTotalDebt - delta < currentTotalDebt which is uint128
-                    totalDebt.currentTotalDebt = currentTotalDebt > delta ? uint128(currentTotalDebt - delta) : 0; // U:[FA-47]
-                }
-            }
-        }
-    }
-
     //
     // HELPERS
     //
@@ -1409,14 +1339,5 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         creditConfiguratorOnly // U:[FA-6]
     {
         canLiquidateWhilePaused[liquidator] = allowanceAction == AllowanceAction.ALLOW; // U:[FA-53]
-    }
-
-    /// @notice Sets the total debt limit and the current total debt value
-    /// @dev The current total debt value is only changed during Credit Facade migration
-    /// @param newCurrentTotalDebt The current total debt value (should differ from recorded value only on Credit Facade migration)
-    /// @param newLimit The new value for total debt limit
-    function setTotalDebtParams(uint128 newCurrentTotalDebt, uint128 newLimit) external creditConfiguratorOnly {
-        totalDebt.currentTotalDebt = newCurrentTotalDebt;
-        totalDebt.totalDebtLimit = newLimit;
     }
 }
