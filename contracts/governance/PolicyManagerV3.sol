@@ -58,13 +58,13 @@ struct Policy {
 /// @title Policy manager V3
 /// @dev A contract for managing bounds and conditions for mission-critical protocol params
 abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
-    uint256 public constant CHECK_EXACT_VALUE_FLAG = 1;
-    uint256 public constant CHECK_MIN_VALUE_FLAG = 1 << 1;
-    uint256 public constant CHECK_MAX_VALUE_FLAG = 1 << 2;
-    uint256 public constant CHECK_MIN_CHANGE_FLAG = 1 << 3;
-    uint256 public constant CHECK_MAX_CHANGE_FLAG = 1 << 4;
-    uint256 public constant CHECK_MIN_PCT_CHANGE_FLAG = 1 << 5;
-    uint256 public constant CHECK_MAX_PCT_CHANGE_FLAG = 1 << 6;
+    uint256 constant CHECK_EXACT_VALUE_FLAG = 1;
+    uint256 constant CHECK_MIN_VALUE_FLAG = 1 << 1;
+    uint256 constant CHECK_MAX_VALUE_FLAG = 1 << 2;
+    uint256 constant CHECK_MIN_CHANGE_FLAG = 1 << 3;
+    uint256 constant CHECK_MAX_CHANGE_FLAG = 1 << 4;
+    uint256 constant CHECK_MIN_PCT_CHANGE_FLAG = 1 << 5;
+    uint256 constant CHECK_MAX_PCT_CHANGE_FLAG = 1 << 6;
 
     /// @dev Mapping from parameter hashes to metaparameters
     mapping(bytes32 => Policy) internal _policies;
@@ -80,15 +80,15 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
 
     constructor(address _addressProvider) ACLNonReentrantTrait(_addressProvider) {}
 
-    /// @notice Sets the policy, using policy UID as key
+    /// @notice Sets the params for a new or existing policy, using policy UID as key
     /// @param policyHash A unique identifier for a policy, generally, should be a hash of (GROUP_NAME, PARAMETER_NAME)
-    /// @param initialPolicy The initial policy values
-    function setPolicy(bytes32 policyHash, Policy memory initialPolicy)
+    /// @param policyParams Policy parameters
+    function setPolicy(bytes32 policyHash, Policy memory policyParams)
         external
         configuratorOnly // U:[PM-1]
     {
-        initialPolicy.enabled = true; // U:[PM-1]
-        _policies[policyHash] = initialPolicy; // U:[PM-1]
+        policyParams.enabled = true; // U:[PM-1]
+        _policies[policyHash] = policyParams; // U:[PM-1]
         emit SetPolicy({policyHash: policyHash, enabled: true}); // U:[PM-1]
     }
 
@@ -172,11 +172,13 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
                 != 0
         ) {
             if (block.timestamp > policy.referencePointTimestampLU + policy.referencePointUpdatePeriod) {
-                policy.referencePoint = oldValue; // U:[PM-6]
+                referencePoint = oldValue;
+                policy.referencePoint = referencePoint; // U:[PM-6]
                 policy.referencePointTimestampLU = uint40(block.timestamp); // U:[PM-6]
+            } else {
+                referencePoint = policy.referencePoint;
             }
 
-            referencePoint = policy.referencePoint;
             (uint256 diff, bool isIncrease) = calcDiff(newValue, referencePoint);
 
             if (flags & CHECK_MIN_CHANGE_FLAG != 0) {
