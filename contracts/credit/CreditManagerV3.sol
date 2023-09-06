@@ -253,7 +253,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         // newCreditAccountInfo.borrower = onBehalfOf; // U:[CM-6]
         assembly {
             let slot := add(newCreditAccountInfo.slot, 4)
-            let value := or(shl(80, onBehalfOf), shl(16, number()))
+            let value := or(shl(80, onBehalfOf), shl(16, and(number(), 0xFFFFFFFFFFFFFFFF)))
             sstore(slot, value)
         }
 
