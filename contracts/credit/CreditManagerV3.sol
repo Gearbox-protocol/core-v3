@@ -974,25 +974,31 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             //  Picks creditAccount on top of stack to remove stack to deep error
             address ca = creditAccount;
             unchecked {
-                for (uint256 i; tokensToCheckMask != 0; ++i) {
+                uint256 i;
+                while (tokensToCheckMask != 0) {
                     uint256 tokenMask;
 
-                    tokenMask = (i < len) ? collateralHints[i] : 1 << (i - len);
-
-                    if (tokensToCheckMask & tokenMask != 0) {
-                        (address token, uint16 lt) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
-
-                        (uint256 quota, uint128 outstandingInterestDelta) =
-                            IPoolQuotaKeeperV3(_poolQuotaKeeper).getQuotaAndOutstandingInterest(ca, token); // U:[CM-24]
-
-                        quotaTokens[j] = token; // U:[CM-24]
-                        quotasPacked[j] = CollateralLogic.packQuota(uint96(quota), lt);
-
-                        /// Quota interest is equal to quota * APY * time. Since quota is a uint96, this is unlikely to overflow in any realistic scenario.
-                        outstandingQuotaInterest += outstandingInterestDelta; // U:[CM-24]
-
-                        ++j; // U:[CM-24]
+                    if (i < len) {
+                        tokenMask = collateralHints[i];
+                        ++i;
+                        if (tokensToCheckMask & tokenMask == 0) continue;
+                    } else {
+                        tokenMask = tokensToCheckMask & uint256(-int256(tokensToCheckMask));
                     }
+
+                    (address token, uint16 lt) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
+
+                    (uint256 quota, uint128 outstandingInterestDelta) =
+                        IPoolQuotaKeeperV3(_poolQuotaKeeper).getQuotaAndOutstandingInterest(ca, token); // U:[CM-24]
+
+                    quotaTokens[j] = token; // U:[CM-24]
+                    quotasPacked[j] = CollateralLogic.packQuota(uint96(quota), lt);
+
+                    /// Quota interest is equal to quota * APY * time. Since quota is a uint96, this is unlikely to overflow in any realistic scenario.
+                    outstandingQuotaInterest += outstandingInterestDelta; // U:[CM-24]
+
+                    ++j; // U:[CM-24]
+
                     tokensToCheckMask = tokensToCheckMask.disable(tokenMask);
                 }
             }

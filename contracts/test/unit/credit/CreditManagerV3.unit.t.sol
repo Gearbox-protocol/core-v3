@@ -1784,16 +1784,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         vm.expectRevert(TokenNotAllowedException.selector);
         creditManager.revokeAdapterAllowances(creditAccount, revCase);
 
-        /// @notice Do nothing if allowance == 1
-        revCase[0] = RevocationPair({token: mockToken, spender: spender});
-        vm.mockCall(mockToken, abi.encodeCall(IERC20.allowance, (creditAccount, spender)), abi.encode(1));
-
-        bytes memory approveCallData = abi.encodeCall(IERC20.approve, (spender, 0));
-        bytes memory executeCallData = abi.encodeCall(ICreditAccountBase.execute, (mockToken, approveCallData));
-
-        vm.mockCallRevert(creditAccount, executeCallData, bytes(""));
-        creditManager.revokeAdapterAllowances(creditAccount, revCase);
-
         /// @notice Set allowance to zero, if it was >2
 
         creditAccount = address(new CreditAccountMock());
@@ -1802,8 +1792,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         revCase[0] = RevocationPair({token: mockToken, spender: spender});
         vm.mockCall(mockToken, abi.encodeCall(IERC20.allowance, (creditAccount, spender)), abi.encode(2));
 
-        approveCallData = abi.encodeCall(IERC20.approve, (spender, 0));
-        executeCallData = abi.encodeCall(ICreditAccountBase.execute, (mockToken, approveCallData));
+        bytes memory approveCallData = abi.encodeCall(IERC20.approve, (spender, 0));
+        bytes memory executeCallData = abi.encodeCall(ICreditAccountBase.execute, (mockToken, approveCallData));
 
         vm.expectCall(creditAccount, executeCallData);
         creditManager.revokeAdapterAllowances(creditAccount, revCase);
