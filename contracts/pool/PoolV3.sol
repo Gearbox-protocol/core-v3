@@ -722,12 +722,18 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         if (newWithdrawFee > MAX_WITHDRAW_FEE) {
             revert IncorrectParameterException(); // U:[LP-26A]
         }
+        if (newWithdrawFee == withdrawFee) return;
+
         withdrawFee = newWithdrawFee.toUint16(); // U:[LP-26B]
         emit SetWithdrawFee(newWithdrawFee); // U:[LP-26B]
     }
 
     /// @dev Sets new total debt limit
     function _setTotalDebtLimit(uint256 limit) internal {
+        uint128 newLimit = _convertToU128(limit);
+
+        if (newLimit == _totalDebt.limit) return;
+
         _totalDebt.limit = _convertToU128(limit); // U:[LP-1B,24]
         emit SetTotalDebtLimit(limit); // U:[LP-1B,24]
     }
