@@ -93,6 +93,8 @@ interface IWithdrawalManagerV3 is IWithdrawalManagerV3Events, IVersion {
     // SCHEDULED WITHDRAWALS //
     // --------------------- //
 
+    function isValidCreditManager(address addr) external view returns (bool);
+
     function delay() external view returns (uint40);
 
     function scheduledWithdrawals(address creditAccount)
@@ -114,8 +116,6 @@ interface IWithdrawalManagerV3 is IWithdrawalManagerV3Events, IVersion {
     // ------------- //
     // CONFIGURATION //
     // ------------- //
-
-    function creditManagers() external view returns (address[] memory);
 
     function setWithdrawalDelay(uint40 newDelay) external;
 

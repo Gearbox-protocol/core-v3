@@ -728,7 +728,6 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerV3Events {
     /// @notice U:[WM-12B]: `addCreditManager` works correctly
     function test_U_WM_12B_addCreditManager_works_correctly() public {
         manager = new WithdrawalManagerHarness(address(acl), DELAY);
-        assertEq(manager.creditManagers().length, 0, "Incorrect credit managers list length before adding");
 
         vm.expectEmit(true, false, false, false);
         emit AddCreditManager(creditManager);
@@ -736,9 +735,7 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerV3Events {
         vm.prank(configurator);
         manager.addCreditManager(creditManager);
 
-        address[] memory cms = manager.creditManagers();
-        assertEq(cms.length, 1, "Incorrect credit managers list length after adding");
-        assertEq(cms[0], creditManager, "Incorrect credit manager address");
+        assertTrue(manager.isValidCreditManager(creditManager), "Credit Manager status was not set");
     }
 
     // ------- //
