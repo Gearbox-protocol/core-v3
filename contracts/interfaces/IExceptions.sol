@@ -116,6 +116,9 @@ error DebtToZeroWithActiveQuotasException();
 /// @notice Thrown when a zero-debt account attempts to increase quota
 error IncreaseQuotaOnZeroDebtAccountException();
 
+/// @notice Thrown when Credit Facade tries to write over a non-zero active Credit Account
+error ActiveCreditAccountOverridenException();
+
 // ------------------- //
 // CREDIT CONFIGURATOR //
 // ------------------- //

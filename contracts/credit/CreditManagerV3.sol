@@ -674,6 +674,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
     {
+        if (_activeCreditAccount != address(1) && creditAccount != address(1)) {
+            revert ActiveCreditAccountOverridenException();
+        }
         _activeCreditAccount = creditAccount;
     }
 
