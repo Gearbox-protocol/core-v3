@@ -32,12 +32,12 @@ contract USDT_Transfer {
         return amount.amountUSDTMinusFee({basisPointsRate: basisPointsRate, maximumFee: _maximumFee()}); // U:[UTT_01]
     }
 
-    /// @dev Returns fee rate
+    /// @dev Returns fee rate in PERCENTAGE_FACTOR format
     function _basisPointsRate() internal view returns (uint256) {
         return IUSDT(usdt).basisPointsRate();
     }
 
-    /// @dev Returns maximum absolute fee
+    /// @dev Returns maximum absolute fee in PERCENTAGE_FACTOR format
     function _maximumFee() internal view returns (uint256) {
         return IUSDT(usdt).maximumFee();
     }
