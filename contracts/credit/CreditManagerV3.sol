@@ -616,11 +616,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 if (spender == address(0) || token == address(0)) {
                     revert ZeroAddressException(); // U:[CM-15]
                 }
-                uint256 allowance = IERC20(token).allowance(creditAccount, spender); // U:[CM-15]
                 /// It checks that token is in collateral token list in _approveSpender function
-                if (allowance > 1) {
-                    _approveSpender({creditAccount: creditAccount, token: token, spender: spender, amount: 0}); // U:[CM-15]
-                }
+                _approveSpender({creditAccount: creditAccount, token: token, spender: spender, amount: 0}); // U:[CM-15]
             }
         }
     }
