@@ -475,6 +475,10 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         override
         controllerOnly // U:[PQK-2]
     {
+        if (fee > PERCENTAGE_FACTOR) {
+            revert IncorrectParameterException();
+        }
+
         TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token]; // U:[PQK-13]
 
         if (!isInitialised(tokenQuotaParams)) {
