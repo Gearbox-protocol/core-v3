@@ -240,6 +240,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacadeOnly // // U:[CM-2]
         returns (address creditAccount)
     {
+        /// Zero parameters are passed for backward compatibility with older AccountFactory versions
         creditAccount = IAccountFactoryBase(accountFactory).takeCreditAccount(0, 0); // U:[CM-6]
 
         CreditAccountInfo storage newCreditAccountInfo = creditAccountInfo[creditAccount];
