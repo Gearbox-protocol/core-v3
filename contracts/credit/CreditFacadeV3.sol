@@ -5,6 +5,8 @@ pragma solidity ^0.8.17;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 
 // LIBS & TRAITS
 import {BalancesLogic, Balance, BalanceWithMask} from "../libraries/BalancesLogic.sol";
@@ -57,6 +59,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     using Address for address;
     using BitMask for uint256;
     using SafeCast for uint256;
+    using SafeERC20 for IERC20;
 
     /// @notice Contract version
     uint256 public constant override version = 3_00;
@@ -1178,7 +1181,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     function _wrapETH() internal {
         if (msg.value != 0) {
             IWETH(weth).deposit{value: msg.value}(); // U:[FA-7]
-            IWETH(weth).transfer(msg.sender, msg.value); // U:[FA-7]
+            IERC20(weth).safeTransfer(msg.sender, msg.value); // U:[FA-7]
         }
     }
 
