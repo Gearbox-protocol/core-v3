@@ -153,8 +153,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             newQuoted = quoted - uint96(-quotaChange);
             tokenQuotaParams.totalQuoted -= uint96(-quotaChange); // U:[PQK-15]
 
-            // The check for `quoted > 1` is omitted
-            if (newQuoted <= 1) {
+            if (quoted > 1 && newQuoted <= 1) {
                 disableToken = true; // U:[PQK-15]
             }
         }
