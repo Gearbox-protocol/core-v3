@@ -1267,7 +1267,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         // The underlying is a special case and its mask is always 1
         if (tokenMask == 1) {
             token = underlying; // U:[CM-34]
-            liquidationThreshold = ltUnderlying; // U:[CM-35]
+            if (calcLT) liquidationThreshold = ltUnderlying; // U:[CM-35]
         } else {
             CollateralTokenData storage tokenData = collateralTokensData[tokenMask]; // U:[CM-34]
 
