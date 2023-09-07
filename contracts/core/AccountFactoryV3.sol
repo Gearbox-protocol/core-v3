@@ -144,5 +144,7 @@ contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait
         }
 
         CreditAccountV3(creditAccount).rescue(target, data); // U:[AF-5C]
+
+        emit Rescue(creditAccount, target, data);
     }
 }
