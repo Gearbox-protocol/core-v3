@@ -3231,6 +3231,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         vm.assume(ltInitial < PERCENTAGE_FACTOR);
         vm.assume(ltFinal < PERCENTAGE_FACTOR);
+        vm.assume(uint256(timestampRampStart) + uint256(rampDuration) < type(uint40).max);
         // uint16 ltFinal = 2312;
         // uint40 timestampRampStart = 1233;
         // uint24 rampDuration = 33;

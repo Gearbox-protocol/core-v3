@@ -64,7 +64,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @notice Contract version
     uint256 public constant override version = 3_00;
 
-    /// @notice maxDebt to maxQuota multiplier
+    /// @notice The maximal size of a quota, as a multiple of maxDebt
     uint256 public constant maxQuotaMultiplier = 8;
 
     /// @notice Maximum number of approved bots for a credit account
