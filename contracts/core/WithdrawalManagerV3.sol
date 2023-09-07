@@ -111,12 +111,9 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
         override
         nonZeroAddress(to) // U:[WM-4A]
     {
-        _claimImmediateWithdrawal({
-            account: msg.sender,
-            token: token == ETH_ADDRESS ? weth : token,
-            to: to,
-            unwrapWETH: token == ETH_ADDRESS
-        }); // U:[WM-4B,4C,4D]
+        bool isETH = token == ETH_ADDRESS;
+
+        _claimImmediateWithdrawal({account: msg.sender, token: isETH ? weth : token, to: to, unwrapWETH: isETH}); // U:[WM-4B,4C,4D]
     }
 
     /// @dev Increases `account`'s immediately withdrawable balance of `token` by `amount`
