@@ -49,6 +49,8 @@ uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS =
 
 uint256 constant CLOSE_CREDIT_ACCOUNT_FLAGS = EXTERNAL_CALLS_PERMISSION;
 
+uint256 constant DUMMY_INVERTED_QUOTED_MASK = type(uint256).max - 1;
+
 /// @title CreditFacadeV3
 /// @notice A contract that provides a user interface for interacting with Credit Manager.
 /// @dev CreditFacadeV3 provides an interface between the user and the Credit Manager. Direct interactions
@@ -591,7 +593,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         /// Inverted mask of quoted tokens is pre-compute to avoid
         /// enabling or disabling them outside `updateQuota`
         // TODO: make it lazy
-        uint256 quotedTokensMaskInverted = ~ICreditManagerV3(creditManager).quotedTokensMask();
+        uint256 quotedTokensMaskInverted = DUMMY_INVERTED_QUOTED_MASK;
 
         // Emits event for multicall start - used in analytics to track actions within multicalls
         emit StartMultiCall({creditAccount: creditAccount, caller: msg.sender}); // U:[FA-18]
@@ -649,6 +651,11 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     /// Transfers new collateral from the caller to the Credit Account.
                     else if (method == ICreditFacadeV3Multicall.addCollateral.selector) {
                         _revertIfNoPermission(flags, ADD_COLLATERAL_PERMISSION); // U:[FA-21]
+
+                        if (quotedTokensMaskInverted == DUMMY_INVERTED_QUOTED_MASK) {
+                            quotedTokensMaskInverted = ~ICreditManagerV3(creditManager).quotedTokensMask();
+                        }
+
                         enabledTokensMask = enabledTokensMask.enable({
                             bitsToEnable: _addCollateral(creditAccount, mcall.callData[4:]),
                             invertedSkipMask: quotedTokensMaskInverted
@@ -680,6 +687,11 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         flags = flags.enable(REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS);
 
                         uint256 tokensToDisable = _scheduleWithdrawal(creditAccount, mcall.callData[4:]); // U:[FA-34]
+
+                        if (quotedTokensMaskInverted == DUMMY_INVERTED_QUOTED_MASK) {
+                            quotedTokensMaskInverted = ~ICreditManagerV3(creditManager).quotedTokensMask();
+                        }
+
                         enabledTokensMask = enabledTokensMask.disable({
                             bitsToDisable: tokensToDisable,
                             invertedSkipMask: quotedTokensMaskInverted
@@ -746,6 +758,11 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         _revertIfNoPermission(flags, ENABLE_TOKEN_PERMISSION); // U:[FA-21]
                         // Parses token
                         address token = abi.decode(mcall.callData[4:], (address)); // U:[FA-33]
+
+                        if (quotedTokensMaskInverted == DUMMY_INVERTED_QUOTED_MASK) {
+                            quotedTokensMaskInverted = ~ICreditManagerV3(creditManager).quotedTokensMask();
+                        }
+
                         enabledTokensMask = enabledTokensMask.enable({
                             bitsToEnable: _getTokenMaskOrRevert(token),
                             invertedSkipMask: quotedTokensMaskInverted
@@ -760,7 +777,11 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         _revertIfNoPermission(flags, DISABLE_TOKEN_PERMISSION); // U:[FA-21]
                         // Parses token
                         address token = abi.decode(mcall.callData[4:], (address)); // U:[FA-33]
-                        /// IGNORE QUOTED TOKEN MASK
+
+                        if (quotedTokensMaskInverted == DUMMY_INVERTED_QUOTED_MASK) {
+                            quotedTokensMaskInverted = ~ICreditManagerV3(creditManager).quotedTokensMask();
+                        }
+
                         enabledTokensMask = enabledTokensMask.disable({
                             bitsToDisable: _getTokenMaskOrRevert(token),
                             invertedSkipMask: quotedTokensMaskInverted
@@ -813,6 +834,11 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     emit Execute({creditAccount: creditAccount, targetContract: targetContract});
 
                     (uint256 tokensToEnable, uint256 tokensToDisable) = abi.decode(result, (uint256, uint256)); // U:[FA-38]
+
+                    if (quotedTokensMaskInverted == DUMMY_INVERTED_QUOTED_MASK) {
+                        quotedTokensMaskInverted = ~ICreditManagerV3(creditManager).quotedTokensMask();
+                    }
+
                     enabledTokensMask = enabledTokensMask.enableDisable({
                         bitsToEnable: tokensToEnable,
                         bitsToDisable: tokensToDisable,
