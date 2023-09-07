@@ -58,13 +58,13 @@ struct Policy {
 /// @title Policy manager V3
 /// @dev A contract for managing bounds and conditions for mission-critical protocol params
 abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
-    uint256 constant CHECK_EXACT_VALUE_FLAG = 1;
-    uint256 constant CHECK_MIN_VALUE_FLAG = 1 << 1;
-    uint256 constant CHECK_MAX_VALUE_FLAG = 1 << 2;
-    uint256 constant CHECK_MIN_CHANGE_FLAG = 1 << 3;
-    uint256 constant CHECK_MAX_CHANGE_FLAG = 1 << 4;
-    uint256 constant CHECK_MIN_PCT_CHANGE_FLAG = 1 << 5;
-    uint256 constant CHECK_MAX_PCT_CHANGE_FLAG = 1 << 6;
+    uint256 internal constant CHECK_EXACT_VALUE_FLAG = 1;
+    uint256 internal constant CHECK_MIN_VALUE_FLAG = 1 << 1;
+    uint256 internal constant CHECK_MAX_VALUE_FLAG = 1 << 2;
+    uint256 internal constant CHECK_MIN_CHANGE_FLAG = 1 << 3;
+    uint256 internal constant CHECK_MAX_CHANGE_FLAG = 1 << 4;
+    uint256 internal constant CHECK_MIN_PCT_CHANGE_FLAG = 1 << 5;
+    uint256 internal constant CHECK_MAX_PCT_CHANGE_FLAG = 1 << 6;
 
     /// @dev Mapping from parameter hashes to metaparameters
     mapping(bytes32 => Policy) internal _policies;
