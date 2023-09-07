@@ -300,11 +300,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     ///
     /// @param creditAccount Credit account address
     /// @param closureAction Whether the account is closed, liquidated or liquidated due to expiry
-    // @param totalValue Portfolio value for liqution, 0 for ordinary closure
+    /// @param collateralDebtData Struct of collateral and debt parameters for the account
     /// @param payer Address which would be charged if credit account has not enough funds to cover amountToPool
     /// @param to Address to which the leftover funds will be sent
     /// @param skipTokensMask Tokenmask contains 1 for tokens which needed to be send directly
     /// @param convertToETH If true converts WETH to ETH
+    /// @return remainingFunds Amount of underlying returned to the borrower after liquidation (0 is returned for normal account closure)
+    /// @return loss Loss incurred during liquidation
     function closeCreditAccount(
         address creditAccount,
         ClosureAction closureAction,
@@ -328,8 +330,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
             if (currentCreditAccountInfo.since == block.number) revert OpenCloseAccountInOneBlockException();
 
-            // Sets borrower's Credit Account to zero address
-            // delete creditAccountInfo[creditAccount].borrower; // U:[CM-8]
+            // Sets `borrower`, `since` and `flags` of Credit Account to zero
             assembly {
                 let slot := add(currentCreditAccountInfo.slot, 4)
                 sstore(slot, 0)
