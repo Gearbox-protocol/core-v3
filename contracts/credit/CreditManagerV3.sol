@@ -355,26 +355,29 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             //   since the account does not risk bad debt, so the liquidation
             //   is not as urgent
 
-            (amountToPool, remainingFunds, profit, loss) = collateralDebtData.calcLiquidationPayments({
-                liquidationDiscount: closureAction == ClosureAction.LIQUIDATE_ACCOUNT
-                    ? liquidationDiscount
-                    : liquidationDiscountExpired,
-                feeLiquidation: closureAction == ClosureAction.LIQUIDATE_ACCOUNT ? feeLiquidation : feeLiquidationExpired,
-                amountWithFeeFn: _amountWithFee,
-                amountMinusFeeFn: _amountMinusFee
-            }); // U:[CM-8]
+            {
+                bool isNormalLiquidation = closureAction == ClosureAction.LIQUIDATE_ACCOUNT;
+
+                (amountToPool, remainingFunds, profit, loss) = collateralDebtData.calcLiquidationPayments({
+                    liquidationDiscount: isNormalLiquidation ? liquidationDiscount : liquidationDiscountExpired,
+                    feeLiquidation: isNormalLiquidation ? feeLiquidation : feeLiquidationExpired,
+                    amountWithFeeFn: _amountWithFee,
+                    amountMinusFeeFn: _amountMinusFee
+                }); // U:[CM-8]
+            }
         }
 
         {
             uint256 underlyingBalance = IERC20(underlying).safeBalanceOf({account: creditAccount}); // U:[CM-8]
+            uint256 distributedFunds = amountToPool + remainingFunds + 1;
 
             // If there is an underlying shortfall, attempts to transfer it from the payer
-            if (underlyingBalance < amountToPool + remainingFunds + 1) {
+            if (underlyingBalance < distributedFunds) {
                 unchecked {
                     IERC20(underlying).safeTransferFrom({
                         from: payer,
                         to: creditAccount,
-                        amount: _amountWithFee(amountToPool + remainingFunds + 1 - underlyingBalance)
+                        amount: _amountWithFee(distributedFunds - underlyingBalance)
                     }); // U:[CM-8]
                 }
             }
