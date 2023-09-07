@@ -654,9 +654,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeV3Multicall.addCollateral.selector) {
                         _revertIfNoPermission(flags, ADD_COLLATERAL_PERMISSION); // U:[FA-21]
 
-                        if (quotedTokensMaskInverted == DUMMY_INVERTED_QUOTED_MASK) {
-                            quotedTokensMaskInverted = ~ICreditManagerV3(creditManager).quotedTokensMask();
-                        }
+                        quotedTokensMaskInverted = _getInvertedQuotedTokensMask(quotedTokensMaskInverted);
 
                         enabledTokensMask = enabledTokensMask.enable({
                             bitsToEnable: _addCollateral(creditAccount, mcall.callData[4:]),
@@ -690,9 +688,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
                         uint256 tokensToDisable = _scheduleWithdrawal(creditAccount, mcall.callData[4:]); // U:[FA-34]
 
-                        if (quotedTokensMaskInverted == DUMMY_INVERTED_QUOTED_MASK) {
-                            quotedTokensMaskInverted = ~ICreditManagerV3(creditManager).quotedTokensMask();
-                        }
+                        quotedTokensMaskInverted = _getInvertedQuotedTokensMask(quotedTokensMaskInverted);
 
                         enabledTokensMask = enabledTokensMask.disable({
                             bitsToDisable: tokensToDisable,
@@ -761,9 +757,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         // Parses token
                         address token = abi.decode(mcall.callData[4:], (address)); // U:[FA-33]
 
-                        if (quotedTokensMaskInverted == DUMMY_INVERTED_QUOTED_MASK) {
-                            quotedTokensMaskInverted = ~ICreditManagerV3(creditManager).quotedTokensMask();
-                        }
+                        quotedTokensMaskInverted = _getInvertedQuotedTokensMask(quotedTokensMaskInverted);
 
                         enabledTokensMask = enabledTokensMask.enable({
                             bitsToEnable: _getTokenMaskOrRevert(token),
@@ -780,9 +774,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         // Parses token
                         address token = abi.decode(mcall.callData[4:], (address)); // U:[FA-33]
 
-                        if (quotedTokensMaskInverted == DUMMY_INVERTED_QUOTED_MASK) {
-                            quotedTokensMaskInverted = ~ICreditManagerV3(creditManager).quotedTokensMask();
-                        }
+                        quotedTokensMaskInverted = _getInvertedQuotedTokensMask(quotedTokensMaskInverted);
 
                         enabledTokensMask = enabledTokensMask.disable({
                             bitsToDisable: _getTokenMaskOrRevert(token),
@@ -837,9 +829,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
                     (uint256 tokensToEnable, uint256 tokensToDisable) = abi.decode(result, (uint256, uint256)); // U:[FA-38]
 
-                    if (quotedTokensMaskInverted == DUMMY_INVERTED_QUOTED_MASK) {
-                        quotedTokensMaskInverted = ~ICreditManagerV3(creditManager).quotedTokensMask();
-                    }
+                    quotedTokensMaskInverted = _getInvertedQuotedTokensMask(quotedTokensMaskInverted);
 
                     enabledTokensMask = enabledTokensMask.enableDisable({
                         bitsToEnable: tokensToEnable,
@@ -1227,6 +1217,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
     function _flagsOf(address creditAccount) internal view returns (uint16) {
         return ICreditManagerV3(creditManager).flagsOf(creditAccount);
+    }
+
+    function _getInvertedQuotedTokensMask(uint256 currentMask) internal view returns (uint256) {
+        return currentMask == DUMMY_INVERTED_QUOTED_MASK
+            ? ~ICreditManagerV3(creditManager).quotedTokensMask()
+            : currentMask;
     }
 
     /// @notice Internal wrapper for `CreditManager.setFlagFor()`. The external call is wrapped
