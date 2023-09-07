@@ -95,28 +95,34 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice The maximal number of enabled tokens on a single Credit Account
     uint8 public override maxEnabledTokens = 12;
 
-    /// @notice Liquidation threshold for the underlying token.
+    /// @notice Liquidation threshold for the underlying token
+    /// @notice In PERCENTAGE_FACTOR format
     uint16 internal ltUnderlying;
 
     /// @notice Interest fee charged by the protocol: fee = interest accrued * feeInterest (this includes quota interest)
+    /// @notice In PERCENTAGE_FACTOR format
     uint16 internal feeInterest;
 
     /// @notice Liquidation fee charged by the protocol: fee = totalValue * feeLiquidation
+    /// @notice In PERCENTAGE_FACTOR format
     uint16 internal feeLiquidation;
 
     /// @notice Multiplier used to compute the total value of funds during liquidation.
     /// At liquidation, the borrower's funds are discounted, and the pool is paid out of discounted value
     /// The liquidator takes the difference between the discounted and actual values as premium.
+    /// @notice In PERCENTAGE_FACTOR format
     uint16 internal liquidationDiscount;
 
     /// @notice Total number of known collateral tokens.
     uint8 public collateralTokensCount;
 
     /// @notice Liquidation fee charged by the protocol during liquidation by expiry. Typically lower than feeLiquidation.
+    /// @notice In PERCENTAGE_FACTOR format
     uint16 internal feeLiquidationExpired;
 
     /// @notice Multiplier used to compute the total value of funds during liquidation by expiry. Typically higher than
     /// liquidationDiscount (meaning lower premium).
+    /// @notice In PERCENTAGE_FACTOR format
     uint16 internal liquidationDiscountExpired;
 
     /// @notice Price oracle used to evaluate assets on Credit Accounts.
