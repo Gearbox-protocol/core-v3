@@ -576,6 +576,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param creditAccount Address of the Credit Account
     /// @param token Collateral token to add
     /// @param amount Amount to add
+    /// @return tokenMask Mask of the added token
     function addCollateral(address payer, address creditAccount, address token, uint256 amount)
         external
         nonReentrant // U:[CM-5]
@@ -708,7 +709,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param creditAccount Address of the Credit Account to check
     /// @param enabledTokensMask Current enabled token mask
     /// @param collateralHints Array of token masks in the desired order of evaluation
-    /// @param minHealthFactor Minimal health factor of the account, in PERCENTAGE format
+    /// @param minHealthFactor Minimal health factor of the account, in PERCENTAGE_FACTOR format
     function fullCollateralCheck(
         address creditAccount,
         uint256 enabledTokensMask,
@@ -754,7 +755,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Returns whether the passed credit account is unhealthy given the provided minHealthFactor
     /// @param creditAccount Address of the credit account to check
     /// @param minHealthFactor The health factor below which the function would
-    ///                        consider the account unhealthy
+    ///                        consider the account unhealthy, in PERCENTAGE_FACTOR format
     function isLiquidatable(address creditAccount, uint16 minHealthFactor) external view override returns (bool) {
         uint256[] memory collateralHints;
 
@@ -803,7 +804,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         /// @dev FULL_COLLATERAL_CHECK_LAZY is a special calculation type
         ///      that can only be used safely internally, since it can stop early
         ///      and possibly return incorrect TWV/TV values. Therefore, it is
-        ///      prevented from being called internally
+        ///      prevented from being called externally
         if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) {
             revert IncorrectParameterException(); // U:[CM-19]
         }
@@ -878,7 +879,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             cumulativeIndexNow: collateralDebtData.cumulativeIndexNow
         }); // U:[CM-21] // I: [CMQ-07]
 
-        collateralDebtData.accruedFees += (collateralDebtData.accruedInterest * feeInterest) / PERCENTAGE_FACTOR; // U:[CM-21]
+        collateralDebtData.accruedFees += collateralDebtData.accruedInterest * feeInterest / PERCENTAGE_FACTOR; // U:[CM-21]
 
         if (task == CollateralCalcTask.DEBT_ONLY) return collateralDebtData; // U:[CM-21]
 
@@ -949,6 +950,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Gathers all data on the Credit Account's quoted tokens and quota interest
     /// @param creditAccount Credit Account to return quoted token data for
     /// @param enabledTokensMask Current mask of enabled tokens
+    /// @param collateralHints Array of token masks in the desired order of evaluation.
+    ///        The order of the final quoted tokens array will follow the order of hints,
+    ///        which can help in stopping collateral computations early to optimize gas.
     /// @param _poolQuotaKeeper The PoolQuotaKeeper contract storing the quota and quota interest data
     /// @return quotaTokens An array of address of quoted tokens on the Credit Account
     /// @return outstandingQuotaInterest Quota interest that has not been saved in the Credit Manager
@@ -1245,7 +1249,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Returns the mask for the provided token
     /// @param token Token to returns the mask for
     function getTokenMaskOrRevert(address token) public view override returns (uint256 tokenMask) {
-        tokenMask = (token == underlying) ? 1 : tokenMasksMapInternal[token]; // U:[CM-34]
+        tokenMask = (token == underlying) ? UNDERLYING_TOKEN_MASK : tokenMasksMapInternal[token]; // U:[CM-34]
         if (tokenMask == 0) revert TokenNotAllowedException(); // U:[CM-34]
     }
 
@@ -1281,7 +1285,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (address token, uint16 liquidationThreshold)
     {
         // The underlying is a special case and its mask is always 1
-        if (tokenMask == 1) {
+        if (tokenMask == UNDERLYING_TOKEN_MASK) {
             token = underlying; // U:[CM-34]
             if (calcLT) liquidationThreshold = ltUnderlying; // U:[CM-35]
         } else {
@@ -1323,15 +1327,17 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     /// @notice Returns the fee parameters of the Credit Manager
-    /// @return _feeInterest Percentage of interest taken by the protocol as profit
+    /// @return _feeInterest Percentage of interest taken by the protocol as profit, in PERCENTAGE_FACTOR format
     /// @return _feeLiquidation Percentage of account value taken by the protocol as profit
-    ///         during unhealthy account liquidations
+    ///         during unhealthy account liquidations, in PERCENTAGE_FACTOR format
     /// @return _liquidationDiscount Multiplier that reduces the effective totalValue during unhealthy account liquidations,
-    ///         allowing the liquidator to take the unaccounted for remainder as premium. Equal to (1 - liquidationPremium)
+    ///         allowing the liquidator to take the unaccounted for remainder as premium. Equal to (1 - liquidationPremium),
+    ///         in PERCENTAGE_FACTOR format
     /// @return _feeLiquidationExpired Percentage of account value taken by the protocol as profit
-    ///         during expired account liquidations
+    ///         during expired account liquidations, in PERCENTAGE_FACTOR format
     /// @return _liquidationDiscountExpired Multiplier that reduces the effective totalValue during expired account liquidations,
-    ///         allowing the liquidator to take the unaccounted for remainder as premium. Equal to (1 - liquidationPremiumExpired)
+    ///         allowing the liquidator to take the unaccounted for remainder as premium. Equal to (1 - liquidationPremiumExpired),
+    ///         in PERCENTAGE_FACTOR format
     function fees()
         external
         view
@@ -1517,15 +1523,17 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     /// @notice Sets fees and premiums
-    /// @param _feeInterest Percentage of interest taken by the protocol as profit
+    /// @param _feeInterest Percentage of interest taken by the protocol as profit, in PERCENTAGE_FACTOR format
     /// @param _feeLiquidation Percentage of account value taken by the protocol as profit
-    ///         during unhealthy account liquidations
+    ///         during unhealthy account liquidations, in PERCENTAGE_FACTOR format
     /// @param _liquidationDiscount Multiplier that reduces the effective totalValue during unhealthy account liquidations,
-    ///         allowing the liquidator to take the unaccounted for remainder as premium. Equal to (1 - liquidationPremium)
+    ///         allowing the liquidator to take the unaccounted for remainder as premium. Equal to (1 - liquidationPremium),
+    ///         in PERCENTAGE_FACTOR format
     /// @param _feeLiquidationExpired Percentage of account value taken by the protocol as profit
-    ///         during expired account liquidations
+    ///         during expired account liquidations, in PERCENTAGE_FACTOR format
     /// @param _liquidationDiscountExpired Multiplier that reduces the effective totalValue during expired account liquidations,
-    ///         allowing the liquidator to take the unaccounted for remainder as premium. Equal to (1 - liquidationPremiumExpired)
+    ///         allowing the liquidator to take the unaccounted for remainder as premium. Equal to (1 - liquidationPremiumExpired),
+    ///         in PERCENTAGE_FACTOR format
     function setFees(
         uint16 _feeInterest,
         uint16 _feeLiquidation,
