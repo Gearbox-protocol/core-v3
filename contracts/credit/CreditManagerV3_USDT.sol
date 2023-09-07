@@ -6,8 +6,8 @@ pragma solidity ^0.8.17;
 import {CreditManagerV3} from "./CreditManagerV3.sol";
 import {USDT_Transfer} from "../traits/USDT_Transfer.sol";
 import {IPoolBase} from "../interfaces/IPoolV3.sol";
-/// @title Credit Manager
 
+/// @title Credit Manager variation that supports USDT with enabled fees
 contract CreditManagerV3_USDT is CreditManagerV3, USDT_Transfer {
     constructor(address _addressProvider, address _pool, string memory _description)
         CreditManagerV3(_addressProvider, _pool, _description)
