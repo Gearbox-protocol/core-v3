@@ -1263,6 +1263,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     /// @notice Returns the liquidation threshold for the provided token
     /// @param token Token to retrieve the LT for
+    /// @return lt Returns the token's LT in PERCENTAGE_FACTOR format
     function liquidationThresholds(address token) public view override returns (uint16 lt) {
         uint256 tokenMask = getTokenMaskOrRevert(token);
         (, lt) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-42]
@@ -1270,6 +1271,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     /// @notice Returns the collateral token with requested mask and its liquidationThreshold
     /// @param tokenMask Token mask corresponding to the token
+    /// @return token Address of the token
+    /// @return liquidationThreshold Returns the token's LT in PERCENTAGE_FACTOR format
     function collateralTokenByMask(uint256 tokenMask)
         public
         view
