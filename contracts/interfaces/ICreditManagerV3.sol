@@ -21,6 +21,9 @@ enum ManageDebtAction {
 uint8 constant WITHDRAWAL_FLAG = 1;
 uint8 constant BOT_PERMISSIONS_SET_FLAG = 1 << 1;
 
+uint8 constant DEFAULT_MAX_ENABLED_TOKENS = 12;
+address constant INACTIVE_CREDIT_ACCOUNT_ADDRESS = address(1);
+
 struct CreditAccountInfo {
     uint256 debt;
     uint256 cumulativeIndexLastUpdate;

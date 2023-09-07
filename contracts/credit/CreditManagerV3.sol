@@ -31,7 +31,9 @@ import {
     RevocationPair,
     CollateralDebtData,
     CollateralCalcTask,
-    WITHDRAWAL_FLAG
+    WITHDRAWAL_FLAG,
+    DEFAULT_MAX_ENABLED_TOKENS,
+    INACTIVE_CREDIT_ACCOUNT_ADDRESS
 } from "../interfaces/ICreditManagerV3.sol";
 import "../interfaces/IAddressProviderV3.sol";
 import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
@@ -93,7 +95,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     address public override creditFacade;
 
     /// @notice The maximal number of enabled tokens on a single Credit Account
-    uint8 public override maxEnabledTokens = 12;
+    uint8 public override maxEnabledTokens = DEFAULT_MAX_ENABLED_TOKENS;
 
     /// @notice Liquidation threshold for the underlying token
     /// @notice In PERCENTAGE_FACTOR format
@@ -222,7 +224,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         creditConfigurator = msg.sender; // U:[CM-1]
 
-        _activeCreditAccount = address(1);
+        _activeCreditAccount = INACTIVE_CREDIT_ACCOUNT_ADDRESS;
 
         description = _description;
     }
@@ -254,8 +256,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         newCreditAccountInfo.debt = debt; // U:[CM-6]
         newCreditAccountInfo.cumulativeIndexLastUpdate = _poolCumulativeIndexNow(); // U:[CM-6]
 
-        // newCreditAccountInfo.since = uint64(block.number); // U:[CM-6]
         // newCreditAccountInfo.flags = 0; // U:[CM-6]
+        // newCreditAccountInfo.since = uint64(block.number); // U:[CM-6]
         // newCreditAccountInfo.borrower = onBehalfOf; // U:[CM-6]
         assembly {
             let slot := add(newCreditAccountInfo.slot, 4)
@@ -263,8 +265,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             sstore(slot, value)
         }
 
-        //     newCreditAccountInfo.cumulativeQuotaInterest = 1;
-        //     newCreditAccountInfo.quotaFees = 0;
+        // newCreditAccountInfo.cumulativeQuotaInterest = 1;
+        // newCreditAccountInfo.quotaFees = 0;
         assembly {
             let slot := add(newCreditAccountInfo.slot, 2)
             sstore(slot, 1)
@@ -680,7 +682,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
     {
-        if (_activeCreditAccount != address(1) && creditAccount != address(1)) {
+        if (_activeCreditAccount != INACTIVE_CREDIT_ACCOUNT_ADDRESS && creditAccount != INACTIVE_CREDIT_ACCOUNT_ADDRESS)
+        {
             revert ActiveCreditAccountOverridenException();
         }
         _activeCreditAccount = creditAccount;
@@ -689,7 +692,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Returns the current active credit account
     function getActiveCreditAccountOrRevert() public view override returns (address creditAccount) {
         creditAccount = _activeCreditAccount;
-        if (creditAccount == address(1)) revert ActiveCreditAccountNotSetException();
+        if (creditAccount == INACTIVE_CREDIT_ACCOUNT_ADDRESS) revert ActiveCreditAccountNotSetException();
     }
 
     //

@@ -26,7 +26,8 @@ import {
     RevocationPair,
     CollateralDebtData,
     CollateralCalcTask,
-    BOT_PERMISSIONS_SET_FLAG
+    BOT_PERMISSIONS_SET_FLAG,
+    INACTIVE_CREDIT_ACCOUNT_ADDRESS
 } from "../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
 import {ClaimAction, ETH_ADDRESS, IWithdrawalManagerV3} from "../interfaces/IWithdrawalManagerV3.sol";
@@ -212,6 +213,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param calls The array of MultiCall structs encoding the required operations. Generally must have
     /// at least a call to addCollateral, as otherwise the health check at the end will fail.
     /// @param referralCode Referral code that is used for potential rewards. 0 if no referral code provided
+    /// @return creditAccount The address of the newly opened account
     function openCreditAccount(uint256 debt, address onBehalfOf, MultiCall[] calldata calls, uint16 referralCode)
         external
         payable
@@ -905,7 +907,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @notice Sets the `externalCallCreditAccount` in Credit Manager
     ///      to the default value
     function _unsetActiveCreditAccount() internal {
-        _setActiveCreditAccount(address(1)); // F:[FA-26]
+        _setActiveCreditAccount(INACTIVE_CREDIT_ACCOUNT_ADDRESS); // F:[FA-26]
     }
 
     /// @notice Reverts if provided flags contain no permission for the requested action
