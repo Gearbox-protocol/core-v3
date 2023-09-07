@@ -1249,7 +1249,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Returns the mask for the provided token
     /// @param token Token to returns the mask for
     function getTokenMaskOrRevert(address token) public view override returns (uint256 tokenMask) {
-        tokenMask = (token == underlying) ? UNDERLYING_TOKEN_MASK : tokenMasksMapInternal[token]; // U:[CM-34]
+        if (token == underlying) return UNDERLYING_TOKEN_MASK; // U:[CM-34]
+
+        tokenMask = tokenMasksMapInternal[token]; // U:[CM-34]
         if (tokenMask == 0) revert TokenNotAllowedException(); // U:[CM-34]
     }
 
