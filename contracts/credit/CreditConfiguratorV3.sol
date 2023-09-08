@@ -112,7 +112,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             // 1. Allowed contracts set stores all the connected third-party contracts - currently only used
             //    to retrieve externally
             // 2. Emergency liquidator set stores all emergency liquidators - used for parameter migration when changing the Credit Facade
-            // 3. Forbidden token set stores all forbidden tokens - used for parameter migration when changing the Credit Facade
 
             address[] memory allowedAdaptersPrev = CreditConfiguratorV3(currentConfigurator).allowedAdapters(); // I:[CC-29]
             uint256 len = allowedAdaptersPrev.length;
@@ -664,10 +663,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         configuratorOnly // I:[CC-2]
     {
         // Retrieves all parameters in case they need to be migrated
-        CreditFacadeV3 prevCreditFacace = CreditFacadeV3(creditFacade());
+        CreditFacadeV3 prevCreditFacade = CreditFacadeV3(creditFacade());
 
         // Checks that the Credit Facade is actually changed, to avoid any redundant actions and events
-        if (_creditFacade == address(prevCreditFacace)) return;
+        if (_creditFacade == address(prevCreditFacade)) return;
 
         // Sanity checks that the address is a contract and has correct Credit Manager
         _revertIfContractIncompatible(_creditFacade); // I:[CC-20]
@@ -677,26 +676,26 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
 
         if (migrateParams) {
             // Copies all limits and restrictions on borrowing
-            _setMaxDebtPerBlockMultiplier(_creditFacade, prevCreditFacace.maxDebtPerBlockMultiplier()); // I:[CC-22]
+            _setMaxDebtPerBlockMultiplier(_creditFacade, prevCreditFacade.maxDebtPerBlockMultiplier()); // I:[CC-22]
 
             // Copy debt limits
-            (uint128 minDebt, uint128 maxDebt) = prevCreditFacace.debtLimits();
+            (uint128 minDebt, uint128 maxDebt) = prevCreditFacade.debtLimits();
             _setLimits({_creditFacade: _creditFacade, minDebt: minDebt, maxDebt: maxDebt}); // I:[CC-22]
 
             // Copy max cumulative loss params
-            (, uint128 maxCumulativeLoss) = prevCreditFacace.lossParams();
+            (, uint128 maxCumulativeLoss) = prevCreditFacade.lossParams();
             _setMaxCumulativeLoss(_creditFacade, maxCumulativeLoss); // I: [CC-22]
 
             // Migrates array-based parameters
             _migrateEmergencyLiquidators(_creditFacade); // I:[CC-22С]
 
             // Copy forbidden token mask
-            _migrateForbiddenTokens(_creditFacade, prevCreditFacace.forbiddenTokenMask()); // I:[CC-22С]
+            _migrateForbiddenTokens(_creditFacade, prevCreditFacade.forbiddenTokenMask()); // I:[CC-22С]
 
             // Copies the expiration date if the contract is expirable
-            if (prevCreditFacace.expirable()) _setExpirationDate(_creditFacade, prevCreditFacace.expirationDate()); // I:[CC-22]
+            if (prevCreditFacade.expirable()) _setExpirationDate(_creditFacade, prevCreditFacade.expirationDate()); // I:[CC-22]
 
-            address botList = prevCreditFacace.botList();
+            address botList = prevCreditFacade.botList();
             if (botList != address(0)) _setBotList(_creditFacade, botList); // I:[CC-22A]
         } else {
             _clearArrayCreditFacadeParams(); // I:[CC-22С]
@@ -927,11 +926,14 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function _addEmergencyLiquidator(address _creditFacade, address liquidator) internal {
         CreditFacadeV3 cf = CreditFacadeV3(_creditFacade);
 
+        // The emergency liquidator is added here, in case
+        // it somehow exists in Credit Facade, but not in the set
+        emergencyLiquidatorsSet.add(liquidator); // I:[CC-27]
+
         // Checks that the address is not already in the list to avoid redundant events
         if (cf.canLiquidateWhilePaused(liquidator)) return;
 
         cf.setEmergencyLiquidator(liquidator, AllowanceAction.ALLOW); // I:[CC-27]
-        emergencyLiquidatorsSet.add(liquidator); // I:[CC-27]
         emit AddEmergencyLiquidator(liquidator); // I:[CC-27]
     }
 
@@ -944,11 +946,14 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     {
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
+        // The emergency liquidator is removed here, in case
+        // it somehow exists in the set, but not in Credit Facade
+        emergencyLiquidatorsSet.remove(liquidator); // I:[CC-28]
+
         // Checks that the address is in the list to avoid redundant events
         if (!cf.canLiquidateWhilePaused(liquidator)) return;
 
         cf.setEmergencyLiquidator(liquidator, AllowanceAction.FORBID); // I:[CC-28]
-        emergencyLiquidatorsSet.remove(liquidator); // I:[CC-28]
         emit RemoveEmergencyLiquidator(liquidator); // I:[CC-28]
     }
 

@@ -141,7 +141,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             (uint96 totalQuoted, uint96 limit) = _getTokenQuotaTotalAndLimit(tokenQuotaParams);
             quotaChange = QuotasLogic.calcActualQuotaChange(totalQuoted, limit, quotaChange); // U:[PQK-15]
 
-            fees = uint128(uint96(quotaChange)) * quotaIncreaseFee / PERCENTAGE_FACTOR; // U:[PQK-15]
+            fees = uint128(uint256(uint96(quotaChange))) * quotaIncreaseFee / PERCENTAGE_FACTOR; // U:[PQK-15]
 
             newQuoted = quoted + uint96(quotaChange);
             if (quoted <= 1 && newQuoted > 1) {
@@ -150,11 +150,11 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
             tokenQuotaParams.totalQuoted = totalQuoted + uint96(quotaChange); // U:[PQK-15]
         } else {
-            newQuoted = quoted - uint96(-quotaChange);
-            tokenQuotaParams.totalQuoted -= uint96(-quotaChange); // U:[PQK-15]
+            uint96 absoluteChange = uint96(-quotaChange);
+            newQuoted = quoted - absoluteChange;
+            tokenQuotaParams.totalQuoted -= absoluteChange; // U:[PQK-15]
 
-            // The check for `quoted > 1` is omitted
-            if (newQuoted <= 1) {
+            if (quoted > 1 && newQuoted <= 1) {
                 disableToken = true; // U:[PQK-15]
             }
         }
@@ -202,13 +202,14 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
                 uint16 rate = tokenQuotaParams.rate;
                 quotaRevenueChange += QuotasLogic.calcQuotaRevenueChange(rate, -int256(uint256(quoted))); // U:[PQK-16]
                 tokenQuotaParams.totalQuoted -= quoted; // U:[PQK-16]
+                accountQuota.quota = 1; // U:[PQK-16]
                 emit UpdateQuota({creditAccount: creditAccount, token: token, quotaChange: -int96(quoted)});
             }
 
-            if (quoted != 0) {
-                // 1 wei instead of 0 for gas optimization
-                accountQuota.quota = 1; // U:[PQK-16]
-            }
+            // if (quoted != 0) {
+            //     // 1 wei instead of 0 for gas optimization
+            //     accountQuota.quota = 1; // U:[PQK-16]
+            // }
 
             if (setLimitsToZero) {
                 _setTokenLimit({tokenQuotaParams: tokenQuotaParams, token: token, limit: 1}); // U:[PQK-16]
@@ -474,6 +475,10 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         override
         controllerOnly // U:[PQK-2]
     {
+        if (fee > PERCENTAGE_FACTOR) {
+            revert IncorrectParameterException();
+        }
+
         TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token]; // U:[PQK-13]
 
         if (!isInitialised(tokenQuotaParams)) {

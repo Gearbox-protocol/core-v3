@@ -25,6 +25,9 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @notice Contract version
     uint256 public constant override version = 3_00;
 
+    /// @dev Minimum liquidation threshold ramp duration
+    uint256 constant MIN_LT_RAMP_DURATION = 7 days;
+
     /// @notice Period before a mature transaction becomes stale
     uint256 public constant override GRACE_PERIOD = 14 days;
 
@@ -187,8 +190,6 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @param creditManager Adress of CM to update the debt limit for
     /// @param debtLimit The new debt limit
     function setCreditManagerDebtLimit(address creditManager, uint256 debtLimit) external override {
-        ICreditFacadeV3 creditFacade = ICreditFacadeV3(ICreditManagerV3(creditManager).creditFacade());
-
         IPoolV3 pool = IPoolV3(ICreditManagerV3(creditManager).pool());
 
         uint256 debtLimitCurrent = pool.creditManagerDebtLimit(address(creditManager));
@@ -227,8 +228,8 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         uint256 delay = _getPolicyDelay(policyHash);
 
         if (
-            !_checkPolicy(policyHash, uint256(ltCurrent), uint256(liquidationThresholdFinal)) || rampDuration < 7 days
-                || rampStart < block.timestamp + delay
+            !_checkPolicy(policyHash, uint256(ltCurrent), uint256(liquidationThresholdFinal))
+                || rampDuration < MIN_LT_RAMP_DURATION || rampStart < block.timestamp + delay
         ) {
             revert ParameterChecksFailedException(); // U: [CT-6]
         }

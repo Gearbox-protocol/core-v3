@@ -79,7 +79,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
 
         creditManagerMock = new CreditManagerMock(address(addressProvider), address(poolMock));
 
-        cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, 1));
+        cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, NO_VERSION_CONTROL));
 
         cr.addPool(address(poolMock));
         cr.addCreditManager(address(creditManagerMock));

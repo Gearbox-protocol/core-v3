@@ -174,45 +174,41 @@ library CollateralLogic {
         uint256 len = collateralHints.length; // U:[CLL-3]
 
         address ca = creditAccount; // U:[CLL-3]
-        for (uint256 i; tokensToCheckMask != 0;) {
+        uint256 i;
+        while (tokensToCheckMask != 0) {
             uint256 tokenMask;
 
-            // To ensure that no erroneous mask can be passed in collateralHints
-            // (e.g., masks with more than 1 bit enabled), `collateralTokenByMaskFn`
-            // must revert upon encountering an unknown mask
-            unchecked {
-                tokenMask = (i < len) ? collateralHints[i] : 1 << (i - len); // U:[CLL-3]
-            }
-
-            if (tokensToCheckMask & tokenMask != 0) {
-                bool nonZero;
-                {
-                    uint256 valueUSD;
-                    uint256 weightedValueUSD;
-                    (valueUSD, weightedValueUSD, nonZero) = calcOneNonQuotedCollateral({
-                        priceOracle: priceOracle,
-                        creditAccount: ca,
-                        tokenMask: tokenMask,
-                        convertToUSDFn: convertToUSDFn,
-                        collateralTokenByMaskFn: collateralTokenByMaskFn
-                    }); // U:[CLL-3]
-                    totalValueUSD += valueUSD; // U:[CLL-3]
-                    twvUSD += weightedValueUSD; // U:[CLL-3]
-                }
-                if (nonZero) {
-                    if (twvUSD >= twvUSDTarget) {
-                        break; // U:[CLL-3]
-                    }
-                } else {
-                    // Zero balance tokens are disabled after the collateral computation
-                    tokensToDisable |= tokenMask; // U:[CLL-3]
-                }
-            }
-            tokensToCheckMask = tokensToCheckMask.disable(tokenMask); // U:[CLL-3]
-
-            unchecked {
+            if (i < len) {
+                tokenMask = collateralHints[i];
                 ++i;
+                if (tokensToCheckMask & tokenMask == 0) continue;
+            } else {
+                tokenMask = tokensToCheckMask & uint256(-int256(tokensToCheckMask));
             }
+
+            bool nonZero;
+            {
+                uint256 valueUSD;
+                uint256 weightedValueUSD;
+                (valueUSD, weightedValueUSD, nonZero) = calcOneNonQuotedCollateral({
+                    priceOracle: priceOracle,
+                    creditAccount: ca,
+                    tokenMask: tokenMask,
+                    convertToUSDFn: convertToUSDFn,
+                    collateralTokenByMaskFn: collateralTokenByMaskFn
+                }); // U:[CLL-3]
+                totalValueUSD += valueUSD; // U:[CLL-3]
+                twvUSD += weightedValueUSD; // U:[CLL-3]
+            }
+            if (nonZero) {
+                if (twvUSD >= twvUSDTarget) {
+                    break; // U:[CLL-3]
+                }
+            } else {
+                // Zero balance tokens are disabled after the collateral computation
+                tokensToDisable |= tokenMask; // U:[CLL-3]
+            }
+            tokensToCheckMask = tokensToCheckMask.disable(tokenMask);
         }
     }
 

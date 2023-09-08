@@ -88,6 +88,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @param permissions A bit mask of permissions
     /// @param fundingAmount Total amount of ETH available to the bot for payments
     /// @param weeklyFundingAllowance Amount of ETH available to the bot weekly
+    /// @return activeBotsRemaining Remaining number of non-special bots with non-zero permissions
     function setBotPermissions(
         address creditManager,
         address creditAccount,
@@ -106,17 +107,19 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
             revert AddressIsNotContractException(bot); // F: [BL-3]
         }
 
-        if (
-            (
-                botSpecialStatus[creditManager][bot].forbidden
-                    || botSpecialStatus[creditManager][bot].specialPermissions != 0
-            ) && permissions != 0
-        ) {
-            revert InvalidBotException(); // F: [BL-3]
-        }
+        EnumerableSet.AddressSet storage accountBots = activeBots[creditManager][creditAccount];
 
         if (permissions != 0) {
-            activeBots[creditManager][creditAccount].add(bot); // F: [BL-3]
+            if (
+                (
+                    botSpecialStatus[creditManager][bot].forbidden
+                        || botSpecialStatus[creditManager][bot].specialPermissions != 0
+                )
+            ) {
+                revert InvalidBotException(); // F: [BL-3]
+            }
+
+            accountBots.add(bot); // F: [BL-3]
 
             botPermissions[creditManager][creditAccount][bot] = permissions; // F: [BL-3]
 
@@ -139,7 +142,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
             _eraseBot(creditManager, creditAccount, bot); // F: [BL-3]
         }
 
-        activeBotsRemaining = activeBots[creditManager][creditAccount].length(); // F: [BL-3]
+        activeBotsRemaining = accountBots.length(); // F: [BL-3]
     }
 
     /// @notice Removes permissions and funding for all bots with non-zero permissions for a credit account
@@ -150,11 +153,13 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         override
         onlyValidCreditFacade(creditManager) // F: [BL-6]
     {
-        uint256 len = activeBots[creditManager][creditAccount].length();
+        EnumerableSet.AddressSet storage accountBots = activeBots[creditManager][creditAccount];
+
+        uint256 len = accountBots.length();
 
         unchecked {
             for (uint256 i = 0; i < len; ++i) {
-                address bot = activeBots[creditManager][creditAccount].at(len - i - 1); // F: [BL-6]
+                address bot = accountBots.at(len - i - 1); // F: [BL-6]
                 _eraseBot({creditManager: creditManager, creditAccount: creditAccount, bot: bot});
             }
         }
@@ -280,8 +285,10 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
 
     /// @dev Implementation of `setBotForbiddenStatus`
     function _setBotForbiddenStatus(address creditManager, address bot, bool status) internal {
-        botSpecialStatus[creditManager][bot].forbidden = status;
-        emit SetBotForbiddenStatus(creditManager, bot, status);
+        if (botSpecialStatus[creditManager][bot].forbidden != status) {
+            botSpecialStatus[creditManager][bot].forbidden = status;
+            emit SetBotForbiddenStatus(creditManager, bot, status);
+        }
     }
 
     /// @notice Gives special permissions to a bot that extend to all credit accounts
@@ -293,8 +300,10 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         override
         configuratorOnly
     {
-        botSpecialStatus[creditManager][bot].specialPermissions = permissions; // F: [BL-7]
-        emit SetBotSpecialPermissions(creditManager, bot, permissions); // F: [BL-7]
+        if (botSpecialStatus[creditManager][bot].specialPermissions != permissions) {
+            botSpecialStatus[creditManager][bot].specialPermissions = permissions; // F: [BL-7]
+            emit SetBotSpecialPermissions(creditManager, bot, permissions); // F: [BL-7]
+        }
     }
 
     /// @notice Sets the DAO fee on bot payments
@@ -304,9 +313,10 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
             revert IncorrectParameterException();
         }
 
-        daoFee = newFee; // F: [BL-2]
-
-        emit SetBotDAOFee(newFee); // F: [BL-2]
+        if (daoFee != newFee) {
+            daoFee = newFee; // F: [BL-2]
+            emit SetBotDAOFee(newFee); // F: [BL-2]
+        }
     }
 
     /// @notice Sets an address' status as an approved credit manager

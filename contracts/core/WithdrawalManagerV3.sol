@@ -57,8 +57,8 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
     /// @dev Mapping credit account => scheduled withdrawals
     mapping(address => ScheduledWithdrawal[2]) internal _scheduled;
 
-    /// @dev List of all added credit managers that can interact with this contract
-    EnumerableSet.AddressSet internal _creditManagersSet;
+    /// @dev Mapping from address to its status as an approved credit manager
+    mapping(address => bool) public isValidCreditManager;
 
     /// @dev Ensures that function caller is one of added credit managers
     modifier creditManagerOnly() {
@@ -111,12 +111,9 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
         override
         nonZeroAddress(to) // U:[WM-4A]
     {
-        _claimImmediateWithdrawal({
-            account: msg.sender,
-            token: token == ETH_ADDRESS ? weth : token,
-            to: to,
-            unwrapWETH: token == ETH_ADDRESS
-        }); // U:[WM-4B,4C,4D]
+        bool isETH = token == ETH_ADDRESS;
+
+        _claimImmediateWithdrawal({account: msg.sender, token: isETH ? weth : token, to: to, unwrapWETH: isETH}); // U:[WM-4B,4C,4D]
     }
 
     /// @dev Increases `account`'s immediately withdrawable balance of `token` by `amount`
@@ -283,11 +280,6 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
     // CONFIGURATION //
     // ------------- //
 
-    /// @notice List of all added credit managers that can interact with this contract
-    function creditManagers() external view override returns (address[] memory) {
-        return _creditManagersSet.values();
-    }
-
     /// @notice Sets delay for scheduled withdrawals, only affects new withdrawal requests
     /// @param newDelay New delay for scheduled withdrawals
     function setWithdrawalDelay(uint40 newDelay)
@@ -309,15 +301,15 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
         configuratorOnly // U:[WM-2]
         registeredCreditManagerOnly(newCreditManager) // U:[WM-12A]
     {
-        if (!_creditManagersSet.contains(newCreditManager)) {
-            _creditManagersSet.add(newCreditManager); // U:[WM-12B]
+        if (!isValidCreditManager[newCreditManager]) {
+            isValidCreditManager[newCreditManager] = true; // U:[WM-12B]
             emit AddCreditManager(newCreditManager); // U:[WM-12B]
         }
     }
 
     /// @dev Ensures caller is one of added credit managers
     function _ensureCallerIsCreditManager() internal view {
-        if (!_creditManagersSet.contains(msg.sender)) {
+        if (!isValidCreditManager[msg.sender]) {
             revert CallerNotCreditManagerException();
         }
     }

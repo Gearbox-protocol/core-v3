@@ -31,7 +31,9 @@ import {
     RevocationPair,
     CollateralDebtData,
     CollateralCalcTask,
-    WITHDRAWAL_FLAG
+    WITHDRAWAL_FLAG,
+    DEFAULT_MAX_ENABLED_TOKENS,
+    INACTIVE_CREDIT_ACCOUNT_ADDRESS
 } from "../interfaces/ICreditManagerV3.sol";
 import "../interfaces/IAddressProviderV3.sol";
 import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
@@ -93,30 +95,36 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     address public override creditFacade;
 
     /// @notice The maximal number of enabled tokens on a single Credit Account
-    uint8 public override maxEnabledTokens = 12;
+    uint8 public override maxEnabledTokens = DEFAULT_MAX_ENABLED_TOKENS;
 
-    /// @notice Liquidation threshold for the underlying token.
+    /// @notice Liquidation threshold for the underlying token
+    /// @notice In PERCENTAGE_FACTOR format
     uint16 internal ltUnderlying;
 
     /// @notice Interest fee charged by the protocol: fee = interest accrued * feeInterest (this includes quota interest)
+    /// @notice In PERCENTAGE_FACTOR format
     uint16 internal feeInterest;
 
     /// @notice Liquidation fee charged by the protocol: fee = totalValue * feeLiquidation
+    /// @notice In PERCENTAGE_FACTOR format
     uint16 internal feeLiquidation;
 
     /// @notice Multiplier used to compute the total value of funds during liquidation.
     /// At liquidation, the borrower's funds are discounted, and the pool is paid out of discounted value
     /// The liquidator takes the difference between the discounted and actual values as premium.
+    /// @notice In PERCENTAGE_FACTOR format
     uint16 internal liquidationDiscount;
 
     /// @notice Total number of known collateral tokens.
     uint8 public collateralTokensCount;
 
     /// @notice Liquidation fee charged by the protocol during liquidation by expiry. Typically lower than feeLiquidation.
+    /// @notice In PERCENTAGE_FACTOR format
     uint16 internal feeLiquidationExpired;
 
     /// @notice Multiplier used to compute the total value of funds during liquidation by expiry. Typically higher than
     /// liquidationDiscount (meaning lower premium).
+    /// @notice In PERCENTAGE_FACTOR format
     uint16 internal liquidationDiscountExpired;
 
     /// @notice Price oracle used to evaluate assets on Credit Accounts.
@@ -216,7 +224,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         creditConfigurator = msg.sender; // U:[CM-1]
 
-        _activeCreditAccount = address(1);
+        _activeCreditAccount = INACTIVE_CREDIT_ACCOUNT_ADDRESS;
 
         description = _description;
     }
@@ -240,6 +248,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacadeOnly // // U:[CM-2]
         returns (address creditAccount)
     {
+        /// Zero parameters are passed for backward compatibility with older AccountFactory versions
         creditAccount = IAccountFactoryBase(accountFactory).takeCreditAccount(0, 0); // U:[CM-6]
 
         CreditAccountInfo storage newCreditAccountInfo = creditAccountInfo[creditAccount];
@@ -247,17 +256,17 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         newCreditAccountInfo.debt = debt; // U:[CM-6]
         newCreditAccountInfo.cumulativeIndexLastUpdate = _poolCumulativeIndexNow(); // U:[CM-6]
 
-        // newCreditAccountInfo.since = uint64(block.number); // U:[CM-6]
         // newCreditAccountInfo.flags = 0; // U:[CM-6]
+        // newCreditAccountInfo.since = uint64(block.number); // U:[CM-6]
         // newCreditAccountInfo.borrower = onBehalfOf; // U:[CM-6]
         assembly {
             let slot := add(newCreditAccountInfo.slot, 4)
-            let value := or(shl(80, onBehalfOf), shl(16, number()))
+            let value := or(shl(80, onBehalfOf), shl(16, and(number(), 0xFFFFFFFFFFFFFFFF)))
             sstore(slot, value)
         }
 
-        //     newCreditAccountInfo.cumulativeQuotaInterest = 1;
-        //     newCreditAccountInfo.quotaFees = 0;
+        // newCreditAccountInfo.cumulativeQuotaInterest = 1;
+        // newCreditAccountInfo.quotaFees = 0;
         assembly {
             let slot := add(newCreditAccountInfo.slot, 2)
             sstore(slot, 1)
@@ -291,11 +300,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     ///
     /// @param creditAccount Credit account address
     /// @param closureAction Whether the account is closed, liquidated or liquidated due to expiry
-    // @param totalValue Portfolio value for liqution, 0 for ordinary closure
+    /// @param collateralDebtData Struct of collateral and debt parameters for the account
     /// @param payer Address which would be charged if credit account has not enough funds to cover amountToPool
     /// @param to Address to which the leftover funds will be sent
     /// @param skipTokensMask Tokenmask contains 1 for tokens which needed to be send directly
     /// @param convertToETH If true converts WETH to ETH
+    /// @return remainingFunds Amount of underlying returned to the borrower after liquidation (0 is returned for normal account closure)
+    /// @return loss Loss incurred during liquidation
     function closeCreditAccount(
         address creditAccount,
         ClosureAction closureAction,
@@ -319,8 +330,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
             if (currentCreditAccountInfo.since == block.number) revert OpenCloseAccountInOneBlockException();
 
-            // Sets borrower's Credit Account to zero address
-            // delete creditAccountInfo[creditAccount].borrower; // U:[CM-8]
+            // Sets `borrower`, `since` and `flags` of Credit Account to zero
             assembly {
                 let slot := add(currentCreditAccountInfo.slot, 4)
                 sstore(slot, 0)
@@ -345,26 +355,29 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             //   since the account does not risk bad debt, so the liquidation
             //   is not as urgent
 
-            (amountToPool, remainingFunds, profit, loss) = collateralDebtData.calcLiquidationPayments({
-                liquidationDiscount: closureAction == ClosureAction.LIQUIDATE_ACCOUNT
-                    ? liquidationDiscount
-                    : liquidationDiscountExpired,
-                feeLiquidation: closureAction == ClosureAction.LIQUIDATE_ACCOUNT ? feeLiquidation : feeLiquidationExpired,
-                amountWithFeeFn: _amountWithFee,
-                amountMinusFeeFn: _amountMinusFee
-            }); // U:[CM-8]
+            {
+                bool isNormalLiquidation = closureAction == ClosureAction.LIQUIDATE_ACCOUNT;
+
+                (amountToPool, remainingFunds, profit, loss) = collateralDebtData.calcLiquidationPayments({
+                    liquidationDiscount: isNormalLiquidation ? liquidationDiscount : liquidationDiscountExpired,
+                    feeLiquidation: isNormalLiquidation ? feeLiquidation : feeLiquidationExpired,
+                    amountWithFeeFn: _amountWithFee,
+                    amountMinusFeeFn: _amountMinusFee
+                }); // U:[CM-8]
+            }
         }
 
         {
             uint256 underlyingBalance = IERC20(underlying).safeBalanceOf({account: creditAccount}); // U:[CM-8]
+            uint256 distributedFunds = amountToPool + remainingFunds + 1;
 
             // If there is an underlying shortfall, attempts to transfer it from the payer
-            if (underlyingBalance < amountToPool + remainingFunds + 1) {
+            if (underlyingBalance < distributedFunds) {
                 unchecked {
                     IERC20(underlying).safeTransferFrom({
                         from: payer,
                         to: creditAccount,
-                        amount: _amountWithFee(amountToPool + remainingFunds + 1 - underlyingBalance)
+                        amount: _amountWithFee(distributedFunds - underlyingBalance)
                     }); // U:[CM-8]
                 }
             }
@@ -563,6 +576,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param creditAccount Address of the Credit Account
     /// @param token Collateral token to add
     /// @param amount Amount to add
+    /// @return tokenMask Mask of the added token
     function addCollateral(address payer, address creditAccount, address token, uint256 amount)
         external
         nonReentrant // U:[CM-5]
@@ -615,11 +629,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 if (spender == address(0) || token == address(0)) {
                     revert ZeroAddressException(); // U:[CM-15]
                 }
-                uint256 allowance = IERC20(token).allowance(creditAccount, spender); // U:[CM-15]
                 /// It checks that token is in collateral token list in _approveSpender function
-                if (allowance > 1) {
-                    _approveSpender({creditAccount: creditAccount, token: token, spender: spender, amount: 0}); // U:[CM-15]
-                }
+                _approveSpender({creditAccount: creditAccount, token: token, spender: spender, amount: 0}); // U:[CM-15]
             }
         }
     }
@@ -676,13 +687,17 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
     {
+        if (_activeCreditAccount != INACTIVE_CREDIT_ACCOUNT_ADDRESS && creditAccount != INACTIVE_CREDIT_ACCOUNT_ADDRESS)
+        {
+            revert ActiveCreditAccountOverridenException();
+        }
         _activeCreditAccount = creditAccount;
     }
 
     /// @notice Returns the current active credit account
     function getActiveCreditAccountOrRevert() public view override returns (address creditAccount) {
         creditAccount = _activeCreditAccount;
-        if (creditAccount == address(1)) revert ActiveCreditAccountNotSetException();
+        if (creditAccount == INACTIVE_CREDIT_ACCOUNT_ADDRESS) revert ActiveCreditAccountNotSetException();
     }
 
     //
@@ -694,7 +709,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param creditAccount Address of the Credit Account to check
     /// @param enabledTokensMask Current enabled token mask
     /// @param collateralHints Array of token masks in the desired order of evaluation
-    /// @param minHealthFactor Minimal health factor of the account, in PERCENTAGE format
+    /// @param minHealthFactor Minimal health factor of the account, in PERCENTAGE_FACTOR format
     function fullCollateralCheck(
         address creditAccount,
         uint256 enabledTokensMask,
@@ -740,7 +755,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Returns whether the passed credit account is unhealthy given the provided minHealthFactor
     /// @param creditAccount Address of the credit account to check
     /// @param minHealthFactor The health factor below which the function would
-    ///                        consider the account unhealthy
+    ///                        consider the account unhealthy, in PERCENTAGE_FACTOR format
     function isLiquidatable(address creditAccount, uint16 minHealthFactor) external view override returns (bool) {
         uint256[] memory collateralHints;
 
@@ -789,7 +804,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         /// @dev FULL_COLLATERAL_CHECK_LAZY is a special calculation type
         ///      that can only be used safely internally, since it can stop early
         ///      and possibly return incorrect TWV/TV values. Therefore, it is
-        ///      prevented from being called internally
+        ///      prevented from being called externally
         if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) {
             revert IncorrectParameterException(); // U:[CM-19]
         }
@@ -864,7 +879,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             cumulativeIndexNow: collateralDebtData.cumulativeIndexNow
         }); // U:[CM-21] // I: [CMQ-07]
 
-        collateralDebtData.accruedFees += (collateralDebtData.accruedInterest * feeInterest) / PERCENTAGE_FACTOR; // U:[CM-21]
+        collateralDebtData.accruedFees += collateralDebtData.accruedInterest * feeInterest / PERCENTAGE_FACTOR; // U:[CM-21]
 
         if (task == CollateralCalcTask.DEBT_ONLY) return collateralDebtData; // U:[CM-21]
 
@@ -935,6 +950,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Gathers all data on the Credit Account's quoted tokens and quota interest
     /// @param creditAccount Credit Account to return quoted token data for
     /// @param enabledTokensMask Current mask of enabled tokens
+    /// @param collateralHints Array of token masks in the desired order of evaluation.
+    ///        The order of the final quoted tokens array will follow the order of hints,
+    ///        which can help in stopping collateral computations early to optimize gas.
     /// @param _poolQuotaKeeper The PoolQuotaKeeper contract storing the quota and quota interest data
     /// @return quotaTokens An array of address of quoted tokens on the Credit Account
     /// @return outstandingQuotaInterest Quota interest that has not been saved in the Credit Manager
@@ -973,25 +991,31 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             //  Picks creditAccount on top of stack to remove stack to deep error
             address ca = creditAccount;
             unchecked {
-                for (uint256 i; tokensToCheckMask != 0; ++i) {
+                uint256 i;
+                while (tokensToCheckMask != 0) {
                     uint256 tokenMask;
 
-                    tokenMask = (i < len) ? collateralHints[i] : 1 << (i - len);
-
-                    if (tokensToCheckMask & tokenMask != 0) {
-                        (address token, uint16 lt) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
-
-                        (uint256 quota, uint128 outstandingInterestDelta) =
-                            IPoolQuotaKeeperV3(_poolQuotaKeeper).getQuotaAndOutstandingInterest(ca, token); // U:[CM-24]
-
-                        quotaTokens[j] = token; // U:[CM-24]
-                        quotasPacked[j] = CollateralLogic.packQuota(uint96(quota), lt);
-
-                        /// Quota interest is equal to quota * APY * time. Since quota is a uint96, this is unlikely to overflow in any realistic scenario.
-                        outstandingQuotaInterest += outstandingInterestDelta; // U:[CM-24]
-
-                        ++j; // U:[CM-24]
+                    if (i < len) {
+                        tokenMask = collateralHints[i];
+                        ++i;
+                        if (tokensToCheckMask & tokenMask == 0) continue;
+                    } else {
+                        tokenMask = tokensToCheckMask & uint256(-int256(tokensToCheckMask));
                     }
+
+                    (address token, uint16 lt) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
+
+                    (uint256 quota, uint128 outstandingInterestDelta) =
+                        IPoolQuotaKeeperV3(_poolQuotaKeeper).getQuotaAndOutstandingInterest(ca, token); // U:[CM-24]
+
+                    quotaTokens[j] = token; // U:[CM-24]
+                    quotasPacked[j] = CollateralLogic.packQuota(uint96(quota), lt);
+
+                    /// Quota interest is equal to quota * APY * time. Since quota is a uint96, this is unlikely to overflow in any realistic scenario.
+                    outstandingQuotaInterest += outstandingInterestDelta; // U:[CM-24]
+
+                    ++j; // U:[CM-24]
+
                     tokensToCheckMask = tokensToCheckMask.disable(tokenMask);
                 }
             }
@@ -1225,7 +1249,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Returns the mask for the provided token
     /// @param token Token to returns the mask for
     function getTokenMaskOrRevert(address token) public view override returns (uint256 tokenMask) {
-        tokenMask = (token == underlying) ? 1 : tokenMasksMapInternal[token]; // U:[CM-34]
+        if (token == underlying) return UNDERLYING_TOKEN_MASK; // U:[CM-34]
+
+        tokenMask = tokenMasksMapInternal[token]; // U:[CM-34]
         if (tokenMask == 0) revert TokenNotAllowedException(); // U:[CM-34]
     }
 
@@ -1237,6 +1263,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     /// @notice Returns the liquidation threshold for the provided token
     /// @param token Token to retrieve the LT for
+    /// @return lt Returns the token's LT in PERCENTAGE_FACTOR format
     function liquidationThresholds(address token) public view override returns (uint16 lt) {
         uint256 tokenMask = getTokenMaskOrRevert(token);
         (, lt) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-42]
@@ -1244,6 +1271,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     /// @notice Returns the collateral token with requested mask and its liquidationThreshold
     /// @param tokenMask Token mask corresponding to the token
+    /// @return token Address of the token
+    /// @return liquidationThreshold Returns the token's LT in PERCENTAGE_FACTOR format
     function collateralTokenByMask(uint256 tokenMask)
         public
         view
@@ -1261,9 +1290,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (address token, uint16 liquidationThreshold)
     {
         // The underlying is a special case and its mask is always 1
-        if (tokenMask == 1) {
+        if (tokenMask == UNDERLYING_TOKEN_MASK) {
             token = underlying; // U:[CM-34]
-            liquidationThreshold = ltUnderlying; // U:[CM-35]
+            if (calcLT) liquidationThreshold = ltUnderlying; // U:[CM-35]
         } else {
             CollateralTokenData storage tokenData = collateralTokensData[tokenMask]; // U:[CM-34]
 
@@ -1303,15 +1332,17 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     /// @notice Returns the fee parameters of the Credit Manager
-    /// @return _feeInterest Percentage of interest taken by the protocol as profit
+    /// @return _feeInterest Percentage of interest taken by the protocol as profit, in PERCENTAGE_FACTOR format
     /// @return _feeLiquidation Percentage of account value taken by the protocol as profit
-    ///         during unhealthy account liquidations
+    ///         during unhealthy account liquidations, in PERCENTAGE_FACTOR format
     /// @return _liquidationDiscount Multiplier that reduces the effective totalValue during unhealthy account liquidations,
-    ///         allowing the liquidator to take the unaccounted for remainder as premium. Equal to (1 - liquidationPremium)
+    ///         allowing the liquidator to take the unaccounted for remainder as premium. Equal to (1 - liquidationPremium),
+    ///         in PERCENTAGE_FACTOR format
     /// @return _feeLiquidationExpired Percentage of account value taken by the protocol as profit
-    ///         during expired account liquidations
+    ///         during expired account liquidations, in PERCENTAGE_FACTOR format
     /// @return _liquidationDiscountExpired Multiplier that reduces the effective totalValue during expired account liquidations,
-    ///         allowing the liquidator to take the unaccounted for remainder as premium. Equal to (1 - liquidationPremiumExpired)
+    ///         allowing the liquidator to take the unaccounted for remainder as premium. Equal to (1 - liquidationPremiumExpired),
+    ///         in PERCENTAGE_FACTOR format
     function fees()
         external
         view
@@ -1497,15 +1528,17 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     /// @notice Sets fees and premiums
-    /// @param _feeInterest Percentage of interest taken by the protocol as profit
+    /// @param _feeInterest Percentage of interest taken by the protocol as profit, in PERCENTAGE_FACTOR format
     /// @param _feeLiquidation Percentage of account value taken by the protocol as profit
-    ///         during unhealthy account liquidations
+    ///         during unhealthy account liquidations, in PERCENTAGE_FACTOR format
     /// @param _liquidationDiscount Multiplier that reduces the effective totalValue during unhealthy account liquidations,
-    ///         allowing the liquidator to take the unaccounted for remainder as premium. Equal to (1 - liquidationPremium)
+    ///         allowing the liquidator to take the unaccounted for remainder as premium. Equal to (1 - liquidationPremium),
+    ///         in PERCENTAGE_FACTOR format
     /// @param _feeLiquidationExpired Percentage of account value taken by the protocol as profit
-    ///         during expired account liquidations
+    ///         during expired account liquidations, in PERCENTAGE_FACTOR format
     /// @param _liquidationDiscountExpired Multiplier that reduces the effective totalValue during expired account liquidations,
-    ///         allowing the liquidator to take the unaccounted for remainder as premium. Equal to (1 - liquidationPremiumExpired)
+    ///         allowing the liquidator to take the unaccounted for remainder as premium. Equal to (1 - liquidationPremiumExpired),
+    ///         in PERCENTAGE_FACTOR format
     function setFees(
         uint16 _feeInterest,
         uint16 _feeLiquidation,

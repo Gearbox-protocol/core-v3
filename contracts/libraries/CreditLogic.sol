@@ -126,14 +126,14 @@ library CreditLogic {
         view
         returns (uint16)
     {
-        if (block.timestamp < timestampRampStart) {
-            return ltInitial; // U:[CL-5]
-        }
         uint40 timestampRampEnd = timestampRampStart + rampDuration;
-        if (block.timestamp < timestampRampEnd) {
+        if (block.timestamp <= timestampRampStart) {
+            return ltInitial; // U:[CL-5]
+        } else if (block.timestamp < timestampRampEnd) {
             return _getRampingLiquidationThreshold(ltInitial, ltFinal, timestampRampStart, timestampRampEnd); // U:[CL-5]
+        } else {
+            return ltFinal; // U:[CL-5]
         }
-        return ltFinal; // U:[CL-5]
     }
 
     /// @dev Computes the LT during the ramping process

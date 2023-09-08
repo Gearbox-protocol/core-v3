@@ -67,14 +67,15 @@ contract LinearInterestRateModelV3 is ILinearInterestRateModelV3 {
         }
 
         /// Critical utilization points are stored in WAD format
-        U_1_WAD = (WAD * U_1) / PERCENTAGE_FACTOR; // U:[LIM-1]
-        U_2_WAD = (WAD * U_2) / PERCENTAGE_FACTOR; // U:[LIM-1]
+
+        U_1_WAD = U_1 * (WAD / PERCENTAGE_FACTOR); // U:[LIM-1]
+        U_2_WAD = U_2 * (WAD / PERCENTAGE_FACTOR); // U:[LIM-1]
 
         /// Slopes are stored in RAY format
-        R_base_RAY = (RAY * R_base) / PERCENTAGE_FACTOR; // U:[LIM-1]
-        R_slope1_RAY = (RAY * R_slope1) / PERCENTAGE_FACTOR; // U:[LIM-1]
-        R_slope2_RAY = (RAY * R_slope2) / PERCENTAGE_FACTOR; // U:[LIM-1]
-        R_slope3_RAY = (RAY * R_slope3) / PERCENTAGE_FACTOR; // U:[LIM-1]
+        R_base_RAY = R_base * (RAY / PERCENTAGE_FACTOR); // U:[LIM-1]
+        R_slope1_RAY = R_slope1 * (RAY / PERCENTAGE_FACTOR); // U:[LIM-1]
+        R_slope2_RAY = R_slope2 * (RAY / PERCENTAGE_FACTOR); // U:[LIM-1]
+        R_slope3_RAY = R_slope3 * (RAY / PERCENTAGE_FACTOR); // U:[LIM-1]
 
         isBorrowingMoreU2Forbidden = _isBorrowingMoreU2Forbidden; // U:[LIM-1]
     }
@@ -94,7 +95,7 @@ contract LinearInterestRateModelV3 is ILinearInterestRateModelV3 {
         override
         returns (uint256)
     {
-        if (expectedLiquidity == 0 || expectedLiquidity < availableLiquidity) {
+        if (expectedLiquidity <= availableLiquidity) {
             return R_base_RAY; // U:[LIM-3]
         }
 
@@ -118,7 +119,7 @@ contract LinearInterestRateModelV3 is ILinearInterestRateModelV3 {
         // borrowRate = R_base + R_slope1 + R_slope2 * -----------
         //                                              U_2 - U_1
 
-        if (U_WAD >= U_1_WAD && U_WAD < U_2_WAD) {
+        if (U_WAD < U_2_WAD) {
             return R_base_RAY + R_slope1_RAY + (R_slope2_RAY * (U_WAD - U_1_WAD)) / (U_2_WAD - U_1_WAD); // U:[LIM-3]
         }
 
@@ -143,12 +144,12 @@ contract LinearInterestRateModelV3 is ILinearInterestRateModelV3 {
         override
         returns (uint16 U_1, uint16 U_2, uint16 R_base, uint16 R_slope1, uint16 R_slope2, uint16 R_slope3)
     {
-        U_1 = uint16((U_1_WAD * PERCENTAGE_FACTOR) / WAD); // U:[LIM-1]
-        U_2 = uint16((U_2_WAD * PERCENTAGE_FACTOR) / WAD); // U:[LIM-1]
-        R_base = uint16(R_base_RAY * PERCENTAGE_FACTOR / RAY); // U:[LIM-1]
-        R_slope1 = uint16(R_slope1_RAY * PERCENTAGE_FACTOR / RAY); // U:[LIM-1]
-        R_slope2 = uint16(R_slope2_RAY * PERCENTAGE_FACTOR / RAY); // U:[LIM-1]
-        R_slope3 = uint16(R_slope3_RAY * PERCENTAGE_FACTOR / RAY); // U:[LIM-1]
+        U_1 = uint16(U_1_WAD / (WAD / PERCENTAGE_FACTOR)); // U:[LIM-1]
+        U_2 = uint16(U_2_WAD / (WAD / PERCENTAGE_FACTOR)); // U:[LIM-1]
+        R_base = uint16(R_base_RAY / (RAY / PERCENTAGE_FACTOR)); // U:[LIM-1]
+        R_slope1 = uint16(R_slope1_RAY / (RAY / PERCENTAGE_FACTOR)); // U:[LIM-1]
+        R_slope2 = uint16(R_slope2_RAY / (RAY / PERCENTAGE_FACTOR)); // U:[LIM-1]
+        R_slope3 = uint16(R_slope3_RAY / (RAY / PERCENTAGE_FACTOR)); // U:[LIM-1]
     }
 
     /// @notice Returns the amount available to borrow

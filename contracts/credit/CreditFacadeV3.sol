@@ -5,6 +5,8 @@ pragma solidity ^0.8.17;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 
 // LIBS & TRAITS
 import {BalancesLogic, Balance, BalanceWithMask} from "../libraries/BalancesLogic.sol";
@@ -24,7 +26,8 @@ import {
     RevocationPair,
     CollateralDebtData,
     CollateralCalcTask,
-    BOT_PERMISSIONS_SET_FLAG
+    BOT_PERMISSIONS_SET_FLAG,
+    INACTIVE_CREDIT_ACCOUNT_ADDRESS
 } from "../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
 import {ClaimAction, ETH_ADDRESS, IWithdrawalManagerV3} from "../interfaces/IWithdrawalManagerV3.sol";
@@ -47,6 +50,8 @@ uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS =
 
 uint256 constant CLOSE_CREDIT_ACCOUNT_FLAGS = EXTERNAL_CALLS_PERMISSION;
 
+uint256 constant DUMMY_INVERTED_QUOTED_MASK = type(uint256).max - 1;
+
 /// @title CreditFacadeV3
 /// @notice A contract that provides a user interface for interacting with Credit Manager.
 /// @dev CreditFacadeV3 provides an interface between the user and the Credit Manager. Direct interactions
@@ -57,11 +62,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     using Address for address;
     using BitMask for uint256;
     using SafeCast for uint256;
+    using SafeERC20 for IERC20;
 
     /// @notice Contract version
     uint256 public constant override version = 3_00;
 
-    /// @notice maxDebt to maxQuota multiplier
+    /// @notice The maximal size of a quota, as a multiple of maxDebt
     uint256 public constant maxQuotaMultiplier = 8;
 
     /// @notice Maximum number of approved bots for a credit account
@@ -207,6 +213,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param calls The array of MultiCall structs encoding the required operations. Generally must have
     /// at least a call to addCollateral, as otherwise the health check at the end will fail.
     /// @param referralCode Referral code that is used for potential rewards. 0 if no referral code provided
+    /// @return creditAccount The address of the newly opened account
     function openCreditAccount(uint256 debt, address onBehalfOf, MultiCall[] calldata calls, uint16 referralCode)
         external
         payable
@@ -588,7 +595,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         /// Inverted mask of quoted tokens is pre-compute to avoid
         /// enabling or disabling them outside `updateQuota`
         // TODO: make it lazy
-        uint256 quotedTokensMaskInverted = ~ICreditManagerV3(creditManager).quotedTokensMask();
+        uint256 quotedTokensMaskInverted = DUMMY_INVERTED_QUOTED_MASK;
 
         // Emits event for multicall start - used in analytics to track actions within multicalls
         emit StartMultiCall({creditAccount: creditAccount, caller: msg.sender}); // U:[FA-18]
@@ -646,6 +653,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     /// Transfers new collateral from the caller to the Credit Account.
                     else if (method == ICreditFacadeV3Multicall.addCollateral.selector) {
                         _revertIfNoPermission(flags, ADD_COLLATERAL_PERMISSION); // U:[FA-21]
+
+                        quotedTokensMaskInverted = _getInvertedQuotedTokensMask(quotedTokensMaskInverted);
+
                         enabledTokensMask = enabledTokensMask.enable({
                             bitsToEnable: _addCollateral(creditAccount, mcall.callData[4:]),
                             invertedSkipMask: quotedTokensMaskInverted
@@ -677,6 +687,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         flags = flags.enable(REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS);
 
                         uint256 tokensToDisable = _scheduleWithdrawal(creditAccount, mcall.callData[4:]); // U:[FA-34]
+
+                        quotedTokensMaskInverted = _getInvertedQuotedTokensMask(quotedTokensMaskInverted);
+
                         enabledTokensMask = enabledTokensMask.disable({
                             bitsToDisable: tokensToDisable,
                             invertedSkipMask: quotedTokensMaskInverted
@@ -743,6 +756,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         _revertIfNoPermission(flags, ENABLE_TOKEN_PERMISSION); // U:[FA-21]
                         // Parses token
                         address token = abi.decode(mcall.callData[4:], (address)); // U:[FA-33]
+
+                        quotedTokensMaskInverted = _getInvertedQuotedTokensMask(quotedTokensMaskInverted);
+
                         enabledTokensMask = enabledTokensMask.enable({
                             bitsToEnable: _getTokenMaskOrRevert(token),
                             invertedSkipMask: quotedTokensMaskInverted
@@ -757,7 +773,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         _revertIfNoPermission(flags, DISABLE_TOKEN_PERMISSION); // U:[FA-21]
                         // Parses token
                         address token = abi.decode(mcall.callData[4:], (address)); // U:[FA-33]
-                        /// IGNORE QUOTED TOKEN MASK
+
+                        quotedTokensMaskInverted = _getInvertedQuotedTokensMask(quotedTokensMaskInverted);
+
                         enabledTokensMask = enabledTokensMask.disable({
                             bitsToDisable: _getTokenMaskOrRevert(token),
                             invertedSkipMask: quotedTokensMaskInverted
@@ -810,6 +828,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     emit Execute({creditAccount: creditAccount, targetContract: targetContract});
 
                     (uint256 tokensToEnable, uint256 tokensToDisable) = abi.decode(result, (uint256, uint256)); // U:[FA-38]
+
+                    quotedTokensMaskInverted = _getInvertedQuotedTokensMask(quotedTokensMaskInverted);
+
                     enabledTokensMask = enabledTokensMask.enableDisable({
                         bitsToEnable: tokensToEnable,
                         bitsToDisable: tokensToDisable,
@@ -876,7 +897,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @notice Sets the `externalCallCreditAccount` in Credit Manager
     ///      to the default value
     function _unsetActiveCreditAccount() internal {
-        _setActiveCreditAccount(address(1)); // F:[FA-26]
+        _setActiveCreditAccount(INACTIVE_CREDIT_ACCOUNT_ADDRESS); // F:[FA-26]
     }
 
     /// @notice Reverts if provided flags contain no permission for the requested action
@@ -1178,7 +1199,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     function _wrapETH() internal {
         if (msg.value != 0) {
             IWETH(weth).deposit{value: msg.value}(); // U:[FA-7]
-            IWETH(weth).transfer(msg.sender, msg.value); // U:[FA-7]
+            IERC20(weth).safeTransfer(msg.sender, msg.value); // U:[FA-7]
         }
     }
 
@@ -1196,6 +1217,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
     function _flagsOf(address creditAccount) internal view returns (uint16) {
         return ICreditManagerV3(creditManager).flagsOf(creditAccount);
+    }
+
+    function _getInvertedQuotedTokensMask(uint256 currentMask) internal view returns (uint256) {
+        return currentMask == DUMMY_INVERTED_QUOTED_MASK
+            ? ~ICreditManagerV3(creditManager).quotedTokensMask()
+            : currentMask;
     }
 
     /// @notice Internal wrapper for `CreditManager.setFlagFor()`. The external call is wrapped

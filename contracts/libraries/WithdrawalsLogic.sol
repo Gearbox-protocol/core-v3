@@ -14,6 +14,7 @@ library WithdrawalsLogic {
     }
 
     /// @dev If withdrawal is scheduled, returns withdrawn token, its mask in credit manager and withdrawn amount
+    /// @dev For non-schedule or zero-value withdrawals, no token/mask is returned
     function tokenMaskAndAmount(ScheduledWithdrawal storage w)
         internal
         view
