@@ -14,3 +14,8 @@ fs_permissions = [{ access = "read-write", path = "./"}]
 
 [fuzz]
 max_test_rejects = 200000
+
+[invariant]
+fail_on_revert = true
+runs=200
+depth=50
