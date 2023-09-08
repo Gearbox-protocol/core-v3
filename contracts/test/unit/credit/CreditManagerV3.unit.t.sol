@@ -1609,7 +1609,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         vm.expectRevert(DebtToZeroWithActiveQuotasException.selector);
 
         /// @notice enabledTokesMask is set to zero, because it has no impact
-        (uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable) = creditManager.manageDebt({
+        creditManager.manageDebt({
             creditAccount: creditAccount,
             amount: type(uint256).max,
             enabledTokensMask: LINK_MASK,

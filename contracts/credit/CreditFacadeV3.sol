@@ -186,8 +186,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         botList =
             IAddressProviderV3(ICreditManagerV3(_creditManager).addressProvider()).getAddressOrRevert(AP_BOT_LIST, 3_00);
 
-        IPoolBase pool = IPoolBase(ICreditManagerV3(_creditManager).pool());
-
         degenNFT = _degenNFT; // U:[FA-1]  // F:[FA-1A]
 
         expirable = _expirable; // U:[FA-1] // F:[FA-1A]
