@@ -26,7 +26,7 @@ contract GearboxInstance is IntegrationTestHelper {
         vm.roll(block.number + 1);
     }
 
-    function getVm() external view returns (Vm) {
+    function getVm() external pure returns (Vm) {
         return vm;
     }
 }

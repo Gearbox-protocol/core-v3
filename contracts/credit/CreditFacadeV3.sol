@@ -250,7 +250,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             creditAccount: creditAccount,
             calls: calls,
             enabledTokensMask: debt == 0 ? 0 : UNDERLYING_TOKEN_MASK,
-            flags: OPEN_CREDIT_ACCOUNT_FLAGS
+            flags: OPEN_CREDIT_ACCOUNT_FLAGS,
+            skip: 0
         }); // U:[FA-10]
 
         // Since it's not possible to enable any forbidden tokens on a new account,
@@ -315,7 +316,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         if (calls.length != 0) {
             /// All account management functions are forbidden during closure
             FullCheckParams memory fullCheckParams =
-                _multicall(creditAccount, calls, debtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS); // U:[FA-11]
+                _multicall(creditAccount, calls, debtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS, 0); // U:[FA-11]
             debtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter; // U:[FA-11]
         }
 
@@ -437,7 +438,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                 creditAccount,
                 calls,
                 collateralDebtData.enabledTokensMask,
-                CLOSE_CREDIT_ACCOUNT_FLAGS.enable(PRICE_UPDATES_ALREADY_APPLIED)
+                CLOSE_CREDIT_ACCOUNT_FLAGS,
+                calls.length - remainingCalls
             ); // U:[FA-16]
             collateralDebtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter; // U:[FA-16]
         }
@@ -556,7 +558,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             creditAccount,
             calls,
             enabledTokensMaskBefore,
-            forbiddenBalances.length != 0 ? flags.enable(FORBIDDEN_TOKENS_BEFORE_CALLS) : flags
+            forbiddenBalances.length != 0 ? flags.enable(FORBIDDEN_TOKENS_BEFORE_CALLS) : flags,
+            0
         );
 
         // Performs one fullCollateralCheck at the end of a multicall
@@ -588,10 +591,13 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     ///                         - enabledTokensMaskAfter: The mask of tokens enabled on the account after the multicall
     ///                                                   The enabledTokensMask value in Credit Manager storage is updated
     ///                                                   during the fullCollateralCheck
-    function _multicall(address creditAccount, MultiCall[] calldata calls, uint256 enabledTokensMask, uint256 flags)
-        internal
-        returns (FullCheckParams memory fullCheckParams)
-    {
+    function _multicall(
+        address creditAccount,
+        MultiCall[] calldata calls,
+        uint256 enabledTokensMask,
+        uint256 flags,
+        uint256 skip
+    ) internal returns (FullCheckParams memory fullCheckParams) {
         /// Inverted mask of quoted tokens is pre-compute to avoid
         /// enabling or disabling them outside `updateQuota`
         // TODO: make it lazy
@@ -609,7 +615,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         uint256 len = calls.length;
 
         unchecked {
-            for (uint256 i = 0; i < len; ++i) {
+            for (uint256 i = skip; i < len; ++i) {
                 MultiCall calldata mcall = calls[i];
                 //
                 // CREDIT FACADE
@@ -643,9 +649,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     /// price updates. This helps support tokens where there is no traditional price feeds,
                     /// but there is attested off-chain price data.
                     else if (method == ICreditFacadeV3Multicall.onDemandPriceUpdate.selector) {
-                        if (flags & PRICE_UPDATES_ALREADY_APPLIED == 0) {
-                            _onDemandPriceUpdate(mcall.callData[4:], fullCheckParams); // U:[FA-25]
-                        }
+                        _onDemandPriceUpdate(mcall.callData[4:], fullCheckParams); // U:[FA-25]
                     }
                     //
                     // ADD COLLATERAL
@@ -803,29 +807,33 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     _revertIfNoPermission(flags, EXTERNAL_CALLS_PERMISSION);
                     // U:[FA-21]
 
-                    address targetContract = ICreditManagerV3(creditManager).adapterToContract(mcall.target);
+                    bytes memory result;
 
-                    // Checks that the target is an allowed adapter in Credit Manager
-                    if (targetContract == address(0)) {
-                        revert TargetContractNotAllowedException();
+                    {
+                        address targetContract = ICreditManagerV3(creditManager).adapterToContract(mcall.target);
+
+                        // Checks that the target is an allowed adapter in Credit Manager
+                        if (targetContract == address(0)) {
+                            revert TargetContractNotAllowedException();
+                        }
+
+                        /// The `externalCallCreditAccount` value in CreditManager is set to the currently processed
+                        /// Credit Account. This value is used by adapters to retrieve the CA that is being worked on
+                        /// After the multicall, the value is set back to address(1)
+                        if (flags & EXTERNAL_CONTRACT_WAS_CALLED == 0) {
+                            flags = flags.enable(EXTERNAL_CONTRACT_WAS_CALLED);
+                            _setActiveCreditAccount(creditAccount); // U:[FA-38]
+                        }
+
+                        /// Performs an adapter call. Each external adapter function returns
+                        /// the masks of tokens to enable and disable, which are applied to the mask
+                        /// on the stack; the net change in the enabled token set is saved to storage
+                        /// only in fullCollateralCheck at the end of the multicall
+                        result = mcall.target.functionCall(mcall.callData); // U:[FA-38]
+
+                        // Emits an event
+                        emit Execute({creditAccount: creditAccount, targetContract: targetContract});
                     }
-
-                    /// The `externalCallCreditAccount` value in CreditManager is set to the currently processed
-                    /// Credit Account. This value is used by adapters to retrieve the CA that is being worked on
-                    /// After the multicall, the value is set back to address(1)
-                    if (flags & EXTERNAL_CONTRACT_WAS_CALLED == 0) {
-                        flags = flags.enable(EXTERNAL_CONTRACT_WAS_CALLED);
-                        _setActiveCreditAccount(creditAccount); // U:[FA-38]
-                    }
-
-                    /// Performs an adapter call. Each external adapter function returns
-                    /// the masks of tokens to enable and disable, which are applied to the mask
-                    /// on the stack; the net change in the enabled token set is saved to storage
-                    /// only in fullCollateralCheck at the end of the multicall
-                    bytes memory result = mcall.target.functionCall(mcall.callData); // U:[FA-38]
-
-                    // Emits an event
-                    emit Execute({creditAccount: creditAccount, targetContract: targetContract});
 
                     (uint256 tokensToEnable, uint256 tokensToDisable) = abi.decode(result, (uint256, uint256)); // U:[FA-38]
 
