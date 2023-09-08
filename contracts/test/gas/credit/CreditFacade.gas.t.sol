@@ -139,18 +139,19 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         vm.startPrank(CONFIGURATOR);
         gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
         poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-        gauge.updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
 
         gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.USDC), 500, 500);
         poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.USDC), type(uint96).max);
-        gauge.updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.USDC));
 
         gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.WETH), 500, 500);
         poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.WETH), type(uint96).max);
-        gauge.updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.WETH));
+
+        vm.warp(block.timestamp + 7 days);
+        gauge.updateEpoch();
+
         vm.stopPrank();
 
         tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
@@ -202,6 +203,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         vm.startPrank(CONFIGURATOR);
         gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
         poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
+        vm.warp(block.timestamp + 7 days);
         gauge.updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
         vm.stopPrank();
@@ -318,8 +320,10 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         vm.startPrank(CONFIGURATOR);
         gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
         poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-        gauge.updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
+
+        vm.warp(block.timestamp + 7 days);
+        gauge.updateEpoch();
         vm.stopPrank();
 
         tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
@@ -529,8 +533,10 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         vm.startPrank(CONFIGURATOR);
         gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
         poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-        gauge.updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
+
+        vm.warp(block.timestamp + 7 days);
+        gauge.updateEpoch();
         vm.stopPrank();
 
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
@@ -655,8 +661,10 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         vm.startPrank(CONFIGURATOR);
         gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
         poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-        gauge.updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
+
+        vm.warp(block.timestamp + 7 days);
+        gauge.updateEpoch();
         vm.stopPrank();
 
         tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
@@ -813,8 +821,10 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         vm.startPrank(CONFIGURATOR);
         gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
         poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-        gauge.updateEpoch();
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
+
+        vm.warp(block.timestamp + 7 days);
+        gauge.updateEpoch();
         vm.stopPrank();
 
         tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);

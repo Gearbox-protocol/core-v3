@@ -166,7 +166,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
         assertEq(tokens.length, 1, "token wasn't added to quotaTokenSet");
 
         (uint16 rate, uint192 cumulativeIndexLU_RAY,, uint96 totalQuoted, uint96 limit) =
-            pqk.totalQuotaParams(DUMB_ADDRESS);
+            pqk.getTokenQuotaParams(DUMB_ADDRESS);
 
         assertEq(totalQuoted, 0, "totalQuoted !=0");
         assertEq(limit, 0, "limit !=0");
@@ -257,7 +257,8 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
             vm.prank(address(gaugeMock));
             pqk.updateRates();
 
-            (uint16 rate, uint192 cumulativeIndexLU_RAY,, uint96 totalQuoted, uint96 limit) = pqk.totalQuotaParams(DAI);
+            (uint16 rate, uint192 cumulativeIndexLU_RAY,, uint96 totalQuoted, uint96 limit) =
+                pqk.getTokenQuotaParams(DAI);
 
             assertEq(rate, DAI_QUOTA_RATE, _testCaseErr("Incorrect DAI rate"));
             assertEq(
@@ -266,7 +267,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 _testCaseErr("Incorrect DAI cumulativeIndexLU")
             );
 
-            (rate, cumulativeIndexLU_RAY,, totalQuoted, limit) = pqk.totalQuotaParams(USDC);
+            (rate, cumulativeIndexLU_RAY,, totalQuoted, limit) = pqk.getTokenQuotaParams(USDC);
 
             assertEq(rate, USDC_QUOTA_RATE, _testCaseErr("Incorrect USDC rate"));
             assertEq(
@@ -348,7 +349,14 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
 
         pqk.setTokenLimit(DUMB_ADDRESS, limit);
 
-        (,,,, uint96 limitSet) = pqk.totalQuotaParams(DUMB_ADDRESS);
+        (,,,, uint96 limitSet) = pqk.getTokenQuotaParams(DUMB_ADDRESS);
+
+        assertEq(limitSet, 0, "Incorrect limit was set");
+
+        vm.warp(block.timestamp + 7 days);
+        gaugeMock.updateEpoch();
+
+        (,,,, limitSet) = pqk.getTokenQuotaParams(DUMB_ADDRESS);
 
         assertEq(limitSet, limit, "Incorrect limit was set");
     }
@@ -364,7 +372,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
 
         pqk.setTokenQuotaIncreaseFee(DUMB_ADDRESS, fee);
 
-        (,, uint16 feeSet,,) = pqk.totalQuotaParams(DUMB_ADDRESS);
+        (,, uint16 feeSet,,) = pqk.getTokenQuotaParams(DUMB_ADDRESS);
 
         assertEq(feeSet, fee, "Incorrect fee was set");
     }
@@ -717,8 +725,8 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
                 assertEq(quota2, cases[i].token2Quota > 0 ? 1 : 0, "Quota 2 was not removed");
             }
 
-            (,,, uint96 totalQuoted1, uint96 limit1) = pqk.totalQuotaParams(token1);
-            (,,, uint96 totalQuoted2, uint96 limit2) = pqk.totalQuotaParams(token2);
+            (,,, uint96 totalQuoted1, uint96 limit1) = pqk.getTokenQuotaParams(token1);
+            (,,, uint96 totalQuoted2, uint96 limit2) = pqk.getTokenQuotaParams(token2);
 
             assertEq(
                 totalQuoted1,

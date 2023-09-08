@@ -427,7 +427,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
         creditFacade.closeCreditAccount(creditAccount, USER, 0, false, new MultiCall[](0));
 
         for (uint256 i = 0; i < quotedTokens.length; ++i) {
-            (,,, uint96 limit,) = poolQuotaKeeper.totalQuotaParams(quotedTokens[i]);
+            (,,, uint96 limit,) = poolQuotaKeeper.getTokenQuotaParams(quotedTokens[i]);
 
             assertEq(limit, 1, "Limit was not zeroed");
         }
