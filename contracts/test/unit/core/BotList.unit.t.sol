@@ -93,14 +93,14 @@ contract BotListTest is Test, IBotListV3Events {
     ///
 
     /// @dev [BL-1]: constructor sets correct values
-    function test_BL_01_constructor_sets_correct_values() public {
+    function test_U_BL_01_constructor_sets_correct_values() public {
         assertEq(botList.treasury(), addressProvider.getAddressOrRevert(AP_TREASURY, 0), "Treasury contract incorrect");
         assertEq(botList.weth(), address(weth), "WETH incorrect");
         assertEq(botList.daoFee(), 0, "Initial DAO fee incorrect");
     }
 
     /// @dev [BL-2]: setDAOFee works correctly
-    function test_BL_02_setDAOFee_works_correctly() public {
+    function test_U_BL_02_setDAOFee_works_correctly() public {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         botList.setDAOFee(1);
 
@@ -114,7 +114,7 @@ contract BotListTest is Test, IBotListV3Events {
     }
 
     /// @dev [BL-3]: setBotPermissions works correctly
-    function test_BL_03_setBotPermissions_works_correctly() public {
+    function test_U_BL_03_setBotPermissions_works_correctly() public {
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         vm.prank(invalidCF);
         botList.setBotPermissions({
@@ -273,7 +273,7 @@ contract BotListTest is Test, IBotListV3Events {
     }
 
     /// @dev [BL-4]: deposit and withdraw work correctly
-    function test_BL_04_deposit_withdraw_work_correctly() public {
+    function test_U_BL_04_deposit_withdraw_work_correctly() public {
         vm.deal(USER, 10 ether);
 
         vm.expectRevert(AmountCantBeZeroException.selector);
@@ -307,7 +307,7 @@ contract BotListTest is Test, IBotListV3Events {
     }
 
     /// @dev [BL-5]: payBot works correctly
-    function test_BL_05_payBot_works_correctly() public {
+    function test_U_BL_05_payBot_works_correctly() public {
         vm.prank(CONFIGURATOR);
         botList.setDAOFee(5000);
 
@@ -377,9 +377,7 @@ contract BotListTest is Test, IBotListV3Events {
 
         assertEq(weth.balanceOf(address(bot)), 1 ether / 20, "Bot was sent incorrect WETH amount");
 
-        assertEq(
-            weth.balanceOf(addressProvider.getTreasuryContract()), 1 ether / 40, "Treasury was sent incorrect amount"
-        );
+        assertEq(botList.collectedDaoFees(), 1 ether / 40, "Collected dao fees was increased with incorrect amount");
 
         vm.warp(block.timestamp + 7 days);
 
@@ -413,13 +411,19 @@ contract BotListTest is Test, IBotListV3Events {
 
         assertEq(weth.balanceOf(address(bot)), 2 ether / 20, "Bot was sent incorrect WETH amount");
 
+        assertEq(botList.collectedDaoFees(), 2 ether / 40, "CollectedDaoFees was incorrectly chaged");
+
+        botList.transferCollectedDaoFees();
+
+        assertEq(botList.collectedDaoFees(), 0, "CollectedDaoFees was not zeroed");
+
         assertEq(
             weth.balanceOf(addressProvider.getTreasuryContract()), 2 ether / 40, "Treasury was sent incorrect amount"
         );
     }
 
     /// @dev [BL-6]: eraseAllBotPermissions works correctly
-    function test_BL_06_eraseAllBotPermissions_works_correctly() public {
+    function test_U_BL_06_eraseAllBotPermissions_works_correctly() public {
         vm.prank(address(creditFacade));
         botList.setBotPermissions({
             creditManager: creditManager,
@@ -494,7 +498,7 @@ contract BotListTest is Test, IBotListV3Events {
     }
 
     /// @dev [BL-7]: setBotSpecialPermissions works correctly
-    function test_BL_07_setBotSpecialPermissions_works_correctly() public {
+    function test_U_BL_07_setBotSpecialPermissions_works_correctly() public {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         botList.setBotSpecialPermissions(address(creditManager), address(bot), 2);
 

@@ -10,6 +10,9 @@ import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
 
 import "forge-std/console.sol";
 
+// Low limit set for speed test, if you need real value, use 30_000_000
+uint256 constant GAS_LIMIT = 20_000; // 30_000_000;
+
 contract GaugeGasTest is IntegrationTestHelper {
     ///
     ///
@@ -22,7 +25,7 @@ contract GaugeGasTest is IntegrationTestHelper {
         uint256 gasUsed;
         uint256 i;
         unchecked {
-            while (gasUsed < 30_000_000) {
+            while (gasUsed < GAS_LIMIT) {
                 ERC20Mock token = new ERC20Mock("TST", "TEST Token", 18);
 
                 vm.startPrank(CONFIGURATOR);
