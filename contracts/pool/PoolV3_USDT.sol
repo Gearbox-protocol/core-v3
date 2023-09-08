@@ -14,11 +14,10 @@ contract PoolV3_USDT is PoolV3, USDT_Transfer {
         address underlyingToken_,
         address interestRateModel_,
         uint256 totalDebtLimit_,
-        bool supportsQuotas_,
         string memory name_,
         string memory symbol_
     )
-        PoolV3(addressProvider_, underlyingToken_, interestRateModel_, totalDebtLimit_, supportsQuotas_, name_, symbol_)
+        PoolV3(addressProvider_, underlyingToken_, interestRateModel_, totalDebtLimit_, name_, symbol_)
         USDT_Transfer(underlyingToken_)
     {}
 
