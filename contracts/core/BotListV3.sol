@@ -70,6 +70,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @notice A fee in bps charged by the DAO on bot payments
     uint16 public override daoFee = 0;
 
+    /// @notice Keep computed dao fees which could be sent to treasury address
     uint256 public collectedDaoFees = 0;
 
     constructor(address addressProvider) ACLNonReentrantTrait(addressProvider) {
@@ -351,7 +352,9 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
 
     /// @notice Transfers collected DAO fees to the treasury
     function transferCollectedDaoFees() external {
-        IERC20(weth).safeTransfer(treasury, collectedDaoFees); // U:[BL-5]
-        collectedDaoFees = 0; // U:[BL-5]
+        if (collectedDaoFees > 0) {
+            IERC20(weth).safeTransfer(treasury, collectedDaoFees); // U:[BL-5]
+            collectedDaoFees = 0; // U:[BL-5]
+        }
     }
 }

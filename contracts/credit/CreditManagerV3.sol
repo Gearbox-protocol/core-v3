@@ -328,7 +328,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         {
             CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
 
-            if (currentCreditAccountInfo.since == block.number) revert OpenCloseAccountInOneBlockException();
+            if (currentCreditAccountInfo.since == block.number) {
+                revert OpenCloseAccountInOneBlockException();
+            }
 
             // Sets `borrower`, `since` and `flags` of Credit Account to zero
             assembly {
@@ -697,7 +699,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Returns the current active credit account
     function getActiveCreditAccountOrRevert() public view override returns (address creditAccount) {
         creditAccount = _activeCreditAccount;
-        if (creditAccount == INACTIVE_CREDIT_ACCOUNT_ADDRESS) revert ActiveCreditAccountNotSetException();
+        if (creditAccount == INACTIVE_CREDIT_ACCOUNT_ADDRESS) {
+            revert ActiveCreditAccountNotSetException();
+        }
     }
 
     //
@@ -879,7 +883,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             cumulativeIndexNow: collateralDebtData.cumulativeIndexNow
         }); // U:[CM-21] // I: [CMQ-07]
 
-        collateralDebtData.accruedFees += collateralDebtData.accruedInterest * feeInterest / PERCENTAGE_FACTOR; // U:[CM-21]
+        collateralDebtData.accruedFees += (collateralDebtData.accruedInterest * feeInterest) / PERCENTAGE_FACTOR; // U:[CM-21]
 
         if (task == CollateralCalcTask.DEBT_ONLY) return collateralDebtData; // U:[CM-21]
 
@@ -892,37 +896,37 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         uint256 totalDebt = collateralDebtData.calcTotalDebt();
 
-        collateralDebtData.totalDebtUSD = totalDebt <= 1
+        /// @custom Invariant: debt ==0 <==> totalDebt == 0
+        collateralDebtData.totalDebtUSD = totalDebt == 0
             ? 0
             : _convertToUSD({_priceOracle: _priceOracle, amountInToken: totalDebt, token: underlying}); // U:[CM-22]
 
         /// The logic for computing collateral is isolated into the `CreditLogic` library. See `CreditLogic.calcCollateral` for details.
         uint256 tokensToDisable;
 
-        /// Target is a TWV threshold at which lazy computation stops. Normally, it happens when TWV
+        /// TargetUSD is a TWV threshold at which lazy computation stops. Normally, it happens when TWV
         /// exceeds the total debt, but the user can also configure a custom HF threshold (above 1),
         /// in order to maintain a desired level of position health
-        uint256 target = (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY)
-            ? collateralDebtData.totalDebtUSD * minHealthFactor / PERCENTAGE_FACTOR
+        uint256 targetUSD = (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY)
+            ? (collateralDebtData.totalDebtUSD * minHealthFactor) / PERCENTAGE_FACTOR
             : type(uint256).max;
 
-        if ((task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) && (target == 0)) {
+        if ((task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) && (targetUSD == 0)) {
             // If the user has zero total debt, we can safely skip all collateral computations during a
             // full collateral check
-            (collateralDebtData.totalValueUSD, collateralDebtData.twvUSD, tokensToDisable) = (0, 0, 0); // U: [CM-18A]
-        } else {
-            (collateralDebtData.totalValueUSD, collateralDebtData.twvUSD, tokensToDisable) = collateralDebtData
-                .calcCollateral({
-                creditAccount: creditAccount,
-                underlying: underlying,
-                twvUSDTarget: target,
-                collateralHints: collateralHints,
-                quotasPacked: quotasPacked,
-                priceOracle: _priceOracle,
-                collateralTokenByMaskFn: _collateralTokenByMask,
-                convertToUSDFn: _convertToUSD
-            }); // U:[CM-22]
+            return collateralDebtData; // U: [CM-18A]
         }
+        (collateralDebtData.totalValueUSD, collateralDebtData.twvUSD, tokensToDisable) = collateralDebtData
+            .calcCollateral({
+            creditAccount: creditAccount,
+            underlying: underlying,
+            twvUSDTarget: targetUSD,
+            collateralHints: collateralHints,
+            quotasPacked: quotasPacked,
+            priceOracle: _priceOracle,
+            collateralTokenByMaskFn: _collateralTokenByMask,
+            convertToUSDFn: _convertToUSD
+        }); // U:[CM-22]
 
         collateralDebtData.enabledTokensMask = enabledTokensMask.disable(tokensToDisable); // U:[CM-22]
 
