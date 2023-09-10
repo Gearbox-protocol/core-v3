@@ -44,6 +44,12 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @notice Name, added for ERC-20 compatibility so that bot funding could be monitored in wallets
     string public constant override name = "Gearbox bot funding";
 
+    /// @notice A fee in bps charged by the DAO on bot payments
+    uint16 public override daoFee = 0;
+
+    /// @notice Keep computed dao fees which could be sent to treasury address
+    uint64 public collectedDaoFees = 0;
+
     /// @notice Mapping from account address to its status as an approved credit manager
     mapping(address => bool) public override approvedCreditManager;
 
@@ -66,12 +72,6 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
 
     /// @notice Mapping from borrower to their bot funding balance
     mapping(address => uint256) public override balanceOf;
-
-    /// @notice A fee in bps charged by the DAO on bot payments
-    uint16 public override daoFee = 0;
-
-    /// @notice Keep computed dao fees which could be sent to treasury address
-    uint256 public collectedDaoFees = 0;
 
     constructor(address addressProvider) ACLNonReentrantTrait(addressProvider) {
         treasury = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL);
@@ -210,7 +210,13 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         IERC20(weth).safeTransfer(bot, paymentAmount); // U:[BL-5]
 
         if (feeAmount != 0) {
-            collectedDaoFees += feeAmount; // U:[BL-5]
+            uint256 newCollecrtedDaoFees = collectedDaoFees + feeAmount; // U:[BL-5]
+            if (newCollecrtedDaoFees >= type(uint64).max) {
+                _transferCollectedDaoFees(newCollecrtedDaoFees); // U:[BL-5]
+                collectedDaoFees = 0; // U:[BL-5]
+            } else {
+                collectedDaoFees = uint64(newCollecrtedDaoFees); // U:[BL-5]
+            }
         }
 
         emit PayBot(payer, creditAccount, bot, paymentAmount, feeAmount); // U:[BL-5]
@@ -352,9 +358,13 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
 
     /// @notice Transfers collected DAO fees to the treasury
     function transferCollectedDaoFees() external {
-        if (collectedDaoFees > 0) {
-            IERC20(weth).safeTransfer(treasury, collectedDaoFees); // U:[BL-5]
-            collectedDaoFees = 0; // U:[BL-5]
+        _transferCollectedDaoFees(collectedDaoFees);
+        collectedDaoFees = 0; // U:[BL-5]
+    }
+
+    function _transferCollectedDaoFees(uint256 amount) internal {
+        if (amount > 0) {
+            IERC20(weth).safeTransfer(treasury, amount); // U:[BL-5]
         }
     }
 }
