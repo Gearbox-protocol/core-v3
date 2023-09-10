@@ -47,7 +47,8 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @notice A fee in bps charged by the DAO on bot payments
     uint16 public override daoFee = 0;
 
-    /// @notice Keep computed dao fees which could be sent to treasury address
+    /// @notice Collects computed dao fees which could be sent to treasury address
+    /// uint64 is chosen to pack vars into 1 slot. type(uint64).max represents 1.8ETH which is enough for many bot operations
     uint64 public collectedDaoFees = 0;
 
     /// @notice Mapping from account address to its status as an approved credit manager
@@ -89,7 +90,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @param creditAccount Credit account to set permissions for
     /// @param bot Bot to set permissions for
     /// @param permissions A bit mask of permissions
-    /// @param fundingAmount Total amount of ETH available to the bot for payments
+    /// @param totalFundingAllowance Total amount of ETH available to the bot for payments
     /// @param weeklyFundingAllowance Amount of ETH available to the bot weekly
     /// @return activeBotsRemaining Remaining number of non-special bots with non-zero permissions
     function setBotPermissions(
@@ -97,7 +98,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         address creditAccount,
         address bot,
         uint192 permissions,
-        uint72 fundingAmount,
+        uint72 totalFundingAllowance,
         uint72 weeklyFundingAllowance
     )
         external
@@ -128,7 +129,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
 
             BotFunding storage bf = botFunding[creditManager][creditAccount][bot];
 
-            bf.remainingFunds = fundingAmount; // U:[BL-3]
+            bf.totalFundingAllowance = totalFundingAllowance; // U:[BL-3]
             bf.maxWeeklyAllowance = weeklyFundingAllowance; // U:[BL-3]
             bf.remainingWeeklyAllowance = weeklyFundingAllowance; // U:[BL-3]
             bf.allowanceLU = uint40(block.timestamp); // U:[BL-3]
@@ -138,7 +139,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
                 creditAccount: creditAccount,
                 bot: bot,
                 permissions: permissions,
-                fundingAmount: fundingAmount,
+                totalFundingAllowance: totalFundingAllowance,
                 weeklyFundingAllowance: weeklyFundingAllowance
             }); // U:[BL-3]
         } else {
@@ -202,18 +203,28 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
 
         uint72 totalAmount = paymentAmount + feeAmount;
 
-        bf.remainingWeeklyAllowance -= totalAmount; // U:[BL-5]
-        bf.remainingFunds -= totalAmount; // U:[BL-5]
+        if (bf.remainingWeeklyAllowance < totalAmount) {
+            revert InsufficientWeeklyFundingAllowance(); // TODO: add test
+        }
+        unchecked {
+            bf.remainingWeeklyAllowance -= totalAmount; // U:[BL-5]
+        }
 
-        balanceOf[payer] -= totalAmount; // U:[BL-5]
+        if (bf.totalFundingAllowance < totalAmount) {
+            revert InsufficientTotalFundingAllowance(); //TODO: add test
+        }
+        unchecked {
+            bf.totalFundingAllowance -= totalAmount; // U:[BL-5]
+        }
+
+        _safeDecreaseBalance(payer, totalAmount); // U:[BL-5]
 
         IERC20(weth).safeTransfer(bot, paymentAmount); // U:[BL-5]
 
         if (feeAmount != 0) {
-            uint256 newCollecrtedDaoFees = collectedDaoFees + feeAmount; // U:[BL-5]
+            uint256 newCollecrtedDaoFees = uint256(collectedDaoFees) + feeAmount; // U:[BL-5]
             if (newCollecrtedDaoFees >= type(uint64).max) {
                 _transferCollectedDaoFees(newCollecrtedDaoFees); // U:[BL-5]
-                collectedDaoFees = 0; // U:[BL-5]
             } else {
                 collectedDaoFees = uint64(newCollecrtedDaoFees); // U:[BL-5]
             }
@@ -236,7 +247,11 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
 
     /// @notice Removes funds from the borrower's bot payment wallet
     function withdraw(uint256 amount) external override nonReentrant {
-        balanceOf[msg.sender] -= amount; // U:[BL-4]
+        if (amount == 0) {
+            revert AmountCantBeZeroException(); // U:[BL-4]
+        }
+
+        _safeDecreaseBalance(msg.sender, amount);
 
         IWETH(weth).withdraw(amount);
         payable(msg.sender).sendValue(amount); // U:[BL-4]
@@ -294,8 +309,9 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
 
     /// @dev Implementation of `setBotForbiddenStatus`
     function _setBotForbiddenStatus(address creditManager, address bot, bool status) internal {
-        if (botSpecialStatus[creditManager][bot].forbidden != status) {
-            botSpecialStatus[creditManager][bot].forbidden = status;
+        BotSpecialStatus storage bss = botSpecialStatus[creditManager][bot]; // U:[BL-7]
+        if (bss.forbidden != status) {
+            bss.forbidden = status;
             emit SetBotForbiddenStatus(creditManager, bot, status);
         }
     }
@@ -309,8 +325,9 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         override
         configuratorOnly
     {
-        if (botSpecialStatus[creditManager][bot].specialPermissions != permissions) {
-            botSpecialStatus[creditManager][bot].specialPermissions = permissions; // U:[BL-7]
+        BotSpecialStatus storage bss = botSpecialStatus[creditManager][bot]; // U:[BL-7]
+        if (bss.specialPermissions != permissions) {
+            bss.specialPermissions = permissions; // U:[BL-7]
             emit SetBotSpecialPermissions(creditManager, bot, permissions); // U:[BL-7]
         }
     }
@@ -359,12 +376,22 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @notice Transfers collected DAO fees to the treasury
     function transferCollectedDaoFees() external {
         _transferCollectedDaoFees(collectedDaoFees);
-        collectedDaoFees = 0; // U:[BL-5]
     }
 
     function _transferCollectedDaoFees(uint256 amount) internal {
         if (amount > 0) {
             IERC20(weth).safeTransfer(treasury, amount); // U:[BL-5]
+            collectedDaoFees = 0; // U:[BL-5]
+        }
+    }
+
+    function _safeDecreaseBalance(address account, uint256 amount) internal {
+        if (balanceOf[account] < amount) {
+            revert InsufficientBalanceException(); // U:[BL-4]
+        }
+
+        unchecked {
+            balanceOf[account] -= amount; // U:[BL-4,5]
         }
     }
 }

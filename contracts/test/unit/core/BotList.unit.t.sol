@@ -122,7 +122,7 @@ contract BotListTest is Test, IBotListV3Events {
             creditAccount: creditAccount,
             bot: address(bot),
             permissions: type(uint192).max,
-            fundingAmount: uint72(1 ether),
+            totalFundingAllowance: uint72(1 ether),
             weeklyFundingAllowance: uint72(1 ether / 10)
         });
 
@@ -133,7 +133,7 @@ contract BotListTest is Test, IBotListV3Events {
             creditAccount: creditAccount,
             bot: DUMB_ADDRESS,
             permissions: type(uint192).max,
-            fundingAmount: uint72(1 ether),
+            totalFundingAllowance: uint72(1 ether),
             weeklyFundingAllowance: uint72(1 ether / 10)
         });
 
@@ -147,7 +147,7 @@ contract BotListTest is Test, IBotListV3Events {
             creditAccount: creditAccount,
             bot: address(bot),
             permissions: type(uint192).max,
-            fundingAmount: uint72(1 ether),
+            totalFundingAllowance: uint72(1 ether),
             weeklyFundingAllowance: uint72(1 ether / 10)
         });
 
@@ -164,7 +164,7 @@ contract BotListTest is Test, IBotListV3Events {
             creditAccount: creditAccount,
             bot: address(bot),
             permissions: type(uint192).max,
-            fundingAmount: uint72(1 ether),
+            totalFundingAllowance: uint72(1 ether),
             weeklyFundingAllowance: uint72(1 ether / 10)
         });
 
@@ -180,7 +180,7 @@ contract BotListTest is Test, IBotListV3Events {
             creditAccount: creditAccount,
             bot: address(bot),
             permissions: 1,
-            fundingAmount: uint72(1 ether),
+            totalFundingAllowance: uint72(1 ether),
             weeklyFundingAllowance: uint72(1 ether / 10)
         });
 
@@ -211,7 +211,7 @@ contract BotListTest is Test, IBotListV3Events {
             creditAccount: creditAccount,
             bot: address(bot),
             permissions: 2,
-            fundingAmount: uint72(2 ether),
+            totalFundingAllowance: uint72(2 ether),
             weeklyFundingAllowance: uint72(2 ether / 10)
         });
 
@@ -248,7 +248,7 @@ contract BotListTest is Test, IBotListV3Events {
             creditAccount: creditAccount,
             bot: address(bot),
             permissions: 0,
-            fundingAmount: 0,
+            totalFundingAllowance: 0,
             weeklyFundingAllowance: 0
         });
 
@@ -293,6 +293,16 @@ contract BotListTest is Test, IBotListV3Events {
         vm.prank(USER);
         botList.deposit{value: 1 ether}();
 
+        vm.expectRevert(AmountCantBeZeroException.selector);
+        vm.prank(USER);
+        botList.withdraw(0);
+
+        uint256 userBalance = botList.balanceOf(USER);
+
+        vm.expectRevert(InsufficientBalanceException.selector);
+        vm.prank(USER);
+        botList.withdraw(userBalance + 1);
+
         assertEq(botList.balanceOf(USER), 2 ether, "User's bot funding wallet has incorrect balance");
 
         vm.expectEmit(true, false, false, true);
@@ -328,7 +338,7 @@ contract BotListTest is Test, IBotListV3Events {
             creditAccount: creditAccount,
             bot: address(bot),
             permissions: 1,
-            fundingAmount: uint72(1 ether),
+            totalFundingAllowance: uint72(1 ether),
             weeklyFundingAllowance: uint72(1 ether / 10)
         });
 
@@ -430,7 +440,7 @@ contract BotListTest is Test, IBotListV3Events {
             creditAccount: creditAccount,
             bot: address(bot),
             permissions: 1,
-            fundingAmount: uint72(1 ether),
+            totalFundingAllowance: uint72(1 ether),
             weeklyFundingAllowance: uint72(1 ether / 10)
         });
 
@@ -442,7 +452,7 @@ contract BotListTest is Test, IBotListV3Events {
             creditAccount: creditAccount,
             bot: address(bot2),
             permissions: 2,
-            fundingAmount: uint72(2 ether),
+            totalFundingAllowance: uint72(2 ether),
             weeklyFundingAllowance: uint72(2 ether / 10)
         });
 
@@ -514,5 +524,49 @@ contract BotListTest is Test, IBotListV3Events {
         assertEq(permissions, 2, "Special permissions are incorrect");
 
         assertTrue(hasSpecialPermissions, "Special permissions status returned incorrectly");
+    }
+
+    /// @dev [BL-8]: payBot correctly reverts if payment bigger than allowances
+    function test_U_BL_08_payBot_correctly_reverts_if_payment_bigger_than_allowances() public {
+        uint72 limit = 1 ether;
+        vm.prank(address(creditFacade));
+        botList.setBotPermissions({
+            creditManager: creditManager,
+            creditAccount: creditAccount,
+            bot: address(bot),
+            permissions: 1,
+            totalFundingAllowance: type(uint72).max,
+            weeklyFundingAllowance: limit
+        });
+
+        vm.expectRevert(InsufficientWeeklyFundingAllowance.selector);
+        vm.prank(address(creditFacade));
+        botList.payBot({
+            payer: USER,
+            creditManager: creditManager,
+            creditAccount: creditAccount,
+            bot: address(bot),
+            paymentAmount: limit + 1
+        });
+
+        vm.prank(address(creditFacade));
+        botList.setBotPermissions({
+            creditManager: creditManager,
+            creditAccount: creditAccount,
+            bot: address(bot),
+            permissions: 1,
+            totalFundingAllowance: limit,
+            weeklyFundingAllowance: type(uint72).max
+        });
+
+        vm.expectRevert(InsufficientTotalFundingAllowance.selector);
+        vm.prank(address(creditFacade));
+        botList.payBot({
+            payer: USER,
+            creditManager: creditManager,
+            creditAccount: creditAccount,
+            bot: address(bot),
+            paymentAmount: limit + 1
+        });
     }
 }

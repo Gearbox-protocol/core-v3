@@ -289,7 +289,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             creditAccount: DUMB_ADDRESS,
             bot: DUMB_ADDRESS,
             permissions: 0,
-            fundingAmount: 0,
+            totalFundingAllowance: 0,
             weeklyFundingAllowance: 0
         });
     }
@@ -325,7 +325,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             creditAccount: DUMB_ADDRESS,
             bot: DUMB_ADDRESS,
             permissions: 0,
-            fundingAmount: 0,
+            totalFundingAllowance: 0,
             weeklyFundingAllowance: 0
         });
     }
@@ -2100,7 +2100,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             creditAccount: creditAccount,
             bot: bot,
             permissions: 1,
-            fundingAmount: 2,
+            totalFundingAllowance: 2,
             weeklyFundingAllowance: 3
         });
 
@@ -2112,7 +2112,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             creditAccount: creditAccount,
             bot: bot,
             permissions: 1,
-            fundingAmount: 2,
+            totalFundingAllowance: 2,
             weeklyFundingAllowance: 3
         });
 
@@ -2132,7 +2132,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             creditAccount: creditAccount,
             bot: bot,
             permissions: 1,
-            fundingAmount: 2,
+            totalFundingAllowance: 2,
             weeklyFundingAllowance: 3
         });
     }

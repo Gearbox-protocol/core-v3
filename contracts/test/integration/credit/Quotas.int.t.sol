@@ -434,8 +434,8 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
 
         address creditAccount = _openCreditAccount(0, USER, 0, 0);
 
-        (, uint256 maxDebt) = creditFacade.debtLimits();
-        uint96 maxQuota = uint96(creditFacade.maxQuotaMultiplier() * maxDebt);
+        // (, uint256 maxDebt) = creditFacade.debtLimits();
+        // uint96 maxQuota = uint96(creditFacade.maxQuotaMultiplier() * maxDebt);
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({

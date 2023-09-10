@@ -1546,7 +1546,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             });
 
             if (caseId == 0) {
-                (uint256 newDebt,,) = creditManager.manageDebt({
+                creditManager.manageDebt({
                     creditAccount: creditAccount,
                     amount: type(uint256).max,
                     enabledTokensMask: 0,

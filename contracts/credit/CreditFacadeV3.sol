@@ -1071,13 +1071,13 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param creditAccount CA to set permissions for
     /// @param bot Bot to set permissions for
     /// @param permissions A bit mask of permissions
-    /// @param fundingAmount Total amount of ETH available to the bot for payments
+    /// @param totalFundingAllowance Total amount of ETH available to the bot for payments
     /// @param weeklyFundingAllowance Amount of ETH available to the bot weekly
     function setBotPermissions(
         address creditAccount,
         address bot,
         uint192 permissions,
-        uint72 fundingAmount,
+        uint72 totalFundingAllowance,
         uint72 weeklyFundingAllowance
     )
         external
@@ -1090,7 +1090,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             creditAccount: creditAccount,
             bot: bot,
             permissions: permissions,
-            fundingAmount: fundingAmount,
+            totalFundingAllowance: totalFundingAllowance,
             weeklyFundingAllowance: weeklyFundingAllowance
         }); // U:[FA-41]
 
