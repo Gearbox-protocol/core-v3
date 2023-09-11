@@ -50,7 +50,7 @@ uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS =
 
 uint256 constant CLOSE_CREDIT_ACCOUNT_FLAGS = EXTERNAL_CALLS_PERMISSION;
 
-uint256 constant DUMMY_INVERTED_QUOTED_MASK = type(uint256).max - 1;
+uint256 constant DUMMY_INVERTED_QUOTED_MASK = 0;
 
 /// @title CreditFacadeV3
 /// @notice A contract that provides a user interface for interacting with Credit Manager.
