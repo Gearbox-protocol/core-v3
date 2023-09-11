@@ -17,7 +17,8 @@ import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {
     CallerNotVoterException,
     IncorrectParameterException,
-    TokenNotAllowedException
+    TokenNotAllowedException,
+    InsufficientVotesException
 } from "../interfaces/IExceptions.sol";
 
 /// @title Gauge V3
@@ -185,11 +186,18 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
         UserVotes storage uv = userTokenVotes[user][token]; // U:[GA-13]
 
         if (lpSide) {
-            qp.totalVotesLpSide -= votes; // U:[GA-13]
-            uv.votesLpSide -= votes; // U:[GA-13]
+            if (uv.votesLpSide < votes) revert InsufficientVotesException(); // TODO: add test
+            unchecked {
+                // TODO: invaraint check that  qp.totalVotesLpSide > uv.votesLpSide
+                qp.totalVotesLpSide -= votes; // U:[GA-13]
+                uv.votesLpSide -= votes; // U:[GA-13]
+            }
         } else {
-            qp.totalVotesCaSide -= votes; // U:[GA-13]
-            uv.votesCaSide -= votes; // U:[GA-13]
+            if (uv.votesCaSide < votes) revert InsufficientVotesException();
+            unchecked {
+                qp.totalVotesCaSide -= votes; // U:[GA-13]
+                uv.votesCaSide -= votes; // U:[GA-13]
+            }
         }
 
         emit Unvote({user: user, token: token, votes: votes, lpSide: lpSide}); // U:[GA-13]

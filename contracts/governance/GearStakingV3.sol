@@ -101,7 +101,13 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
 
         _processPendingWithdrawals(msg.sender, to);
 
-        voteLockData[msg.sender].available -= amount; // U: [GS-03]
+        UserVoteLockData storage vld = voteLockData[msg.sender];
+
+        if (vld.available < amount) revert InsufficientBalanceException(); // TODO: add test
+        unchecked {
+            vld.available -= amount; // U: [GS-03]
+        }
+
         withdrawalData[msg.sender].withdrawalsPerEpoch[EPOCHS_TO_WITHDRAW - 1] += amount; // U: [GS-03]
 
         emit ScheduleGearWithdrawal(msg.sender, amount); // U: [GS-03]
@@ -129,8 +135,13 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
 
         UserVoteLockData storage vld = voteLockData[msg.sender];
 
-        vld.available -= amount; // U: [GS-07]
-        vld.totalStaked -= amount; // U: [GS-07]
+        if (vld.available < amount) revert InsufficientBalanceException(); // TODO: add test
+        unchecked {
+            vld.available -= amount; // U: [GS-07]
+
+            // Invariant: vld.available < vld.totalStaked
+            vld.totalStaked -= amount; // U: [GS-07]
+        }
 
         IERC20(gear).approve(successor, uint256(amount));
         IGearStakingV3(successor).depositOnMigration(amount, msg.sender, votesAfter); // U: [GS-07]
@@ -178,6 +189,8 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
 
             if (totalClaimable != 0) {
                 IERC20(gear).safeTransfer(to, totalClaimable);
+
+                // TODO: could we put into unchecked block?
                 voteLockData[user].totalStaked -= totalClaimable.toUint96();
 
                 emit ClaimGearWithdrawal(user, to, totalClaimable);
@@ -203,8 +216,12 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
                     revert VotingContractNotAllowedException(); // U: [GS-04A]
                 }
 
+                if (vld.available < currentVote.voteAmount) revert InsufficientBalanceException(); // TODO: add test
+                unchecked {
+                    vld.available -= currentVote.voteAmount;
+                }
+
                 IVotingContractV3(currentVote.votingContract).vote(user, currentVote.voteAmount, currentVote.extraData);
-                vld.available -= currentVote.voteAmount;
             } else {
                 if (allowedVotingContract[currentVote.votingContract] == VotingContractStatus.NOT_ALLOWED) {
                     revert VotingContractNotAllowedException(); // U: [GS-04A]

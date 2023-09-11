@@ -304,3 +304,6 @@ error StalePriceException();
 
 /// @notice Thrown by Degen NFT when attempting to burn on opening an account with 0 balance
 error InsufficientBalanceException();
+
+/// @notice Thrown by Degen NFT when attempting to burn on opening an account with 0 balance
+error InsufficientVotesException();
