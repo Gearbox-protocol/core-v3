@@ -238,6 +238,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         // Emits an event for Credit Account opening
         emit OpenCreditAccount(creditAccount, onBehalfOf, msg.sender, debt, referralCode); // U:[FA-10]
 
+        // Price feed updates must be applied before the multicall because they affect CA's collateral evaluation
+        uint256 skipCalls = _applyOnDemandPriceUpdates(calls);
+
         // Initially, only the underlying is on the Credit Account,
         // so the enabledTokenMask before the multicall is 1
         // Also, changing debt is prohibited during account opening,
@@ -247,7 +250,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             calls: calls,
             enabledTokensMask: debt == 0 ? 0 : UNDERLYING_TOKEN_MASK,
             flags: OPEN_CREDIT_ACCOUNT_FLAGS,
-            skip: 0
+            skip: skipCalls
         }); // U:[FA-10]
 
         // Since it's not possible to enable any forbidden tokens on a new account,
@@ -310,9 +313,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         _claimWithdrawals(creditAccount, to, ClaimAction.FORCE_CLAIM); // U:[FA-11]
 
         if (calls.length != 0) {
+            // Price feed updates must be applied before the multicall because they affect CA's collateral evaluation
+            uint256 skipCalls = _applyOnDemandPriceUpdates(calls);
+
             /// All account management functions are forbidden during closure
             FullCheckParams memory fullCheckParams =
-                _multicall(creditAccount, calls, debtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS, 0); // U:[FA-11]
+                _multicall(creditAccount, calls, debtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS, skipCalls); // U:[FA-11]
             debtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter; // U:[FA-11]
         }
 
@@ -393,7 +399,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         address borrower = _getBorrowerOrRevert(creditAccount); // F:[FA-5]
 
         // Price feed updates must be applied before the multicall because they affect CA's collateral evaluation
-        uint256 remainingCalls = _applyOnDemandPriceUpdates(calls);
+        uint256 skipCalls = _applyOnDemandPriceUpdates(calls);
 
         // Checks that the account hf < 1 and computes the totalValue
         // before the multicall
@@ -429,17 +435,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(tokensToEnable); // U:[FA-15]
         }
 
-        if (remainingCalls != 0) {
+        {
             FullCheckParams memory fullCheckParams = _multicall(
-                creditAccount,
-                calls,
-                collateralDebtData.enabledTokensMask,
-                CLOSE_CREDIT_ACCOUNT_FLAGS,
-                calls.length - remainingCalls
+                creditAccount, calls, collateralDebtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS, skipCalls
             ); // U:[FA-16]
             collateralDebtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter; // U:[FA-16]
         }
-
         /// Bot permissions are specific to (owner, creditAccount),
         /// so they need to be erased on account closure
         _eraseAllBotPermissionsAtClosure({creditAccount: creditAccount}); // U:[FA-16]
@@ -550,12 +551,15 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             getTokenByMaskFn: _getTokenByMask
         });
 
+        // Price feed updates must be applied before the multicall because they affect CA's collateral evaluation
+        uint256 skipCalls = _applyOnDemandPriceUpdates(calls);
+
         FullCheckParams memory fullCheckParams = _multicall(
             creditAccount,
             calls,
             enabledTokensMaskBefore,
             forbiddenBalances.length != 0 ? flags.enable(FORBIDDEN_TOKENS_BEFORE_CALLS) : flags,
-            0
+            skipCalls
         );
 
         // Performs one fullCollateralCheck at the end of a multicall
@@ -636,15 +640,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         // Sets expected balances to currentBalance + delta
                         Balance[] memory expected = abi.decode(mcall.callData[4:], (Balance[])); // U:[FA-23]
                         expectedBalances = BalancesLogic.storeBalances(creditAccount, expected); // U:[FA-23]
-                    }
-                    //
-                    // ON DEMAND PRICE UPDATE
-                    //
-                    /// Utility function that enables support for price feeds with on-demand
-                    /// price updates. This helps support tokens where there is no traditional price feeds,
-                    /// but there is attested off-chain price data.
-                    else if (method == ICreditFacadeV3Multicall.onDemandPriceUpdate.selector) {
-                        _onDemandPriceUpdate(mcall.callData[4:], fullCheckParams); // U:[FA-25]
                     }
                     //
                     // ADD COLLATERAL
@@ -871,9 +866,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
     /// @dev Applies on-demand price feed updates from the multicall if the are any, returns number of calls remaining
     ///      `onDemandPriceUpdate` calls are expected to be placed before all other calls in the multicall
-    function _applyOnDemandPriceUpdates(MultiCall[] calldata calls) internal returns (uint256 remainingCalls) {
+    function _applyOnDemandPriceUpdates(MultiCall[] calldata calls) internal returns (uint256 skip) {
         uint256 len = calls.length;
-        FullCheckParams memory fcp;
+        address priceOracle = ICreditManagerV3(creditManager).priceOracle(); // U:[FA-25]
         unchecked {
             for (uint256 i; i < len; ++i) {
                 MultiCall calldata mcall = calls[i];
@@ -881,12 +876,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     mcall.target == address(this)
                         && bytes4(mcall.callData) == ICreditFacadeV3Multicall.onDemandPriceUpdate.selector
                 ) {
-                    _onDemandPriceUpdate(mcall.callData[4:], fcp);
+                    _onDemandPriceUpdate(mcall.callData[4:], priceOracle);
                 } else {
-                    return len - i;
+                    return i;
                 }
             }
-            return 0;
+            return len;
         }
     }
 
@@ -918,14 +913,10 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @dev Should generally be called only when interacting with tokens
     ///         that use on-demand price feeds
     /// @param callData Bytes calldata for parsing
-    function _onDemandPriceUpdate(bytes calldata callData, FullCheckParams memory fullCheckParams) internal {
+    function _onDemandPriceUpdate(bytes calldata callData, address priceOracle) internal {
         (address token, bytes memory data) = abi.decode(callData, (address, bytes)); // U:[FA-25]
 
-        if (fullCheckParams.priceOracle == address(0)) {
-            fullCheckParams.priceOracle = ICreditManagerV3(creditManager).priceOracle();
-        }
-
-        address priceFeed = IPriceOracleBase(fullCheckParams.priceOracle).priceFeeds(token); // U:[FA-25]
+        address priceFeed = IPriceOracleBase(priceOracle).priceFeeds(token); // U:[FA-25]
         if (priceFeed == address(0)) revert PriceFeedDoesNotExistException(); // U:[FA-25]
 
         IUpdatablePriceFeed(priceFeed).updatePrice(data); // U:[FA-25]
