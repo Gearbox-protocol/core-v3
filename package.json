@@ -23,8 +23,7 @@
     "prepare": "husky install",
     "prettier": "forge fmt",
     "prettier:ci": "forge fmt",
-    "forge-install": "forge install --no-commit foundry-rs/forge-std",
-    "build": "tsc --p tsconfig.build.json"
+    "forge-install": "forge install --no-commit foundry-rs/forge-std"
   },
   "devDependencies": {
     "@1inch/solidity-utils": "^2.2.27",
