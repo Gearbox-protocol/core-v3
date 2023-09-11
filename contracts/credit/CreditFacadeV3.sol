@@ -238,7 +238,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         // Emits an event for Credit Account opening
         emit OpenCreditAccount(creditAccount, onBehalfOf, msg.sender, debt, referralCode); // U:[FA-10]
 
-        // Price feed updates must be applied before the multicall because they affect CA's collateral evaluation
+        // Price feed updates
         uint256 skipCalls = _applyOnDemandPriceUpdates(calls);
 
         // Initially, only the underlying is on the Credit Account,
@@ -313,7 +313,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         _claimWithdrawals(creditAccount, to, ClaimAction.FORCE_CLAIM); // U:[FA-11]
 
         if (calls.length != 0) {
-            // Price feed updates must be applied before the multicall because they affect CA's collateral evaluation
+            // Price feed updates
             uint256 skipCalls = _applyOnDemandPriceUpdates(calls);
 
             /// All account management functions are forbidden during closure
@@ -398,7 +398,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         // Checks that the CA exists to revert early for late liquidations and save gas
         address borrower = _getBorrowerOrRevert(creditAccount); // F:[FA-5]
 
-        // Price feed updates must be applied before the multicall because they affect CA's collateral evaluation
+        // Price feed updates
         uint256 skipCalls = _applyOnDemandPriceUpdates(calls);
 
         // Checks that the account hf < 1 and computes the totalValue
@@ -866,7 +866,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
     /// @dev Applies on-demand price feed updates from the multicall if the are any, returns number of calls remaining
     ///      `onDemandPriceUpdate` calls are expected to be placed before all other calls in the multicall
-    function _applyOnDemandPriceUpdates(MultiCall[] calldata calls) internal returns (uint256 skip) {
+    function _applyOnDemandPriceUpdates(MultiCall[] calldata calls) internal returns (uint256 skipCalls) {
         uint256 len = calls.length;
         address priceOracle = ICreditManagerV3(creditManager).priceOracle(); // U:[FA-25]
         unchecked {
@@ -876,7 +876,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     mcall.target == address(this)
                         && bytes4(mcall.callData) == ICreditFacadeV3Multicall.onDemandPriceUpdate.selector
                 ) {
-                    _onDemandPriceUpdate(mcall.callData[4:], priceOracle);
+                    (address token, bytes memory data) = abi.decode(mcall.callData[4:], (address, bytes)); // U:[FA-25]
+
+                    address priceFeed = IPriceOracleBase(priceOracle).priceFeeds(token); // U:[FA-25]
+                    if (priceFeed == address(0)) revert PriceFeedDoesNotExistException(); // U:[FA-25]
+
+                    IUpdatablePriceFeed(priceFeed).updatePrice(data); // U:[FA-25]
                 } else {
                     return i;
                 }
@@ -905,21 +910,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         if (flags & permission == 0) {
             revert NoPermissionException(permission); // F:[FA-39]
         }
-    }
-
-    /// @notice Requests an on-demand price update from a price feed
-    ///      The price update accepts a generic data blob that is processed
-    ///      on the price feed side.
-    /// @dev Should generally be called only when interacting with tokens
-    ///         that use on-demand price feeds
-    /// @param callData Bytes calldata for parsing
-    function _onDemandPriceUpdate(bytes calldata callData, address priceOracle) internal {
-        (address token, bytes memory data) = abi.decode(callData, (address, bytes)); // U:[FA-25]
-
-        address priceFeed = IPriceOracleBase(priceOracle).priceFeeds(token); // U:[FA-25]
-        if (priceFeed == address(0)) revert PriceFeedDoesNotExistException(); // U:[FA-25]
-
-        IUpdatablePriceFeed(priceFeed).updatePrice(data); // U:[FA-25]
     }
 
     /// @notice Requests the Credit Manager to transfer collateral from the caller to the Credit Account
