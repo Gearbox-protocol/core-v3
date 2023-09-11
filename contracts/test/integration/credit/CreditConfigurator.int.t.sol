@@ -1102,7 +1102,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     function test_I_CC_25_setExpirationDate_reverts_on_incorrect_newExpirationDate_otherwise_sets()
         public
         expirableCase
-        withQuotas
         creditTest
     {
         uint40 expirationDate = creditFacade.expirationDate();

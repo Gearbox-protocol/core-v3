@@ -38,7 +38,7 @@ struct TransferCheck {
 
 contract BalanceHelper is BalanceEngine {
     // Suites
-    TokensTestSuite internal tokenTestSuite;
+    TokensTestSuite public tokenTestSuite;
 
     uint256 internal tokenTrackingSession = 1;
     mapping(uint256 => mapping(address => mapping(address => mapping(address => TransferCheck)))) internal

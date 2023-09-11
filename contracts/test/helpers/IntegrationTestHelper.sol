@@ -63,7 +63,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     BotListV3 botList;
 
     /// POOL & CREDIT MANAGER
-    PoolV3 pool;
+    PoolV3 public pool;
     PoolQuotaKeeperV3 public poolQuotaKeeper;
     GaugeV3 public gauge;
 
@@ -152,30 +152,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         _;
     }
 
-    modifier withoutQuotas() {
-        anySupportsQuotas = false;
-        supportsQuotas = false;
-        _;
-    }
-
-    modifier withQuotas() {
-        anySupportsQuotas = false;
-        supportsQuotas = true;
-        _;
-    }
-
-    modifier withAllQuotas() {
-        anySupportsQuotas = false;
-
-        uint256 snapshot = vm.snapshot();
-
-        supportsQuotas = true;
-        _;
-        vm.revertTo(snapshot);
-        supportsQuotas = false;
-        _;
-    }
-
     modifier withAccountFactoryV1() {
         anyAccountFactory = false;
         accountFactoryVersion = 1;
@@ -257,6 +233,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         chainId = nd.chainId();
 
         tokenTestSuite = new TokensTestSuite();
+        vm.deal(address(this), 100 * WAD);
         tokenTestSuite.topUpWETH{value: 100 * WAD}();
 
         weth = tokenTestSuite.addressOf(Tokens.WETH);

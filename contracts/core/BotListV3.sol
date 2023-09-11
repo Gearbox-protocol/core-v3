@@ -44,6 +44,13 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @notice Name, added for ERC-20 compatibility so that bot funding could be monitored in wallets
     string public constant override name = "Gearbox bot funding";
 
+    /// @notice A fee in bps charged by the DAO on bot payments
+    uint16 public override daoFee = 0;
+
+    /// @notice Collects computed dao fees which could be sent to treasury address
+    /// uint64 is chosen to pack vars into 1 slot. type(uint64).max represents 1.8ETH which is enough for many bot operations
+    uint64 public collectedDaoFees = 0;
+
     /// @notice Mapping from account address to its status as an approved credit manager
     mapping(address => bool) public override approvedCreditManager;
 
@@ -67,9 +74,6 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @notice Mapping from borrower to their bot funding balance
     mapping(address => uint256) public override balanceOf;
 
-    /// @notice A fee in bps charged by the DAO on bot payments
-    uint16 public override daoFee = 0;
-
     constructor(address addressProvider) ACLNonReentrantTrait(addressProvider) {
         treasury = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL);
         weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL);
@@ -86,7 +90,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @param creditAccount Credit account to set permissions for
     /// @param bot Bot to set permissions for
     /// @param permissions A bit mask of permissions
-    /// @param fundingAmount Total amount of ETH available to the bot for payments
+    /// @param totalFundingAllowance Total amount of ETH available to the bot for payments
     /// @param weeklyFundingAllowance Amount of ETH available to the bot weekly
     /// @return activeBotsRemaining Remaining number of non-special bots with non-zero permissions
     function setBotPermissions(
@@ -94,17 +98,17 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         address creditAccount,
         address bot,
         uint192 permissions,
-        uint72 fundingAmount,
+        uint72 totalFundingAllowance,
         uint72 weeklyFundingAllowance
     )
         external
         override
         nonZeroAddress(bot)
-        onlyValidCreditFacade(creditManager) // F: [BL-3]
+        onlyValidCreditFacade(creditManager) // U:[BL-3]
         returns (uint256 activeBotsRemaining)
     {
         if (!bot.isContract()) {
-            revert AddressIsNotContractException(bot); // F: [BL-3]
+            revert AddressIsNotContractException(bot); // U:[BL-3]
         }
 
         EnumerableSet.AddressSet storage accountBots = activeBots[creditManager][creditAccount];
@@ -116,33 +120,33 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
                         || botSpecialStatus[creditManager][bot].specialPermissions != 0
                 )
             ) {
-                revert InvalidBotException(); // F: [BL-3]
+                revert InvalidBotException(); // U:[BL-3]
             }
 
-            accountBots.add(bot); // F: [BL-3]
+            accountBots.add(bot); // U:[BL-3]
 
-            botPermissions[creditManager][creditAccount][bot] = permissions; // F: [BL-3]
+            botPermissions[creditManager][creditAccount][bot] = permissions; // U:[BL-3]
 
             BotFunding storage bf = botFunding[creditManager][creditAccount][bot];
 
-            bf.remainingFunds = fundingAmount; // F: [BL-3]
-            bf.maxWeeklyAllowance = weeklyFundingAllowance; // F: [BL-3]
-            bf.remainingWeeklyAllowance = weeklyFundingAllowance; // F: [BL-3]
-            bf.allowanceLU = uint40(block.timestamp); // F: [BL-3]
+            bf.totalFundingAllowance = totalFundingAllowance; // U:[BL-3]
+            bf.maxWeeklyAllowance = weeklyFundingAllowance; // U:[BL-3]
+            bf.remainingWeeklyAllowance = weeklyFundingAllowance; // U:[BL-3]
+            bf.allowanceLU = uint40(block.timestamp); // U:[BL-3]
 
             emit SetBotPermissions({
                 creditManager: creditManager,
                 creditAccount: creditAccount,
                 bot: bot,
                 permissions: permissions,
-                fundingAmount: fundingAmount,
+                totalFundingAllowance: totalFundingAllowance,
                 weeklyFundingAllowance: weeklyFundingAllowance
-            }); // F: [BL-3]
+            }); // U:[BL-3]
         } else {
-            _eraseBot(creditManager, creditAccount, bot); // F: [BL-3]
+            _eraseBot(creditManager, creditAccount, bot); // U:[BL-3]
         }
 
-        activeBotsRemaining = accountBots.length(); // F: [BL-3]
+        activeBotsRemaining = accountBots.length(); // U:[BL-3]
     }
 
     /// @notice Removes permissions and funding for all bots with non-zero permissions for a credit account
@@ -151,7 +155,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     function eraseAllBotPermissions(address creditManager, address creditAccount)
         external
         override
-        onlyValidCreditFacade(creditManager) // F: [BL-6]
+        onlyValidCreditFacade(creditManager) // U:[BL-6]
     {
         EnumerableSet.AddressSet storage accountBots = activeBots[creditManager][creditAccount];
 
@@ -159,7 +163,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
 
         unchecked {
             for (uint256 i = 0; i < len; ++i) {
-                address bot = accountBots.at(len - i - 1); // F: [BL-6]
+                address bot = accountBots.at(len - i - 1); // U:[BL-6]
                 _eraseBot({creditManager: creditManager, creditAccount: creditAccount, bot: bot});
             }
         }
@@ -167,11 +171,11 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
 
     /// @dev Removes all permissions and funding for a (creditManager, credit account, bot) tuple
     function _eraseBot(address creditManager, address creditAccount, address bot) internal {
-        delete botPermissions[creditManager][creditAccount][bot]; // F: [BL-6]
-        delete botFunding[creditManager][creditAccount][bot]; // F: [BL-6]
+        delete botPermissions[creditManager][creditAccount][bot]; // U:[BL-6]
+        delete botFunding[creditManager][creditAccount][bot]; // U:[BL-6]
 
-        activeBots[creditManager][creditAccount].remove(bot); // F: [BL-6]
-        emit EraseBot({creditManager: creditManager, creditAccount: creditAccount, bot: bot}); // F: [BL-6]
+        activeBots[creditManager][creditAccount].remove(bot); // U:[BL-6]
+        emit EraseBot({creditManager: creditManager, creditAccount: creditAccount, bot: bot}); // U:[BL-6]
     }
 
     /// @notice Takes payment for performed services from the user's balance and sends to the bot
@@ -183,56 +187,76 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     function payBot(address payer, address creditManager, address creditAccount, address bot, uint72 paymentAmount)
         external
         override
-        onlyValidCreditFacade(creditManager) // F: [BL-5]
+        onlyValidCreditFacade(creditManager) // U:[BL-5]
     {
         if (paymentAmount == 0) return;
 
-        BotFunding storage bf = botFunding[creditManager][creditAccount][bot]; // F: [BL-5]
+        BotFunding storage bf = botFunding[creditManager][creditAccount][bot]; // U:[BL-5]
 
         if (block.timestamp >= bf.allowanceLU + uint40(7 days)) {
-            bf.allowanceLU = uint40(block.timestamp); // F: [BL-5]
-            bf.remainingWeeklyAllowance = bf.maxWeeklyAllowance; // F: [BL-5]
+            bf.allowanceLU = uint40(block.timestamp); // U:[BL-5]
+            bf.remainingWeeklyAllowance = bf.maxWeeklyAllowance; // U:[BL-5]
         }
 
         // feeAmount is always < paymentAmount, however `uint256` conversion adds more space for computations
-        uint72 feeAmount = uint72(uint256(daoFee) * paymentAmount / PERCENTAGE_FACTOR); // F: [BL-5]
+        uint72 feeAmount = uint72(uint256(daoFee) * paymentAmount / PERCENTAGE_FACTOR); // U:[BL-5]
 
         uint72 totalAmount = paymentAmount + feeAmount;
 
-        bf.remainingWeeklyAllowance -= totalAmount; // F: [BL-5]
-        bf.remainingFunds -= totalAmount; // F: [BL-5]
-
-        balanceOf[payer] -= totalAmount; // F: [BL-5]
-
-        IERC20(weth).safeTransfer(bot, paymentAmount); // F: [BL-5]
-
-        if (feeAmount != 0) {
-            IERC20(weth).safeTransfer(treasury, feeAmount); // F: [BL-5]
+        if (bf.remainingWeeklyAllowance < totalAmount) {
+            revert InsufficientWeeklyFundingAllowance(); // TODO: add test
+        }
+        unchecked {
+            bf.remainingWeeklyAllowance -= totalAmount; // U:[BL-5]
         }
 
-        emit PayBot(payer, creditAccount, bot, paymentAmount, feeAmount); // F: [BL-5]
+        if (bf.totalFundingAllowance < totalAmount) {
+            revert InsufficientTotalFundingAllowance(); //TODO: add test
+        }
+        unchecked {
+            bf.totalFundingAllowance -= totalAmount; // U:[BL-5]
+        }
+
+        _safeDecreaseBalance(payer, totalAmount); // U:[BL-5]
+
+        IERC20(weth).safeTransfer(bot, paymentAmount); // U:[BL-5]
+
+        if (feeAmount != 0) {
+            uint256 newCollecrtedDaoFees = uint256(collectedDaoFees) + feeAmount; // U:[BL-5]
+            if (newCollecrtedDaoFees >= type(uint64).max) {
+                _transferCollectedDaoFees(newCollecrtedDaoFees); // U:[BL-5]
+            } else {
+                collectedDaoFees = uint64(newCollecrtedDaoFees); // U:[BL-5]
+            }
+        }
+
+        emit PayBot(payer, creditAccount, bot, paymentAmount, feeAmount); // U:[BL-5]
     }
 
     /// @notice Adds funds to the borrower's bot payment wallet
     function deposit() public payable override nonReentrant {
         if (msg.value == 0) {
-            revert AmountCantBeZeroException(); // F: [BL-4]
+            revert AmountCantBeZeroException(); // U:[BL-4]
         }
 
         IWETH(weth).deposit{value: msg.value}();
         balanceOf[msg.sender] += msg.value;
 
-        emit Deposit(msg.sender, msg.value); // F: [BL-4]
+        emit Deposit(msg.sender, msg.value); // U:[BL-4]
     }
 
     /// @notice Removes funds from the borrower's bot payment wallet
     function withdraw(uint256 amount) external override nonReentrant {
-        balanceOf[msg.sender] -= amount; // F: [BL-4]
+        if (amount == 0) {
+            revert AmountCantBeZeroException(); // U:[BL-4]
+        }
+
+        _safeDecreaseBalance(msg.sender, amount);
 
         IWETH(weth).withdraw(amount);
-        payable(msg.sender).sendValue(amount); // F: [BL-4]
+        payable(msg.sender).sendValue(amount); // U:[BL-4]
 
-        emit Withdraw(msg.sender, amount); // F: [BL-4]
+        emit Withdraw(msg.sender, amount); // U:[BL-4]
     }
 
     /// @notice Returns all currently active bots on the account
@@ -254,7 +278,7 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     {
         uint192 specialPermissions;
         (forbidden, specialPermissions) =
-            (botSpecialStatus[creditManager][bot].forbidden, botSpecialStatus[creditManager][bot].specialPermissions); // F: [BL-7]
+            (botSpecialStatus[creditManager][bot].forbidden, botSpecialStatus[creditManager][bot].specialPermissions); // U:[BL-7]
 
         hasSpecialPermissions = specialPermissions != 0;
         permissions = hasSpecialPermissions ? specialPermissions : botPermissions[creditManager][creditAccount][bot];
@@ -285,8 +309,9 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
 
     /// @dev Implementation of `setBotForbiddenStatus`
     function _setBotForbiddenStatus(address creditManager, address bot, bool status) internal {
-        if (botSpecialStatus[creditManager][bot].forbidden != status) {
-            botSpecialStatus[creditManager][bot].forbidden = status;
+        BotSpecialStatus storage bss = botSpecialStatus[creditManager][bot]; // U:[BL-7]
+        if (bss.forbidden != status) {
+            bss.forbidden = status;
             emit SetBotForbiddenStatus(creditManager, bot, status);
         }
     }
@@ -300,9 +325,10 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         override
         configuratorOnly
     {
-        if (botSpecialStatus[creditManager][bot].specialPermissions != permissions) {
-            botSpecialStatus[creditManager][bot].specialPermissions = permissions; // F: [BL-7]
-            emit SetBotSpecialPermissions(creditManager, bot, permissions); // F: [BL-7]
+        BotSpecialStatus storage bss = botSpecialStatus[creditManager][bot]; // U:[BL-7]
+        if (bss.specialPermissions != permissions) {
+            bss.specialPermissions = permissions; // U:[BL-7]
+            emit SetBotSpecialPermissions(creditManager, bot, permissions); // U:[BL-7]
         }
     }
 
@@ -314,8 +340,8 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
         }
 
         if (daoFee != newFee) {
-            daoFee = newFee; // F: [BL-2]
-            emit SetBotDAOFee(newFee); // F: [BL-2]
+            daoFee = newFee; // U:[BL-2]
+            emit SetBotDAOFee(newFee); // U:[BL-2]
         }
     }
 
@@ -345,5 +371,27 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @notice Allows this contract to receive ETH, wraps it immediately if caller is not WETH
     receive() external payable {
         if (msg.sender != weth) deposit();
+    }
+
+    /// @notice Transfers collected DAO fees to the treasury
+    function transferCollectedDaoFees() external {
+        _transferCollectedDaoFees(collectedDaoFees);
+    }
+
+    function _transferCollectedDaoFees(uint256 amount) internal {
+        if (amount > 0) {
+            IERC20(weth).safeTransfer(treasury, amount); // U:[BL-5]
+            collectedDaoFees = 0; // U:[BL-5]
+        }
+    }
+
+    function _safeDecreaseBalance(address account, uint256 amount) internal {
+        if (balanceOf[account] < amount) {
+            revert InsufficientBalanceException(); // U:[BL-4]
+        }
+
+        unchecked {
+            balanceOf[account] -= amount; // U:[BL-4,5]
+        }
     }
 }

@@ -35,12 +35,10 @@ uint256 constant REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS = 1 << 193;
 /// @dev Indicates that external calls from credit account to adapters were made during multicall,
 ///      set to true on the first call to the adapter
 uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 1 << 194;
-/// @dev Indicates that `onDemandPriceUpdate` calls can be skipped since they were already applied,
-///      set to true in `liquidateCreditAccount`
-uint256 constant PRICE_UPDATES_ALREADY_APPLIED = 1 << 195;
+
 /// @dev Indicates that `payBot` can be called during multicall to fund the bot, set to true when
 ///      multicall is initiated in `botMulticall` and reset after the first `payBot` call
-uint256 constant PAY_BOT_CAN_BE_CALLED = 1 << 196;
+uint256 constant PAY_BOT_CAN_BE_CALLED = 1 << 195;
 
 interface ICreditFacadeV3Multicall {
     /// @dev Instructs CreditFacadeV3 to check token balances at the end

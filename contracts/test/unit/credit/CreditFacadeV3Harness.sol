@@ -21,7 +21,7 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
         external
         returns (FullCheckParams memory fullCheckParams)
     {
-        return _multicall(creditAccount, calls, enabledTokensMask, flags);
+        return _multicall(creditAccount, calls, enabledTokensMask, flags, 0);
     }
 
     function revertIfNoPermission(uint256 flags, uint256 permission) external pure {
