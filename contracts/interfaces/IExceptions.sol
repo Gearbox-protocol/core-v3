@@ -73,9 +73,6 @@ error BorrowingMoreThanU2ForbiddenException();
 /// @notice Thrown when a credit manager attempts to borrow more than its limit in the current block, or in general
 error CreditManagerCantBorrowException();
 
-/// @notice Thrown when attempting to perform a quota-specific action in a pool that does not support quotas
-error QuotasNotSupportedException();
-
 /// @notice Thrown when attempting to connect a quota keeper to an incompatible pool
 error IncompatiblePoolQuotaKeeperException();
 

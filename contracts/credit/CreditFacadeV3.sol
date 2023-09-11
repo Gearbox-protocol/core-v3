@@ -50,8 +50,6 @@ uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS =
 
 uint256 constant CLOSE_CREDIT_ACCOUNT_FLAGS = EXTERNAL_CALLS_PERMISSION;
 
-uint256 constant DUMMY_INVERTED_QUOTED_MASK = 0;
-
 /// @title CreditFacadeV3
 /// @notice A contract that provides a user interface for interacting with Credit Manager.
 /// @dev CreditFacadeV3 provides an interface between the user and the Credit Manager. Direct interactions
@@ -598,8 +596,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     ) internal returns (FullCheckParams memory fullCheckParams) {
         /// Inverted mask of quoted tokens is pre-compute to avoid
         /// enabling or disabling them outside `updateQuota`
-        // TODO: make it lazy
-        uint256 quotedTokensMaskInverted = DUMMY_INVERTED_QUOTED_MASK;
+        uint256 quotedTokensMaskInverted;
 
         // Emits event for multicall start - used in analytics to track actions within multicalls
         emit StartMultiCall({creditAccount: creditAccount, caller: msg.sender}); // U:[FA-18]
@@ -1226,9 +1223,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     }
 
     function _getInvertedQuotedTokensMask(uint256 currentMask) internal view returns (uint256) {
-        return currentMask == DUMMY_INVERTED_QUOTED_MASK
-            ? ~ICreditManagerV3(creditManager).quotedTokensMask()
-            : currentMask;
+        /// currentMask == 0 means that the mask is not set (it's never could be 0, because underlying token is not quoted)
+        return currentMask == 0 ? ~ICreditManagerV3(creditManager).quotedTokensMask() : currentMask;
     }
 
     /// @notice Internal wrapper for `CreditManager.setFlagFor()`. The external call is wrapped

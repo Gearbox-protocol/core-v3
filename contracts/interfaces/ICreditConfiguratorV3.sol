@@ -111,9 +111,6 @@ interface ICreditConfiguratorEvents {
 
     /// @dev Emits when the current cumulative loss in Credit Facade is reset
     event ResetCumulativeLoss();
-
-    /// @dev Emits when new total debt limit is set
-    event SetTotalDebtLimit(uint128);
 }
 
 /// @dev CreditConfiguratorV3 Exceptions
