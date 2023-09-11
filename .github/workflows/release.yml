@@ -36,10 +36,6 @@ jobs:
         run: forge build
         timeout-minutes: 10
 
-      - name: Generate types
-        run: |
-          yarn types
-
       - name: Build lib
         run: |
           yarn build
