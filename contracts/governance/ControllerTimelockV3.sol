@@ -335,9 +335,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
 
         address poolQuotaKeeper = IPoolV3(pool).poolQuotaKeeper();
 
-
         uint96 oldLimit = getTokenLimit(poolQuotaKeeper, token);
-
 
         if (!_checkPolicy(policyHash, uint256(oldLimit), uint256(limit))) {
             revert ParameterChecksFailedException(); // U: [CT-11]
@@ -355,7 +353,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
 
     /// @dev Retrieves the per-token quota limit from pool quota keeper
     function getTokenLimit(address poolQuotaKeeper, address token) public view returns (uint96) {
-        (,,,, uint96 oldLimit) = IPoolQuotaKeeperV3(poolQuotaKeeper).getTokenQuotaParams(token);
+        (,,,, uint96 oldLimit,) = IPoolQuotaKeeperV3(poolQuotaKeeper).getTokenQuotaParams(token);
         return oldLimit;
     }
 
@@ -370,9 +368,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
 
         address poolQuotaKeeper = IPoolV3(pool).poolQuotaKeeper();
 
-
         uint16 quotaIncreaseFeeOld = getTokenQuotaIncreaseFee(poolQuotaKeeper, token);
-
 
         if (!_checkPolicy(policyHash, uint256(quotaIncreaseFeeOld), uint256(quotaIncreaseFee))) {
             revert ParameterChecksFailedException(); // U: [CT-12]
@@ -390,7 +386,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
 
     /// @dev Retrieves the quota increase fee for a token
     function getTokenQuotaIncreaseFee(address poolQuotaKeeper, address token) public view returns (uint16) {
-        (,, uint16 quotaIncreaseFeeOld,,) = IPoolQuotaKeeperV3(poolQuotaKeeper).getTokenQuotaParams(token);
+        (,, uint16 quotaIncreaseFeeOld,,,) = IPoolQuotaKeeperV3(poolQuotaKeeper).getTokenQuotaParams(token);
         return quotaIncreaseFeeOld;
     }
 
