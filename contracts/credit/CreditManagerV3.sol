@@ -1273,6 +1273,24 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         (, lt) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-42]
     }
 
+    /// @notice Returns raw parameters used to calculate ramping LTs
+    /// @param token Token to get parameters for
+    /// @return ltInitial LT at the beginning of the ramp
+    /// @return ltFinal LT at the end of the ramp
+    /// @return timestampRampStart Timestamp when the ramp begins
+    /// @return rampDuration Duration of the ramp
+    function ltParams(address token)
+        external
+        view
+        override
+        returns (uint16 ltInitial, uint16 ltFinal, uint40 timestampRampStart, uint24 rampDuration)
+    {
+        uint256 tokenMask = getTokenMaskOrRevert(token);
+        CollateralTokenData storage tokenData = collateralTokensData[tokenMask];
+
+        return (tokenData.ltInitial, tokenData.ltFinal, tokenData.timestampRampStart, tokenData.rampDuration);
+    }
+
     /// @notice Returns the collateral token with requested mask and its liquidationThreshold
     /// @param tokenMask Token mask corresponding to the token
     /// @return token Address of the token

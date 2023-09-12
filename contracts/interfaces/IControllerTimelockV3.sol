@@ -12,6 +12,8 @@ struct QueuedTransactionData {
     uint40 eta;
     string signature;
     bytes data;
+    uint256 sanityCheckValue;
+    bytes sanityCheckCallData;
 }
 
 interface IControllerTimelockV3Events {
@@ -81,7 +83,16 @@ interface IControllerTimelockV3 is IControllerTimelockV3Events, IVersion {
     function queuedTransactions(bytes32 txHash)
         external
         view
-        returns (bool queued, address executor, address target, uint40 eta, string memory signature, bytes memory data);
+        returns (
+            bool queued,
+            address executor,
+            address target,
+            uint40 eta,
+            string memory signature,
+            bytes memory data,
+            uint256 sanityCheckValue,
+            bytes memory sanityCheckCallData
+        );
 
     function executeTransaction(bytes32 txHash) external;
 
