@@ -318,7 +318,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             bool isActive
         )
     {
-        TokenQuotaParams storage tq = _totalQuotaParamsInt[token];
+        TokenQuotaParams memory tq = _totalQuotaParamsInt[token];
         rate = tq.rate;
         cumulativeIndexLU = tq.cumulativeIndexLU;
         quotaIncreaseFee = tq.quotaIncreaseFee;
