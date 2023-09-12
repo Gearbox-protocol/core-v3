@@ -180,7 +180,9 @@ library CollateralLogic {
 
             if (i < len) {
                 tokenMask = collateralHints[i];
-                ++i;
+                unchecked {
+                    ++i;
+                }
                 if (tokensToCheckMask & tokenMask == 0) continue;
             } else {
                 tokenMask = tokensToCheckMask & uint256(-int256(tokensToCheckMask));
@@ -206,7 +208,7 @@ library CollateralLogic {
                 }
             } else {
                 // Zero balance tokens are disabled after the collateral computation
-                tokensToDisable |= tokenMask; // U:[CLL-3]
+                tokensToDisable = tokensToDisable.enable(tokenMask); // U:[CLL-3]
             }
             tokensToCheckMask = tokensToCheckMask.disable(tokenMask);
         }

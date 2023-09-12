@@ -13,8 +13,8 @@ library WithdrawalsLogic {
         w.amount = 1; // U:[WL-1]
     }
 
-    /// @dev If withdrawal is scheduled, returns withdrawn token, its mask in credit manager and withdrawn amount
-    /// @dev For non-schedule or zero-value withdrawals, no token/mask is returned
+    /// @dev Returns withdrawn token, its mask in credit manager and withdrawn amount
+    ///      It's expected that the function is only called for scheduled withdrawals
     function tokenMaskAndAmount(ScheduledWithdrawal storage w)
         internal
         view

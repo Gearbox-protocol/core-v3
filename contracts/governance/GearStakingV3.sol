@@ -39,6 +39,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     uint256 public immutable override firstEpochTimestamp;
 
     /// @dev Mapping from user to their stake amount and tokens available for voting
+    /// @custom:invariant For every user `u`, `voteLockData[u].available <= voteLockData[u].totalStaked`
     mapping(address => UserVoteLockData) internal voteLockData;
 
     /// @dev Mapping from user to their future withdrawal amounts
@@ -103,7 +104,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
 
         UserVoteLockData storage vld = voteLockData[msg.sender];
 
-        if (vld.available < amount) revert InsufficientBalanceException(); // TODO: add test
+        if (vld.available < amount) revert InsufficientBalanceException();
         unchecked {
             vld.available -= amount; // U: [GS-03]
         }
@@ -135,11 +136,9 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
 
         UserVoteLockData storage vld = voteLockData[msg.sender];
 
-        if (vld.available < amount) revert InsufficientBalanceException(); // TODO: add test
+        if (vld.available < amount) revert InsufficientBalanceException();
         unchecked {
             vld.available -= amount; // U: [GS-07]
-
-            // Invariant: vld.available < vld.totalStaked
             vld.totalStaked -= amount; // U: [GS-07]
         }
 
@@ -216,7 +215,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
                     revert VotingContractNotAllowedException(); // U: [GS-04A]
                 }
 
-                if (vld.available < currentVote.voteAmount) revert InsufficientBalanceException(); // TODO: add test
+                if (vld.available < currentVote.voteAmount) revert InsufficientBalanceException();
                 unchecked {
                     vld.available -= currentVote.voteAmount;
                 }

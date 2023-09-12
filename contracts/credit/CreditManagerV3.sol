@@ -49,7 +49,6 @@ import {
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
-import "forge-std/console.sol";
 
 /// @title Credit Manager
 /// @dev Encapsulates the business logic for managing Credit Accounts
@@ -248,7 +247,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacadeOnly // // U:[CM-2]
         returns (address creditAccount)
     {
-        /// Zero parameters are passed for backward compatibility with older AccountFactory versions
         creditAccount = IAccountFactoryBase(accountFactory).takeCreditAccount(0, 0); // U:[CM-6]
 
         CreditAccountInfo storage newCreditAccountInfo = creditAccountInfo[creditAccount];
@@ -556,8 +554,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 });
             }
 
-            /// @dev The amount of principal repaid is what is left after repaying all interest and fees
-            ///      and is the difference between newDebt and debt
+            /// The amount of principal repaid is what is left after repaying all interest and fees
+            /// and is the difference between newDebt and debt
             _poolRepayCreditAccount(collateralDebtData.debt - newDebt, profit, 0); // U:[CM-11]
 
             currentCreditAccountInfo.cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // U:[CM-11]
@@ -797,6 +795,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     ///               is paused, and the withdrawal matures while the DAO coordinates a response.
     /// @return collateralDebtData A struct containing debt and collateral parameters. It is filled based on the passed task.
     ///                            For more information on struct fields, see its definition along the `ICreditManagerV3` interface
+    /// @custom:invariant Unless `task == GENERIC_PARAMS`, from `creditAccountInfo[creditAccount].debt == 0`
+    ///                   follows `collateralDebtData.accruedInterest == collateralDebtData.accruedFees == 0`
     function calcDebtAndCollateral(address creditAccount, CollateralCalcTask task)
         external
         view
@@ -896,7 +896,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         uint256 totalDebt = collateralDebtData.calcTotalDebt();
 
-        /// @custom Invariant: debt ==0 <==> totalDebt == 0
         collateralDebtData.totalDebtUSD = totalDebt == 0
             ? 0
             : _convertToUSD({_priceOracle: _priceOracle, amountInToken: totalDebt, token: underlying}); // U:[CM-22]
@@ -1458,7 +1457,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     /// @notice Checks quantity of enabled tokens and saves the mask to creditAccountInfo
-
     function _saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) internal {
         if (enabledTokensMask.calcEnabledTokens() > maxEnabledTokens) {
             revert TooManyEnabledTokensException(); // U:[CM-37]

@@ -120,6 +120,8 @@ interface IBotListV3 is IBotListV3Events, IVersion {
 
     function daoFee() external view returns (uint16);
 
+    function collectedDaoFees() external view returns (uint64);
+
     function approvedCreditManager(address) external view returns (bool);
 
     function botSpecialStatus(address creditManager, address bot)
@@ -136,4 +138,6 @@ interface IBotListV3 is IBotListV3Events, IVersion {
     function setDAOFee(uint16 newFee) external;
 
     function setApprovedCreditManagerStatus(address creditManager, bool newStatus) external;
+
+    function transferCollectedDaoFees() external;
 }

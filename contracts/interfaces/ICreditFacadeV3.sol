@@ -194,7 +194,6 @@ interface ICreditFacadeV3 is ICreditFacadeV3Events, IVersion {
     /// @return minDebt Minimal borrowed amount per credit account
     function debtLimits() external view returns (uint128 minDebt, uint128 maxDebt);
 
-    // TODO: add comment
     function maxDebtPerBlockMultiplier() external view returns (uint8);
 
     /// @return currentCumulativeLoss The total amount of loss accumulated since last reset

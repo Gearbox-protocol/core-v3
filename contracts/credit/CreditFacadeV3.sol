@@ -447,8 +447,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         /// so they need to be erased on account closure
         _eraseAllBotPermissionsAtClosure({creditAccount: creditAccount}); // U:[FA-16]
 
-        /// @dev In this case only the liquidator's funds are sent to `to`, while the remaining
-        ///      funds are sent to the original borrower
+        /// In this case only the liquidator's funds are sent to `to`, while the remaining
+        /// funds are sent to the original borrower
         (uint256 remainingFunds, uint256 reportedLoss) = _closeCreditAccount({
             creditAccount: creditAccount,
             closureAction: closeAction,
@@ -866,8 +866,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         fullCheckParams.enabledTokensMaskAfter = enabledTokensMask; // U:[FA-38]
     }
 
-    /// @dev Applies on-demand price feed updates from the multicall if the are any, returns number of calls remaining
-    ///      `onDemandPriceUpdate` calls are expected to be placed before all other calls in the multicall
+    /// @dev Applies on-demand price feed updates placed at the beginning of the multicall (if there are any)
+    /// @return skipCalls Number of update calls made that can be skiped later in the `_multicall`
     function _applyOnDemandPriceUpdates(MultiCall[] calldata calls) internal returns (uint256 skipCalls) {
         uint256 len = calls.length;
         address priceOracle = ICreditManagerV3(creditManager).priceOracle(); // U:[FA-25]
