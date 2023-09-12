@@ -228,7 +228,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         /// Attempts to burn the IDegenNFTV2 - if onBehalfOf has none, this will fail
         if (degenNFT != address(0)) {
-            if (msg.sender != onBehalfOf) revert ForbiddenInWhitelistedModeException(); // U:[FA-9]
+            if (msg.sender != onBehalfOf) {
+                revert ForbiddenInWhitelistedModeException();
+            } // U:[FA-9]
             IDegenNFTV2(degenNFT).burn(onBehalfOf, 1); // U:[FA-9]
         }
 
@@ -435,7 +437,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(tokensToEnable); // U:[FA-15]
         }
 
-        {
+        if (skipCalls < calls.length) {
             FullCheckParams memory fullCheckParams = _multicall(
                 creditAccount, calls, collateralDebtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS, skipCalls
             ); // U:[FA-16]
@@ -879,7 +881,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     (address token, bytes memory data) = abi.decode(mcall.callData[4:], (address, bytes)); // U:[FA-25]
 
                     address priceFeed = IPriceOracleBase(priceOracle).priceFeeds(token); // U:[FA-25]
-                    if (priceFeed == address(0)) revert PriceFeedDoesNotExistException(); // U:[FA-25]
+                    if (priceFeed == address(0)) {
+                        revert PriceFeedDoesNotExistException();
+                    } // U:[FA-25]
 
                     IUpdatablePriceFeed(priceFeed).updatePrice(data); // U:[FA-25]
                 } else {
@@ -980,7 +984,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         // Thus, some gas can be saved by not querying token's mask.
         if (hasForbiddenTokens && quotaChange > 0) {
             uint256 mask = _getTokenMaskOrRevert(token);
-            if (mask & forbiddenTokenMask != 0) revert ForbiddenTokensException();
+            if (mask & forbiddenTokenMask != 0) {
+                revert ForbiddenTokensException();
+            }
         }
 
         (tokensToEnable, tokensToDisable) = ICreditManagerV3(creditManager).updateQuota({
@@ -1007,7 +1013,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param creditAccount Credit Account to revoke allowances for
     /// @param callData Bytes calldata for parsing
     function _revokeAdapterAllowances(address creditAccount, bytes calldata callData) internal {
-        (RevocationPair[] memory revocations) = abi.decode(callData, (RevocationPair[])); // U:[FA-36]
+        RevocationPair[] memory revocations = abi.decode(callData, (RevocationPair[])); // U:[FA-36]
         ICreditManagerV3(creditManager).revokeAdapterAllowances(creditAccount, revocations); // U:[FA-36]
     }
 
