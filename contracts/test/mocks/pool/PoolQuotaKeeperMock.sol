@@ -139,9 +139,16 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     function getTokenQuotaParams(address)
         external
         pure
-        returns (uint16 rate, uint192 cumulativeIndexLU, uint16 quotaIncreaseFee, uint96 totalQuoted, uint96 limit)
+        returns (
+            uint16 rate,
+            uint192 cumulativeIndexLU,
+            uint16 quotaIncreaseFee,
+            uint96 totalQuoted,
+            uint96 limit,
+            bool isActive
+        )
     {
-        return (0, 0, 0, 0, 0);
+        return (0, 0, 0, 0, 0, false);
     }
 
     function addCreditManager(address _creditManager) external {}

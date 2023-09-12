@@ -49,7 +49,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     EnumerableSet.AddressSet internal quotaTokensSet;
 
     /// @notice Mapping from token to global token quota params
-    mapping(address => TokenQuotaParams) public _totalQuotaParamsInt;
+    mapping(address => TokenQuotaParams) internal _totalQuotaParamsInt;
 
     /// @dev Mapping from (creditAccount, token) to account's token quota params
     mapping(address => mapping(address => AccountQuota)) internal accountQuotas;
@@ -129,26 +129,29 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         (uint16 rate, uint192 tqCumulativeIndexLU, uint16 quotaIncreaseFee) =
             _getTokenQuotaParamsOrRevert(tokenQuotaParams);
 
+        uint96 newQuoted;
+
         uint192 cumulativeIndexNow = QuotasLogic.cumulativeIndexSince(tqCumulativeIndexLU, rate, lastQuotaRateUpdate);
 
         // Accrued quota interest depends on the quota and thus must be computed before updating it
         caQuotaInterestChange =
             QuotasLogic.calcAccruedQuotaInterest(quoted, cumulativeIndexNow, accountQuota.cumulativeIndexLU); // U:[PQK-15]
 
-        uint96 newQuoted;
         quotaChange = requestedChange;
         if (quotaChange > 0) {
-            (uint96 totalQuoted, uint96 limit) = _getTokenQuotaTotalAndLimit(tokenQuotaParams);
-            quotaChange = QuotasLogic.calcActualQuotaChange(totalQuoted, limit, quotaChange); // U:[PQK-15]
+            if (rate != 0) {
+                (uint96 totalQuoted, uint96 limit) = _getTokenQuotaTotalAndLimit(tokenQuotaParams);
+                quotaChange = QuotasLogic.calcActualQuotaChange(totalQuoted, limit, quotaChange); // U:[PQK-15]
 
-            fees = uint128(uint256(uint96(quotaChange))) * quotaIncreaseFee / PERCENTAGE_FACTOR; // U:[PQK-15]
+                fees = uint128(uint256(uint96(quotaChange))) * quotaIncreaseFee / PERCENTAGE_FACTOR; // U:[PQK-15]
 
-            newQuoted = quoted + uint96(quotaChange);
-            if (quoted <= 1 && newQuoted > 1) {
-                enableToken = true; // U:[PQK-15]
+                newQuoted = quoted + uint96(quotaChange);
+                if (quoted <= 1 && newQuoted > 1) {
+                    enableToken = true; // U:[PQK-15]
+                }
+
+                tokenQuotaParams.totalQuoted = totalQuoted + uint96(quotaChange); // U:[PQK-15]
             }
-
-            tokenQuotaParams.totalQuoted = totalQuoted + uint96(quotaChange); // U:[PQK-15]
         } else {
             uint96 absoluteChange = uint96(-quotaChange);
             newQuoted = quoted - absoluteChange;
@@ -205,11 +208,6 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
                 accountQuota.quota = 1; // U:[PQK-16]
                 emit UpdateQuota({creditAccount: creditAccount, token: token, quotaChange: -int96(quoted)});
             }
-
-            // if (quoted != 0) {
-            //     // 1 wei instead of 0 for gas optimization
-            //     accountQuota.quota = 1; // U:[PQK-16]
-            // }
 
             if (setLimitsToZero) {
                 _setTokenLimit({tokenQuotaParams: tokenQuotaParams, token: token, limit: 1}); // U:[PQK-16]
@@ -311,14 +309,22 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         external
         view
         override
-        returns (uint16 rate, uint192 cumulativeIndexLU, uint16 quotaIncreaseFee, uint96 totalQuoted, uint96 limit)
+        returns (
+            uint16 rate,
+            uint192 cumulativeIndexLU,
+            uint16 quotaIncreaseFee,
+            uint96 totalQuoted,
+            uint96 limit,
+            bool isActive
+        )
     {
         TokenQuotaParams storage tq = _totalQuotaParamsInt[token];
         rate = tq.rate;
         cumulativeIndexLU = tq.cumulativeIndexLU;
         quotaIncreaseFee = tq.quotaIncreaseFee;
         totalQuoted = tq.totalQuoted;
-        limit = tq.rate == 0 ? 0 : tq.limit;
+        limit = tq.limit;
+        isActive = rate != 0;
     }
 
     /// @notice Returns the pool's quota revenue (in units of underlying per year)
@@ -529,12 +535,10 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     {
         // totalQuoted = tokenQuotaParams.totalQuoted;
         // limit = tokenQuotaParams.limit;
-        uint16 rate;
         assembly {
             let data := sload(add(tokenQuotaParams.slot, 1))
             totalQuoted := and(data, 0xFFFFFFFFFFFFFFFFFFFFFFFF)
-            rate := shr(112, data)
-            if not(iszero(rate)) { limit := shr(96, data) }
+            limit := shr(96, data)
         }
     }
 

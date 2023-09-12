@@ -73,7 +73,14 @@ interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion {
     function getTokenQuotaParams(address token)
         external
         view
-        returns (uint16 rate, uint192 cumulativeIndexLU, uint16 quotaIncreaseFee, uint96 totalQuoted, uint96 limit);
+        returns (
+            uint16 rate,
+            uint192 cumulativeIndexLU,
+            uint16 quotaIncreaseFee,
+            uint96 totalQuoted,
+            uint96 limit,
+            bool isActive
+        );
 
     function getQuotaAndOutstandingInterest(address creditAccount, address token)
         external

@@ -277,7 +277,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
 
         address poolQuotaKeeper = IPoolV3(pool).poolQuotaKeeper();
 
-        (,,,, uint96 oldLimit) = IPoolQuotaKeeperV3(poolQuotaKeeper).getTokenQuotaParams(token);
+        (,,,, uint96 oldLimit,) = IPoolQuotaKeeperV3(poolQuotaKeeper).getTokenQuotaParams(token);
 
         if (!_checkPolicy(policyHash, uint256(oldLimit), uint256(limit))) {
             revert ParameterChecksFailedException(); // U: [CT-11]
@@ -302,7 +302,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
 
         address poolQuotaKeeper = IPoolV3(pool).poolQuotaKeeper();
 
-        (,, uint16 quotaIncreaseFeeOld,,) = IPoolQuotaKeeperV3(poolQuotaKeeper).getTokenQuotaParams(token);
+        (,, uint16 quotaIncreaseFeeOld,,,) = IPoolQuotaKeeperV3(poolQuotaKeeper).getTokenQuotaParams(token);
 
         if (!_checkPolicy(policyHash, uint256(quotaIncreaseFeeOld), uint256(quotaIncreaseFee))) {
             revert ParameterChecksFailedException(); // U: [CT-12]
