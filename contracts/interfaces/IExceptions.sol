@@ -249,6 +249,9 @@ error TxExecutedOutsideTimeWindowException();
 /// @notice Thrown when execution of a transaction fails
 error TxExecutionRevertedException();
 
+/// @notice Thrown when the value of a parameter on execution is different from the value on queue
+error ParameterChangedAfterQueuedTxException();
+
 // -------- //
 // BOT LIST //
 // -------- //
