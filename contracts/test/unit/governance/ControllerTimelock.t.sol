@@ -1040,7 +1040,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.mockCall(
             poolQuotaKeeper,
             abi.encodeCall(IPoolQuotaKeeperV3.getTokenQuotaParams, (token)),
-            abi.encode(uint16(10), uint192(1e27), uint16(15), uint96(1e17), uint96(1e18))
+            abi.encode(uint16(10), uint192(1e27), uint16(15), uint96(1e17), uint96(1e18), false)
         );
 
         bytes32 POLICY_CODE = keccak256(abi.encode("POOL", "TOKEN", "TOKEN_QUOTA_INCREASE_FEE"));
