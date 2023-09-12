@@ -289,7 +289,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             creditAccount: DUMB_ADDRESS,
             bot: DUMB_ADDRESS,
             permissions: 0,
-            fundingAmount: 0,
+            totalFundingAllowance: 0,
             weeklyFundingAllowance: 0
         });
     }
@@ -325,7 +325,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             creditAccount: DUMB_ADDRESS,
             bot: DUMB_ADDRESS,
             permissions: 0,
-            fundingAmount: 0,
+            totalFundingAllowance: 0,
             weeklyFundingAllowance: 0
         });
     }
@@ -1170,7 +1170,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         creditManagerMock.setBorrower(USER);
 
-        MultiCallPermissionTestCase[12] memory cases = [
+        MultiCallPermissionTestCase[11] memory cases = [
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.revertIfReceivedLessThan, (new Balance[](0))),
                 permissionRquired: 0
@@ -1210,10 +1210,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.revokeAdapterAllowances, (new RevocationPair[](0))),
                 permissionRquired: REVOKE_ALLOWANCES_PERMISSION
-            }),
-            MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.onDemandPriceUpdate, (token, bytes(""))),
-                permissionRquired: 0
             }),
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.payBot, (0)),
@@ -1355,7 +1351,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
     /// @dev U:[FA-25]: multicall onDemandPriceUpdate works properly
     function test_U_FA_25_multicall_onDemandPriceUpdate_works_properly() public notExpirableCase {
-        address creditAccount = DUMB_ADDRESS;
         bytes memory cd = bytes("Hellew");
 
         address token = tokenTestSuite.addressOf(Tokens.LINK);
@@ -1375,7 +1370,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.expectCall(address(priceOracleMock), abi.encodeCall(IPriceOracleBase.priceFeeds, (token)));
         vm.expectCall(address(priceFeedOnDemandMock), abi.encodeCall(PriceFeedOnDemandMock.updatePrice, (cd)));
-        creditFacade.multicallInt({creditAccount: creditAccount, calls: calls, enabledTokensMask: 0, flags: 0});
+        creditFacade.applyPriceOnDemandInt({calls: calls});
 
         /// @notice it reverts for zero value
         calls = MultiCallBuilder.build(
@@ -1386,7 +1381,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         );
 
         vm.expectRevert(PriceFeedDoesNotExistException.selector);
-        creditFacade.multicallInt({creditAccount: creditAccount, calls: calls, enabledTokensMask: 0, flags: 0});
+        creditFacade.applyPriceOnDemandInt({calls: calls});
     }
 
     /// @dev U:[FA-26]: multicall addCollateral works properly
@@ -2100,7 +2095,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             creditAccount: creditAccount,
             bot: bot,
             permissions: 1,
-            fundingAmount: 2,
+            totalFundingAllowance: 2,
             weeklyFundingAllowance: 3
         });
 
@@ -2112,7 +2107,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             creditAccount: creditAccount,
             bot: bot,
             permissions: 1,
-            fundingAmount: 2,
+            totalFundingAllowance: 2,
             weeklyFundingAllowance: 3
         });
 
@@ -2132,7 +2127,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             creditAccount: creditAccount,
             bot: bot,
             permissions: 1,
-            fundingAmount: 2,
+            totalFundingAllowance: 2,
             weeklyFundingAllowance: 3
         });
     }

@@ -59,7 +59,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
             creditAccount: creditAccount,
             bot: address(adapterMock),
             permissions: uint192(ADD_COLLATERAL_PERMISSION),
-            fundingAmount: 0,
+            totalFundingAllowance: 0,
             weeklyFundingAllowance: 0
         });
 

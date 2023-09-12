@@ -101,8 +101,12 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
 
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "EXPIRATION_DATE"));
 
+        uint256 initialExpirationDate = block.timestamp;
+
         vm.mockCall(
-            creditFacade, abi.encodeWithSelector(ICreditFacadeV3.expirationDate.selector), abi.encode(block.timestamp)
+            creditFacade,
+            abi.encodeWithSelector(ICreditFacadeV3.expirationDate.selector),
+            abi.encode(initialExpirationDate)
         );
 
         vm.mockCall(
@@ -177,6 +181,13 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.setExpirationDate(creditManager, uint40(block.timestamp + 5));
 
+        (,,,,,, uint256 sanityCheckValue, bytes memory sanityCheckCallData) =
+            controllerTimelock.queuedTransactions(txHash);
+
+        assertEq(sanityCheckValue, initialExpirationDate, "Sanity check value written incorrectly");
+
+        assertEq(sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getExpirationDate, (creditFacade)));
+
         vm.expectCall(
             creditConfigurator,
             abi.encodeWithSelector(ICreditConfiguratorV3.setExpirationDate.selector, block.timestamp + 5)
@@ -187,7 +198,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -252,6 +263,13 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.setLPPriceFeedLimiter(lpPriceFeed, 7);
 
+        (,,,,,, uint256 sanityCheckValue, bytes memory sanityCheckCallData) =
+            controllerTimelock.queuedTransactions(txHash);
+
+        assertEq(sanityCheckValue, 5, "Sanity check value written incorrectly");
+
+        assertEq(sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getPriceFeedLowerBound, (lpPriceFeed)));
+
         vm.expectCall(lpPriceFeed, abi.encodeWithSelector(ILPPriceFeedV2.setLimiter.selector, 7));
 
         vm.warp(block.timestamp + 1 days);
@@ -259,7 +277,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -335,6 +353,13 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.setMaxDebtPerBlockMultiplier(creditManager, 4);
 
+        (,,,,,, uint256 sanityCheckValue, bytes memory sanityCheckCallData) =
+            controllerTimelock.queuedTransactions(txHash);
+
+        assertEq(sanityCheckValue, 3, "Sanity check value written incorrectly");
+
+        assertEq(sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getMaxDebtPerBlockMultiplier, (creditFacade)));
+
         vm.expectCall(
             creditConfigurator, abi.encodeWithSelector(ICreditConfiguratorV3.setMaxDebtPerBlockMultiplier.selector, 4)
         );
@@ -344,7 +369,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -412,6 +437,13 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.setMinDebtLimit(creditManager, 15);
 
+        (,,,,,, uint256 sanityCheckValue, bytes memory sanityCheckCallData) =
+            controllerTimelock.queuedTransactions(txHash);
+
+        assertEq(sanityCheckValue, 10, "Sanity check value written incorrectly");
+
+        assertEq(sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getMinDebtLimit, (creditFacade)));
+
         vm.expectCall(creditConfigurator, abi.encodeWithSelector(ICreditConfiguratorV3.setMinDebtLimit.selector, 15));
 
         vm.warp(block.timestamp + 3 days);
@@ -419,7 +451,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -487,6 +519,13 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.setMaxDebtLimit(creditManager, 25);
 
+        (,,,,,, uint256 sanityCheckValue, bytes memory sanityCheckCallData) =
+            controllerTimelock.queuedTransactions(txHash);
+
+        assertEq(sanityCheckValue, 20, "Sanity check value written incorrectly");
+
+        assertEq(sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getMaxDebtLimit, (creditFacade)));
+
         vm.expectCall(creditConfigurator, abi.encodeWithSelector(ICreditConfiguratorV3.setMaxDebtLimit.selector, 25));
 
         vm.warp(block.timestamp + 1 days);
@@ -494,7 +533,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -573,6 +612,15 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.setCreditManagerDebtLimit(creditManager, 2e18);
 
+        (,,,,,, uint256 sanityCheckValue, bytes memory sanityCheckCallData) =
+            controllerTimelock.queuedTransactions(txHash);
+
+        assertEq(sanityCheckValue, 1e18, "Sanity check value written incorrectly");
+
+        assertEq(
+            sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getCreditManagerDebtLimit, (pool, creditManager))
+        );
+
         vm.expectCall(pool, abi.encodeWithSelector(PoolV3.setCreditManagerDebtLimit.selector, creditManager, 2e18));
 
         vm.warp(block.timestamp + 1 days);
@@ -580,95 +628,10 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
-
-    // TODO: looks obsolete, can we remove it?
-    // /// @dev U:[CT-5A]: setCreditManagerDebtLimit works correctly, Credit Facade tracks debt
-    // function test_U_CT_05A_setCreditManagerDebtLimit_works_correctly_CF_totalDebt() public {
-    //     (address creditManager, address creditFacade, address creditConfigurator,,) = _makeMocks();
-
-    //     // TODO: double check
-    //     // vm.mockCall(creditFacade, abi.encodeCall(ICreditFacadeV3.trackTotalDebt, ()), abi.encode(true));
-
-    //     bytes32 POLICY_CODE = keccak256(abi.encode("CM", "CREDIT_MANAGER_DEBT_LIMIT"));
-
-    //     vm.mockCall(creditFacade, abi.encodeCall(ICreditFacadeV3.totalDebt, ()), abi.encode(uint128(0), uint128(1e18)));
-
-    //     Policy memory policy = Policy({
-    //         enabled: false,
-    //         admin: admin,
-    //         delay: 1 days,
-    //         flags: 1,
-    //         exactValue: 2e18,
-    //         minValue: 0,
-    //         maxValue: 0,
-    //         referencePoint: 0,
-    //         referencePointUpdatePeriod: 0,
-    //         referencePointTimestampLU: 0,
-    //         minPctChangeDown: 0,
-    //         minPctChangeUp: 0,
-    //         maxPctChangeDown: 0,
-    //         maxPctChangeUp: 0,
-    //         minChange: 0,
-    //         maxChange: 0
-    //     });
-
-    //     // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
-    //     vm.expectRevert(ParameterChecksFailedException.selector);
-    //     vm.prank(admin);
-    //     controllerTimelock.setCreditManagerDebtLimit(creditManager, 2e18);
-
-    //     vm.prank(CONFIGURATOR);
-    //     controllerTimelock.setPolicy(POLICY_CODE, policy);
-
-    //     // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
-    //     vm.expectRevert(ParameterChecksFailedException.selector);
-    //     vm.prank(USER);
-    //     controllerTimelock.setCreditManagerDebtLimit(creditManager, 2e18);
-
-    //     // VERIFY THAT POLICY CHECKS ARE PERFORMED
-    //     vm.expectRevert(ParameterChecksFailedException.selector);
-    //     vm.prank(admin);
-    //     controllerTimelock.setCreditManagerDebtLimit(creditManager, 1e18);
-
-    //     // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-    //     bytes32 txHash = keccak256(
-    //         abi.encode(
-    //             admin,
-    //             creditConfigurator,
-    //             "setTotalDebtLimit(uint128)",
-    //             abi.encode(uint128(2e18)),
-    //             block.timestamp + 1 days
-    //         )
-    //     );
-
-    //     vm.expectEmit(true, false, false, true);
-    //     emit QueueTransaction(
-    //         txHash,
-    //         admin,
-    //         creditConfigurator,
-    //         "setTotalDebtLimit(uint128)",
-    //         abi.encode(uint128(2e18)),
-    //         uint40(block.timestamp + 1 days)
-    //     );
-
-    //     vm.prank(admin);
-    //     controllerTimelock.setCreditManagerDebtLimit(creditManager, 2e18);
-
-    //     vm.expectCall(creditConfigurator, abi.encodeCall(ICreditConfiguratorV3.setTotalDebtLimit, (2e18)));
-
-    //     vm.warp(block.timestamp + 1 days);
-
-    //     vm.prank(admin);
-    //     controllerTimelock.executeTransaction(txHash);
-
-    //     (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
-
-    //     assertTrue(!queued, "Transaction is still queued after execution");
-    // }
 
     /// @dev U:[CT-6]: rampLiquidationThreshold works correctly
     function test_U_CT_06_rampLiquidationThreshold_works_correctly() public {
@@ -683,6 +646,12 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
 
         vm.mockCall(
             creditManager, abi.encodeWithSelector(ICreditManagerV3.liquidationThresholds.selector), abi.encode(5000)
+        );
+
+        vm.mockCall(
+            creditManager,
+            abi.encodeWithSelector(ICreditManagerV3.ltParams.selector),
+            abi.encode(uint16(5000), uint16(5000), type(uint40).max, uint24(0))
         );
 
         Policy memory policy = Policy({
@@ -767,6 +736,17 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
             creditManager, token, 6000, uint40(block.timestamp + 14 days), 7 days
         );
 
+        (,,,,,, uint256 sanityCheckValue, bytes memory sanityCheckCallData) =
+            controllerTimelock.queuedTransactions(txHash);
+
+        assertEq(
+            sanityCheckValue,
+            uint256(keccak256(abi.encode(uint16(5000), uint16(5000), type(uint40).max, uint24(0)))),
+            "Sanity check value written incorrectly"
+        );
+
+        assertEq(sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getLTRampParamsHash, (creditManager, token)));
+
         vm.expectCall(
             creditConfigurator,
             abi.encodeWithSelector(
@@ -783,7 +763,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -847,7 +827,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(vetoAdmin);
         controllerTimelock.cancelTransaction(txHash);
 
-        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after cancelling");
 
@@ -877,8 +857,12 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
 
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "EXPIRATION_DATE"));
 
+        uint40 initialExpirationDate = uint40(block.timestamp);
+
         vm.mockCall(
-            creditFacade, abi.encodeWithSelector(ICreditFacadeV3.expirationDate.selector), abi.encode(block.timestamp)
+            creditFacade,
+            abi.encodeWithSelector(ICreditFacadeV3.expirationDate.selector),
+            abi.encode(initialExpirationDate)
         );
 
         vm.mockCall(pool, abi.encodeWithSelector(IPoolV3.creditManagerBorrowed.selector, creditManager), abi.encode(0));
@@ -949,6 +933,26 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
 
         vm.clearMockedCalls();
 
+        vm.mockCall(
+            creditManager, abi.encodeWithSelector(ICreditManagerV3.creditFacade.selector), abi.encode(creditFacade)
+        );
+
+        vm.mockCall(
+            creditFacade,
+            abi.encodeWithSelector(ICreditFacadeV3.expirationDate.selector),
+            abi.encode(block.timestamp + 2 days)
+        );
+
+        vm.expectRevert(ParameterChangedAfterQueuedTxException.selector);
+        vm.prank(FRIEND);
+        controllerTimelock.executeTransaction(txHash);
+
+        vm.mockCall(
+            creditFacade,
+            abi.encodeWithSelector(ICreditFacadeV3.expirationDate.selector),
+            abi.encode(initialExpirationDate)
+        );
+
         vm.expectEmit(true, false, false, false);
         emit ExecuteTransaction(txHash);
 
@@ -1014,6 +1018,13 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.forbidAdapter(creditManager, DUMB_ADDRESS);
 
+        (,,,,,, uint256 sanityCheckValue, bytes memory sanityCheckCallData) =
+            controllerTimelock.queuedTransactions(txHash);
+
+        assertEq(sanityCheckValue, 0, "Sanity check value written incorrectly");
+
+        assertEq(sanityCheckCallData, "");
+
         vm.expectCall(
             creditConfigurator, abi.encodeWithSelector(ICreditConfiguratorV3.forbidAdapter.selector, DUMB_ADDRESS)
         );
@@ -1023,7 +1034,104 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,,,) = controllerTimelock.queuedTransactions(txHash);
+
+        assertTrue(!queued, "Transaction is still queued after execution");
+    }
+
+    /// @dev U:[CT-11]: setTokenLimit works correctly
+    function test_U_CT_11_setTokenLimit_works_correctly() public {
+        (,,, address pool, address poolQuotaKeeper) = _makeMocks();
+
+        address token = makeAddr("TOKEN");
+
+        vm.prank(CONFIGURATOR);
+        controllerTimelock.setGroup(token, "TOKEN");
+
+        vm.mockCall(
+            poolQuotaKeeper,
+            abi.encodeCall(IPoolQuotaKeeperV3.getTokenQuotaParams, (token)),
+            abi.encode(uint16(10), uint192(1e27), uint16(15), uint96(1e17), uint96(1e18))
+        );
+
+        bytes32 POLICY_CODE = keccak256(abi.encode("POOL", "TOKEN", "TOKEN_LIMIT"));
+
+        Policy memory policy = Policy({
+            enabled: false,
+            admin: admin,
+            delay: 1 days,
+            flags: 1,
+            exactValue: 1e19,
+            minValue: 0,
+            maxValue: 0,
+            referencePoint: 0,
+            referencePointUpdatePeriod: 0,
+            referencePointTimestampLU: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
+            minChange: 0,
+            maxChange: 0
+        });
+
+        // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setTokenLimit(pool, token, 1e19);
+
+        vm.prank(CONFIGURATOR);
+        controllerTimelock.setPolicy(POLICY_CODE, policy);
+
+        // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(USER);
+        controllerTimelock.setTokenLimit(pool, token, 1e19);
+
+        // VERIFY THAT THE FUNCTION PERFORMS POLICY CHECKS
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setTokenLimit(pool, token, 1e20);
+
+        // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
+        bytes32 txHash = keccak256(
+            abi.encode(
+                admin,
+                poolQuotaKeeper,
+                "setTokenLimit(address,uint96)",
+                abi.encode(token, uint96(1e19)),
+                block.timestamp + 1 days
+            )
+        );
+
+        vm.expectEmit(true, false, false, true);
+        emit QueueTransaction(
+            txHash,
+            admin,
+            poolQuotaKeeper,
+            "setTokenLimit(address,uint96)",
+            abi.encode(token, uint96(1e19)),
+            uint40(block.timestamp + 1 days)
+        );
+
+        vm.prank(admin);
+        controllerTimelock.setTokenLimit(pool, token, 1e19);
+
+        (,,,,,, uint256 sanityCheckValue, bytes memory sanityCheckCallData) =
+            controllerTimelock.queuedTransactions(txHash);
+
+        assertEq(sanityCheckValue, 1e18, "Sanity check value written incorrectly");
+
+        assertEq(sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getTokenLimit, (poolQuotaKeeper, token)));
+
+        vm.expectCall(poolQuotaKeeper, abi.encodeCall(PoolQuotaKeeperV3.setTokenLimit, (token, 1e19)));
+
+        vm.warp(block.timestamp + 1 days);
+
+        vm.prank(admin);
+        controllerTimelock.executeTransaction(txHash);
+
+        (bool queued,,,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -1106,6 +1214,15 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.setTokenQuotaIncreaseFee(pool, token, 20);
 
+        (,,,,,, uint256 sanityCheckValue, bytes memory sanityCheckCallData) =
+            controllerTimelock.queuedTransactions(txHash);
+
+        assertEq(sanityCheckValue, 15, "Sanity check value written incorrectly");
+
+        assertEq(
+            sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getTokenQuotaIncreaseFee, (poolQuotaKeeper, token))
+        );
+
         vm.expectCall(poolQuotaKeeper, abi.encodeCall(PoolQuotaKeeperV3.setTokenQuotaIncreaseFee, (token, 20)));
 
         vm.warp(block.timestamp + 1 days);
@@ -1113,7 +1230,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -1175,6 +1292,13 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.setTotalDebtLimit(pool, 2e18);
 
+        (,,,,,, uint256 sanityCheckValue, bytes memory sanityCheckCallData) =
+            controllerTimelock.queuedTransactions(txHash);
+
+        assertEq(sanityCheckValue, 1e18, "Sanity check value written incorrectly");
+
+        assertEq(sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getTotalDebtLimit, (pool)));
+
         vm.expectCall(pool, abi.encodeCall(PoolV3.setTotalDebtLimit, (2e18)));
 
         vm.warp(block.timestamp + 1 days);
@@ -1182,7 +1306,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -1244,6 +1368,13 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.setWithdrawFee(pool, 20);
 
+        (,,,,,, uint256 sanityCheckValue, bytes memory sanityCheckCallData) =
+            controllerTimelock.queuedTransactions(txHash);
+
+        assertEq(sanityCheckValue, 10, "Sanity check value written incorrectly");
+
+        assertEq(sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getWithdrawFee, (pool)));
+
         vm.expectCall(pool, abi.encodeCall(PoolV3.setWithdrawFee, (20)));
 
         vm.warp(block.timestamp + 1 days);
@@ -1251,7 +1382,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -1338,6 +1469,13 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.setMinQuotaRate(pool, token, 15);
 
+        (,,,,,, uint256 sanityCheckValue, bytes memory sanityCheckCallData) =
+            controllerTimelock.queuedTransactions(txHash);
+
+        assertEq(sanityCheckValue, 10, "Sanity check value written incorrectly");
+
+        assertEq(sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getMinQuotaRate, (gauge, token)));
+
         vm.expectCall(gauge, abi.encodeCall(GaugeV3.changeQuotaMinRate, (token, 15)));
 
         vm.warp(block.timestamp + 1 days);
@@ -1345,7 +1483,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -1432,6 +1570,13 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.setMaxQuotaRate(pool, token, 25);
 
+        (,,,,,, uint256 sanityCheckValue, bytes memory sanityCheckCallData) =
+            controllerTimelock.queuedTransactions(txHash);
+
+        assertEq(sanityCheckValue, 20, "Sanity check value written incorrectly");
+
+        assertEq(sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getMaxQuotaRate, (gauge, token)));
+
         vm.expectCall(gauge, abi.encodeCall(GaugeV3.changeQuotaMaxRate, (token, 25)));
 
         vm.warp(block.timestamp + 1 days);
@@ -1439,7 +1584,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }
@@ -1513,6 +1658,13 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.setReservePriceFeedStatus(priceOracle, token, true);
 
+        (,,,,,, uint256 sanityCheckValue, bytes memory sanityCheckCallData) =
+            controllerTimelock.queuedTransactions(txHash);
+
+        assertEq(sanityCheckValue, 0, "Sanity check value written incorrectly");
+
+        assertEq(sanityCheckCallData, "");
+
         vm.expectCall(priceOracle, abi.encodeCall(IPriceOracleV3.setReservePriceFeedStatus, (token, true)));
 
         vm.warp(block.timestamp + 1 days);
@@ -1520,7 +1672,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         vm.prank(admin);
         controllerTimelock.executeTransaction(txHash);
 
-        (bool queued,,,,,) = controllerTimelock.queuedTransactions(txHash);
+        (bool queued,,,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
     }

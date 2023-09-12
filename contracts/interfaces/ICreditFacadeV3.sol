@@ -27,14 +27,6 @@ struct FullCheckParams {
     uint256[] collateralHints;
     uint16 minHealthFactor;
     uint256 enabledTokensMaskAfter;
-    address priceOracle;
-}
-
-struct TotalDebt {
-    /// @dev Current total borrowing
-    uint128 currentTotalDebt;
-    /// @dev Total borrowing limit
-    uint128 totalDebtLimit;
 }
 
 interface ICreditFacadeV3Events {

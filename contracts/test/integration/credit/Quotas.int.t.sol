@@ -52,7 +52,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
     ///
 
     /// @dev I:[CMQ-2]: setQuotedMask works correctly
-    function test_I_CMQ_02_setQuotedMask_works_correctly() public withQuotas creditTest {
+    function test_I_CMQ_02_setQuotedMask_works_correctly() public creditTest {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
@@ -63,7 +63,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
     }
 
     /// @dev I:[CMQ-3]: updateQuotas works correctly
-    function test_I_CMQ_03_updateQuotas_works_correctly() public withQuotas creditTest {
+    function test_I_CMQ_03_updateQuotas_works_correctly() public creditTest {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
@@ -150,7 +150,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
     }
 
     /// @dev I:[CMQ-4]: Quotas are handled correctly on debt decrease: amount < quota interest case
-    function test_I_CMQ_04_quotas_are_handled_correctly_at_repayment_partial_case() public withQuotas creditTest {
+    function test_I_CMQ_04_quotas_are_handled_correctly_at_repayment_partial_case() public creditTest {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
@@ -210,7 +210,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
     }
 
     /// @dev I:[CMQ-5]: Quotas are handled correctly on debt decrease: amount >= quota interest case
-    function test_I_CMQ_05_quotas_are_handled_correctly_at_repayment_full_case() public withQuotas creditTest {
+    function test_I_CMQ_05_quotas_are_handled_correctly_at_repayment_full_case() public creditTest {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 1000, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
@@ -260,11 +260,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
     }
 
     /// @dev I:[CMQ-6]: Quotas are disabled on closing an account
-    function test_I_CMQ_06_quotas_are_disabled_on_close_account_and_all_quota_fees_are_repaid()
-        public
-        withQuotas
-        creditTest
-    {
+    function test_I_CMQ_06_quotas_are_disabled_on_close_account_and_all_quota_fees_are_repaid() public creditTest {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 5_00, uint96(1_000_000 * WAD));
 
@@ -332,7 +328,6 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
     /// @dev I:[CMQ-07]: calcDebtAndCollateral correctly counts quota interest
     function test_I_CMQ_07_calcDebtAndCollateral_correctly_includes_quota_interest(uint96 quotaLink, uint96 quotaUsdt)
         public
-        withQuotas
         creditTest
     {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
@@ -392,7 +387,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
     }
 
     /// @dev I:[CMQ-08]: Credit Manager zeroes limits on quoted tokens upon incurring a loss
-    function test_I_CMQ_08_creditManager_triggers_limit_zeroing_on_loss() public withQuotas creditTest {
+    function test_I_CMQ_08_creditManager_triggers_limit_zeroing_on_loss() public creditTest {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
@@ -434,13 +429,13 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
     }
 
     /// @dev I:[CMQ-09]: positive updateQuotas reverts on zero debt
-    function test_I_CMQ_09_updateQuotas_with_positive_value_reverts_on_zero_debt() public withQuotas creditTest {
+    function test_I_CMQ_09_updateQuotas_with_positive_value_reverts_on_zero_debt() public creditTest {
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
 
         address creditAccount = _openCreditAccount(0, USER, 0, 0);
 
-        (, uint256 maxDebt) = creditFacade.debtLimits();
-        uint96 maxQuota = uint96(creditFacade.maxQuotaMultiplier() * maxDebt);
+        // (, uint256 maxDebt) = creditFacade.debtLimits();
+        // uint96 maxQuota = uint96(creditFacade.maxQuotaMultiplier() * maxDebt);
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({

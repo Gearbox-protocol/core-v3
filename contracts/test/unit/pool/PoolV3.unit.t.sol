@@ -98,7 +98,6 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             addressProvider_: address(addressProvider),
             interestRateModel_: interestRateModel,
             totalDebtLimit_: 2000,
-            supportsQuotas_: supportsQuotas,
             name_: string(abi.encodePacked("diesel ", IERC20Metadata(underlying).name())),
             symbol_: string(abi.encodePacked("d", IERC20Metadata(underlying).symbol()))
         });
@@ -138,7 +137,6 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             addressProvider_: address(addressProvider),
             interestRateModel_: interestRateModel,
             totalDebtLimit_: type(uint256).max,
-            supportsQuotas_: false,
             name_: "",
             symbol_: ""
         });
@@ -149,7 +147,6 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             addressProvider_: address(0),
             interestRateModel_: interestRateModel,
             totalDebtLimit_: type(uint256).max,
-            supportsQuotas_: false,
             name_: "",
             symbol_: ""
         });
@@ -160,7 +157,6 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             addressProvider_: address(addressProvider),
             interestRateModel_: address(0),
             totalDebtLimit_: type(uint256).max,
-            supportsQuotas_: false,
             name_: "",
             symbol_: ""
         });
@@ -179,7 +175,6 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             addressProvider_: address(addressProvider),
             interestRateModel_: interestRateModel,
             totalDebtLimit_: 2000,
-            supportsQuotas_: true,
             name_: string(abi.encodePacked("diesel ", IERC20Metadata(underlying).name())),
             symbol_: string(abi.encodePacked("d", IERC20Metadata(underlying).symbol()))
         });

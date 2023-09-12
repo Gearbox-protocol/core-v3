@@ -112,7 +112,6 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     /// @param underlyingToken_ Pool underlying token address
     /// @param interestRateModel_ Interest rate model contract address
     /// @param totalDebtLimit_ Initial total debt limit, `type(uint256).max` for no limit
-    /// @param supportsQuotas_ Whether pool should support quotas
     /// @param name_ Name of the pool
     /// @param symbol_ Symbol of the pool's LP token
     constructor(
@@ -120,7 +119,6 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         address underlyingToken_,
         address interestRateModel_,
         uint256 totalDebtLimit_,
-        bool supportsQuotas_,
         string memory name_,
         string memory symbol_
     )
