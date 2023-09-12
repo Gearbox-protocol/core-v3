@@ -135,6 +135,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     address internal _activeCreditAccount;
 
     /// @notice Mask of tokens to apply quota logic for
+    /// @custom:invariant `quotedTokensMask % 2 == 0`
     uint256 public override quotedTokensMask;
 
     /// @notice Address of the connected Credit Configurator

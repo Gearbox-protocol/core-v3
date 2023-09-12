@@ -1210,7 +1210,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     }
 
     function _getInvertedQuotedTokensMask(uint256 currentMask) internal view returns (uint256) {
-        /// currentMask == 0 means that the mask is not set (it's never could be 0, because underlying token is not quoted)
+        // Underlying token is not quoted, so `quotedTokenMask` can never be 0, and, thus,
+        // `currentMask == 0` means `quotedTokenMask` hasn't been queried yet
         return currentMask == 0 ? ~ICreditManagerV3(creditManager).quotedTokensMask() : currentMask;
     }
 
