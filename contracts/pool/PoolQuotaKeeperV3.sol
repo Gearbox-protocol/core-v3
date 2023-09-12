@@ -139,19 +139,19 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
         quotaChange = requestedChange;
         if (quotaChange > 0) {
-            if (rate != 0) {
-                (uint96 totalQuoted, uint96 limit) = _getTokenQuotaTotalAndLimit(tokenQuotaParams);
-                quotaChange = QuotasLogic.calcActualQuotaChange(totalQuoted, limit, quotaChange); // U:[PQK-15]
+            (uint96 totalQuoted, uint96 limit) = _getTokenQuotaTotalAndLimit(tokenQuotaParams);
 
-                fees = uint128(uint256(uint96(quotaChange))) * quotaIncreaseFee / PERCENTAGE_FACTOR; // U:[PQK-15]
+            // rate == 0 before the first update, the quota is not actiove, so you can't increase it
+            quotaChange = (rate == 0) ? int96(0) : QuotasLogic.calcActualQuotaChange(totalQuoted, limit, quotaChange); // U:[PQK-15]
 
-                newQuoted = quoted + uint96(quotaChange);
-                if (quoted <= 1 && newQuoted > 1) {
-                    enableToken = true; // U:[PQK-15]
-                }
+            fees = uint128(uint256(uint96(quotaChange))) * quotaIncreaseFee / PERCENTAGE_FACTOR; // U:[PQK-15]
 
-                tokenQuotaParams.totalQuoted = totalQuoted + uint96(quotaChange); // U:[PQK-15]
+            newQuoted = quoted + uint96(quotaChange);
+            if (quoted <= 1 && newQuoted > 1) {
+                enableToken = true; // U:[PQK-15]
             }
+
+            tokenQuotaParams.totalQuoted = totalQuoted + uint96(quotaChange); // U:[PQK-15]
         } else {
             uint96 absoluteChange = uint96(-quotaChange);
             newQuoted = quoted - absoluteChange;
