@@ -68,7 +68,7 @@ contract AddressProviderV3 is IAddressProviderV3 {
 
     /// @notice Contracts register contract address
     function getContractsRegister() external view returns (address) {
-        return getAddressOrRevert(AP_CONTRACTS_REGISTER, 1);
+        return getAddressOrRevert(AP_CONTRACTS_REGISTER, NO_VERSION_CONTROL);
     }
 
     /// @notice Price oracle contract address

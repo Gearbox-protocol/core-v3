@@ -17,7 +17,8 @@ import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {
     CallerNotVoterException,
     IncorrectParameterException,
-    TokenNotAllowedException
+    TokenNotAllowedException,
+    InsufficientVotesException
 } from "../interfaces/IExceptions.sol";
 
 /// @title Gauge V3
@@ -39,6 +40,9 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     mapping(address => QuotaRateParams) public override quotaRateParams;
 
     /// @notice Mapping from (user, token) to vote amounts submitted by `user` for each side
+    /// @custom:invariant For every user `u` and every token `t`,
+    ///                   `userTokenVotes[u][t].votesLpSide <= quotaRateParams[t].totalVotesLpSide` and
+    ///                   `userTokenVotes[u][t].votesCaSide <= quotaRateParams[t].totalVotesCaSide`
     mapping(address => mapping(address => UserVotes)) public override userTokenVotes;
 
     /// @notice GEAR staking and voting contract
@@ -185,11 +189,17 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
         UserVotes storage uv = userTokenVotes[user][token]; // U:[GA-13]
 
         if (lpSide) {
-            qp.totalVotesLpSide -= votes; // U:[GA-13]
-            uv.votesLpSide -= votes; // U:[GA-13]
+            if (uv.votesLpSide < votes) revert InsufficientVotesException();
+            unchecked {
+                qp.totalVotesLpSide -= votes; // U:[GA-13]
+                uv.votesLpSide -= votes; // U:[GA-13]
+            }
         } else {
-            qp.totalVotesCaSide -= votes; // U:[GA-13]
-            uv.votesCaSide -= votes; // U:[GA-13]
+            if (uv.votesCaSide < votes) revert InsufficientVotesException();
+            unchecked {
+                qp.totalVotesCaSide -= votes; // U:[GA-13]
+                uv.votesCaSide -= votes; // U:[GA-13]
+            }
         }
 
         emit Unvote({user: user, token: token, votes: votes, lpSide: lpSide}); // U:[GA-13]

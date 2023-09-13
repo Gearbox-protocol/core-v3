@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 struct BotFunding {
-    uint72 remainingFunds;
+    uint72 totalFundingAllowance;
     uint72 maxWeeklyAllowance;
     uint72 remainingWeeklyAllowance;
     uint40 allowanceLU;
@@ -24,7 +24,7 @@ interface IBotListV3Events {
         address indexed creditAccount,
         address indexed bot,
         uint256 permissions,
-        uint72 fundingAmount,
+        uint72 totalFundingAllowance,
         uint72 weeklyFundingAllowance
     );
 
@@ -74,7 +74,7 @@ interface IBotListV3 is IBotListV3Events, IVersion {
         address creditAccount,
         address bot,
         uint192 permissions,
-        uint72 fundingAmount,
+        uint72 totalFundingAllowance,
         uint72 weeklyFundingAllowance
     ) external returns (uint256 activeBotsRemaining);
 
@@ -120,6 +120,8 @@ interface IBotListV3 is IBotListV3Events, IVersion {
 
     function daoFee() external view returns (uint16);
 
+    function collectedDaoFees() external view returns (uint64);
+
     function approvedCreditManager(address) external view returns (bool);
 
     function botSpecialStatus(address creditManager, address bot)
@@ -136,4 +138,6 @@ interface IBotListV3 is IBotListV3Events, IVersion {
     function setDAOFee(uint16 newFee) external;
 
     function setApprovedCreditManagerStatus(address creditManager, bool newStatus) external;
+
+    function transferCollectedDaoFees() external;
 }

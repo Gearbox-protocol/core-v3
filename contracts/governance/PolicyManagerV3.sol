@@ -30,8 +30,10 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/C
 /// @param referencePointUpdatePeriod The minimal time period after which the RP can be updated
 /// @param referencePointTimestampLU  Last timestamp at which the reference point was updated
 ///        NB: Should not be changed manually in most cases
-/// @param minPctChange Min absolute percentage changes for new values, relative to reference point
-/// @param maxPctChange Max absolute percentage changes for new values, relative to reference point
+/// @param minPctChangeDown Min percentage decrease for new values, relative to reference point
+/// @param minPctChangeUp Min percentage increase for new values, relative to reference point
+/// @param maxPctChangeDown Max percentage decrease for new values, relative to reference point
+/// @param maxPctChangeUp Max percentage increase for new values, relative to reference point
 /// @param minChange Min absolute changes for new values, relative to reference point
 /// @param maxChange Max absolute changes for new values, relative to reference point
 struct Policy {
@@ -45,8 +47,10 @@ struct Policy {
     uint256 referencePoint;
     uint40 referencePointUpdatePeriod;
     uint40 referencePointTimestampLU;
-    uint16 minPctChange;
-    uint16 maxPctChange;
+    uint16 minPctChangeDown;
+    uint16 minPctChangeUp;
+    uint16 maxPctChangeDown;
+    uint16 maxPctChangeUp;
     uint256 minChange;
     uint256 maxChange;
 }
@@ -54,13 +58,13 @@ struct Policy {
 /// @title Policy manager V3
 /// @dev A contract for managing bounds and conditions for mission-critical protocol params
 abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
-    uint256 public constant CHECK_EXACT_VALUE_FLAG = 1;
-    uint256 public constant CHECK_MIN_VALUE_FLAG = 1 << 1;
-    uint256 public constant CHECK_MAX_VALUE_FLAG = 1 << 2;
-    uint256 public constant CHECK_MIN_CHANGE_FLAG = 1 << 3;
-    uint256 public constant CHECK_MAX_CHANGE_FLAG = 1 << 4;
-    uint256 public constant CHECK_MIN_PCT_CHANGE_FLAG = 1 << 5;
-    uint256 public constant CHECK_MAX_PCT_CHANGE_FLAG = 1 << 6;
+    uint256 internal constant CHECK_EXACT_VALUE_FLAG = 1;
+    uint256 internal constant CHECK_MIN_VALUE_FLAG = 1 << 1;
+    uint256 internal constant CHECK_MAX_VALUE_FLAG = 1 << 2;
+    uint256 internal constant CHECK_MIN_CHANGE_FLAG = 1 << 3;
+    uint256 internal constant CHECK_MAX_CHANGE_FLAG = 1 << 4;
+    uint256 internal constant CHECK_MIN_PCT_CHANGE_FLAG = 1 << 5;
+    uint256 internal constant CHECK_MAX_PCT_CHANGE_FLAG = 1 << 6;
 
     /// @dev Mapping from parameter hashes to metaparameters
     mapping(bytes32 => Policy) internal _policies;
@@ -76,15 +80,15 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
 
     constructor(address _addressProvider) ACLNonReentrantTrait(_addressProvider) {}
 
-    /// @notice Sets the policy, using policy UID as key
-    /// @param policyHash A unique identifier for a policy, generally, should be a hash of (PARAMETER_NAME, GROUP_NAME)
-    /// @param initialPolicy The initial policy values
-    function setPolicy(bytes32 policyHash, Policy memory initialPolicy)
+    /// @notice Sets the params for a new or existing policy, using policy UID as key
+    /// @param policyHash A unique identifier for a policy, generally, should be a hash of (GROUP_NAME, PARAMETER_NAME)
+    /// @param policyParams Policy parameters
+    function setPolicy(bytes32 policyHash, Policy memory policyParams)
         external
         configuratorOnly // U:[PM-1]
     {
-        initialPolicy.enabled = true; // U:[PM-1]
-        _policies[policyHash] = initialPolicy; // U:[PM-1]
+        policyParams.enabled = true; // U:[PM-1]
+        _policies[policyHash] = policyParams; // U:[PM-1]
         emit SetPolicy({policyHash: policyHash, enabled: true}); // U:[PM-1]
     }
 
@@ -168,12 +172,14 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
                 != 0
         ) {
             if (block.timestamp > policy.referencePointTimestampLU + policy.referencePointUpdatePeriod) {
-                policy.referencePoint = oldValue; // U:[PM-6]
+                referencePoint = oldValue;
+                policy.referencePoint = referencePoint; // U:[PM-6]
                 policy.referencePointTimestampLU = uint40(block.timestamp); // U:[PM-6]
+            } else {
+                referencePoint = policy.referencePoint;
             }
 
-            referencePoint = policy.referencePoint;
-            uint256 diff = absDiff(newValue, referencePoint);
+            (uint256 diff, bool isIncrease) = calcDiff(newValue, referencePoint);
 
             if (flags & CHECK_MIN_CHANGE_FLAG != 0) {
                 if (diff < policy.minChange) return false; // U:[PM-7]
@@ -185,15 +191,21 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
 
             if (flags & (CHECK_MIN_PCT_CHANGE_FLAG | CHECK_MAX_PCT_CHANGE_FLAG) != 0) {
                 uint256 pctDiff = diff * PERCENTAGE_FACTOR / referencePoint;
-                if (flags & CHECK_MIN_PCT_CHANGE_FLAG != 0 && pctDiff < policy.minPctChange) return false; // U:[PM-9]
-                if (flags & CHECK_MAX_PCT_CHANGE_FLAG != 0 && pctDiff > policy.maxPctChange) return false; // U:[PM-10]
+                if (
+                    flags & CHECK_MIN_PCT_CHANGE_FLAG != 0
+                        && pctDiff < (isIncrease ? policy.minPctChangeUp : policy.minPctChangeDown)
+                ) return false; // U:[PM-9]
+                if (
+                    flags & CHECK_MAX_PCT_CHANGE_FLAG != 0
+                        && pctDiff > (isIncrease ? policy.maxPctChangeUp : policy.maxPctChangeDown)
+                ) return false; // U:[PM-10]
             }
         }
 
         return true;
     }
 
-    function absDiff(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a > b ? a - b : b - a;
+    function calcDiff(uint256 a, uint256 b) internal pure returns (uint256, bool) {
+        return a > b ? (a - b, true) : (b - a, false);
     }
 }

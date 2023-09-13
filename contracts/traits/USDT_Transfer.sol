@@ -4,11 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {USDTFees} from "../libraries/USDTFees.sol";
-
-interface IUSDT {
-    function basisPointsRate() external view returns (uint256);
-    function maximumFee() external view returns (uint256);
-}
+import {IUSDT} from "../interfaces/external/IUSDT.sol";
 
 /// @title USDT transfer
 /// @notice Trait that allows to calculate amounts adjusted for transfer fees
@@ -36,7 +32,7 @@ contract USDT_Transfer {
         return amount.amountUSDTMinusFee({basisPointsRate: basisPointsRate, maximumFee: _maximumFee()}); // U:[UTT_01]
     }
 
-    /// @dev Returns fee rate
+    /// @dev Returns fee rate in bps
     function _basisPointsRate() internal view returns (uint256) {
         return IUSDT(usdt).basisPointsRate();
     }

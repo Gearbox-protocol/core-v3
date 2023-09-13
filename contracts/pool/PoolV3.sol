@@ -66,9 +66,6 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     /// @notice Protocol treasury address
     address public immutable override treasury;
 
-    /// @notice Whether pool supports quotas
-    bool public immutable override supportsQuotas;
-
     /// @notice Interest rate model contract address
     address public override interestRateModel;
     /// @notice Timestamp of the last base interest rate and index update
@@ -115,7 +112,6 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     /// @param underlyingToken_ Pool underlying token address
     /// @param interestRateModel_ Interest rate model contract address
     /// @param totalDebtLimit_ Initial total debt limit, `type(uint256).max` for no limit
-    /// @param supportsQuotas_ Whether pool should support quotas
     /// @param name_ Name of the pool
     /// @param symbol_ Symbol of the pool's LP token
     constructor(
@@ -123,7 +119,6 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         address underlyingToken_,
         address interestRateModel_,
         uint256 totalDebtLimit_,
-        bool supportsQuotas_,
         string memory name_,
         string memory symbol_
     )
@@ -147,7 +142,6 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         emit SetInterestRateModel(interestRateModel_); // U:[LP-1B]
 
         _setTotalDebtLimit(totalDebtLimit_); // U:[LP-1B]
-        supportsQuotas = supportsQuotas_; // U:[LP-1B]
     }
 
     /// @notice Addresses of all connected credit managers
@@ -163,7 +157,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     /// @notice Amount of underlying that would be in the pool if debt principal, base interest
     ///         and quota revenue were fully repaid
     function expectedLiquidity() public view override returns (uint256) {
-        return _expectedLiquidityLU + _calcBaseInterestAccrued() + (supportsQuotas ? _calcQuotaRevenueAccrued() : 0); // U:[LP-4]
+        return _expectedLiquidityLU + _calcBaseInterestAccrued() + _calcQuotaRevenueAccrued(); // U:[LP-4]
     }
 
     /// @notice Expected liquidity stored as of last update
@@ -248,9 +242,10 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         nonZeroAddress(receiver) // U:[LP-5]
         returns (uint256 shares)
     {
-        uint256 assetsSent = _amountWithWithdrawalFee(_amountWithFee(assets)); // U:[LP-8]
+        uint256 assetsToUser = _amountWithFee(assets);
+        uint256 assetsSent = _amountWithWithdrawalFee(assetsToUser); // U:[LP-8]
         shares = _convertToShares(assetsSent, Math.Rounding.Up); // U:[LP-8]
-        _withdraw(receiver, owner, assetsSent, assets, shares); // U:[LP-8]
+        _withdraw(receiver, owner, assetsSent, assets, assetsToUser, shares); // U:[LP-8]
     }
 
     /// @notice Redeems given number of pool shares for underlying tokens
@@ -267,8 +262,9 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         returns (uint256 assets)
     {
         uint256 assetsSent = _convertToAssets(shares, Math.Rounding.Down); // U:[LP-9]
-        assets = _amountMinusFee(_amountMinusWithdrawalFee(assetsSent)); // U:[LP-9]
-        _withdraw(receiver, owner, assetsSent, assets, shares); // U:[LP-9]
+        uint256 assetsToUser = _amountMinusWithdrawalFee(assetsSent);
+        assets = _amountMinusFee(assetsToUser); // U:[LP-9]
+        _withdraw(receiver, owner, assetsSent, assets, assetsToUser, shares); // U:[LP-9]
     }
 
     /// @notice Number of pool shares that would be minted on depositing `assets`
@@ -338,9 +334,14 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     ///      - burns pool shares from `owner`
     ///      - updates base interest rate and index
     ///      - transfers underlying to `receiver` and, if withdrawal fee is activated, to the treasury
-    function _withdraw(address receiver, address owner, uint256 assetsSent, uint256 assetsReceived, uint256 shares)
-        internal
-    {
+    function _withdraw(
+        address receiver,
+        address owner,
+        uint256 assetsSent,
+        uint256 assetsReceived,
+        uint256 amountToUser,
+        uint256 shares
+    ) internal {
         if (msg.sender != owner) _spendAllowance({owner: owner, spender: msg.sender, amount: shares}); // U:[LP-8,9]
         _burn(owner, shares); // U:[LP-8,9]
 
@@ -350,7 +351,6 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
             checkOptimalBorrowing: false
         }); // U:[LP-8,9]
 
-        uint256 amountToUser = _amountWithFee(assetsReceived);
         IERC20(underlyingToken).safeTransfer({to: receiver, value: amountToUser}); // U:[LP-8,9]
         if (assetsSent > amountToUser) {
             unchecked {
@@ -564,7 +564,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
             lastBaseInterestUpdate = uint40(block.timestamp); // U:[LP-18]
         }
 
-        if (supportsQuotas && block.timestamp != lastQuotaRevenueUpdate) {
+        if (block.timestamp != lastQuotaRevenueUpdate) {
             lastQuotaRevenueUpdate = uint40(block.timestamp); // U:[LP-18]
         }
 
@@ -666,9 +666,6 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         configuratorOnly // U:[LP-2C]
         nonZeroAddress(newPoolQuotaKeeper) // U:[LP-23A]
     {
-        if (!supportsQuotas) {
-            revert QuotasNotSupportedException(); // U:[LP-23B]
-        }
         if (IPoolQuotaKeeperV3(newPoolQuotaKeeper).pool() != address(this)) {
             revert IncompatiblePoolQuotaKeeperException(); // U:[LP-23C]
         }
@@ -723,13 +720,18 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         if (newWithdrawFee > MAX_WITHDRAW_FEE) {
             revert IncorrectParameterException(); // U:[LP-26A]
         }
+        if (newWithdrawFee == withdrawFee) return;
+
         withdrawFee = newWithdrawFee.toUint16(); // U:[LP-26B]
         emit SetWithdrawFee(newWithdrawFee); // U:[LP-26B]
     }
 
     /// @dev Sets new total debt limit
     function _setTotalDebtLimit(uint256 limit) internal {
-        _totalDebt.limit = _convertToU128(limit); // U:[LP-1B,24]
+        uint128 newLimit = _convertToU128(limit);
+        if (newLimit == _totalDebt.limit) return;
+
+        _totalDebt.limit = newLimit; // U:[LP-1B,24]
         emit SetTotalDebtLimit(limit); // U:[LP-1B,24]
     }
 

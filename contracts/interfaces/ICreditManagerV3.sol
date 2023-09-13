@@ -21,6 +21,9 @@ enum ManageDebtAction {
 uint8 constant WITHDRAWAL_FLAG = 1;
 uint8 constant BOT_PERMISSIONS_SET_FLAG = 1 << 1;
 
+uint8 constant DEFAULT_MAX_ENABLED_TOKENS = 12;
+address constant INACTIVE_CREDIT_ACCOUNT_ADDRESS = address(1);
+
 struct CreditAccountInfo {
     uint256 debt;
     uint256 cumulativeIndexLastUpdate;
@@ -245,9 +248,6 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @dev Returns the current pool quota keeper connected to the pool
     function poolQuotaKeeper() external view returns (address);
 
-    /// @dev Whether the Credit Manager supports quotas
-    function supportsQuotas() external view returns (bool);
-
     /// @dev Address of the connected Credit Configurator
     function creditConfigurator() external view returns (address);
 
@@ -257,6 +257,12 @@ interface ICreditManagerV3 is ICreditManagerV3Events, IVersion {
     /// @dev Returns the liquidation threshold for the provided token
     /// @param token Token to retrieve the LT for
     function liquidationThresholds(address token) external view returns (uint16);
+
+    /// @dev Returns raw parameters used to calculate ramping LTs
+    function ltParams(address token)
+        external
+        view
+        returns (uint16 ltInitial, uint16 ltFinal, uint40 timestampRampStart, uint24 rampDuration);
 
     /// @dev The maximal number of enabled tokens on a single Credit Account
     function maxEnabledTokens() external view returns (uint8);

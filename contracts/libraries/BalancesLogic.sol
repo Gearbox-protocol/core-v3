@@ -70,17 +70,18 @@ library BalancesLogic {
         uint256 forbiddenTokensOnAccount = enabledTokensMask & forbiddenTokenMask; // U:[BLL-3]
 
         if (forbiddenTokensOnAccount != 0) {
+            uint256 i = 0;
             forbiddenBalances = new  BalanceWithMask[](forbiddenTokensOnAccount.calcEnabledTokens());
             unchecked {
-                uint256 i;
-                for (uint256 tokenMask = 1; tokenMask <= forbiddenTokensOnAccount; tokenMask <<= 1) {
-                    if (forbiddenTokensOnAccount & tokenMask != 0) {
-                        address token = getTokenByMaskFn(tokenMask);
-                        forbiddenBalances[i].token = token; // U:[BLL-3]
-                        forbiddenBalances[i].tokenMask = tokenMask; // U:[BLL-3]
-                        forbiddenBalances[i].balance = IERC20(token).safeBalanceOf({account: creditAccount}); // U:[BLL-3]
-                        ++i;
-                    }
+                while (forbiddenTokensOnAccount != 0) {
+                    uint256 tokenMask = forbiddenTokensOnAccount & uint256(-int256(forbiddenTokensOnAccount));
+                    forbiddenTokensOnAccount &= forbiddenTokensOnAccount - 1;
+
+                    address token = getTokenByMaskFn(tokenMask);
+                    forbiddenBalances[i].token = token; // U:[BLL-3]
+                    forbiddenBalances[i].tokenMask = tokenMask; // U:[BLL-3]
+                    forbiddenBalances[i].balance = IERC20(token).safeBalanceOf({account: creditAccount}); // U:[BLL-3]
+                    ++i;
                 }
             }
         }

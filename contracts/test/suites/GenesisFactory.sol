@@ -31,7 +31,7 @@ contract GenesisFactory is Ownable {
         addressProvider.setAddress(AP_TREASURY, treasury, false);
 
         ContractsRegister contractsRegister = new ContractsRegister(address(addressProvider));
-        addressProvider.setAddress(AP_CONTRACTS_REGISTER, address(contractsRegister), true);
+        addressProvider.setAddress(AP_CONTRACTS_REGISTER, address(contractsRegister), false);
 
         priceOracle = new PriceOracleV3(address(addressProvider));
         addressProvider.setAddress(AP_PRICE_ORACLE, address(priceOracle), true);

@@ -73,9 +73,6 @@ error BorrowingMoreThanU2ForbiddenException();
 /// @notice Thrown when a credit manager attempts to borrow more than its limit in the current block, or in general
 error CreditManagerCantBorrowException();
 
-/// @notice Thrown when attempting to perform a quota-specific action in a pool that does not support quotas
-error QuotasNotSupportedException();
-
 /// @notice Thrown when attempting to connect a quota keeper to an incompatible pool
 error IncompatiblePoolQuotaKeeperException();
 
@@ -115,6 +112,9 @@ error DebtToZeroWithActiveQuotasException();
 
 /// @notice Thrown when a zero-debt account attempts to increase quota
 error IncreaseQuotaOnZeroDebtAccountException();
+
+/// @notice Thrown when Credit Facade tries to write over a non-zero active Credit Account
+error ActiveCreditAccountOverridenException();
 
 // ------------------- //
 // CREDIT CONFIGURATOR //
@@ -249,12 +249,21 @@ error TxExecutedOutsideTimeWindowException();
 /// @notice Thrown when execution of a transaction fails
 error TxExecutionRevertedException();
 
+/// @notice Thrown when the value of a parameter on execution is different from the value on queue
+error ParameterChangedAfterQueuedTxException();
+
 // -------- //
 // BOT LIST //
 // -------- //
 
 /// @notice Thrown when attempting to set non-zero permissions for a forbidden bot
 error InvalidBotException();
+
+/// @notice Thrown if payment amount bigger that remaining weekly allowance
+error InsufficientWeeklyFundingAllowance();
+
+/// @notice Thrown if payment amount bigger that remaining total allowance
+error InsufficientTotalFundingAllowance();
 
 // ------------------ //
 // WITHDRAWAL MANAGER //
@@ -298,3 +307,6 @@ error StalePriceException();
 
 /// @notice Thrown by Degen NFT when attempting to burn on opening an account with 0 balance
 error InsufficientBalanceException();
+
+/// @notice Thrown by Degen NFT when attempting to burn on opening an account with 0 balance
+error InsufficientVotesException();

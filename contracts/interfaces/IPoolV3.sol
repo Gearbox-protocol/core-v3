@@ -119,8 +119,6 @@ interface IPoolV3 is IPoolV3Events, IPoolBase, IERC4626 {
     // QUOTAS //
     // ------ //
 
-    function supportsQuotas() external view returns (bool);
-
     function poolQuotaKeeper() external view returns (address);
 
     function quotaRevenue() external view returns (uint256);

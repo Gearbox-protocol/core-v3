@@ -21,7 +21,11 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
         external
         returns (FullCheckParams memory fullCheckParams)
     {
-        return _multicall(creditAccount, calls, enabledTokensMask, flags);
+        return _multicall(creditAccount, calls, enabledTokensMask, flags, 0);
+    }
+
+    function applyPriceOnDemandInt(MultiCall[] calldata calls) external returns (uint256 remainingCalls) {
+        return _applyOnDemandPriceUpdates(calls);
     }
 
     function revertIfNoPermission(uint256 flags, uint256 permission) external pure {
@@ -58,10 +62,6 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
 
     function isExpired() external view returns (bool) {
         return _isExpired();
-    }
-
-    function revertIfOutOfTotalDebtLimit(uint256 delta, ManageDebtAction action) external {
-        _revertIfOutOfTotalDebtLimit(delta, action);
     }
 
     function setCurrentCumulativeLoss(uint128 _currentCumulativeLoss) external {

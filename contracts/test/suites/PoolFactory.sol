@@ -52,7 +52,6 @@ contract PoolFactory is Test {
         // address underlyingToken_,
         // address interestRateModel_,
         // uint256 totalDebtLimit_,
-        // bool supportsQuotas_,
         // string memory namePrefix_,
         // string memory symbolPrefix_
         pool = new PoolV3({
@@ -60,7 +59,6 @@ contract PoolFactory is Test {
            underlyingToken_: underlying,
            interestRateModel_: address(irm),
            totalDebtLimit_: type(uint256).max,
-           supportsQuotas_: supportQuotas,
            name_: config.name(),
            symbol_: config.symbol()
      } );

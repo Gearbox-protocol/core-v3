@@ -49,9 +49,7 @@ library CreditAccountHelper {
         try creditAccount.execute(token, abi.encodeCall(IERC20.approve, (spender, amount))) returns (
             bytes memory result
         ) {
-            if (result.length == 0 || abi.decode(result, (bool)) == true) {
-                return true;
-            }
+            if (result.length == 0 || abi.decode(result, (bool))) return true;
         } catch {}
 
         // On the first try, failure is allowed to handle tokens that prohibit changing allowance from non-zero value.
@@ -66,7 +64,7 @@ library CreditAccountHelper {
     /// @param to Address to send to
     /// @param amount Amount to send
     function transfer(ICreditAccountBase creditAccount, address token, address to, uint256 amount) internal {
-        ICreditAccountBase(creditAccount).safeTransfer(token, to, amount);
+        creditAccount.safeTransfer(token, to, amount);
     }
 
     /// @dev Performs a token transfer from a Credit account and returns the actual amount of token transferred

@@ -80,8 +80,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
     bool expirable;
 
-    bool v1PoolUsed;
-
     modifier notExpirableCase() {
         _notExpirable();
         _;
@@ -120,15 +118,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.revertTo(snapshot);
 
         _withDegenNFT();
-        _;
-    }
-
-    modifier withV1PoolTest() {
-        uint256 snapshot = vm.snapshot();
-        v1PoolUsed = false;
-        _;
-        vm.revertTo(snapshot);
-        v1PoolUsed = true;
         _;
     }
 
@@ -182,7 +171,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     }
 
     function _deploy() internal {
-        poolMock.setVersion(v1PoolUsed ? 1 : 3_00);
+        poolMock.setVersion(3_00);
         creditFacade = new CreditFacadeV3Harness(
             address(creditManagerMock),
             address(degenNFTMock),
@@ -300,7 +289,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             creditAccount: DUMB_ADDRESS,
             bot: DUMB_ADDRESS,
             permissions: 0,
-            fundingAmount: 0,
+            totalFundingAllowance: 0,
             weeklyFundingAllowance: 0
         });
     }
@@ -336,7 +325,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             creditAccount: DUMB_ADDRESS,
             bot: DUMB_ADDRESS,
             permissions: 0,
-            fundingAmount: 0,
+            totalFundingAllowance: 0,
             weeklyFundingAllowance: 0
         });
     }
@@ -402,11 +391,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     //
 
     /// @dev U:[FA-8]: openCreditAccount reverts if out of limits
-    function test_U_FA_08_openCreditAccount_reverts_if_out_of_limits(uint128 a, uint128 b)
-        public
-        withV1PoolTest
-        notExpirableCase
-    {
+    function test_U_FA_08_openCreditAccount_reverts_if_out_of_limits(uint128 a, uint128 b) public notExpirableCase {
         vm.assume(a > 1 && b > 1);
 
         uint128 minDebt = uint128(Math.min(a, b));
@@ -435,21 +420,10 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.expectRevert(BorrowedBlockLimitException.selector);
         creditFacade.openCreditAccount({debt: minDebt, onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
-
-        if (v1PoolUsed) {
-            vm.prank(CONFIGURATOR);
-            creditFacade.setDebtLimits(minDebt, maxDebt, type(uint8).max);
-
-            vm.prank(CONFIGURATOR);
-            creditFacade.setTotalDebtParams(b - minDebt + 1, b);
-
-            vm.expectRevert(CreditManagerCantBorrowException.selector);
-            creditFacade.openCreditAccount({debt: minDebt, onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
-        }
     }
 
     /// @dev U:[FA-8A]: openCreditAccount suceeds for 0 debt
-    function test_U_FA_08A_openCreditAccount_does_not_revert_for_0_debt() public withV1PoolTest notExpirableCase {
+    function test_U_FA_08A_openCreditAccount_does_not_revert_for_0_debt() public notExpirableCase {
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(200, 400, 0);
 
@@ -478,7 +452,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     }
 
     /// @dev U:[FA-10]: openCreditAccount wokrs as expected
-    function test_U_FA_10_openCreditAccount_works_as_expected() public withV1PoolTest notExpirableCase {
+    function test_U_FA_10_openCreditAccount_works_as_expected() public notExpirableCase {
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(100, 200, 1);
 
@@ -492,13 +466,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         }
 
         uint256 debtInBlock = creditFacade.totalBorrowedInBlockInt();
-
-        if (v1PoolUsed) {
-            vm.prank(CONFIGURATOR);
-            creditFacade.setTotalDebtParams(uint128(debt), uint128(debt * 2));
-        }
-
-        (uint256 totalDebt,) = creditFacade.totalDebt();
 
         address expectedCreditAccount = DUMB_ADDRESS;
         creditManagerMock.setReturnOpenCreditAccount(expectedCreditAccount);
@@ -532,20 +499,10 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         assertEq(creditAccount, expectedCreditAccount, "Incorrect credit account");
         assertEq(creditFacade.totalBorrowedInBlockInt(), debtInBlock + debt, "Debt in block was updated incorrectly");
-
-        if (v1PoolUsed) {
-            (uint256 totalDebtNow,) = creditFacade.totalDebt();
-
-            assertEq(totalDebtNow, totalDebt + debt, "Incorrect total debt update");
-        }
     }
 
     /// @dev U:[FA-11]: closeCreditAccount wokrs as expected
-    function test_U_FA_11_closeCreditAccount_works_as_expected(uint256 enabledTokensMask)
-        public
-        withV1PoolTest
-        notExpirableCase
-    {
+    function test_U_FA_11_closeCreditAccount_works_as_expected(uint256 enabledTokensMask) public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
         bool hasCalls = (getHash({value: enabledTokensMask, seed: 2}) % 2) == 0;
@@ -553,11 +510,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         uint256 LINK_TOKEN_MASK = 4;
         uint128 debt = uint128(getHash({value: enabledTokensMask, seed: 2})) / 2;
-
-        if (v1PoolUsed) {
-            vm.prank(CONFIGURATOR);
-            creditFacade.setTotalDebtParams(uint128(debt) + 500, uint128(debt * 2));
-        }
 
         address adapter = address(new AdapterMock(address(creditManagerMock), DUMB_ADDRESS));
 
@@ -667,12 +619,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             expectedCollateralDebtData,
             _testCaseErr("Incorrect collateralDebtData")
         );
-
-        if (v1PoolUsed) {
-            (uint256 totalDebtNow,) = creditFacade.totalDebt();
-
-            assertEq(totalDebtNow, 500, "Incorrect total debt update");
-        }
     }
 
     //
@@ -888,22 +834,13 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     }
 
     /// @dev U:[FA-16]: liquidate wokrs as expected
-    function test_U_FA_16_liquidate_wokrs_as_expected(uint256 enabledTokensMask)
-        public
-        withV1PoolTest
-        notExpirableCase
-    {
+    function test_U_FA_16_liquidate_wokrs_as_expected(uint256 enabledTokensMask) public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
         bool hasCalls = (getHash({value: enabledTokensMask, seed: 2}) % 2) == 0;
         bool hasBotPermissions = (getHash({value: enabledTokensMask, seed: 3}) % 2) == 0;
 
         uint128 debt = uint128(getHash({value: enabledTokensMask, seed: 2})) / 2;
-
-        if (v1PoolUsed) {
-            vm.prank(CONFIGURATOR);
-            creditFacade.setTotalDebtParams(uint128(debt) + 500, uint128(debt * 2));
-        }
 
         uint256 cancelMask = 1 << 7;
         uint256 LINK_TOKEN_MASK = 4;
@@ -1011,12 +948,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             expectedCollateralDebtData,
             _testCaseErr("Incorrect collateralDebtData")
         );
-
-        if (v1PoolUsed) {
-            (uint256 totalDebtNow,) = creditFacade.totalDebt();
-
-            assertEq(totalDebtNow, 500, "Incorrect total debt update");
-        }
     }
 
     /// @dev U:[FA-17]: liquidate correctly computes cumulative loss and pause contract if needed
@@ -1239,7 +1170,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         creditManagerMock.setBorrower(USER);
 
-        MultiCallPermissionTestCase[12] memory cases = [
+        MultiCallPermissionTestCase[11] memory cases = [
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.revertIfReceivedLessThan, (new Balance[](0))),
                 permissionRquired: 0
@@ -1279,10 +1210,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.revokeAdapterAllowances, (new RevocationPair[](0))),
                 permissionRquired: REVOKE_ALLOWANCES_PERMISSION
-            }),
-            MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.onDemandPriceUpdate, (token, bytes(""))),
-                permissionRquired: 0
             }),
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.payBot, (0)),
@@ -1424,7 +1351,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
     /// @dev U:[FA-25]: multicall onDemandPriceUpdate works properly
     function test_U_FA_25_multicall_onDemandPriceUpdate_works_properly() public notExpirableCase {
-        address creditAccount = DUMB_ADDRESS;
         bytes memory cd = bytes("Hellew");
 
         address token = tokenTestSuite.addressOf(Tokens.LINK);
@@ -1444,7 +1370,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.expectCall(address(priceOracleMock), abi.encodeCall(IPriceOracleBase.priceFeeds, (token)));
         vm.expectCall(address(priceFeedOnDemandMock), abi.encodeCall(PriceFeedOnDemandMock.updatePrice, (cd)));
-        creditFacade.multicallInt({creditAccount: creditAccount, calls: calls, enabledTokensMask: 0, flags: 0});
+        creditFacade.applyPriceOnDemandInt({calls: calls});
 
         /// @notice it reverts for zero value
         calls = MultiCallBuilder.build(
@@ -1455,7 +1381,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         );
 
         vm.expectRevert(PriceFeedDoesNotExistException.selector);
-        creditFacade.multicallInt({creditAccount: creditAccount, calls: calls, enabledTokensMask: 0, flags: 0});
+        creditFacade.applyPriceOnDemandInt({calls: calls});
     }
 
     /// @dev U:[FA-26]: multicall addCollateral works properly
@@ -1506,7 +1432,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     }
 
     /// @dev U:[FA-27]: multicall increaseDebt works properly
-    function test_U_FA_27_multicall_increaseDebt_works_properly() public withV1PoolTest notExpirableCase {
+    function test_U_FA_27_multicall_increaseDebt_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
         uint256 amount = 50;
@@ -1524,13 +1450,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         }
 
         uint256 debtInBlock = creditFacade.totalBorrowedInBlockInt();
-
-        if (v1PoolUsed) {
-            vm.prank(CONFIGURATOR);
-            creditFacade.setTotalDebtParams(uint128(amount), uint128(amount * 2));
-        }
-
-        (uint256 totalDebt,) = creditFacade.totalDebt();
 
         creditManagerMock.setManageDebt({newDebt: 50, tokensToEnable: UNDERLYING_TOKEN_MASK, tokensToDisable: 0});
 
@@ -1563,12 +1482,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         );
 
         assertEq(creditFacade.totalBorrowedInBlockInt(), debtInBlock + amount, "Debt in block was updated incorrectly");
-
-        if (v1PoolUsed) {
-            (uint256 totalDebtNow,) = creditFacade.totalDebt();
-
-            assertEq(totalDebtNow, totalDebt + amount, "Incorrect total debt update");
-        }
     }
 
     /// @dev U:[FA-28]: multicall increaseDebt reverts if out of debt
@@ -1701,7 +1614,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     ///
 
     /// @dev U:[FA-31]: multicall decreaseDebt works properly
-    function test_U_FA_31_multicall_decreaseDebt_works_properly() public withV1PoolTest notExpirableCase {
+    function test_U_FA_31_multicall_decreaseDebt_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
         uint256 amount = 50;
@@ -1710,13 +1623,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(1, 100, 1);
-
-        if (v1PoolUsed) {
-            vm.prank(CONFIGURATOR);
-            creditFacade.setTotalDebtParams(uint128(amount), uint128(amount * 2));
-        }
-
-        (uint256 totalDebt,) = creditFacade.totalDebt();
 
         creditManagerMock.setManageDebt({newDebt: 50, tokensToEnable: 0, tokensToDisable: UNDERLYING_TOKEN_MASK});
 
@@ -1745,12 +1651,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             mask & (~UNDERLYING_TOKEN_MASK),
             _testCaseErr("Incorrect enabledTokenMask")
         );
-
-        if (v1PoolUsed) {
-            (uint256 totalDebtNow,) = creditFacade.totalDebt();
-
-            assertEq(totalDebtNow, totalDebt - amount, "Incorrect total debt update");
-        }
     }
 
     /// @dev U:[FA-32]: multicall decreaseDebt reverts if out of debt
@@ -2195,7 +2095,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             creditAccount: creditAccount,
             bot: bot,
             permissions: 1,
-            fundingAmount: 2,
+            totalFundingAllowance: 2,
             weeklyFundingAllowance: 3
         });
 
@@ -2207,7 +2107,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             creditAccount: creditAccount,
             bot: bot,
             permissions: 1,
-            fundingAmount: 2,
+            totalFundingAllowance: 2,
             weeklyFundingAllowance: 3
         });
 
@@ -2227,7 +2127,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             creditAccount: creditAccount,
             bot: bot,
             permissions: 1,
-            fundingAmount: 2,
+            totalFundingAllowance: 2,
             weeklyFundingAllowance: 3
         });
     }
@@ -2320,39 +2220,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.warp(timestamp);
         assertEq(creditFacade.isExpired(), expirable, "Incorrect isExpired");
-    }
-
-    /// @dev U:[FA-47]: revertIfOutOfTotalDebtLimit works properly
-    function test_U_FA_47_revertIfOutOfTotalDebtLimit_works_properly() public notExpirableCase {
-        uint128 initialTD = 10_000;
-        uint128 limit = 50_000;
-
-        // Case: it increases currentTotalDebt if ManageDebtAction.INCREASE_DEBT
-        vm.prank(CONFIGURATOR);
-        creditFacade.setTotalDebtParams(initialTD, limit);
-
-        creditFacade.revertIfOutOfTotalDebtLimit(100, ManageDebtAction.INCREASE_DEBT);
-        (uint128 currentTotalDebt,) = creditFacade.totalDebt();
-        assertEq(currentTotalDebt, initialTD + 100, "Incorrect total debt after increase");
-
-        // Case: it decreases currentTotalDebt if ManageDebtAction.DECREASE_DEBT
-        vm.prank(CONFIGURATOR);
-        creditFacade.setTotalDebtParams(initialTD, limit);
-
-        creditFacade.revertIfOutOfTotalDebtLimit(100, ManageDebtAction.DECREASE_DEBT);
-        (currentTotalDebt,) = creditFacade.totalDebt();
-        assertEq(currentTotalDebt, initialTD - 100, "Incorrect total debt after increase");
-
-        // Case: it reverts of currentTotalDebt > limit
-        vm.prank(CONFIGURATOR);
-        creditFacade.setTotalDebtParams(initialTD, limit);
-        vm.expectRevert(CreditManagerCantBorrowException.selector);
-        creditFacade.revertIfOutOfTotalDebtLimit(limit - initialTD + 1, ManageDebtAction.INCREASE_DEBT);
-
-        // Case: it doesn't reverts for decrease debt more than expecetd
-        vm.prank(CONFIGURATOR);
-        creditFacade.setTotalDebtParams(initialTD, limit);
-        creditFacade.revertIfOutOfTotalDebtLimit(type(uint128).max, ManageDebtAction.DECREASE_DEBT);
     }
 
     /// @dev U:[FA-48]: rsetExpirationDate works properly
@@ -2484,20 +2351,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             false,
             "incorrect canLiquidateWhilePaused for LIQUIDATOR after ALLOW"
         );
-    }
-
-    /// @dev U:[FA-54]: setTotalDebtParams works properly
-    function test_U_FA_54_setTotalDebtParams_works_properly() public notExpirableCase {
-        (uint128 currentTotalDebt, uint128 totalDebtLimit) = creditFacade.totalDebt();
-        assertEq(currentTotalDebt, 0, "SETUP: incorrect currentTotalDebt");
-        assertEq(totalDebtLimit, 0, "SETUP: incorrect totalDebtLimit");
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setTotalDebtParams(100, 200);
-
-        (currentTotalDebt, totalDebtLimit) = creditFacade.totalDebt();
-        assertEq(currentTotalDebt, 100, "incorrect currentTotalDebt");
-        assertEq(totalDebtLimit, 200, "incorrect totalDebtLimit");
     }
 
     // todo: check
