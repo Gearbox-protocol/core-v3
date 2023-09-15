@@ -46,7 +46,7 @@ import {GeneralMock} from "../../mocks//GeneralMock.sol";
 
 import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
-import {IPoolBase} from "../../../interfaces/IPoolV3.sol";
+import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 
 import "forge-std/console.sol";
 
@@ -262,7 +262,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         vm.warp(block.timestamp + 365 days);
         vm.roll(block.number + 1);
 
-        uint256 cumulativeIndexAtClose = pool.calcLinearCumulative_RAY();
+        uint256 cumulativeIndexAtClose = pool.baseInterestIndex();
 
         uint256 interestAccrued = (debt * cumulativeIndexAtClose) / cumulativeIndexLastUpdate - debt;
 
@@ -272,7 +272,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
 
         uint256 amountToPool = debt + interestAccrued + profit;
 
-        vm.expectCall(address(pool), abi.encodeCall(IPoolBase.repayCreditAccount, (debt, profit, 0)));
+        vm.expectCall(address(pool), abi.encodeCall(IPoolV3.repayCreditAccount, (debt, profit, 0)));
 
         vm.prank(USER);
         creditFacade.closeCreditAccount(creditAccount, FRIEND, 0, false, new MultiCall[](0));
@@ -324,7 +324,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         vm.warp(block.timestamp + warpTime);
         vm.roll(block.number + 1);
 
-        uint256 cumulativeIndexAtClose = pool.calcLinearCumulative_RAY();
+        uint256 cumulativeIndexAtClose = pool.baseInterestIndex();
 
         uint256 interestAccrued = (debt * cumulativeIndexAtClose) / cumulativeIndexLastUpdate - debt;
 
@@ -340,7 +340,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
 
             uint256 poolBalanceBefore = tokenTestSuite.balanceOf(Tokens.DAI, address(pool));
 
-            vm.expectCall(address(pool), abi.encodeCall(IPoolBase.repayCreditAccount, (debt, profit, 0)));
+            vm.expectCall(address(pool), abi.encodeCall(IPoolV3.repayCreditAccount, (debt, profit, 0)));
 
             vm.prank(USER);
             creditFacade.closeCreditAccount(creditAccount, FRIEND, 0, false, new MultiCall[](0));
@@ -424,7 +424,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
             // }
             vm.roll(block.number + 1);
 
-            uint256 cumulativeIndexAtClose = pool.calcLinearCumulative_RAY();
+            uint256 cumulativeIndexAtClose = pool.baseInterestIndex();
 
             interestAccrued = (debt * cumulativeIndexAtClose) / cumulativeIndexLastUpdate - debt;
         }
@@ -444,7 +444,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         {
             uint256 loss = debt + interestAccrued - amountToPool;
 
-            vm.expectCall(address(pool), abi.encodeCall(IPoolBase.repayCreditAccount, (debt, 0, loss)));
+            vm.expectCall(address(pool), abi.encodeCall(IPoolV3.repayCreditAccount, (debt, 0, loss)));
         }
 
         vm.prank(LIQUIDATOR);
@@ -530,7 +530,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
 
         // vm.warp(block.timestamp + 365 days);
 
-        // uint256 cumulativeIndexAtClose = pool.calcLinearCumulative_RAY();
+        // uint256 cumulativeIndexAtClose = pool.baseInterestIndex();
 
         // uint256 interestAccrued = (debt * cumulativeIndexAtClose) / cumulativeIndexLastUpdate - debt;
 

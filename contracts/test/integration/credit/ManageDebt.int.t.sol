@@ -306,7 +306,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
         //     assertEq(cumulativeIndexLastUpdateAfter, cumulativeIndexNow, "Incorrect cumulativeIndexLastUpdate");
         // } else {
         //     CreditManagerTestInternal cmi = new CreditManagerTestInternal(
-        //         creditManager.poolService(), address(withdrawalManager)
+        //         creditManager.pool(), address(withdrawalManager)
         //     );
 
         //     {

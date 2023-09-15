@@ -219,7 +219,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
 
         //     vm.warp(block.timestamp + 365 days);
 
-        //     uint256 cumulativeIndexAtClose = pool.calcLinearCumulative_RAY();
+        //     uint256 cumulativeIndexAtClose = pool.baseInterestIndex();
 
         //     interestAccrued = (debt * cumulativeIndexAtClose) / cumulativeIndexLastUpdate - debt;
 

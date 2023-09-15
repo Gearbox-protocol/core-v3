@@ -7,23 +7,59 @@ import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.
 
 import {ClaimAction, IWithdrawalManagerV3} from "./IWithdrawalManagerV3.sol";
 
+uint8 constant WITHDRAWAL_FLAG = 1;
+uint8 constant BOT_PERMISSIONS_SET_FLAG = 1 << 1;
+
+uint8 constant DEFAULT_MAX_ENABLED_TOKENS = 12;
+address constant INACTIVE_CREDIT_ACCOUNT_ADDRESS = address(1);
+
+/// @notice Account closure mode
+///         - `CLOSE_ACCOUNT` performs normal account closure:
+//            * repays debt, interest and fees to the pool, reverts in case of underlying shortfall
+///           * transfers remaining tokens on the credit account to an owner-specified address
+///         - `LIQUIDATE_ACCOUNT`
+///           * computes amounts that should be distributed between pool and account owner and potential losses
+///           * repays due funds to the pool, charges liquidagtor in case of underlying shortfall
+///           * transfers due funds in underlying to account owner (if any)
+///           * transfers remaining tokens on the credit account to a liquidator-specified address
+///         - `LIQUIDATE_EXPIRED_ACCOUNT` is same as `LIQUIDATE_ACCOUNT` but with lower liquidation premium and fee
 enum ClosureAction {
     CLOSE_ACCOUNT,
     LIQUIDATE_ACCOUNT,
     LIQUIDATE_EXPIRED_ACCOUNT
 }
 
+/// @notice Debt management type
+///         - `INCREASE_DEBT` borrows additional funds from the pool, updates account's debt and cumulative interest index
+///         - `DECREASE_DEBT` repays debt components (quota interest and fees -> base interest and fees -> debt principal)
+///           and updates all corresponding state varibles (base interest index, quota interest and fees, debt).
+///           When repaying all the debt, ensures that account has no enabled quotas.
 enum ManageDebtAction {
     INCREASE_DEBT,
-    DECREASE_DEBT,
-    FULL_REPAYMENT
+    DECREASE_DEBT
 }
 
-uint8 constant WITHDRAWAL_FLAG = 1;
-uint8 constant BOT_PERMISSIONS_SET_FLAG = 1 << 1;
-
-uint8 constant DEFAULT_MAX_ENABLED_TOKENS = 12;
-address constant INACTIVE_CREDIT_ACCOUNT_ADDRESS = address(1);
+/// @notice Collateral/debt calculation mode
+///         - `GENERIC_PARAMS` returns generic data like account debt and cumulative indexes
+///         - `DEBT_ONLY` is same as `GENERIC_PARAMS` but includes more detailed debt info, like accrued base/quota
+///           interest and fees
+///         - `DEBT_COLLATERAL_WITHOUT_WITHDRAWALS` is same as `DEBT_ONLY` but also returns total value and total
+///           LT-weighted value of account's tokens, this mode is used during account closure
+///         - `DEBT_COLLATERAL_CANCEL_WITHDRAWALS` is same as `DEBT_COLLATERAL_WITHOUT_WITHDRAWALS` but adds the value
+///           of immature scheduled withdrawals to the total value, this mode is used during liquidations
+///         - `DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS` is same as `DEBT_COLLATERAL_WITHOUT_WITHDRAWALS` but adds the
+///           value of all scheduled withdrawals to the total value, this mode is used during emergency liquidations
+///         - `FULL_COLLATERAL_CHECK_LAZY` checks whether account is sufficiently collateralized in a lazy fashion,
+///           i.e. it stops iterating over collateral tokens once TWV reaches the desired target.
+///           Since it may return underestimated TWV, it's only available for internal use.
+enum CollateralCalcTask {
+    GENERIC_PARAMS,
+    DEBT_ONLY,
+    DEBT_COLLATERAL_WITHOUT_WITHDRAWALS,
+    DEBT_COLLATERAL_CANCEL_WITHDRAWALS,
+    DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS,
+    FULL_COLLATERAL_CHECK_LAZY
+}
 
 struct CreditAccountInfo {
     uint256 debt;
@@ -34,15 +70,6 @@ struct CreditAccountInfo {
     uint16 flags;
     uint64 since;
     address borrower;
-}
-
-enum CollateralCalcTask {
-    GENERIC_PARAMS,
-    DEBT_ONLY,
-    DEBT_COLLATERAL_WITHOUT_WITHDRAWALS,
-    DEBT_COLLATERAL_CANCEL_WITHDRAWALS,
-    DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS,
-    FULL_COLLATERAL_CHECK_LAZY
 }
 
 struct CollateralDebtData {
@@ -82,16 +109,21 @@ interface ICreditManagerV3Events {
 
 /// @title Credit manager V3 interface
 interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
-    function description() external view returns (string memory);
     function pool() external view returns (address);
-    function poolService() external view returns (address);
+
     function underlying() external view returns (address);
+
     function creditFacade() external view returns (address);
+
     function creditConfigurator() external view returns (address);
-    function priceOracle() external view returns (address);
+
     function addressProvider() external view returns (address);
+
     function accountFactory() external view returns (address);
+
     function weth() external view returns (address);
+
+    function description() external view returns (string memory);
 
     // ------------------ //
     // ACCOUNT MANAGEMENT //
@@ -117,6 +149,8 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
         external
         returns (uint256 tokenMask);
 
+    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external;
+
     // -------- //
     // ADAPTERS //
     // -------- //
@@ -125,11 +159,9 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
 
     function contractToAdapter(address targetContract) external view returns (address adapter);
 
-    function execute(bytes calldata data) external returns (bytes memory);
+    function execute(bytes calldata data) external returns (bytes memory result);
 
     function approveCreditAccount(address token, uint256 amount) external;
-
-    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external;
 
     function setActiveCreditAccount(address creditAccount) external;
 
@@ -139,19 +171,21 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
     // COLLATERAL CHECKS //
     // ----------------- //
 
+    function priceOracle() external view returns (address);
+
     function fullCollateralCheck(
         address creditAccount,
         uint256 enabledTokensMask,
         uint256[] calldata collateralHints,
         uint16 minHealthFactor
-    ) external returns (uint256);
+    ) external returns (uint256 enabledTokensMaskAfter);
 
     function isLiquidatable(address creditAccount, uint16 minHealthFactor) external view returns (bool);
 
     function calcDebtAndCollateral(address creditAccount, CollateralCalcTask task)
         external
         view
-        returns (CollateralDebtData memory collateralDebtData);
+        returns (CollateralDebtData memory cdd);
 
     // ------ //
     // QUOTAS //

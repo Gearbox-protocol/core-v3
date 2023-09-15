@@ -34,7 +34,7 @@ import {ClaimAction, ETH_ADDRESS, IWithdrawalManagerV3} from "../interfaces/IWit
 import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
 import {IUpdatablePriceFeed} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceFeed.sol";
 
-import {IPoolV3, IPoolBase} from "../interfaces/IPoolV3.sol";
+import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IDegenNFTV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFTV2.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IBotListV3} from "../interfaces/IBotListV3.sol";
