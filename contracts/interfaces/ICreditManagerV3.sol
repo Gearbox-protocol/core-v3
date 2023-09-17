@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
-import {ClaimAction, IWithdrawalManagerV3} from "./IWithdrawalManagerV3.sol";
+import {ClaimAction} from "./IWithdrawalManagerV3.sol";
 
 uint8 constant WITHDRAWAL_FLAG = 1;
 uint8 constant BOT_PERMISSIONS_SET_FLAG = 1 << 1;

@@ -20,6 +20,7 @@ bytes32 constant AP_WITHDRAWAL_MANAGER = "WITHDRAWAL_MANAGER";
 bytes32 constant AP_ROUTER = "ROUTER";
 bytes32 constant AP_BOT_LIST = "BOT_LIST";
 bytes32 constant AP_GEAR_STAKING = "GEAR_STAKING";
+bytes32 constant AP_ZAPPER_REGISTER = "ZAPPER_REGISTER";
 
 interface IAddressProviderV3Events {
     /// @notice Emitted when an address is set for a contract key
