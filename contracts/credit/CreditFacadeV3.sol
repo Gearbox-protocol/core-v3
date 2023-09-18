@@ -6,6 +6,7 @@ pragma solidity ^0.8.17;
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 
 // LIBS & TRAITS
@@ -664,6 +665,20 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         }); // U:[FA-26]
                     }
                     //
+                    // ADD COLLATERAL
+                    //
+                    /// Transfers new collateral from the caller to the Credit Account.
+                    else if (method == ICreditFacadeV3Multicall.addCollateralPermit.selector) {
+                        _revertIfNoPermission(flags, ADD_COLLATERAL_PERMISSION); // U:[FA-21]
+
+                        quotedTokensMaskInverted = _getInvertedQuotedTokensMask(quotedTokensMaskInverted);
+
+                        enabledTokensMask = enabledTokensMask.enable({
+                            bitsToEnable: _addCollateralPermit(creditAccount, mcall.callData[4:]),
+                            invertedSkipMask: quotedTokensMaskInverted
+                        }); // U:[FA-26]
+                    }
+                    //
                     // UPDATE QUOTA
                     //
                     /// Updates a quota on a token. Quota is an underlying-denominated value
@@ -939,8 +954,16 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param callData Bytes calldata for parsing
     function _addCollateral(address creditAccount, bytes calldata callData) internal returns (uint256 tokenMaskAfter) {
         (address token, uint256 amount) = abi.decode(callData, (address, uint256)); // U:[FA-26]
-        // Requests Credit Manager to transfer collateral to the Credit Account
+            // Requests Credit Manager to transfer collateral to the Credit Account
 
+        return _addCollateral(creditAccount, token, amount);
+    }
+
+    function _addCollateral(address creditAccount, address token, uint256 amount)
+        internal
+        returns (uint256 tokenMaskAfter)
+    {
+        // Requests Credit Manager to transfer collateral to the Credit Account
         tokenMaskAfter = ICreditManagerV3(creditManager).addCollateral({
             payer: msg.sender,
             creditAccount: creditAccount,
@@ -950,6 +973,17 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         // Emits event
         emit AddCollateral(creditAccount, token, amount); // U:[FA-26]
+    }
+
+    function _addCollateralPermit(address creditAccount, bytes calldata callData)
+        internal
+        returns (uint256 tokenMaskAfter)
+    {
+        (address token, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s) =
+            abi.decode(callData, (address, uint256, uint256, uint8, bytes32, bytes32)); // U:[FA-26]
+
+        IERC20Permit(token).permit(msg.sender, creditManager, amount, deadline, v, r, s);
+        return _addCollateral(creditAccount, token, amount);
     }
 
     /// @notice Requests the Credit Manager to change the CA's debt

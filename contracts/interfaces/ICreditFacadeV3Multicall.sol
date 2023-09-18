@@ -66,6 +66,13 @@ interface ICreditFacadeV3Multicall {
     /// @param amount Amount to add
     function addCollateral(address token, uint256 amount) external;
 
+    /// @dev Adds collateral to borrower's credit account
+    /// @param token Address of a collateral token
+    /// @param amount Amount to add
+    /// To get permit signature, please use msg.sender as owner and creditManager as spender
+    function addCollateralPermit(address token, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
+        external;
+
     /// @dev Increases debt for msg.sender's Credit Account
     /// - Borrows the requested amount from the pool
     /// - Updates the CA's borrowAmount / cumulativeIndexOpen
