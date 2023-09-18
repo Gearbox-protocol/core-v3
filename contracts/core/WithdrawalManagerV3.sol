@@ -58,7 +58,7 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
     mapping(address => ScheduledWithdrawal[2]) internal _scheduled;
 
     /// @notice Mapping from address to its status as an approved credit manager
-    mapping(address => bool) public isValidCreditManager;
+    mapping(address => bool) public override isValidCreditManager;
 
     /// @dev Ensures that function caller is one of added credit managers
     modifier creditManagerOnly() {
