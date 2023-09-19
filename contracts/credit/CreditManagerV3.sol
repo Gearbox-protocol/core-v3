@@ -46,7 +46,10 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/C
 import "../interfaces/IExceptions.sol";
 
 /// @title Credit manager V3
-/// @dev Encapsulates the business logic for managing Credit Accounts
+/// @notice Credit manager implements core logic for credit accounts management.
+///         The contract itself is not open to neither external users nor the DAO: users should use `CreditFacadeV3`
+///         to open accounts and perform interactions with external protocols, while the DAO can configure manager
+///         params using `CreditConfiguratorV3`. Both mentioned contracts perform some important safety checks.
 contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using BitMask for uint256;

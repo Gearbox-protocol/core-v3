@@ -41,12 +41,9 @@ import "../interfaces/IAddressProviderV3.sol";
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
-/// @title CreditConfiguratorV3
-/// @notice This contract is used to configure Credit Managers and is the only one with the privilege
-///         to call access-restricted functions
-/// @dev All functions can only by called by the Configurator as per ACL.
-///      Credit Manager blindly executes all requests (in nearly all cases) from Credit Configurator,
-///      so most sanity checks are performed here.
+/// @title Credit configurator V3
+/// @notice Provides funcionality to configure various aspects of credit manager and facade's behavior
+/// @dev Most of the functions can only be accessed by configurator or timelock controller
 contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using Address for address;

@@ -50,8 +50,18 @@ uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS =
 uint256 constant CLOSE_CREDIT_ACCOUNT_FLAGS = EXTERNAL_CALLS_PERMISSION;
 
 /// @title Credit facade V3
-/// @notice Provides a user interface to open, close and liqiuidate leveraged positions in the credit manager,
+/// @notice Provides a user interface to open, close and liquidate leveraged positions in the credit manager,
 ///         and implements the main entry-point for credit accounts management: multicall.
+/// @notice Multicall allows account owners to batch all the desired operations (changing debt size, interacting with
+///         external protocols via adapters, increasing quotas or scheduling withdrawals) into one call, followed by
+///         the collateral check that ensures that account is sufficiently collateralized.
+///         For more details on what one can achieve with multicalls, see `_multicall` and  `ICreditFacadeV3Multicall`.
+/// @notice Users can also let external bots to manage their accounts via `botMulticall`. Bots can be relatively general,
+///         the facade only ensures that they can do no harm to the protocol by running the collateral check after the
+///         multicall and checking the permissions given to them by users. See `BotListV3` for additional details.
+/// @notice Credit facade implements a few safeguards on top of those present in the credit manager, including debt and
+///         quota size validation, pausing on large protocol losses, Degen NFT whitelist mode, and forbidden tokens
+///         (they count towards account value, but having them enabled as collateral restricts available actions).
 contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     using Address for address;
     using BitMask for uint256;
@@ -539,7 +549,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param calls Array of `(target, callData)` tuples representing a sequence of calls to perform
     ///        - if `target` is this contract's address, `callData` must be an ABI-encoded calldata of a method
     ///          from `ICreditFacadeV3Multicall`, which is dispatched and handled appropriately
-    ///        - otherwise, `target` must be an allowed adapter, which is then called with `callData`
+    ///        - otherwise, `target` must be an allowed adapter, which is called with `callData`, and is expected to
+    ///          return two ABI-encoded `uint256` masks of tokens that should be enabled/disabled after the call
     /// @param enabledTokensMask Bitmask of account's enabled collateral tokens before the multicall
     /// @param flags Permissions and flags that dictate what methods can be called
     /// @param skip The number of calls that can be skipped (see `_applyOnDemandPriceUpdates`)

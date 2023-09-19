@@ -7,7 +7,7 @@ import {PoolV3} from "./PoolV3.sol";
 import {USDT_Transfer} from "../traits/USDT_Transfer.sol";
 
 /// @title Pool V3 USDT
-/// @notice Pool implementation for USDT which has optional transfer fee
+/// @notice Pool variation for USDT underlying with enabled transfer fees
 contract PoolV3_USDT is PoolV3, USDT_Transfer {
     constructor(
         address addressProvider_,
