@@ -16,7 +16,7 @@ import {
     IVersion
 } from "../../../credit/CreditConfiguratorV3.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
-import {ICreditConfiguratorEvents} from "../../../interfaces/ICreditConfiguratorV3.sol";
+import {ICreditConfiguratorV3Events} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {IAdapter} from "@gearbox-protocol/core-v2/contracts/interfaces/IAdapter.sol";
 
 //
@@ -44,7 +44,7 @@ import {MockCreditConfig, CollateralTokenHuman} from "../../config/MockCreditCon
 
 import "forge-std/console.sol";
 
-contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConfiguratorEvents {
+contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConfiguratorV3Events {
     using AddressList for address[];
 
     // function setUp() public creditTest {
@@ -282,7 +282,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         );
 
         vm.expectEmit(true, false, false, false);
-        emit AllowToken(usdcToken);
+        emit AddCollateralToken(usdcToken);
 
         vm.expectEmit(true, false, false, true);
         emit SetTokenLiquidationThreshold(usdcToken, 6000);
@@ -417,7 +417,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         address newToken = tokenTestSuite.addressOf(Tokens.wstETH);
 
         vm.expectEmit(true, false, false, false);
-        emit AllowToken(newToken);
+        emit AddCollateralToken(newToken);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.addCollateralToken(newToken, 8800);
