@@ -161,7 +161,7 @@ contract LinearInterestRateModelV3 is ILinearInterestRateModelV3 {
         override
         returns (uint256)
     {
-        if (isBorrowingMoreU2Forbidden && (expectedLiquidity >= availableLiquidity) && expectedLiquidity != 0) {
+        if (isBorrowingMoreU2Forbidden && (expectedLiquidity >= availableLiquidity)) {
             uint256 U_WAD = (WAD * (expectedLiquidity - availableLiquidity)) / expectedLiquidity; // U:[LIM-3]
 
             return (U_WAD < U_2_WAD) ? ((U_2_WAD - U_WAD) * expectedLiquidity) / WAD : 0; // U:[LIM-3]
