@@ -451,7 +451,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     {
         debt = creditAccountAmount;
 
-        cumulativeIndexLastUpdate = pool.calcLinearCumulative_RAY();
+        cumulativeIndexLastUpdate = pool.baseInterestIndex();
         // pool.setCumulativeIndexNow(cumulativeIndexLastUpdate);
 
         vm.prank(address(creditFacade));

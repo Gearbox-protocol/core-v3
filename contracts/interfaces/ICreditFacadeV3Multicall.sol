@@ -6,7 +6,9 @@ pragma solidity ^0.8.17;
 import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 import {RevocationPair} from "./ICreditManagerV3.sol";
 
-// PERMISSIONS
+// ----------- //
+// PERMISSIONS //
+// ----------- //
 
 uint192 constant ADD_COLLATERAL_PERMISSION = 1;
 uint192 constant INCREASE_DEBT_PERMISSION = 1 << 1;
@@ -25,13 +27,17 @@ uint256 constant ALL_CREDIT_FACADE_CALLS_PERMISSION = ADD_COLLATERAL_PERMISSION 
 
 uint256 constant ALL_PERMISSIONS = ALL_CREDIT_FACADE_CALLS_PERMISSION | EXTERNAL_CALLS_PERMISSION;
 
-// FLAGS
+// ----- //
+// FLAGS //
+// ----- //
 
 /// @dev Indicates that there are enabled forbidden tokens on the account before multicall
 uint256 constant FORBIDDEN_TOKENS_BEFORE_CALLS = 1 << 192;
+
 /// @dev Indicates that there must be no enabled forbidden tokens on the account after multicall,
 ///      set to true when `increaseDebt` or `scheduleWithdrawal` is called
 uint256 constant REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS = 1 << 193;
+
 /// @dev Indicates that external calls from credit account to adapters were made during multicall,
 ///      set to true on the first call to the adapter
 uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 1 << 194;
@@ -40,63 +46,88 @@ uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 1 << 194;
 ///      multicall is initiated in `botMulticall` and reset after the first `payBot` call
 uint256 constant PAY_BOT_CAN_BE_CALLED = 1 << 195;
 
+/// @title Credit facade V3 multicall interface
+/// @dev Unless specified otherwise, all these methods are only available in `openCreditAccount`,
+///      `multicall`, and, with account owner's permission, `botMulticall`
 interface ICreditFacadeV3Multicall {
-    /// @dev Instructs CreditFacadeV3 to check token balances at the end
-    /// Used to control slippage after the entire sequence of operations, since tracking slippage
-    /// On each operation is not ideal. Stores expected balances (computed as current balance + passed delta)
-    /// and compare with actual balances at the end of a multicall, reverts
-    /// if at least one is less than expected
-    /// @param expected Array of expected balance changes
-    /// @notice This is an extenstion function that does not exist in the Credit Facade
-    ///         itself and can only be used within a multicall
-    function revertIfReceivedLessThan(Balance[] memory expected) external;
+    /// @notice Updates the price for a token with on-demand updatable price feed
+    /// @param token Token to push the price update for
+    /// @param data Data to call `updatePrice` with
+    /// @dev Calls of this type must be placed before all other calls in the multicall not to revert
+    /// @dev This method is available in all kinds of multicalls
+    function onDemandPriceUpdate(address token, bytes calldata data) external;
 
-    /// @dev Enables token in enabledTokensMask for the Credit Account of msg.sender
-    /// @param token Address of token to enable
-    function enableToken(address token) external;
+    /// @notice Ensures that token balances increase at least by specified deltas after the following calls
+    /// @param balanceDeltas Array of (token, minBalanceDelta) pairs
+    /// @dev The method can only be called once during the multicall, typically before all balance-changing calls
+    /// @dev This method is available in all kinds of multicalls
+    function revertIfReceivedLessThan(Balance[] calldata balanceDeltas) external;
 
-    /// @dev Disables a token on the caller's Credit Account
-    /// @param token Token to disable
-    /// @notice This is an extenstion function that does not exist in the Credit Facade
-    ///         itself and can only be used within a multicall
-    function disableToken(address token) external;
-
-    /// @dev Adds collateral to borrower's credit account
-    /// @param token Address of a collateral token
+    /// @notice Adds collateral to account
+    /// @param token Token to add
     /// @param amount Amount to add
+    /// @dev Requires token approval from caller to the credit manager
     function addCollateral(address token, uint256 amount) external;
 
-    /// @dev Increases debt for msg.sender's Credit Account
-    /// - Borrows the requested amount from the pool
-    /// - Updates the CA's borrowAmount / cumulativeIndexOpen
-    ///   to correctly compute interest going forward
-    /// - Performs a full collateral check
-    ///
-    /// @param amount Amount to borrow
+    /// @notice Increases account's debt
+    /// @param amount Underlying amount to borrow
+    /// @dev Increasing debt is prohibited when opening an account
+    /// @dev The resulting debt amount must be within allowed range
+    /// @dev Increasing debt is prohibited if there are forbidden tokens enabled as collateral on the account
+    /// @dev After debt increase, total amount borrowed by the credit manager in the current block must not exceed
+    ///      the limit defined in the facade
     function increaseDebt(uint256 amount) external;
 
-    /// @dev Decrease debt
-    /// - Decreases the debt by paying the requested amount + accrued interest + fees back to the pool
-    /// - It's also include to this payment interest accrued at the moment and fees
-    /// - Updates cunulativeIndex to cumulativeIndex now
-    ///
-    /// @param amount Amount to increase borrowed amount
+    /// @notice Decreases account's debt
+    /// @param amount Underlying amount to repay, value above account's total debt indicates full repayment
+    /// @dev Decreasing debt is prohibited when opening an account
+    /// @dev Decreasing debt is prohibited if it was previously increased in the same multicall
+    /// @dev The resulting debt amount must be within allowed range or zero
+    /// @dev Full repayment brings account into a special mode that skips collateral checks and thus requires
+    ///      an account to have no potential debt sources, e.g., all quotas must be disabled
     function decreaseDebt(uint256 amount) external;
 
-    /// @dev Update msg.sender's Credit Account quota
+    /// @notice Updates account's quota for a token
+    /// @param token Token to update the quota for
+    /// @param quotaChange Desired quota change in underlying token units
+    /// @param minQuota Minimum resulting account's quota for token required not to revert
+    /// @dev Enables token as collateral if quota is increased from zero, disables if decreased to zero
+    /// @dev Quota increase is prohibited if there are forbidden tokens enabled as collateral on the account
+    /// @dev Quota increase is prohibited if account has zero debt
+    /// @dev Resulting account's quota for token must not exceed the limit defined in the facade
     function updateQuota(address token, int96 quotaChange, uint96 minQuota) external;
 
-    /// @dev Set collateral hints for a full check
-    /// @param collateralHints Array of token mask in the desired order of checking
-    /// @param minHealthFactor Minimal HF threshold to pass the collateral check in PERCENTAGE format.
-    ///                        Cannot be lower than PERCENTAGE_FACTOR.
-    function setFullCheckParams(uint256[] memory collateralHints, uint16 minHealthFactor) external;
-
+    /// @notice Schedules a delayed withdrawal from account
+    /// @param token Token to withdraw
+    /// @param amount Amount to withdraw
+    /// @dev Withdrawals are prohibited if there are forbidden tokens enabled as collateral on the account
+    /// @dev Withdrawals are prohibited when opening an account
     function scheduleWithdrawal(address token, uint256 amount) external;
 
-    function revokeAdapterAllowances(RevocationPair[] calldata revocations) external;
-
-    function onDemandPriceUpdate(address token, bytes memory data) external;
-
+    /// @notice Requests bot list to make a payment to the caller
+    /// @param paymentAmount Paymenet amount in WETH
+    /// @dev This method is only available in `botMulticall` and can only be called once
     function payBot(uint72 paymentAmount) external;
+
+    /// @notice Sets advanced collateral check parameters
+    /// @param collateralHints Optional array of token masks to check first to reduce the amount of computation
+    ///        when known subset of account's collateral tokens covers all the debt
+    /// @param minHealthFactor Min account's health factor in bps in order not to revert, must be at least 10000 (default)
+    function setFullCheckParams(uint256[] calldata collateralHints, uint16 minHealthFactor) external;
+
+    /// @notice Enables token as account's collateral, which makes it count towards account's total value
+    /// @param token Token to enable as collateral
+    /// @dev Enabling forbidden tokens is prohibited
+    /// @dev Quoted tokens can only be enabled via `updateQuota`, this method is no-op for them
+    function enableToken(address token) external;
+
+    /// @notice Disables token as account's collateral
+    /// @param token Token to disable as collateral
+    /// @dev Quoted tokens can only be disabled via `updateQuota`, this method is no-op for them
+    function disableToken(address token) external;
+
+    /// @notice Revokes account's allowances for specified spender/token pairs
+    /// @param revocations Array of spender/token pairs
+    /// @dev Exists primarily to allow users to revoke allowances on accounts from old account factory on mainnet
+    function revokeAdapterAllowances(RevocationPair[] calldata revocations) external;
 }

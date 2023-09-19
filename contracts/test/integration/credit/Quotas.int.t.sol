@@ -292,7 +292,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
         vm.warp(block.timestamp + 365 days);
         vm.roll(block.number + 100);
 
-        uint256 cumulativeIndexAtClose = pool.calcLinearCumulative_RAY();
+        uint256 cumulativeIndexAtClose = pool.baseInterestIndex();
 
         (uint16 feeInterest,,,,) = creditManager.fees();
 
@@ -361,7 +361,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
 
         vm.warp(block.timestamp + 365 days);
 
-        uint256 cumulativeIndexAtClose = pool.calcLinearCumulative_RAY();
+        uint256 cumulativeIndexAtClose = pool.baseInterestIndex();
 
         (uint16 feeInterest,,,,) = creditManager.fees();
 

@@ -49,7 +49,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
             AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL)).head();
 
         uint256 blockAtOpen = block.number;
-        uint256 cumulativeAtOpen = pool.calcLinearCumulative_RAY();
+        uint256 cumulativeAtOpen = pool.baseInterestIndex();
         // pool.setCumulativeIndexNow(cumulativeAtOpen);
 
         tokenTestSuite.mint(Tokens.DAI, USER, DAI_ACCOUNT_AMOUNT);
@@ -251,7 +251,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         amount = bound(amount, 10000, DAI_ACCOUNT_AMOUNT);
         vm.assume(token1 > 0 && token1 < creditManager.collateralTokensCount());
 
-        tokenTestSuite.mint(Tokens.DAI, address(creditManager.poolService()), type(uint96).max);
+        tokenTestSuite.mint(Tokens.DAI, address(creditManager.pool()), type(uint96).max);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.setMaxDebtPerBlockMultiplier(type(uint8).max);
@@ -417,7 +417,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
             AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL)).head();
 
         uint256 blockAtOpen = block.number;
-        uint256 cumulativeAtOpen = pool.calcLinearCumulative_RAY();
+        uint256 cumulativeAtOpen = pool.baseInterestIndex();
         // pool.setCumulativeIndexNow(cumulativeAtOpen);
 
         MultiCall[] memory calls = MultiCallBuilder.build();

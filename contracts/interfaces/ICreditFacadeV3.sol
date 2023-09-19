@@ -8,21 +8,29 @@ import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 import {ClosureAction} from "../interfaces/ICreditManagerV3.sol";
 import "./ICreditFacadeV3Multicall.sol";
+import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
 
+/// @notice Debt limits packed into a single slot
+/// @param minDebt Minimum debt amount per credit account
+/// @param maxDebt Maximum debt amount per credit account
 struct DebtLimits {
-    /// @dev Minimal borrowed amount per credit account
     uint128 minDebt;
-    /// @dev Maximum aborrowed amount per credit account
     uint128 maxDebt;
 }
 
+/// @notice Info on bad debt liquidation losses packed into a single slot
+/// @param currentCumulativeLoss Current cumulative loss from bad debt liquidations
+/// @param maxCumulativeLoss Max cumulative loss incurred before the facade gets paused
 struct CumulativeLossParams {
-    /// @dev Current cumulative loss from all bad debt liquidations
     uint128 currentCumulativeLoss;
-    /// @dev Max cumulative loss accrued before the system is paused
     uint128 maxCumulativeLoss;
 }
 
+/// @notice Collateral check params
+/// @param collateralHints Optional array of token masks to check first to reduce the amount of computation
+///        when known subset of account's collateral tokens covers all the debt
+/// @param minHealthFactor Min account's health factor in bps in order not to revert
+/// @param enabledTokensMaskAfter Bitmask of account's enabled collateral tokens after the multicall
 struct FullCheckParams {
     uint256[] collateralHints;
     uint16 minHealthFactor;
@@ -30,7 +38,7 @@ struct FullCheckParams {
 }
 
 interface ICreditFacadeV3Events {
-    /// @dev Emits when a new Credit Account is opened through the Credit Facade
+    /// @notice Emitted when a new credit account is opened
     event OpenCreditAccount(
         address indexed creditAccount,
         address indexed onBehalfOf,
@@ -39,10 +47,10 @@ interface ICreditFacadeV3Events {
         uint16 referralCode
     );
 
-    /// @dev Emits when the account owner closes their CA normally
+    /// @notice Emitted when account is closed
     event CloseCreditAccount(address indexed creditAccount, address indexed borrower, address indexed to);
 
-    /// @dev Emits when a Credit Account is liquidated due to low health factor
+    /// @notice Emitted when account is liquidated
     event LiquidateCreditAccount(
         address indexed creditAccount,
         address indexed borrower,
@@ -52,60 +60,67 @@ interface ICreditFacadeV3Events {
         uint256 remainingFunds
     );
 
-    /// @dev Emits when the account owner increases CA's debt
+    /// @notice Emitted when account's debt is increased
     event IncreaseDebt(address indexed creditAccount, uint256 amount);
 
-    /// @dev Emits when the account owner reduces CA's debt
+    /// @notice Emitted when account's debt is decreased
     event DecreaseDebt(address indexed creditAccount, uint256 amount);
 
-    /// @dev Emits when the account owner add new collateral to a CA
+    /// @notice Emitted when collateral is added to account
     event AddCollateral(address indexed creditAccount, address indexed token, uint256 value);
 
-    /// @dev Emits when a multicall is started
+    /// @notice Emitted when a multicall is started
     event StartMultiCall(address indexed creditAccount, address indexed caller);
 
-    /// @dev Emits when a call to an external contract is made through the Credit Manager
+    /// @notice Emitted when a call from account to an external contract is made during a multicall
     event Execute(address indexed creditAccount, address indexed targetContract);
 
-    /// @dev Emits when a multicall is finished
+    /// @notice Emitted when a multicall is finished
     event FinishMultiCall();
 
-    /// @dev Emits when enabledTokensMask is updated
+    /// @notice Emitted when the mask of account's enabled tokens is updated
     event SetEnabledTokensMask(address indexed creditAccount, uint256 enabledTokensMask);
 }
 
-interface ICreditFacadeV3 is ICreditFacadeV3Events, IVersion {
-    //
-    // CREDIT ACCOUNT MANAGEMENT
-    //
+/// @title Credit facade V3 interface
+interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
+    function creditManager() external view returns (address);
 
-    /// @dev Opens a Credit Account and runs a batch of operations in a multicall
-    /// @param debt Debt size
-    /// @param onBehalfOf The address to open an account for
-    /// @param calls The array of MultiCall structs encoding the required operations. Generally must have
-    /// at least a call to addCollateral, as otherwise the health check at the end will fail.
-    /// @param referralCode Referral code which is used for potential rewards. 0 if no referral code provided
+    function degenNFT() external view returns (address);
+
+    function weth() external view returns (address);
+
+    function botList() external view returns (address);
+
+    function withdrawalManager() external view returns (address);
+
+    function maxDebtPerBlockMultiplier() external view returns (uint8);
+
+    function maxQuotaMultiplier() external view returns (uint256);
+
+    function maxApprovedBots() external view returns (uint256);
+
+    function expirable() external view returns (bool);
+
+    function expirationDate() external view returns (uint40);
+
+    function debtLimits() external view returns (uint128 minDebt, uint128 maxDebt);
+
+    function lossParams() external view returns (uint128 currentCumulativeLoss, uint128 maxCumulativeLoss);
+
+    function forbiddenTokenMask() external view returns (uint256);
+
+    function canLiquidateWhilePaused(address) external view returns (bool);
+
+    // ------------------ //
+    // ACCOUNT MANAGEMENT //
+    // ------------------ //
+
     function openCreditAccount(uint256 debt, address onBehalfOf, MultiCall[] calldata calls, uint16 referralCode)
         external
         payable
         returns (address creditAccount);
 
-    /// @dev Runs a batch of transactions within a multicall and closes the account
-    /// - Wraps ETH to WETH and sends it msg.sender if value > 0
-    /// - Executes the multicall - the main purpose of a multicall when closing is to convert all assets to underlying
-    /// in order to pay the debt.
-    /// - Closes credit account:
-    ///    + Checks the underlying balance: if it is greater than the amount paid to the pool, transfers the underlying
-    ///      from the Credit Account and proceeds. If not, tries to transfer the shortfall from msg.sender.
-    ///    + Transfers all enabled assets with non-zero balances to the "to" address, unless they are marked
-    ///      to be skipped in skipTokenMask
-    ///    + If convertToETH is true, converts WETH into ETH before sending to the recipient
-    /// - Emits a CloseCreditAccount event
-    ///
-    /// @param to Address to send funds to during account closing
-    /// @param skipTokenMask Uint-encoded bit mask where 1's mark tokens that shouldn't be transferred
-    /// @param convertToETH If true, converts WETH into ETH before sending to "to"
-    /// @param calls The array of MultiCall structs encoding the operations to execute before closing the account.
     function closeCreditAccount(
         address creditAccount,
         address to,
@@ -114,30 +129,6 @@ interface ICreditFacadeV3 is ICreditFacadeV3Events, IVersion {
         MultiCall[] calldata calls
     ) external payable;
 
-    /// @dev Runs a batch of transactions within a multicall and liquidates the account
-    /// - Computes the total value and checks that hf < 1. An account can't be liquidated when hf >= 1.
-    ///   Total value has to be computed before the multicall, otherwise the liquidator would be able
-    ///   to manipulate it.
-    /// - Wraps ETH to WETH and sends it to msg.sender (liquidator) if value > 0
-    /// - Executes the multicall - the main purpose of a multicall when liquidating is to convert all assets to underlying
-    ///   in order to pay the debt.
-    /// - Liquidate credit account:
-    ///    + Computes the amount that needs to be paid to the pool. If totalValue * liquidationDiscount < borrow + interest + fees,
-    ///      only totalValue * liquidationDiscount has to be paid. Since liquidationDiscount < 1, the liquidator can take
-    ///      totalValue * (1 - liquidationDiscount) as premium. Also computes the remaining funds to be sent to borrower
-    ///      as totalValue * liquidationDiscount - amountToPool.
-    ///    + Checks the underlying balance: if it is greater than amountToPool + remainingFunds, transfers the underlying
-    ///      from the Credit Account and proceeds. If not, tries to transfer the shortfall from the liquidator.
-    ///    + Transfers all enabled assets with non-zero balances to the "to" address, unless they are marked
-    ///      to be skipped in skipTokenMask. If the liquidator is confident that all assets were converted
-    ///      during the multicall, they can set the mask to uint256.max - 1, to only transfer the underlying
-    ///    + If convertToETH is true, converts WETH into ETH before sending
-    /// - Emits LiquidateCreditAccount event
-    ///
-    /// @param to Address to send funds to after liquidation
-    /// @param skipTokenMask Uint-encoded bit mask where 1's mark tokens that shouldn't be transferred
-    /// @param convertToETH If true, converts WETH into ETH before sending to "to"
-    /// @param calls The array of MultiCall structs encoding the operations to execute before liquidating the account.
     function liquidateCreditAccount(
         address creditAccount,
         address to,
@@ -146,33 +137,12 @@ interface ICreditFacadeV3 is ICreditFacadeV3Events, IVersion {
         MultiCall[] calldata calls
     ) external;
 
-    /// @dev Executes a batch of transactions within a Multicall, to manage an existing account
-    ///  - Wraps ETH and sends it back to msg.sender, if value > 0
-    ///  - Executes the Multicall
-    ///  - Performs a fullCollateralCheck to verify that hf > 1 after all actions
-    /// @param calls The array of MultiCall structs encoding the operations to execute.
     function multicall(address creditAccount, MultiCall[] calldata calls) external payable;
 
-    /// @dev Executes a batch of transactions within a Multicall from bot on behalf of a borrower
-    ///  - Wraps ETH and sends it back to msg.sender, if value > 0
-    ///  - Executes the Multicall
-    ///  - Performs a fullCollateralCheck to verify that hf > 1 after all actions
-    /// @param borrower Borrower the perform the multicall for
-    /// @param calls The array of MultiCall structs encoding the operations to execute.
-    function botMulticall(address borrower, MultiCall[] calldata calls) external;
-
-    // /// @dev Enables token in enabledTokensMask for the Credit Account of msg.sender
-    // /// @param token Address of token to enable
-    // function enableToken(address token) external;
+    function botMulticall(address creditAccount, MultiCall[] calldata calls) external;
 
     function claimWithdrawals(address creditAccount, address to) external;
 
-    /// @dev Sets permissions and funding parameters for a bot
-    /// @param creditAccount CA to set permissions for
-    /// @param bot Bot to set permissions for
-    /// @param permissions A bit mask of permissions
-    /// @param fundingAmount Total amount of ETH available to the bot for payments
-    /// @param weeklyFundingAllowance Amount of ETH available to the bot weekly
     function setBotPermissions(
         address creditAccount,
         address bot,
@@ -181,36 +151,19 @@ interface ICreditFacadeV3 is ICreditFacadeV3Events, IVersion {
         uint72 weeklyFundingAllowance
     ) external;
 
-    //
-    // GETTERS
-    //
+    // ------------- //
+    // CONFIGURATION //
+    // ------------- //
 
-    /// @dev Bit mask encoding a set of forbidden tokens
-    function forbiddenTokenMask() external view returns (uint256);
+    function setExpirationDate(uint40 newExpirationDate) external;
 
-    /// @dev Returns the CreditManagerV3 connected to this Credit Facade
-    function creditManager() external view returns (address);
+    function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt, uint8 newMaxDebtPerBlockMultiplier) external;
 
-    /// @return minDebt Minimal borrowed amount per credit account
-    function debtLimits() external view returns (uint128 minDebt, uint128 maxDebt);
+    function setBotList(address newBotList) external;
 
-    function maxDebtPerBlockMultiplier() external view returns (uint8);
+    function setCumulativeLossParams(uint128 newMaxCumulativeLoss, bool resetCumulativeLoss) external;
 
-    /// @return currentCumulativeLoss The total amount of loss accumulated since last reset
-    /// @return maxCumulativeLoss The maximal amount of loss accumulated before the Credit Manager is paused
-    function lossParams() external view returns (uint128 currentCumulativeLoss, uint128 maxCumulativeLoss);
+    function setTokenAllowance(address token, AllowanceAction allowance) external;
 
-    /// @dev Address of the IDegenNFTV2 that gatekeeps account openings in whitelisted mode
-    function degenNFT() external view returns (address);
-
-    /// @dev Maps addresses to their status as emergency liquidator.
-    /// @notice Emergency liquidators are trusted addresses
-    /// that are able to liquidate positions while the contracts are paused,
-    /// e.g. when there is a risk of bad debt while an exploit is being patched.
-    /// In the interest of fairness, emergency liquidators do not receive a premium
-    /// And are compensated by the Gearbox DAO separately.
-    function canLiquidateWhilePaused(address) external view returns (bool);
-
-    /// @dev Timestamp at which accounts on an expirable CM will be liquidated
-    function expirationDate() external view returns (uint40);
+    function setEmergencyLiquidator(address liquidator, AllowanceAction allowance) external;
 }

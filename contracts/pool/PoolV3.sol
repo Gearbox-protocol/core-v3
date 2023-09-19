@@ -527,11 +527,6 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
         return _calcBaseInterestIndex(timestampLU); // U:[LP-16]
     }
 
-    /// @dev Same as `baseInterestIndex`, kept for backward compatibility
-    function calcLinearCumulative_RAY() external view override returns (uint256) {
-        return baseInterestIndex();
-    }
-
     /// @notice Cumulative base interest index stored as of last update in ray
     function baseInterestIndexLU() external view override returns (uint256) {
         return _baseInterestIndexLU;

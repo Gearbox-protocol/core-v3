@@ -285,8 +285,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
     /// @dev U:[CM-1]: credit manager reverts if were called non-creditFacade
     function test_U_CM_01_constructor_sets_correct_values() public creditManagerTest {
-        assertEq(address(creditManager.poolService()), address(poolMock), _testCaseErr("Incorrect poolService"));
-
         assertEq(address(creditManager.pool()), address(poolMock), _testCaseErr("Incorrect pool"));
 
         assertEq(creditManager.underlying(), tokenTestSuite.addressOf(Tokens.DAI), _testCaseErr("Incorrect underlying"));

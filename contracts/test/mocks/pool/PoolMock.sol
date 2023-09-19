@@ -99,6 +99,10 @@ contract PoolMock is IPoolService {
         _cumulativeIndex_RAY = cumulativeIndex_RAY;
     }
 
+    function baseInterestIndex() public view returns (uint256) {
+        return _cumulativeIndex_RAY;
+    }
+
     function calcLinearCumulative_RAY() public view override returns (uint256) {
         return _cumulativeIndex_RAY;
     }
@@ -216,19 +220,4 @@ contract PoolMock is IPoolService {
     function setExpectedLiquidityLimit(uint256 num) external {}
 
     function setWithdrawFee(uint256 num) external {}
-
-    //    function calcCumulativeIndexAtBorrowMore(
-    //        uint256 amount,
-    //        uint256 dAmount,
-    //        uint256 cumulativeIndexLastUpdate
-    //    ) external view override returns (uint256) {
-    //        return
-    //            (calcLinearCumulative_RAY() *
-    //                (cumulativeIndexLastUpdate) *
-    //                (amount + dAmount)) /
-    //            (calcLinearCumulative_RAY() *
-    //                amount +
-    //                dAmount *
-    //                cumulativeIndexLastUpdate);
-    //    }
 }

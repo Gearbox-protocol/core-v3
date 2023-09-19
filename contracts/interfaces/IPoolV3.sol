@@ -7,16 +7,6 @@ pragma abicoder v1;
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
-/// @title Pool base interface
-/// @notice Functions shared accross newer and older versions
-interface IPoolBase is IVersion {
-    function addressProvider() external view returns (address);
-    function underlyingToken() external view returns (address);
-    function calcLinearCumulative_RAY() external view returns (uint256);
-    function lendCreditAccount(uint256 borrowedAmount, address creditAccount) external;
-    function repayCreditAccount(uint256 repaidAmount, uint256 profit, uint256 loss) external;
-}
-
 interface IPoolV3Events {
     /// @notice Emitted when depositing liquidity with referral code
     event Refer(address indexed onBehalfOf, uint256 indexed referralCode, uint256 amount);
@@ -50,10 +40,10 @@ interface IPoolV3Events {
 }
 
 /// @title Pool V3 interface
-interface IPoolV3 is IPoolV3Events, IPoolBase, IERC4626 {
-    function addressProvider() external view override returns (address);
+interface IPoolV3 is IVersion, IPoolV3Events, IERC4626 {
+    function addressProvider() external view returns (address);
 
-    function underlyingToken() external view override returns (address);
+    function underlyingToken() external view returns (address);
 
     function treasury() external view returns (address);
 
@@ -93,9 +83,9 @@ interface IPoolV3 is IPoolV3Events, IPoolBase, IERC4626 {
 
     function creditManagerBorrowable(address creditManager) external view returns (uint256 borrowable);
 
-    function lendCreditAccount(uint256 borrowedAmount, address creditAccount) external override;
+    function lendCreditAccount(uint256 borrowedAmount, address creditAccount) external;
 
-    function repayCreditAccount(uint256 repaidAmount, uint256 profit, uint256 loss) external override;
+    function repayCreditAccount(uint256 repaidAmount, uint256 profit, uint256 loss) external;
 
     // ------------- //
     // INTEREST RATE //
@@ -108,8 +98,6 @@ interface IPoolV3 is IPoolV3Events, IPoolBase, IERC4626 {
     function supplyRate() external view returns (uint256);
 
     function baseInterestIndex() external view returns (uint256);
-
-    function calcLinearCumulative_RAY() external view override returns (uint256);
 
     function baseInterestIndexLU() external view returns (uint256);
 
