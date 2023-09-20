@@ -189,6 +189,9 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         assertEq(pool.baseInterestIndex(), RAY, "Incorrect baseInterestIndex");
         assertEq(pool.interestRateModel(), address(interestRateModel), "Incorrect interestRateModel");
         assertEq(pool.totalDebtLimit(), 2000, "Incorrect totalDebtLimit");
+
+        (, string memory eip712Name,,,,,) = pool.eip712Domain();
+        assertEq(eip712Name, "diesel Test Token", "Incorrect EIP-712 name");
     }
 
     /// @notice U:[LP-2A]: External functions revert when contract is on pause
