@@ -170,7 +170,7 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
     // ---------------- //
 
     /// @notice Total amount of underlying tokens managed by the pool, same as `expectedLiquidity`
-    /// @dev Since `totalAssets` doesn't depend on underlying balance, pools are not vulnerable to the inflation attack
+    /// @dev Since `totalAssets` doesn't depend on underlying balance, pool is not vulnerable to the inflation attack
     function totalAssets() public view override(ERC4626, IERC4626) returns (uint256 assets) {
         return expectedLiquidity();
     }
@@ -358,6 +358,20 @@ contract PoolV3 is ERC4626, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV
             }
         }
         emit Withdraw(msg.sender, receiver, owner, assetsReceived, shares); // U:[LP-8,9]
+    }
+
+    /// @dev Internal conversion function (from assets to shares) with support for rounding direction
+    /// @dev Pool is not vulnerable to the inflation attack, so the simplified implementation w/o virtual shares is used
+    function _convertToShares(uint256 assets, Math.Rounding rounding) internal view override returns (uint256 shares) {
+        uint256 supply = totalSupply();
+        return (assets == 0 || supply == 0) ? assets : assets.mulDiv(supply, totalAssets(), rounding);
+    }
+
+    /// @dev Internal conversion function (from shares to assets) with support for rounding direction
+    /// @dev Pool is not vulnerable to the inflation attack, so the simplified implementation w/o virtual shares is used
+    function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view override returns (uint256 assets) {
+        uint256 supply = totalSupply();
+        return (supply == 0) ? shares : shares.mulDiv(totalAssets(), supply, rounding);
     }
 
     // --------- //

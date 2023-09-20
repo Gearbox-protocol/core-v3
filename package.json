@@ -26,14 +26,14 @@
     "forge-install": "forge install --no-commit foundry-rs/forge-std"
   },
   "devDependencies": {
-    "@1inch/solidity-utils": "^2.2.27",
+    "@1inch/solidity-utils": "2.4.0",
     "@chainlink/contracts": "^0.6.1",
     "@commitlint/cli": "^17.6.3",
     "@commitlint/config-conventional": "17.6.0",
     "@gearbox-protocol/core-v2": "1.19.0-base.11",
     "@gearbox-protocol/prettier-config": "^1.5.0",
     "@gearbox-protocol/sdk-gov": "^1.4.6",
-    "@openzeppelin/contracts": "4.8.3",
+    "@openzeppelin/contracts": "4.9.3",
     "husky": "^8.0.3",
     "lint-staged": "^13.0.3",
     "prettier": "^2.7.1",
