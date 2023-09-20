@@ -8,6 +8,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 
 // LIBS & TRAITS
@@ -597,6 +598,17 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                             invertedSkipMask: quotedTokensMaskInverted
                         }); // U:[FA-26]
                     }
+                    // addCollateralWithPermit
+                    else if (method == ICreditFacadeV3Multicall.addCollateralWithPermit.selector) {
+                        _revertIfNoPermission(flags, ADD_COLLATERAL_PERMISSION); // U:[FA-21]
+
+                        quotedTokensMaskInverted = _getInvertedQuotedTokensMask(quotedTokensMaskInverted);
+
+                        enabledTokensMask = enabledTokensMask.enable({
+                            bitsToEnable: _addCollateralWithPermit(creditAccount, mcall.callData[4:]),
+                            invertedSkipMask: quotedTokensMaskInverted
+                        }); // U:[FA-26B]
+                    }
                     // updateQuota
                     else if (method == ICreditFacadeV3Multicall.updateQuota.selector) {
                         _revertIfNoPermission(flags, UPDATE_QUOTA_PERMISSION); // U:[FA-21]
@@ -797,17 +809,29 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     }
 
     /// @dev `ICreditFacadeV3Multicall.addCollateral` implementation
-    function _addCollateral(address creditAccount, bytes calldata callData) internal returns (uint256 tokenMaskAfter) {
+    function _addCollateral(address creditAccount, bytes calldata callData) internal returns (uint256 tokensToEnable) {
         (address token, uint256 amount) = abi.decode(callData, (address, uint256)); // U:[FA-26]
 
-        tokenMaskAfter = ICreditManagerV3(creditManager).addCollateral({
-            payer: msg.sender,
-            creditAccount: creditAccount,
-            token: token,
-            amount: amount
-        }); // U:[FA-26]
+        tokensToEnable = _addCollateral({payer: msg.sender, creditAccount: creditAccount, token: token, amount: amount}); // U:[FA-26]
 
         emit AddCollateral(creditAccount, token, amount); // U:[FA-26]
+    }
+
+    /// @dev `ICreditFacadeV3Multicall.addCollateralWithPermit` implementation
+    function _addCollateralWithPermit(address creditAccount, bytes calldata callData)
+        internal
+        returns (uint256 tokensToEnable)
+    {
+        (address token, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s) =
+            abi.decode(callData, (address, uint256, uint256, uint8, bytes32, bytes32)); // U:[FA-26B]
+
+        // `token` is only validated later in `addCollateral`, but to benefit off of it the attacker would have to make
+        // it recognizable as collateral in the credit manager, which requires gaining configurator access rights
+        try IERC20Permit(token).permit(msg.sender, creditManager, amount, deadline, v, r, s) {} catch {} // U:[FA-26B]
+
+        tokensToEnable = _addCollateral({payer: msg.sender, creditAccount: creditAccount, token: token, amount: amount}); // U:[FA-26B]
+
+        emit AddCollateral(creditAccount, token, amount); // U:[FA-26B]
     }
 
     /// @dev `ICreditFacadeV3Multicall.{increase|decrease}Debt` implementation
@@ -1095,12 +1119,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
     /// @dev Internal wrapper for `creditManager.setActiveCreditAccount` call to reduce contract size
     function _setActiveCreditAccount(address creditAccount) internal {
-        ICreditManagerV3(creditManager).setActiveCreditAccount(creditAccount); // U:[FA-26]
+        ICreditManagerV3(creditManager).setActiveCreditAccount(creditAccount);
     }
 
     /// @dev Same as above but unsets active credit account
     function _unsetActiveCreditAccount() internal {
-        _setActiveCreditAccount(INACTIVE_CREDIT_ACCOUNT_ADDRESS); // U:[FA-26]
+        _setActiveCreditAccount(INACTIVE_CREDIT_ACCOUNT_ADDRESS);
     }
 
     /// @dev Internal wrapper for `creditManager.closeCreditAccount` call to reduce contract size
@@ -1121,7 +1145,20 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             to: to,
             skipTokensMask: skipTokensMask,
             convertToETH: convertToETH
-        }); // U:[FA-15,49]
+        });
+    }
+
+    /// @dev Internal wrapper for `creditManager.addCollateral` call to reduce contract size
+    function _addCollateral(address payer, address creditAccount, address token, uint256 amount)
+        internal
+        returns (uint256 tokenMask)
+    {
+        tokenMask = ICreditManagerV3(creditManager).addCollateral({
+            payer: payer,
+            creditAccount: creditAccount,
+            token: token,
+            amount: amount
+        });
     }
 
     /// @dev Internal wrapper for `creditManager.calcDebtAndCollateral` call to reduce contract size
@@ -1138,14 +1175,14 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         internal
         returns (uint256 tokensToEnable)
     {
-        tokensToEnable = ICreditManagerV3(creditManager).claimWithdrawals(creditAccount, to, action); // U:[FA-16,37]
+        tokensToEnable = ICreditManagerV3(creditManager).claimWithdrawals(creditAccount, to, action);
     }
 
     /// @dev Internal wrapper for `botList.eraseAllBotPermissions` call to reduce contract size
     function _eraseAllBotPermissions(address creditAccount) internal {
-        uint16 flags = _flagsOf(creditAccount); // U:[FA-42]
+        uint16 flags = _flagsOf(creditAccount);
         if (flags & BOT_PERMISSIONS_SET_FLAG != 0) {
-            IBotListV3(botList).eraseAllBotPermissions(creditManager, creditAccount); // U:[FA-42]
+            IBotListV3(botList).eraseAllBotPermissions(creditManager, creditAccount);
         }
     }
 
@@ -1166,7 +1203,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @dev Reverts if credit facade is expired
     function _checkExpired() internal view {
         if (_isExpired()) {
-            revert NotAllowedAfterExpirationException(); // U:[FA-46]
+            revert NotAllowedAfterExpirationException();
         }
     }
 }
