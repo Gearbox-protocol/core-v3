@@ -4,6 +4,7 @@
 pragma solidity ^0.8.17;
 
 // THIRD-PARTY
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -13,7 +14,6 @@ import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol
 import {BalancesLogic, Balance, BalanceWithMask} from "../libraries/BalancesLogic.sol";
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {BitMask, UNDERLYING_TOKEN_MASK} from "../libraries/BitMask.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 // INTERFACES
 import "../interfaces/ICreditFacadeV3.sol";
@@ -56,7 +56,7 @@ uint256 constant CLOSE_CREDIT_ACCOUNT_FLAGS = EXTERNAL_CALLS_PERMISSION;
 ///         external protocols via adapters, increasing quotas or scheduling withdrawals) into one call, followed by
 ///         the collateral check that ensures that account is sufficiently collateralized.
 ///         For more details on what one can achieve with multicalls, see `_multicall` and  `ICreditFacadeV3Multicall`.
-/// @notice Users can also let external bots to manage their accounts via `botMulticall`. Bots can be relatively general,
+/// @notice Users can also let external bots manage their accounts via `botMulticall`. Bots can be relatively general,
 ///         the facade only ensures that they can do no harm to the protocol by running the collateral check after the
 ///         multicall and checking the permissions given to them by users. See `BotListV3` for additional details.
 /// @notice Credit facade implements a few safeguards on top of those present in the credit manager, including debt and
@@ -1061,9 +1061,11 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         IWithdrawalManagerV3(withdrawalManager).claimImmediateWithdrawal({token: ETH_ADDRESS, to: to});
     }
 
-    /// @dev Whether credit facade has expired (always `false` if it's not expirable)
+    /// @dev Whether credit facade has expired (`false` if it's not expirable or expiration timestamp is not set)
     function _isExpired() internal view returns (bool) {
-        return expirable && block.timestamp >= expirationDate; // U:[FA-46]
+        if (!expirable) return false; // U:[FA-46]
+        uint40 _expirationDate = expirationDate;
+        return _expirationDate != 0 && block.timestamp >= _expirationDate; // U:[FA-46]
     }
 
     /// @dev Internal wrapper for `creditManager.getBorrowerOrRevert` call to reduce contract size

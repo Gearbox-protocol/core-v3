@@ -603,7 +603,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     /// @param newCreditFacade New credit facade
     /// @param migrateParams Whether to migrate old credit facade params
     /// @dev Reverts if `newCreditFacade` is incompatible with credit manager
-    /// @dev If `migrateParams` is true, reverts if old facade is expirable and the new one is not
     function setCreditFacade(address newCreditFacade, bool migrateParams)
         external
         override
@@ -629,7 +628,9 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
 
             _migrateForbiddenTokens(newCreditFacade, prevCreditFacade.forbiddenTokenMask()); // I:[CC-22С]
 
-            if (prevCreditFacade.expirable()) _setExpirationDate(newCreditFacade, prevCreditFacade.expirationDate()); // I:[CC-22]
+            if (prevCreditFacade.expirable() && CreditFacadeV3(newCreditFacade).expirable()) {
+                _setExpirationDate(newCreditFacade, prevCreditFacade.expirationDate()); // I:[CC-22]
+            }
 
             address botList = prevCreditFacade.botList();
             if (botList != address(0)) _setBotList(newCreditFacade, botList); // I:[CC-22A]
