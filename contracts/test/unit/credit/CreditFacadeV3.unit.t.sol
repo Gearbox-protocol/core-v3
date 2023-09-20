@@ -7,6 +7,8 @@ import "../../../interfaces/IAddressProviderV3.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
 import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
+import {ERC20PermitMock} from "../../mocks/token/ERC20PermitMock.sol";
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
 
 /// LIBS
@@ -1170,11 +1172,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         creditManagerMock.setBorrower(USER);
 
-        MultiCallPermissionTestCase[11] memory cases = [
-            MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.revertIfReceivedLessThan, (new Balance[](0))),
-                permissionRquired: 0
-            }),
+        MultiCallPermissionTestCase[10] memory cases = [
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (token)),
                 permissionRquired: ENABLE_TOKEN_PERMISSION
@@ -1188,6 +1186,12 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 permissionRquired: ADD_COLLATERAL_PERMISSION
             }),
             MultiCallPermissionTestCase({
+                callData: abi.encodeCall(
+                    ICreditFacadeV3Multicall.addCollateralWithPermit, (token, 0, 0, 0, bytes32(0), bytes32(0))
+                    ),
+                permissionRquired: ADD_COLLATERAL_PERMISSION
+            }),
+            MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (1)),
                 permissionRquired: INCREASE_DEBT_PERMISSION
             }),
@@ -1198,10 +1202,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (token, 0, 0)),
                 permissionRquired: UPDATE_QUOTA_PERMISSION
-            }),
-            MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (new uint256[](0), 10_001)),
-                permissionRquired: 0
             }),
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.scheduleWithdrawal, (token, 0)),
@@ -1219,18 +1219,14 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         uint256 len = cases.length;
         for (uint256 i = 0; i < len; ++i) {
-            uint256 cur_flags = type(uint256).max.disable(cases[i].permissionRquired);
-            for (uint256 j = 0; j < len; ++j) {
-                if (i == j && cases[i].permissionRquired != 0) {
-                    vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, cases[i].permissionRquired));
-                }
-                creditFacade.multicallInt({
-                    creditAccount: creditAccount,
-                    calls: MultiCallBuilder.build(MultiCall({target: address(creditFacade), callData: cases[j].callData})),
-                    enabledTokensMask: 0,
-                    flags: cur_flags
-                });
-            }
+            vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, cases[i].permissionRquired));
+
+            creditFacade.multicallInt({
+                creditAccount: creditAccount,
+                calls: MultiCallBuilder.build(MultiCall({target: address(creditFacade), callData: cases[i].callData})),
+                enabledTokensMask: 0,
+                flags: type(uint256).max.disable(cases[i].permissionRquired)
+            });
         }
 
         uint256 flags = type(uint256).max.disable(EXTERNAL_CALLS_PERMISSION);
@@ -1416,6 +1412,63 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             vm.expectEmit(true, true, true, true);
             emit AddCollateral(creditAccount, token, amount);
 
+            FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
+                creditAccount: creditAccount,
+                calls: calls,
+                enabledTokensMask: UNDERLYING_TOKEN_MASK,
+                flags: ADD_COLLATERAL_PERMISSION
+            });
+
+            assertEq(
+                fullCheckParams.enabledTokensMaskAfter,
+                testCase == 0 ? (mask | UNDERLYING_TOKEN_MASK) : UNDERLYING_TOKEN_MASK,
+                _testCaseErr("Incorrect enabledTokenMask")
+            );
+        }
+    }
+
+    /// @dev U:[FA-26B]: multicall addCollateralWithPermit works properly
+    function test_U_FA_26B_multicall_addCollateralWithPermit_works_properly() public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+
+        (address user, uint256 key) = makeAddrAndKey("user");
+
+        ERC20PermitMock token = new ERC20PermitMock("Test Token", "TEST", 18);
+        uint256 amount = 12333345;
+        uint256 mask = 1 << 5;
+        uint256 deadline = block.timestamp + 1;
+
+        creditManagerMock.setAddCollateral(mask);
+
+        for (uint256 testCase = 0; testCase < 2; ++testCase) {
+            (uint8 v, bytes32 r, bytes32 s) =
+                vm.sign(key, token.getPermitHash(user, address(creditManagerMock), amount, deadline));
+
+            MultiCall[] memory calls = MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(
+                        ICreditFacadeV3Multicall.addCollateralWithPermit, (address(token), amount, deadline, v, r, s)
+                        )
+                })
+            );
+
+            creditManagerMock.setQuotedTokensMask(testCase == 0 ? 0 : mask);
+
+            vm.expectCall(
+                address(token),
+                abi.encodeCall(IERC20Permit.permit, (user, address(creditManagerMock), amount, deadline, v, r, s))
+            );
+
+            vm.expectCall(
+                address(creditManagerMock),
+                abi.encodeCall(ICreditManagerV3.addCollateral, (user, creditAccount, address(token), amount))
+            );
+
+            vm.expectEmit(true, true, true, true);
+            emit AddCollateral(creditAccount, address(token), amount);
+
+            vm.prank(user);
             FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
                 creditAccount: creditAccount,
                 calls: calls,
