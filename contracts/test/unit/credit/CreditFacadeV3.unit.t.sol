@@ -2210,13 +2210,15 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     function test_U_FA_46_isExpired_works_properly(uint40 timestamp) public allExpirableCases {
         vm.assume(timestamp > 1);
 
+        assertTrue(!creditFacade.isExpired(), "isExpired unexpectedly returns true (expiration date not set)");
+
         if (expirable) {
             vm.prank(CONFIGURATOR);
             creditFacade.setExpirationDate(timestamp);
         }
 
         vm.warp(timestamp - 1);
-        assertTrue(!creditFacade.isExpired(), "isExpired unexpectedly returns true");
+        assertTrue(!creditFacade.isExpired(), "isExpired unexpectedly returns true (not expired)");
 
         vm.warp(timestamp);
         assertEq(creditFacade.isExpired(), expirable, "Incorrect isExpired");

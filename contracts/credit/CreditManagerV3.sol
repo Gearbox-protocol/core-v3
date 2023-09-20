@@ -256,7 +256,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 revert OpenCloseAccountInOneBlockException();
             }
 
-            // currentCreditAccountInfo.borrowerd = address(0);
+            // currentCreditAccountInfo.borrower = address(0);
             // currentCreditAccountInfo.since = 0;
             // currentCreditAccountInfo.flags = 0;
             assembly {
