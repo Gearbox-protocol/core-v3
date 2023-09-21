@@ -40,8 +40,8 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         creditAccountInfo[creditAccount].borrower = borrower;
     }
 
-    function setSince(address creditAccount, uint64 since) external {
-        creditAccountInfo[creditAccount].since = since;
+    function setLastDebtUpdate(address creditAccount, uint64 lastDebtUpdate) external {
+        creditAccountInfo[creditAccount].lastDebtUpdate = lastDebtUpdate;
     }
 
     function setDebt(address creditAccount, uint256 debt) external {

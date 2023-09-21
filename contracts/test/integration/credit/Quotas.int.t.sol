@@ -155,6 +155,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
         (address creditAccount,) = _openTestCreditAccount();
+        vm.roll(block.timestamp + 1);
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
@@ -215,6 +216,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
         (address creditAccount,) = _openTestCreditAccount();
+        vm.roll(block.timestamp + 1);
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({

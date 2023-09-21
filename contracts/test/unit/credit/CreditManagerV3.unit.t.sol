@@ -540,7 +540,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             ,
             uint256 enabledTokensMask,
             uint16 flags,
-            uint64 since,
+            uint64 lastDebtUpdate,
             address borrower
         ) = creditManager.creditAccountInfo(creditAccount);
 
@@ -549,7 +549,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         assertEq(cumulativeQuotaInterest, 1, _testCaseErr("Incorrect cumulativeQuotaInterest"));
         assertEq(enabledTokensMask, enabledTokensMaskBefore, _testCaseErr("Incorrect enabledTokensMask"));
 
-        assertEq(since, block.number, _testCaseErr("Incorrect since"));
+        assertEq(lastDebtUpdate, block.number, _testCaseErr("Incorrect lastDebtUpdate"));
 
         assertEq(flags, 0, _testCaseErr("Incorrect flags"));
         assertEq(borrower, USER, _testCaseErr("Incorrect borrower"));
@@ -602,7 +602,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             ,
             uint256 enabledTokensMask,
             uint16 flags,
-            uint64 since,
+            uint64 lastDebtUpdate,
             address borrower
         ) = creditManager.creditAccountInfo(creditAccount);
 
@@ -611,7 +611,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         assertEq(cumulativeQuotaInterest, 1, _testCaseErr("Incorrect cumulativeQuotaInterest"));
         assertEq(enabledTokensMask, enabledTokensMaskBefore, _testCaseErr("Incorrect enabledTokensMask"));
 
-        assertEq(since, block.number, _testCaseErr("Incorrect since"));
+        assertEq(lastDebtUpdate, 0, _testCaseErr("Incorrect lastDebtUpdate"));
 
         assertEq(flags, 0, _testCaseErr("Incorrect flags"));
         assertEq(borrower, USER, _testCaseErr("Incorrect borrower"));
@@ -648,10 +648,10 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         uint64 newBlock = 12312312;
 
         vm.roll(newBlock);
-        creditManager.setSince(creditAccount, newBlock);
+        creditManager.setLastDebtUpdate(creditAccount, newBlock);
         creditManager.setBorrower(creditAccount, USER);
 
-        vm.expectRevert(OpenCloseAccountInOneBlockException.selector);
+        vm.expectRevert(DebtUpdatedTwiceInOneBlockException.selector);
         creditManager.closeCreditAccount({
             creditAccount: creditAccount,
             closureAction: ClosureAction.CLOSE_ACCOUNT,
@@ -1190,7 +1190,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         /// @notice checking creditAccountInf update
 
-        (uint256 debt, uint256 cumulativeIndexLastUpdate,,,,,,) = creditManager.creditAccountInfo(creditAccount);
+        (uint256 debt, uint256 cumulativeIndexLastUpdate,,,,, uint64 lastDebtUpdate,) =
+            creditManager.creditAccountInfo(creditAccount);
 
         assertEq(debt, expectedNewDebt, _testCaseErr("Incorrect debt update in creditAccountInfo"));
         assertEq(
@@ -1198,6 +1199,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             expectedCumulativeIndex,
             _testCaseErr("Incorrect cumulativeIndexLastUpdate update in creditAccountInfo")
         );
+        assertEq(lastDebtUpdate, amount == 0 ? 0 : block.number, _testCaseErr("Incorrect lastDebtUpdate"));
 
         assertEq(tokensToEnable, amount == 0 ? 0 : UNDERLYING_TOKEN_MASK, _testCaseErr("Incorrect tokensToEnable"));
         assertEq(tokensToDisable, 0, _testCaseErr("Incorrect tokensToDisable"));
@@ -1324,8 +1326,15 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         /// @notice checking creditAccountInf update
         {
-            (uint256 debt, uint256 cumulativeIndexLastUpdate, uint256 cumulativeQuotaInterest,,,,,) =
-                creditManager.creditAccountInfo(creditAccount);
+            (
+                uint256 debt,
+                uint256 cumulativeIndexLastUpdate,
+                uint256 cumulativeQuotaInterest,
+                ,
+                ,
+                ,
+                uint64 lastDebtUpdate,
+            ) = creditManager.creditAccountInfo(creditAccount);
 
             assertEq(debt, expectedNewDebt, _testCaseErr("Incorrect debt update in creditAccountInfo"));
             assertEq(
@@ -1333,6 +1342,10 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 expectedCumulativeIndex,
                 _testCaseErr("Incorrect cumulativeIndexLastUpdate update in creditAccountInfo")
             );
+            {
+                uint256 expectedLastDebtUpdate = amount == 0 ? 0 : block.number;
+                assertEq(lastDebtUpdate, expectedLastDebtUpdate, _testCaseErr("Incorrect lastDebtUpdate"));
+            }
 
             /// @notice cumulativeQuotaInterest should not be changed if supportsQuotas  == false
 
@@ -1615,8 +1628,29 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
     }
 
-    /// @dev U:[CM-12]: manageDebt with 0 amount doesn't change anythig
-    function test_U_CM_12_manageDebt_with_0_amount_doesn_t_change_anythig() public withFeeTokenCase creditManagerTest {
+    /// @dev U:[CM-12A]: manageDebt reverts when debt was already updated in the same block
+    function test_U_CM_12A_manageDebt_reverts_when_already_updated_in_the_same_block()
+        public
+        withFeeTokenCase
+        creditManagerTest
+    {
+        address creditAccount = accountFactory.usedAccount();
+
+        creditManager.setLastDebtUpdate(creditAccount, uint64(block.number));
+
+        vm.expectRevert(DebtUpdatedTwiceInOneBlockException.selector);
+        creditManager.manageDebt(creditAccount, 1, 0, ManageDebtAction.INCREASE_DEBT);
+
+        vm.expectRevert(DebtUpdatedTwiceInOneBlockException.selector);
+        creditManager.manageDebt(creditAccount, 1, 0, ManageDebtAction.DECREASE_DEBT);
+    }
+
+    /// @dev U:[CM-12B]: manageDebt with 0 amount doesn't change anythig
+    function test_U_CM_12B_manageDebt_with_0_amount_doesn_t_change_anythig()
+        public
+        withFeeTokenCase
+        creditManagerTest
+    {
         uint256 debt = 10000;
         address creditAccount = accountFactory.usedAccount();
 
