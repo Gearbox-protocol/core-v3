@@ -146,6 +146,7 @@ contract MultiCallIntegrationTest is
         creditTest
     {
         (address creditAccount,) = _openTestCreditAccount();
+        vm.roll(block.number + 1);
 
         address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
         tokenTestSuite.mint(Tokens.USDC, USER, USDC_EXCHANGE_AMOUNT);
@@ -206,6 +207,7 @@ contract MultiCallIntegrationTest is
         creditTest
     {
         (address creditAccount,) = _openTestCreditAccount();
+        vm.roll(block.number + 1);
 
         address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
         tokenTestSuite.mint(Tokens.USDC, USER, USDC_EXCHANGE_AMOUNT);
@@ -264,7 +266,7 @@ contract MultiCallIntegrationTest is
     function test_I_MC_08_multicall_reverts_for_decrease_opeartion_after_increase_one() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
-        vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, DECREASE_DEBT_PERMISSION));
+        vm.expectRevert(DebtUpdatedTwiceInOneBlockException.selector);
 
         vm.prank(USER);
         creditFacade.multicall(

@@ -195,17 +195,20 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         CreditAccountInfo storage newCreditAccountInfo = creditAccountInfo[creditAccount];
 
+        // accounts are reusable, so debt and interest index must be reset either when opening an account or closing it
+        // to make potential liquidations cheaper, they are reset here
         newCreditAccountInfo.debt = debt; // U:[CM-6]
         newCreditAccountInfo.cumulativeIndexLastUpdate = _poolBaseInterestIndex(); // U:[CM-6]
 
         // newCreditAccountInfo.flags = 0;
-        // newCreditAccountInfo.since = uint64(block.number);
+        // newCreditAccountInfo.lastDebtUpdate = (debt > 0) ? 0 : uint64(block.number);
         // newCreditAccountInfo.borrower = onBehalfOf;
         assembly {
             let slot := add(newCreditAccountInfo.slot, 4)
-            let value := or(shl(80, onBehalfOf), shl(16, and(number(), 0xFFFFFFFFFFFFFFFF)))
+            let value := shl(80, onBehalfOf)
+            if gt(debt, 0) { value := or(value, shl(16, and(number(), 0xFFFFFFFFFFFFFFFF))) }
             sstore(slot, value)
-        } // U:[CM-6]
+        } // U:[CM-6,6A]
 
         // newCreditAccountInfo.cumulativeQuotaInterest = 1;
         // newCreditAccountInfo.quotaFees = 0;
@@ -214,7 +217,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             sstore(slot, 1)
         } // U:[CM-6]
 
-        if (debt != 0) _poolLendCreditAccount(debt, creditAccount); // U:[CM-6]
+        if (debt != 0) _poolLendCreditAccount(debt, creditAccount); // U:[CM-6,6A]
         creditAccountsSet.add(creditAccount); // U:[CM-6]
     }
 
@@ -252,17 +255,17 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         {
             CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
-            if (currentCreditAccountInfo.since == block.number) {
-                revert OpenCloseAccountInOneBlockException();
+            if (currentCreditAccountInfo.lastDebtUpdate == block.number) {
+                revert DebtUpdatedTwiceInOneBlockException(); // U:[CM-7]
             }
 
             // currentCreditAccountInfo.borrower = address(0);
-            // currentCreditAccountInfo.since = 0;
+            // currentCreditAccountInfo.lastDebtUpdate = 0;
             // currentCreditAccountInfo.flags = 0;
             assembly {
                 let slot := add(currentCreditAccountInfo.slot, 4)
                 sstore(slot, 0)
-            }
+            } // U:[CM-8]
         }
 
         uint256 amountToPool;
@@ -352,7 +355,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable)
     {
         CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
-        if (amount == 0) return (currentCreditAccountInfo.debt, 0, 0);
+        if (currentCreditAccountInfo.lastDebtUpdate == block.number) {
+            revert DebtUpdatedTwiceInOneBlockException(); // U:[CM-12A]
+        }
+        if (amount == 0) return (currentCreditAccountInfo.debt, 0, 0); // U:[CM-12B]
 
         uint256[] memory collateralHints;
         CollateralDebtData memory collateralDebtData = _calcDebtAndCollateral({
@@ -429,6 +435,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
 
         currentCreditAccountInfo.debt = newDebt; // U:[CM-10, 11]
+        currentCreditAccountInfo.lastDebtUpdate = uint64(block.number); // U:[CM-10, 11]
         currentCreditAccountInfo.cumulativeIndexLastUpdate = newCumulativeIndex; // U:[CM-10, 11]
     }
 

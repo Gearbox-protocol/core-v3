@@ -45,8 +45,7 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/C
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
-uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS =
-    ALL_PERMISSIONS & ~(INCREASE_DEBT_PERMISSION | DECREASE_DEBT_PERMISSION | WITHDRAW_PERMISSION);
+uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS & ~WITHDRAW_PERMISSION;
 
 uint256 constant CLOSE_CREDIT_ACCOUNT_FLAGS = EXTERNAL_CALLS_PERMISSION;
 
@@ -245,6 +244,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param calls List of calls to perform before closing the account
     /// @dev Reverts if caller is not `creditAccount`'s owner
     /// @dev Reverts if facade is paused
+    /// @dev Reverts if account's debt was updated in the same block
     function closeCreditAccount(
         address creditAccount,
         address to,
@@ -312,6 +312,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @dev When the credit facade is paused, reverts if caller is not an approved emergency liquidator
     /// @dev Reverts if `creditAccount` is not opened in connected credit manager
     /// @dev Reverts if account is not liquidatable
+    /// @dev Reverts if account's debt was updated in the same block
     function liquidateCreditAccount(
         address creditAccount,
         address to,
@@ -621,7 +622,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeV3Multicall.scheduleWithdrawal.selector) {
                         _revertIfNoPermission(flags, WITHDRAW_PERMISSION); // U:[FA-21]
 
-                        flags = flags.enable(REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS);
+                        flags = flags.enable(REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS); // U:[FA-30]
 
                         uint256 tokensToDisable = _scheduleWithdrawal(creditAccount, mcall.callData[4:]); // U:[FA-34]
 
@@ -636,7 +637,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeV3Multicall.increaseDebt.selector) {
                         _revertIfNoPermission(flags, INCREASE_DEBT_PERMISSION); // U:[FA-21]
 
-                        flags = flags.enable(REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS).disable(DECREASE_DEBT_PERMISSION); // U:[FA-29]
+                        flags = flags.enable(REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS); // U:[FA-30]
 
                         (uint256 tokensToEnable,) = _manageDebt(
                             creditAccount, mcall.callData[4:], enabledTokensMask, ManageDebtAction.INCREASE_DEBT

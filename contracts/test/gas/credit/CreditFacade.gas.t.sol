@@ -263,6 +263,8 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
 
+        vm.roll(block.number + 1);
+
         calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
@@ -296,6 +298,8 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
 
         vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+
+        vm.roll(block.timestamp + 1);
 
         calls = MultiCallBuilder.build(
             MultiCall({
@@ -348,6 +352,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
 
+        vm.roll(block.timestamp + 1);
         vm.warp(block.timestamp + 30 days);
 
         calls = MultiCallBuilder.build(

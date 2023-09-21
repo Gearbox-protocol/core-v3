@@ -26,6 +26,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
     /// @dev I:[MD-1]: increaseDebt executes function as expected
     function test_I_MD_01_increaseDebt_executes_actions_as_expected() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
+        vm.roll(block.number + 1);
 
         vm.expectCall(
             address(creditManager),
@@ -57,6 +58,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
     /// @dev I:[MD-2]: increaseDebt revets if more than block limit
     function test_I_MD_02_increaseDebt_revets_if_more_than_block_limit() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
+        vm.roll(block.number + 1);
 
         uint8 maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
         (, uint128 maxDebt) = creditFacade.debtLimits();
@@ -80,6 +82,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
     /// @dev I:[MD-3]: increaseDebt revets if more than maxDebt
     function test_I_MD_03_increaseDebt_revets_if_more_than_block_limit() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
+        vm.roll(block.number + 1);
 
         (, uint128 maxDebt) = creditFacade.debtLimits();
 
@@ -104,6 +107,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
     /// @dev I:[MD-4]: increaseDebt revets isIncreaseDebtForbidden is enabled
     function test_I_MD_04_increaseDebt_revets_isIncreaseDebtForbidden_is_enabled() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
+        vm.roll(block.number + 1);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.forbidBorrowing();
@@ -125,6 +129,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
     /// @dev I:[MD-5]: increaseDebt reverts if there is a forbidden token on account
     function test_I_MD_05_increaseDebt_reverts_with_forbidden_tokens() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
+        vm.roll(block.number + 1);
 
         address link = tokenTestSuite.addressOf(Tokens.LINK);
 
@@ -159,6 +164,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
     /// @dev I:[MD-6]: decreaseDebt executes function as expected
     function test_I_MD_06_decreaseDebt_executes_actions_as_expected() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
+        vm.roll(block.number + 1);
 
         vm.expectCall(
             address(creditManager),
@@ -190,6 +196,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
     /// @dev I:[MD-7]:decreaseDebt revets if less than minDebt
     function test_I_MD_07_decreaseDebt_revets_if_less_than_minDebt() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
+        vm.roll(block.number + 1);
 
         (uint128 minDebt,) = creditFacade.debtLimits();
 

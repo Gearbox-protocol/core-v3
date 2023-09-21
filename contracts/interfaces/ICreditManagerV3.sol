@@ -68,7 +68,7 @@ struct CreditAccountInfo {
     uint128 quotaFees;
     uint256 enabledTokensMask;
     uint16 flags;
-    uint64 since;
+    uint64 lastDebtUpdate;
     address borrower;
 }
 
@@ -262,7 +262,7 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
             uint128 quotaFees,
             uint256 enabledTokensMask,
             uint16 flags,
-            uint64 since,
+            uint64 lastDebtUpdate,
             address borrower
         );
 

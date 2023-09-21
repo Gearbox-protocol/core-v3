@@ -1583,34 +1583,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         });
     }
 
-    /// @dev U:[FA-29]: multicall decrease debt reverts after increase debt
-    function test_U_FA_29_multicall_decrease_debt_reverts_after_increase_debt() public notExpirableCase {
-        address creditAccount = DUMB_ADDRESS;
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setDebtLimits(1, 100, 1);
-
-        creditManagerMock.setManageDebt({newDebt: 50, tokensToEnable: UNDERLYING_TOKEN_MASK, tokensToDisable: 0});
-
-        vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, DECREASE_DEBT_PERMISSION));
-
-        creditFacade.multicallInt({
-            creditAccount: creditAccount,
-            calls: MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (10))
-                }),
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (1))
-                })
-                ),
-            enabledTokensMask: 0,
-            flags: INCREASE_DEBT_PERMISSION | DECREASE_DEBT_PERMISSION
-        });
-    }
-
     /// @dev U:[FA-30]: multicall increase debt / schedule withdrawal if forbid tokens on account
     function test_U_FA_30_multicall_increase_debt_if_forbid_tokens_on_account() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;

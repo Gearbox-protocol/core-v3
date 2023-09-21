@@ -297,7 +297,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
     /// @dev I:[OCA-8]: decrease debt during openCreditAccount
     function test_I_OCA_08_decrease_debt_forbidden_during_openCreditAccount() public creditTest {
-        vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, DECREASE_DEBT_PERMISSION));
+        vm.expectRevert(DebtUpdatedTwiceInOneBlockException.selector);
 
         vm.prank(USER);
 
