@@ -5,6 +5,7 @@ pragma solidity ^0.8.17;
 pragma abicoder v1;
 
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 interface IPoolV3Events {
@@ -40,7 +41,7 @@ interface IPoolV3Events {
 }
 
 /// @title Pool V3 interface
-interface IPoolV3 is IVersion, IPoolV3Events, IERC4626 {
+interface IPoolV3 is IVersion, IPoolV3Events, IERC4626, IERC20Permit {
     function addressProvider() external view returns (address);
 
     function underlyingToken() external view returns (address);
