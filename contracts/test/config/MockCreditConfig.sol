@@ -80,7 +80,7 @@ contract MockCreditConfig is Test, IPoolV3DeployConfig {
         cp.expirable = false;
         cp.skipInit = false;
         cp.poolLimit = type(uint256).max;
-        cp.description = string.concat("Mock Credit Manager ", tokenTestSuite_.symbols(_underlying));
+        cp.name = string.concat("Mock Credit Manager ", tokenTestSuite_.symbols(_underlying));
 
         pushCollateralToken(_underlying, cp.collateralTokens);
     }

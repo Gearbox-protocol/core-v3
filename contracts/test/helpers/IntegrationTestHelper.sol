@@ -376,7 +376,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 collateralTokens: _convertCollateral(cmParams.collateralTokens),
                 degenNFT: (whitelisted) ? address(degenNFT) : address(0),
                 expirable: (anyExpirable) ? cmParams.expirable : expirable,
-                description: cmParams.description
+                name: cmParams.name
             });
 
             CreditManagerFactory cmf = new CreditManagerFactory(

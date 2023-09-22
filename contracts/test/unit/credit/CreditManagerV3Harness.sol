@@ -12,8 +12,8 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/C
 contract CreditManagerV3Harness is CreditManagerV3 {
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    constructor(address _addressProvider, address _pool, string memory _description)
-        CreditManagerV3(_addressProvider, _pool, _description)
+    constructor(address _addressProvider, address _pool, string memory _name)
+        CreditManagerV3(_addressProvider, _pool, _name)
     {}
 
     function setReentrancy(uint8 _status) external {

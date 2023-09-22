@@ -247,7 +247,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             collateralTokens: cTokens,
             degenNFT: address(0),
             expirable: false,
-            description: "Test Credit Manager"
+            name: "Test Credit Manager"
         });
 
         creditManager = new CreditManagerV3(address(addressProvider), address(pool), "Test Credit Manager");
@@ -1202,7 +1202,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             collateralTokens: cTokens,
             degenNFT: address(0),
             expirable: false,
-            description: "Test Credit Manager"
+            name: "Test Credit Manager"
         });
 
         CreditConfiguratorV3 newCC = new CreditConfiguratorV3(

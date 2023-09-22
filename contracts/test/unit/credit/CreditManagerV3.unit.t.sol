@@ -75,7 +75,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     using USDTFees for uint256;
     using Vars for VarU256;
 
-    string constant description = "Test Credit Manager";
+    string constant name = "Test Credit Manager";
 
     IAddressProviderV3 addressProvider;
 
@@ -145,8 +145,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         poolMock.setPoolQuotaKeeper(address(poolQuotaKeeperMock));
 
         creditManager = (isFeeToken)
-            ? new CreditManagerV3Harness_USDT(address(addressProvider), address(poolMock), description)
-            : new CreditManagerV3Harness(address(addressProvider), address(poolMock), description);
+            ? new CreditManagerV3Harness_USDT(address(addressProvider), address(poolMock), name)
+            : new CreditManagerV3Harness(address(addressProvider), address(poolMock), name);
         creditManager.setCreditFacade(address(this));
 
         creditManager.setFees(
@@ -329,7 +329,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             _testCaseErr("Incorrect creditConfigurator")
         );
 
-        assertEq(creditManager.description(), description, _testCaseErr("Incorrect description"));
+        assertEq(creditManager.name(), name, _testCaseErr("Incorrect name"));
     }
 
     //

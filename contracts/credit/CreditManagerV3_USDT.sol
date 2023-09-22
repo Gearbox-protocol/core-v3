@@ -9,8 +9,8 @@ import {USDT_Transfer} from "../traits/USDT_Transfer.sol";
 /// @title Credit manager V3 USDT
 /// @notice Credit manager variation for USDT underlying with enabled transfer fees
 contract CreditManagerV3_USDT is CreditManagerV3, USDT_Transfer {
-    constructor(address _addressProvider, address _pool, string memory _description)
-        CreditManagerV3(_addressProvider, _pool, _description)
+    constructor(address _addressProvider, address _pool, string memory _name)
+        CreditManagerV3(_addressProvider, _pool, _name)
         USDT_Transfer(underlying)
     {}
 
