@@ -138,8 +138,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @dev Set of all credit accounts opened in this credit manager
     EnumerableSet.AddressSet internal creditAccountsSet;
 
-    /// @notice Credit manager description
-    string public override description;
+    /// @notice Credit manager name
+    string public override name;
 
     /// @dev Ensures that function caller is the credit facade
     modifier creditFacadeOnly() {
@@ -156,9 +156,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Constructor
     /// @param _addressProvider Address provider contract address
     /// @param _pool Address of the lending pool to connect this credit manager to
+    /// @param _name Credit manager name
     /// @dev Adds pool's underlying as collateral token with LT = 0
     /// @dev Sets `msg.sender` as credit configurator
-    constructor(address _addressProvider, address _pool, string memory _description) {
+    constructor(address _addressProvider, address _pool, string memory _name) {
         addressProvider = _addressProvider;
         pool = _pool; // U:[CM-1]
 
@@ -172,7 +173,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         creditConfigurator = msg.sender; // U:[CM-1]
 
-        description = _description;
+        name = _name;
     }
 
     // ------------------ //

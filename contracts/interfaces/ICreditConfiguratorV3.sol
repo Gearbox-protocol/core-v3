@@ -24,14 +24,14 @@ struct CollateralToken {
 /// @param collateralTokens Array of collateral tokens
 /// @param degenNFT Whether to apply Degen NFT whitelist logic
 /// @param expirable Whether facade must be expirable
-/// @param description Credit manager description
+/// @param name Credit manager name
 struct CreditManagerOpts {
     uint128 minDebt;
     uint128 maxDebt;
     CollateralToken[] collateralTokens;
     address degenNFT;
     bool expirable;
-    string description;
+    string name;
 }
 
 interface ICreditConfiguratorV3Events {

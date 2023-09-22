@@ -50,7 +50,7 @@ struct UniswapV3Pair {
 /// @dev A struct representing the initial Credit Manager configuration parameters
 struct CreditManagerV3DeployParams {
     /// @dev The Credit Manager's name
-    string description;
+    string name;
     /// @dev The minimal debt principal amount
     uint128 minDebt;
     /// @dev The maximal debt principal amount

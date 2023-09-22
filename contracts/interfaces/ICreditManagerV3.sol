@@ -123,7 +123,7 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
 
     function weth() external view returns (address);
 
-    function description() external view returns (string memory);
+    function name() external view returns (string memory);
 
     // ------------------ //
     // ACCOUNT MANAGEMENT //
