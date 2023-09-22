@@ -346,7 +346,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         vm.startPrank(USER);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
-        creditManager.openCreditAccount(200000, address(this));
+        creditManager.openCreditAccount(address(this));
 
         CollateralDebtData memory collateralDebtData;
 
@@ -444,7 +444,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.setReentrancy(ENTERED);
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditManager.openCreditAccount(200000, address(this));
+        creditManager.openCreditAccount(address(this));
 
         CollateralDebtData memory collateralDebtData;
 
@@ -528,7 +528,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         // todo: check why expectCall doesn't work
         //  vm.expectCall(address(accountFactory), abi.encodeCall(IAccountFactory.takeCreditAccount, (0, 0)));
-        address creditAccount = creditManager.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER);
+        address creditAccount = creditManager.openCreditAccount(USER);
         assertEq(
             address(creditAccount), accountFactory.usedAccount(), _testCaseErr("Incorrect credit account returned")
         );
@@ -544,23 +544,23 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             address borrower
         ) = creditManager.creditAccountInfo(creditAccount);
 
-        assertEq(debt, DAI_ACCOUNT_AMOUNT, _testCaseErr("Incorrect debt"));
+        assertEq(debt, 0, _testCaseErr("Incorrect debt"));
         assertEq(cumulativeIndexLastUpdate, cumulativeIndexNow, _testCaseErr("Incorrect cumulativeIndexLastUpdate"));
         assertEq(cumulativeQuotaInterest, 1, _testCaseErr("Incorrect cumulativeQuotaInterest"));
         assertEq(enabledTokensMask, enabledTokensMaskBefore, _testCaseErr("Incorrect enabledTokensMask"));
 
-        assertEq(lastDebtUpdate, block.number, _testCaseErr("Incorrect lastDebtUpdate"));
+        assertEq(lastDebtUpdate, 0, _testCaseErr("Incorrect lastDebtUpdate"));
 
         assertEq(flags, 0, _testCaseErr("Incorrect flags"));
         assertEq(borrower, USER, _testCaseErr("Incorrect borrower"));
 
-        assertEq(poolMock.lendAmount(), DAI_ACCOUNT_AMOUNT, _testCaseErr("Incorrect amount was borrowed"));
-        assertEq(poolMock.lendAccount(), creditAccount, _testCaseErr("Incorrect amount was borrowed"));
+        // assertEq(poolMock.lendAmount(), DAI_ACCOUNT_AMOUNT, _testCaseErr("Incorrect amount was borrowed"));
+        // assertEq(poolMock.lendAccount(), creditAccount, _testCaseErr("Incorrect amount was borrowed"));
 
         assertEq(creditManager.creditAccounts().length, 1, _testCaseErr("incorrect creditAccounts() length"));
         assertEq(creditManager.creditAccounts()[0], creditAccount, _testCaseErr("incorrect creditAccounts()[0] value"));
 
-        expectBalance(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT, _testCaseErr("incorrect balance on creditAccount"));
+        // expectBalance(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT, _testCaseErr("incorrect balance on creditAccount"));
     }
 
     /// @dev U:[CM-6A]: open credit account works with 0 debt
@@ -590,7 +590,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         // todo: check why expectCall doesn't work
         //  vm.expectCall(address(accountFactory), abi.encodeCall(IAccountFactory.takeCreditAccount, (0, 0)));
-        address creditAccount = creditManager.openCreditAccount(0, USER);
+        address creditAccount = creditManager.openCreditAccount(USER);
         assertEq(
             address(creditAccount), accountFactory.usedAccount(), _testCaseErr("Incorrect credit account returned")
         );

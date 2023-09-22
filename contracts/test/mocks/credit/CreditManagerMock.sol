@@ -155,7 +155,7 @@ contract CreditManagerMock {
         nextCreditAccount = _nextCreditAccount;
     }
 
-    function openCreditAccount(uint256, address) external view returns (address creditAccount) {
+    function openCreditAccount(address) external view returns (address creditAccount) {
         return nextCreditAccount;
     }
 

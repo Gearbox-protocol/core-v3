@@ -444,27 +444,27 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         }
     }
 
-    /// @dev Opens credit account for testing management functions
-    function _openCreditAccount()
-        internal
-        returns (uint256 debt, uint256 cumulativeIndexLastUpdate, address creditAccount)
-    {
-        debt = creditAccountAmount;
+    // /// @dev Opens credit account for testing management functions
+    // function _openCreditAccount()
+    //     internal
+    //     returns (uint256 debt, uint256 cumulativeIndexLastUpdate, address creditAccount)
+    // {
+    //     debt = creditAccountAmount;
 
-        cumulativeIndexLastUpdate = pool.baseInterestIndex();
-        // pool.setCumulativeIndexNow(cumulativeIndexLastUpdate);
+    //     cumulativeIndexLastUpdate = pool.baseInterestIndex();
+    //     // pool.setCumulativeIndexNow(cumulativeIndexLastUpdate);
 
-        vm.prank(address(creditFacade));
+    //     vm.prank(address(creditFacade));
 
-        // Existing address case
-        creditAccount = creditManager.openCreditAccount(debt, USER);
+    //     // Existing address case
+    //     creditAccount = creditManager.openCreditAccount(debt, USER);
 
-        // Increase block number cause it's forbidden to close credit account in the same block
-        vm.roll(block.number + 1);
-        // vm.warp(block.timestamp + 100 days);
+    //     // Increase block number cause it's forbidden to close credit account in the same block
+    //     vm.roll(block.number + 1);
+    //     // vm.warp(block.timestamp + 100 days);
 
-        // pool.setCumulativeIndexNow(cumulativeIndexAtClose);
-    }
+    //     // pool.setCumulativeIndexNow(cumulativeIndexAtClose);
+    // }
 
     function _addAndEnableTokens(address creditAccount, uint256 numTokens, uint256 balance) internal {
         for (uint256 i = 0; i < numTokens; i++) {
@@ -489,12 +489,15 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         internal
         returns (address)
     {
-        uint256 borrowedAmount = (amount * leverageFactor) / 100; // LEVERAGE_DECIMALS; // F:[FA-5]
+        uint256 debt = (amount * leverageFactor) / 100; // LEVERAGE_DECIMALS; // F:[FA-5]
 
         return creditFacade.openCreditAccount(
-            borrowedAmount,
             onBehalfOf,
             MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (debt))
+                }),
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, amount))

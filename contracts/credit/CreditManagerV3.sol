@@ -180,10 +180,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     // ------------------ //
 
     /// @notice Opens a new credit account by taking it from the factory and borrowing funds from the pool
-    /// @param debt Amount of underlying to borrow from the pool
     /// @param onBehalfOf Owner of a newly opened credit account
     /// @return creditAccount Address of the newly opened credit account
-    function openCreditAccount(uint256 debt, address onBehalfOf)
+    function openCreditAccount(address onBehalfOf)
         external
         override
         nonZeroAddress(onBehalfOf)
@@ -197,7 +196,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         // accounts are reusable, so debt and interest index must be reset either when opening an account or closing it
         // to make potential liquidations cheaper, they are reset here
-        newCreditAccountInfo.debt = debt; // U:[CM-6]
+        newCreditAccountInfo.debt = 0; // U:[CM-6]
         newCreditAccountInfo.cumulativeIndexLastUpdate = _poolBaseInterestIndex(); // U:[CM-6]
 
         // newCreditAccountInfo.flags = 0;
@@ -206,7 +205,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         assembly {
             let slot := add(newCreditAccountInfo.slot, 4)
             let value := shl(80, onBehalfOf)
-            if gt(debt, 0) { value := or(value, shl(16, and(number(), 0xFFFFFFFFFFFFFFFF))) }
             sstore(slot, value)
         } // U:[CM-6,6A]
 
@@ -217,7 +215,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             sstore(slot, 1)
         } // U:[CM-6]
 
-        if (debt != 0) _poolLendCreditAccount(debt, creditAccount); // U:[CM-6,6A]
         creditAccountsSet.add(creditAccount); // U:[CM-6]
     }
 
