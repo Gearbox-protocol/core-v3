@@ -13,11 +13,15 @@ contract PriceOracleV3Harness is PriceOracleV3 {
     }
 
     function getPriceFeedParams(address token) external view returns (PriceFeedParams memory) {
-        return _priceFeedsParams[token];
+        (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals, bool useReserve) =
+            _getPriceFeedParams(token);
+        return PriceFeedParams(priceFeed, stalenessPeriod, skipCheck, decimals, useReserve);
     }
 
     function getReservePriceFeedParams(address token) external view returns (PriceFeedParams memory) {
-        return _priceFeedsParams[_getTokenReserveKey(token)];
+        (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals, bool useReserve) =
+            _getPriceFeedParams(_getTokenReserveKey(token));
+        return PriceFeedParams(priceFeed, stalenessPeriod, skipCheck, decimals, useReserve);
     }
 
     function getPrice(address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals)

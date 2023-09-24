@@ -127,9 +127,9 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
             let data := sload(params.slot)
             priceFeed := data
             stalenessPeriod := shr(160, data)
-            skipCheck := shr(192, data)
+            skipCheck := and(shr(192, data), 0x01)
             decimals := shr(200, data)
-            useReserve := shr(208, data)
+            useReserve := and(shr(208, data), 0x01)
         } // U:[PO-2]
     }
 
