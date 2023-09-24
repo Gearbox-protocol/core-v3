@@ -38,9 +38,9 @@ import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 import "../../../interfaces/IExceptions.sol";
 
 // MOCKS
-import {AdapterMock} from "../../mocks//core/AdapterMock.sol";
-
-import {GeneralMock} from "../../mocks//GeneralMock.sol";
+import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
+import {PriceFeedMock} from "../../mocks/oracles/PriceFeedMock.sol";
+import {GeneralMock} from "../../mocks/GeneralMock.sol";
 
 // SUITES
 
@@ -416,28 +416,11 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
                 uint256 warpTime = RAY / rate * SECONDS_PER_YEAR;
 
                 vm.warp(block.timestamp + warpTime);
-            } // /// @dev I:[CM-64]: closeCreditAccount reverts when attempting to liquidate while paused,
-            // /// and the payer is not set as emergency liquidator
 
-            // function test_I_CM_64_closeCreditAccount_reverts_when_paused_and_liquidator_not_privileged() public creditTest {
-            //     vm.prank(CONFIGURATOR);
-            //     creditManager.pause();
+                address pf = priceOracle.priceFeeds(tokenTestSuite.addressOf(Tokens.DAI));
+                PriceFeedMock(pf).setParams(0, 0, block.timestamp, 0);
+            }
 
-            //     vm.expectRevert("Pausable: paused");
-            //     // creditManager.closeCreditAccount(USER, ClosureAction.LIQUIDATE_ACCOUNT, 0, LIQUIDATOR, FRIEND, 0, false);
-            // }
-
-            // /// @dev I:[CM-65]: Emergency liquidator can't close an account instead of liquidating
-
-            // function test_I_CM_65_closeCreditAccount_reverts_when_paused_and_liquidator_tries_to_close() public creditTest {
-            //     vm.startPrank(CONFIGURATOR);
-            //     creditManager.pause();
-            //     creditManager.addEmergencyLiquidator(LIQUIDATOR);
-            //     vm.stopPrank();
-
-            //     vm.expectRevert("Pausable: paused");
-            //     // creditManager.closeCreditAccount(USER, ClosureAction.CLOSE_ACCOUNT, 0, LIQUIDATOR, FRIEND, 0, false);
-            // }
             vm.roll(block.number + 1);
 
             uint256 cumulativeIndexAtClose = pool.baseInterestIndex();
