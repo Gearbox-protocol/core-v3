@@ -40,11 +40,7 @@ struct FullCheckParams {
 interface ICreditFacadeV3Events {
     /// @notice Emitted when a new credit account is opened
     event OpenCreditAccount(
-        address indexed creditAccount,
-        address indexed onBehalfOf,
-        address indexed caller,
-        uint256 debt,
-        uint16 referralCode
+        address indexed creditAccount, address indexed onBehalfOf, address indexed caller, uint16 referralCode
     );
 
     /// @notice Emitted when account is closed
@@ -116,7 +112,7 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
     // ACCOUNT MANAGEMENT //
     // ------------------ //
 
-    function openCreditAccount(uint256 debt, address onBehalfOf, MultiCall[] calldata calls, uint16 referralCode)
+    function openCreditAccount(address onBehalfOf, MultiCall[] calldata calls, uint16 referralCode)
         external
         payable
         returns (address creditAccount);

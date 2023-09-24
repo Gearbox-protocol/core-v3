@@ -201,6 +201,10 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_ACCOUNT_AMOUNT))
+            }),
+            MultiCall({
+                target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT / 2)
                     )
@@ -209,7 +213,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
 
         // Existing address case
         vm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
 
         assertTrue(
             creditAccount
@@ -244,6 +248,10 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_ACCOUNT_AMOUNT))
+            }),
+            MultiCall({
+                target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT / 2)
                     )
@@ -252,7 +260,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
 
         // Existing address case
         vm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
 
         uint256 poolBalanceBefore = tokenTestSuite.balanceOf(Tokens.DAI, address(pool));
         uint256 friendBalanceBefore = tokenTestSuite.balanceOf(Tokens.DAI, FRIEND);
@@ -298,6 +306,10 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_ACCOUNT_AMOUNT))
+            }),
+            MultiCall({
+                target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT / 2)
                     )
@@ -306,7 +318,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
 
         // Existing address case
         vm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
 
         tokenTestSuite.mint(Tokens.DAI, USER, 2 * DAI_ACCOUNT_AMOUNT);
 
@@ -376,6 +388,10 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_ACCOUNT_AMOUNT))
+            }),
+            MultiCall({
+                target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT / 2)
                     )
@@ -384,7 +400,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
 
         // Existing address case
         vm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
 
         tokenTestSuite.mint(Tokens.DAI, LIQUIDATOR, 2 * DAI_ACCOUNT_AMOUNT);
         uint256 debt;

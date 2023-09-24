@@ -58,6 +58,10 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_ACCOUNT_AMOUNT))
+            }),
+            MultiCall({
+                target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT / 2)
                     )
@@ -66,7 +70,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
         // Existing address case
         vm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, USER, calls, 0);
+        address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
 
         assertEq(creditAccount, expectedCreditAccount, "Incorrecct credit account address");
 
@@ -94,9 +98,12 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
         vm.prank(FRIEND);
         creditFacade.openCreditAccount(
-            minDebt,
             FRIEND,
             MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (minDebt))
+                }),
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
@@ -170,13 +177,17 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (minDebt))
+            }),
+            MultiCall({
+                target: address(creditFacade),
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
             })
         );
 
         vm.expectRevert(BorrowedBlockLimitException.selector);
         vm.prank(USER);
-        creditFacade.openCreditAccount(minDebt, USER, calls, 0);
+        creditFacade.openCreditAccount(USER, calls, 0);
     }
 
     /// @dev I:[OCA-6]: openCreditAccount runs operations in correct order
@@ -193,6 +204,10 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_ACCOUNT_AMOUNT))
+            }),
+            MultiCall({
+                target: address(creditFacade),
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT))
             }),
             MultiCall({
@@ -203,12 +218,10 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
         // EXPECTED STACK TRACE & EVENTS
 
-        vm.expectCall(
-            address(creditManager), abi.encodeCall(ICreditManagerV3.openCreditAccount, (DAI_ACCOUNT_AMOUNT, FRIEND))
-        );
+        vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.openCreditAccount, (FRIEND)));
 
         vm.expectEmit(true, true, false, true);
-        emit OpenCreditAccount(expectedCreditAccountAddress, FRIEND, USER, DAI_ACCOUNT_AMOUNT, REFERRAL_CODE);
+        emit OpenCreditAccount(expectedCreditAccountAddress, FRIEND, USER, REFERRAL_CODE);
 
         vm.expectEmit(true, false, false, false);
         emit StartMultiCall({creditAccount: expectedCreditAccountAddress, caller: USER});
@@ -240,7 +253,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         );
 
         vm.prank(USER);
-        creditFacade.openCreditAccount(DAI_ACCOUNT_AMOUNT, FRIEND, calls, REFERRAL_CODE);
+        creditFacade.openCreditAccount(FRIEND, calls, REFERRAL_CODE);
     }
 
     /// @dev I:[OCA-7]: openCreditAccount cant open credit account with hf <1;
@@ -283,9 +296,12 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
         vm.prank(USER);
         creditFacade.openCreditAccount(
-            DAI_ACCOUNT_AMOUNT,
             USER,
             MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_ACCOUNT_AMOUNT))
+                }),
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (collateral, amount))
@@ -295,82 +311,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         );
     }
 
-    /// @dev I:[OCA-8]: decrease debt during openCreditAccount
-    function test_I_OCA_08_decrease_debt_forbidden_during_openCreditAccount() public creditTest {
-        vm.expectRevert(DebtUpdatedTwiceInOneBlockException.selector);
-
-        vm.prank(USER);
-
-        creditFacade.openCreditAccount(
-            DAI_ACCOUNT_AMOUNT,
-            USER,
-            MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, 812)
-                })
-            ),
-            REFERRAL_CODE
-        );
-    }
-
-    /// @dev I:[OCA-9]: openCreditAccount reverts if met borrowed limit per block
-    function test_I_OCA_09_openCreditAccount_reverts_if_met_borrowed_limit_per_block() public creditTest {
-        (uint128 _minDebt, uint128 _maxDebt) = creditFacade.debtLimits();
-
-        tokenTestSuite.mint(Tokens.DAI, address(pool), _maxDebt * 2);
-
-        tokenTestSuite.mint(Tokens.DAI, USER, DAI_ACCOUNT_AMOUNT);
-        tokenTestSuite.mint(Tokens.DAI, FRIEND, DAI_ACCOUNT_AMOUNT);
-
-        tokenTestSuite.approve(Tokens.DAI, USER, address(creditManager));
-        tokenTestSuite.approve(Tokens.DAI, FRIEND, address(creditManager));
-
-        vm.roll(2);
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setMaxDebtPerBlockMultiplier(1);
-
-        MultiCall[] memory calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT))
-            })
-        );
-
-        vm.prank(FRIEND);
-        creditFacade.openCreditAccount(_maxDebt - _minDebt, FRIEND, calls, 0);
-
-        vm.expectRevert(BorrowedBlockLimitException.selector);
-
-        vm.prank(USER);
-        creditFacade.openCreditAccount(_minDebt + 1, USER, calls, 0);
-    }
-
-    /// @dev I:[OCA-10]: openCreditAccount reverts if amount < minAmount or amount > maxAmount
-    function test_I_OCA_10_openCreditAccount_reverts_if_amount_less_minDebt_or_bigger_than_maxDebt()
-        public
-        creditTest
-    {
-        (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
-
-        MultiCall[] memory calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
-            })
-        );
-
-        vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
-        vm.prank(USER);
-        creditFacade.openCreditAccount(minDebt - 1, USER, calls, 0);
-
-        vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
-        vm.prank(USER);
-        creditFacade.openCreditAccount(maxDebt + 1, USER, calls, 0);
-    }
-
-    /// @dev I:[OCA-11]: openCreditAccount and openCreditAccount no longer work if the CreditFacadeV3 is expired
+    /// @dev I:[OCA-11]: openCreditAccount no longer works if the CreditFacadeV3 is expired
     function test_I_OCA_11_openCreditAccount_reverts_on_expired_CreditFacade() public expirableCase creditTest {
         vm.warp(block.timestamp + 1);
 
@@ -378,9 +319,12 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
         vm.prank(USER);
         creditFacade.openCreditAccount(
-            DAI_ACCOUNT_AMOUNT,
             USER,
             MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_ACCOUNT_AMOUNT))
+                }),
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
@@ -398,9 +342,12 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
         vm.prank(USER);
         creditFacade.openCreditAccount{value: WETH_TEST_AMOUNT}(
-            DAI_ACCOUNT_AMOUNT,
             USER,
             MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_ACCOUNT_AMOUNT))
+                }),
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT / 4))
@@ -424,7 +371,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
         // Existing address case
         vm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(0, USER, calls, 0);
+        address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
 
         assertEq(creditAccount, expectedCreditAccount, "Incorrecct credit account address");
 

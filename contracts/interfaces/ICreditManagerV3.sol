@@ -129,7 +129,7 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
     // ACCOUNT MANAGEMENT //
     // ------------------ //
 
-    function openCreditAccount(uint256 debt, address onBehalfOf) external returns (address);
+    function openCreditAccount(address onBehalfOf) external returns (address);
 
     function closeCreditAccount(
         address creditAccount,
