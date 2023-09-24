@@ -202,7 +202,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.pause();
 
         vm.expectRevert("Pausable: paused");
-        creditFacade.openCreditAccount({debt: 0, onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
+        creditFacade.openCreditAccount({onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
 
         vm.expectRevert("Pausable: paused");
         creditFacade.closeCreditAccount({
@@ -242,7 +242,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.warp(block.timestamp + 1);
 
         vm.expectRevert(NotAllowedAfterExpirationException.selector);
-        creditFacade.openCreditAccount({debt: 0, onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
+        creditFacade.openCreditAccount({onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
 
         vm.expectRevert(NotAllowedAfterExpirationException.selector);
         creditFacade.multicall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
@@ -257,7 +257,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditManagerMock.setBorrower(address(this));
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditFacade.openCreditAccount({debt: 0, onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
+        creditFacade.openCreditAccount({onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditFacade.closeCreditAccount({
@@ -360,11 +360,21 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(1 ether, 9 ether, 9);
 
+        address weth = tokenTestSuite.addressOf(Tokens.WETH);
+
         vm.prank(USER);
         creditFacade.openCreditAccount{value: 1 ether}({
-            debt: 1 ether,
             onBehalfOf: USER,
-            calls: new MultiCall[](0),
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (1 ether))
+                }),
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (weth, 1 ether))
+                })
+                ),
             referralCode: 0
         });
 
@@ -392,46 +402,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     // OPEN CREDIT ACCOUNT
     //
 
-    /// @dev U:[FA-8]: openCreditAccount reverts if out of limits
-    function test_U_FA_08_openCreditAccount_reverts_if_out_of_limits(uint128 a, uint128 b) public notExpirableCase {
-        vm.assume(a > 1 && b > 1);
-
-        uint128 minDebt = uint128(Math.min(a, b));
-        uint128 maxDebt = uint128(Math.max(a, b));
-        uint8 multiplier = uint8((maxDebt % 255) + 1);
-
-        vm.assume(maxDebt < type(uint128).max / 256);
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setDebtLimits(minDebt, maxDebt, 0);
-
-        if (minDebt != 1) {
-            vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
-            creditFacade.openCreditAccount({
-                debt: minDebt - 1,
-                onBehalfOf: USER,
-                calls: new MultiCall[](0),
-                referralCode: 0
-            });
-        }
-
-        vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
-        creditFacade.openCreditAccount({debt: maxDebt + 1, onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
-
-        creditFacade.setTotalBorrowedInBlock(maxDebt * multiplier - minDebt + 1);
-
-        vm.expectRevert(BorrowedBlockLimitException.selector);
-        creditFacade.openCreditAccount({debt: minDebt, onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
-    }
-
-    /// @dev U:[FA-8A]: openCreditAccount suceeds for 0 debt
-    function test_U_FA_08A_openCreditAccount_does_not_revert_for_0_debt() public notExpirableCase {
-        vm.prank(CONFIGURATOR);
-        creditFacade.setDebtLimits(200, 400, 0);
-
-        creditFacade.openCreditAccount({debt: 0, onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
-    }
-
     /// @dev U:[FA-9]: openCreditAccount reverts in whitelisted if user has no rights
     function test_U_FA_09_openCreditAccount_reverts_in_whitelisted_if_user_has_no_rights()
         public
@@ -444,13 +414,13 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.prank(USER);
 
         vm.expectRevert(ForbiddenInWhitelistedModeException.selector);
-        creditFacade.openCreditAccount({debt: 1, onBehalfOf: FRIEND, calls: new MultiCall[](0), referralCode: 0});
+        creditFacade.openCreditAccount({onBehalfOf: FRIEND, calls: new MultiCall[](0), referralCode: 0});
 
         degenNFTMock.setRevertOnBurn(true);
 
         vm.prank(USER);
         vm.expectRevert(InsufficientBalanceException.selector);
-        creditFacade.openCreditAccount({debt: 1, onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
+        creditFacade.openCreditAccount({onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
     }
 
     /// @dev U:[FA-10]: openCreditAccount wokrs as expected
@@ -472,13 +442,23 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         address expectedCreditAccount = DUMB_ADDRESS;
         creditManagerMock.setReturnOpenCreditAccount(expectedCreditAccount);
 
-        vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.openCreditAccount, (debt, FRIEND)));
+        vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.openCreditAccount, (FRIEND)));
 
         vm.expectEmit(true, true, true, true);
-        emit OpenCreditAccount(expectedCreditAccount, FRIEND, USER, debt, REFERRAL_CODE);
+        emit OpenCreditAccount(expectedCreditAccount, FRIEND, USER, REFERRAL_CODE);
 
         vm.expectEmit(true, true, false, false);
         emit StartMultiCall({creditAccount: expectedCreditAccount, caller: USER});
+
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(
+                ICreditManagerV3.manageDebt, (expectedCreditAccount, debt, 0, ManageDebtAction.INCREASE_DEBT)
+            )
+        );
+
+        vm.expectEmit(true, true, false, false);
+        emit IncreaseDebt({creditAccount: expectedCreditAccount, amount: debt});
 
         vm.expectEmit(true, false, false, false);
         emit FinishMultiCall();
@@ -486,16 +466,19 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.expectCall(
             address(creditManagerMock),
             abi.encodeCall(
-                ICreditManagerV3.fullCollateralCheck,
-                (expectedCreditAccount, UNDERLYING_TOKEN_MASK, new uint256[](0), PERCENTAGE_FACTOR)
+                ICreditManagerV3.fullCollateralCheck, (expectedCreditAccount, 0, new uint256[](0), PERCENTAGE_FACTOR)
             )
         );
 
         vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount({
-            debt: debt,
             onBehalfOf: FRIEND,
-            calls: new MultiCall[](0),
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (debt))
+                })
+                ),
             referralCode: REFERRAL_CODE
         });
 
@@ -1117,7 +1100,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         );
 
         vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, PAY_BOT_CAN_BE_CALLED));
-        creditFacade.openCreditAccount({debt: 1, onBehalfOf: USER, calls: calls, referralCode: 0});
+        creditFacade.openCreditAccount({onBehalfOf: USER, calls: calls, referralCode: 0});
 
         vm.prank(USER);
         vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, PAY_BOT_CAN_BE_CALLED));

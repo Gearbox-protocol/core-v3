@@ -47,9 +47,12 @@ contract Handler {
             gi.tokenTestSuite().approve(gi.underlyingT(), address(this), address(gi.creditManager()));
 
             gi.creditFacade().openCreditAccount(
-                debt,
                 address(this),
                 MultiCallBuilder.build(
+                    MultiCall({
+                        target: address(gi.creditFacade()),
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (debt))
+                    }),
                     MultiCall({
                         target: address(gi.creditFacade()),
                         callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (gi.underlying(), debt))

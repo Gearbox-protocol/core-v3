@@ -175,19 +175,16 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @notice Opens a new credit account
     ///         - Wraps any ETH sent in the function call and sends it back to the caller
     ///         - If Degen NFT is enabled, burns one from the caller
-    ///         - Opens an account in the credit manager and optionally borrows funds from the pool
-    ///         - Performs a multicall (all calls allowed except debt size manipulation and withdrawals)
+    ///         - Opens an account in the credit manager
+    ///         - Performs a multicall (all calls allowed except withdrawals)
     ///         - Runs the collateral check
-    /// @param debt Initial amount of underlying to borrow, can be 0
     /// @param onBehalfOf Address on whose behalf to open the account
     /// @param calls List of calls to perform after opening the account
     /// @param referralCode Referral code to use for potential rewards, 0 if no referral code is provided
     /// @return creditAccount Address of the newly opened account
     /// @dev Reverts if credit facade is paused or expired
-    /// @dev If `debt` is non-zero, reverts if it is not within allowed range
-    /// @dev Reverts if the total amount borrowed by the credit manager exceeds the limit
     /// @dev Reverts if `onBehalfOf` is not caller while Degen NFT is enabled
-    function openCreditAccount(uint256 debt, address onBehalfOf, MultiCall[] calldata calls, uint16 referralCode)
+    function openCreditAccount(address onBehalfOf, MultiCall[] calldata calls, uint16 referralCode)
         external
         payable
         override
@@ -197,8 +194,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         wrapETH // U:[FA-7]
         returns (address creditAccount)
     {
-        _revertIfOutOfDebtLimits(debt); // U:[FA-8]
-        _revertIfOutOfBorrowingLimit(debt); // U:[FA-11]
         if (degenNFT != address(0)) {
             if (msg.sender != onBehalfOf) {
                 revert ForbiddenInWhitelistedModeException(); // U:[FA-9]
@@ -206,9 +201,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             IDegenNFTV2(degenNFT).burn(onBehalfOf, 1); // U:[FA-9]
         }
 
-        creditAccount = ICreditManagerV3(creditManager).openCreditAccount({debt: debt, onBehalfOf: onBehalfOf}); // U:[FA-10]
+        creditAccount = ICreditManagerV3(creditManager).openCreditAccount({onBehalfOf: onBehalfOf}); // U:[FA-10]
 
-        emit OpenCreditAccount(creditAccount, onBehalfOf, msg.sender, debt, referralCode); // U:[FA-10]
+        emit OpenCreditAccount(creditAccount, onBehalfOf, msg.sender, referralCode); // U:[FA-10]
 
         // same as `_multicallFullCollateralCheck` but leverages the fact that account is freshly opened to save gas
         BalanceWithMask[] memory forbiddenBalances;
@@ -217,14 +212,14 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         FullCheckParams memory fullCheckParams = _multicall({
             creditAccount: creditAccount,
             calls: calls,
-            enabledTokensMask: debt == 0 ? 0 : UNDERLYING_TOKEN_MASK,
+            enabledTokensMask: 0,
             flags: OPEN_CREDIT_ACCOUNT_FLAGS,
             skip: skipCalls
         }); // U:[FA-10]
 
         _fullCollateralCheck({
             creditAccount: creditAccount,
-            enabledTokensMaskBefore: UNDERLYING_TOKEN_MASK,
+            enabledTokensMaskBefore: 0,
             fullCheckParams: fullCheckParams,
             forbiddenBalances: forbiddenBalances,
             _forbiddenTokenMask: forbiddenTokenMask
