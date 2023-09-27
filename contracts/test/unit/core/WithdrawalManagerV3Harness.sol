@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 import {ClaimAction, ScheduledWithdrawal} from "../../../interfaces/IWithdrawalManagerV3.sol";
 import {WithdrawalManagerV3} from "../../../core/WithdrawalManagerV3.sol";
 
-contract WithdrawalManagerHarness is WithdrawalManagerV3 {
+contract WithdrawalManagerV3Harness is WithdrawalManagerV3 {
     constructor(address _addressProvider, uint40 _delay) WithdrawalManagerV3(_addressProvider, _delay) {}
 
     function setWithdrawalSlot(address creditAccount, uint8 slot, ScheduledWithdrawal memory w) external {

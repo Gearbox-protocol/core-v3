@@ -28,7 +28,7 @@ import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
 import {ERC20BlacklistableMock} from "../../mocks/token/ERC20Blacklistable.sol";
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 
-import {WithdrawalManagerHarness} from "./WithdrawalManagerHarness.sol";
+import {WithdrawalManagerV3Harness} from "./WithdrawalManagerV3Harness.sol";
 
 enum ScheduleTask {
     IMMATURE,
@@ -36,10 +36,10 @@ enum ScheduleTask {
     NON_SCHEDULED
 }
 
-/// @title Withdrawal manager unit test
+/// @title Withdrawal manager V3 unit test
 /// @notice U:[WM]: Unit tests for withdrawal manager
-contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerV3Events {
-    WithdrawalManagerHarness manager;
+contract WithdrawalManagerV3UnitTest is TestHelper, IWithdrawalManagerV3Events {
+    WithdrawalManagerV3Harness manager;
     AddressProviderV3ACLMock acl;
     TokensTestSuite ts;
     ERC20BlacklistableMock token0;
@@ -70,7 +70,7 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerV3Events {
         acl = new AddressProviderV3ACLMock();
         acl.setAddress(AP_WETH_TOKEN, address(token1), false);
         acl.addCreditManager(creditManager);
-        manager = new WithdrawalManagerHarness(address(acl), DELAY);
+        manager = new WithdrawalManagerV3Harness(address(acl), DELAY);
         manager.addCreditManager(creditManager);
         vm.stopPrank();
     }
@@ -154,13 +154,6 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerV3Events {
         vm.expectRevert(ZeroAddressException.selector);
         vm.prank(USER);
         manager.claimImmediateWithdrawal(address(token0), address(0));
-    }
-
-    /// @notice U:[WM-4B]: `claimImmediateWithdrawal` reverts on nothing to claim
-    function test_U_WM_04B_claimImmediateWithdrawal_reverts_on_nothing_to_claim() public {
-        vm.expectRevert(NothingToClaimException.selector);
-        vm.prank(USER);
-        manager.claimImmediateWithdrawal(address(token0), address(USER));
     }
 
     /// @notice U:[WM-4C]: `claimImmediateWithdrawal` works correctly
@@ -727,7 +720,7 @@ contract WithdrawalManagerUnitTest is TestHelper, IWithdrawalManagerV3Events {
 
     /// @notice U:[WM-12B]: `addCreditManager` works correctly
     function test_U_WM_12B_addCreditManager_works_correctly() public {
-        manager = new WithdrawalManagerHarness(address(acl), DELAY);
+        manager = new WithdrawalManagerV3Harness(address(acl), DELAY);
 
         vm.expectEmit(true, false, false, false);
         emit AddCreditManager(creditManager);

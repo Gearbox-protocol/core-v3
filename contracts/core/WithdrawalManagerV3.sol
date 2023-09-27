@@ -127,7 +127,7 @@ contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegiste
     /// @dev Sends all `account`'s immediately withdrawable balance of `token` to `to`
     function _claimImmediateWithdrawal(address account, address token, address to, bool unwrapWETH) internal {
         uint256 amount = immediateWithdrawals[account][token];
-        if (amount <= 1) revert NothingToClaimException(); // U:[WM-4B]
+        if (amount <= 1) return;
         unchecked {
             --amount; // U:[WM-4C,4D]
         }
