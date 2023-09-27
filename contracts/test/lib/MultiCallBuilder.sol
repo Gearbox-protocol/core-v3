@@ -54,6 +54,6 @@ library MultiCallBuilder {
         calls[1] = call2;
         calls[2] = call3;
         calls[3] = call4;
-        calls[4] = call4;
+        calls[4] = call5;
     }
 }
