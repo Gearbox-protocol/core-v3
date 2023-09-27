@@ -624,9 +624,9 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             (, uint128 maxCumulativeLoss) = prevCreditFacade.lossParams();
             _setMaxCumulativeLoss(newCreditFacade, maxCumulativeLoss); // [CC-22]
 
-            _migrateEmergencyLiquidators(newCreditFacade); // I:[CC-22С]
+            _migrateEmergencyLiquidators(newCreditFacade); // I:[CC-22C]
 
-            _migrateForbiddenTokens(newCreditFacade, prevCreditFacade.forbiddenTokenMask()); // I:[CC-22С]
+            _migrateForbiddenTokens(newCreditFacade, prevCreditFacade.forbiddenTokenMask()); // I:[CC-22C]
 
             if (prevCreditFacade.expirable() && CreditFacadeV3(newCreditFacade).expirable()) {
                 _setExpirationDate(newCreditFacade, prevCreditFacade.expirationDate()); // I:[CC-22]
@@ -636,7 +636,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             if (botList != address(0)) _setBotList(newCreditFacade, botList); // I:[CC-22A]
         } else {
             // emergency liquidators set must be cleared to keep it consistent between facade and configurator
-            _clearEmergencyLiquidatorsSet(); // I:[CC-22С]
+            _clearEmergencyLiquidatorsSet(); // I:[CC-22C]
         }
 
         emit SetCreditFacade(newCreditFacade); // I:[CC-22]
