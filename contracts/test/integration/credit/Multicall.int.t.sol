@@ -362,10 +362,10 @@ contract MultiCallIntegrationTest is
 
         address tokenLINK = tokenTestSuite.addressOf(Tokens.LINK);
 
-        Balance[] memory expectedBalances = new Balance[](2);
-        expectedBalances[0] = Balance({token: underlying, balance: expectedDAI});
+        BalanceDelta[] memory expectedBalances = new BalanceDelta[](2);
+        expectedBalances[0] = BalanceDelta({token: underlying, amount: int256(expectedDAI)});
 
-        expectedBalances[1] = Balance({token: tokenLINK, balance: expectedLINK});
+        expectedBalances[1] = BalanceDelta({token: tokenLINK, amount: int256(expectedLINK)});
 
         // TOKEN PREPARATION
         tokenTestSuite.mint(Tokens.DAI, USER, expectedDAI * 3);
@@ -425,8 +425,8 @@ contract MultiCallIntegrationTest is
     function test_I_MC_12_revertIfGetLessThan_reverts_if_called_twice() public creditTest {
         uint256 expectedDAI = 1000;
 
-        Balance[] memory expectedBalances = new Balance[](1);
-        expectedBalances[0] = Balance({token: underlying, balance: expectedDAI});
+        BalanceDelta[] memory expectedBalances = new BalanceDelta[](1);
+        expectedBalances[0] = BalanceDelta({token: underlying, amount: int256(expectedDAI)});
 
         (address creditAccount,) = _openTestCreditAccount();
         vm.prank(USER);

@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
+import {BalanceDelta} from "../libraries/BalancesLogic.sol";
 import {RevocationPair} from "./ICreditManagerV3.sol";
 
 // ----------- //
@@ -58,10 +58,10 @@ interface ICreditFacadeV3Multicall {
     function onDemandPriceUpdate(address token, bytes calldata data) external;
 
     /// @notice Ensures that token balances increase at least by specified deltas after the following calls
-    /// @param balanceDeltas Array of (token, minBalanceDelta) pairs
+    /// @param balanceDeltas Array of (token, minBalanceDelta) pairs, deltas are allowed to be negative
     /// @dev The method can only be called once during the multicall, typically before all balance-changing calls
     /// @dev This method is available in all kinds of multicalls
-    function revertIfReceivedLessThan(Balance[] calldata balanceDeltas) external;
+    function revertIfReceivedLessThan(BalanceDelta[] calldata balanceDeltas) external;
 
     /// @notice Adds collateral to account
     /// @param token Token to add
