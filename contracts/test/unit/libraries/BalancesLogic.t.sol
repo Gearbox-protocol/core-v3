@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
-import {BalancesLogic, BalanceWithMask} from "../../../libraries/BalancesLogic.sol";
+import {BalancesLogic, BalanceDelta, BalanceWithMask} from "../../../libraries/BalancesLogic.sol";
 
 import {TestHelper} from "../../lib/helper.sol";
 
@@ -30,17 +30,20 @@ contract BalancesLogicTest is TestHelper {
     /// @notice U:[BLL-1]: storeBalances works correctly
     function test_BLL_01_storeBalances_works_correctly(
         uint128[16] calldata balances,
-        uint128[16] calldata deltas,
+        int128[16] calldata deltas,
         uint256 length
     ) public {
         vm.assume(length <= 16);
 
         _setupTokenBalances(balances, length);
 
-        Balance[] memory deltaArray = new Balance[](length);
+        BalanceDelta[] memory deltaArray = new BalanceDelta[](length);
 
         for (uint256 i = 0; i < length; ++i) {
-            deltaArray[i] = Balance({token: tokens[i], balance: deltas[i]});
+            deltaArray[i] = BalanceDelta({
+                token: tokens[i],
+                amount: deltas[i] < -int256(uint256(balances[i])) ? -int256(uint256(balances[i])) : deltas[i]
+            });
         }
 
         Balance[] memory expectedBalances = BalancesLogic.storeBalances(creditAccount, deltaArray);
@@ -51,7 +54,9 @@ contract BalancesLogicTest is TestHelper {
             assertEq(expectedBalances[i].token, tokens[i]);
 
             assertEq(
-                expectedBalances[i].balance, uint256(balances[i]) + uint256(deltas[i]), "Incorrect expected balance"
+                expectedBalances[i].balance,
+                uint256(int256(uint256(balances[i])) + deltaArray[i].amount),
+                "Incorrect expected balance"
             );
         }
     }

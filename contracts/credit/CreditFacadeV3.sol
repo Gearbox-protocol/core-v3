@@ -12,7 +12,7 @@ import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC2
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 
 // LIBS & TRAITS
-import {BalancesLogic, Balance, BalanceWithMask} from "../libraries/BalancesLogic.sol";
+import {BalancesLogic, Balance, BalanceDelta, BalanceWithMask} from "../libraries/BalancesLogic.sol";
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {BitMask, UNDERLYING_TOKEN_MASK} from "../libraries/BitMask.sol";
 
@@ -580,7 +580,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                             revert ExpectedBalancesAlreadySetException(); // U:[FA-23]
                         }
 
-                        Balance[] memory balanceDeltas = abi.decode(mcall.callData[4:], (Balance[])); // U:[FA-23]
+                        BalanceDelta[] memory balanceDeltas = abi.decode(mcall.callData[4:], (BalanceDelta[])); // U:[FA-23]
                         expectedBalances = BalancesLogic.storeBalances(creditAccount, balanceDeltas); // U:[FA-23]
                     }
                     // addCollateral
