@@ -184,7 +184,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @return creditAccount Address of the newly opened account
     /// @dev Reverts if credit facade is paused or expired
     /// @dev Reverts if `onBehalfOf` is not caller while Degen NFT is enabled
-    function openCreditAccount(address onBehalfOf, MultiCall[] calldata calls, uint16 referralCode)
+    function openCreditAccount(address onBehalfOf, MultiCall[] calldata calls, uint256 referralCode)
         external
         payable
         override

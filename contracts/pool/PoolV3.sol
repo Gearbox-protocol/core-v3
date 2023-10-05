@@ -202,7 +202,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     }
 
     /// @dev Same as `deposit`, but allows to specify the referral code
-    function depositWithReferral(uint256 assets, address receiver, uint16 referralCode)
+    function depositWithReferral(uint256 assets, address receiver, uint256 referralCode)
         external
         override
         returns (uint256 shares)
@@ -229,7 +229,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     }
 
     /// @dev Same as `mint`, but allows to specify the referral code
-    function mintWithReferral(uint256 shares, address receiver, uint16 referralCode)
+    function mintWithReferral(uint256 shares, address receiver, uint256 referralCode)
         external
         override
         returns (uint256 assets)
