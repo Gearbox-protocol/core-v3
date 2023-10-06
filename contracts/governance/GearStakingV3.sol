@@ -189,7 +189,6 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
             if (totalClaimable != 0) {
                 IERC20(gear).safeTransfer(to, totalClaimable);
 
-                // TODO: could we put into unchecked block?
                 voteLockData[user].totalStaked -= totalClaimable.toUint96();
 
                 emit ClaimGearWithdrawal(user, to, totalClaimable);
