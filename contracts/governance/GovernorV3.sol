@@ -137,7 +137,7 @@ contract GovernorV3 is IGovernorV3 {
         }
     }
 
-    function _batch(TimeLockTx[] calldata txs, TxAction action) internal override returns (uint240) {
+    function _batch(TimeLockTx[] calldata txs, TxAction action) internal returns (uint240) {
         uint256 len = txs.length;
         if (len == 0) revert IncorrectBatchLengthException();
 

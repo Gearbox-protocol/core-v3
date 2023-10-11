@@ -50,6 +50,9 @@ interface IGovernorV3 is IGovernorV3Events {
         payable
         returns (bytes memory);
 
+    function cancelTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta)
+        external;
+
     function sealBatch(TimeLockTx[] calldata txs) external;
 
     function executeBatch(TimeLockTx[] calldata txs) external payable;
