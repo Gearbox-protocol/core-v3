@@ -62,11 +62,11 @@ interface IPoolV3 is IVersion, IPoolV3Events, IERC4626, IERC20Permit {
     // ERC-4626 LENDING //
     // ---------------- //
 
-    function depositWithReferral(uint256 assets, address receiver, uint16 referralCode)
+    function depositWithReferral(uint256 assets, address receiver, uint256 referralCode)
         external
         returns (uint256 shares);
 
-    function mintWithReferral(uint256 shares, address receiver, uint16 referralCode)
+    function mintWithReferral(uint256 shares, address receiver, uint256 referralCode)
         external
         returns (uint256 assets);
 
