@@ -14,4 +14,6 @@ interface ITimeLock {
         external;
 
     function acceptAdmin() external;
+
+    function queuedTransactions(bytes32 txHash) external view returns (bool);
 }

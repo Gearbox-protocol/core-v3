@@ -47,6 +47,7 @@ contract GovernorV3 is IGovernorV3 {
         timeLock = _timeLock;
         _addQueueAdmin(_queueAdmin);
         _updateVetoAdmin(_vetoAdmin);
+        batchNum = 1;
     }
 
     // QUEUE
@@ -64,7 +65,6 @@ contract GovernorV3 is IGovernorV3 {
         uint256 len = txs.length;
         if (len >= 2 ** BATCH_SIZE_BITS) revert IncorrectBatchLengthException();
 
-        ++batchNum;
         uint240 _batchNum = batchNum;
 
         uint256 batchShifted = uint256(_batchNum) << BATCH_SIZE_BITS;
@@ -78,13 +78,19 @@ contract GovernorV3 is IGovernorV3 {
                     revert TxHashCollisionException(ttx.target, ttx.value, ttx.signature, ttx.data, ttx.eta);
                 }
 
-                batchedTransactions[txHash] = batchShifted + i;
+                if (!ITimeLock(timeLock).queuedTransactions(txHash)) {
+                    revert TxNotQueuedException();
+                }
+
+                batchedTransactions[txHash] = batchShifted | i;
             }
         }
 
         batchedTransactionsCount[_batchNum] = len;
 
         emit SealBatch(batchNum, len);
+
+        batchNum = _batchNum + 1;
     }
 
     // EXECUTE
@@ -152,7 +158,7 @@ contract GovernorV3 is IGovernorV3 {
                 TimeLockTx calldata ttx = txs[i];
                 bytes32 txHash = getTxHash(ttx);
 
-                if (batchedTransactions[txHash] != batchShifted + i) {
+                if (batchedTransactions[txHash] != batchShifted | i) {
                     revert TxIncorrectOrder(ttx.target, ttx.value, ttx.signature, ttx.data, ttx.eta);
                 }
 
@@ -173,10 +179,14 @@ contract GovernorV3 is IGovernorV3 {
         return _batchNum;
     }
 
-    // GETTER
+    // GETTERS
 
     function getTxHash(TimeLockTx calldata ttx) public pure returns (bytes32) {
         return keccak256(abi.encode(ttx.target, ttx.value, ttx.signature, ttx.data, ttx.eta));
+    }
+
+    function getQueueAdmins() external view override returns (address[] memory) {
+        return queueAdmins.values();
     }
 
     /// Setting admins

@@ -41,6 +41,8 @@ interface IGovernorV3 is IGovernorV3Events {
 
     error BatchNotFoundException();
 
+    error TxNotQueuedException();
+
     function queueTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta)
         external
         returns (bytes32);
@@ -64,6 +66,8 @@ interface IGovernorV3 is IGovernorV3Events {
     function getTxHash(TimeLockTx calldata ttx) external pure returns (bytes32);
 
     function timeLock() external view returns (address);
+
+    function getQueueAdmins() external view returns (address[] memory);
 
     function vetoAdmin() external view returns (address);
 
