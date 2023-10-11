@@ -22,6 +22,8 @@ contract GovernorV3 is IGovernorV3 {
 
     /// Batches
     uint240 public override batchNum;
+    uint16 index;
+    bool _batchMode;
 
     mapping(bytes32 => uint256) public override batchedTransactions;
     mapping(uint240 => uint256) public override batchedTransactionsCount;
@@ -58,39 +60,45 @@ contract GovernorV3 is IGovernorV3 {
         queueAdminOnly
         returns (bytes32)
     {
+        if (_batchMode) {
+            if (batchNum == block.number) {
+                bytes32 txHash = keccak256(abi.encode(target, value, signature, data, eta));
+                if (batchedTransactions[txHash] != 0) {
+                    revert TxHashCollisionException(target, value, signature, data, eta);
+                }
+
+                uint16 indexCached = index;
+
+                batchedTransactions[txHash] = uint256(batchNum) << BATCH_SIZE_BITS | indexCached;
+                ++indexCached;
+
+                index = indexCached;
+                batchedTransactionsCount[batchNum] = indexCached;
+            } else {
+                _batchMode = false;
+                index = 0;
+            }
+        }
         return ITimeLock(timeLock).queueTransaction(target, value, signature, data, eta);
     }
 
-    function sealBatch(TimeLockTx[] calldata txs) external override queueAdminOnly {
-        uint256 len = txs.length;
-        if (len >= 2 ** BATCH_SIZE_BITS) revert IncorrectBatchLengthException();
-
-        uint240 _batchNum = batchNum;
-
-        uint256 batchShifted = uint256(_batchNum) << BATCH_SIZE_BITS;
-
-        unchecked {
-            for (uint256 i = 0; i < len; ++i) {
-                TimeLockTx calldata ttx = txs[i];
-                bytes32 txHash = getTxHash(ttx);
-
-                if (batchedTransactions[txHash] != 0) {
-                    revert TxHashCollisionException(ttx.target, ttx.value, ttx.signature, ttx.data, ttx.eta);
-                }
-
-                if (!ITimeLock(timeLock).queuedTransactions(txHash)) {
-                    revert TxNotQueuedException();
-                }
-
-                batchedTransactions[txHash] = batchShifted | i;
-            }
+    function startBatch() external override queueAdminOnly {
+        if (batchNum == block.number) {
+            revert CantStartTwoBatchesInOneBlockException();
         }
 
-        batchedTransactionsCount[_batchNum] = len;
+        index = 0;
+        batchNum = uint240(block.number);
+        _batchMode = true;
 
-        emit SealBatch(batchNum, len);
+        emit StartBatch();
+    }
 
-        batchNum = _batchNum + 1;
+    function finishBatch() external override queueAdminOnly {
+        if (batchNum == block.number) {
+            _batchMode = false;
+            emit FinishBatch();
+        }
     }
 
     // EXECUTE
