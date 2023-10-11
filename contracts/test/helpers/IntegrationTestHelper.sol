@@ -232,18 +232,20 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         address creditManagerAddr;
         bool skipTest = false;
 
-        address[] memory cms = cr.getCreditManagers();
-        uint256 len = cms.length;
-        unchecked {
-            for (uint256 i = 0; i < len; i++) {
-                address poolAddr = cr.poolByIndex(i);
-                if (!_attachPool(poolAddr)) {
-                    console.log("Skipped");
-                    skipTest = true;
-                    break;
-                } else {}
-            }
-        }
+        // address[] memory cms = cr.getCreditManagers();
+        // uint256 len = cms.length;
+        // unchecked {
+        //     for (uint256 i = 0; i < len; i++) {
+        //         address poolAddr = cr.poolByIndex(i);
+        //         if (!_attachPool(poolAddr)) {
+        //             console.log("Skipped");
+        //             skipTest = true;
+        //             break;
+        //         } else {}
+        //     }
+        // }
+
+        _;
     }
 
     function _setupCore() internal {
