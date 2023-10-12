@@ -11,8 +11,6 @@ struct TimeLockTx {
 interface IGovernorV3Events {
     event StartBatch();
 
-    event FinishBatch();
-
     event ExecuteBatch(uint256 indexed batchNum);
 
     event CancelBatch(uint256 indexed batchNum);
@@ -59,8 +57,6 @@ interface IGovernorV3 is IGovernorV3Events {
 
     function startBatch() external;
 
-    function finishBatch() external;
-
     function executeBatch(TimeLockTx[] calldata txs) external payable;
 
     function cancelBatch(TimeLockTx[] calldata txs) external;
@@ -75,11 +71,11 @@ interface IGovernorV3 is IGovernorV3Events {
 
     function vetoAdmin() external view returns (address);
 
-    function batchNum() external view returns (uint240);
+    function batchNum() external view returns (uint64);
 
     function batchedTransactions(bytes32) external view returns (uint256);
 
-    function batchedTransactionsCount(uint240) external view returns (uint256);
+    function batchedTransactionsCount(uint64) external view returns (uint256);
 
     // CONFIGURE
 
