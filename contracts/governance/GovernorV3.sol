@@ -20,11 +20,11 @@ contract GovernorV3 is IGovernorV3 {
 
     address public override vetoAdmin;
 
-    /// Batches
-    uint240 public override batchNum;
+    uint64 public override batchNum;
+    uint16 index;
 
     mapping(bytes32 => uint256) public override batchedTransactions;
-    mapping(uint240 => uint256) public override batchedTransactionsCount;
+    mapping(uint64 => uint256) public override batchedTransactionsCount;
 
     modifier queueAdminOnly() {
         if (!queueAdmins.contains(msg.sender)) revert CallerNotQueueAdminException();
@@ -47,7 +47,6 @@ contract GovernorV3 is IGovernorV3 {
         timeLock = _timeLock;
         _addQueueAdmin(_queueAdmin);
         _updateVetoAdmin(_vetoAdmin);
-        batchNum = 1;
     }
 
     // QUEUE
@@ -58,39 +57,37 @@ contract GovernorV3 is IGovernorV3 {
         queueAdminOnly
         returns (bytes32)
     {
+        if (isBatchStarted()) {
+            bytes32 txHash = keccak256(abi.encode(target, value, signature, data, eta));
+            if (batchedTransactions[txHash] != 0) {
+                revert TxHashCollisionException(target, value, signature, data, eta);
+            }
+
+            uint16 indexCached = index;
+
+            batchedTransactions[txHash] = uint256(batchNum) << BATCH_SIZE_BITS | indexCached;
+            ++indexCached;
+
+            index = indexCached;
+            batchedTransactionsCount[batchNum] = indexCached;
+        }
+
         return ITimeLock(timeLock).queueTransaction(target, value, signature, data, eta);
     }
 
-    function sealBatch(TimeLockTx[] calldata txs) external override queueAdminOnly {
-        uint256 len = txs.length;
-        if (len >= 2 ** BATCH_SIZE_BITS) revert IncorrectBatchLengthException();
-
-        uint240 _batchNum = batchNum;
-
-        uint256 batchShifted = uint256(_batchNum) << BATCH_SIZE_BITS;
-
-        unchecked {
-            for (uint256 i = 0; i < len; ++i) {
-                TimeLockTx calldata ttx = txs[i];
-                bytes32 txHash = getTxHash(ttx);
-
-                if (batchedTransactions[txHash] != 0) {
-                    revert TxHashCollisionException(ttx.target, ttx.value, ttx.signature, ttx.data, ttx.eta);
-                }
-
-                if (!ITimeLock(timeLock).queuedTransactions(txHash)) {
-                    revert TxNotQueuedException();
-                }
-
-                batchedTransactions[txHash] = batchShifted | i;
-            }
+    function startBatch() external override queueAdminOnly {
+        if (batchNum == block.number) {
+            revert CantStartTwoBatchesInOneBlockException();
         }
 
-        batchedTransactionsCount[_batchNum] = len;
+        index = 0;
+        batchNum = uint64(block.number);
 
-        emit SealBatch(batchNum, len);
+        emit StartBatch();
+    }
 
-        batchNum = _batchNum + 1;
+    function isBatchStarted() internal view returns (bool) {
+        return batchNum == uint64(block.number);
     }
 
     // EXECUTE
@@ -147,8 +144,10 @@ contract GovernorV3 is IGovernorV3 {
         uint256 len = txs.length;
         if (len == 0) revert IncorrectBatchLengthException();
 
+        /// @notice It has 0 in all BATCH_SIZE_BITS bits because it's the first tx in the batch
         uint256 batchShifted = batchedTransactions[getTxHash(txs[0])];
-        uint240 _batchNum = uint240(batchShifted >> BATCH_SIZE_BITS);
+
+        uint64 _batchNum = uint64(batchShifted >> BATCH_SIZE_BITS);
         if (_batchNum == 0) revert BatchNotFoundException();
 
         if (batchedTransactionsCount[_batchNum] != len) revert IncorrectBatchLengthException();

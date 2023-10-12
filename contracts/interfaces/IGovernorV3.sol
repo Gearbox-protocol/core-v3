@@ -9,7 +9,7 @@ struct TimeLockTx {
 }
 
 interface IGovernorV3Events {
-    event SealBatch(uint256 indexed batchNum, uint256 length);
+    event StartBatch();
 
     event ExecuteBatch(uint256 indexed batchNum);
 
@@ -41,7 +41,7 @@ interface IGovernorV3 is IGovernorV3Events {
 
     error BatchNotFoundException();
 
-    error TxNotQueuedException();
+    error CantStartTwoBatchesInOneBlockException();
 
     function queueTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta)
         external
@@ -55,7 +55,7 @@ interface IGovernorV3 is IGovernorV3Events {
     function cancelTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta)
         external;
 
-    function sealBatch(TimeLockTx[] calldata txs) external;
+    function startBatch() external;
 
     function executeBatch(TimeLockTx[] calldata txs) external payable;
 
@@ -71,11 +71,11 @@ interface IGovernorV3 is IGovernorV3Events {
 
     function vetoAdmin() external view returns (address);
 
-    function batchNum() external view returns (uint240);
+    function batchNum() external view returns (uint64);
 
     function batchedTransactions(bytes32) external view returns (uint256);
 
-    function batchedTransactionsCount(uint240) external view returns (uint256);
+    function batchedTransactionsCount(uint64) external view returns (uint256);
 
     // CONFIGURE
 
