@@ -5,6 +5,7 @@ pragma solidity ^0.8.17;
 
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 import {AP_GEAR_TOKEN, IAddressProviderV3, NO_VERSION_CONTROL} from "../interfaces/IAddressProviderV3.sol";
@@ -68,8 +69,26 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     /// @notice Stakes given amount of GEAR, and, optionally, performs a sequence of votes
     /// @param amount Amount of GEAR to stake
     /// @param votes Sequence of votes to perform, see `MultiVote`
+    /// @dev Requires approval from `msg.sender` for GEAR to this contract
     function deposit(uint96 amount, MultiVote[] calldata votes) external override nonReentrant {
         _deposit(amount, msg.sender, votes); // U: [GS-02]
+    }
+
+    /// @notice Same as `deposit` but uses signed EIP-2612 permit message
+    /// @param amount Amount of GEAR to stake
+    /// @param votes Sequence of votes to perform, see `MultiVote`
+    /// @param deadline Permit deadline
+    /// @dev `v`, `r`, `s` must be a valid signature of the permit message from `msg.sender` for GEAR to this contract
+    function depositWithPermit(
+        uint96 amount,
+        MultiVote[] calldata votes,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external override nonReentrant {
+        try IERC20Permit(gear).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {} // U:[GS-02]
+        _deposit(amount, msg.sender, votes); // U:[GS-02]
     }
 
     /// @dev Implementation of `deposit`
