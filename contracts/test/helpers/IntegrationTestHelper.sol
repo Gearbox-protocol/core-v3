@@ -276,6 +276,11 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     }
 
     function _attachCore() internal {
+        new Roles();
+        NetworkDetector nd = new NetworkDetector();
+        chainId = nd.chainId();
+
+        tokenTestSuite = new TokensTestSuite();
         try vm.envAddress("ETH_FORK_ADDRESS_PROVIDER") returns (address val) {
             addressProvider = IAddressProviderV3(val);
         } catch {
@@ -312,6 +317,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     function _attachCreditManager(address _creditManager) internal returns (bool isCompartible) {
         creditManager = CreditManagerV3(_creditManager);
         creditFacade = CreditFacadeV3(creditManager.creditFacade());
+        creditConfigurator = CreditConfiguratorV3(creditManager.creditConfigurator());
 
         if (!_attachPool(creditManager.pool())) {
             return false;
@@ -326,6 +332,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         }
 
         (, creditAccountAmount) = creditFacade.debtLimits();
+
+        return true;
     }
 
     function _deployPool(IPoolV3DeployConfig config) internal {
