@@ -210,8 +210,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
         bool skipTest = false;
 
-        try vm.envAddress("ETH_FORK_CREDIT_MANAGER") returns (address) {
-            creditManagerAddr = vm.envAddress("ETH_FORK_CREDIT_MANAGER");
+        try vm.envAddress("ATTACH_CREDIT_MANAGER") returns (address) {
+            creditManagerAddr = vm.envAddress("ATTACH_CREDIT_MANAGER");
         } catch {
             revert("Credit manager address not set");
         }
@@ -281,10 +281,10 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         chainId = nd.chainId();
 
         tokenTestSuite = new TokensTestSuite();
-        try vm.envAddress("ETH_FORK_ADDRESS_PROVIDER") returns (address val) {
+        try vm.envAddress("ATTACH_ADDRESS_PROVIDER") returns (address val) {
             addressProvider = IAddressProviderV3(val);
         } catch {
-            revert("ETH_FORK_ADDRESS_PROVIDER is not provided");
+            revert("ATTACH_ADDRESS_PROVIDER is not provided");
         }
 
         console.log("Starting mainnet test with address provider: %s", address(addressProvider));

@@ -8,6 +8,7 @@ import {IGearStakingV3Events, MultiVote, VotingContractStatus} from "../../../in
 import {IVotingContractV3} from "../../../interfaces/IVotingContractV3.sol";
 
 import "../../../interfaces/IAddressProviderV3.sol";
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 
 // TEST
 import "../../lib/constants.sol";
@@ -79,17 +80,40 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         tokenTestSuite.mint(gearToken, USER, WAD);
         tokenTestSuite.approve(gearToken, USER, address(gearStaking));
 
-        vm.expectEmit(true, false, false, true);
-        emit DepositGear(USER, WAD);
+        uint256 snapshot = vm.snapshot();
+        for (uint256 i; i < 2; ++i) {
+            bool withPermit = i == 1;
 
-        vm.expectCall(address(votingContract), abi.encodeCall(IVotingContractV3.vote, (USER, uint96(WAD / 2), "")));
+            vm.expectEmit(true, false, false, true);
+            emit DepositGear(USER, WAD);
 
-        vm.prank(USER);
-        gearStaking.deposit(uint96(WAD), votes);
+            if (withPermit) {
+                vm.mockCall(
+                    gearToken,
+                    abi.encodeCall(IERC20Permit.permit, (USER, address(gearStaking), WAD, 0, 0, bytes32(0), bytes32(0))),
+                    bytes("")
+                );
+                vm.expectCall(
+                    gearToken,
+                    abi.encodeCall(IERC20Permit.permit, (USER, address(gearStaking), WAD, 0, 0, bytes32(0), bytes32(0)))
+                );
+            }
 
-        assertEq(gearStaking.balanceOf(USER), WAD);
+            vm.expectCall(address(votingContract), abi.encodeCall(IVotingContractV3.vote, (USER, uint96(WAD / 2), "")));
 
-        assertEq(gearStaking.availableBalance(USER), WAD / 2);
+            vm.prank(USER);
+            if (withPermit) {
+                gearStaking.depositWithPermit(uint96(WAD), votes, 0, 0, bytes32(0), bytes32(0));
+            } else {
+                gearStaking.deposit(uint96(WAD), votes);
+            }
+
+            assertEq(gearStaking.balanceOf(USER), WAD);
+
+            assertEq(gearStaking.availableBalance(USER), WAD / 2);
+
+            vm.revertTo(snapshot);
+        }
     }
 
     /// @dev U:[GS-03]: withdraw performs operations in order and emits events

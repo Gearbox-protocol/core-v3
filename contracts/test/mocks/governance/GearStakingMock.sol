@@ -20,6 +20,15 @@ contract GearStakingMock is IGearStakingV3 {
 
     function deposit(uint96 amount, MultiVote[] calldata votes) external {}
 
+    function depositWithPermit(
+        uint96 amount,
+        MultiVote[] calldata votes,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external {}
+
     function multivote(MultiVote[] calldata votes) external {}
 
     function withdraw(uint96 amount, address to, MultiVote[] calldata votes) external {}
