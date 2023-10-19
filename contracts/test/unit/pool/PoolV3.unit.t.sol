@@ -76,23 +76,10 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         treasury = addressProvider.getTreasuryContract();
         vm.stopPrank();
 
-        _setupPool({supportsQuotas: true});
+        _setupPool();
     }
 
-    modifier repeatWithoutQuotas() {
-        uint256 snapshot = vm.snapshot();
-        _;
-        vm.revertTo(snapshot);
-        _setupPool({supportsQuotas: false});
-        _;
-    }
-
-    modifier onlyWithoutQuotas() {
-        _setupPool({supportsQuotas: false});
-        _;
-    }
-
-    function _setupPool(bool supportsQuotas) internal {
+    function _setupPool() internal {
         pool = new PoolV3Harness({
             underlyingToken_: address(underlying),
             addressProvider_: address(addressProvider),
@@ -111,7 +98,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         // connect contracts
         vm.startPrank(configurator);
         pool.setCreditManagerDebtLimit(creditManager, 1000);
-        if (supportsQuotas) pool.setPoolQuotaKeeper(quotaKeeper);
+        pool.setPoolQuotaKeeper(quotaKeeper);
         vm.stopPrank();
 
         // setup liquidity and borrowing
@@ -262,7 +249,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
     }
 
     /// @notice U:[LP-2C]: External function have correct access rights
-    function test_U_LP_02C_external_functions_have_correct_access() public repeatWithoutQuotas {
+    function test_U_LP_02C_external_functions_have_correct_access() public {
         vm.expectRevert(CreditManagerCantBorrowException.selector);
         pool.lendCreditAccount({borrowedAmount: 1, creditAccount: address(0)});
 
@@ -298,7 +285,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
     }
 
     /// @notice U:[LP-4]: `expectedLiquidity` works as expected
-    function test_U_LP_04_expectedLiquidity_works_as_expected() public repeatWithoutQuotas {
+    function test_U_LP_04_expectedLiquidity_works_as_expected() public {
         pool.hackBaseInterestRate(RAY / 10); // 10% yearly
 
         assertEq(pool.expectedLiquidity(), 2000, "Incorrect expectedLiquidity right after base interest update");
@@ -797,9 +784,9 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
     /// @notice U:[LP-12]: `creditManagerBorrowable` works as expected
     function test_U_LP_12_creditManagerBorrowable_works_as_expected() public {
-        // for the next two cases, `irm.availableToBorrow` shouldn't be called
+        // for the next two cases, `irm.availableToBorrow` should not be called
         vm.mockCallRevert(
-            interestRateModel, abi.encode(ILinearInterestRateModelV3.availableToBorrow.selector), "shouldn't be called"
+            interestRateModel, abi.encode(ILinearInterestRateModelV3.availableToBorrow.selector), "should not be called"
         );
 
         // case: total debt limit is fully used
@@ -944,7 +931,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
     // ------------- //
 
     /// @notice U:[LP-15]: `supplyRate` works as expected
-    function test_U_LP_15_supplyRate_works_as_expected() public repeatWithoutQuotas {
+    function test_U_LP_15_supplyRate_works_as_expected() public {
         _activateWithdrawFee(100);
 
         // supply rate now:
@@ -982,7 +969,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
     }
 
     /// @notice U:[LP-18]: `_updateBaseInterest` works as expected
-    function test_U_LP_18_updateBaseInterest_works_as_expected() public repeatWithoutQuotas {
+    function test_U_LP_18_updateBaseInterest_works_as_expected() public {
         // expected liquidity in a year: 2200 = 2000 + 1000 * 10% + 100
         // expected base interest index in a year: 1.32 = 1.2 * 1.1
         pool.hackBaseInterestRate(RAY / 10);
