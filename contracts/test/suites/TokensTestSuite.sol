@@ -4,6 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {WETHMock} from "../mocks/token/WETHMock.sol";
 import {ERC20BlacklistableMock} from "../mocks/token/ERC20Blacklistable.sol";
@@ -26,6 +27,8 @@ import {TokenData, TokensDataLive, TokenType} from "@gearbox-protocol/sdk-gov/co
 import {NetworkDetector} from "@gearbox-protocol/sdk-gov/contracts/NetworkDetector.sol";
 
 contract TokensTestSuite is Test, TokensTestSuiteHelper {
+    using SafeERC20 for IERC20;
+
     mapping(Tokens => address) public addressOf;
     mapping(Tokens => string) public symbols;
     mapping(Tokens => uint256) public prices;
@@ -183,7 +186,7 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
 
         if (balance > 0) {
             vm.prank(account);
-            IERC20(token).transfer(address(type(uint160).max), balance);
+            IERC20(token).safeTransfer(address(type(uint160).max), balance);
         }
     }
 }
