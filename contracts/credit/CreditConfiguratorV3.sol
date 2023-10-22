@@ -874,7 +874,8 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         return CreditManagerV3(creditManager).getTokenMaskOrRevert(token); // I:[CC-7]
     }
 
-    /// @dev Ensures that contract is compatible with credit manager
+    /// @dev Ensures that contract is compatible with credit manager by checking that it implements
+    ///      the `creditManager()` function that returns the correct address
     function _revertIfContractIncompatible(address _contract)
         internal
         view
@@ -884,6 +885,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             revert AddressIsNotContractException(_contract); // I:[CC-12A,29]
         }
 
+        // any interface with `creditManager()` would work instead of `CreditFacadeV3` here
         try CreditFacadeV3(_contract).creditManager() returns (address cm) {
             if (cm != creditManager) revert IncompatibleContractException(); // I:[CC-12B,29]
         } catch {

@@ -24,6 +24,8 @@ import {PriceFeedValidationTrait} from "../traits/PriceFeedValidationTrait.sol";
 ///         to the price oracle by returning `skipPriceCheck = true`.
 ///         Price oracle also allows to set a reserve price feed for a token, that can be activated
 ///         in case the main one becomes stale or starts returning wrong values.
+///         One should not expect the reserve price feed to always differ from the main one, although
+///         most often that would be the case.
 contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPriceOracleV3 {
     /// @notice Contract version
     uint256 public constant override version = 3_00;
