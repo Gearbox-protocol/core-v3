@@ -540,7 +540,7 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
 
     /// @dev U:[CT-5]: setCreditManagerDebtLimit works correctly
     function test_U_CT_05_setCreditManagerDebtLimit_works_correctly() public {
-        (address creditManager, address creditFacade,, address pool,) = _makeMocks();
+        (address creditManager, /* address creditFacade */,, address pool,) = _makeMocks();
 
         // TODO: double check
         // vm.mockCall(creditFacade, abi.encodeCall(ICreditFacadeV3.trackTotalDebt, ()), abi.encode(false));
@@ -1666,6 +1666,76 @@ contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
         assertEq(sanityCheckCallData, "");
 
         vm.expectCall(priceOracle, abi.encodeCall(IPriceOracleV3.setReservePriceFeedStatus, (token, true)));
+
+        vm.warp(block.timestamp + 1 days);
+
+        vm.prank(admin);
+        controllerTimelock.executeTransaction(txHash);
+
+        (bool queued,,,,,,,) = controllerTimelock.queuedTransactions(txHash);
+
+        assertTrue(!queued, "Transaction is still queued after execution");
+    }
+
+    /// @dev U:[CT-17]: forbidBoundsUpdate works correctly
+    function test_U_CT_17_forbidBoundsUpdate_works_correctly() public {
+        address priceFeed = makeAddr("PRICE_FEED");
+        vm.mockCall(priceFeed, abi.encodeWithSignature("forbidBoundsUpdate()"), "");
+
+        vm.prank(CONFIGURATOR);
+        controllerTimelock.setGroup(priceFeed, "PRICE_FEED");
+
+        bytes32 POLICY_CODE = keccak256(abi.encode("PRICE_FEED", "UPDATE_BOUNDS_ALLOWED"));
+
+        Policy memory policy = Policy({
+            enabled: false,
+            admin: admin,
+            delay: 1 days,
+            flags: 0,
+            exactValue: 0,
+            minValue: 0,
+            maxValue: 0,
+            referencePoint: 0,
+            referencePointUpdatePeriod: 0,
+            referencePointTimestampLU: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 0,
+            minChange: 0,
+            maxChange: 0
+        });
+
+        // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.forbidBoundsUpdate(priceFeed);
+
+        vm.prank(CONFIGURATOR);
+        controllerTimelock.setPolicy(POLICY_CODE, policy);
+
+        // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(USER);
+        controllerTimelock.forbidBoundsUpdate(priceFeed);
+
+        // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
+        bytes32 txHash = keccak256(abi.encode(admin, priceFeed, "forbidBoundsUpdate()", "", block.timestamp + 1 days));
+
+        vm.expectEmit(true, false, false, true);
+        emit QueueTransaction(txHash, admin, priceFeed, "forbidBoundsUpdate()", "", uint40(block.timestamp + 1 days));
+
+        vm.prank(admin);
+        controllerTimelock.forbidBoundsUpdate(priceFeed);
+
+        (,,,,,, uint256 sanityCheckValue, bytes memory sanityCheckCallData) =
+            controllerTimelock.queuedTransactions(txHash);
+
+        assertEq(sanityCheckValue, 0, "Sanity check value written incorrectly");
+
+        assertEq(sanityCheckCallData, "");
+
+        vm.expectCall(priceFeed, abi.encodeWithSignature("forbidBoundsUpdate()"));
 
         vm.warp(block.timestamp + 1 days);
 
