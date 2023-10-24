@@ -58,7 +58,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
 
         vm.prank(address(creditFacade));
         botList.setBotPermissions(
-            address(creditManager), creditAccount, bot, type(uint192).max, uint72(1 ether), uint72(1 ether / 10)
+            address(creditManager), creditAccount, bot, uint192(ALL_PERMISSIONS), uint72(1 ether), uint72(1 ether / 10)
         );
 
         vm.expectRevert(NotApprovedBotException.selector);
@@ -78,7 +78,9 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         botList.setBotSpecialPermissions(address(creditManager), address(bot), 0);
 
         vm.prank(USER);
-        creditFacade.setBotPermissions(creditAccount, bot, type(uint192).max, uint72(1 ether), uint72(1 ether / 10));
+        creditFacade.setBotPermissions(
+            creditAccount, bot, uint192(ALL_PERMISSIONS), uint72(1 ether), uint72(1 ether / 10)
+        );
 
         botList.getBotStatus({creditManager: address(creditManager), creditAccount: creditAccount, bot: bot});
 
@@ -127,7 +129,9 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
 
         vm.expectRevert(CallerNotCreditAccountOwnerException.selector);
         vm.prank(FRIEND);
-        creditFacade.setBotPermissions(creditAccount, bot, type(uint192).max, uint72(1 ether), uint72(1 ether / 10));
+        creditFacade.setBotPermissions(
+            creditAccount, bot, uint192(ALL_PERMISSIONS), uint72(1 ether), uint72(1 ether / 10)
+        );
 
         vm.expectCall(
             address(creditManager),
@@ -135,7 +139,9 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         );
 
         vm.prank(USER);
-        creditFacade.setBotPermissions(creditAccount, bot, type(uint192).max, uint72(1 ether), uint72(1 ether / 10));
+        creditFacade.setBotPermissions(
+            creditAccount, bot, uint192(ALL_PERMISSIONS), uint72(1 ether), uint72(1 ether / 10)
+        );
 
         assertTrue(creditManager.flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG > 0, "Flag was not set");
 
