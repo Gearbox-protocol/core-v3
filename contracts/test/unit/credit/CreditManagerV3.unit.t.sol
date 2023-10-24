@@ -3089,7 +3089,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         vm.prank(CONFIGURATOR);
         creditManager.setMaxEnabledTokens(maxEnabledTokens);
 
-        if (mask.calcEnabledTokens() > maxEnabledTokens) {
+        if (mask.disable(UNDERLYING_TOKEN_MASK).calcEnabledTokens() > maxEnabledTokens) {
             vm.expectRevert(TooManyEnabledTokensException.selector);
             creditManager.saveEnabledTokensMask(creditAccount, mask);
         } else {

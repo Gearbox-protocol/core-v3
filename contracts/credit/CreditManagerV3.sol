@@ -1145,9 +1145,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     /// @dev Saves `creditAccount`'s `enabledTokensMask` in the storage
-    /// @dev Ensures that the number of enabled tokens does not exceed `maxEnabledTokens`
+    /// @dev Ensures that the number of enabled tokens excluding underlying does not exceed `maxEnabledTokens`
     function _saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) internal {
-        if (enabledTokensMask.calcEnabledTokens() > maxEnabledTokens) {
+        if (enabledTokensMask.disable(UNDERLYING_TOKEN_MASK).calcEnabledTokens() > maxEnabledTokens) {
             revert TooManyEnabledTokensException(); // U:[CM-37]
         }
 
