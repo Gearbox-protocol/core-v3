@@ -473,6 +473,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param totalFundingAllowance Total amount of WETH available to bot for payments
     /// @param weeklyFundingAllowance Amount of WETH available to bot for payments weekly
     /// @dev Reverts if caller is not `creditAccount`'s owner
+    /// @dev Reverts if `permissions` has unexpected bits enabled
     /// @dev Reverts if account has more active bots than allowed after changing permissions
     //       to prevent users from inflating liquidation gas costs
     /// @dev Changes account's `BOT_PERMISSIONS_SET_FLAG` in the credit manager if needed
@@ -488,6 +489,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         creditAccountOwnerOnly(creditAccount) // U:[FA-5]
         nonReentrant // U:[FA-4]
     {
+        if (permissions & ~ALL_PERMISSIONS != 0) revert UnexpectedPermissionsException(); // U:[FA-41]
+
         uint256 remainingBots = IBotListV3(botList).setBotPermissions({
             creditManager: creditManager,
             creditAccount: creditAccount,

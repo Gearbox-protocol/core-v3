@@ -2083,6 +2083,17 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         creditManagerMock.setBorrower(USER);
 
+        /// It reverts if passed unexpected permissions
+        vm.expectRevert(UnexpectedPermissionsException.selector);
+        vm.prank(USER);
+        creditFacade.setBotPermissions({
+            creditAccount: creditAccount,
+            bot: bot,
+            permissions: type(uint192).max,
+            totalFundingAllowance: 2,
+            weeklyFundingAllowance: 3
+        });
+
         creditManagerMock.setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: false});
 
         botListMock.setBotPermissionsReturn(1);
