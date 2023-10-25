@@ -207,7 +207,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.closeCreditAccount({
             creditAccount: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
-            skipTokensMask: 0,
+            tokensToTransferMask: type(uint256).max,
             convertToETH: false,
             calls: new MultiCall[](0)
         });
@@ -262,7 +262,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.closeCreditAccount({
             creditAccount: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
-            skipTokensMask: 0,
+            tokensToTransferMask: type(uint256).max,
             convertToETH: false,
             calls: new MultiCall[](0)
         });
@@ -301,7 +301,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.closeCreditAccount({
             creditAccount: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
-            skipTokensMask: 0,
+            tokensToTransferMask: type(uint256).max,
             convertToETH: false,
             calls: new MultiCall[](0)
         });
@@ -385,7 +385,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.closeCreditAccount{value: 1 ether}({
             creditAccount: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
-            skipTokensMask: 0,
+            tokensToTransferMask: type(uint256).max,
             convertToETH: false,
             calls: new MultiCall[](0)
         });

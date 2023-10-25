@@ -353,8 +353,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.closeCreditAccount({
             creditAccount: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
-            enabledTokensMask: 0,
-            skipTokensMask: 0,
+            tokensToTransferMask: type(uint256).max,
             convertToETH: false
         });
 
@@ -449,8 +448,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.closeCreditAccount({
             creditAccount: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
-            enabledTokensMask: 0,
-            skipTokensMask: 0,
+            tokensToTransferMask: type(uint256).max,
             convertToETH: false
         });
 
