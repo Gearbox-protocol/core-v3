@@ -194,11 +194,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         CreditAccountInfo storage newCreditAccountInfo = creditAccountInfo[creditAccount];
 
-        // accounts are reusable, so debt and interest index must be reset either when opening an account or closing it
-        // to make potential liquidations cheaper, they are reset here
-        newCreditAccountInfo.debt = 0; // U:[CM-6]
-        newCreditAccountInfo.cumulativeIndexLastUpdate = _poolBaseInterestIndex(); // U:[CM-6]
-
         // newCreditAccountInfo.flags = 0;
         // newCreditAccountInfo.lastDebtUpdate = 0;
         // newCreditAccountInfo.borrower = onBehalfOf;
@@ -255,28 +250,26 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditAccountsSet.remove(creditAccount); // U:[CM-8]
     }
 
-    /// @notice Closes a credit account by repaying debt to the pool, removing quotas and returning account to the factory
-    /// @param creditAccount Account to close
+    /// @notice Liquidates a credit account
+    /// @param creditAccount Account to liquidate
     /// @param collateralDebtData A struct with account's debt and collateral data
-    /// @param payer Address to transfer underlying from in case account's balance is insufficient
-    /// @param to Address to transfer tokens that left on the account after closure and repayments
-    /// @param skipTokensMask Bit mask of tokens that should be skipped
+    /// @param to Address to transfer tokens left on the account after liquidation
+    /// @param tokensToTransferMask Bit mask of tokens left on the account that should be sent
     /// @param convertToETH If true and any of transferred tokens is WETH, it will be sent to withdrawal manager,
-    ///        from which `to` can later claim it as ETH
-    /// @return remainingFunds Amount of underlying sent to account owner on liquidation
+    ///        from which credit facade should claim it as ETH to `to` at the end of the call
+    /// @return remainingFunds Total value of assets left on the account after liquidation
     /// @return loss Loss incurred on liquidation
     /// @dev If `loss > 0`, zeroes out limits for account's quoted tokens in the quota keeper
-    /// @custom:expects `cdd` is a result of `calcDebtAndCollateral` in `DEBT_COLLATERAL_{x}_WITHDRAWALS` mode, where x is
-    ///                 `WITHOUT` for normal closure, `CANCEL` for liquidation and `FORCE_CANCEL` for emergency liquidation
-    /// @custom:invariant `remainingFunds * loss == 0`
+    /// @custom:expects Account is opened in this credit manager
+    /// @custom:expects `cdd` is a result of `calcDebtAndCollateral` in `DEBT_COLLATERAL_{x}_WITHDRAWALS` mode,
+    ///                 where x is `CANCEL` for normal liquidation and `FORCE_CANCEL` for emergency liquidation
     function liquidateCreditAccount(
         address creditAccount,
         CollateralDebtData calldata collateralDebtData,
-        address payer,
         address to,
-        uint256 skipTokensMask,
+        uint256 tokensToTransferMask,
         bool convertToETH,
-        bool isExpiredLiquidation
+        bool isExpired
     )
         external
         override
@@ -284,54 +277,34 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacadeOnly // U:[CM-2]
         returns (uint256 remainingFunds, uint256 loss)
     {
-        getBorrowerOrRevert(creditAccount); // U:[CM-7]
-
-        {
-            CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
-            if (currentCreditAccountInfo.lastDebtUpdate == block.number) {
-                revert DebtUpdatedTwiceInOneBlockException(); // U:[CM-7]
-            }
+        CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
+        if (currentCreditAccountInfo.lastDebtUpdate == block.number) {
+            revert DebtUpdatedTwiceInOneBlockException();
         }
+
+        currentCreditAccountInfo.debt = 0;
+        currentCreditAccountInfo.lastDebtUpdate = uint64(block.number);
+
+        // currentCreditAccountInfo.cumulativeQuotaInterest = 1;
+        // currentCreditAccountInfo.quotaFees = 0;
+        assembly {
+            let slot := add(currentCreditAccountInfo.slot, 2)
+            sstore(slot, 1)
+        }
+
+        remainingFunds = IERC20(underlying).safeBalanceOf({account: creditAccount});
+        uint256 minRemainingFunds;
+
         {
             uint256 amountToPool;
             uint256 profit;
 
-            (amountToPool, remainingFunds, profit, loss) = collateralDebtData.calcLiquidationPayments({
-                liquidationDiscount: isExpiredLiquidation ? liquidationDiscountExpired : liquidationDiscount,
-                feeLiquidation: isExpiredLiquidation ? feeLiquidationExpired : feeLiquidation,
+            (amountToPool, minRemainingFunds, profit, loss) = collateralDebtData.calcLiquidationPayments({
+                liquidationDiscount: isExpired ? liquidationDiscountExpired : liquidationDiscount,
+                feeLiquidation: isExpired ? feeLiquidationExpired : feeLiquidation,
                 amountWithFeeFn: _amountWithFee,
                 amountMinusFeeFn: _amountMinusFee
             }); // U:[CM-8]
-
-            // Computes total value of tokens which will be kept on account
-            if (remainingFunds > 1) {
-                // Calc totalValue for skipTokensMask without underlying
-                skipTokensMask = skipTokensMask.disable(UNDERLYING_TOKEN_MASK); // U:[CM-8]
-
-                if (skipTokensMask != 0) {
-                    uint256 skipTokensValue = _getTokensValue(creditAccount, skipTokensMask);
-                    unchecked {
-                        remainingFunds = remainingFunds > skipTokensValue ? remainingFunds - skipTokensValue : 0;
-                    }
-                }
-            }
-
-            uint256 underlyingBalance = IERC20(underlying).safeBalanceOf({account: creditAccount}); // U:[CM-8]
-            {
-                uint256 distributedFunds = amountToPool + remainingFunds + 1;
-
-                if (underlyingBalance < distributedFunds) {
-                    unchecked {
-                        IERC20(underlying).safeTransferFrom({
-                            from: payer,
-                            to: creditAccount,
-                            amount: _amountWithFee(distributedFunds - underlyingBalance)
-                        }); // U:[CM-8]
-                    }
-
-                    underlyingBalance = distributedFunds;
-                }
-            }
 
             if (collateralDebtData.quotedTokens.length != 0) {
                 bool setLimitsToZero = loss > 0; // U:[CM-8]
@@ -346,35 +319,53 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             if (amountToPool != 0) {
                 ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amountToPool}); // U:[CM-8]
                 unchecked {
-                    underlyingBalance -= amountToPool;
+                    remainingFunds -= amountToPool;
                 }
             }
 
             if (collateralDebtData.debt + profit + loss != 0) {
                 _poolRepayCreditAccount(collateralDebtData.debt, profit, loss); // U:[CM-8]
             }
+        }
 
-            if (remainingFunds > 1) {
-                uint256 amountToLiquidator = underlyingBalance - remainingFunds;
-                if (amountToLiquidator != 0) {
-                    _safeTokenTransfer({
-                        creditAccount: creditAccount,
-                        token: underlying,
-                        to: to,
-                        amount: amountToLiquidator,
-                        convertToETH: convertToETH
-                    }); // U:[CM-8]
+        uint256 skipTokensValue;
+        uint256 skipTokensMask =
+            collateralDebtData.enabledTokensMask.disable(UNDERLYING_TOKEN_MASK).disable(tokensToTransferMask);
+        if (skipTokensMask != 0) skipTokensValue = _getTokensValue(creditAccount, skipTokensMask);
+
+        if (remainingFunds + skipTokensValue < minRemainingFunds) {
+            revert InsufficientRemainingFundsException();
+        }
+
+        if (tokensToTransferMask & UNDERLYING_TOKEN_MASK != 0) {
+            tokensToTransferMask = tokensToTransferMask.disable(UNDERLYING_TOKEN_MASK);
+
+            uint256 amountToLiquidator = remainingFunds;
+            if (skipTokensValue < minRemainingFunds) {
+                unchecked {
+                    amountToLiquidator -= minRemainingFunds - skipTokensValue;
                 }
+            }
 
-                skipTokensMask = skipTokensMask.enable(UNDERLYING_TOKEN_MASK); // U:[CM-8]
+            if (amountToLiquidator != 0) {
+                _safeTokenTransfer({
+                    creditAccount: creditAccount,
+                    token: underlying,
+                    to: to,
+                    amount: amountToLiquidator,
+                    convertToETH: convertToETH
+                }); // U:[CM-8]
+                remainingFunds -= amountToLiquidator;
             }
         }
+
+        remainingFunds += skipTokensValue;
 
         _batchTokensTransfer({
             creditAccount: creditAccount,
             to: to,
             convertToETH: convertToETH,
-            tokensToTransferMask: collateralDebtData.enabledTokensMask.disable(skipTokensMask)
+            tokensToTransferMask: tokensToTransferMask
         }); // U:[CM-8, 9]
     }
 
@@ -700,7 +691,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         cdd.debt = currentCreditAccountInfo.debt; // U:[CM-20]
         cdd.cumulativeIndexLastUpdate = currentCreditAccountInfo.cumulativeIndexLastUpdate; // U:[CM-20]
-        cdd.cumulativeIndexNow = _poolBaseInterestIndex(); // U:[CM-20]
+        cdd.cumulativeIndexNow = IPoolV3(pool).baseInterestIndex(); // U:[CM-20]
 
         if (task == CollateralCalcTask.GENERIC_PARAMS) {
             return cdd; // U:[CM-20]
@@ -1478,11 +1469,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     ///      Pools with fee-on-transfer underlying should override this method
     function _amountMinusFee(uint256 amount) internal view virtual returns (uint256) {
         return amount;
-    }
-
-    /// @dev Internal wrapper for `pool.baseInterestIndex` call to reduce contract size
-    function _poolBaseInterestIndex() internal view returns (uint256) {
-        return IPoolV3(pool).baseInterestIndex();
     }
 
     /// @dev Internal wrapper for `pool.repayCreditAccount` call to reduce contract size

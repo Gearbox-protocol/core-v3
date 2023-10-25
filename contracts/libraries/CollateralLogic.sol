@@ -284,12 +284,8 @@ library CollateralLogic {
         address priceOracle,
         uint256 tokensToCheckMask
     ) internal view returns (uint256 totalValueUSD) {
-        uint256 totalValueUSD;
-
         while (tokensToCheckMask != 0) {
-            uint256 tokenMask;
-            tokenMask = tokensToCheckMask & uint256(-int256(tokensToCheckMask));
-
+            uint256 tokenMask = tokensToCheckMask & uint256(-int256(tokensToCheckMask));
             (address token,) = collateralTokenByMaskFn(tokenMask, false);
 
             uint256 balance = IERC20(token).safeBalanceOf({account: creditAccount});

@@ -116,6 +116,9 @@ error IncreaseQuotaOnZeroDebtAccountException();
 /// @notice Thrown when attempting to close an account with non-zero debt
 error CloseAccountWithNonZeroDebtException();
 
+/// @notice Thrown when value of funds remaining on the account after liquidation is insufficient
+error InsufficientRemainingFundsException();
+
 /// @notice Thrown when Credit Facade tries to write over a non-zero active Credit Account
 error ActiveCreditAccountOverridenException();
 

@@ -121,11 +121,10 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
     function liquidateCreditAccount(
         address creditAccount,
         CollateralDebtData calldata collateralDebtData,
-        address payer,
         address to,
-        uint256 skipTokensMask,
+        uint256 tokensToTransferMask,
         bool convertToETH,
-        bool isExpiredLiquidation
+        bool isExpired
     ) external returns (uint256 remainingFunds, uint256 loss);
 
     function manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)

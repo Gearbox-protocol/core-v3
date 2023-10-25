@@ -67,6 +67,7 @@ interface ICreditFacadeV3Multicall {
     /// @param token Token to add
     /// @param amount Amount to add
     /// @dev Requires token approval from caller to the credit manager
+    /// @dev This method can also be called during liquidation
     function addCollateral(address token, uint256 amount) external;
 
     /// @notice Adds collateral to account using signed EIP-2612 permit message
@@ -74,6 +75,7 @@ interface ICreditFacadeV3Multicall {
     /// @param amount Amount to add
     /// @param deadline Permit deadline
     /// @dev `v`, `r`, `s` must be a valid signature of the permit message from caller to the credit manager
+    /// @dev This method can also be called during liquidation
     function addCollateralWithPermit(address token, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
         external;
 

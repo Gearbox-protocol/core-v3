@@ -48,7 +48,7 @@ uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS & ~(DECREASE_DEBT_P
 
 uint256 constant CLOSE_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS & ~(INCREASE_DEBT_PERMISSION | WITHDRAW_PERMISSION);
 
-uint256 constant LIQUIDATE_CREDIT_ACCOUNT_FLAGS = EXTERNAL_CALLS_PERMISSION;
+uint256 constant LIQUIDATE_CREDIT_ACCOUNT_FLAGS = EXTERNAL_CALLS_PERMISSION | ADD_COLLATERAL_PERMISSION;
 
 /// @title Credit facade V3
 /// @notice Provides a user interface to open, close and liquidate leveraged positions in the credit manager,
@@ -289,27 +289,32 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     ///         - Evaluates account's collateral and debt to determine whether liquidated account is unhealthy or expired
     ///         - Cancels immature scheduled withdrawals and returns tokens to the account (on emergency, even mature
     ///           withdrawals are returned)
-    ///         - Performs a multicall (only adapter calls allowed)
+    ///         - Performs a multicall (only `addCollateral` and adapter calls are allowed)
     ///         - Erases all bots permissions
-    ///         - Closes a credit account in the credit manager, distributing the funds between pool, owner and liquidator
+    ///         - Liquidates a credit account in the credit manager by repaying debt to the pool, removing quotas
+    ///           and transferring specified tokens to the liquidator
     ///         - If pool incurs a loss on liquidation, further borrowing through the facade is forbidden
     ///         - If cumulative loss from bad debt liquidations exceeds the threshold, the facade is paused
     /// @notice Typically, a liquidator would swap all holdings on the account to underlying via multicall and receive
-    ///         the premium. An alternative strategy would be to allow credit manager to take underlying shortfall from
-    ///         the caller and receive all account's holdings directly to handle them in another way.
+    ///         the premium in underlying (in this case, one can set `tokensToTransferMask` to `1`).
+    ///         An alternative strategy would be to add underlying collateral to repay debt and receive specified tokens
+    ///         to handle them in another way.
+    /// @notice Accounts stays open after liqudiation with zero debt and leftover funds
     /// @param creditAccount Account to liquidate
-    /// @param to Address to send tokens left on the account after closure and funds distribution
-    /// @param skipTokensMask Bit mask of tokens that should be skipped
+    /// @param to Address to send tokens left on the account after liquidation
+    /// @param tokensToTransferMask Bit mask of tokens left on the account that should be sent
     /// @param convertToETH Whether to unwrap WETH before sending to `to`
     /// @param calls List of calls to perform before liquidating the account
     /// @dev When the credit facade is paused, reverts if caller is not an approved emergency liquidator
     /// @dev Reverts if `creditAccount` is not opened in connected credit manager
     /// @dev Reverts if account is not liquidatable
     /// @dev Reverts if account's debt was updated in the same block
+    /// @dev Reverts if total value of funds left on the account after repaying debt to the pool and sending specified
+    ///      tokens to the liquidator is insufficient
     function liquidateCreditAccount(
         address creditAccount,
         address to,
-        uint256 skipTokensMask,
+        uint256 tokensToTransferMask,
         bool convertToETH,
         MultiCall[] calldata calls
     )
@@ -353,13 +358,10 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(tokensToEnable); // U:[FA-15]
         }
 
-        // add replace: add underlying -> remove any enabled token [ with profit]
-
         if (skipCalls < calls.length) {
-            FullCheckParams memory fullCheckParams = _multicall(
+            _multicall(
                 creditAccount, calls, collateralDebtData.enabledTokensMask, LIQUIDATE_CREDIT_ACCOUNT_FLAGS, skipCalls
             ); // U:[FA-16]
-            collateralDebtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter; // U:[FA-16]
         }
 
         _eraseAllBotPermissions({creditAccount: creditAccount}); // U:[FA-16]
@@ -367,11 +369,10 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         (uint256 remainingFunds, uint256 reportedLoss) = ICreditManagerV3(creditManager).liquidateCreditAccount({
             creditAccount: creditAccount,
             collateralDebtData: collateralDebtData,
-            payer: msg.sender,
             to: to,
-            skipTokensMask: skipTokensMask,
+            tokensToTransferMask: tokensToTransferMask,
             convertToETH: convertToETH,
-            isExpiredLiquidation: isExpired
+            isExpired: isExpired
         }); // U:[FA-16]
 
         if (reportedLoss > 0) {

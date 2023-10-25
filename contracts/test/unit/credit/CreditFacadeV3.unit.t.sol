@@ -217,7 +217,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.liquidateCreditAccount({
             creditAccount: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
-            skipTokensMask: 0,
+            tokensToTransferMask: 1,
             convertToETH: false,
             calls: new MultiCall[](0)
         });
@@ -271,7 +271,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.liquidateCreditAccount({
             creditAccount: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
-            skipTokensMask: 0,
+            tokensToTransferMask: 1,
             convertToETH: false,
             calls: new MultiCall[](0)
         });
@@ -310,7 +310,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.liquidateCreditAccount({
             creditAccount: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
-            skipTokensMask: 0,
+            tokensToTransferMask: 1,
             convertToETH: false,
             calls: new MultiCall[](0)
         });
