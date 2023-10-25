@@ -6,7 +6,6 @@ pragma solidity ^0.8.17;
 import {
     ICreditManagerV3,
     ICreditManagerV3Events,
-    ClosureAction,
     ManageDebtAction,
     BOT_PERMISSIONS_SET_FLAG
 } from "../../../interfaces/ICreditManagerV3.sol";

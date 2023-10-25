@@ -8,7 +8,6 @@ import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
 import {
     ICreditManagerV3,
     ICreditManagerV3Events,
-    ClosureAction,
     ManageDebtAction,
     BOT_PERMISSIONS_SET_FLAG
 } from "../../../interfaces/ICreditManagerV3.sol";
@@ -117,7 +116,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
         // );
 
         vm.expectEmit(true, true, true, true);
-        emit LiquidateCreditAccount(creditAccount, USER, LIQUIDATOR, FRIEND, ClosureAction.LIQUIDATE_ACCOUNT, 0);
+        emit LiquidateCreditAccount(creditAccount, USER, LIQUIDATOR, FRIEND, 0);
 
         vm.prank(LIQUIDATOR);
         creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 10, false, calls);

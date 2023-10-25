@@ -21,7 +21,6 @@ import "../interfaces/ICreditFacadeV3.sol";
 import "../interfaces/IAddressProviderV3.sol";
 import {
     ICreditManagerV3,
-    ClosureAction,
     ManageDebtAction,
     RevocationPair,
     CollateralDebtData,
@@ -234,7 +233,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     ///         - Closes a credit account in the credit manager (all debt must be repaid for this step to succeed)
     /// @param creditAccount Account to close
     /// @param to Address to send withdrawals and any tokens left on the account after closure
-    /// @param skipTokenMask Bit mask of tokens that should be skipped
+    /// @param skipTokensMask Bit mask of tokens that should be skipped
     /// @param convertToETH Whether to unwrap WETH before sending to `to`
     /// @param calls List of calls to perform before closing the account
     /// @dev Reverts if caller is not `creditAccount`'s owner
@@ -243,7 +242,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     function closeCreditAccount(
         address creditAccount,
         address to,
-        uint256 skipTokenMask,
+        uint256 skipTokensMask,
         bool convertToETH,
         MultiCall[] calldata calls
     )
@@ -269,15 +268,13 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         _eraseAllBotPermissions({creditAccount: creditAccount}); // U:[FA-11]
 
-        _closeCreditAccount({
+        ICreditManagerV3(creditManager).closeCreditAccount({
             creditAccount: creditAccount,
-            closureAction: ClosureAction.CLOSE_ACCOUNT,
-            collateralDebtData: debtData,
-            payer: msg.sender,
             to: to,
-            skipTokensMask: skipTokenMask,
+            enabledTokensMask: debtData.enabledTokensMask,
+            skipTokensMask: skipTokensMask,
             convertToETH: convertToETH
-        }); // U:[FA-11]
+        });
 
         if (convertToETH) {
             _wethWithdrawTo(to); // U:[FA-11]
@@ -301,7 +298,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     ///         the caller and receive all account's holdings directly to handle them in another way.
     /// @param creditAccount Account to liquidate
     /// @param to Address to send tokens left on the account after closure and funds distribution
-    /// @param skipTokenMask Bit mask of tokens that should be skipped
+    /// @param skipTokensMask Bit mask of tokens that should be skipped
     /// @param convertToETH Whether to unwrap WETH before sending to `to`
     /// @param calls List of calls to perform before liquidating the account
     /// @dev When the credit facade is paused, reverts if caller is not an approved emergency liquidator
@@ -311,7 +308,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     function liquidateCreditAccount(
         address creditAccount,
         address to,
-        uint256 skipTokenMask,
+        uint256 skipTokensMask,
         bool convertToETH,
         MultiCall[] calldata calls
     )
@@ -325,7 +322,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         uint256 skipCalls = _applyOnDemandPriceUpdates(calls);
 
-        ClosureAction closeAction;
+        bool isExpired = false;
         CollateralDebtData memory collateralDebtData;
         {
             bool isEmergency = paused();
@@ -337,13 +334,11 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     : CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS
             ); // U:[FA-15]
 
-            closeAction = ClosureAction.LIQUIDATE_ACCOUNT; // U:[FA-14]
-
             bool isLiquidatable = collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD; // U:[FA-13]
 
             if (!isLiquidatable && _isExpired()) {
                 isLiquidatable = true; // U:[FA-13]
-                closeAction = ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT; // U:[FA-14]
+                isExpired = true; // U:[FA-14]
             }
 
             if (!isLiquidatable) revert CreditAccountNotLiquidatableException(); // U:[FA-13]
@@ -357,6 +352,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(tokensToEnable); // U:[FA-15]
         }
 
+        // add replace: add underlying -> remove any enabled token [ with profit]
+
         if (skipCalls < calls.length) {
             FullCheckParams memory fullCheckParams = _multicall(
                 creditAccount, calls, collateralDebtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS, skipCalls
@@ -366,14 +363,14 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         _eraseAllBotPermissions({creditAccount: creditAccount}); // U:[FA-16]
 
-        (uint256 remainingFunds, uint256 reportedLoss) = _closeCreditAccount({
+        (uint256 remainingFunds, uint256 reportedLoss) = ICreditManagerV3(creditManager).liquidateCreditAccount({
             creditAccount: creditAccount,
-            closureAction: closeAction,
             collateralDebtData: collateralDebtData,
             payer: msg.sender,
             to: to,
-            skipTokensMask: skipTokenMask,
-            convertToETH: convertToETH
+            skipTokensMask: skipTokensMask,
+            convertToETH: convertToETH,
+            isExpiredLiquidation: isExpired
         }); // U:[FA-16]
 
         if (reportedLoss > 0) {
@@ -392,7 +389,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             _wethWithdrawTo(to); // U:[FA-16]
         }
 
-        emit LiquidateCreditAccount(creditAccount, borrower, msg.sender, to, closeAction, remainingFunds); // U:[FA-14,16,17]
+        emit LiquidateCreditAccount(creditAccount, borrower, msg.sender, to, remainingFunds); // U:[FA-14,16,17]
     }
 
     /// @notice Executes a batch of calls allowing user to manage their credit account
@@ -1121,27 +1118,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @dev Same as above but unsets active credit account
     function _unsetActiveCreditAccount() internal {
         _setActiveCreditAccount(INACTIVE_CREDIT_ACCOUNT_ADDRESS);
-    }
-
-    /// @dev Internal wrapper for `creditManager.closeCreditAccount` call to reduce contract size
-    function _closeCreditAccount(
-        address creditAccount,
-        ClosureAction closureAction,
-        CollateralDebtData memory collateralDebtData,
-        address payer,
-        address to,
-        uint256 skipTokensMask,
-        bool convertToETH
-    ) internal returns (uint256 remainingFunds, uint256 reportedLoss) {
-        (remainingFunds, reportedLoss) = ICreditManagerV3(creditManager).closeCreditAccount({
-            creditAccount: creditAccount,
-            closureAction: closureAction,
-            collateralDebtData: collateralDebtData,
-            payer: payer,
-            to: to,
-            skipTokensMask: skipTokensMask,
-            convertToETH: convertToETH
-        });
     }
 
     /// @dev Internal wrapper for `creditManager.addCollateral` call to reduce contract size

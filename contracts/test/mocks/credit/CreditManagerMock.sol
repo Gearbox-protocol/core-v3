@@ -7,7 +7,6 @@ import "../../../interfaces/IAddressProviderV3.sol";
 
 import {
     ICreditManagerV3,
-    ClosureAction,
     CollateralDebtData,
     CollateralCalcTask,
     ManageDebtAction,
@@ -164,19 +163,19 @@ contract CreditManagerMock {
         return_loss = loss;
     }
 
-    function closeCreditAccount(
-        address,
-        ClosureAction,
-        CollateralDebtData memory collateralDebtData,
-        address,
-        address,
-        uint256,
-        bool
-    ) external returns (uint256 remainingFunds, uint256 loss) {
-        _closeCollateralDebtData = collateralDebtData;
-        remainingFunds = return_remainingFunds;
-        loss = return_loss;
-    }
+    // function closeCreditAccount(
+    //     address,
+    //     ClosureAction,
+    //     CollateralDebtData memory collateralDebtData,
+    //     address,
+    //     address,
+    //     uint256,
+    //     bool
+    // ) external returns (uint256 remainingFunds, uint256 loss) {
+    //     _closeCollateralDebtData = collateralDebtData;
+    //     remainingFunds = return_remainingFunds;
+    //     loss = return_loss;
+    // }
 
     function fullCollateralCheck(address, uint256 enabledTokensMask, uint256[] memory, uint16)
         external

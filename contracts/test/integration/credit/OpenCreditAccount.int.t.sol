@@ -12,7 +12,6 @@ import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICr
 import {
     ICreditManagerV3,
     ICreditManagerV3Events,
-    ClosureAction,
     CollateralTokenData,
     ManageDebtAction,
     CollateralDebtData

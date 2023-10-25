@@ -960,17 +960,17 @@
     "@ethersproject/properties" "^5.7.0"
     "@ethersproject/strings" "^5.7.0"
 
+"@gearbox-protocol/core-v2@1.19.0-base.16":
+  version "1.19.0-base.16"
+  resolved "https://registry.yarnpkg.com/@gearbox-protocol/core-v2/-/core-v2-1.19.0-base.16.tgz#6bfd3c2d7981541a987cec3dfaf53919ff4a52ec"
+  integrity sha512-NPV/TPhZPsq03Ke2Fb3v1DsRZS4y1mAtvR/B1z6VNfEhs0fqk/UigvgCpHFkZUxwQxljpOCe2cxlf8EPYXnVrA==
+
 "@gearbox-protocol/core-v2@^1.16.2", "@gearbox-protocol/core-v2@^1.19.0-base.8", "@gearbox-protocol/core-v2@^1.21.0":
   version "1.21.0"
   resolved "https://registry.yarnpkg.com/@gearbox-protocol/core-v2/-/core-v2-1.21.0.tgz#5a899c4f96200a28e6516f8416cfd2d39ce20695"
   integrity sha512-9pv8K2gdoGMByVkdbT9OWRnn2Xp5p+zanoOCghzTgcC245UZabEfmm3ZrWIo9rqMNZZY64W7RH1Pbt1TU7hqHw==
   dependencies:
     "@typechain/ethers-v5" "^10.2.1"
-
-"@gearbox-protocol/core-v2@^1.19.0-base.16":
-  version "1.19.0-base.16"
-  resolved "https://registry.yarnpkg.com/@gearbox-protocol/core-v2/-/core-v2-1.19.0-base.16.tgz#6bfd3c2d7981541a987cec3dfaf53919ff4a52ec"
-  integrity sha512-NPV/TPhZPsq03Ke2Fb3v1DsRZS4y1mAtvR/B1z6VNfEhs0fqk/UigvgCpHFkZUxwQxljpOCe2cxlf8EPYXnVrA==
 
 "@gearbox-protocol/core-v3@^1.34.1":
   version "1.36.2"
@@ -1163,7 +1163,7 @@
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-4.8.2.tgz#d815ade0027b50beb9bcca67143c6bcc3e3923d6"
   integrity sha512-kEUOgPQszC0fSYWpbh2kT94ltOJwj1qfT2DWo+zVttmGmf97JZ99LspePNaeeaLhCImaHVeBbjaQFZQn7+Zc5g==
 
-"@openzeppelin/contracts@4.9.3":
+"@openzeppelin/contracts@^4.9.3":
   version "4.9.3"
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-4.9.3.tgz#00d7a8cf35a475b160b3f0293a6403c511099364"
   integrity sha512-He3LieZ1pP2TNt5JbkPA4PNT9WC3gOTOlDcFGJW4Le4QKqwmiNJCRt44APfxMxvq7OugU/cqYuPcSBzOw38DAg==

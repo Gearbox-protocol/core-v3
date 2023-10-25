@@ -13,22 +13,6 @@ uint8 constant BOT_PERMISSIONS_SET_FLAG = 1 << 1;
 uint8 constant DEFAULT_MAX_ENABLED_TOKENS = 12;
 address constant INACTIVE_CREDIT_ACCOUNT_ADDRESS = address(1);
 
-/// @notice Account closure mode
-///         - `CLOSE_ACCOUNT` performs normal account closure:
-//            * repays debt, interest and fees to the pool, reverts in case of underlying shortfall
-///           * transfers remaining tokens on the credit account to an owner-specified address
-///         - `LIQUIDATE_ACCOUNT`
-///           * computes amounts that should be distributed between pool and account owner and potential losses
-///           * repays due funds to the pool, charges liquidagtor in case of underlying shortfall
-///           * transfers due funds in underlying to account owner (if any)
-///           * transfers remaining tokens on the credit account to a liquidator-specified address
-///         - `LIQUIDATE_EXPIRED_ACCOUNT` is same as `LIQUIDATE_ACCOUNT` but with lower liquidation premium and fee
-enum ClosureAction {
-    CLOSE_ACCOUNT,
-    LIQUIDATE_ACCOUNT,
-    LIQUIDATE_EXPIRED_ACCOUNT
-}
-
 /// @notice Debt management type
 ///         - `INCREASE_DEBT` borrows additional funds from the pool, updates account's debt and cumulative interest index
 ///         - `DECREASE_DEBT` repays debt components (quota interest and fees -> base interest and fees -> debt principal)
@@ -133,12 +117,20 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
 
     function closeCreditAccount(
         address creditAccount,
-        ClosureAction closureAction,
+        address to,
+        uint256 enabledTokensMask,
+        uint256 skipTokensMask,
+        bool convertToETH
+    ) external;
+
+    function liquidateCreditAccount(
+        address creditAccount,
         CollateralDebtData calldata collateralDebtData,
         address payer,
         address to,
         uint256 skipTokensMask,
-        bool convertToETH
+        bool convertToETH,
+        bool isExpiredLiquidation
     ) external returns (uint256 remainingFunds, uint256 loss);
 
     function manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)

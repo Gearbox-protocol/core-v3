@@ -8,7 +8,6 @@ import "../../../interfaces/ICreditFacadeV3Multicall.sol";
 import {
     ICreditManagerV3,
     ICreditManagerV3Events,
-    ClosureAction,
     CollateralTokenData,
     ManageDebtAction,
     CollateralCalcTask,

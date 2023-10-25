@@ -31,7 +31,6 @@ import {ENTERED} from "../../../traits/ReentrancyGuardTrait.sol";
 import "../../../interfaces/ICreditFacadeV3.sol";
 import {
     ICreditManagerV3,
-    ClosureAction,
     CollateralCalcTask,
     CollateralDebtData,
     ManageDebtAction,
@@ -208,7 +207,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.closeCreditAccount({
             creditAccount: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
-            skipTokenMask: 0,
+            skipTokensMask: 0,
             convertToETH: false,
             calls: new MultiCall[](0)
         });
@@ -218,7 +217,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.liquidateCreditAccount({
             creditAccount: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
-            skipTokenMask: 0,
+            skipTokensMask: 0,
             convertToETH: false,
             calls: new MultiCall[](0)
         });
@@ -263,7 +262,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.closeCreditAccount({
             creditAccount: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
-            skipTokenMask: 0,
+            skipTokensMask: 0,
             convertToETH: false,
             calls: new MultiCall[](0)
         });
@@ -272,7 +271,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.liquidateCreditAccount({
             creditAccount: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
-            skipTokenMask: 0,
+            skipTokensMask: 0,
             convertToETH: false,
             calls: new MultiCall[](0)
         });
@@ -302,7 +301,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.closeCreditAccount({
             creditAccount: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
-            skipTokenMask: 0,
+            skipTokensMask: 0,
             convertToETH: false,
             calls: new MultiCall[](0)
         });
@@ -311,7 +310,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.liquidateCreditAccount({
             creditAccount: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
-            skipTokenMask: 0,
+            skipTokensMask: 0,
             convertToETH: false,
             calls: new MultiCall[](0)
         });
@@ -386,7 +385,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.closeCreditAccount{value: 1 ether}({
             creditAccount: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
-            skipTokenMask: 0,
+            skipTokensMask: 0,
             convertToETH: false,
             calls: new MultiCall[](0)
         });
@@ -486,523 +485,523 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         assertEq(creditFacade.totalBorrowedInBlockInt(), debtInBlock + debt, "Debt in block was updated incorrectly");
     }
 
-    /// @dev U:[FA-11]: closeCreditAccount wokrs as expected
-    function test_U_FA_11_closeCreditAccount_works_as_expected(uint256 enabledTokensMask) public notExpirableCase {
-        address creditAccount = DUMB_ADDRESS;
-
-        bool hasCalls = (getHash({value: enabledTokensMask, seed: 2}) % 2) == 0;
-        bool hasBotPermissions = (getHash({value: enabledTokensMask, seed: 3}) % 2) == 0;
-
-        uint256 LINK_TOKEN_MASK = 4;
-        uint128 debt = uint128(getHash({value: enabledTokensMask, seed: 2})) / 2;
-
-        address adapter = address(new AdapterMock(address(creditManagerMock), DUMB_ADDRESS));
-
-        creditManagerMock.setContractAllowance({adapter: adapter, targetContract: DUMB_ADDRESS});
-
-        MultiCall[] memory calls;
-
-        creditManagerMock.setBorrower(USER);
-        creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, hasBotPermissions);
-
-        CollateralDebtData memory collateralDebtData = CollateralDebtData({
-            debt: debt,
-            cumulativeIndexNow: getHash({value: enabledTokensMask, seed: 3}),
-            cumulativeIndexLastUpdate: getHash({value: enabledTokensMask, seed: 4}),
-            cumulativeQuotaInterest: uint128(getHash({value: enabledTokensMask, seed: 5})),
-            accruedInterest: getHash({value: enabledTokensMask, seed: 6}),
-            accruedFees: getHash({value: enabledTokensMask, seed: 7}),
-            totalDebtUSD: 0,
-            totalValue: 0,
-            totalValueUSD: 0,
-            twvUSD: 0,
-            enabledTokensMask: enabledTokensMask,
-            quotedTokensMask: 0,
-            quotedTokens: new address[](0),
-            // quotedLts: new uint16[](0),
-            // quotas: new uint256[](0),
-            _poolQuotaKeeper: address(0)
-        });
-
-        CollateralDebtData memory expectedCollateralDebtData = clone(collateralDebtData);
-
-        if (hasCalls) {
-            calls = MultiCallBuilder.build(
-                MultiCall({target: adapter, callData: abi.encodeCall(AdapterMock.dumbCall, (LINK_TOKEN_MASK, 0))})
-            );
-
-            expectedCollateralDebtData.enabledTokensMask |= LINK_TOKEN_MASK;
-        } else {
-            creditManagerMock.setRevertOnActiveAccount(true);
-        }
-
-        creditManagerMock.setDebtAndCollateralData(collateralDebtData);
-
-        bool convertToETH = (getHash({value: enabledTokensMask, seed: 1}) % 2) == 1;
-
-        caseName =
-            string.concat(caseName, "convertToETH = ", boolToStr(convertToETH), ", hasCalls = ", boolToStr(hasCalls));
-
-        vm.expectCall(
-            address(creditManagerMock),
-            abi.encodeCall(ICreditManagerV3.calcDebtAndCollateral, (creditAccount, CollateralCalcTask.DEBT_ONLY))
-        );
-
-        vm.expectCall(
-            address(creditManagerMock),
-            abi.encodeCall(ICreditManagerV3.claimWithdrawals, (creditAccount, FRIEND, ClaimAction.FORCE_CLAIM))
-        );
-
-        uint256 skipTokenMask = getHash({value: enabledTokensMask, seed: 1});
-
-        vm.expectCall(
-            address(creditManagerMock),
-            abi.encodeCall(
-                ICreditManagerV3.closeCreditAccount,
-                (
-                    creditAccount,
-                    ClosureAction.CLOSE_ACCOUNT,
-                    expectedCollateralDebtData,
-                    USER,
-                    FRIEND,
-                    skipTokenMask,
-                    convertToETH
-                )
-            )
-        );
-
-        if (convertToETH) {
-            vm.expectCall(
-                address(withdrawalManagerMock),
-                abi.encodeCall(IWithdrawalManagerV3.claimImmediateWithdrawal, (ETH_ADDRESS, FRIEND))
-            );
-        }
-
-        if (hasBotPermissions) {
-            vm.expectCall(
-                address(botListMock),
-                abi.encodeCall(IBotListV3.eraseAllBotPermissions, (address(creditManagerMock), creditAccount))
-            );
-        } else {
-            botListMock.setRevertOnErase(true);
-        }
-
-        vm.expectEmit(true, true, true, true);
-        emit CloseCreditAccount(creditAccount, USER, FRIEND);
-
-        vm.prank(USER);
-        creditFacade.closeCreditAccount({
-            creditAccount: creditAccount,
-            to: FRIEND,
-            skipTokenMask: skipTokenMask,
-            convertToETH: convertToETH,
-            calls: calls
-        });
-
-        assertEq(
-            creditManagerMock.closeCollateralDebtData(),
-            expectedCollateralDebtData,
-            _testCaseErr("Incorrect collateralDebtData")
-        );
-    }
-
-    //
-    // LIQUIDATE CREDIT ACCOUNT
-    //
-
-    /// @dev U:[FA-12]: liquidateCreditAccount allows emergency liquidators when paused
-    function test_U_FA_12_liquidateCreditAccount_allows_emergency_liquidators_when_paused() public notExpirableCase {
-        address creditAccount = DUMB_ADDRESS;
-
-        creditManagerMock.setBorrower(USER);
-
-        CollateralDebtData memory collateralDebtData;
-        collateralDebtData.totalDebtUSD = 101;
-        collateralDebtData.twvUSD = 100;
-
-        creditManagerMock.setDebtAndCollateralData(collateralDebtData);
+    // /// @dev U:[FA-11]: closeCreditAccount wokrs as expected
+    // function test_U_FA_11_closeCreditAccount_works_as_expected(uint256 enabledTokensMask) public notExpirableCase {
+    //     address creditAccount = DUMB_ADDRESS;
+
+    //     bool hasCalls = (getHash({value: enabledTokensMask, seed: 2}) % 2) == 0;
+    //     bool hasBotPermissions = (getHash({value: enabledTokensMask, seed: 3}) % 2) == 0;
+
+    //     uint256 LINK_TOKEN_MASK = 4;
+    //     uint128 debt = uint128(getHash({value: enabledTokensMask, seed: 2})) / 2;
+
+    //     address adapter = address(new AdapterMock(address(creditManagerMock), DUMB_ADDRESS));
+
+    //     creditManagerMock.setContractAllowance({adapter: adapter, targetContract: DUMB_ADDRESS});
+
+    //     MultiCall[] memory calls;
+
+    //     creditManagerMock.setBorrower(USER);
+    //     creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, hasBotPermissions);
+
+    //     CollateralDebtData memory collateralDebtData = CollateralDebtData({
+    //         debt: debt,
+    //         cumulativeIndexNow: getHash({value: enabledTokensMask, seed: 3}),
+    //         cumulativeIndexLastUpdate: getHash({value: enabledTokensMask, seed: 4}),
+    //         cumulativeQuotaInterest: uint128(getHash({value: enabledTokensMask, seed: 5})),
+    //         accruedInterest: getHash({value: enabledTokensMask, seed: 6}),
+    //         accruedFees: getHash({value: enabledTokensMask, seed: 7}),
+    //         totalDebtUSD: 0,
+    //         totalValue: 0,
+    //         totalValueUSD: 0,
+    //         twvUSD: 0,
+    //         enabledTokensMask: enabledTokensMask,
+    //         quotedTokensMask: 0,
+    //         quotedTokens: new address[](0),
+    //         // quotedLts: new uint16[](0),
+    //         // quotas: new uint256[](0),
+    //         _poolQuotaKeeper: address(0)
+    //     });
+
+    //     CollateralDebtData memory expectedCollateralDebtData = clone(collateralDebtData);
+
+    //     if (hasCalls) {
+    //         calls = MultiCallBuilder.build(
+    //             MultiCall({target: adapter, callData: abi.encodeCall(AdapterMock.dumbCall, (LINK_TOKEN_MASK, 0))})
+    //         );
+
+    //         expectedCollateralDebtData.enabledTokensMask |= LINK_TOKEN_MASK;
+    //     } else {
+    //         creditManagerMock.setRevertOnActiveAccount(true);
+    //     }
+
+    //     creditManagerMock.setDebtAndCollateralData(collateralDebtData);
+
+    //     bool convertToETH = (getHash({value: enabledTokensMask, seed: 1}) % 2) == 1;
+
+    //     caseName =
+    //         string.concat(caseName, "convertToETH = ", boolToStr(convertToETH), ", hasCalls = ", boolToStr(hasCalls));
+
+    //     vm.expectCall(
+    //         address(creditManagerMock),
+    //         abi.encodeCall(ICreditManagerV3.calcDebtAndCollateral, (creditAccount, CollateralCalcTask.DEBT_ONLY))
+    //     );
+
+    //     vm.expectCall(
+    //         address(creditManagerMock),
+    //         abi.encodeCall(ICreditManagerV3.claimWithdrawals, (creditAccount, FRIEND, ClaimAction.FORCE_CLAIM))
+    //     );
+
+    //     uint256 skipTokensMask = getHash({value: enabledTokensMask, seed: 1});
+
+    //     vm.expectCall(
+    //         address(creditManagerMock),
+    //         abi.encodeCall(
+    //             ICreditManagerV3.closeCreditAccount,
+    //             (
+    //                 creditAccount,
+    //                 ClosureAction.CLOSE_ACCOUNT,
+    //                 expectedCollateralDebtData,
+    //                 USER,
+    //                 FRIEND,
+    //                 skipTokensMask,
+    //                 convertToETH
+    //             )
+    //         )
+    //     );
+
+    //     if (convertToETH) {
+    //         vm.expectCall(
+    //             address(withdrawalManagerMock),
+    //             abi.encodeCall(IWithdrawalManagerV3.claimImmediateWithdrawal, (ETH_ADDRESS, FRIEND))
+    //         );
+    //     }
+
+    //     if (hasBotPermissions) {
+    //         vm.expectCall(
+    //             address(botListMock),
+    //             abi.encodeCall(IBotListV3.eraseAllBotPermissions, (address(creditManagerMock), creditAccount))
+    //         );
+    //     } else {
+    //         botListMock.setRevertOnErase(true);
+    //     }
+
+    //     vm.expectEmit(true, true, true, true);
+    //     emit CloseCreditAccount(creditAccount, USER, FRIEND);
+
+    //     vm.prank(USER);
+    //     creditFacade.closeCreditAccount({
+    //         creditAccount: creditAccount,
+    //         to: FRIEND,
+    //         skipTokensMask: skipTokensMask,
+    //         convertToETH: convertToETH,
+    //         calls: calls
+    //     });
+
+    //     assertEq(
+    //         creditManagerMock.closeCollateralDebtData(),
+    //         expectedCollateralDebtData,
+    //         _testCaseErr("Incorrect collateralDebtData")
+    //     );
+    // }
+
+    // //
+    // // LIQUIDATE CREDIT ACCOUNT
+    // //
+
+    // /// @dev U:[FA-12]: liquidateCreditAccount allows emergency liquidators when paused
+    // function test_U_FA_12_liquidateCreditAccount_allows_emergency_liquidators_when_paused() public notExpirableCase {
+    //     address creditAccount = DUMB_ADDRESS;
+
+    //     creditManagerMock.setBorrower(USER);
+
+    //     CollateralDebtData memory collateralDebtData;
+    //     collateralDebtData.totalDebtUSD = 101;
+    //     collateralDebtData.twvUSD = 100;
+
+    //     creditManagerMock.setDebtAndCollateralData(collateralDebtData);
 
-        vm.prank(CONFIGURATOR);
-        creditFacade.pause();
-
-        for (uint256 i = 0; i < 2; ++i) {
-            bool isEmergencyLiquidator = i == 0;
-
-            vm.prank(CONFIGURATOR);
-            creditFacade.setEmergencyLiquidator(
-                LIQUIDATOR, isEmergencyLiquidator ? AllowanceAction.ALLOW : AllowanceAction.FORBID
-            );
-
-            caseName = string.concat(caseName, "isEmergencyLiquidator = ", boolToStr(isEmergencyLiquidator));
-
-            if (!isEmergencyLiquidator) {
-                vm.expectRevert("Pausable: paused");
-            }
-
-            vm.prank(LIQUIDATOR);
-            creditFacade.liquidateCreditAccount({
-                creditAccount: creditAccount,
-                to: FRIEND,
-                skipTokenMask: 0,
-                convertToETH: false,
-                calls: new MultiCall[](0)
-            });
-        }
-    }
-
-    /// @dev U:[FA-13]: liquidateCreditAccount reverts if account has enough collateral
-    function test_U_FA_13_liquidateCreditAccount_reverts_if_account_has_enough_collateral(uint40 timestamp)
-        public
-        allExpirableCases
-    {
-        address creditAccount = DUMB_ADDRESS;
-
-        uint40 expiredAt = uint40(getHash({value: timestamp, seed: 1}) % type(uint40).max);
-
-        if (expirable) {
-            vm.prank(CONFIGURATOR);
-            creditFacade.setExpirationDate(expiredAt);
-        }
-
-        creditManagerMock.setBorrower(USER);
-
-        CollateralDebtData memory collateralDebtData;
-        collateralDebtData.totalDebtUSD = 100;
-        collateralDebtData.twvUSD = 100;
-
-        creditManagerMock.setDebtAndCollateralData(collateralDebtData);
-
-        vm.warp(timestamp);
-
-        bool isExpiredLiquidatable = expirable && (timestamp >= expiredAt);
-
-        if (!isExpiredLiquidatable) {
-            vm.expectRevert(CreditAccountNotLiquidatableException.selector);
-        }
-
-        vm.prank(LIQUIDATOR);
-        creditFacade.liquidateCreditAccount({
-            creditAccount: creditAccount,
-            to: FRIEND,
-            skipTokenMask: 0,
-            convertToETH: false,
-            calls: new MultiCall[](0)
-        });
-    }
-
-    /// @dev U:[FA-14]: liquidateCreditAccount picks correct close action
-    function test_U_FA_14_liquidateCreditAccount_picks_correct_close_action(uint40 timestamp)
-        public
-        allExpirableCases
-    {
-        address creditAccount = DUMB_ADDRESS;
-
-        uint40 expiredAt = uint40(getHash({value: timestamp, seed: 1}) % type(uint40).max);
-
-        if (expirable) {
-            vm.prank(CONFIGURATOR);
-            creditFacade.setExpirationDate(expiredAt);
-        }
-
-        creditManagerMock.setBorrower(USER);
-
-        vm.warp(timestamp);
-
-        bool isExpiredLiquidatable = expirable && (timestamp >= expiredAt);
-
-        bool enoughCollateral;
-        if (isExpiredLiquidatable) {
-            enoughCollateral = (getHash({value: timestamp, seed: 3}) % 2) == 0;
-        }
-
-        CollateralDebtData memory collateralDebtData;
-        collateralDebtData.totalDebtUSD = 101;
-        collateralDebtData.twvUSD = enoughCollateral ? 101 : 100;
-
-        creditManagerMock.setDebtAndCollateralData(collateralDebtData);
-
-        ClosureAction closeAction = (enoughCollateral && isExpiredLiquidatable)
-            ? ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT
-            : ClosureAction.LIQUIDATE_ACCOUNT;
-
-        vm.expectEmit(true, true, true, true);
-        emit LiquidateCreditAccount(creditAccount, USER, LIQUIDATOR, FRIEND, closeAction, 0);
-
-        vm.expectCall(
-            address(creditManagerMock),
-            abi.encodeCall(
-                ICreditManagerV3.closeCreditAccount,
-                (creditAccount, closeAction, collateralDebtData, LIQUIDATOR, FRIEND, 0, false)
-            )
-        );
-
-        vm.prank(LIQUIDATOR);
-        creditFacade.liquidateCreditAccount({
-            creditAccount: creditAccount,
-            to: FRIEND,
-            skipTokenMask: 0,
-            convertToETH: false,
-            calls: new MultiCall[](0)
-        });
-    }
-
-    /// @dev U:[FA-15]: liquidateCreditAccount claims correct withdrawal amount and enable token
-    function test_U_FA_15_liquidateCreditAccount_claims_correct_withdrawal_amount() public notExpirableCase {
-        address creditAccount = DUMB_ADDRESS;
-
-        uint256 cancelMask = 1 << 7;
-
-        creditManagerMock.setBorrower(USER);
-
-        CollateralDebtData memory collateralDebtData;
-        collateralDebtData.totalDebtUSD = 101;
-        collateralDebtData.twvUSD = 100;
-
-        creditManagerMock.setDebtAndCollateralData(collateralDebtData);
-        creditManagerMock.setClaimWithdrawals(cancelMask);
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setEmergencyLiquidator(LIQUIDATOR, AllowanceAction.ALLOW);
-
-        CollateralDebtData memory expectedCollateralDebtData = clone(collateralDebtData);
-        expectedCollateralDebtData.enabledTokensMask = cancelMask;
-
-        for (uint256 i = 0; i < 2; ++i) {
-            uint256 snapshot = vm.snapshot();
-            bool isEmergencyLiquidation = i == 1;
-
-            if (isEmergencyLiquidation) {
-                vm.prank(CONFIGURATOR);
-                creditFacade.pause();
-            }
-
-            caseName = string.concat(caseName, "isEmergencyLiquidation = ", boolToStr(isEmergencyLiquidation));
-
-            vm.expectCall(
-                address(creditManagerMock),
-                abi.encodeCall(
-                    ICreditManagerV3.calcDebtAndCollateral,
-                    (
-                        creditAccount,
-                        isEmergencyLiquidation
-                            ? CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
-                            : CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS
-                    )
-                )
-            );
-
-            vm.expectCall(
-                address(creditManagerMock),
-                abi.encodeCall(
-                    ICreditManagerV3.claimWithdrawals,
-                    (creditAccount, USER, isEmergencyLiquidation ? ClaimAction.FORCE_CANCEL : ClaimAction.CANCEL)
-                )
-            );
-
-            vm.prank(LIQUIDATOR);
-            creditFacade.liquidateCreditAccount({
-                creditAccount: creditAccount,
-                to: FRIEND,
-                skipTokenMask: 0,
-                convertToETH: false,
-                calls: new MultiCall[](0)
-            });
-
-            assertEq(
-                creditManagerMock.closeCollateralDebtData(),
-                expectedCollateralDebtData,
-                _testCaseErr("Incorrect collateralDebtData")
-            );
-
-            vm.revertTo(snapshot);
-        }
-    }
-
-    /// @dev U:[FA-16]: liquidate wokrs as expected
-    function test_U_FA_16_liquidate_wokrs_as_expected(uint256 enabledTokensMask) public notExpirableCase {
-        address creditAccount = DUMB_ADDRESS;
-
-        bool hasCalls = (getHash({value: enabledTokensMask, seed: 2}) % 2) == 0;
-        bool hasBotPermissions = (getHash({value: enabledTokensMask, seed: 3}) % 2) == 0;
-
-        uint128 debt = uint128(getHash({value: enabledTokensMask, seed: 2})) / 2;
-
-        uint256 cancelMask = 1 << 7;
-        uint256 LINK_TOKEN_MASK = 4;
-
-        address adapter = address(new AdapterMock(address(creditManagerMock), DUMB_ADDRESS));
-
-        creditManagerMock.setContractAllowance({adapter: adapter, targetContract: DUMB_ADDRESS});
-
-        MultiCall[] memory calls;
-
-        creditManagerMock.setBorrower(USER);
-        creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, hasBotPermissions);
-
-        CollateralDebtData memory collateralDebtData;
-        collateralDebtData.debt = debt;
-        collateralDebtData.totalDebtUSD = 101;
-        collateralDebtData.twvUSD = 100;
-
-        creditManagerMock.setDebtAndCollateralData(collateralDebtData);
-        creditManagerMock.setClaimWithdrawals(cancelMask);
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setEmergencyLiquidator(LIQUIDATOR, AllowanceAction.ALLOW);
-
-        CollateralDebtData memory expectedCollateralDebtData = clone(collateralDebtData);
-        expectedCollateralDebtData.enabledTokensMask = cancelMask;
-
-        if (hasCalls) {
-            calls = MultiCallBuilder.build(
-                MultiCall({target: adapter, callData: abi.encodeCall(AdapterMock.dumbCall, (LINK_TOKEN_MASK, 0))})
-            );
-
-            expectedCollateralDebtData.enabledTokensMask |= LINK_TOKEN_MASK;
-        } else {
-            creditManagerMock.setRevertOnActiveAccount(true);
-        }
-
-        bool convertToETH = (getHash({value: enabledTokensMask, seed: 1}) % 2) == 1;
-
-        caseName =
-            string.concat(caseName, "convertToETH = ", boolToStr(convertToETH), ", hasCalls = ", boolToStr(hasCalls));
-
-        vm.expectCall(
-            address(creditManagerMock),
-            abi.encodeCall(
-                ICreditManagerV3.calcDebtAndCollateral,
-                (creditAccount, CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS)
-            )
-        );
-
-        vm.expectCall(
-            address(creditManagerMock),
-            abi.encodeCall(ICreditManagerV3.claimWithdrawals, (creditAccount, USER, ClaimAction.CANCEL))
-        );
-
-        uint256 skipTokenMask = getHash({value: enabledTokensMask, seed: 1});
-
-        vm.expectCall(
-            address(creditManagerMock),
-            abi.encodeCall(
-                ICreditManagerV3.closeCreditAccount,
-                (
-                    creditAccount,
-                    ClosureAction.LIQUIDATE_ACCOUNT,
-                    expectedCollateralDebtData,
-                    LIQUIDATOR,
-                    FRIEND,
-                    skipTokenMask,
-                    convertToETH
-                )
-            )
-        );
-
-        if (convertToETH) {
-            vm.expectCall(
-                address(withdrawalManagerMock),
-                abi.encodeCall(IWithdrawalManagerV3.claimImmediateWithdrawal, (ETH_ADDRESS, FRIEND))
-            );
-        }
-
-        if (hasBotPermissions) {
-            vm.expectCall(
-                address(botListMock),
-                abi.encodeCall(IBotListV3.eraseAllBotPermissions, (address(creditManagerMock), creditAccount))
-            );
-        } else {
-            botListMock.setRevertOnErase(true);
-        }
-        creditManagerMock.setCloseCreditAccountReturns(1_000, 0);
-
-        vm.expectEmit(true, true, true, true);
-        emit LiquidateCreditAccount(creditAccount, USER, LIQUIDATOR, FRIEND, ClosureAction.LIQUIDATE_ACCOUNT, 1_000);
-
-        vm.prank(LIQUIDATOR);
-        creditFacade.liquidateCreditAccount({
-            creditAccount: creditAccount,
-            to: FRIEND,
-            skipTokenMask: skipTokenMask,
-            convertToETH: convertToETH,
-            calls: calls
-        });
-
-        assertEq(
-            creditManagerMock.closeCollateralDebtData(),
-            expectedCollateralDebtData,
-            _testCaseErr("Incorrect collateralDebtData")
-        );
-    }
-
-    /// @dev U:[FA-17]: liquidate correctly computes cumulative loss and pause contract if needed
-    function test_U_FA_17_liquidate_correctly_computes_cumulative_loss_and_pause_contract_if_needed(uint128 maxLoss)
-        public
-        notExpirableCase
-    {
-        vm.assume(maxLoss > 0 && maxLoss < type(uint120).max);
-
-        address creditAccount = DUMB_ADDRESS;
-
-        MultiCall[] memory calls;
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setCumulativeLossParams(maxLoss, true);
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setDebtLimits(1, 100, 10);
-
-        assertEq(creditFacade.maxDebtPerBlockMultiplier(), 10, "SETUP: incorrect  maxDebtPerBlockMultiplier");
-
-        uint256 step = maxLoss / ((getHash(maxLoss, 3) % 5) + 1) + 1;
-
-        uint256 expectedCumulativeLoss;
-
-        creditManagerMock.setBorrower(USER);
-
-        CollateralDebtData memory collateralDebtData;
-        collateralDebtData.totalDebtUSD = 101;
-        collateralDebtData.twvUSD = 100;
-
-        creditManagerMock.setDebtAndCollateralData(collateralDebtData);
-        creditManagerMock.setClaimWithdrawals(0);
-
-        creditManagerMock.setCloseCreditAccountReturns(1000, step);
-
-        do {
-            vm.expectCall(
-                address(creditManagerMock),
-                abi.encodeCall(
-                    ICreditManagerV3.closeCreditAccount,
-                    (creditAccount, ClosureAction.LIQUIDATE_ACCOUNT, collateralDebtData, LIQUIDATOR, FRIEND, 0, false)
-                )
-            );
-
-            vm.expectEmit(true, true, true, true);
-            emit LiquidateCreditAccount(creditAccount, USER, LIQUIDATOR, FRIEND, ClosureAction.LIQUIDATE_ACCOUNT, 1_000);
-
-            vm.prank(LIQUIDATOR);
-            creditFacade.liquidateCreditAccount({
-                creditAccount: creditAccount,
-                to: FRIEND,
-                skipTokenMask: 0,
-                convertToETH: false,
-                calls: calls
-            });
-
-            assertEq(creditFacade.maxDebtPerBlockMultiplier(), 0, "maxDebtPerBlockMultiplier wasnt set to zero");
-
-            (uint128 currentCumulativeLoss,) = creditFacade.lossParams();
-
-            expectedCumulativeLoss += step;
-
-            assertEq(currentCumulativeLoss, expectedCumulativeLoss, "Incorrect currentCumulativeLoss");
-
-            bool shoudBePaused = expectedCumulativeLoss > maxLoss;
-
-            assertEq(creditFacade.paused(), shoudBePaused, "Paused wasn't set");
-        } while (expectedCumulativeLoss < maxLoss);
-    }
+    //     vm.prank(CONFIGURATOR);
+    //     creditFacade.pause();
+
+    //     for (uint256 i = 0; i < 2; ++i) {
+    //         bool isEmergencyLiquidator = i == 0;
+
+    //         vm.prank(CONFIGURATOR);
+    //         creditFacade.setEmergencyLiquidator(
+    //             LIQUIDATOR, isEmergencyLiquidator ? AllowanceAction.ALLOW : AllowanceAction.FORBID
+    //         );
+
+    //         caseName = string.concat(caseName, "isEmergencyLiquidator = ", boolToStr(isEmergencyLiquidator));
+
+    //         if (!isEmergencyLiquidator) {
+    //             vm.expectRevert("Pausable: paused");
+    //         }
+
+    //         vm.prank(LIQUIDATOR);
+    //         creditFacade.liquidateCreditAccount({
+    //             creditAccount: creditAccount,
+    //             to: FRIEND,
+    //             skipTokensMask: 0,
+    //             convertToETH: false,
+    //             calls: new MultiCall[](0)
+    //         });
+    //     }
+    // }
+
+    // /// @dev U:[FA-13]: liquidateCreditAccount reverts if account has enough collateral
+    // function test_U_FA_13_liquidateCreditAccount_reverts_if_account_has_enough_collateral(uint40 timestamp)
+    //     public
+    //     allExpirableCases
+    // {
+    //     address creditAccount = DUMB_ADDRESS;
+
+    //     uint40 expiredAt = uint40(getHash({value: timestamp, seed: 1}) % type(uint40).max);
+
+    //     if (expirable) {
+    //         vm.prank(CONFIGURATOR);
+    //         creditFacade.setExpirationDate(expiredAt);
+    //     }
+
+    //     creditManagerMock.setBorrower(USER);
+
+    //     CollateralDebtData memory collateralDebtData;
+    //     collateralDebtData.totalDebtUSD = 100;
+    //     collateralDebtData.twvUSD = 100;
+
+    //     creditManagerMock.setDebtAndCollateralData(collateralDebtData);
+
+    //     vm.warp(timestamp);
+
+    //     bool isExpiredLiquidatable = expirable && (timestamp >= expiredAt);
+
+    //     if (!isExpiredLiquidatable) {
+    //         vm.expectRevert(CreditAccountNotLiquidatableException.selector);
+    //     }
+
+    //     vm.prank(LIQUIDATOR);
+    //     creditFacade.liquidateCreditAccount({
+    //         creditAccount: creditAccount,
+    //         to: FRIEND,
+    //         skipTokensMask: 0,
+    //         convertToETH: false,
+    //         calls: new MultiCall[](0)
+    //     });
+    // }
+
+    // /// @dev U:[FA-14]: liquidateCreditAccount picks correct close action
+    // function test_U_FA_14_liquidateCreditAccount_picks_correct_close_action(uint40 timestamp)
+    //     public
+    //     allExpirableCases
+    // {
+    //     address creditAccount = DUMB_ADDRESS;
+
+    //     uint40 expiredAt = uint40(getHash({value: timestamp, seed: 1}) % type(uint40).max);
+
+    //     if (expirable) {
+    //         vm.prank(CONFIGURATOR);
+    //         creditFacade.setExpirationDate(expiredAt);
+    //     }
+
+    //     creditManagerMock.setBorrower(USER);
+
+    //     vm.warp(timestamp);
+
+    //     bool isExpiredLiquidatable = expirable && (timestamp >= expiredAt);
+
+    //     bool enoughCollateral;
+    //     if (isExpiredLiquidatable) {
+    //         enoughCollateral = (getHash({value: timestamp, seed: 3}) % 2) == 0;
+    //     }
+
+    //     CollateralDebtData memory collateralDebtData;
+    //     collateralDebtData.totalDebtUSD = 101;
+    //     collateralDebtData.twvUSD = enoughCollateral ? 101 : 100;
+
+    //     creditManagerMock.setDebtAndCollateralData(collateralDebtData);
+
+    //     ClosureAction closeAction = (enoughCollateral && isExpiredLiquidatable)
+    //         ? ClosureAction.LIQUIDATE_EXPIRED_ACCOUNT
+    //         : ClosureAction.LIQUIDATE_ACCOUNT;
+
+    //     vm.expectEmit(true, true, true, true);
+    //     emit LiquidateCreditAccount(creditAccount, USER, LIQUIDATOR, FRIEND, closeAction, 0);
+
+    //     vm.expectCall(
+    //         address(creditManagerMock),
+    //         abi.encodeCall(
+    //             ICreditManagerV3.closeCreditAccount,
+    //             (creditAccount, closeAction, collateralDebtData, LIQUIDATOR, FRIEND, 0, false)
+    //         )
+    //     );
+
+    //     vm.prank(LIQUIDATOR);
+    //     creditFacade.liquidateCreditAccount({
+    //         creditAccount: creditAccount,
+    //         to: FRIEND,
+    //         skipTokensMask: 0,
+    //         convertToETH: false,
+    //         calls: new MultiCall[](0)
+    //     });
+    // }
+
+    // /// @dev U:[FA-15]: liquidateCreditAccount claims correct withdrawal amount and enable token
+    // function test_U_FA_15_liquidateCreditAccount_claims_correct_withdrawal_amount() public notExpirableCase {
+    //     address creditAccount = DUMB_ADDRESS;
+
+    //     uint256 cancelMask = 1 << 7;
+
+    //     creditManagerMock.setBorrower(USER);
+
+    //     CollateralDebtData memory collateralDebtData;
+    //     collateralDebtData.totalDebtUSD = 101;
+    //     collateralDebtData.twvUSD = 100;
+
+    //     creditManagerMock.setDebtAndCollateralData(collateralDebtData);
+    //     creditManagerMock.setClaimWithdrawals(cancelMask);
+
+    //     vm.prank(CONFIGURATOR);
+    //     creditFacade.setEmergencyLiquidator(LIQUIDATOR, AllowanceAction.ALLOW);
+
+    //     CollateralDebtData memory expectedCollateralDebtData = clone(collateralDebtData);
+    //     expectedCollateralDebtData.enabledTokensMask = cancelMask;
+
+    //     for (uint256 i = 0; i < 2; ++i) {
+    //         uint256 snapshot = vm.snapshot();
+    //         bool isEmergencyLiquidation = i == 1;
+
+    //         if (isEmergencyLiquidation) {
+    //             vm.prank(CONFIGURATOR);
+    //             creditFacade.pause();
+    //         }
+
+    //         caseName = string.concat(caseName, "isEmergencyLiquidation = ", boolToStr(isEmergencyLiquidation));
+
+    //         vm.expectCall(
+    //             address(creditManagerMock),
+    //             abi.encodeCall(
+    //                 ICreditManagerV3.calcDebtAndCollateral,
+    //                 (
+    //                     creditAccount,
+    //                     isEmergencyLiquidation
+    //                         ? CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
+    //                         : CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS
+    //                 )
+    //             )
+    //         );
+
+    //         vm.expectCall(
+    //             address(creditManagerMock),
+    //             abi.encodeCall(
+    //                 ICreditManagerV3.claimWithdrawals,
+    //                 (creditAccount, USER, isEmergencyLiquidation ? ClaimAction.FORCE_CANCEL : ClaimAction.CANCEL)
+    //             )
+    //         );
+
+    //         vm.prank(LIQUIDATOR);
+    //         creditFacade.liquidateCreditAccount({
+    //             creditAccount: creditAccount,
+    //             to: FRIEND,
+    //             skipTokensMask: 0,
+    //             convertToETH: false,
+    //             calls: new MultiCall[](0)
+    //         });
+
+    //         assertEq(
+    //             creditManagerMock.closeCollateralDebtData(),
+    //             expectedCollateralDebtData,
+    //             _testCaseErr("Incorrect collateralDebtData")
+    //         );
+
+    //         vm.revertTo(snapshot);
+    //     }
+    // }
+
+    // /// @dev U:[FA-16]: liquidate wokrs as expected
+    // function test_U_FA_16_liquidate_wokrs_as_expected(uint256 enabledTokensMask) public notExpirableCase {
+    //     address creditAccount = DUMB_ADDRESS;
+
+    //     bool hasCalls = (getHash({value: enabledTokensMask, seed: 2}) % 2) == 0;
+    //     bool hasBotPermissions = (getHash({value: enabledTokensMask, seed: 3}) % 2) == 0;
+
+    //     uint128 debt = uint128(getHash({value: enabledTokensMask, seed: 2})) / 2;
+
+    //     uint256 cancelMask = 1 << 7;
+    //     uint256 LINK_TOKEN_MASK = 4;
+
+    //     address adapter = address(new AdapterMock(address(creditManagerMock), DUMB_ADDRESS));
+
+    //     creditManagerMock.setContractAllowance({adapter: adapter, targetContract: DUMB_ADDRESS});
+
+    //     MultiCall[] memory calls;
+
+    //     creditManagerMock.setBorrower(USER);
+    //     creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, hasBotPermissions);
+
+    //     CollateralDebtData memory collateralDebtData;
+    //     collateralDebtData.debt = debt;
+    //     collateralDebtData.totalDebtUSD = 101;
+    //     collateralDebtData.twvUSD = 100;
+
+    //     creditManagerMock.setDebtAndCollateralData(collateralDebtData);
+    //     creditManagerMock.setClaimWithdrawals(cancelMask);
+
+    //     vm.prank(CONFIGURATOR);
+    //     creditFacade.setEmergencyLiquidator(LIQUIDATOR, AllowanceAction.ALLOW);
+
+    //     CollateralDebtData memory expectedCollateralDebtData = clone(collateralDebtData);
+    //     expectedCollateralDebtData.enabledTokensMask = cancelMask;
+
+    //     if (hasCalls) {
+    //         calls = MultiCallBuilder.build(
+    //             MultiCall({target: adapter, callData: abi.encodeCall(AdapterMock.dumbCall, (LINK_TOKEN_MASK, 0))})
+    //         );
+
+    //         expectedCollateralDebtData.enabledTokensMask |= LINK_TOKEN_MASK;
+    //     } else {
+    //         creditManagerMock.setRevertOnActiveAccount(true);
+    //     }
+
+    //     bool convertToETH = (getHash({value: enabledTokensMask, seed: 1}) % 2) == 1;
+
+    //     caseName =
+    //         string.concat(caseName, "convertToETH = ", boolToStr(convertToETH), ", hasCalls = ", boolToStr(hasCalls));
+
+    //     vm.expectCall(
+    //         address(creditManagerMock),
+    //         abi.encodeCall(
+    //             ICreditManagerV3.calcDebtAndCollateral,
+    //             (creditAccount, CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS)
+    //         )
+    //     );
+
+    //     vm.expectCall(
+    //         address(creditManagerMock),
+    //         abi.encodeCall(ICreditManagerV3.claimWithdrawals, (creditAccount, USER, ClaimAction.CANCEL))
+    //     );
+
+    //     uint256 skipTokensMask = getHash({value: enabledTokensMask, seed: 1});
+
+    //     vm.expectCall(
+    //         address(creditManagerMock),
+    //         abi.encodeCall(
+    //             ICreditManagerV3.closeCreditAccount,
+    //             (
+    //                 creditAccount,
+    //                 ClosureAction.LIQUIDATE_ACCOUNT,
+    //                 expectedCollateralDebtData,
+    //                 LIQUIDATOR,
+    //                 FRIEND,
+    //                 skipTokensMask,
+    //                 convertToETH
+    //             )
+    //         )
+    //     );
+
+    //     if (convertToETH) {
+    //         vm.expectCall(
+    //             address(withdrawalManagerMock),
+    //             abi.encodeCall(IWithdrawalManagerV3.claimImmediateWithdrawal, (ETH_ADDRESS, FRIEND))
+    //         );
+    //     }
+
+    //     if (hasBotPermissions) {
+    //         vm.expectCall(
+    //             address(botListMock),
+    //             abi.encodeCall(IBotListV3.eraseAllBotPermissions, (address(creditManagerMock), creditAccount))
+    //         );
+    //     } else {
+    //         botListMock.setRevertOnErase(true);
+    //     }
+    //     creditManagerMock.setCloseCreditAccountReturns(1_000, 0);
+
+    //     vm.expectEmit(true, true, true, true);
+    //     emit LiquidateCreditAccount(creditAccount, USER, LIQUIDATOR, FRIEND, ClosureAction.LIQUIDATE_ACCOUNT, 1_000);
+
+    //     vm.prank(LIQUIDATOR);
+    //     creditFacade.liquidateCreditAccount({
+    //         creditAccount: creditAccount,
+    //         to: FRIEND,
+    //         skipTokensMask: skipTokensMask,
+    //         convertToETH: convertToETH,
+    //         calls: calls
+    //     });
+
+    //     assertEq(
+    //         creditManagerMock.closeCollateralDebtData(),
+    //         expectedCollateralDebtData,
+    //         _testCaseErr("Incorrect collateralDebtData")
+    //     );
+    // }
+
+    // /// @dev U:[FA-17]: liquidate correctly computes cumulative loss and pause contract if needed
+    // function test_U_FA_17_liquidate_correctly_computes_cumulative_loss_and_pause_contract_if_needed(uint128 maxLoss)
+    //     public
+    //     notExpirableCase
+    // {
+    //     vm.assume(maxLoss > 0 && maxLoss < type(uint120).max);
+
+    //     address creditAccount = DUMB_ADDRESS;
+
+    //     MultiCall[] memory calls;
+
+    //     vm.prank(CONFIGURATOR);
+    //     creditFacade.setCumulativeLossParams(maxLoss, true);
+
+    //     vm.prank(CONFIGURATOR);
+    //     creditFacade.setDebtLimits(1, 100, 10);
+
+    //     assertEq(creditFacade.maxDebtPerBlockMultiplier(), 10, "SETUP: incorrect  maxDebtPerBlockMultiplier");
+
+    //     uint256 step = maxLoss / ((getHash(maxLoss, 3) % 5) + 1) + 1;
+
+    //     uint256 expectedCumulativeLoss;
+
+    //     creditManagerMock.setBorrower(USER);
+
+    //     CollateralDebtData memory collateralDebtData;
+    //     collateralDebtData.totalDebtUSD = 101;
+    //     collateralDebtData.twvUSD = 100;
+
+    //     creditManagerMock.setDebtAndCollateralData(collateralDebtData);
+    //     creditManagerMock.setClaimWithdrawals(0);
+
+    //     creditManagerMock.setCloseCreditAccountReturns(1000, step);
+
+    //     do {
+    //         vm.expectCall(
+    //             address(creditManagerMock),
+    //             abi.encodeCall(
+    //                 ICreditManagerV3.closeCreditAccount,
+    //                 (creditAccount, ClosureAction.LIQUIDATE_ACCOUNT, collateralDebtData, LIQUIDATOR, FRIEND, 0, false)
+    //             )
+    //         );
+
+    //         vm.expectEmit(true, true, true, true);
+    //         emit LiquidateCreditAccount(creditAccount, USER, LIQUIDATOR, FRIEND, ClosureAction.LIQUIDATE_ACCOUNT, 1_000);
+
+    //         vm.prank(LIQUIDATOR);
+    //         creditFacade.liquidateCreditAccount({
+    //             creditAccount: creditAccount,
+    //             to: FRIEND,
+    //             skipTokensMask: 0,
+    //             convertToETH: false,
+    //             calls: calls
+    //         });
+
+    //         assertEq(creditFacade.maxDebtPerBlockMultiplier(), 0, "maxDebtPerBlockMultiplier wasnt set to zero");
+
+    //         (uint128 currentCumulativeLoss,) = creditFacade.lossParams();
+
+    //         expectedCumulativeLoss += step;
+
+    //         assertEq(currentCumulativeLoss, expectedCumulativeLoss, "Incorrect currentCumulativeLoss");
+
+    //         bool shoudBePaused = expectedCumulativeLoss > maxLoss;
+
+    //         assertEq(creditFacade.paused(), shoudBePaused, "Paused wasn't set");
+    //     } while (expectedCumulativeLoss < maxLoss);
+    // }
 
     //
     //

@@ -24,7 +24,6 @@ import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {ClaimAction, IWithdrawalManagerV3} from "../interfaces/IWithdrawalManagerV3.sol";
 import {
     ICreditManagerV3,
-    ClosureAction,
     CollateralTokenData,
     ManageDebtAction,
     CreditAccountInfo,
@@ -219,9 +218,48 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditAccountsSet.add(creditAccount); // U:[CM-6]
     }
 
+    function closeCreditAccount(
+        address creditAccount,
+        address to,
+        uint256 enabledTokensMask,
+        uint256 skipTokensMask,
+        bool convertToETH
+    )
+        external
+        // override
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // U:[CM-2]
+    {
+        getBorrowerOrRevert(creditAccount); // U:[CM-7]
+
+        {
+            CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
+            if (currentCreditAccountInfo.debt != 0) {
+                revert(); // TODO: add exception here!
+            }
+
+            // currentCreditAccountInfo.borrower = address(0);
+            // currentCreditAccountInfo.lastDebtUpdate = 0;
+            // currentCreditAccountInfo.flags = 0;
+            assembly {
+                let slot := add(currentCreditAccountInfo.slot, 4)
+                sstore(slot, 0)
+            } // U:[CM-8]
+        }
+
+        _batchTokensTransfer({
+            creditAccount: creditAccount,
+            to: to,
+            convertToETH: convertToETH,
+            tokensToTransferMask: enabledTokensMask.disable(skipTokensMask)
+        }); // U:[CM-8, 9]
+
+        IAccountFactoryBase(accountFactory).returnCreditAccount({creditAccount: creditAccount}); // U:[CM-8]
+        creditAccountsSet.remove(creditAccount); // U:[CM-8]
+    }
+
     /// @notice Closes a credit account by repaying debt to the pool, removing quotas and returning account to the factory
     /// @param creditAccount Account to close
-    /// @param closureAction Closure mode, see `ClosureAction` for details
     /// @param collateralDebtData A struct with account's debt and collateral data
     /// @param payer Address to transfer underlying from in case account's balance is insufficient
     /// @param to Address to transfer tokens that left on the account after closure and repayments
@@ -234,14 +272,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @custom:expects `cdd` is a result of `calcDebtAndCollateral` in `DEBT_COLLATERAL_{x}_WITHDRAWALS` mode, where x is
     ///                 `WITHOUT` for normal closure, `CANCEL` for liquidation and `FORCE_CANCEL` for emergency liquidation
     /// @custom:invariant `remainingFunds * loss == 0`
-    function closeCreditAccount(
+    function liquidateCreditAccount(
         address creditAccount,
-        ClosureAction closureAction,
         CollateralDebtData calldata collateralDebtData,
         address payer,
         address to,
         uint256 skipTokensMask,
-        bool convertToETH
+        bool convertToETH,
+        bool isExpiredLiquidation
     )
         external
         override
@@ -249,79 +287,90 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacadeOnly // U:[CM-2]
         returns (uint256 remainingFunds, uint256 loss)
     {
-        address borrower = getBorrowerOrRevert(creditAccount); // U:[CM-7]
+        getBorrowerOrRevert(creditAccount); // U:[CM-7]
 
         {
             CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
             if (currentCreditAccountInfo.lastDebtUpdate == block.number) {
                 revert DebtUpdatedTwiceInOneBlockException(); // U:[CM-7]
             }
-
-            // currentCreditAccountInfo.borrower = address(0);
-            // currentCreditAccountInfo.lastDebtUpdate = 0;
-            // currentCreditAccountInfo.flags = 0;
-            assembly {
-                let slot := add(currentCreditAccountInfo.slot, 4)
-                sstore(slot, 0)
-            } // U:[CM-8]
         }
-
-        uint256 amountToPool;
-        uint256 profit;
-        if (closureAction == ClosureAction.CLOSE_ACCOUNT) {
-            (amountToPool, profit) = collateralDebtData.calcClosePayments({amountWithFeeFn: _amountWithFee}); // U:[CM-8]
-        } else {
-            bool isNormalLiquidation = closureAction == ClosureAction.LIQUIDATE_ACCOUNT;
+        {
+            uint256 amountToPool;
+            uint256 profit;
 
             (amountToPool, remainingFunds, profit, loss) = collateralDebtData.calcLiquidationPayments({
-                liquidationDiscount: isNormalLiquidation ? liquidationDiscount : liquidationDiscountExpired,
-                feeLiquidation: isNormalLiquidation ? feeLiquidation : feeLiquidationExpired,
+                liquidationDiscount: isExpiredLiquidation ? liquidationDiscountExpired : liquidationDiscount,
+                feeLiquidation: isExpiredLiquidation ? feeLiquidationExpired : feeLiquidation,
                 amountWithFeeFn: _amountWithFee,
                 amountMinusFeeFn: _amountMinusFee
             }); // U:[CM-8]
-        }
 
-        {
-            uint256 underlyingBalance = IERC20(underlying).safeBalanceOf({account: creditAccount}); // U:[CM-8]
-            uint256 distributedFunds = amountToPool + remainingFunds + 1;
+            // Computes total value of tokens which will be kept on account
+            if (remainingFunds > 1) {
+                // Calc totalValue for skipTokensMask without underlying
+                skipTokensMask = skipTokensMask.disable(UNDERLYING_TOKEN_MASK); // U:[CM-8]
 
-            if (underlyingBalance < distributedFunds) {
-                unchecked {
-                    IERC20(underlying).safeTransferFrom({
-                        from: payer,
-                        to: creditAccount,
-                        amount: _amountWithFee(distributedFunds - underlyingBalance)
-                    }); // U:[CM-8]
+                if (skipTokensMask != 0) {
+                    uint256 skipTokensValue = 0; // TODO: add calc here
+                    unchecked {
+                        remainingFunds = remainingFunds > skipTokensValue ? remainingFunds - skipTokensValue : 0;
+                    }
                 }
             }
-        }
 
-        if (collateralDebtData.quotedTokens.length != 0) {
-            bool setLimitsToZero = loss > 0; // U:[CM-8]
+            uint256 underlyingBalance = IERC20(underlying).safeBalanceOf({account: creditAccount}); // U:[CM-8]
+            {
+                uint256 distributedFunds = amountToPool + remainingFunds + 1;
 
-            IPoolQuotaKeeperV3(collateralDebtData._poolQuotaKeeper).removeQuotas({
-                creditAccount: creditAccount,
-                tokens: collateralDebtData.quotedTokens,
-                setLimitsToZero: setLimitsToZero
-            }); // U:[CM-8]
-        }
+                if (underlyingBalance < distributedFunds) {
+                    unchecked {
+                        IERC20(underlying).safeTransferFrom({
+                            from: payer,
+                            to: creditAccount,
+                            amount: _amountWithFee(distributedFunds - underlyingBalance)
+                        }); // U:[CM-8]
+                    }
 
-        if (amountToPool != 0) {
-            ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amountToPool}); // U:[CM-8]
-        }
+                    underlyingBalance = distributedFunds;
+                }
+            }
 
-        if (collateralDebtData.debt + profit + loss != 0) {
-            _poolRepayCreditAccount(collateralDebtData.debt, profit, loss); // U:[CM-8]
-        }
+            if (collateralDebtData.quotedTokens.length != 0) {
+                bool setLimitsToZero = loss > 0; // U:[CM-8]
 
-        if (remainingFunds > 1) {
-            _safeTokenTransfer({
-                creditAccount: creditAccount,
-                token: underlying,
-                to: borrower,
-                amount: remainingFunds,
-                convertToETH: false
-            }); // U:[CM-8]
+                IPoolQuotaKeeperV3(collateralDebtData._poolQuotaKeeper).removeQuotas({
+                    creditAccount: creditAccount,
+                    tokens: collateralDebtData.quotedTokens,
+                    setLimitsToZero: setLimitsToZero
+                }); // U:[CM-8]
+            }
+
+            if (amountToPool != 0) {
+                ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amountToPool}); // U:[CM-8]
+                unchecked {
+                    underlyingBalance -= amountToPool;
+                }
+            }
+
+            if (collateralDebtData.debt + profit + loss != 0) {
+                _poolRepayCreditAccount(collateralDebtData.debt, profit, loss); // U:[CM-8]
+            }
+
+            if (remainingFunds > 1) {
+                uint256 amountToLiquidator = underlyingBalance - remainingFunds;
+                if (amountToLiquidator != 0) {
+                    _safeTokenTransfer({
+                        creditAccount: creditAccount,
+                        token: underlying,
+                        to: to,
+                        amount: amountToLiquidator,
+                        convertToETH: convertToETH
+                    }); // U:[CM-8]
+                }
+
+                skipTokensMask = skipTokensMask.enable(UNDERLYING_TOKEN_MASK); // U:[CM-8]
+            }
         }
 
         _batchTokensTransfer({
@@ -330,9 +379,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             convertToETH: convertToETH,
             tokensToTransferMask: collateralDebtData.enabledTokensMask.disable(skipTokensMask)
         }); // U:[CM-8, 9]
-
-        IAccountFactoryBase(accountFactory).returnCreditAccount({creditAccount: creditAccount}); // U:[CM-8]
-        creditAccountsSet.remove(creditAccount); // U:[CM-8]
     }
 
     /// @notice Increases or decreases credit account's debt

@@ -13,7 +13,6 @@ import {SECONDS_PER_YEAR} from "@gearbox-protocol/core-v2/contracts/libraries/Co
 import {
     ICreditManagerV3,
     ICreditManagerV3Events,
-    ClosureAction,
     ManageDebtAction,
     BOT_PERMISSIONS_SET_FLAG
 } from "../../../interfaces/ICreditManagerV3.sol";
@@ -474,7 +473,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
     /// Remaining funds: >0
     ///
 
-    function test_I_CCA_09_close_credit_account_with_nonzero_skipTokenMask_sends_correct_tokens() public creditTest {
+    function test_I_CCA_09_close_credit_account_with_nonzero_skipTokensMask_sends_correct_tokens() public creditTest {
         // (uint256 debt,, address creditAccount) = _openCreditAccount();
 
         // tokenTestSuite.mint(Tokens.DAI, creditAccount, debt);
