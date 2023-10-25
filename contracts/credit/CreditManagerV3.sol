@@ -312,7 +312,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 skipTokensMask = skipTokensMask.disable(UNDERLYING_TOKEN_MASK); // U:[CM-8]
 
                 if (skipTokensMask != 0) {
-                    uint256 skipTokensValue = 0; // TODO: add calc here
+                    uint256 skipTokensValue = _getTokensValue(creditAccount, skipTokensMask);
                     unchecked {
                         remainingFunds = remainingFunds > skipTokensValue ? remainingFunds - skipTokensValue : 0;
                     }
@@ -846,6 +846,23 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 tokensToCheckMask = tokensToCheckMask.disable(tokenMask);
             }
         }
+    }
+
+    /// @dev Returns underlying-denominated value of the tokens in the mask for a CA
+    /// @param creditAccount Account to compute value for
+    /// @param tokensToCheckMask Mask of tokens to compute value of
+    function _getTokensValue(address creditAccount, uint256 tokensToCheckMask) internal view returns (uint256 value) {
+        address _priceOracle = priceOracle;
+
+        uint256 valueUSD = CollateralLogic.calcTotalTokenValueUSD({
+            creditAccount: creditAccount,
+            convertToUSDFn: _convertToUSD,
+            collateralTokenByMaskFn: _collateralTokenByMask,
+            priceOracle: _priceOracle,
+            tokensToCheckMask: tokensToCheckMask
+        });
+
+        value = _convertFromUSD(_priceOracle, valueUSD, underlying);
     }
 
     // ------ //
