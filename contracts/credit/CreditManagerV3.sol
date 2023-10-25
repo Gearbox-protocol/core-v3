@@ -218,41 +218,38 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditAccountsSet.add(creditAccount); // U:[CM-6]
     }
 
-    function closeCreditAccount(
-        address creditAccount,
-        address to,
-        uint256 enabledTokensMask,
-        uint256 skipTokensMask,
-        bool convertToETH
-    )
+    /// @notice Closes a credit account
+    /// @param creditAccount Account to close
+    /// @param to Address to send tokens left on the account after closure
+    /// @param tokensToTransferMask Bit mask of tokens left on the account that should be sent
+    /// @param convertToETH If true and any of transferred tokens is WETH, it will be sent to withdrawal manager,
+    ///        from which credit facade should claim it as ETH to `to` at the end of the call
+    /// @custom:expects Account is opened in this credit manager
+    function closeCreditAccount(address creditAccount, address to, uint256 tokensToTransferMask, bool convertToETH)
         external
-        // override
+        override
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
     {
-        getBorrowerOrRevert(creditAccount); // U:[CM-7]
-
-        {
-            CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
-            if (currentCreditAccountInfo.debt != 0) {
-                revert(); // TODO: add exception here!
-            }
-
-            // currentCreditAccountInfo.borrower = address(0);
-            // currentCreditAccountInfo.lastDebtUpdate = 0;
-            // currentCreditAccountInfo.flags = 0;
-            assembly {
-                let slot := add(currentCreditAccountInfo.slot, 4)
-                sstore(slot, 0)
-            } // U:[CM-8]
+        CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
+        if (currentCreditAccountInfo.debt != 0) {
+            revert CloseAccountWithNonZeroDebtException(); // U:[CM-8]
         }
+
+        // currentCreditAccountInfo.borrower = address(0);
+        // currentCreditAccountInfo.lastDebtUpdate = 0;
+        // currentCreditAccountInfo.flags = 0;
+        assembly {
+            let slot := add(currentCreditAccountInfo.slot, 4)
+            sstore(slot, 0)
+        } // U:[CM-8]
 
         _batchTokensTransfer({
             creditAccount: creditAccount,
             to: to,
             convertToETH: convertToETH,
-            tokensToTransferMask: enabledTokensMask.disable(skipTokensMask)
-        }); // U:[CM-8, 9]
+            tokensToTransferMask: tokensToTransferMask
+        }); // U:[CM-8]
 
         IAccountFactoryBase(accountFactory).returnCreditAccount({creditAccount: creditAccount}); // U:[CM-8]
         creditAccountsSet.remove(creditAccount); // U:[CM-8]

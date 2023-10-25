@@ -115,13 +115,8 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
 
     function openCreditAccount(address onBehalfOf) external returns (address);
 
-    function closeCreditAccount(
-        address creditAccount,
-        address to,
-        uint256 enabledTokensMask,
-        uint256 skipTokensMask,
-        bool convertToETH
-    ) external;
+    function closeCreditAccount(address creditAccount, address to, uint256 tokensToTransferMask, bool convertToETH)
+        external;
 
     function liquidateCreditAccount(
         address creditAccount,

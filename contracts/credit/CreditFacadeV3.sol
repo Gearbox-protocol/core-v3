@@ -44,9 +44,11 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/C
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
-uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS & ~WITHDRAW_PERMISSION;
+uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS & ~(DECREASE_DEBT_PERMISSION | WITHDRAW_PERMISSION);
 
-uint256 constant CLOSE_CREDIT_ACCOUNT_FLAGS = EXTERNAL_CALLS_PERMISSION;
+uint256 constant CLOSE_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS & ~(INCREASE_DEBT_PERMISSION | WITHDRAW_PERMISSION);
+
+uint256 constant LIQUIDATE_CREDIT_ACCOUNT_FLAGS = EXTERNAL_CALLS_PERMISSION;
 
 /// @title Credit facade V3
 /// @notice Provides a user interface to open, close and liquidate leveraged positions in the credit manager,
@@ -175,7 +177,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     ///         - Wraps any ETH sent in the function call and sends it back to the caller
     ///         - If Degen NFT is enabled, burns one from the caller
     ///         - Opens an account in the credit manager
-    ///         - Performs a multicall (all calls allowed except withdrawals)
+    ///         - Performs a multicall (all calls allowed except debt decrease and withdrawals)
     ///         - Runs the collateral check
     /// @param onBehalfOf Address on whose behalf to open the account
     /// @param calls List of calls to perform after opening the account
@@ -229,20 +231,20 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     ///         - Wraps any ETH sent in the function call and sends it back to the caller
     ///         - Claims all scheduled withdrawals
     ///         - Erases all bots permissions
-    ///         - Performs a multicall (only adapter calls allowed)
-    ///         - Closes a credit account in the credit manager (all debt must be repaid for this step to succeed)
+    ///         - Performs a multicall (all calls are allowed except debt increase and withdrawals)
+    ///         - Closes a credit account in the credit manager
     /// @param creditAccount Account to close
     /// @param to Address to send withdrawals and any tokens left on the account after closure
-    /// @param skipTokensMask Bit mask of tokens that should be skipped
+    /// @param tokensToTransferMask Bit mask of tokens left on the account that should be sent
     /// @param convertToETH Whether to unwrap WETH before sending to `to`
     /// @param calls List of calls to perform before closing the account
     /// @dev Reverts if caller is not `creditAccount`'s owner
     /// @dev Reverts if facade is paused
-    /// @dev Reverts if account's debt was updated in the same block
+    /// @dev Reverts if account's debt is not zero after executing `calls`
     function closeCreditAccount(
         address creditAccount,
         address to,
-        uint256 skipTokensMask,
+        uint256 tokensToTransferMask,
         bool convertToETH,
         MultiCall[] calldata calls
     )
@@ -271,8 +273,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         ICreditManagerV3(creditManager).closeCreditAccount({
             creditAccount: creditAccount,
             to: to,
-            enabledTokensMask: debtData.enabledTokensMask,
-            skipTokensMask: skipTokensMask,
+            tokensToTransferMask: tokensToTransferMask,
             convertToETH: convertToETH
         });
 
@@ -356,7 +357,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         if (skipCalls < calls.length) {
             FullCheckParams memory fullCheckParams = _multicall(
-                creditAccount, calls, collateralDebtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS, skipCalls
+                creditAccount, calls, collateralDebtData.enabledTokensMask, LIQUIDATE_CREDIT_ACCOUNT_FLAGS, skipCalls
             ); // U:[FA-16]
             collateralDebtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter; // U:[FA-16]
         }

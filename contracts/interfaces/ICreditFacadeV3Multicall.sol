@@ -48,7 +48,7 @@ uint256 constant PAY_BOT_CAN_BE_CALLED = 1 << 195;
 
 /// @title Credit facade V3 multicall interface
 /// @dev Unless specified otherwise, all these methods are only available in `openCreditAccount`,
-///      `multicall`, and, with account owner's permission, `botMulticall`
+///      `closeCreditAccount`, `multicall`, and, with account owner's permission, `botMulticall`
 interface ICreditFacadeV3Multicall {
     /// @notice Updates the price for a token with on-demand updatable price feed
     /// @param token Token to push the price update for
@@ -79,6 +79,7 @@ interface ICreditFacadeV3Multicall {
 
     /// @notice Increases account's debt
     /// @param amount Underlying amount to borrow
+    /// @dev Increasing debt is prohibited when closing an account
     /// @dev Increasing debt is prohibited if it was previously updated in the same block
     /// @dev The resulting debt amount must be within allowed range
     /// @dev Increasing debt is prohibited if there are forbidden tokens enabled as collateral on the account
@@ -88,6 +89,7 @@ interface ICreditFacadeV3Multicall {
 
     /// @notice Decreases account's debt
     /// @param amount Underlying amount to repay, value above account's total debt indicates full repayment
+    /// @dev Decreasing debt is prohibited when opening an account
     /// @dev Decreasing debt is prohibited if it was previously updated in the same block
     /// @dev The resulting debt amount must be within allowed range or zero
     /// @dev Full repayment brings account into a special mode that skips collateral checks and thus requires
@@ -108,7 +110,7 @@ interface ICreditFacadeV3Multicall {
     /// @param token Token to withdraw
     /// @param amount Amount to withdraw
     /// @dev Withdrawals are prohibited if there are forbidden tokens enabled as collateral on the account
-    /// @dev Withdrawals are prohibited when opening an account
+    /// @dev Withdrawals are prohibited when opening or closing an account
     function scheduleWithdrawal(address token, uint256 amount) external;
 
     /// @notice Requests bot list to make a payment to the caller
