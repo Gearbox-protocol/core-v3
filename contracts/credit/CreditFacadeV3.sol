@@ -590,7 +590,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeV3Multicall.addCollateral.selector) {
                         _revertIfNoPermission(flags, ADD_COLLATERAL_PERMISSION); // U:[FA-21]
 
-                        quotedTokensMaskInverted = _getInvertedQuotedTokensMask(quotedTokensMaskInverted);
+                        quotedTokensMaskInverted = _quotedTokensMaskInvertedLoE(quotedTokensMaskInverted);
 
                         enabledTokensMask = enabledTokensMask.enable({
                             bitsToEnable: _addCollateral(creditAccount, mcall.callData[4:]),
@@ -601,7 +601,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeV3Multicall.addCollateralWithPermit.selector) {
                         _revertIfNoPermission(flags, ADD_COLLATERAL_PERMISSION); // U:[FA-21]
 
-                        quotedTokensMaskInverted = _getInvertedQuotedTokensMask(quotedTokensMaskInverted);
+                        quotedTokensMaskInverted = _quotedTokensMaskInvertedLoE(quotedTokensMaskInverted);
 
                         enabledTokensMask = enabledTokensMask.enable({
                             bitsToEnable: _addCollateralWithPermit(creditAccount, mcall.callData[4:]),
@@ -624,7 +624,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
                         uint256 tokensToDisable = _scheduleWithdrawal(creditAccount, mcall.callData[4:]); // U:[FA-34]
 
-                        quotedTokensMaskInverted = _getInvertedQuotedTokensMask(quotedTokensMaskInverted);
+                        quotedTokensMaskInverted = _quotedTokensMaskInvertedLoE(quotedTokensMaskInverted);
 
                         enabledTokensMask = enabledTokensMask.disable({
                             bitsToDisable: tokensToDisable,
@@ -667,7 +667,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         _revertIfNoPermission(flags, ENABLE_TOKEN_PERMISSION); // U:[FA-21]
                         address token = abi.decode(mcall.callData[4:], (address)); // U:[FA-33]
 
-                        quotedTokensMaskInverted = _getInvertedQuotedTokensMask(quotedTokensMaskInverted);
+                        quotedTokensMaskInverted = _quotedTokensMaskInvertedLoE(quotedTokensMaskInverted);
 
                         enabledTokensMask = enabledTokensMask.enable({
                             bitsToEnable: _getTokenMaskOrRevert(token),
@@ -679,7 +679,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         _revertIfNoPermission(flags, DISABLE_TOKEN_PERMISSION); // U:[FA-21]
                         address token = abi.decode(mcall.callData[4:], (address)); // U:[FA-33]
 
-                        quotedTokensMaskInverted = _getInvertedQuotedTokensMask(quotedTokensMaskInverted);
+                        quotedTokensMaskInverted = _quotedTokensMaskInvertedLoE(quotedTokensMaskInverted);
 
                         enabledTokensMask = enabledTokensMask.disable({
                             bitsToDisable: _getTokenMaskOrRevert(token),
@@ -719,7 +719,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
                     (uint256 tokensToEnable, uint256 tokensToDisable) = abi.decode(result, (uint256, uint256)); // U:[FA-38]
 
-                    quotedTokensMaskInverted = _getInvertedQuotedTokensMask(quotedTokensMaskInverted);
+                    quotedTokensMaskInverted = _quotedTokensMaskInvertedLoE(quotedTokensMaskInverted);
 
                     enabledTokensMask = enabledTokensMask.enableDisable({
                         bitsToEnable: tokensToEnable,
@@ -762,7 +762,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                 ) {
                     (address token, bytes memory data) = abi.decode(mcall.callData[4:], (address, bytes)); // U:[FA-25]
 
-                    priceOracle = _getPriceOracle(priceOracle); // U:[FA-25]
+                    priceOracle = _priceOracleLoE(priceOracle); // U:[FA-25]
                     address priceFeed = IPriceOracleBase(priceOracle).priceFeeds(token); // U:[FA-25]
                     if (priceFeed == address(0)) {
                         revert PriceFeedDoesNotExistException(); // U:[FA-25]
@@ -1059,16 +1059,20 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         }
     }
 
-    /// @dev Returns inverted quoted tokens mask, avoids external call if it has already been queried
-    function _getInvertedQuotedTokensMask(uint256 currentMask) internal view returns (uint256) {
-        // since underlying token can't be quoted, we can use `currentMask == 0` as an indicator
-        // that mask hasn't been queried yet
-        return currentMask == 0 ? ~ICreditManagerV3(creditManager).quotedTokensMask() : currentMask;
+    /// @dev Load-on-empty function to read inverted quoted tokens mask at most once if it's needed,
+    ///      returns its argument if it's not empty or inverted `quotedTokensMask` from credit manager otherwise
+    /// @dev Non-empty inverted quoted tokens mask always has it's LSB set to 1 since underlying can't be quoted
+    function _quotedTokensMaskInvertedLoE(uint256 quotedTokensMaskInvertedOrEmpty) internal view returns (uint256) {
+        return quotedTokensMaskInvertedOrEmpty == 0
+            ? ~ICreditManagerV3(creditManager).quotedTokensMask()
+            : quotedTokensMaskInvertedOrEmpty;
     }
 
-    /// @dev Returns price oracle address, avoids external call if it has already been queried
-    function _getPriceOracle(address priceOracle) internal view returns (address) {
-        return priceOracle == address(0) ? ICreditManagerV3(creditManager).priceOracle() : priceOracle;
+    /// @dev Load-on-empty function to read price oracle at most once if it's needed,
+    ///      returns its argument if it's not empty or `priceOracle` from credit manager otherwise
+    /// @dev Non-empty price oracle always has non-zero address
+    function _priceOracleLoE(address priceOracleOrEmpty) internal view returns (address) {
+        return priceOracleOrEmpty == address(0) ? ICreditManagerV3(creditManager).priceOracle() : priceOracleOrEmpty;
     }
 
     /// @dev Wraps any ETH sent in the function call and sends it back to `msg.sender`
