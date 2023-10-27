@@ -64,8 +64,14 @@ error AddressNotFoundException();
 /// @notice Thrown by pool-adjacent contracts when a credit manager being connected has a wrong pool address
 error IncompatibleCreditManagerException();
 
+/// @notice Thrown when attempting to set an incompatible successor staking contract
+error IncompatibleSuccessorException();
+
 /// @notice Thrown when attempting to vote in a non-approved contract
 error VotingContractNotAllowedException();
+
+/// @notice Thrown when attempting to unvote more votes than there are
+error InsufficientVotesException();
 
 /// @notice Thrown when attempting to borrow more than the second point on a two-point curve
 error BorrowingMoreThanU2ForbiddenException();
@@ -100,6 +106,9 @@ error TooManyEnabledTokensException();
 
 /// @notice Thrown when a custom HF parameter lower than 10000 is passed into the full collateral check
 error CustomHealthFactorTooLowException();
+
+/// @notice Thrown when submitted collateral hint is not a valid token mask
+error InvalidCollateralHintException();
 
 /// @notice Thrown when attempting to execute a protocol interaction without active credit account set
 error ActiveCreditAccountNotSetException();
@@ -310,6 +319,3 @@ error StalePriceException();
 
 /// @notice Thrown by Degen NFT when attempting to burn on opening an account with 0 balance
 error InsufficientBalanceException();
-
-/// @notice Thrown by Degen NFT when attempting to burn on opening an account with 0 balance
-error InsufficientVotesException();

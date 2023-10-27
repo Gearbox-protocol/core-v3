@@ -778,6 +778,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 uint256 tokenMask;
                 if (hintsIdx < hintsLen) {
                     tokenMask = collateralHints[hintsIdx++];
+                    if (tokenMask == 0 || tokenMask & tokenMask - 1 != 0) revert InvalidCollateralHintException();
                     if (tokensToCheckMask & tokenMask == 0) continue;
                 } else {
                     // mask with only the LSB of `tokensToCheckMask` enabled
@@ -1162,7 +1163,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Returns chunk of up to `limit` credit accounts opened in this credit manager starting from `offset`
     function creditAccounts(uint256 offset, uint256 limit) external view override returns (address[] memory result) {
         uint256 len = creditAccountsSet.length();
-        uint256 resultLen = offset + limit > len ? len - offset : limit;
+        uint256 resultLen = offset + limit > len ? (offset > len ? 0 : len - offset) : limit;
 
         result = new address[](resultLen);
         unchecked {
@@ -1358,7 +1359,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         unchecked {
             while (tokensToTransferMask > 0) {
                 uint256 tokenMask = tokensToTransferMask & uint256(-int256(tokensToTransferMask));
-                tokensToTransferMask &= tokensToTransferMask - 1;
+                tokensToTransferMask ^= tokenMask;
 
                 address token = getTokenByMask(tokenMask); // U:[CM-31]
                 uint256 amount = IERC20(token).safeBalanceOf({account: creditAccount}); // U:[CM-31]

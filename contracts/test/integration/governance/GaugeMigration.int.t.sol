@@ -171,8 +171,8 @@ contract GaugeMigrationIntegrationTest is Test {
         GearStakingV3 newStaking = new GearStakingV3(address(addressProvider), block.timestamp);
         GaugeV3 newGauge = new GaugeV3(address(pool), address(newStaking));
 
-        staking.setSuccessor(address(newStaking));
         newStaking.setMigrator(address(staking));
+        staking.setSuccessor(address(newStaking));
 
         staking.setVotingContractStatus(address(gauge), VotingContractStatus.UNVOTE_ONLY);
         newStaking.setVotingContractStatus(address(newGauge), VotingContractStatus.ALLOWED);

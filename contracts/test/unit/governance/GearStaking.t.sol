@@ -411,14 +411,10 @@ contract GearStakingTest is Test, IGearStakingV3Events {
         gearStaking.migrate(uint96(WAD / 2), new MultiVote[](0), new MultiVote[](0));
 
         vm.prank(CONFIGURATOR);
-        gearStaking.setSuccessor(address(gearStakingSuccessor));
-
-        vm.expectRevert(CallerNotMigratorException.selector);
-        vm.prank(USER);
-        gearStaking.migrate(uint96(WAD / 2), new MultiVote[](0), new MultiVote[](0));
+        gearStakingSuccessor.setMigrator(address(gearStaking));
 
         vm.prank(CONFIGURATOR);
-        gearStakingSuccessor.setMigrator(address(gearStaking));
+        gearStaking.setSuccessor(address(gearStakingSuccessor));
 
         address newVotingContract = address(new TargetContractMock());
 
@@ -468,6 +464,14 @@ contract GearStakingTest is Test, IGearStakingV3Events {
     function test_U_GS_08_setSuccessor_works_correctly() public {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         gearStaking.setSuccessor(DUMB_ADDRESS);
+
+        vm.mockCall(DUMB_ADDRESS, abi.encodeWithSignature("migrator()"), abi.encode(address(0)));
+
+        vm.expectRevert(IncompatibleSuccessorException.selector);
+        vm.prank(CONFIGURATOR);
+        gearStaking.setSuccessor(DUMB_ADDRESS);
+
+        vm.mockCall(DUMB_ADDRESS, abi.encodeWithSignature("migrator()"), abi.encode(address(gearStaking)));
 
         vm.expectEmit(true, false, false, false);
         emit SetSuccessor(DUMB_ADDRESS);

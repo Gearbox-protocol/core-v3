@@ -63,12 +63,10 @@ contract BotListV3 is ACLNonReentrantTrait, IBotListV3 {
     /// @notice Mapping from (creditManager, creditAccount, bot) to bot funding parameters
     mapping(address => mapping(address => mapping(address => BotFunding))) public override botFunding;
 
-    /// @dev Mapping from credit account to the set of bots with non-zero permissions
+    /// @dev Mapping from (creditManager, creditAccount) to the set of bots with non-zero permissions
     mapping(address => mapping(address => EnumerableSet.AddressSet)) internal activeBots;
 
-    /// @notice Mapping from (creditManager, bot) to bot's special status parameters:
-    ///         * Whether the bot is forbidden
-    ///         * Mask of special permissions
+    /// @notice Mapping from (creditManager, bot) to bot special status parameters
     mapping(address => mapping(address => BotSpecialStatus)) public override botSpecialStatus;
 
     /// @notice Mapping from borrower to their bot funding balance

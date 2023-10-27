@@ -205,6 +205,7 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
         return true;
     }
 
+    /// @dev Returns the absolute difference between two numbers and the flag whether the first one is greater
     function calcDiff(uint256 a, uint256 b) internal pure returns (uint256, bool) {
         return a > b ? (a - b, true) : (b - a, false);
     }

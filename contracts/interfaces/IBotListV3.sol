@@ -12,6 +12,9 @@ struct BotFunding {
     uint40 allowanceLU;
 }
 
+/// @notice Bot special status parameters
+/// @param forbidden Whether bot is forbidden in the credit manager
+/// @param specialPermissions Mask of multicall actions that bot can perform for all accounts in the credit manager
 struct BotSpecialStatus {
     bool forbidden;
     uint192 specialPermissions;
@@ -23,7 +26,7 @@ interface IBotListV3Events {
         address indexed creditManager,
         address indexed creditAccount,
         address indexed bot,
-        uint256 permissions,
+        uint192 permissions,
         uint72 totalFundingAllowance,
         uint72 weeklyFundingAllowance
     );

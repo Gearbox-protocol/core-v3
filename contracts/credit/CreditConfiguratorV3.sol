@@ -659,7 +659,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
                 uint256 mask = forbiddenTokensMask & uint256(-int256(forbiddenTokensMask));
                 address token = CreditManagerV3(creditManager).getTokenByMask(mask);
                 _forbidToken(_creditFacade, token);
-                forbiddenTokensMask &= forbiddenTokensMask - 1;
+                forbiddenTokensMask ^= mask;
             }
         }
     }

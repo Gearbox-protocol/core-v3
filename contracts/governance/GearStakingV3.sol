@@ -144,7 +144,6 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     /// @param votesBefore Votes to apply before sending GEAR to the successor contract
     /// @param votesBefore Sequence of votes to perform in this contract before sending GEAR to the successor
     /// @param votesAfter Sequence of votes to perform in the successor contract after sending GEAR
-    /// @custom:expects This contract is set as `migrator` in the `successor` contract, otherwise this would revert
     function migrate(uint96 amount, MultiVote[] calldata votesBefore, MultiVote[] calldata votesAfter)
         external
         override
@@ -317,9 +316,13 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     /// @notice Sets a new successor contract
     /// @dev Successor is a new staking contract where staked GEAR can be migrated, bypassing the withdrawal delay.
     ///      This is used to upgrade staking contracts when new functionality is added.
+    ///      It must already have this contract set as migrator.
     /// @param newSuccessor Address of the new successor contract
     function setSuccessor(address newSuccessor) external override configuratorOnly {
         if (successor != newSuccessor) {
+            if (IGearStakingV3(newSuccessor).migrator() != address(this)) {
+                revert IncompatibleSuccessorException(); // U: [GS-08]
+            }
             successor = newSuccessor; // U: [GS-08]
 
             emit SetSuccessor(newSuccessor); // U: [GS-08]

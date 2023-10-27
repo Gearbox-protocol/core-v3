@@ -27,6 +27,7 @@ struct BalanceDelta {
 library BalancesLogic {
     using BitMask for uint256;
     using SafeCast for int256;
+    using SafeCast for uint256;
     using SafeERC20 for IERC20;
 
     /// @dev Returns an array of expected token balances after operations
@@ -40,8 +41,8 @@ library BalancesLogic {
         uint256 len = deltas.length;
         expected = new Balance[](len); // U:[BLL-1]
         for (uint256 i = 0; i < len;) {
-            uint256 balance = IERC20(deltas[i].token).safeBalanceOf({account: creditAccount});
-            expected[i] = Balance({token: deltas[i].token, balance: (int256(balance) + deltas[i].amount).toUint256()}); // U:[BLL-1]
+            int256 balance = IERC20(deltas[i].token).safeBalanceOf({account: creditAccount}).toInt256();
+            expected[i] = Balance({token: deltas[i].token, balance: (balance + deltas[i].amount).toUint256()}); // U:[BLL-1]
             unchecked {
                 ++i;
             }
@@ -83,12 +84,14 @@ library BalancesLogic {
             unchecked {
                 while (forbiddenTokensOnAccount != 0) {
                     uint256 tokenMask = forbiddenTokensOnAccount & uint256(-int256(forbiddenTokensOnAccount));
-                    forbiddenTokensOnAccount &= forbiddenTokensOnAccount - 1;
+                    forbiddenTokensOnAccount ^= tokenMask;
 
                     address token = getTokenByMaskFn(tokenMask);
-                    forbiddenBalances[i].token = token; // U:[BLL-3]
-                    forbiddenBalances[i].tokenMask = tokenMask; // U:[BLL-3]
-                    forbiddenBalances[i].balance = IERC20(token).safeBalanceOf({account: creditAccount}); // U:[BLL-3]
+                    forbiddenBalances[i] = BalanceWithMask({
+                        token: token,
+                        tokenMask: tokenMask,
+                        balance: IERC20(token).safeBalanceOf({account: creditAccount})
+                    }); // U:[BLL-3]
                     ++i;
                 }
             }

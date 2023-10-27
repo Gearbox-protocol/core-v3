@@ -65,6 +65,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
         voter = _gearStaking; // U:[GA-01]
         epochLastUpdate = IGearStakingV3(_gearStaking).getCurrentEpoch(); // U:[GA-01]
         epochFrozen = true; // U:[GA-01]
+        emit SetFrozenEpoch(true); // U:[GA-01]
     }
 
     /// @dev Ensures that function caller is voter
