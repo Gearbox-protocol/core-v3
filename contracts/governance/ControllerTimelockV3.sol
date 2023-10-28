@@ -541,6 +541,25 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         }); // U:[CT-16]
     }
 
+    /// @notice Queues a transaction to forbid permissionless bounds update in an LP price feed
+    /// @dev Requires the policy for keccak(group(priceFeed), "UPDATE_BOUNDS_ALLOWED") to be enabled,
+    ///      otherwise auto-fails the check
+    /// @param priceFeed The price feed to forbid bounds update for
+    function forbidBoundsUpdate(address priceFeed) external override {
+        if (!_checkPolicy(priceFeed, "UPDATE_BOUNDS_ALLOWED", 0, 0)) {
+            revert ParameterChecksFailedException(); // U:[CT-17]
+        }
+
+        _queueTransaction({
+            target: priceFeed,
+            signature: "forbidBoundsUpdate()",
+            data: "",
+            delay: _getPolicyDelay(priceFeed, "UPDATE_BOUNDS_ALLOWED"),
+            sanityCheckValue: 0,
+            sanityCheckCallData: ""
+        }); // U:[CT-17]
+    }
+
     /// @dev Internal function that stores the transaction in the queued tx map
     /// @param target The contract to call
     /// @param signature The signature of the called function

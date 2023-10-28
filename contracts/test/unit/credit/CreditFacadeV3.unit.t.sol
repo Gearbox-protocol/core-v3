@@ -1193,7 +1193,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         address creditAccount = DUMB_ADDRESS;
 
         address link = tokenTestSuite.addressOf(Tokens.LINK);
-        Balance[] memory expectedBalance = new Balance[](1);
+        BalanceDelta[] memory expectedBalance = new BalanceDelta[](1);
 
         address acm = address(new AdapterCallMock());
 
@@ -1207,7 +1207,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             /// case 2: no reverty because expect 1 and it mints 1 duyring the call
             /// case 3: reverts because called twice
 
-            expectedBalance[0] = Balance({token: link, balance: testCase > 0 ? 1 : 0});
+            expectedBalance[0] = BalanceDelta({token: link, amount: int256(uint256(testCase > 0 ? 1 : 0))});
 
             MultiCall[] memory calls = MultiCallBuilder.build(
                 MultiCall({

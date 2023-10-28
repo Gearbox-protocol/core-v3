@@ -210,8 +210,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
         bool skipTest = false;
 
-        try vm.envAddress("ETH_FORK_CREDIT_MANAGER") returns (address) {
-            creditManagerAddr = vm.envAddress("ETH_FORK_CREDIT_MANAGER");
+        try vm.envAddress("ATTACH_CREDIT_MANAGER") returns (address) {
+            creditManagerAddr = vm.envAddress("ATTACH_CREDIT_MANAGER");
         } catch {
             revert("Credit manager address not set");
         }
@@ -224,6 +224,28 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         if (!skipTest) {
             _;
         }
+    }
+
+    modifier attachAllV3CMTest() {
+        _attachCore();
+
+        address creditManagerAddr;
+        bool skipTest = false;
+
+        // address[] memory cms = cr.getCreditManagers();
+        // uint256 len = cms.length;
+        // unchecked {
+        //     for (uint256 i = 0; i < len; i++) {
+        //         address poolAddr = cr.poolByIndex(i);
+        //         if (!_attachPool(poolAddr)) {
+        //             console.log("Skipped");
+        //             skipTest = true;
+        //             break;
+        //         } else {}
+        //     }
+        // }
+
+        _;
     }
 
     function _setupCore() internal {
@@ -254,10 +276,15 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     }
 
     function _attachCore() internal {
-        try vm.envAddress("ETH_FORK_ADDRESS_PROVIDER") returns (address val) {
+        new Roles();
+        NetworkDetector nd = new NetworkDetector();
+        chainId = nd.chainId();
+
+        tokenTestSuite = new TokensTestSuite();
+        try vm.envAddress("ATTACH_ADDRESS_PROVIDER") returns (address val) {
             addressProvider = IAddressProviderV3(val);
         } catch {
-            revert("ETH_FORK_ADDRESS_PROVIDER is not provided");
+            revert("ATTACH_ADDRESS_PROVIDER is not provided");
         }
 
         console.log("Starting mainnet test with address provider: %s", address(addressProvider));
@@ -290,6 +317,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     function _attachCreditManager(address _creditManager) internal returns (bool isCompartible) {
         creditManager = CreditManagerV3(_creditManager);
         creditFacade = CreditFacadeV3(creditManager.creditFacade());
+        creditConfigurator = CreditConfiguratorV3(creditManager.creditConfigurator());
 
         if (!_attachPool(creditManager.pool())) {
             return false;
@@ -304,6 +332,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         }
 
         (, creditAccountAmount) = creditFacade.debtLimits();
+
+        return true;
     }
 
     function _deployPool(IPoolV3DeployConfig config) internal {

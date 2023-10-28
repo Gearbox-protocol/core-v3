@@ -4,6 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 
 import {BitMask} from "./BitMask.sol";
@@ -16,24 +17,31 @@ struct BalanceWithMask {
     uint256 balance;
 }
 
+struct BalanceDelta {
+    address token;
+    int256 amount;
+}
+
 /// @title Balances logic library
 /// @notice Implements functions for before-and-after balance comparisons
 library BalancesLogic {
     using BitMask for uint256;
+    using SafeCast for int256;
     using SafeERC20 for IERC20;
 
     /// @dev Returns an array of expected token balances after operations
     /// @param creditAccount Credit account to compute expected balances for
     /// @param deltas The array of (token, amount) structs that contain expected balance increases
-    function storeBalances(address creditAccount, Balance[] memory deltas)
+    function storeBalances(address creditAccount, BalanceDelta[] memory deltas)
         internal
         view
         returns (Balance[] memory expected)
     {
-        expected = deltas; // U:[BLL-1]
         uint256 len = deltas.length;
+        expected = new Balance[](len); // U:[BLL-1]
         for (uint256 i = 0; i < len;) {
-            expected[i].balance += IERC20(expected[i].token).safeBalanceOf({account: creditAccount}); // U:[BLL-1]
+            uint256 balance = IERC20(deltas[i].token).safeBalanceOf({account: creditAccount});
+            expected[i] = Balance({token: deltas[i].token, balance: (int256(balance) + deltas[i].amount).toUint256()}); // U:[BLL-1]
             unchecked {
                 ++i;
             }
