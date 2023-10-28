@@ -347,14 +347,23 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.openCreditAccount(address(this));
 
-        CollateralDebtData memory collateralDebtData;
-
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.closeCreditAccount({
             creditAccount: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
             tokensToTransferMask: type(uint256).max,
             convertToETH: false
+        });
+
+        CollateralDebtData memory collateralDebtData;
+        vm.expectRevert(CallerNotCreditFacadeException.selector);
+        creditManager.liquidateCreditAccount({
+            creditAccount: DUMB_ADDRESS,
+            collateralDebtData: collateralDebtData,
+            to: DUMB_ADDRESS,
+            tokensToTransferMask: 0,
+            convertToETH: false,
+            isExpired: false
         });
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
@@ -442,14 +451,23 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditManager.openCreditAccount(address(this));
 
-        CollateralDebtData memory collateralDebtData;
-
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditManager.closeCreditAccount({
             creditAccount: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
             tokensToTransferMask: type(uint256).max,
             convertToETH: false
+        });
+
+        CollateralDebtData memory collateralDebtData;
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        creditManager.liquidateCreditAccount({
+            creditAccount: DUMB_ADDRESS,
+            collateralDebtData: collateralDebtData,
+            to: DUMB_ADDRESS,
+            tokensToTransferMask: 0,
+            convertToETH: false,
+            isExpired: false
         });
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
@@ -494,102 +512,102 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
     /// @dev U:[CM-6]: open credit account works as expected
     function test_U_CM_06_open_credit_account_works_as_expected() public creditManagerTest {
-        uint256 cumulativeIndexNow = RAY * 5;
-
-        vm.roll(892323);
-        creditManager.setCollateralTokensCount(255);
-
-        poolMock.setCumulativeIndexNow(cumulativeIndexNow);
-
-        tokenTestSuite.mint(Tokens.DAI, address(poolMock), DAI_ACCOUNT_AMOUNT);
-
         assertEq(creditManager.creditAccounts().length, 0, _testCaseErr("SETUP: incorrect creditAccounts() length"));
 
-        uint128 cumulativeQuotaInterestBefore = 123412321;
-        uint256 enabledTokensMaskBefore = 231423;
+        address expectedAccount = accountFactory.usedAccount();
 
         creditManager.setCreditAccountInfoMap({
-            creditAccount: accountFactory.usedAccount(),
-            debt: 12039120,
-            cumulativeIndexLastUpdate: 23e3,
-            cumulativeQuotaInterest: cumulativeQuotaInterestBefore,
-            quotaFees: 0,
-            enabledTokensMask: enabledTokensMaskBefore,
+            creditAccount: expectedAccount,
+            debt: 0,
+            cumulativeIndexLastUpdate: 0,
+            cumulativeQuotaInterest: 12121,
+            quotaFees: 23232,
+            enabledTokensMask: 0,
             flags: 34343,
             borrower: address(0)
         });
+        creditManager.setLastDebtUpdate(expectedAccount, 123);
 
-        // todo: check why expectCall doesn't work
-        //  vm.expectCall(address(accountFactory), abi.encodeCall(IAccountFactory.takeCreditAccount, (0, 0)));
+        vm.expectCall(address(accountFactory), abi.encodeCall(accountFactory.takeCreditAccount, (0, 0)));
         address creditAccount = creditManager.openCreditAccount(USER);
-        assertEq(
-            address(creditAccount), accountFactory.usedAccount(), _testCaseErr("Incorrect credit account returned")
-        );
 
-        (
-            uint256 debt,
-            uint256 cumulativeIndexLastUpdate,
-            uint128 cumulativeQuotaInterest,
-            ,
-            uint256 enabledTokensMask,
-            uint16 flags,
-            uint64 lastDebtUpdate,
-            address borrower
-        ) = creditManager.creditAccountInfo(creditAccount);
+        assertEq(creditAccount, expectedAccount, _testCaseErr("Incorrect credit account returned"));
 
-        assertEq(debt, 0, _testCaseErr("Incorrect debt"));
-        assertEq(cumulativeIndexLastUpdate, cumulativeIndexNow, _testCaseErr("Incorrect cumulativeIndexLastUpdate"));
+        (,, uint128 cumulativeQuotaInterest, uint128 quotaFees,, uint16 flags, uint64 lastDebtUpdate, address borrower)
+        = creditManager.creditAccountInfo(creditAccount);
+
         assertEq(cumulativeQuotaInterest, 1, _testCaseErr("Incorrect cumulativeQuotaInterest"));
-        assertEq(enabledTokensMask, enabledTokensMaskBefore, _testCaseErr("Incorrect enabledTokensMask"));
-
+        assertEq(quotaFees, 0, _testCaseErr("Incorrect quotaFees"));
         assertEq(lastDebtUpdate, 0, _testCaseErr("Incorrect lastDebtUpdate"));
-
         assertEq(flags, 0, _testCaseErr("Incorrect flags"));
         assertEq(borrower, USER, _testCaseErr("Incorrect borrower"));
 
-        assertEq(creditManager.creditAccounts().length, 1, _testCaseErr("incorrect creditAccounts() length"));
-        assertEq(creditManager.creditAccounts()[0], creditAccount, _testCaseErr("incorrect creditAccounts()[0] value"));
+        assertEq(creditManager.creditAccountsLen(), 1, _testCaseErr("Incorerct creditAccounts length"));
+        assertEq(creditManager.creditAccounts()[0], creditAccount, _testCaseErr("Incorrect creditAccounts[0] value"));
     }
 
-    // // //
-    // // //
-    // // // CLOSE CREDIT ACCOUNT
-    // // //
-    // // //
+    //
+    //
+    // CLOSE CREDIT ACCOUNT
+    //
+    //
 
-    // /// @dev U:[CM-7]: close credit account reverts if account not exists
-    // function test_U_CM_07_close_credit_account_reverts_if_account_not_exists() public creditManagerTest {
-    //     CollateralDebtData memory collateralDebtData;
-    //     address creditAccount = DUMB_ADDRESS;
+    /// @dev U:[CM-7]: close credit account works as expected
+    function test_U_CM_07_close_credit_account_works_as_expected() public creditManagerTest {
+        address creditAccount = DUMB_ADDRESS;
 
-    //     vm.expectRevert(CreditAccountDoesNotExistException.selector);
-    //     creditManager.closeCreditAccount({
-    //         creditAccount: creditAccount,
-    //         closureAction: ClosureAction.CLOSE_ACCOUNT,
-    //         collateralDebtData: collateralDebtData,
-    //         payer: DUMB_ADDRESS,
-    //         to: DUMB_ADDRESS,
-    //         skipTokensMask: 0,
-    //         convertToETH: false
-    //     });
+        creditManager.setCreditAccountInfoMap({
+            creditAccount: creditAccount,
+            debt: 123,
+            cumulativeIndexLastUpdate: 0,
+            cumulativeQuotaInterest: 0,
+            quotaFees: 0,
+            enabledTokensMask: 0,
+            flags: 0,
+            borrower: address(0)
+        });
 
-    //     uint64 newBlock = 12312312;
+        vm.expectRevert(CloseAccountWithNonZeroDebtException.selector);
+        creditManager.closeCreditAccount(creditAccount, address(0), 0, false);
 
-    //     vm.roll(newBlock);
-    //     creditManager.setLastDebtUpdate(creditAccount, newBlock);
-    //     creditManager.setBorrower(creditAccount, USER);
+        creditManager.addToCAList(creditAccount);
+        creditManager.setCreditAccountInfoMap({
+            creditAccount: creditAccount,
+            debt: 0,
+            cumulativeIndexLastUpdate: 0,
+            cumulativeQuotaInterest: 0,
+            quotaFees: 0,
+            enabledTokensMask: 0,
+            flags: 123,
+            borrower: address(0)
+        });
 
-    //     vm.expectRevert(DebtUpdatedTwiceInOneBlockException.selector);
-    //     creditManager.closeCreditAccount({
-    //         creditAccount: creditAccount,
-    //         closureAction: ClosureAction.CLOSE_ACCOUNT,
-    //         collateralDebtData: collateralDebtData,
-    //         payer: DUMB_ADDRESS,
-    //         to: DUMB_ADDRESS,
-    //         skipTokensMask: 0,
-    //         convertToETH: false
-    //     });
-    // }
+        vm.expectCall(address(accountFactory), abi.encodeCall(accountFactory.returnCreditAccount, (creditAccount)));
+        creditManager.closeCreditAccount(creditAccount, address(0), 0, false);
+
+        (,,,,, uint16 flags, uint64 lastDebtUpdate, address borrower) = creditManager.creditAccountInfo(creditAccount);
+        assertEq(borrower, address(0), "borrower not cleared");
+        assertEq(lastDebtUpdate, 0, "lastDebtUpadte not cleared");
+        assertEq(flags, 0, "flags not cleared");
+
+        assertEq(creditManager.creditAccountsLen(), 0, _testCaseErr("incorrect creditAccounts length"));
+    }
+
+    //
+    //
+    // LIQUIDATE CREDIT ACCOUNT
+    //
+    //
+
+    /// @dev U:[CM-8]: liquidate credit account works as expected
+    function test_U_CM_08_liquidateCreditAccount_works_as_expected() public creditManagerTest {
+        fail();
+    }
+
+    /// @dev U:[CM-9]: liquidate credit account reverts on insufficient remaining funds
+    function test_U_CM_09_liquidateCreditAccount_reverts_on_insufficient_remaining_funds() public creditManagerTest {
+        fail();
+    }
 
     // struct CloseCreditAccountTestCase {
     //     string name;
@@ -1411,107 +1429,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         /// @notice it should disable token mask with 0 or 1 balance after
         assertEq(tokensToDisable, amount != 0 ? UNDERLYING_TOKEN_MASK : 0, _testCaseErr("Incorrect tokensToDisable"));
     }
-
-    // /// @dev U:[CM-11B]: manageDebt with full repayment is equivalent to closeCreditAccount
-    // function test_U_CM_11B_manageDebt_full_repayment_equivalent_to_close_credit_account(uint256 _amount)
-    //     public
-    //     withFeeTokenCase
-    //     creditManagerTest
-    // {
-    //     vm.assume(_amount < 10 ** 10 * (10 ** _decimals(underlying)));
-    //     vm.assume(_amount > 1);
-
-    //     /// @notice for stack optimisation
-    //     uint256 amount = _amount;
-
-    //     address creditAccount = accountFactory.usedAccount();
-
-    //     CollateralDebtData memory collateralDebtData;
-
-    //     collateralDebtData.debt = amount * (amount % 5 + 1);
-    //     collateralDebtData.cumulativeIndexNow = RAY * (10 + amount % 5) / 10;
-    //     collateralDebtData.cumulativeIndexLastUpdate = RAY;
-
-    //     collateralDebtData.accruedInterest = CreditLogic.calcAccruedInterest(
-    //         collateralDebtData.debt, collateralDebtData.cumulativeIndexLastUpdate, collateralDebtData.cumulativeIndexNow
-    //     );
-
-    //     collateralDebtData.cumulativeQuotaInterest = uint128(amount / (amount % 5 + 1));
-    //     collateralDebtData.accruedInterest += collateralDebtData.cumulativeQuotaInterest;
-
-    //     /// Quota fees
-    //     collateralDebtData.accruedFees += amount / (amount % 10 + 1);
-
-    //     {
-    //         (uint16 feeInterest,,,,) = creditManager.fees();
-
-    //         collateralDebtData.accruedFees += (collateralDebtData.accruedInterest * feeInterest) / PERCENTAGE_FACTOR;
-    //     }
-
-    //     poolMock.setCumulativeIndexNow(collateralDebtData.cumulativeIndexNow);
-
-    //     uint256 initialCQI = collateralDebtData.cumulativeQuotaInterest + 1;
-    //     creditManager
-    //         /// @notice enabledTokensMask is read directly from function parameters, not from this function
-    //         .setCreditAccountInfoMap({
-    //         creditAccount: creditAccount,
-    //         debt: collateralDebtData.debt,
-    //         cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
-    //         cumulativeQuotaInterest: uint128(initialCQI),
-    //         quotaFees: uint128(amount / (amount % 10 + 1)),
-    //         enabledTokensMask: 0,
-    //         flags: 0,
-    //         borrower: USER
-    //     });
-
-    //     {
-    //         uint256 amountOnAccount = _amountWithFee(collateralDebtData.calcTotalDebt()) + 1;
-    //         tokenTestSuite.mint(underlying, creditAccount, amountOnAccount);
-    //     }
-
-    //     for (uint256 caseId = 0; caseId <= 1; ++caseId) {
-    //         uint256 ss = vm.snapshot();
-
-    //         caseName = string.concat(caseName, caseId == 0 ? "full repayment" : "close account");
-
-    //         startTokenTrackingSession(caseName);
-
-    //         expectTokenTransfer({
-    //             reason: "transfer from user to pool",
-    //             token: underlying,
-    //             from: creditAccount,
-    //             to: address(poolMock),
-    //             amount: collateralDebtData.calcTotalDebt()
-    //         });
-
-    //         if (caseId == 0) {
-    //             creditManager.manageDebt({
-    //                 creditAccount: creditAccount,
-    //                 amount: type(uint256).max,
-    //                 enabledTokensMask: 0,
-    //                 action: ManageDebtAction.DECREASE_DEBT
-    //             });
-    //         } else {
-    //             creditManager.closeCreditAccount({
-    //                 creditAccount: creditAccount,
-    //                 closureAction: ClosureAction.CLOSE_ACCOUNT,
-    //                 collateralDebtData: collateralDebtData,
-    //                 payer: USER,
-    //                 to: USER,
-    //                 skipTokensMask: 0,
-    //                 convertToETH: false
-    //             });
-    //         }
-
-    //         checkTokenTransfers({debug: false});
-
-    //         assertEq(poolMock.repayAmount(), collateralDebtData.debt, _testCaseErr("Incorrect repay amount"));
-    //         assertEq(poolMock.repayProfit(), collateralDebtData.accruedFees, _testCaseErr("Incorrect repay profit"));
-    //         assertEq(poolMock.repayLoss(), 0, _testCaseErr("Incorrect repay loss"));
-
-    //         vm.revertTo(ss);
-    //     }
-    // }
 
     /// @dev U:[CM-11C]: manageDebt reverts on full repayment with non-zero quotas
     function test_U_CM_11C_manageDebt_reverts_on_full_repayment_with_quotas()

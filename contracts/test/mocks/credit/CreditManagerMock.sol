@@ -48,7 +48,7 @@ contract CreditManagerMock {
 
     CollateralDebtData return_collateralDebtData;
 
-    CollateralDebtData _closeCollateralDebtData;
+    CollateralDebtData _liquidateCollateralDebtData;
     uint256 internal _enabledTokensMask;
 
     address nextCreditAccount;
@@ -163,19 +163,16 @@ contract CreditManagerMock {
         return_loss = loss;
     }
 
-    // function closeCreditAccount(
-    //     address,
-    //     ClosureAction,
-    //     CollateralDebtData memory collateralDebtData,
-    //     address,
-    //     address,
-    //     uint256,
-    //     bool
-    // ) external returns (uint256 remainingFunds, uint256 loss) {
-    //     _closeCollateralDebtData = collateralDebtData;
-    //     remainingFunds = return_remainingFunds;
-    //     loss = return_loss;
-    // }
+    function closeCreditAccount(address, address, uint256, bool) external {}
+
+    function liquidateCreditAccount(address, CollateralDebtData memory collateralDebtData, address, uint256, bool, bool)
+        external
+        returns (uint256 remainingFunds, uint256 loss)
+    {
+        _liquidateCollateralDebtData = collateralDebtData;
+        remainingFunds = return_remainingFunds;
+        loss = return_loss;
+    }
 
     function fullCollateralCheck(address, uint256 enabledTokensMask, uint256[] memory, uint16)
         external
@@ -205,8 +202,8 @@ contract CreditManagerMock {
         return_collateralDebtData = _collateralDebtData;
     }
 
-    function closeCollateralDebtData() external view returns (CollateralDebtData memory) {
-        return _closeCollateralDebtData;
+    function liquidateCollateralDebtData() external view returns (CollateralDebtData memory) {
+        return _liquidateCollateralDebtData;
     }
 
     function setClaimWithdrawals(uint256 tokensToEnable) external {

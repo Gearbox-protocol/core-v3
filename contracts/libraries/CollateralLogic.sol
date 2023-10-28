@@ -271,32 +271,6 @@ library CollateralLogic {
         }
     }
 
-    /// @dev Computes USD value of the requested tokens on a credit account
-    /// @param creditAccount Address of the credit account
-    /// @param convertToUSDFn Function to convert asset amounts to USD
-    /// @param collateralTokenByMaskFn Function to retrieve the token's address and LT by its mask
-    /// @param priceOracle Address of the price oracle
-    /// @param tokensToCheckMask Mask of tokens to compute total value for
-    function calcTotalTokenValueUSD(
-        address creditAccount,
-        function (address, uint256, address) view returns(uint256) convertToUSDFn,
-        function (uint256, bool) view returns (address, uint16) collateralTokenByMaskFn,
-        address priceOracle,
-        uint256 tokensToCheckMask
-    ) internal view returns (uint256 totalValueUSD) {
-        while (tokensToCheckMask != 0) {
-            uint256 tokenMask = tokensToCheckMask & uint256(-int256(tokensToCheckMask));
-            (address token,) = collateralTokenByMaskFn(tokenMask, false);
-
-            uint256 balance = IERC20(token).safeBalanceOf({account: creditAccount});
-
-            if (balance > 1) {
-                totalValueUSD += convertToUSDFn(priceOracle, balance - 1, token);
-            }
-            tokensToCheckMask = tokensToCheckMask.disable(tokenMask);
-        }
-    }
-
     /// @dev Packs quota and LT into one word
     function packQuota(uint96 quota, uint16 lt) internal pure returns (uint256) {
         return (uint256(lt) << 96) | quota;

@@ -363,7 +363,6 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
             AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL)).head();
 
         uint256 blockAtOpen = block.number;
-        uint256 cumulativeAtOpen = pool.baseInterestIndex();
         // pool.setCumulativeIndexNow(cumulativeAtOpen);
 
         MultiCall[] memory calls = MultiCallBuilder.build();
@@ -377,7 +376,6 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         (uint256 debt, uint256 cumulativeIndexLastUpdate,,,,,,) = creditManager.creditAccountInfo(creditAccount);
 
         assertEq(debt, 0, "Incorrect borrowed amount set in CA");
-        assertEq(cumulativeIndexLastUpdate, cumulativeAtOpen, "Incorrect cumulativeIndexLastUpdate set in CA");
 
         assertEq(ICreditAccount(creditAccount).since(), blockAtOpen, "Incorrect since set in CA");
 

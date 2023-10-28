@@ -33,6 +33,7 @@ library CreditLogic {
         pure
         returns (uint256)
     {
+        if (amount == 0) return 0;
         return (amount * cumulativeIndexNow) / cumulativeIndexLastUpdate - amount; // U:[CL-1]
     }
 
@@ -155,6 +156,7 @@ library CreditLogic {
         pure
         returns (uint256 newDebt, uint256 newCumulativeIndex)
     {
+        if (debt == 0) return (amount, cumulativeIndexNow);
         newDebt = debt + amount; // U:[CL-2]
         newCumulativeIndex = (
             (cumulativeIndexNow * newDebt * INDEX_PRECISION)

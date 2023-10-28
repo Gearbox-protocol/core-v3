@@ -256,16 +256,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         nonReentrant // U:[FA-4]
         wrapETH // U:[FA-7]
     {
-        CollateralDebtData memory debtData = _calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_ONLY); // U:[FA-11]
-
         _claimWithdrawals(creditAccount, to, ClaimAction.FORCE_CLAIM); // U:[FA-11]
 
         if (calls.length != 0) {
             uint256 skipCalls = _applyOnDemandPriceUpdates(calls);
 
-            FullCheckParams memory fullCheckParams =
-                _multicall(creditAccount, calls, debtData.enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS, skipCalls); // U:[FA-11]
-            debtData.enabledTokensMask = fullCheckParams.enabledTokensMaskAfter; // U:[FA-11]
+            _multicall(creditAccount, calls, _enabledTokensMaskOf(creditAccount), CLOSE_CREDIT_ACCOUNT_FLAGS, skipCalls); // U:[FA-11]
         }
 
         _eraseAllBotPermissions({creditAccount: creditAccount}); // U:[FA-11]
@@ -299,7 +295,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     ///         the premium in underlying (in this case, one can set `tokensToTransferMask` to `1`).
     ///         An alternative strategy would be to add underlying collateral to repay debt and receive specified tokens
     ///         to handle them in another way.
-    /// @notice Accounts stays open after liqudiation with zero debt and leftover funds
+    /// @notice Account stays open after liqudiation with zero debt and leftover funds
     /// @param creditAccount Account to liquidate
     /// @param to Address to send tokens left on the account after liquidation
     /// @param tokensToTransferMask Bit mask of tokens left on the account that should be sent
@@ -333,7 +329,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         {
             bool isEmergency = paused();
 
-            collateralDebtData = _calcDebtAndCollateral(
+            collateralDebtData = ICreditManagerV3(creditManager).calcDebtAndCollateral(
                 creditAccount,
                 isEmergency
                     ? CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
@@ -514,7 +510,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @dev Batches price feed updates, multicall and collateral check into a single function
     function _multicallFullCollateralCheck(address creditAccount, MultiCall[] calldata calls, uint256 flags) internal {
         uint256 _forbiddenTokenMask = forbiddenTokenMask;
-        uint256 enabledTokensMaskBefore = ICreditManagerV3(creditManager).enabledTokensMaskOf(creditAccount); // U:[FA-18]
+        uint256 enabledTokensMaskBefore = _enabledTokensMaskOf(creditAccount); // U:[FA-18]
         BalanceWithMask[] memory forbiddenBalances = BalancesLogic.storeForbiddenBalances({
             creditAccount: creditAccount,
             forbiddenTokenMask: _forbiddenTokenMask,
@@ -1135,13 +1131,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         });
     }
 
-    /// @dev Internal wrapper for `creditManager.calcDebtAndCollateral` call to reduce contract size
-    function _calcDebtAndCollateral(address creditAccount, CollateralCalcTask task)
-        internal
-        view
-        returns (CollateralDebtData memory)
-    {
-        return ICreditManagerV3(creditManager).calcDebtAndCollateral(creditAccount, task);
+    /// @dev Internal wrapper for `creditManager.enabledTokensMaskOf` call to reduce contract size
+    function _enabledTokensMaskOf(address creditAccount) internal view returns (uint256) {
+        return ICreditManagerV3(creditManager).enabledTokensMaskOf(creditAccount);
     }
 
     /// @dev Internal wrapper for `creditManager.claimWithdrawals` call to reduce contract size
