@@ -10,9 +10,9 @@ import {BalancesLogic, BalanceDelta, BalanceWithMask} from "../../../libraries/B
 
 import {TestHelper} from "../../lib/helper.sol";
 
-/// @title BalancesLogic test
-/// @notice [BM]: Unit tests for BalancesLogic
-contract BalancesLogicTest is TestHelper {
+/// @title Balances logic library unit test
+/// @notice U:[BLL]: Unit tests for balances logic library
+contract BalancesLogicUnitTest is TestHelper {
     address creditAccount;
     address[16] tokens;
     mapping(uint256 => uint256) maskToIndex;
@@ -27,8 +27,22 @@ contract BalancesLogicTest is TestHelper {
         }
     }
 
-    /// @notice U:[BLL-1]: storeBalances works correctly
-    function test_BLL_01_storeBalances_works_correctly(
+    /// @notice U:[BLL-1]: `checkBalance` works correctly
+    function test_U_BLL_01_checkBalance_works_correctly(uint128[16] calldata balances, uint128 value, bool greater)
+        public
+    {
+        _setupTokenBalances(balances, 1);
+
+        bool result = BalancesLogic.checkBalance(creditAccount, tokens[0], value, greater);
+        if (greater) {
+            assertEq(result, balances[0] >= value);
+        } else {
+            assertEq(result, balances[0] <= value);
+        }
+    }
+
+    /// @notice U:[BLL-2]: `storeBalances` with deltas works correctly
+    function test_U_BLL_02_storeBalances_with_deltas_works_correctly(
         uint128[16] calldata balances,
         int128[16] calldata deltas,
         uint256 length
@@ -61,11 +75,12 @@ contract BalancesLogicTest is TestHelper {
         }
     }
 
-    /// @notice U:[BLL-2]: compareBalances works correctly
-    function test_BLL_02_compareBalances_works_correctly(
+    /// @notice U:[BLL-3]: `compareBalances` without tokens mask works correctly
+    function test_U_BLL_03_compareBalances_without_tokens_mask_works_correctly(
         uint128[16] calldata balances,
         uint128[16] calldata expectedBalances,
-        uint256 length
+        uint256 length,
+        bool greater
     ) public {
         vm.assume(length <= 16);
 
@@ -73,85 +88,86 @@ contract BalancesLogicTest is TestHelper {
 
         bool expectedResult = true;
         for (uint256 i = 0; i < length; ++i) {
-            if (expectedBalances[i] > balances[i]) {
+            if (greater && expectedBalances[i] > balances[i]) {
+                expectedResult = false;
+                break;
+            }
+
+            if (!greater && expectedBalances[i] < balances[i]) {
                 expectedResult = false;
                 break;
             }
         }
 
-        Balance[] memory expectedArray = new Balance[](length);
+        Balance[] memory storedBalances = new Balance[](length);
         for (uint256 i = 0; i < length; ++i) {
-            expectedArray[i] = Balance({token: tokens[i], balance: expectedBalances[i]});
+            storedBalances[i] = Balance({token: tokens[i], balance: expectedBalances[i]});
         }
 
-        bool result = BalancesLogic.compareBalances(creditAccount, expectedArray);
+        bool result = BalancesLogic.compareBalances(creditAccount, storedBalances, greater);
         assertEq(result, expectedResult, "Incorrect result");
     }
 
-    /// @notice U:[BLL-3]: storeForbiddenBalances works correctly
-    function test_BLL_03_storeForbiddenBalances_works_correctly(
+    /// @notice U:[BLL-4]: `storeBalances` with tokens mask works correctly
+    function test_U_BLL_04_storeBalances_with_tokens_mask_works_correctly(
         uint128[16] calldata balances,
-        uint256 enabledTokensMask,
-        uint256 forbiddenTokensMask
+        uint256 tokensMask
     ) public {
-        enabledTokensMask %= (2 ** 16);
-        forbiddenTokensMask %= (2 ** 16);
+        tokensMask %= (2 ** 16);
 
         _setupTokenBalances(balances, 16);
 
-        BalanceWithMask[] memory forbiddenBalances =
-            BalancesLogic.storeForbiddenBalances(creditAccount, enabledTokensMask, forbiddenTokensMask, _getTokenByMask);
+        BalanceWithMask[] memory storedBalances =
+            BalancesLogic.storeBalances(creditAccount, tokensMask, _getTokenByMask);
 
         uint256 j;
 
         for (uint256 i = 0; i < 16; ++i) {
             uint256 tokenMask = 1 << i;
-            if (tokenMask & enabledTokensMask & forbiddenTokensMask > 0) {
-                assertEq(forbiddenBalances[j].balance, balances[i], "Incorrect forbidden token balance");
+            if (tokenMask & tokensMask > 0) {
+                assertEq(storedBalances[j].balance, balances[i], "Incorrect token balance");
 
-                assertEq(forbiddenBalances[j].token, tokens[i], "Incorrect forbidden token address");
+                assertEq(storedBalances[j].token, tokens[i], "Incorrect token address");
 
-                assertEq(forbiddenBalances[j].tokenMask, tokenMask, "Incorrect forbidden token mask");
+                assertEq(storedBalances[j].tokenMask, tokenMask, "Incorrect token mask");
                 ++j;
             }
         }
     }
 
-    /// @notice U:[BLL-4]: checkForbiddenBalances works correctly
-    function test_BLL_04_storeForbiddenBalances_works_correctly(
+    /// @notice U:[BLL-5]: `compareBalances` with tokens mask works correctly
+    function test_U_BLL_05_compareBalances_with_tokens_mask_works_correctly(
         uint128[16] calldata balancesBefore,
         uint128[16] calldata balancesAfter,
-        uint256 enabledTokensMaskBefore,
-        uint256 enabledTokensMaskAfter,
-        uint256 forbiddenTokensMask
+        uint256 tokensMask,
+        bool greater
     ) public {
-        enabledTokensMaskBefore %= (2 ** 16);
-        enabledTokensMaskAfter %= (2 ** 16);
-        forbiddenTokensMask %= (2 ** 16);
+        tokensMask %= (2 ** 16);
 
         _setupTokenBalances(balancesBefore, 16);
 
-        BalanceWithMask[] memory forbiddenBalances = BalancesLogic.storeForbiddenBalances(
-            creditAccount, enabledTokensMaskBefore, forbiddenTokensMask, _getTokenByMask
-        );
+        BalanceWithMask[] memory storedBalances =
+            BalancesLogic.storeBalances(creditAccount, tokensMask, _getTokenByMask);
 
         _setupTokenBalances(balancesAfter, 16);
 
         bool expectedResult = true;
-        if ((enabledTokensMaskAfter & ~enabledTokensMaskBefore) & forbiddenTokensMask > 0) expectedResult = false;
-
         for (uint256 i = 0; i < 16; ++i) {
             uint256 tokenMask = 1 << i;
-            if ((enabledTokensMaskAfter & forbiddenTokensMask & tokenMask > 0) && balancesAfter[i] > balancesBefore[i])
-            {
-                expectedResult = false;
-                break;
+            if (tokensMask & tokenMask > 0) {
+                if (greater && balancesAfter[i] < balancesBefore[i]) {
+                    expectedResult = false;
+                    break;
+                }
+
+                if (!greater && balancesAfter[i] > balancesBefore[i]) {
+                    expectedResult = false;
+                    break;
+                }
             }
         }
 
-        bool result = BalancesLogic.checkForbiddenBalances(
-            creditAccount, enabledTokensMaskBefore, enabledTokensMaskAfter, forbiddenBalances, forbiddenTokensMask
-        );
+        bool result = BalancesLogic.compareBalances(creditAccount, tokensMask, storedBalances, greater);
         assertEq(result, expectedResult, "Incorrect result");
     }
 

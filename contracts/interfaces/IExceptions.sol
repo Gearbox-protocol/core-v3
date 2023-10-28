@@ -181,6 +181,15 @@ error ExpectedBalancesAlreadySetException();
 /// @notice Thrown when trying to perform an action that is forbidden when credit account has enabled forbidden tokens
 error ForbiddenTokensException();
 
+/// @notice Thrown when new forbidden tokens are enabled during the multicall
+error ForbiddenTokenEnabledException();
+
+/// @notice Thrown when enabled forbidden token balance is increased during the multicall
+error ForbiddenTokenBalanceIncreasedException();
+
+/// @notice Thrown when the remaining token balance is increased during the liquidation
+error RemainingTokenBalanceIncreasedException();
+
 /// @notice Thrown if `botMulticall` is called by an address that is not approved by account owner or is forbidden
 error NotApprovedBotException();
 
