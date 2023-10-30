@@ -1930,7 +1930,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         address bot = makeAddr("BOT");
         vm.expectCall(
             address(botListMock),
-            abi.encodeCall(IBotListV3.payBot, (USER, address(creditManagerMock), creditAccount, bot, paymentAmount))
+            abi.encodeCall(IBotListV3.payBot, (bot, address(creditManagerMock), creditAccount, USER, paymentAmount))
         );
 
         vm.prank(bot);
@@ -2106,7 +2106,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         );
         vm.expectCall(
             address(botListMock),
-            abi.encodeCall(IBotListV3.setBotPermissions, (address(creditManagerMock), creditAccount, bot, 1, 2, 3))
+            abi.encodeCall(IBotListV3.setBotPermissions, (bot, address(creditManagerMock), creditAccount, 1, 2, 3))
         );
 
         vm.prank(USER);
@@ -2134,7 +2134,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         botListMock.setBotPermissionsReturn(0);
         vm.expectCall(
             address(botListMock),
-            abi.encodeCall(IBotListV3.setBotPermissions, (address(creditManagerMock), creditAccount, bot, 1, 2, 3))
+            abi.encodeCall(IBotListV3.setBotPermissions, (bot, address(creditManagerMock), creditAccount, 1, 2, 3))
         );
 
         vm.expectCall(

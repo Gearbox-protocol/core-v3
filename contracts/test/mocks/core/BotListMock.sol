@@ -38,7 +38,7 @@ contract BotListMock {
         revertOnErase = _value;
     }
 
-    function payBot(address payer, address creditManager, address creditAccount, address bot, uint72 paymentAmount)
+    function payBot(address bot, address creditManager, address creditAccount, address payer, uint72 paymentAmount)
         external
     {}
 

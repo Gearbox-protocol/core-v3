@@ -447,7 +447,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             pool.setCreditManagerDebtLimit(address(creditManager), cmParams.poolLimit);
 
             vm.prank(CONFIGURATOR);
-            botList.setApprovedCreditManagerStatus(address(creditManager), true);
+            botList.setCreditManagerApprovedStatus(address(creditManager), true);
 
             vm.label(address(creditFacade), "CreditFacadeV3");
             vm.label(address(creditManager), "CreditManagerV3");

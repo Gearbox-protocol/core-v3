@@ -58,7 +58,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
 
         vm.prank(address(creditFacade));
         botList.setBotPermissions(
-            address(creditManager), creditAccount, bot, uint192(ALL_PERMISSIONS), uint72(1 ether), uint72(1 ether / 10)
+            bot, address(creditManager), creditAccount, uint192(ALL_PERMISSIONS), uint72(1 ether), uint72(1 ether / 10)
         );
 
         vm.expectRevert(NotApprovedBotException.selector);
@@ -71,11 +71,11 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         );
 
         vm.prank(CONFIGURATOR);
-        botList.setBotSpecialPermissions(address(creditManager), address(bot), type(uint192).max);
+        botList.setBotSpecialPermissions(address(bot), address(creditManager), type(uint192).max);
         vm.prank(bot);
         creditFacade.botMulticall(creditAccount, calls);
         vm.prank(CONFIGURATOR);
-        botList.setBotSpecialPermissions(address(creditManager), address(bot), 0);
+        botList.setBotSpecialPermissions(address(bot), address(creditManager), 0);
 
         vm.prank(USER);
         creditFacade.setBotPermissions(
@@ -114,7 +114,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         creditFacade.botMulticall(creditAccount, calls);
 
         vm.prank(CONFIGURATOR);
-        botList.setBotForbiddenStatus(address(creditManager), bot, true);
+        botList.setBotForbiddenStatus(bot, true);
 
         vm.expectRevert(NotApprovedBotException.selector);
         vm.prank(bot);

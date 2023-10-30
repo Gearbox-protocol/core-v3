@@ -62,28 +62,25 @@ contract BotListTest is Test, IBotListV3Events {
         creditFacade = makeAddr("CREDIT_FACADE");
         creditAccount = makeAddr("CREDIT_ACCOUNT");
 
-        invalidCF = address(new InvalidCFMock(address(creditManager)));
+        invalidCF = address(new InvalidCFMock(creditManager));
 
         vm.mockCall(
-            address(creditManager),
-            abi.encodeWithSelector(ICreditManagerV3.creditFacade.selector),
-            abi.encode(address(creditFacade))
+            creditManager, abi.encodeWithSelector(ICreditManagerV3.creditFacade.selector), abi.encode(creditFacade)
         );
 
         vm.mockCall(
-            address(creditFacade),
-            abi.encodeWithSelector(ICreditFacadeV3.creditManager.selector),
-            abi.encode(address(creditManager))
+            creditFacade, abi.encodeWithSelector(ICreditFacadeV3.creditManager.selector), abi.encode(creditManager)
         );
 
         vm.mockCall(
-            creditAccount,
-            abi.encodeWithSelector(ICreditAccountBase.creditManager.selector),
-            abi.encode(address(creditManager))
+            creditAccount, abi.encodeWithSelector(ICreditAccountBase.creditManager.selector), abi.encode(creditManager)
         );
 
         vm.prank(CONFIGURATOR);
-        botList.setApprovedCreditManagerStatus(address(creditManager), true);
+        addressProvider.addCreditManager(creditManager);
+
+        vm.prank(CONFIGURATOR);
+        botList.setCreditManagerApprovedStatus(creditManager, true);
     }
 
     ///
@@ -96,21 +93,22 @@ contract BotListTest is Test, IBotListV3Events {
     function test_U_BL_01_constructor_sets_correct_values() public {
         assertEq(botList.treasury(), addressProvider.getAddressOrRevert(AP_TREASURY, 0), "Treasury contract incorrect");
         assertEq(botList.weth(), address(weth), "WETH incorrect");
-        assertEq(botList.daoFee(), 0, "Initial DAO fee incorrect");
+        assertEq(botList.paymentFee(), 0, "Initial payment fee incorrect");
+        assertEq(botList.collectedPaymentFees(), 0, "Initial collected payment fees incorrect");
     }
 
-    /// @dev [BL-2]: setDAOFee works correctly
-    function test_U_BL_02_setDAOFee_works_correctly() public {
+    /// @dev [BL-2]: setPaymentFee works correctly
+    function test_U_BL_02_setPaymentFee_works_correctly() public {
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        botList.setDAOFee(1);
+        botList.setPaymentFee(1);
 
         vm.expectEmit(false, false, false, true);
-        emit SetBotDAOFee(15);
+        emit SetPaymentFee(15);
 
         vm.prank(CONFIGURATOR);
-        botList.setDAOFee(15);
+        botList.setPaymentFee(15);
 
-        assertEq(botList.daoFee(), 15, "DAO fee incorrect");
+        assertEq(botList.paymentFee(), 15, "Payment fee incorrect");
     }
 
     /// @dev [BL-3]: setBotPermissions works correctly
@@ -118,67 +116,67 @@ contract BotListTest is Test, IBotListV3Events {
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         vm.prank(invalidCF);
         botList.setBotPermissions({
+            bot: address(bot),
             creditManager: creditManager,
             creditAccount: creditAccount,
-            bot: address(bot),
             permissions: type(uint192).max,
             totalFundingAllowance: uint72(1 ether),
             weeklyFundingAllowance: uint72(1 ether / 10)
         });
 
         vm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, DUMB_ADDRESS));
-        vm.prank(address(creditFacade));
+        vm.prank(creditFacade);
         botList.setBotPermissions({
-            creditManager: creditManager,
-            creditAccount: creditAccount,
             bot: DUMB_ADDRESS,
-            permissions: type(uint192).max,
-            totalFundingAllowance: uint72(1 ether),
-            weeklyFundingAllowance: uint72(1 ether / 10)
-        });
-
-        vm.prank(CONFIGURATOR);
-        botList.setBotForbiddenStatus(address(creditManager), address(bot), true);
-
-        vm.expectRevert(InvalidBotException.selector);
-        vm.prank(address(creditFacade));
-        botList.setBotPermissions({
             creditManager: creditManager,
             creditAccount: creditAccount,
-            bot: address(bot),
             permissions: type(uint192).max,
             totalFundingAllowance: uint72(1 ether),
             weeklyFundingAllowance: uint72(1 ether / 10)
         });
 
         vm.prank(CONFIGURATOR);
-        botList.setBotForbiddenStatus(address(creditManager), address(bot), false);
-
-        vm.prank(CONFIGURATOR);
-        botList.setBotSpecialPermissions(address(creditManager), address(bot), 1);
+        botList.setBotForbiddenStatus(address(bot), true);
 
         vm.expectRevert(InvalidBotException.selector);
-        vm.prank(address(creditFacade));
+        vm.prank(creditFacade);
         botList.setBotPermissions({
+            bot: address(bot),
             creditManager: creditManager,
             creditAccount: creditAccount,
-            bot: address(bot),
             permissions: type(uint192).max,
             totalFundingAllowance: uint72(1 ether),
             weeklyFundingAllowance: uint72(1 ether / 10)
         });
 
         vm.prank(CONFIGURATOR);
-        botList.setBotSpecialPermissions(address(creditManager), address(bot), 0);
+        botList.setBotForbiddenStatus(address(bot), false);
+
+        vm.prank(CONFIGURATOR);
+        botList.setBotSpecialPermissions(address(bot), creditManager, 1);
+
+        vm.expectRevert(InvalidBotException.selector);
+        vm.prank(creditFacade);
+        botList.setBotPermissions({
+            bot: address(bot),
+            creditManager: creditManager,
+            creditAccount: creditAccount,
+            permissions: type(uint192).max,
+            totalFundingAllowance: uint72(1 ether),
+            weeklyFundingAllowance: uint72(1 ether / 10)
+        });
+
+        vm.prank(CONFIGURATOR);
+        botList.setBotSpecialPermissions(address(bot), creditManager, 0);
 
         vm.expectEmit(true, true, true, true);
-        emit SetBotPermissions(creditManager, creditAccount, address(bot), 1, uint72(1 ether), uint72(1 ether / 10));
+        emit SetBotPermissions(address(bot), creditManager, creditAccount, 1, uint72(1 ether), uint72(1 ether / 10));
 
-        vm.prank(address(creditFacade));
+        vm.prank(creditFacade);
         uint256 activeBotsRemaining = botList.setBotPermissions({
+            bot: address(bot),
             creditManager: creditManager,
             creditAccount: creditAccount,
-            bot: address(bot),
             permissions: 1,
             totalFundingAllowance: uint72(1 ether),
             weeklyFundingAllowance: uint72(1 ether / 10)
@@ -186,88 +184,85 @@ contract BotListTest is Test, IBotListV3Events {
 
         assertEq(activeBotsRemaining, 1, "Incorrect number of bots returned");
 
-        assertEq(botList.botPermissions(creditManager, creditAccount, address(bot)), 1, "Bot permissions were not set");
+        assertEq(botList.botPermissions(address(bot), creditManager, creditAccount), 1, "Bot permissions were not set");
 
-        (uint256 remainingFunds, uint256 maxWeeklyAllowance, uint256 remainingWeeklyAllowance, uint256 allowanceLU) =
-            botList.botFunding(creditManager, creditAccount, address(bot));
+        BotFunding memory bf = botList.botFunding(address(bot), creditManager, creditAccount);
 
-        address[] memory bots = botList.getActiveBots(creditManager, creditAccount);
+        address[] memory bots = botList.activeBots(creditManager, creditAccount);
 
         assertEq(bots.length, 1, "Incorrect active bots array length");
 
         assertEq(bots[0], address(bot), "Incorrect address added to active bots list");
 
-        assertEq(remainingFunds, 1 ether, "Incorrect remaining funds value");
+        assertEq(bf.totalFundingAllowance, 1 ether, "Incorrect total funding allowance");
 
-        assertEq(maxWeeklyAllowance, 1 ether / 10, "Incorrect max weekly allowance");
+        assertEq(bf.maxWeeklyAllowance, 1 ether / 10, "Incorrect max weekly allowance");
 
-        assertEq(remainingWeeklyAllowance, 1 ether / 10, "Incorrect remaining weekly allowance");
+        assertEq(bf.remainingWeeklyAllowance, 1 ether / 10, "Incorrect remaining weekly allowance");
 
-        assertEq(allowanceLU, block.timestamp, "Incorrect allowance update timestamp");
+        assertEq(bf.lastAllowanceUpdate, block.timestamp, "Incorrect allowance update timestamp");
 
-        vm.prank(address(creditFacade));
+        vm.prank(creditFacade);
         activeBotsRemaining = botList.setBotPermissions({
+            bot: address(bot),
             creditManager: creditManager,
             creditAccount: creditAccount,
-            bot: address(bot),
             permissions: 2,
             totalFundingAllowance: uint72(2 ether),
             weeklyFundingAllowance: uint72(2 ether / 10)
         });
 
-        (remainingFunds, maxWeeklyAllowance, remainingWeeklyAllowance, allowanceLU) =
-            botList.botFunding(creditManager, creditAccount, address(bot));
+        bf = botList.botFunding(address(bot), creditManager, creditAccount);
 
         assertEq(activeBotsRemaining, 1, "Incorrect number of bots returned");
 
-        assertEq(botList.botPermissions(creditManager, creditAccount, address(bot)), 2, "Bot permissions were not set");
+        assertEq(botList.botPermissions(address(bot), creditManager, creditAccount), 2, "Bot permissions were not set");
 
-        assertEq(remainingFunds, 2 ether, "Incorrect remaining funds value");
+        assertEq(bf.totalFundingAllowance, 2 ether, "Incorrect total funding allowance");
 
-        assertEq(maxWeeklyAllowance, 2 ether / 10, "Incorrect max weekly allowance");
+        assertEq(bf.maxWeeklyAllowance, 2 ether / 10, "Incorrect max weekly allowance");
 
-        assertEq(remainingWeeklyAllowance, 2 ether / 10, "Incorrect remaining weekly allowance");
+        assertEq(bf.remainingWeeklyAllowance, 2 ether / 10, "Incorrect remaining weekly allowance");
 
-        assertEq(allowanceLU, block.timestamp, "Incorrect allowance update timestamp");
+        assertEq(bf.lastAllowanceUpdate, block.timestamp, "Incorrect allowance update timestamp");
 
-        bots = botList.getActiveBots(creditManager, creditAccount);
+        bots = botList.activeBots(creditManager, creditAccount);
 
         assertEq(bots.length, 1, "Incorrect active bots array length");
 
         assertEq(bots[0], address(bot), "Incorrect address added to active bots list");
 
         vm.prank(CONFIGURATOR);
-        botList.setBotForbiddenStatus(address(creditManager), address(bot), true);
+        botList.setBotForbiddenStatus(address(bot), true);
 
         vm.expectEmit(true, true, true, false);
-        emit EraseBot(address(creditManager), address(creditAccount), address(bot));
+        emit EraseBot(address(bot), creditManager, creditAccount);
 
-        vm.prank(address(creditFacade));
+        vm.prank(creditFacade);
         activeBotsRemaining = botList.setBotPermissions({
+            bot: address(bot),
             creditManager: creditManager,
             creditAccount: creditAccount,
-            bot: address(bot),
             permissions: 0,
             totalFundingAllowance: 0,
             weeklyFundingAllowance: 0
         });
 
-        (remainingFunds, maxWeeklyAllowance, remainingWeeklyAllowance, allowanceLU) =
-            botList.botFunding(creditManager, creditAccount, address(bot));
+        bf = botList.botFunding(address(bot), creditManager, creditAccount);
 
         assertEq(activeBotsRemaining, 0, "Incorrect number of bots returned");
 
-        assertEq(botList.botPermissions(creditManager, creditAccount, address(bot)), 0, "Bot permissions were not set");
+        assertEq(botList.botPermissions(address(bot), creditManager, creditAccount), 0, "Bot permissions were not set");
 
-        assertEq(remainingFunds, 0, "Incorrect remaining funds value");
+        assertEq(bf.totalFundingAllowance, 0, "Incorrect total funding allowance");
 
-        assertEq(maxWeeklyAllowance, 0, "Incorrect max weekly allowance");
+        assertEq(bf.maxWeeklyAllowance, 0, "Incorrect max weekly allowance");
 
-        assertEq(remainingWeeklyAllowance, 0, "Incorrect remaining weekly allowance");
+        assertEq(bf.remainingWeeklyAllowance, 0, "Incorrect remaining weekly allowance");
 
-        assertEq(allowanceLU, 0, "Incorrect allowance update timestamp");
+        assertEq(bf.lastAllowanceUpdate, 0, "Incorrect allowance update timestamp");
 
-        bots = botList.getActiveBots(creditManager, creditAccount);
+        bots = botList.activeBots(creditManager, creditAccount);
 
         assertEq(bots.length, 0, "Incorrect active bots array length");
     }
@@ -319,24 +314,18 @@ contract BotListTest is Test, IBotListV3Events {
     /// @dev [BL-5]: payBot works correctly
     function test_U_BL_05_payBot_works_correctly() public {
         vm.prank(CONFIGURATOR);
-        botList.setDAOFee(5000);
-
-        vm.mockCall(
-            address(creditManager),
-            abi.encodeWithSelector(ICreditManagerV3.getBorrowerOrRevert.selector, creditAccount),
-            abi.encode(USER)
-        );
+        botList.setPaymentFee(5000);
 
         vm.deal(USER, 10 ether);
 
         vm.prank(USER);
         botList.deposit{value: 2 ether}();
 
-        vm.prank(address(creditFacade));
+        vm.prank(creditFacade);
         botList.setBotPermissions({
+            bot: address(bot),
             creditManager: creditManager,
             creditAccount: creditAccount,
-            bot: address(bot),
             permissions: 1,
             totalFundingAllowance: uint72(1 ether),
             weeklyFundingAllowance: uint72(1 ether / 10)
@@ -347,32 +336,33 @@ contract BotListTest is Test, IBotListV3Events {
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         vm.prank(invalidCF);
         botList.payBot({
-            payer: USER,
+            bot: address(bot),
             creditManager: creditManager,
             creditAccount: creditAccount,
-            bot: address(bot),
+            payer: USER,
             paymentAmount: uint72(1 ether / 20)
         });
 
         vm.expectEmit(true, true, true, true);
-        emit PayBot(USER, creditAccount, address(bot), uint72(1 ether / 20), uint72(1 ether / 40));
+        emit PayBot(address(bot), creditManager, creditAccount, USER, uint72(1 ether / 20), uint72(1 ether / 40));
 
-        vm.prank(address(creditFacade));
+        vm.prank(creditFacade);
         botList.payBot({
-            payer: USER,
+            bot: address(bot),
             creditManager: creditManager,
             creditAccount: creditAccount,
-            bot: address(bot),
+            payer: USER,
             paymentAmount: uint72(1 ether / 20)
         });
 
-        (uint256 remainingFunds, uint256 maxWeeklyAllowance, uint256 remainingWeeklyAllowance, uint256 allowanceLU) =
-            botList.botFunding(creditManager, creditAccount, address(bot));
-
-        assertEq(remainingFunds, 1 ether - (1 ether / 20) - (1 ether / 40), "Bot funding remaining funds incorrect");
+        BotFunding memory bf = botList.botFunding(address(bot), creditManager, creditAccount);
 
         assertEq(
-            remainingWeeklyAllowance,
+            bf.totalFundingAllowance, 1 ether - (1 ether / 20) - (1 ether / 40), "Bot total funding allowance incorrect"
+        );
+
+        assertEq(
+            bf.remainingWeeklyAllowance,
             (1 ether / 10) - (1 ether / 20) - (1 ether / 40),
             "Bot remaining weekly allowance incorrect"
         );
@@ -383,35 +373,38 @@ contract BotListTest is Test, IBotListV3Events {
             "User remaining funding balance incorrect"
         );
 
-        assertEq(allowanceLU, block.timestamp - 1 days, "Allowance update timestamp incorrect");
+        assertEq(bf.lastAllowanceUpdate, block.timestamp - 1 days, "Allowance update timestamp incorrect");
 
         assertEq(weth.balanceOf(address(bot)), 1 ether / 20, "Bot was sent incorrect WETH amount");
 
-        assertEq(botList.collectedDaoFees(), 1 ether / 40, "Collected dao fees was increased with incorrect amount");
+        assertEq(
+            botList.collectedPaymentFees(), 1 ether / 40, "Collected payment fees was increased with incorrect amount"
+        );
 
         vm.warp(block.timestamp + 7 days);
 
-        vm.prank(address(creditFacade));
+        vm.prank(creditFacade);
         botList.payBot({
-            payer: USER,
+            bot: address(bot),
             creditManager: creditManager,
             creditAccount: creditAccount,
-            bot: address(bot),
+            payer: USER,
             paymentAmount: uint72(1 ether / 20)
         });
 
-        (remainingFunds, maxWeeklyAllowance, remainingWeeklyAllowance, allowanceLU) =
-            botList.botFunding(creditManager, creditAccount, address(bot));
-
-        assertEq(remainingFunds, 1 ether - (2 ether / 20) - (2 ether / 40), "Bot funding remaining funds incorrect");
+        bf = botList.botFunding(address(bot), creditManager, creditAccount);
 
         assertEq(
-            remainingWeeklyAllowance,
+            bf.totalFundingAllowance, 1 ether - (2 ether / 20) - (2 ether / 40), "Bot total funding allowance incorrect"
+        );
+
+        assertEq(
+            bf.remainingWeeklyAllowance,
             (1 ether / 10) - (1 ether / 20) - (1 ether / 40),
             "Bot remaining weekly allowance incorrect"
         );
 
-        assertEq(allowanceLU, block.timestamp, "Allowance update timestamp incorrect");
+        assertEq(bf.lastAllowanceUpdate, block.timestamp, "Allowance update timestamp incorrect");
 
         assertEq(
             botList.balanceOf(USER),
@@ -421,11 +414,14 @@ contract BotListTest is Test, IBotListV3Events {
 
         assertEq(weth.balanceOf(address(bot)), 2 ether / 20, "Bot was sent incorrect WETH amount");
 
-        assertEq(botList.collectedDaoFees(), 2 ether / 40, "CollectedDaoFees was incorrectly chaged");
+        assertEq(botList.collectedPaymentFees(), 2 ether / 40, "CollectedPaymentFees was incorrectly chaged");
 
-        botList.transferCollectedDaoFees();
+        vm.expectEmit(false, false, false, true);
+        emit TransferCollectedPaymentFees(2 ether / 40);
 
-        assertEq(botList.collectedDaoFees(), 0, "CollectedDaoFees was not zeroed");
+        botList.transferCollectedPaymentFees();
+
+        assertEq(botList.collectedPaymentFees(), 0, "CollectedPaymentFees was not zeroed");
 
         assertEq(
             weth.balanceOf(addressProvider.getTreasuryContract()), 2 ether / 40, "Treasury was sent incorrect amount"
@@ -434,11 +430,11 @@ contract BotListTest is Test, IBotListV3Events {
 
     /// @dev [BL-6]: eraseAllBotPermissions works correctly
     function test_U_BL_06_eraseAllBotPermissions_works_correctly() public {
-        vm.prank(address(creditFacade));
+        vm.prank(creditFacade);
         botList.setBotPermissions({
+            bot: address(bot),
             creditManager: creditManager,
             creditAccount: creditAccount,
-            bot: address(bot),
             permissions: 1,
             totalFundingAllowance: uint72(1 ether),
             weeklyFundingAllowance: uint72(1 ether / 10)
@@ -446,11 +442,11 @@ contract BotListTest is Test, IBotListV3Events {
 
         address bot2 = address(new GeneralMock());
 
-        vm.prank(address(creditFacade));
+        vm.prank(creditFacade);
         uint256 activeBotsRemaining = botList.setBotPermissions({
+            bot: address(bot2),
             creditManager: creditManager,
             creditAccount: creditAccount,
-            bot: address(bot2),
             permissions: 2,
             totalFundingAllowance: uint72(2 ether),
             weeklyFundingAllowance: uint72(2 ether / 10)
@@ -464,45 +460,43 @@ contract BotListTest is Test, IBotListV3Events {
 
         // it starts removing bots from the end
         vm.expectEmit(true, true, true, false);
-        emit EraseBot(creditManager, creditAccount, address(bot2));
+        emit EraseBot(address(bot2), creditManager, creditAccount);
 
         vm.expectEmit(true, true, true, false);
-        emit EraseBot(creditManager, creditAccount, address(bot));
+        emit EraseBot(address(bot), creditManager, creditAccount);
 
-        vm.prank(address(creditFacade));
+        vm.prank(creditFacade);
         botList.eraseAllBotPermissions(creditManager, creditAccount);
 
         assertEq(
-            botList.botPermissions(creditManager, creditAccount, address(bot)),
+            botList.botPermissions(address(bot), creditManager, creditAccount),
             0,
             "Permissions were not erased for bot 1"
         );
 
         assertEq(
-            botList.botPermissions(creditManager, creditAccount, address(bot2)),
+            botList.botPermissions(address(bot2), creditManager, creditAccount),
             0,
             "Permissions were not erased for bot 2"
         );
 
-        (uint256 remainingFunds, uint256 maxWeeklyAllowance, uint256 remainingWeeklyAllowance, uint256 allowanceLU) =
-            botList.botFunding(creditManager, creditAccount, address(bot));
+        BotFunding memory bf = botList.botFunding(creditManager, creditAccount, address(bot));
 
-        assertEq(remainingFunds, 0, "Remaining funds were not zeroed");
+        assertEq(bf.totalFundingAllowance, 0, "total funding allowance was not zeroed for bot 1");
 
-        assertEq(maxWeeklyAllowance, 0, "Remaining funds were not zeroed");
+        assertEq(bf.maxWeeklyAllowance, 0, "max weekly allowance was not zeroed for bot 1");
 
-        assertEq(remainingWeeklyAllowance, 0, "Remaining funds were not zeroed");
+        assertEq(bf.remainingWeeklyAllowance, 0, "Remaining weekly allowance not zeroed for bot 1");
 
-        (remainingFunds, maxWeeklyAllowance, remainingWeeklyAllowance, allowanceLU) =
-            botList.botFunding(creditManager, creditAccount, address(bot2));
+        bf = botList.botFunding(address(bot2), creditManager, creditAccount);
 
-        assertEq(remainingFunds, 0, "Remaining funds were not zeroed");
+        assertEq(bf.totalFundingAllowance, 0, "total funding allowance was not zeroed for bot 2");
 
-        assertEq(maxWeeklyAllowance, 0, "Remaining funds were not zeroed");
+        assertEq(bf.maxWeeklyAllowance, 0, "max weekly allowance was not zeroed for bot 2");
 
-        assertEq(remainingWeeklyAllowance, 0, "Remaining funds were not zeroed");
+        assertEq(bf.remainingWeeklyAllowance, 0, "Remaining weekly allowance not zeroed for bot 2");
 
-        address[] memory activeBots = botList.getActiveBots(creditManager, creditAccount);
+        address[] memory activeBots = botList.activeBots(creditManager, creditAccount);
 
         assertEq(activeBots.length, 0, "Not all active bots were disabled");
     }
@@ -510,16 +504,16 @@ contract BotListTest is Test, IBotListV3Events {
     /// @dev [BL-7]: setBotSpecialPermissions works correctly
     function test_U_BL_07_setBotSpecialPermissions_works_correctly() public {
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        botList.setBotSpecialPermissions(address(creditManager), address(bot), 2);
+        botList.setBotSpecialPermissions(address(bot), creditManager, 2);
 
         vm.expectEmit(true, true, false, true);
-        emit SetBotSpecialPermissions(address(creditManager), address(bot), 2);
+        emit SetBotSpecialPermissions(address(bot), creditManager, 2);
 
         vm.prank(CONFIGURATOR);
-        botList.setBotSpecialPermissions(address(creditManager), address(bot), 2);
+        botList.setBotSpecialPermissions(address(bot), creditManager, 2);
 
         (uint192 permissions,, bool hasSpecialPermissions) =
-            botList.getBotStatus(address(creditManager), address(creditAccount), address(bot));
+            botList.getBotStatus(address(bot), creditManager, creditAccount);
 
         assertEq(permissions, 2, "Special permissions are incorrect");
 
@@ -529,43 +523,43 @@ contract BotListTest is Test, IBotListV3Events {
     /// @dev [BL-8]: payBot correctly reverts if payment bigger than allowances
     function test_U_BL_08_payBot_correctly_reverts_if_payment_bigger_than_allowances() public {
         uint72 limit = 1 ether;
-        vm.prank(address(creditFacade));
+        vm.prank(creditFacade);
         botList.setBotPermissions({
+            bot: address(bot),
             creditManager: creditManager,
             creditAccount: creditAccount,
-            bot: address(bot),
             permissions: 1,
             totalFundingAllowance: type(uint72).max,
             weeklyFundingAllowance: limit
         });
 
         vm.expectRevert(InsufficientWeeklyFundingAllowance.selector);
-        vm.prank(address(creditFacade));
+        vm.prank(creditFacade);
         botList.payBot({
-            payer: USER,
+            bot: address(bot),
             creditManager: creditManager,
             creditAccount: creditAccount,
-            bot: address(bot),
+            payer: USER,
             paymentAmount: limit + 1
         });
 
-        vm.prank(address(creditFacade));
+        vm.prank(creditFacade);
         botList.setBotPermissions({
+            bot: address(bot),
             creditManager: creditManager,
             creditAccount: creditAccount,
-            bot: address(bot),
             permissions: 1,
             totalFundingAllowance: limit,
             weeklyFundingAllowance: type(uint72).max
         });
 
         vm.expectRevert(InsufficientTotalFundingAllowance.selector);
-        vm.prank(address(creditFacade));
+        vm.prank(creditFacade);
         botList.payBot({
-            payer: USER,
+            bot: address(bot),
             creditManager: creditManager,
             creditAccount: creditAccount,
-            bot: address(bot),
+            payer: USER,
             paymentAmount: limit + 1
         });
     }
