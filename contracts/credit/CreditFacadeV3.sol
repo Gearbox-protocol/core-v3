@@ -30,7 +30,7 @@ import {
 } from "../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
 import {ETH_ADDRESS, IWithdrawalManagerV3} from "../interfaces/IWithdrawalManagerV3.sol";
-import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
+import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
 import {IUpdatablePriceFeed} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceFeed.sol";
 
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
@@ -440,10 +440,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             revert NotApprovedBotException(); // U:[FA-19]
         }
 
-        if (!hasSpecialPermissions) {
-            botPermissions = botPermissions.enable(PAY_BOT_CAN_BE_CALLED);
-        }
-
         _multicallFullCollateralCheck(creditAccount, calls, botPermissions); // U:[FA-19, 20]
     }
 
@@ -594,10 +590,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         enabledTokensMask = enabledTokensMask.enableDisable(tokensToEnable, tokensToDisable); // U:[FA-34]
                     }
                     // withdraw
-                    else if (
-                        method == ICreditFacadeV3Multicall.withdraw.selector
-                            || method == ICreditFacadeV3Multicall.withdrawAll.selector
-                    ) {
+                    else if (method == ICreditFacadeV3Multicall.withdraw.selector) {
                         _revertIfNoPermission(flags, WITHDRAW_PERMISSION); // U:[FA-21]
 
                         flags = flags.enable(REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS); // U:[FA-30]
@@ -605,9 +598,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         // It enabled additinal check that all collateral tokens pricefeeds work correctly
                         fullCheckParams.reservePriceFeedCheck = true;
 
-                        uint256 tokensToDisable = method == ICreditFacadeV3Multicall.withdraw.selector
-                            ? _withdrawAmount(creditAccount, mcall.callData[4:])
-                            : _withdrawAll(creditAccount, mcall.callData[4:]); // U:[FA-34]
+                        uint256 tokensToDisable = _withdraw(creditAccount, mcall.callData[4:]); // U:[FA-34]
 
                         quotedTokensMaskInverted = _getInvertedQuotedTokensMask(quotedTokensMaskInverted);
 
@@ -635,12 +626,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                             creditAccount, mcall.callData[4:], enabledTokensMask, ManageDebtAction.DECREASE_DEBT
                         ); // U:[FA-31]
                         enabledTokensMask = enabledTokensMask.disable(tokensToDisable); // U:[FA-31]
-                    }
-                    // payBot
-                    else if (method == ICreditFacadeV3Multicall.payBot.selector) {
-                        _revertIfNoPermission(flags, PAY_BOT_CAN_BE_CALLED); // U:[FA-21]
-                        flags = flags.disable(PAY_BOT_CAN_BE_CALLED); // U:[FA-37]
-                        _payBot(creditAccount, mcall.callData[4:]); // U:[FA-37]
                     }
                     // setFullCheckParams
                     else if (method == ICreditFacadeV3Multicall.setFullCheckParams.selector) {
@@ -746,10 +731,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     mcall.target == address(this)
                         && bytes4(mcall.callData) == ICreditFacadeV3Multicall.onDemandPriceUpdate.selector
                 ) {
-                    (address token, bytes memory data) = abi.decode(mcall.callData[4:], (address, bytes)); // U:[FA-25]
+                    (address token, bool reserve, bytes memory data) =
+                        abi.decode(mcall.callData[4:], (address, bool, bytes)); // U:[FA-25]
 
                     priceOracle = _getPriceOracle(priceOracle); // U:[FA-25]
-                    address priceFeed = IPriceOracleBase(priceOracle).priceFeeds(token); // U:[FA-25]
+                    address priceFeed = IPriceOracleV3(priceOracle).priceFeedsRaw(token, reserve); // U:[FA-25]
+
                     if (priceFeed == address(0)) {
                         revert PriceFeedDoesNotExistException(); // U:[FA-25]
                     }
@@ -879,30 +866,16 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         }); // U:[FA-34]
     }
 
-    function _withdrawAmount(address creditAccount, bytes calldata callData)
-        internal
-        returns (uint256 tokensToDisable)
-    {
+    function _withdraw(address creditAccount, bytes calldata callData) internal returns (uint256 tokensToDisable) {
         (address token, uint256 amount, address to) = abi.decode(callData, (address, uint256, address)); // U:[FA-35]
-        tokensToDisable = _withdraw(creditAccount, token, amount, to);
-    }
 
-    function _withdrawAll(address creditAccount, bytes calldata callData) internal returns (uint256 tokensToDisable) {
-        (address token, address to) = abi.decode(callData, (address, address)); // U:[FA-35]
-
-        uint256 amount = IERC20(token).balanceOf(creditAccount);
-        if (amount > 1) {
+        if (amount == type(uint256).max) {
+            uint256 amount = IERC20(token).balanceOf(creditAccount);
+            if (amount <= 1) return 0;
             unchecked {
-                tokensToDisable = _withdraw(creditAccount, token, amount - 1, to);
+                --amount;
             }
         }
-    }
-
-    /// @dev `ICreditFacadeV3Multicall.withdraw` implementation
-    function _withdraw(address creditAccount, address token, uint256 amount, address to)
-        internal
-        returns (uint256 tokensToDisable)
-    {
         tokensToDisable = ICreditManagerV3(creditManager).withdraw(creditAccount, token, amount, to); // U:[FA-35]
     }
 

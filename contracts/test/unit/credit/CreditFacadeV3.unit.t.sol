@@ -1025,53 +1025,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.botMulticall(creditAccount, calls);
     }
 
-    /// @dev U:[FA-20]: only botMulticall doesn't revert for pay bot call
-    function test_U_FA_20_only_botMulticall_doesnt_revert_for_pay_bot_call() public notExpirableCase {
-        address creditAccount = DUMB_ADDRESS;
-
-        creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, true);
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setDebtLimits(1, 100, 1);
-
-        creditManagerMock.setBorrower(USER);
-        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false, false);
-
-        MultiCall[] memory calls = MultiCallBuilder.build(
-            MultiCall({target: address(creditFacade), callData: abi.encodeCall(ICreditFacadeV3Multicall.payBot, (1))})
-        );
-
-        vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, PAY_BOT_CAN_BE_CALLED));
-        creditFacade.openCreditAccount({onBehalfOf: USER, calls: calls, referralCode: 0});
-
-        vm.prank(USER);
-        vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, PAY_BOT_CAN_BE_CALLED));
-        creditFacade.multicall(creditAccount, calls);
-
-        /// Case: it works for bot multicall
-        creditFacade.botMulticall(creditAccount, calls);
-    }
-
-    /// @dev U:[FA-20A]: botMulticall reverts for payBot calls for bots with special permissions
-    function test_U_FA_20A_payBot_reverts_for_special_bots() public notExpirableCase {
-        address creditAccount = DUMB_ADDRESS;
-
-        creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, true);
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setDebtLimits(1, 100, 1);
-
-        creditManagerMock.setBorrower(USER);
-        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false, true);
-
-        MultiCall[] memory calls = MultiCallBuilder.build(
-            MultiCall({target: address(creditFacade), callData: abi.encodeCall(ICreditFacadeV3Multicall.payBot, (1))})
-        );
-
-        vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, PAY_BOT_CAN_BE_CALLED));
-        creditFacade.botMulticall(creditAccount, calls);
-    }
-
     struct MultiCallPermissionTestCase {
         bytes callData;
         uint256 permissionRquired;
@@ -1097,7 +1050,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         creditManagerMock.setBorrower(USER);
 
-        MultiCallPermissionTestCase[10] memory cases = [
+        MultiCallPermissionTestCase[9] memory cases = [
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (token)),
                 permissionRquired: ENABLE_TOKEN_PERMISSION
@@ -1135,10 +1088,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.revokeAdapterAllowances, (new RevocationPair[](0))),
                 permissionRquired: REVOKE_ALLOWANCES_PERMISSION
-            }),
-            MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.payBot, (0)),
-                permissionRquired: PAY_BOT_CAN_BE_CALLED
             })
         ];
 
@@ -1285,7 +1234,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.onDemandPriceUpdate, (token, cd))
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.onDemandPriceUpdate, (token, false, cd))
             })
         );
 
@@ -1297,7 +1246,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.onDemandPriceUpdate, (DUMB_ADDRESS, cd))
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.onDemandPriceUpdate, (DUMB_ADDRESS, false, cd))
             })
         );
 
@@ -1857,52 +1806,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 ),
             enabledTokensMask: 0,
             flags: REVOKE_ALLOWANCES_PERMISSION
-        });
-    }
-
-    /// @dev U:[FA-37]: multicall payBot works properly
-    function test_U_FA_37_multicall_payBot_works_properly() public notExpirableCase {
-        address creditAccount = DUMB_ADDRESS;
-
-        creditManagerMock.setBorrower(USER);
-
-        uint72 paymentAmount = 100_000;
-
-        address bot = makeAddr("BOT");
-        vm.expectCall(
-            address(botListMock),
-            abi.encodeCall(IBotListV3.payBot, (USER, address(creditManagerMock), creditAccount, bot, paymentAmount))
-        );
-
-        vm.prank(bot);
-        creditFacade.multicallInt({
-            creditAccount: creditAccount,
-            calls: MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.payBot, (paymentAmount))
-                })
-                ),
-            enabledTokensMask: 0,
-            flags: PAY_BOT_CAN_BE_CALLED
-        });
-
-        vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, PAY_BOT_CAN_BE_CALLED));
-        vm.prank(bot);
-        creditFacade.multicallInt({
-            creditAccount: creditAccount,
-            calls: MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.payBot, (paymentAmount))
-                }),
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.payBot, (paymentAmount))
-                })
-                ),
-            enabledTokensMask: 0,
-            flags: PAY_BOT_CAN_BE_CALLED
         });
     }
 

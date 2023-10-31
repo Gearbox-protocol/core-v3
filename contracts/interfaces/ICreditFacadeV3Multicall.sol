@@ -42,20 +42,17 @@ uint256 constant REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS = 1 << 193;
 ///      set to true on the first call to the adapter
 uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 1 << 194;
 
-/// @dev Indicates that `payBot` can be called during multicall to fund the bot, set to true when
-///      multicall is initiated in `botMulticall` and reset after the first `payBot` call
-uint256 constant PAY_BOT_CAN_BE_CALLED = 1 << 195;
-
 /// @title Credit facade V3 multicall interface
 /// @dev Unless specified otherwise, all these methods are only available in `openCreditAccount`,
 ///      `closeCreditAccount`, `multicall`, and, with account owner's permission, `botMulticall`
 interface ICreditFacadeV3Multicall {
     /// @notice Updates the price for a token with on-demand updatable price feed
     /// @param token Token to push the price update for
+    /// @param reserve Whether to update reserve price feed or main price feed
     /// @param data Data to call `updatePrice` with
     /// @dev Calls of this type must be placed before all other calls in the multicall not to revert
     /// @dev This method is available in all kinds of multicalls
-    function onDemandPriceUpdate(address token, bytes calldata data) external;
+    function onDemandPriceUpdate(address token, bool reserve, bytes calldata data) external;
 
     /// @notice Ensures that token balances increase at least by specified deltas after the following calls
     /// @param balanceDeltas Array of (token, minBalanceDelta) pairs, deltas are allowed to be negative
@@ -114,18 +111,6 @@ interface ICreditFacadeV3Multicall {
     /// @dev Withdrawals are prohibited if there are forbidden tokens enabled as collateral on the account
     /// @dev Withdrawals are prohibited when opening or closing an account
     function withdraw(address token, uint256 amount, address to) external;
-
-    /// @notice Withdraw tokens from account
-    /// @param token Token to withdraw
-    /// @param amount Amount to withdraw
-    /// @dev Withdrawals are prohibited if there are forbidden tokens enabled as collateral on the account
-    /// @dev Withdrawals are prohibited when opening or closing an account
-    function withdrawAll(address token, address to) external;
-
-    /// @notice Requests bot list to make a payment to the caller
-    /// @param paymentAmount Paymenet amount in WETH
-    /// @dev This method is only available in `botMulticall` and can only be called once
-    function payBot(uint72 paymentAmount) external;
 
     /// @notice Sets advanced collateral check parameters
     /// @param collateralHints Optional array of token masks to check first to reduce the amount of computation
