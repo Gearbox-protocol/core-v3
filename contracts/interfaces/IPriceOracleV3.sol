@@ -36,7 +36,14 @@ interface IPriceOracleV3 is IPriceOracleBase, IPriceOracleV3Events {
     function priceFeedParams(address token)
         external
         view
-        returns (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals);
+        returns (
+            address priceFeed,
+            uint32 stalenessPeriod,
+            bool skipCheck,
+            uint8 decimals,
+            bool zeroPriceFeed,
+            bool trustedPriceFeed
+        );
 
     // ------------- //
     // CONFIGURATION //
