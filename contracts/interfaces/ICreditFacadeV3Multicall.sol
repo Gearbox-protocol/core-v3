@@ -108,12 +108,19 @@ interface ICreditFacadeV3Multicall {
     /// @dev Resulting account's quota for token must not exceed the limit defined in the facade
     function updateQuota(address token, int96 quotaChange, uint96 minQuota) external;
 
-    /// @notice Schedules a delayed withdrawal from account
+    /// @notice Withdraw tokens from account
     /// @param token Token to withdraw
     /// @param amount Amount to withdraw
     /// @dev Withdrawals are prohibited if there are forbidden tokens enabled as collateral on the account
     /// @dev Withdrawals are prohibited when opening or closing an account
-    function withdraw(address token, uint256 amount) external;
+    function withdraw(address token, uint256 amount, address to) external;
+
+    /// @notice Withdraw tokens from account
+    /// @param token Token to withdraw
+    /// @param amount Amount to withdraw
+    /// @dev Withdrawals are prohibited if there are forbidden tokens enabled as collateral on the account
+    /// @dev Withdrawals are prohibited when opening or closing an account
+    function withdrawAll(address token, address to) external;
 
     /// @notice Requests bot list to make a payment to the caller
     /// @param paymentAmount Paymenet amount in WETH

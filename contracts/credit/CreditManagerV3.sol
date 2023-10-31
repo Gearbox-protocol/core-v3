@@ -929,9 +929,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param creditAccount Credit account to schedule a withdrawal from
     /// @param token Token to withdraw
     /// @param amount Amount to withdraw
+    /// @param to receiver
     /// @return tokensToDisable Mask of tokens that should be disabled after the operation
     ///         (equals `token`'s mask if withdrawing the entire balance, zero otherwise)
-    function withdraw(address creditAccount, address token, uint256 amount)
+    function withdraw(address creditAccount, address token, uint256 amount, address to)
         external
         override
         nonReentrant // U:[CM-5]
@@ -940,14 +941,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         uint256 tokenMask = getTokenMaskOrRevert({token: token}); // U:[CM-26]
 
-        address borrower = getBorrowerOrRevert({creditAccount: creditAccount});
-        _safeTokenTransfer({
-            creditAccount: creditAccount,
-            token: token,
-            to: borrower,
-            amount: amount,
-            convertToETH: false
-        }); // U:[CM-27]
+        _safeTokenTransfer({creditAccount: creditAccount, token: token, to: to, amount: amount, convertToETH: false}); // U:[CM-27]
 
         if (IERC20(token).safeBalanceOf({account: creditAccount}) <= 1) {
             tokensToDisable = tokenMask; // U:[CM-27]

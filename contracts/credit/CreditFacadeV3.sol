@@ -594,7 +594,10 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         enabledTokensMask = enabledTokensMask.enableDisable(tokensToEnable, tokensToDisable); // U:[FA-34]
                     }
                     // withdraw
-                    else if (method == ICreditFacadeV3Multicall.withdraw.selector) {
+                    else if (
+                        method == ICreditFacadeV3Multicall.withdraw.selector
+                            || method == ICreditFacadeV3Multicall.withdrawAll.selector
+                    ) {
                         _revertIfNoPermission(flags, WITHDRAW_PERMISSION); // U:[FA-21]
 
                         flags = flags.enable(REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS); // U:[FA-30]
@@ -602,7 +605,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         // It enabled additinal check that all collateral tokens pricefeeds work correctly
                         fullCheckParams.reservePriceFeedCheck = true;
 
-                        uint256 tokensToDisable = _withdraw(creditAccount, mcall.callData[4:]); // U:[FA-34]
+                        uint256 tokensToDisable = method == ICreditFacadeV3Multicall.withdraw.selector
+                            ? _withdrawAmount(creditAccount, mcall.callData[4:])
+                            : _withdrawAll(creditAccount, mcall.callData[4:]); // U:[FA-34]
 
                         quotedTokensMaskInverted = _getInvertedQuotedTokensMask(quotedTokensMaskInverted);
 
@@ -874,11 +879,31 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         }); // U:[FA-34]
     }
 
-    /// @dev `ICreditFacadeV3Multicall.withdraw` implementation
-    function _withdraw(address creditAccount, bytes calldata callData) internal returns (uint256 tokensToDisable) {
-        (address token, uint256 amount) = abi.decode(callData, (address, uint256)); // U:[FA-35]
+    function _withdrawAmount(address creditAccount, bytes calldata callData)
+        internal
+        returns (uint256 tokensToDisable)
+    {
+        (address token, uint256 amount, address to) = abi.decode(callData, (address, uint256, address)); // U:[FA-35]
+        tokensToDisable = _withdraw(creditAccount, token, amount, to);
+    }
 
-        tokensToDisable = ICreditManagerV3(creditManager).withdraw(creditAccount, token, amount); // U:[FA-35]
+    function _withdrawAll(address creditAccount, bytes calldata callData) internal returns (uint256 tokensToDisable) {
+        (address token, address to) = abi.decode(callData, (address, address)); // U:[FA-35]
+
+        uint256 amount = IERC20(token).balanceOf(creditAccount);
+        if (amount > 1) {
+            unchecked {
+                tokensToDisable = _withdraw(creditAccount, token, amount - 1, to);
+            }
+        }
+    }
+
+    /// @dev `ICreditFacadeV3Multicall.withdraw` implementation
+    function _withdraw(address creditAccount, address token, uint256 amount, address to)
+        internal
+        returns (uint256 tokensToDisable)
+    {
+        tokensToDisable = ICreditManagerV3(creditManager).withdraw(creditAccount, token, amount, to); // U:[FA-35]
     }
 
     /// @dev `ICreditFacadeV3Multicall.revokeAdapterAllowances` implementation

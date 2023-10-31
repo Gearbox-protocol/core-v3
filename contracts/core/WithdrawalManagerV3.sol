@@ -6,7 +6,6 @@ pragma solidity ^0.8.17;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 
@@ -19,7 +18,6 @@ import {
     ReceiveIsNotAllowedException
 } from "../interfaces/IExceptions.sol";
 import {ETH_ADDRESS, IWithdrawalManagerV3} from "../interfaces/IWithdrawalManagerV3.sol";
-import {UnsafeERC20} from "../libraries/UnsafeERC20.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
@@ -32,9 +30,7 @@ import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 ///           from credit accounts. One credit account can have up to two scheduled withdrawals at the same time.
 contract WithdrawalManagerV3 is IWithdrawalManagerV3, ACLTrait, ContractsRegisterTrait {
     using SafeERC20 for IERC20;
-    using UnsafeERC20 for IERC20;
     using Address for address payable;
-    using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice Contract version
     uint256 public constant override version = 3_00;

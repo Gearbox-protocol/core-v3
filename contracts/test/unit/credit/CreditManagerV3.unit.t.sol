@@ -373,7 +373,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.updateQuota(DUMB_ADDRESS, DUMB_ADDRESS, 0, 0, 0);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
-        creditManager.withdraw(DUMB_ADDRESS, DUMB_ADDRESS, 0);
+        creditManager.withdraw(DUMB_ADDRESS, DUMB_ADDRESS, 0, USER);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.revokeAdapterAllowances(DUMB_ADDRESS, new RevocationPair[](0));
@@ -474,7 +474,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.updateQuota(DUMB_ADDRESS, DUMB_ADDRESS, 0, 0, 0);
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditManager.withdraw(DUMB_ADDRESS, DUMB_ADDRESS, 0);
+        creditManager.withdraw(DUMB_ADDRESS, DUMB_ADDRESS, 0, USER);
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditManager.revokeAdapterAllowances(DUMB_ADDRESS, new RevocationPair[](0));
@@ -2452,7 +2452,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         address linkToken = tokenTestSuite.addressOf(Tokens.LINK);
         /// @notice check that it reverts on unknown token
         vm.expectRevert(TokenNotAllowedException.selector);
-        creditManager.withdraw({creditAccount: creditAccount, token: linkToken, amount: 20000});
+        creditManager.withdraw({creditAccount: creditAccount, token: linkToken, amount: 20000, to: USER});
     }
 
     /// @dev U:[CM-27]: withdraw transfers token
@@ -2463,7 +2463,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
         (uint256 tokensToDisable) =
-            creditManager.withdraw({creditAccount: creditAccount, token: underlying, amount: 20_000});
+            creditManager.withdraw({creditAccount: creditAccount, token: underlying, amount: 20_000, to: USER});
 
         creditManager.setBorrower({creditAccount: creditAccount, borrower: USER});
 
@@ -2478,7 +2478,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             amount: _amountMinusFee(20_000)
         });
 
-        (tokensToDisable) = creditManager.withdraw({creditAccount: creditAccount, token: underlying, amount: 20_000});
+        (tokensToDisable) =
+            creditManager.withdraw({creditAccount: creditAccount, token: underlying, amount: 20_000, to: USER});
 
         checkTokenTransfers({debug: false});
 
@@ -2499,7 +2500,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             amount: _amountMinusFee(amount)
         });
 
-        (tokensToDisable) = creditManager.withdraw({creditAccount: creditAccount, token: underlying, amount: amount});
+        (tokensToDisable) =
+            creditManager.withdraw({creditAccount: creditAccount, token: underlying, amount: amount, to: USER});
 
         checkTokenTransfers({debug: false});
 

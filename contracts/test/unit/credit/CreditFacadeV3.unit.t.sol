@@ -1129,7 +1129,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 permissionRquired: UPDATE_QUOTA_PERMISSION
             }),
             MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.withdraw, (token, 0)),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.withdraw, (token, 0, USER)),
                 permissionRquired: WITHDRAW_PERMISSION
             }),
             MultiCallPermissionTestCase({
@@ -1553,7 +1553,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.withdraw, (link, 1000))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.withdraw, (link, 1000, USER))
                 })
                 ),
             enabledTokensMask: linkMask,
@@ -1815,7 +1815,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditManagerMock.setScheduleWithdrawal({tokensToDisable: maskToDisable});
 
         vm.expectCall(
-            address(creditManagerMock), abi.encodeCall(ICreditManagerV3.withdraw, (creditAccount, link, amount))
+            address(creditManagerMock), abi.encodeCall(ICreditManagerV3.withdraw, (creditAccount, link, amount, USER))
         );
 
         FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
@@ -1823,7 +1823,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.withdraw, (link, amount))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.withdraw, (link, amount, USER))
                 })
                 ),
             enabledTokensMask: maskToDisable | UNDERLYING_TOKEN_MASK,
