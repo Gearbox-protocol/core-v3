@@ -262,13 +262,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         if (task == CollateralCalcTask.DEBT_ONLY) return "DEBT_ONLY";
 
-        if (task == CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS) {
-            return "DEBT_COLLATERAL_WITHOUT_WITHDRAWALS";
-        }
-        if (task == CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS) return "DEBT_COLLATERAL_CANCEL_WITHDRAWALS";
-
-        if (task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS) {
-            return "DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS";
+        if (task == CollateralCalcTask.DEBT_COLLATERAL) {
+            return "DEBT_COLLATERAL";
         }
 
         if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) return "FULL_COLLATERAL_CHECK_LAZY";
@@ -1760,7 +1755,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
 
         CollateralDebtData memory collateralDebtData =
-            creditManager.calcDebtAndCollateralFC(creditAccount, CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS);
+            creditManager.calcDebtAndCollateralFC(creditAccount, CollateralCalcTask.DEBT_COLLATERAL);
 
         /// @notice fuzzler could find a combination which enabled tokens with zero balances,
         /// which cause to twvUSD == 0 and arithmetic errr later
@@ -1865,7 +1860,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
 
         CollateralDebtData memory collateralDebtData =
-            creditManager.calcDebtAndCollateralFC(creditAccount, CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS);
+            creditManager.calcDebtAndCollateralFC(creditAccount, CollateralCalcTask.DEBT_COLLATERAL);
 
         /// @notice fuzzler could find a combination which enabled tokens with zero balances,
         /// which cause to twvUSD == 0 and arithmetic errr later
@@ -2162,11 +2157,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         address creditAccount = DUMB_ADDRESS;
 
-        CollateralCalcTask[3] memory tasks = [
-            CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS,
-            CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS,
-            CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
-        ];
+        CollateralCalcTask[1] memory tasks = [CollateralCalcTask.DEBT_COLLATERAL];
 
         for (uint256 taskIndex = 0; taskIndex < 1; ++taskIndex) {
             caseName = string.concat(caseName, _taskName(tasks[taskIndex]));
@@ -2267,47 +2258,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
             CollateralDebtData memory collateralDebtData = creditManager.calcDebtAndCollateral({
                 creditAccount: creditAccount,
-                task: CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS
+                task: CollateralCalcTask.DEBT_COLLATERAL
             });
-
-            CollateralDebtData memory collateralDebtDataNormal = creditManager.calcDebtAndCollateral({
-                creditAccount: creditAccount,
-                task: CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS
-            });
-
-            CollateralDebtData memory collateralDebtDataForced = creditManager.calcDebtAndCollateral({
-                creditAccount: creditAccount,
-                task: CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
-            });
-
-            assertEq(
-                collateralDebtDataNormal.totalValueUSD - collateralDebtData.totalValueUSD,
-                setFlag ? amount1 * vars.get("LINK_PRICE") + amount2 * vars.get("STETH_PRICE") : 0,
-                _testCaseErr("Incorrect totalValueUSD normal case")
-            );
-
-            assertEq(
-                collateralDebtDataForced.totalValueUSD - collateralDebtData.totalValueUSD,
-                setFlag ? amount1 * vars.get("USDC_PRICE") + amount2 * vars.get("UNDERLYING_PRICE") : 0,
-                _testCaseErr("Incorrect totalValueUSD force case")
-            );
-
-            assertEq(
-                collateralDebtDataNormal.totalValue - collateralDebtData.totalValue,
-                setFlag
-                    ? (amount1 * vars.get("LINK_PRICE") + amount2 * vars.get("STETH_PRICE")) / vars.get("UNDERLYING_PRICE")
-                    : 0,
-                _testCaseErr("Incorrect totalValue normal case")
-            );
-
-            assertEq(
-                collateralDebtDataForced.totalValue - collateralDebtData.totalValue,
-                setFlag
-                    ? (amount1 * vars.get("USDC_PRICE") + amount2 * vars.get("UNDERLYING_PRICE"))
-                        / vars.get("UNDERLYING_PRICE")
-                    : 0,
-                _testCaseErr("Incorrect totalValue force case")
-            );
         }
     }
 

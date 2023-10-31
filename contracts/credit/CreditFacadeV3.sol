@@ -331,12 +331,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         {
             bool isEmergency = paused();
 
-            collateralDebtData = ICreditManagerV3(creditManager).calcDebtAndCollateral(
-                creditAccount,
-                isEmergency
-                    ? CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
-                    : CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS
-            ); // U:[FA-15]
+            collateralDebtData =
+                ICreditManagerV3(creditManager).calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_COLLATERAL); // U:[FA-15]
 
             bool isLiquidatable = collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD; // U:[FA-13]
 
@@ -346,14 +342,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             }
 
             if (!isLiquidatable) revert CreditAccountNotLiquidatableException(); // U:[FA-13]
-
-            uint256 tokensToEnable = _claimWithdrawals({
-                action: isEmergency ? ClaimAction.FORCE_CANCEL : ClaimAction.CANCEL,
-                creditAccount: creditAccount,
-                to: borrower
-            }); // U:[FA-15]
-
-            collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(tokensToEnable); // U:[FA-15]
         }
 
         if (skipCalls < calls.length) {

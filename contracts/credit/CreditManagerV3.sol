@@ -35,7 +35,7 @@ import {
     INACTIVE_CREDIT_ACCOUNT_ADDRESS
 } from "../interfaces/ICreditManagerV3.sol";
 import "../interfaces/IAddressProviderV3.sol";
-import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
+import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 
 // CONSTANTS
@@ -744,13 +744,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             return cdd; // U:[CM-18]
         }
 
-        if (task != CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS && _hasWithdrawals(creditAccount)) {
-            cdd.totalValueUSD += _getCancellableWithdrawalsValue({
-                _priceOracle: _priceOracle,
-                creditAccount: creditAccount,
-                isForceCancel: task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
-            }); // U:[CM-23]
-        }
+        // if (task != CollateralCalcTask.DEBT_COLLATERAL && _hasWithdrawals(creditAccount)) {
+        //     cdd.totalValueUSD += _getCancellableWithdrawalsValue({
+        //         _priceOracle: _priceOracle,
+        //         creditAccount: creditAccount,
+        //         isForceCancel: task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
+        //     }); // U:[CM-23]
+        // }
 
         cdd.totalValue = _convertFromUSD(_priceOracle, cdd.totalValueUSD, underlying); // U:[CM-22,23]
     }
@@ -1497,7 +1497,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         view
         returns (uint256 amountInUSD)
     {
-        amountInUSD = IPriceOracleBase(_priceOracle).convertToUSD(amountInToken, token);
+        amountInUSD = IPriceOracleV3(_priceOracle).convertToUSD(amountInToken, token);
     }
 
     /// @dev Internal wrapper for `priceOracle.convertFromUSD` call to reduce contract size
@@ -1506,7 +1506,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         view
         returns (uint256 amountInToken)
     {
-        amountInToken = IPriceOracleBase(_priceOracle).convertFromUSD(amountInUSD, token);
+        amountInToken = IPriceOracleV3(_priceOracle).convertFromUSD(amountInUSD, token);
     }
 
     /// @dev Internal wrapper for `withdrawalManager.addImmediateWithdrawal` call to reduce contract size

@@ -27,11 +27,11 @@ enum ManageDebtAction {
 ///         - `GENERIC_PARAMS` returns generic data like account debt and cumulative indexes
 ///         - `DEBT_ONLY` is same as `GENERIC_PARAMS` but includes more detailed debt info, like accrued base/quota
 ///           interest and fees
-///         - `DEBT_COLLATERAL_WITHOUT_WITHDRAWALS` is same as `DEBT_ONLY` but also returns total value and total
+///         - `DEBT_COLLATERAL` is same as `DEBT_ONLY` but also returns total value and total
 ///           LT-weighted value of account's tokens, this mode is used during account closure
-///         - `DEBT_COLLATERAL_CANCEL_WITHDRAWALS` is same as `DEBT_COLLATERAL_WITHOUT_WITHDRAWALS` but adds the value
+///         - `DEBT_COLLATERAL_CANCEL_WITHDRAWALS` is same as `DEBT_COLLATERAL` but adds the value
 ///           of immature scheduled withdrawals to the total value, this mode is used during liquidations
-///         - `DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS` is same as `DEBT_COLLATERAL_WITHOUT_WITHDRAWALS` but adds the
+///         - `DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS` is same as `DEBT_COLLATERAL` but adds the
 ///           value of all scheduled withdrawals to the total value, this mode is used during emergency liquidations
 ///         - `FULL_COLLATERAL_CHECK_LAZY` checks whether account is sufficiently collateralized in a lazy fashion,
 ///           i.e. it stops iterating over collateral tokens once TWV reaches the desired target.
@@ -39,9 +39,7 @@ enum ManageDebtAction {
 enum CollateralCalcTask {
     GENERIC_PARAMS,
     DEBT_ONLY,
-    DEBT_COLLATERAL_WITHOUT_WITHDRAWALS,
-    DEBT_COLLATERAL_CANCEL_WITHDRAWALS,
-    DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS,
+    DEBT_COLLATERAL,
     FULL_COLLATERAL_CHECK_LAZY
 }
 
