@@ -39,7 +39,7 @@ import {
 import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {IBotListV3} from "../../../interfaces/IBotListV3.sol";
 
-import {ClaimAction, ETH_ADDRESS, IWithdrawalManagerV3} from "../../../interfaces/IWithdrawalManagerV3.sol";
+import {ETH_ADDRESS, IWithdrawalManagerV3} from "../../../interfaces/IWithdrawalManagerV3.sol";
 import {BitMask, UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
@@ -227,9 +227,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.expectRevert("Pausable: paused");
         creditFacade.botMulticall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
-
-        vm.expectRevert("Pausable: paused");
-        creditFacade.claimWithdrawals({creditAccount: DUMB_ADDRESS, to: DUMB_ADDRESS});
     }
 
     /// @dev U:[FA-3]: user functions revert if credit facade is expired
@@ -283,9 +280,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.botMulticall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditFacade.claimWithdrawals({creditAccount: DUMB_ADDRESS, to: DUMB_ADDRESS});
-
-        vm.expectRevert("ReentrancyGuard: reentrant call");
         creditFacade.setBotPermissions({
             creditAccount: DUMB_ADDRESS,
             bot: DUMB_ADDRESS,
@@ -317,9 +311,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
         creditFacade.multicall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
-
-        vm.expectRevert(CreditAccountDoesNotExistException.selector);
-        creditFacade.claimWithdrawals({creditAccount: DUMB_ADDRESS, to: DUMB_ADDRESS});
 
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
         creditFacade.setBotPermissions({
@@ -520,11 +511,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         caseName =
             string.concat(caseName, "convertToETH = ", boolToStr(convertToETH), ", hasCalls = ", boolToStr(hasCalls));
-
-        vm.expectCall(
-            address(creditManagerMock),
-            abi.encodeCall(ICreditManagerV3.claimWithdrawals, (creditAccount, FRIEND, ClaimAction.FORCE_CLAIM))
-        );
 
         uint256 skipTokensMask = getHash({value: tokensToTransferMask, seed: 1});
 
@@ -1143,7 +1129,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 permissionRquired: UPDATE_QUOTA_PERMISSION
             }),
             MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.scheduleWithdrawal, (token, 0)),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.withdraw, (token, 0)),
                 permissionRquired: WITHDRAW_PERMISSION
             }),
             MultiCallPermissionTestCase({
@@ -1567,7 +1553,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.scheduleWithdrawal, (link, 1000))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.withdraw, (link, 1000))
                 })
                 ),
             enabledTokensMask: linkMask,
@@ -1818,7 +1804,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         });
     }
 
-    /// @dev U:[FA-35]: multicall `scheduleWithdrawal` works properly
+    /// @dev U:[FA-35]: multicall `withdraw` works properly
     function test_U_FA_35_multicall_scheduleWithdrawal_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
@@ -1829,8 +1815,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditManagerMock.setScheduleWithdrawal({tokensToDisable: maskToDisable});
 
         vm.expectCall(
-            address(creditManagerMock),
-            abi.encodeCall(ICreditManagerV3.scheduleWithdrawal, (creditAccount, link, amount))
+            address(creditManagerMock), abi.encodeCall(ICreditManagerV3.withdraw, (creditAccount, link, amount))
         );
 
         FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
@@ -1838,7 +1823,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.scheduleWithdrawal, (link, amount))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.withdraw, (link, amount))
                 })
                 ),
             enabledTokensMask: maskToDisable | UNDERLYING_TOKEN_MASK,
@@ -2014,22 +1999,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, permission));
 
         creditFacade.revertIfNoPermission(mask & ~(permission), permission);
-    }
-
-    /// @dev U:[FA-40]: claimWithdrawals calls works properly
-    function test_U_FA_40_claimWithdrawals_calls_properly() public notExpirableCase {
-        address creditAccount = DUMB_ADDRESS;
-        address to = makeAddr("TO");
-
-        creditManagerMock.setBorrower(USER);
-
-        vm.expectCall(
-            address(creditManagerMock),
-            abi.encodeCall(ICreditManagerV3.claimWithdrawals, (creditAccount, to, ClaimAction.CLAIM))
-        );
-
-        vm.prank(USER);
-        creditFacade.claimWithdrawals(creditAccount, to);
     }
 
     /// @dev U:[FA-41]: setBotPermissions calls works properly

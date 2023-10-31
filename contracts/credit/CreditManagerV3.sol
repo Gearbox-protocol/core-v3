@@ -21,7 +21,7 @@ import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 import {IAccountFactoryBase} from "../interfaces/IAccountFactoryV3.sol";
 import {ICreditAccountBase} from "../interfaces/ICreditAccountV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
-import {ClaimAction, IWithdrawalManagerV3} from "../interfaces/IWithdrawalManagerV3.sol";
+import {IWithdrawalManagerV3} from "../interfaces/IWithdrawalManagerV3.sol";
 import {
     ICreditManagerV3,
     CollateralTokenData,
@@ -30,7 +30,6 @@ import {
     RevocationPair,
     CollateralDebtData,
     CollateralCalcTask,
-    WITHDRAWAL_FLAG,
     DEFAULT_MAX_ENABLED_TOKENS,
     INACTIVE_CREDIT_ACCOUNT_ADDRESS
 } from "../interfaces/ICreditManagerV3.sol";
@@ -926,15 +925,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     // WITHDRAWALS //
     // ----------- //
 
-    /// @notice Schedules a withdrawal from the credit account
+    /// @notice Withdraws token from the credit account
     /// @param creditAccount Credit account to schedule a withdrawal from
     /// @param token Token to withdraw
     /// @param amount Amount to withdraw
     /// @return tokensToDisable Mask of tokens that should be disabled after the operation
     ///         (equals `token`'s mask if withdrawing the entire balance, zero otherwise)
-    /// @dev If withdrawal manager's delay is zero, token is immediately sent to the account owner.
-    ///      Otherwise, token is sent to the withdrawal manager and `WITHDRAWAL_FLAG` is enabled for the account.
-    function scheduleWithdrawal(address creditAccount, address token, uint256 amount)
+    function withdraw(address creditAccount, address token, uint256 amount)
         external
         override
         nonReentrant // U:[CM-5]
@@ -943,84 +940,18 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         uint256 tokenMask = getTokenMaskOrRevert({token: token}); // U:[CM-26]
 
-        if (IWithdrawalManagerV3(withdrawalManager).delay() == 0) {
-            address borrower = getBorrowerOrRevert({creditAccount: creditAccount});
-            _safeTokenTransfer({
-                creditAccount: creditAccount,
-                token: token,
-                to: borrower,
-                amount: amount,
-                convertToETH: false
-            }); // U:[CM-27]
-        } else {
-            uint256 delivered = ICreditAccountBase(creditAccount).transferDeliveredBalanceControl({
-                token: token,
-                to: withdrawalManager,
-                amount: amount
-            }); // U:[CM-28]
-
-            IWithdrawalManagerV3(withdrawalManager).addScheduledWithdrawal({
-                creditAccount: creditAccount,
-                token: token,
-                amount: delivered,
-                tokenIndex: tokenMask.calcIndex()
-            }); // U:[CM-28]
-
-            _enableFlag({creditAccount: creditAccount, flag: WITHDRAWAL_FLAG});
-        }
+        address borrower = getBorrowerOrRevert({creditAccount: creditAccount});
+        _safeTokenTransfer({
+            creditAccount: creditAccount,
+            token: token,
+            to: borrower,
+            amount: amount,
+            convertToETH: false
+        }); // U:[CM-27]
 
         if (IERC20(token).safeBalanceOf({account: creditAccount}) <= 1) {
             tokensToDisable = tokenMask; // U:[CM-27]
         }
-    }
-
-    /// @notice Claims scheduled withdrawals from the credit account
-    /// @param creditAccount Credit account to claim withdrawals from
-    /// @param to Address to claim withdrawals to
-    /// @param action Action to perform, see `ClaimAction` for details
-    /// @return tokensToEnable Mask of tokens that should be enabled after the operation
-    ///         (non-zero when tokens are returned to the account on withdrawal cancellation)
-    /// @dev If account has no withdrawals scheduled after the operation, `WITHDRAWAL_FLAG` is disabled
-    function claimWithdrawals(address creditAccount, address to, ClaimAction action)
-        external
-        override
-        nonReentrant // U:[CM-5]
-        creditFacadeOnly // U:[CM-2]
-        returns (uint256 tokensToEnable)
-    {
-        if (_hasWithdrawals(creditAccount)) {
-            bool hasScheduled;
-
-            (hasScheduled, tokensToEnable) =
-                IWithdrawalManagerV3(withdrawalManager).claimScheduledWithdrawals(creditAccount, to, action); // U:[CM-29]
-
-            if (!hasScheduled) {
-                _disableFlag(creditAccount, WITHDRAWAL_FLAG); // U:[CM-29]
-            }
-        }
-    }
-
-    /// @dev Returns the USD value of `creditAccount`'s cancellable scheduled withdrawals
-    /// @param isForceCancel Whether to account for immature or all scheduled withdrawals
-    function _getCancellableWithdrawalsValue(address _priceOracle, address creditAccount, bool isForceCancel)
-        internal
-        view
-        returns (uint256 totalValueUSD)
-    {
-        (address token1, uint256 amount1, address token2, uint256 amount2) =
-            IWithdrawalManagerV3(withdrawalManager).cancellableScheduledWithdrawals(creditAccount, isForceCancel); // U:[CM-30]
-
-        if (amount1 != 0) {
-            totalValueUSD = _convertToUSD({_priceOracle: _priceOracle, amountInToken: amount1, token: token1}); // U:[CM-30]
-        }
-        if (amount2 != 0) {
-            totalValueUSD += _convertToUSD({_priceOracle: _priceOracle, amountInToken: amount2, token: token2}); // U:[CM-30]
-        }
-    }
-
-    /// @dev Checks whether credit account has scheduled withdrawals
-    function _hasWithdrawals(address creditAccount) internal view returns (bool) {
-        return flagsOf(creditAccount) & WITHDRAWAL_FLAG != 0; // U:[CM-36]
     }
 
     // --------------------- //
@@ -1453,16 +1384,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             ICreditAccountBase(creditAccount).transfer({token: token, to: withdrawalManager, amount: amount}); // U:[CM-31, 32]
             _addImmediateWithdrawal({token: token, to: msg.sender, amount: amount}); // U:[CM-31, 32]
         } else {
-            try ICreditAccountBase(creditAccount).safeTransfer({token: token, to: to, amount: amount}) {
-                // U:[CM-31, 32, 33]
-            } catch {
-                uint256 delivered = ICreditAccountBase(creditAccount).transferDeliveredBalanceControl({
-                    token: token,
-                    to: withdrawalManager,
-                    amount: amount
-                }); // U:[CM-33]
-                _addImmediateWithdrawal({token: token, to: to, amount: delivered}); // U:[CM-33]
-            }
+            ICreditAccountBase(creditAccount).safeTransfer({token: token, to: to, amount: amount});
         }
     }
 

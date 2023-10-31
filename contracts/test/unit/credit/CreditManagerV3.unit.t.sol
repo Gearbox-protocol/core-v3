@@ -31,14 +31,13 @@ import {
     RevocationPair,
     CollateralDebtData,
     CollateralCalcTask,
-    ICreditManagerV3Events,
-    WITHDRAWAL_FLAG
+    ICreditManagerV3Events
 } from "../../../interfaces/ICreditManagerV3.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {ClaimAction, IWithdrawalManagerV3} from "../../../interfaces/IWithdrawalManagerV3.sol";
+import {IWithdrawalManagerV3} from "../../../interfaces/IWithdrawalManagerV3.sol";
 import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 
 // EXCEPTIONS
@@ -374,10 +373,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.updateQuota(DUMB_ADDRESS, DUMB_ADDRESS, 0, 0, 0);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
-        creditManager.scheduleWithdrawal(DUMB_ADDRESS, DUMB_ADDRESS, 0);
-
-        vm.expectRevert(CallerNotCreditFacadeException.selector);
-        creditManager.claimWithdrawals(DUMB_ADDRESS, DUMB_ADDRESS, ClaimAction.CLAIM);
+        creditManager.withdraw(DUMB_ADDRESS, DUMB_ADDRESS, 0);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.revokeAdapterAllowances(DUMB_ADDRESS, new RevocationPair[](0));
@@ -478,10 +474,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.updateQuota(DUMB_ADDRESS, DUMB_ADDRESS, 0, 0, 0);
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditManager.scheduleWithdrawal(DUMB_ADDRESS, DUMB_ADDRESS, 0);
-
-        vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditManager.claimWithdrawals(DUMB_ADDRESS, DUMB_ADDRESS, ClaimAction.CLAIM);
+        creditManager.withdraw(DUMB_ADDRESS, DUMB_ADDRESS, 0);
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditManager.revokeAdapterAllowances(DUMB_ADDRESS, new RevocationPair[](0));
@@ -2248,17 +2241,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 cumulativeQuotaInterest: uint128(vars.get("INITIAL_INTEREST") + 1),
                 quotaFees: 0,
                 enabledTokensMask: UNDERLYING_TOKEN_MASK,
-                flags: setFlag ? WITHDRAWAL_FLAG : 0,
+                flags: 0,
                 borrower: USER
             });
-
-            withdrawalManagerMock.setCancellableWithdrawals(
-                false, tokenTestSuite.addressOf(Tokens.LINK), amount1, tokenTestSuite.addressOf(Tokens.STETH), amount2
-            );
-
-            withdrawalManagerMock.setCancellableWithdrawals(
-                true, tokenTestSuite.addressOf(Tokens.USDC), amount1, tokenTestSuite.addressOf(Tokens.DAI), amount2
-            );
 
             CollateralDebtData memory collateralDebtData = creditManager.calcDebtAndCollateral({
                 creditAccount: creditAccount,
@@ -2461,30 +2446,24 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     // SCHEDULE WITHDRAWAL
     //
 
-    /// @dev U:[CM-26]: scheduleWithdrawal reverts for unknown token
+    /// @dev U:[CM-26]: withdraw reverts for unknown token
     function test_U_CM_26_scheduleWithdrawal_reverts_for_unknown_token() public creditManagerTest {
         address creditAccount = DUMB_ADDRESS;
         address linkToken = tokenTestSuite.addressOf(Tokens.LINK);
         /// @notice check that it reverts on unknown token
         vm.expectRevert(TokenNotAllowedException.selector);
-        creditManager.scheduleWithdrawal({creditAccount: creditAccount, token: linkToken, amount: 20000});
+        creditManager.withdraw({creditAccount: creditAccount, token: linkToken, amount: 20000});
     }
 
-    /// @dev U:[CM-27]: scheduleWithdrawal transfers token if delay == 0
-    function test_U_CM_27_scheduleWithdrawal_transfers_token_if_delay_is_zero()
-        public
-        withFeeTokenCase
-        creditManagerTest
-    {
+    /// @dev U:[CM-27]: withdraw transfers token
+    function test_U_CM_27_withdraw_transfers_token() public withFeeTokenCase creditManagerTest {
         address creditAccount = address(new CreditAccountMock());
-
-        withdrawalManagerMock.setDelay(0);
 
         tokenTestSuite.mint(underlying, creditAccount, DAI_ACCOUNT_AMOUNT);
 
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
         (uint256 tokensToDisable) =
-            creditManager.scheduleWithdrawal({creditAccount: creditAccount, token: underlying, amount: 20_000});
+            creditManager.withdraw({creditAccount: creditAccount, token: underlying, amount: 20_000});
 
         creditManager.setBorrower({creditAccount: creditAccount, borrower: USER});
 
@@ -2499,8 +2478,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             amount: _amountMinusFee(20_000)
         });
 
-        (tokensToDisable) =
-            creditManager.scheduleWithdrawal({creditAccount: creditAccount, token: underlying, amount: 20_000});
+        (tokensToDisable) = creditManager.withdraw({creditAccount: creditAccount, token: underlying, amount: 20_000});
 
         checkTokenTransfers({debug: false});
 
@@ -2521,173 +2499,11 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             amount: _amountMinusFee(amount)
         });
 
-        (tokensToDisable) =
-            creditManager.scheduleWithdrawal({creditAccount: creditAccount, token: underlying, amount: amount});
+        (tokensToDisable) = creditManager.withdraw({creditAccount: creditAccount, token: underlying, amount: amount});
 
         checkTokenTransfers({debug: false});
 
         assertEq(tokensToDisable, UNDERLYING_TOKEN_MASK, _testCaseErr("Incorrect token to disable"));
-    }
-
-    /// @dev U:[CM-28]: scheduleWithdrawal works correctly if delay != 0
-    function test_U_CM_28_scheduleWithdrawal_works_correctly_if_delay_not_eq_zero()
-        public
-        withFeeTokenCase
-        creditManagerTest
-    {
-        address creditAccount = address(new CreditAccountMock());
-
-        withdrawalManagerMock.setDelay(uint40(3 days));
-
-        tokenTestSuite.mint(underlying, creditAccount, DAI_ACCOUNT_AMOUNT);
-
-        creditManager.setBorrower({creditAccount: creditAccount, borrower: USER});
-
-        string memory caseNameBak = string.concat(caseName, "a part of funds");
-        startTokenTrackingSession(caseName);
-
-        uint256 amountDelivered = _amountMinusFee(20_000);
-
-        expectTokenTransfer({
-            reason: "direct transfer to withdrawal manager",
-            token: underlying,
-            from: creditAccount,
-            to: address(withdrawalManagerMock),
-            amount: amountDelivered
-        });
-
-        vm.expectCall(
-            address(withdrawalManagerMock),
-            abi.encodeCall(IWithdrawalManagerV3.addScheduledWithdrawal, (creditAccount, underlying, amountDelivered, 0))
-        );
-
-        (uint256 tokensToDisable) =
-            creditManager.scheduleWithdrawal({creditAccount: creditAccount, token: underlying, amount: 20_000});
-
-        checkTokenTransfers({debug: false});
-
-        assertEq(tokensToDisable, 0, _testCaseErr("Incorrect token to disable"));
-
-        // KEEP 1 CASE DISABLES TOKEN
-
-        caseName = string.concat(caseNameBak, " keep 1 token");
-        uint256 amount = IERC20(underlying).balanceOf(creditAccount) - 1;
-
-        (tokensToDisable) =
-            creditManager.scheduleWithdrawal({creditAccount: creditAccount, token: underlying, amount: amount});
-
-        assertEq(tokensToDisable, UNDERLYING_TOKEN_MASK, _testCaseErr("Incorrect token to disable"));
-    }
-
-    /// @dev U:[CM-29]: claimWithdrawals works correctly
-    function test_U_CM_29_claimWithdrawals_works_correctly() public creditManagerTest {
-        address creditAccount = DUMB_ADDRESS;
-
-        uint256 tokenMask = 5 << 1;
-
-        /// @notice it does nothing if flag is not set
-        creditManager.setFlagFor(creditAccount, WITHDRAWAL_FLAG, false);
-        creditManager.claimWithdrawals(creditAccount, FRIEND, ClaimAction.CLAIM);
-
-        assertTrue(
-            !withdrawalManagerMock.claimScheduledWithdrawalsWasCalled(), "Unexpected call to claimScheduledWithdrawals"
-        );
-
-        string memory caseNameBak = caseName;
-
-        for (uint256 i = 0; i < 2; ++i) {
-            creditManager.setFlagFor(creditAccount, WITHDRAWAL_FLAG, true);
-
-            bool hasScheduled = i == 1;
-
-            caseName = string.concat(caseNameBak, "hasScheduled = ", hasScheduled ? "true" : "false");
-
-            withdrawalManagerMock.setClaimScheduledWithdrawals(hasScheduled, tokenMask);
-            (uint256 tokensToEnable) = creditManager.claimWithdrawals(creditAccount, FRIEND, ClaimAction.CLAIM);
-
-            assertTrue(
-                creditManager.hasWithdrawals(creditAccount) == hasScheduled,
-                _testCaseErr("Incorrect WITHDRAWALS FLAG setting")
-            );
-            assertEq(tokensToEnable, tokenMask, _testCaseErr("Incorrect tokensToEnable"));
-        }
-    }
-
-    struct getCancellableWithdrawalsValueTestCase {
-        string name;
-        uint256 amount1;
-        uint256 amount2;
-        uint256 expectedTotalValueUSD;
-    }
-
-    /// @dev U:[CM-30]: _getCancellableWithdrawalsValue works correctly
-    function test_U_CM_30_getCancellableWithdrawalsValue_works_correctly() public creditManagerTest {
-        priceOracleMock.setPrice(tokenTestSuite.addressOf(Tokens.DAI), 1 * (10 ** 8));
-        priceOracleMock.setPrice(tokenTestSuite.addressOf(Tokens.WETH), 2_000 * (10 ** 8));
-
-        getCancellableWithdrawalsValueTestCase[4] memory cases = [
-            getCancellableWithdrawalsValueTestCase({
-                name: "amount1 == 0, amount2 == 0",
-                amount1: 0,
-                amount2: 0,
-                expectedTotalValueUSD: 0
-            }),
-            getCancellableWithdrawalsValueTestCase({
-                name: "amount1 == 100, amount2 == 0",
-                amount1: 100,
-                amount2: 0,
-                expectedTotalValueUSD: 100 * 1
-            }),
-            getCancellableWithdrawalsValueTestCase({
-                name: "amount1 == 0, amount2 == 20",
-                amount1: 0,
-                amount2: 20,
-                expectedTotalValueUSD: 20 * 2_000
-            }),
-            getCancellableWithdrawalsValueTestCase({
-                name: "amount1 == 15_00, amount2 == 8",
-                amount1: 15_00,
-                amount2: 8,
-                expectedTotalValueUSD: 15_00 * 1 + 8 * 20_00
-            })
-        ];
-
-        address creditAccount = DUMB_ADDRESS;
-
-        for (uint256 j = 0; j < 2; ++j) {
-            bool isForceCancel = j == 1;
-
-            for (uint256 i; i < cases.length; ++i) {
-                uint256 snapshot = vm.snapshot();
-
-                getCancellableWithdrawalsValueTestCase memory _case = cases[i];
-
-                caseName = string.concat(caseName, _case.name, ", isForceCancel = ", isForceCancel ? "true" : "false");
-
-                priceOracleMock.setRevertOnGetPrice(tokenTestSuite.addressOf(Tokens.DAI), _case.amount1 == 0);
-                priceOracleMock.setRevertOnGetPrice(tokenTestSuite.addressOf(Tokens.WETH), _case.amount2 == 0);
-
-                withdrawalManagerMock.setCancellableWithdrawals({
-                    isForceCancel: isForceCancel,
-                    token1: tokenTestSuite.addressOf(Tokens.DAI),
-                    amount1: _case.amount1,
-                    token2: tokenTestSuite.addressOf(Tokens.WETH),
-                    amount2: _case.amount2
-                });
-
-                vm.expectCall(
-                    address(withdrawalManagerMock),
-                    abi.encodeCall(IWithdrawalManagerV3.cancellableScheduledWithdrawals, (creditAccount, isForceCancel))
-                );
-
-                uint256 totalValueUSD =
-                    creditManager.getCancellableWithdrawalsValue(address(priceOracleMock), creditAccount, isForceCancel);
-
-                assertEq(totalValueUSD, _case.expectedTotalValueUSD, _testCaseErr("Incorrect totalValueUSD"));
-
-                vm.revertTo(snapshot);
-            }
-        }
     }
 
     //
@@ -2925,10 +2741,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 uint16 flagToTest = uint16(1 << i);
                 creditManager.setFlagFor(creditAccount, flagToTest, value);
                 assertEq(creditManager.flagsOf(creditAccount) & flagToTest != 0, value, "Incorrect flag set");
-
-                if (flagToTest == WITHDRAWAL_FLAG) {
-                    assertEq(creditManager.hasWithdrawals(creditAccount), value, "Incorrect hasWithdrawals");
-                }
             }
         }
     }

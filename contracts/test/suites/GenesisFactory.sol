@@ -49,7 +49,7 @@ contract GenesisFactory is Ownable {
 
         addressProvider.setAddress(AP_ACCOUNT_FACTORY, accountFactory, false);
 
-        WithdrawalManagerV3 wm = new WithdrawalManagerV3(address(addressProvider), 1 days);
+        WithdrawalManagerV3 wm = new WithdrawalManagerV3(address(addressProvider));
         addressProvider.setAddress(AP_WITHDRAWAL_MANAGER, address(wm), true);
 
         BotListV3 botList = new BotListV3(address(addressProvider));

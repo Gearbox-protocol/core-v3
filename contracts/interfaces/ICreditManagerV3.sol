@@ -5,10 +5,7 @@ pragma solidity ^0.8.17;
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
-import {ClaimAction} from "./IWithdrawalManagerV3.sol";
-
-uint8 constant WITHDRAWAL_FLAG = 1;
-uint8 constant BOT_PERMISSIONS_SET_FLAG = 1 << 1;
+uint8 constant BOT_PERMISSIONS_SET_FLAG = 1;
 
 uint8 constant DEFAULT_MAX_ENABLED_TOKENS = 12;
 address constant INACTIVE_CREDIT_ACCOUNT_ADDRESS = address(1);
@@ -190,13 +187,9 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
 
     function withdrawalManager() external view returns (address);
 
-    function scheduleWithdrawal(address creditAccount, address token, uint256 amount)
+    function withdraw(address creditAccount, address token, uint256 amount)
         external
         returns (uint256 tokensToDisable);
-
-    function claimWithdrawals(address creditAccount, address to, ClaimAction action)
-        external
-        returns (uint256 tokensToEnable);
 
     // --------------------- //
     // CREDIT MANAGER PARAMS //

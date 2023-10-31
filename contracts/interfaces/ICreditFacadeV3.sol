@@ -136,8 +136,6 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
 
     function botMulticall(address creditAccount, MultiCall[] calldata calls) external;
 
-    function claimWithdrawals(address creditAccount, address to) external;
-
     function setBotPermissions(
         address creditAccount,
         address bot,

@@ -14,8 +14,6 @@ import {
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 
-import {ClaimAction} from "../../../interfaces/IWithdrawalManagerV3.sol";
-
 import "../../../interfaces/IExceptions.sol";
 
 import "../../lib/constants.sol";
@@ -206,14 +204,6 @@ contract CreditManagerMock {
         return _liquidateCollateralDebtData;
     }
 
-    function setClaimWithdrawals(uint256 tokensToEnable) external {
-        cw_return_tokensToEnable = tokensToEnable;
-    }
-
-    function claimWithdrawals(address, address, ClaimAction) external view returns (uint256 tokensToEnable) {
-        tokensToEnable = cw_return_tokensToEnable;
-    }
-
     function enabledTokensMaskOf(address) external view returns (uint256) {
         return _enabledTokensMask;
     }
@@ -289,7 +279,7 @@ contract CreditManagerMock {
         sw_tokensToDisable = tokensToDisable;
     }
 
-    function scheduleWithdrawal(address, address, uint256) external view returns (uint256 tokensToDisable) {
+    function withdraw(address, address, uint256) external view returns (uint256 tokensToDisable) {
         tokensToDisable = sw_tokensToDisable;
     }
 

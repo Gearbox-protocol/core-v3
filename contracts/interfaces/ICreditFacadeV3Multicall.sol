@@ -35,7 +35,7 @@ uint256 constant ALL_PERMISSIONS = ALL_CREDIT_FACADE_CALLS_PERMISSION | EXTERNAL
 uint256 constant FORBIDDEN_TOKENS_BEFORE_CALLS = 1 << 192;
 
 /// @dev Indicates that there must be no enabled forbidden tokens on the account after multicall,
-///      set to true when `increaseDebt` or `scheduleWithdrawal` is called
+///      set to true when `increaseDebt` or `withdraw` is called
 uint256 constant REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS = 1 << 193;
 
 /// @dev Indicates that external calls from credit account to adapters were made during multicall,
@@ -113,7 +113,7 @@ interface ICreditFacadeV3Multicall {
     /// @param amount Amount to withdraw
     /// @dev Withdrawals are prohibited if there are forbidden tokens enabled as collateral on the account
     /// @dev Withdrawals are prohibited when opening or closing an account
-    function scheduleWithdrawal(address token, uint256 amount) external;
+    function withdraw(address token, uint256 amount) external;
 
     /// @notice Requests bot list to make a payment to the caller
     /// @param paymentAmount Paymenet amount in WETH
