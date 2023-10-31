@@ -556,6 +556,7 @@ contract MultiCallIntegrationTest is
             )
         );
 
+        vm.expectRevert(InvalidCollateralHintException.selector);
         vm.prank(USER);
         creditFacade.multicall(
             creditAccount,

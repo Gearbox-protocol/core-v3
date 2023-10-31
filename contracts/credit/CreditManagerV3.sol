@@ -582,6 +582,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             revert CustomHealthFactorTooLowException(); // U:[CM-17]
         }
 
+        unchecked {
+            uint256 len = collateralHints.length;
+            for (uint256 i; i < len; ++i) {
+                uint256 mask = collateralHints[i];
+                if (mask == 0 || mask & mask - 1 != 0) revert InvalidCollateralHintException(); // U:[CM-17]
+            }
+        }
+
         CollateralDebtData memory cdd = _calcDebtAndCollateral({
             creditAccount: creditAccount,
             minHealthFactor: minHealthFactor,
@@ -778,7 +786,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 uint256 tokenMask;
                 if (hintsIdx < hintsLen) {
                     tokenMask = collateralHints[hintsIdx++];
-                    if (tokenMask == 0 || tokenMask & tokenMask - 1 != 0) revert InvalidCollateralHintException();
                     if (tokensToCheckMask & tokenMask == 0) continue;
                 } else {
                     // mask with only the LSB of `tokensToCheckMask` enabled

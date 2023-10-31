@@ -1801,14 +1801,32 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     //
     //
 
-    /// @dev U:[CM-17]: fullCollateralCheck reverts if hf < 10K
-    function test_U_CM_17_fullCollateralCheck_reverts_if_hf_less_10K() public creditManagerTest {
+    /// @dev U:[CM-17]: fullCollateralCheck reverts with invalid params
+    function test_U_CM_17_fullCollateralCheck_reverts_with_invalid_params() public creditManagerTest {
         vm.expectRevert(CustomHealthFactorTooLowException.selector);
         creditManager.fullCollateralCheck({
             creditAccount: DUMB_ADDRESS,
             enabledTokensMask: 0,
             collateralHints: new uint256[](0),
             minHealthFactor: PERCENTAGE_FACTOR - 1
+        });
+
+        uint256[] memory collateralHints = new uint256[](1);
+        vm.expectRevert(InvalidCollateralHintException.selector);
+        creditManager.fullCollateralCheck({
+            creditAccount: DUMB_ADDRESS,
+            enabledTokensMask: 0,
+            collateralHints: collateralHints,
+            minHealthFactor: PERCENTAGE_FACTOR
+        });
+
+        collateralHints[0] = 3;
+        vm.expectRevert(InvalidCollateralHintException.selector);
+        creditManager.fullCollateralCheck({
+            creditAccount: DUMB_ADDRESS,
+            enabledTokensMask: 0,
+            collateralHints: collateralHints,
+            minHealthFactor: PERCENTAGE_FACTOR
         });
     }
 
