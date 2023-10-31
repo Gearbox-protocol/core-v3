@@ -13,23 +13,33 @@ contract PriceOracleV3Harness is PriceOracleV3 {
     }
 
     function getPriceFeedParams(address token) external view returns (PriceFeedParams memory) {
-        (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals, bool useReserve) =
-            _getPriceFeedParams(token);
-        return PriceFeedParams(priceFeed, stalenessPeriod, skipCheck, decimals, useReserve);
+        (
+            address priceFeed,
+            uint32 stalenessPeriod,
+            bool skipCheck,
+            uint8 decimals,
+            bool useReserve,
+            bool zeroPriceFeed,
+            bool trustedPriceFeed
+        ) = _getPriceFeedParams(token);
+        return PriceFeedParams(
+            priceFeed, stalenessPeriod, skipCheck, decimals, useReserve, zeroPriceFeed, trustedPriceFeed
+        );
     }
 
     function getReservePriceFeedParams(address token) external view returns (PriceFeedParams memory) {
-        (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals, bool useReserve) =
-            _getPriceFeedParams(_getTokenReserveKey(token));
-        return PriceFeedParams(priceFeed, stalenessPeriod, skipCheck, decimals, useReserve);
-    }
-
-    function getPrice(address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals)
-        external
-        view
-        returns (uint256 price, uint256 scale)
-    {
-        return _getPrice(priceFeed, stalenessPeriod, skipCheck, decimals);
+        (
+            address priceFeed,
+            uint32 stalenessPeriod,
+            bool skipCheck,
+            uint8 decimals,
+            bool useReserve,
+            bool zeroPriceFeed,
+            bool trustedPriceFeed
+        ) = _getPriceFeedParams(_getTokenReserveKey(token));
+        return PriceFeedParams(
+            priceFeed, stalenessPeriod, skipCheck, decimals, useReserve, zeroPriceFeed, trustedPriceFeed
+        );
     }
 
     function hackPriceFeedParams(address token, PriceFeedParams memory params) external {

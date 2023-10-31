@@ -11,6 +11,9 @@ struct PriceFeedParams {
     bool skipCheck;
     uint8 decimals;
     bool useReserve;
+    // these parameters used in double check
+    bool zeroPriceFeed;
+    bool trustedPriceFeed;
 }
 
 interface IPriceOracleV3Events {

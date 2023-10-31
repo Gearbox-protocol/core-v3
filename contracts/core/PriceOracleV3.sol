@@ -39,51 +39,42 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
 
     /// @notice Returns `token`'s price in USD (with 8 decimals)
     function getPrice(address token) external view override returns (uint256 price) {
-        (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals) = priceFeedParams(token);
-        (price,) = _getPrice(priceFeed, stalenessPeriod, skipCheck, decimals);
+        (price,) = _getPrice(token);
     }
 
     /// @notice Returns `token`'s price in USD (with 8 decimals) with explicitly specified price feed
     function getPriceRaw(address token, bool reserve) external view returns (uint256 price) {
-        (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals,) =
-            _getPriceFeedParams(reserve ? _getTokenReserveKey(token) : token);
-        if (priceFeed == address(0)) revert PriceFeedDoesNotExistException();
-        (price,) = _getPrice(priceFeed, stalenessPeriod, skipCheck, decimals);
+        (price,) = _getPrice(reserve ? _getTokenReserveKey(token) : token);
     }
 
     /// @notice Converts `amount` of `token` into USD amount (with 8 decimals)
     function convertToUSD(uint256 amount, address token) public view override returns (uint256) {
-        (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals) = priceFeedParams(token);
-        (uint256 price, uint256 scale) = _getPrice(priceFeed, stalenessPeriod, skipCheck, decimals);
+        (uint256 price, uint256 scale) = _getPrice(token);
         return amount * price / scale; // U:[PO-9]
     }
 
     /// @notice Converts `amount` of USD (with 8 decimals) into `token` amount
     function convertFromUSD(uint256 amount, address token) public view override returns (uint256) {
-        (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals) = priceFeedParams(token);
-        (uint256 price, uint256 scale) = _getPrice(priceFeed, stalenessPeriod, skipCheck, decimals);
+        (uint256 price, uint256 scale) = _getPrice(token);
         return amount * scale / price; // U:[PO-9]
     }
 
     /// @notice Converts `amount` of `tokenFrom` into `tokenTo` amount
     function convert(uint256 amount, address tokenFrom, address tokenTo) external view override returns (uint256) {
-        (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals) = priceFeedParams(tokenFrom);
-        (uint256 priceFrom, uint256 scaleFrom) = _getPrice(priceFeed, stalenessPeriod, skipCheck, decimals);
-
-        (priceFeed, stalenessPeriod, skipCheck, decimals) = priceFeedParams(tokenTo);
-        (uint256 priceTo, uint256 scaleTo) = _getPrice(priceFeed, stalenessPeriod, skipCheck, decimals);
+        (uint256 priceFrom, uint256 scaleFrom) = _getPrice(tokenFrom);
+        (uint256 priceTo, uint256 scaleTo) = _getPrice(tokenTo);
 
         return amount * priceFrom * scaleTo / (priceTo * scaleFrom); // U:[PO-10]
     }
 
     /// @notice Returns the price feed for `token` or reverts if price feed is not set
     function priceFeeds(address token) external view override returns (address priceFeed) {
-        (priceFeed,,,) = priceFeedParams(token); // U:[PO-8]
+        (priceFeed,,,,,) = priceFeedParams(token); // U:[PO-8]
     }
 
     /// @notice Returns the price feed for `token` with explicitly specified price feed
     function priceFeedsRaw(address token, bool reserve) external view override returns (address priceFeed) {
-        (priceFeed,,,,) = _getPriceFeedParams(reserve ? _getTokenReserveKey(token) : token);
+        (priceFeed,,,,,,) = _getPriceFeedParams(reserve ? _getTokenReserveKey(token) : token);
     }
 
     /// @notice Returns price feed parameters for `token` or reverts if price feed is not set
@@ -91,22 +82,29 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
         public
         view
         override
-        returns (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals)
+        returns (
+            address priceFeed,
+            uint32 stalenessPeriod,
+            bool skipCheck,
+            uint8 decimals,
+            bool zeroPriceFeed,
+            bool trustedPriceFeed
+        )
     {
         bool useReserve;
-        (priceFeed, stalenessPeriod, skipCheck, decimals, useReserve) = _getPriceFeedParams(token);
+        (priceFeed, stalenessPeriod, skipCheck, decimals, useReserve, zeroPriceFeed, trustedPriceFeed) =
+            _getPriceFeedParams(token);
         if (decimals == 0) revert PriceFeedDoesNotExistException();
         if (useReserve) {
-            (priceFeed, stalenessPeriod, skipCheck, decimals,) = _getPriceFeedParams(_getTokenReserveKey(token));
+            (priceFeed, stalenessPeriod, skipCheck, decimals,, zeroPriceFeed, trustedPriceFeed) =
+                _getPriceFeedParams(_getTokenReserveKey(token));
         }
     }
 
     /// @dev Returns price feed answer and scale, optionally performs sanity and staleness checks
-    function _getPrice(address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals)
-        internal
-        view
-        returns (uint256 price, uint256 scale)
-    {
+    function _getPrice(address token) internal view returns (uint256 price, uint256 scale) {
+        (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals,,) = priceFeedParams(token);
+        if (priceFeed == address(0)) revert PriceFeedDoesNotExistException();
         int256 answer = _getValidatedPrice(priceFeed, stalenessPeriod, skipCheck); // U:[PO-1]
 
         // answer should not be negative (price feeds with `skipCheck = true` must ensure that!)
@@ -122,7 +120,15 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     function _getPriceFeedParams(address token)
         internal
         view
-        returns (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals, bool useReserve)
+        returns (
+            address priceFeed,
+            uint32 stalenessPeriod,
+            bool skipCheck,
+            uint8 decimals,
+            bool useReserve,
+            bool zeroPriceFeed,
+            bool trustedPriceFeed
+        )
     {
         PriceFeedParams storage params = _priceFeedsParams[token];
         assembly {
@@ -132,6 +138,8 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
             skipCheck := and(shr(192, data), 0x01)
             decimals := shr(200, data)
             useReserve := and(shr(208, data), 0x01)
+            zeroPriceFeed := and(shr(209, data), 0x01)
+            trustedPriceFeed := and(shr(210, data), 0x01)
         } // U:[PO-2]
     }
 
@@ -165,7 +173,9 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
             stalenessPeriod: stalenessPeriod,
             skipCheck: skipCheck,
             decimals: decimals,
-            useReserve: false
+            useReserve: false,
+            zeroPriceFeed: false,
+            trustedPriceFeed: false
         }); // U:[PO-6]
         emit SetPriceFeed(token, priceFeed, stalenessPeriod, skipCheck); // U:[PO-6]
     }
@@ -188,7 +198,9 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
             stalenessPeriod: stalenessPeriod,
             skipCheck: skipCheck,
             decimals: decimals,
-            useReserve: false
+            useReserve: false,
+            zeroPriceFeed: false,
+            trustedPriceFeed: false
         }); // U:[PO-7]
         emit SetReservePriceFeed(token, priceFeed, stalenessPeriod, skipCheck); // U:[PO-7]
     }
