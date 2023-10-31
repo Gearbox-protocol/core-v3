@@ -247,7 +247,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
             address(creditManager),
             abi.encodeCall(
                 ICreditManagerV3.fullCollateralCheck,
-                (expectedCreditAccountAddress, 1, new uint256[](0), PERCENTAGE_FACTOR)
+                (expectedCreditAccountAddress, 1, new uint256[](0), PERCENTAGE_FACTOR, false)
             )
         );
 

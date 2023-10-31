@@ -100,7 +100,8 @@ contract CreditManagerV3Harness is CreditManagerV3 {
             enabledTokensMask: enabledTokensMaskOf(creditAccount),
             collateralHints: collateralHints,
             minHealthFactor: PERCENTAGE_FACTOR,
-            task: task
+            task: task,
+            reservePriceFeedCheck: false
         });
     }
 

@@ -34,6 +34,7 @@ struct FullCheckParams {
     uint256[] collateralHints;
     uint16 minHealthFactor;
     uint256 enabledTokensMaskAfter;
+    bool reservePriceFeedCheck;
 }
 
 interface ICreditFacadeV3Events {

@@ -791,7 +791,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             creditAccount,
             fullCheckParams.enabledTokensMaskAfter,
             fullCheckParams.collateralHints,
-            fullCheckParams.minHealthFactor
+            fullCheckParams.minHealthFactor,
+            fullCheckParams.reservePriceFeedCheck
         );
 
         uint256 enabledForbiddenTokensMask = enabledTokensMask & forbiddenTokensMask;

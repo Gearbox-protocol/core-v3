@@ -35,7 +35,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
         vm.expectCall(
             address(creditManager),
             abi.encodeCall(
-                ICreditManagerV3.fullCollateralCheck, (creditAccount, 1, new uint256[](0), PERCENTAGE_FACTOR)
+                ICreditManagerV3.fullCollateralCheck, (creditAccount, 1, new uint256[](0), PERCENTAGE_FACTOR, false)
             )
         );
 
@@ -173,7 +173,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
         vm.expectCall(
             address(creditManager),
             abi.encodeCall(
-                ICreditManagerV3.fullCollateralCheck, (creditAccount, 1, new uint256[](0), PERCENTAGE_FACTOR)
+                ICreditManagerV3.fullCollateralCheck, (creditAccount, 1, new uint256[](0), PERCENTAGE_FACTOR, false)
             )
         );
 

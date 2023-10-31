@@ -368,7 +368,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.addCollateral(DUMB_ADDRESS, DUMB_ADDRESS, DUMB_ADDRESS, 100);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
-        creditManager.fullCollateralCheck(DUMB_ADDRESS, 0, new uint256[](0), 1);
+        creditManager.fullCollateralCheck(DUMB_ADDRESS, 0, new uint256[](0), 1, false);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.updateQuota(DUMB_ADDRESS, DUMB_ADDRESS, 0, 0, 0);
@@ -472,7 +472,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.addCollateral(DUMB_ADDRESS, DUMB_ADDRESS, DUMB_ADDRESS, 100);
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditManager.fullCollateralCheck(DUMB_ADDRESS, 0, new uint256[](0), 1);
+        creditManager.fullCollateralCheck(DUMB_ADDRESS, 0, new uint256[](0), 1, false);
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditManager.updateQuota(DUMB_ADDRESS, DUMB_ADDRESS, 0, 0, 0);
@@ -1713,7 +1713,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             creditAccount: DUMB_ADDRESS,
             enabledTokensMask: 0,
             collateralHints: new uint256[](0),
-            minHealthFactor: PERCENTAGE_FACTOR - 1
+            minHealthFactor: PERCENTAGE_FACTOR - 1,
+            reservePriceFeedCheck: false
         });
     }
 
@@ -1775,7 +1776,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             creditAccount: creditAccount,
             enabledTokensMask: enabledTokensMask,
             collateralHints: new uint256[](0),
-            minHealthFactor: PERCENTAGE_FACTOR
+            minHealthFactor: PERCENTAGE_FACTOR,
+            reservePriceFeedCheck: false
         });
 
         assertTrue(
@@ -1812,7 +1814,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             creditAccount: creditAccount,
             enabledTokensMask: enabledTokensMask,
             collateralHints: new uint256[](0),
-            minHealthFactor: PERCENTAGE_FACTOR
+            minHealthFactor: PERCENTAGE_FACTOR,
+            reservePriceFeedCheck: false
         });
 
         uint256 enabledTokensMaskAfter = creditManager.enabledTokensMaskOf(creditAccount);
@@ -1882,7 +1885,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             creditAccount: creditAccount,
             enabledTokensMask: enabledTokensMask,
             collateralHints: new uint256[](0),
-            minHealthFactor: PERCENTAGE_FACTOR
+            minHealthFactor: PERCENTAGE_FACTOR,
+            reservePriceFeedCheck: false
         });
 
         uint256 enabledTokensMaskAfter = creditManager.enabledTokensMaskOf(creditAccount);

@@ -391,7 +391,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             minHealthFactor: PERCENTAGE_FACTOR,
             task: (action == ManageDebtAction.INCREASE_DEBT)
                 ? CollateralCalcTask.GENERIC_PARAMS
-                : CollateralCalcTask.DEBT_ONLY
+                : CollateralCalcTask.DEBT_ONLY,
+            reservePriceFeedCheck: false
         }); // U:[CM-10, 11]
 
         uint256 newCumulativeIndex;
@@ -595,7 +596,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         address creditAccount,
         uint256 enabledTokensMask,
         uint256[] calldata collateralHints,
-        uint16 minHealthFactor
+        uint16 minHealthFactor,
+        bool reservePriceFeedCheck
     )
         external
         override
@@ -612,7 +614,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             minHealthFactor: minHealthFactor,
             collateralHints: collateralHints,
             enabledTokensMask: enabledTokensMask,
-            task: CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY
+            task: CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY,
+            reservePriceFeedCheck: reservePriceFeedCheck
         }); // U:[CM-18]
 
         if (cdd.twvUSD < cdd.totalDebtUSD) {
@@ -633,7 +636,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             enabledTokensMask: enabledTokensMaskOf(creditAccount),
             collateralHints: collateralHints,
             minHealthFactor: minHealthFactor,
-            task: CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY
+            task: CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY,
+            reservePriceFeedCheck: false
         }); // U:[CM-18]
 
         return cdd.twvUSD < cdd.totalDebtUSD; // U:[CM-18]
@@ -660,7 +664,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             enabledTokensMask: enabledTokensMaskOf(creditAccount),
             collateralHints: collateralHints,
             minHealthFactor: PERCENTAGE_FACTOR,
-            task: task
+            task: task,
+            reservePriceFeedCheck: false
         }); // U:[CM-20]
     }
 
@@ -676,7 +681,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         uint256 enabledTokensMask,
         uint256[] memory collateralHints,
         uint16 minHealthFactor,
-        CollateralCalcTask task
+        CollateralCalcTask task,
+        bool reservePriceFeedCheck
     ) internal view returns (CollateralDebtData memory cdd) {
         CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
 
@@ -716,11 +722,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         address _priceOracle = priceOracle;
 
-        uint256 totalDebt = cdd.calcTotalDebt();
-        if (totalDebt != 0) {
-            cdd.totalDebtUSD = _convertToUSD({_priceOracle: _priceOracle, amountInToken: totalDebt, token: underlying}); // U:[CM-22]
-        } else if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) {
-            return cdd; // U:[CM-18A]
+        function (address, uint256, address) view returns(uint256) convertToUSDFn =
+            reservePriceFeedCheck ? _convertToUSDReserveCheck : _convertToUSD;
+        {
+            uint256 totalDebt = cdd.calcTotalDebt();
+            if (totalDebt != 0) {
+                cdd.totalDebtUSD = convertToUSDFn(_priceOracle, totalDebt, underlying); // U:[CM-22]
+            } else if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) {
+                return cdd; // U:[CM-18A]
+            }
         }
 
         uint256 targetUSD = (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY)
@@ -736,7 +746,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             quotasPacked: quotasPacked,
             priceOracle: _priceOracle,
             collateralTokenByMaskFn: _collateralTokenByMask,
-            convertToUSDFn: _convertToUSD
+            convertToUSDFn: convertToUSDFn
         }); // U:[CM-22]
         cdd.enabledTokensMask = enabledTokensMask.disable(tokensToDisable); // U:[CM-22]
 
@@ -744,15 +754,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             return cdd; // U:[CM-18]
         }
 
-        // if (task != CollateralCalcTask.DEBT_COLLATERAL && _hasWithdrawals(creditAccount)) {
-        //     cdd.totalValueUSD += _getCancellableWithdrawalsValue({
-        //         _priceOracle: _priceOracle,
-        //         creditAccount: creditAccount,
-        //         isForceCancel: task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
-        //     }); // U:[CM-23]
-        // }
-
-        cdd.totalValue = _convertFromUSD(_priceOracle, cdd.totalValueUSD, underlying); // U:[CM-22,23]
+        cdd.totalValue = reservePriceFeedCheck
+            ? _convertFromUSDReserveCheck(_priceOracle, cdd.totalValueUSD, underlying)
+            : _convertFromUSD(_priceOracle, cdd.totalValueUSD, underlying); // U:[CM-22,23]
     }
 
     /// @dev Returns quotas data for credit manager and credit account
@@ -1507,6 +1511,24 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (uint256 amountInToken)
     {
         amountInToken = IPriceOracleV3(_priceOracle).convertFromUSD(amountInUSD, token);
+    }
+
+    /// @dev Internal wrapper for `priceOracle.convertToUSD` call to reduce contract size
+    function _convertToUSDReserveCheck(address _priceOracle, uint256 amountInToken, address token)
+        internal
+        view
+        returns (uint256 amountInUSD)
+    {
+        amountInUSD = IPriceOracleV3(_priceOracle).convertToUSDReserveCheck(amountInToken, token);
+    }
+
+    /// @dev Internal wrapper for `priceOracle.convertFromUSD` call to reduce contract size
+    function _convertFromUSDReserveCheck(address _priceOracle, uint256 amountInUSD, address token)
+        internal
+        view
+        returns (uint256 amountInToken)
+    {
+        amountInToken = IPriceOracleV3(_priceOracle).convertFromUSDReserveCheck(amountInUSD, token);
     }
 
     /// @dev Internal wrapper for `withdrawalManager.addImmediateWithdrawal` call to reduce contract size

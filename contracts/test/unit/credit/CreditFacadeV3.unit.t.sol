@@ -465,7 +465,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.expectCall(
             address(creditManagerMock),
             abi.encodeCall(
-                ICreditManagerV3.fullCollateralCheck, (expectedCreditAccount, 0, new uint256[](0), PERCENTAGE_FACTOR)
+                ICreditManagerV3.fullCollateralCheck,
+                (expectedCreditAccount, 0, new uint256[](0), PERCENTAGE_FACTOR, false)
             )
         );
 
@@ -990,7 +991,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 address(creditManagerMock),
                 abi.encodeCall(
                     ICreditManagerV3.fullCollateralCheck,
-                    (creditAccount, enabledTokensMaskAfter, new uint256[](0), PERCENTAGE_FACTOR)
+                    (creditAccount, enabledTokensMaskAfter, new uint256[](0), PERCENTAGE_FACTOR, false)
                 )
             );
 

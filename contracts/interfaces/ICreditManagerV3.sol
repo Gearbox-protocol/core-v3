@@ -161,7 +161,8 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
         address creditAccount,
         uint256 enabledTokensMask,
         uint256[] calldata collateralHints,
-        uint16 minHealthFactor
+        uint16 minHealthFactor,
+        bool reservePriceFeedCheck
     ) external returns (uint256 enabledTokensMaskAfter);
 
     function isLiquidatable(address creditAccount, uint16 minHealthFactor) external view returns (bool);
