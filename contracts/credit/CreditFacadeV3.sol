@@ -256,7 +256,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         if (enabledTokensMask != 0) revert CloseAccountWithEnabledTokensException(); // U:[FA-11]
 
-        _eraseAllBotPermissions({creditAccount: creditAccount}); // U:[FA-11]
+        if (_flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG != 0) {
+            IBotListV3(botList).eraseAllBotPermissions(creditManager, creditAccount); // U:[FA-11]
+        }
 
         ICreditManagerV3(creditManager).closeCreditAccount(creditAccount); // U:[FA-11]
 
@@ -394,8 +396,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     }
 
     /// @notice Executes a batch of calls allowing bot to manage a credit account
-    ///         - Performs a multicall (allowed calls are determined by permissions given by account's owner; also,
-    ///           unless caller is a special DAO-approved bot, it is allowed to call `payBot` to receive a payment)
+    ///         - Performs a multicall (allowed calls are determined by permissions given by account's owner)
     ///         - Runs the collateral check
     /// @param creditAccount Account to perform the calls on
     /// @param calls List of calls to perform
@@ -409,9 +410,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         nonReentrant // U:[FA-4]
     {
         (uint256 botPermissions, bool forbidden, bool hasSpecialPermissions) = IBotListV3(botList).getBotStatus({
+            bot: msg.sender,
             creditManager: creditManager,
-            creditAccount: creditAccount,
-            bot: msg.sender
+            creditAccount: creditAccount
         });
 
         if (
@@ -567,7 +568,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         _revertIfNoPermission(flags, WITHDRAW_COLLATERAL_PERMISSION); // U:[FA-21]
 
                         flags = flags.enable(REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS); // U:[FA-30]
-                        fullCheckParams.reservePriceFeedCheck = true;
+                        fullCheckParams.useSafePrices = true;
 
                         uint256 tokensToDisable = _withdrawCollateral(creditAccount, mcall.callData[4:]); // U:[FA-34]
 
@@ -740,7 +741,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             fullCheckParams.enabledTokensMaskAfter,
             fullCheckParams.collateralHints,
             fullCheckParams.minHealthFactor,
-            fullCheckParams.reservePriceFeedCheck
+            fullCheckParams.useSafePrices
         );
 
         uint256 enabledForbiddenTokensMask = enabledTokensMask & forbiddenTokensMask;
@@ -1101,14 +1102,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @dev Internal wrapper for `creditManager.enabledTokensMaskOf` call to reduce contract size
     function _enabledTokensMaskOf(address creditAccount) internal view returns (uint256) {
         return ICreditManagerV3(creditManager).enabledTokensMaskOf(creditAccount);
-    }
-
-    /// @dev Internal wrapper for `botList.eraseAllBotPermissions` call to reduce contract size
-    function _eraseAllBotPermissions(address creditAccount) internal {
-        uint16 flags = _flagsOf(creditAccount);
-        if (flags & BOT_PERMISSIONS_SET_FLAG != 0) {
-            IBotListV3(botList).eraseAllBotPermissions(creditManager, creditAccount);
-        }
     }
 
     /// @dev Reverts if `msg.sender` is not credit configurator

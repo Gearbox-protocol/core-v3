@@ -295,16 +295,6 @@ error InsufficientWeeklyFundingAllowance();
 /// @notice Thrown if payment amount bigger that remaining total allowance
 error InsufficientTotalFundingAllowance();
 
-// ------------------ //
-// WITHDRAWAL MANAGER //
-// ------------------ //
-
-/// @notice Thrown when attempting to claim funds without having anything claimable
-error NothingToClaimException();
-
-/// @notice Thrown when attempting to schedule withdrawal from a credit account that has no free withdrawal slots
-error NoFreeWithdrawalSlotsException();
-
 // --------------- //
 // ACCOUNT FACTORY //
 // --------------- //

@@ -36,9 +36,9 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
     // CORE INTERNAL FUNCTIONS //
     // ----------------------- //
 
-    /// @notice U:[PO-1]: `_getPriceRaw` works as expected
+    /// @notice U:[PO-1]: `_getPrice` works as expected
     /// forge-config: default.fuzz.runs = 5000
-    function test_U_PO_01_getPriceRaw_works_as_expected(
+    function test_U_PO_01_getPrice_works_as_expected(
         int256 answer,
         uint256 updatedAt,
         uint32 stalenessPeriod,
@@ -68,7 +68,7 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
             mustRevert = true;
         }
 
-        (uint256 price, uint256 scale) = priceOracle.getPriceRaw(priceFeed, stalenessPeriod, skipCheck, decimals);
+        (uint256 price, uint256 scale) = priceOracle.getPrice(priceFeed, stalenessPeriod, skipCheck, decimals);
 
         if (!mustRevert) {
             assertEq(price, uint256(answer), "Incorrect price");
@@ -83,7 +83,13 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
     {
         priceOracle.hackPriceFeedParams(token, expectedParams);
 
+        if (expectedParams.priceFeed == address(0)) {
+            vm.expectRevert(PriceFeedDoesNotExistException.selector);
+        }
+
         PriceFeedParams memory params = priceOracle.getPriceFeedParams(token);
+
+        if (expectedParams.priceFeed == address(0)) return;
 
         assertEq(params.priceFeed, expectedParams.priceFeed, "Incorrect priceFeed");
         assertEq(params.stalenessPeriod, expectedParams.stalenessPeriod, "Incorrect stalenessPeriod");
@@ -274,7 +280,9 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         vm.prank(configurator);
         priceOracle.setReservePriceFeedStatus(address(token), true);
 
-        priceOracle.hackPriceFeedParams(address(token), PriceFeedParams(address(0), 0, false, 18, false, false));
+        priceOracle.hackPriceFeedParams(
+            address(token), PriceFeedParams(makeAddr("MAIN_PRICE_FEED"), 0, false, 18, false, false)
+        );
         priceOracle.hackReservePriceFeedParams(
             address(token), PriceFeedParams(address(priceFeed), 0, false, 18, false, false)
         );

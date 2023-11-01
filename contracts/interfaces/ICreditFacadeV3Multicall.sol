@@ -111,7 +111,7 @@ interface ICreditFacadeV3Multicall {
     /// @param to Token recipient
     /// @dev Withdrawals are prohibited if there are forbidden tokens enabled as collateral on the account
     /// @dev Withdrawals are prohibited when opening an account
-    /// @dev Withdrawals activate a secure variant of collateral check that uses min of main and reserve feed prices
+    /// @dev Withdrawals activate safe pricing (min of main and reserve feeds) in collateral check
     function withdrawCollateral(address token, uint256 amount, address to) external;
 
     /// @notice Sets advanced collateral check parameters

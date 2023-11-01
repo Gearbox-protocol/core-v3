@@ -1889,23 +1889,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.setBotPermissions({creditAccount: creditAccount, bot: bot, permissions: 1});
     }
 
-    /// @dev U:[FA-42]: eraseAllBotPermissions works properly
-    function test_U_FA_42_eraseAllBotPermissions_works_properly() public notExpirableCase {
-        address creditAccount = DUMB_ADDRESS;
-
-        botListMock.setRevertOnErase(true);
-        creditManagerMock.setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: false});
-        creditFacade.eraseAllBotPermissions(creditAccount);
-
-        botListMock.setRevertOnErase(false);
-        creditManagerMock.setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: true});
-        vm.expectCall(
-            address(botListMock),
-            abi.encodeCall(IBotListV3.eraseAllBotPermissions, (address(creditManagerMock), creditAccount))
-        );
-        creditFacade.eraseAllBotPermissions(creditAccount);
-    }
-
     /// @dev U:[FA-43]: revertIfOutOfBorrowingLimit works properly
     function test_U_FA_43_revertIfOutOfBorrowingLimit_works_properly() public notExpirableCase {
         //

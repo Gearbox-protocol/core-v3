@@ -101,7 +101,7 @@ contract CreditManagerV3Harness is CreditManagerV3 {
             collateralHints: collateralHints,
             minHealthFactor: PERCENTAGE_FACTOR,
             task: task,
-            reservePriceFeedCheck: false
+            useSafePrices: false
         });
     }
 

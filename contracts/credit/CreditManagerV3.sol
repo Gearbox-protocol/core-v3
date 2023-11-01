@@ -247,13 +247,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param collateralDebtData A struct with account's debt and collateral data
     /// @param to Address to transfer tokens left on the account after liquidation
     /// @param tokensToTransferMask Bit mask of tokens left on the account that should be sent
-    /// @param convertToETH If true and any of transferred tokens is WETH, it will be sent to withdrawal manager,
-    ///        from which credit facade should claim it as ETH to `to` at the end of the call
+    /// @param convertToETH If true and any of transferred tokens is WETH, it will be sent to the credit facade,
+    ///        which should unwrap it and send to `to` at the end of the call
     /// @return remainingFunds Total value of assets left on the account after liquidation
     /// @return loss Loss incurred on liquidation
     /// @custom:expects Account is opened in this credit manager
-    /// @custom:expects `collateralDebtData` is a result of `calcDebtAndCollateral` in `DEBT_COLLATERAL_{x}_WITHDRAWALS`
-    ///                 mode, where x is `CANCEL` for normal liquidation and `FORCE_CANCEL` for emergency liquidation
+    /// @custom:expects `collateralDebtData` is a result of `calcDebtAndCollateral` in `DEBT_COLLATERAL` mode
     function liquidateCreditAccount(
         address creditAccount,
         CollateralDebtData calldata collateralDebtData,
@@ -377,7 +376,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             task: (action == ManageDebtAction.INCREASE_DEBT)
                 ? CollateralCalcTask.GENERIC_PARAMS
                 : CollateralCalcTask.DEBT_ONLY,
-            reservePriceFeedCheck: false
+            useSafePrices: false
         }); // U:[CM-10, 11]
 
         uint256 newCumulativeIndex;
@@ -597,7 +596,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param collateralHints Optional array of token masks to check first to reduce the amount of computation
     ///        when known subset of account's collateral tokens covers all the debt
     /// @param minHealthFactor Health factor threshold in bps, the check fails if `twvUSD < minHealthFactor * totalDebtUSD`
-    /// @param reservePriceFeedCheck Whether to use worse of main and reserve feed prices when evaluating collateral
+    /// @param useSafePrices Whether to use safe prices (min of main and reserve feeds) when evaluating collateral
     /// @return enabledTokensMaskAfter Bitmask of account's enabled collateral tokens after potential cleanup
     /// @dev Reverts if `collateralHints` contains masks that don't correspond to known collateral tokens
     /// @dev Even when `collateralHints` are specified, quoted tokens are evaluated before non-quoted ones
@@ -607,7 +606,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         uint256 enabledTokensMask,
         uint256[] calldata collateralHints,
         uint16 minHealthFactor,
-        bool reservePriceFeedCheck
+        bool useSafePrices
     )
         external
         override
@@ -633,7 +632,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             collateralHints: collateralHints,
             enabledTokensMask: enabledTokensMask,
             task: CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY,
-            reservePriceFeedCheck: reservePriceFeedCheck
+            useSafePrices: useSafePrices
         }); // U:[CM-18]
 
         if (cdd.twvUSD < cdd.totalDebtUSD) {
@@ -655,7 +654,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             collateralHints: collateralHints,
             minHealthFactor: minHealthFactor,
             task: CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY,
-            reservePriceFeedCheck: false
+            useSafePrices: false
         }); // U:[CM-18]
 
         return cdd.twvUSD < cdd.totalDebtUSD; // U:[CM-18]
@@ -683,7 +682,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             collateralHints: collateralHints,
             minHealthFactor: PERCENTAGE_FACTOR,
             task: task,
-            reservePriceFeedCheck: false
+            useSafePrices: false
         }); // U:[CM-20]
     }
 
@@ -693,7 +692,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param collateralHints Optional array of token masks specifying the order of checking collateral tokens
     /// @param minHealthFactor Health factor in bps to stop the calculations after when performing collateral check
     /// @param task Calculation mode, see `CollateralCalcTask` for details
-    /// @param reservePriceFeedCheck Whether to use worse of main and reserve feed prices when evaluating collateral
+    /// @param useSafePrices Whether to use safe pricing (min of main and reserve feeds) when evaluating collateral
     /// @return cdd A struct with debt and collateral data
     function _calcDebtAndCollateral(
         address creditAccount,
@@ -701,7 +700,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         uint256[] memory collateralHints,
         uint16 minHealthFactor,
         CollateralCalcTask task,
-        bool reservePriceFeedCheck
+        bool useSafePrices
     ) internal view returns (CollateralDebtData memory cdd) {
         CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
 
@@ -741,12 +740,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         address _priceOracle = priceOracle;
 
-        function (address, uint256, address) view returns(uint256) convertToUSDFn =
-            reservePriceFeedCheck ? _convertToUSDReserveCheck : _convertToUSD;
         {
             uint256 totalDebt = cdd.calcTotalDebt();
             if (totalDebt != 0) {
-                cdd.totalDebtUSD = convertToUSDFn(_priceOracle, totalDebt, underlying); // U:[CM-22]
+                cdd.totalDebtUSD = _convertToUSD(_priceOracle, totalDebt, underlying); // U:[CM-22]
             } else if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) {
                 return cdd; // U:[CM-18A]
             }
@@ -765,7 +762,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             quotasPacked: quotasPacked,
             priceOracle: _priceOracle,
             collateralTokenByMaskFn: _collateralTokenByMask,
-            convertToUSDFn: convertToUSDFn
+            convertToUSDFn: useSafePrices ? _safeConvertToUSD : _convertToUSD
         }); // U:[CM-22]
         cdd.enabledTokensMask = enabledTokensMask.disable(tokensToDisable); // U:[CM-22]
 
@@ -773,8 +770,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             return cdd; // U:[CM-18]
         }
 
-        cdd.totalValue = reservePriceFeedCheck
-            ? _convertFromUSDReserveCheck(_priceOracle, cdd.totalValueUSD, underlying)
+        cdd.totalValue = useSafePrices
+            ? _safeConvertFromUSD(_priceOracle, cdd.totalValueUSD, underlying)
             : _convertFromUSD(_priceOracle, cdd.totalValueUSD, underlying); // U:[CM-22,23]
     }
 
@@ -1416,22 +1413,22 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         amountInToken = IPriceOracleV3(_priceOracle).convertFromUSD(amountInUSD, token);
     }
 
-    /// @dev Internal wrapper for `priceOracle.convertToUSDReserveCheck` call to reduce contract size
-    function _convertToUSDReserveCheck(address _priceOracle, uint256 amountInToken, address token)
+    /// @dev Internal wrapper for `priceOracle.safeConvertToUSD` call to reduce contract size
+    function _safeConvertToUSD(address _priceOracle, uint256 amountInToken, address token)
         internal
         view
         returns (uint256 amountInUSD)
     {
-        amountInUSD = IPriceOracleV3(_priceOracle).convertToUSDReserveCheck(amountInToken, token);
+        amountInUSD = IPriceOracleV3(_priceOracle).safeConvertToUSD(amountInToken, token);
     }
 
-    /// @dev Internal wrapper for `priceOracle.convertFromUSDReserveCheck` call to reduce contract size
-    function _convertFromUSDReserveCheck(address _priceOracle, uint256 amountInUSD, address token)
+    /// @dev Internal wrapper for `priceOracle.safeConvertFromUSD` call to reduce contract size
+    function _safeConvertFromUSD(address _priceOracle, uint256 amountInUSD, address token)
         internal
         view
         returns (uint256 amountInToken)
     {
-        amountInToken = IPriceOracleV3(_priceOracle).convertFromUSDReserveCheck(amountInUSD, token);
+        amountInToken = IPriceOracleV3(_priceOracle).safeConvertFromUSD(amountInUSD, token);
     }
 
     /// @dev Reverts if `msg.sender` is not the credit facade

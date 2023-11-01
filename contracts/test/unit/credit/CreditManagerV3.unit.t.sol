@@ -1689,7 +1689,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             enabledTokensMask: 0,
             collateralHints: new uint256[](0),
             minHealthFactor: PERCENTAGE_FACTOR - 1,
-            reservePriceFeedCheck: false
+            useSafePrices: false
         });
 
         uint256[] memory collateralHints = new uint256[](1);
@@ -1699,7 +1699,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             enabledTokensMask: 0,
             collateralHints: collateralHints,
             minHealthFactor: PERCENTAGE_FACTOR,
-            reservePriceFeedCheck: false
+            useSafePrices: false
         });
 
         collateralHints[0] = 3;
@@ -1709,7 +1709,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             enabledTokensMask: 0,
             collateralHints: collateralHints,
             minHealthFactor: PERCENTAGE_FACTOR,
-            reservePriceFeedCheck: false
+            useSafePrices: false
         });
     }
 
@@ -1772,7 +1772,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             enabledTokensMask: enabledTokensMask,
             collateralHints: new uint256[](0),
             minHealthFactor: PERCENTAGE_FACTOR,
-            reservePriceFeedCheck: false
+            useSafePrices: false
         });
 
         assertTrue(
@@ -1810,7 +1810,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             enabledTokensMask: enabledTokensMask,
             collateralHints: new uint256[](0),
             minHealthFactor: PERCENTAGE_FACTOR,
-            reservePriceFeedCheck: false
+            useSafePrices: false
         });
 
         uint256 enabledTokensMaskAfter = creditManager.enabledTokensMaskOf(creditAccount);
@@ -1881,7 +1881,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             enabledTokensMask: enabledTokensMask,
             collateralHints: new uint256[](0),
             minHealthFactor: PERCENTAGE_FACTOR,
-            reservePriceFeedCheck: false
+            useSafePrices: false
         });
 
         uint256 enabledTokensMaskAfter = creditManager.enabledTokensMaskOf(creditAccount);
@@ -2463,14 +2463,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         tokenTestSuite.mint(underlying, creditAccount, DAI_ACCOUNT_AMOUNT);
 
-        vm.expectRevert(CreditAccountDoesNotExistException.selector);
-        (uint256 tokensToDisable) = creditManager.withdrawCollateral({
-            creditAccount: creditAccount,
-            token: underlying,
-            amount: 20_000,
-            to: USER
-        });
-
         creditManager.setBorrower({creditAccount: creditAccount, borrower: USER});
 
         string memory caseNameBak = string.concat(caseName, "a part of funds");
@@ -2484,7 +2476,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             amount: _amountMinusFee(20_000)
         });
 
-        (tokensToDisable) = creditManager.withdrawCollateral({
+        (uint256 tokensToDisable) = creditManager.withdrawCollateral({
             creditAccount: creditAccount,
             token: underlying,
             amount: 20_000,
@@ -2634,37 +2626,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
             checkTokenTransfers({debug: false});
         }
-    }
-
-    /// @dev U:[CM-33]: batchTokensTransfer works correctly
-    function test_U_CM_33_batchTokensTransfer_works_correctly() public withFeeTokenCase creditManagerTest {
-        uint256 amount = 22423423;
-        CreditAccountMock ca = new CreditAccountMock();
-        ca.setRevertOnTransfer(underlying, FRIEND);
-
-        address creditAccount = address(ca);
-
-        tokenTestSuite.mint({token: underlying, to: creditAccount, amount: amount});
-
-        startTokenTrackingSession(caseName);
-
-        expectTokenTransfer({
-            reason: "transfer token ",
-            token: underlying,
-            from: creditAccount,
-            to: address(this),
-            amount: _amountMinusFee(amount)
-        });
-
-        creditManager.safeTokenTransfer({
-            creditAccount: creditAccount,
-            token: underlying,
-            to: FRIEND,
-            amount: amount,
-            convertToETH: false
-        });
-
-        checkTokenTransfers({debug: false});
     }
 
     //
