@@ -57,9 +57,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
 
         vm.prank(address(creditFacade));
-        botList.setBotPermissions(
-            bot, address(creditManager), creditAccount, uint192(ALL_PERMISSIONS), uint72(1 ether), uint72(1 ether / 10)
-        );
+        botList.setBotPermissions(bot, address(creditManager), creditAccount, uint192(ALL_PERMISSIONS));
 
         vm.expectRevert(NotApprovedBotException.selector);
         creditFacade.botMulticall(
@@ -78,9 +76,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         botList.setBotSpecialPermissions(address(bot), address(creditManager), 0);
 
         vm.prank(USER);
-        creditFacade.setBotPermissions(
-            creditAccount, bot, uint192(ALL_PERMISSIONS), uint72(1 ether), uint72(1 ether / 10)
-        );
+        creditFacade.setBotPermissions(creditAccount, bot, uint192(ALL_PERMISSIONS));
 
         botList.getBotStatus({creditManager: address(creditManager), creditAccount: creditAccount, bot: bot});
 
@@ -129,9 +125,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
 
         vm.expectRevert(CallerNotCreditAccountOwnerException.selector);
         vm.prank(FRIEND);
-        creditFacade.setBotPermissions(
-            creditAccount, bot, uint192(ALL_PERMISSIONS), uint72(1 ether), uint72(1 ether / 10)
-        );
+        creditFacade.setBotPermissions(creditAccount, bot, uint192(ALL_PERMISSIONS));
 
         vm.expectCall(
             address(creditManager),
@@ -139,9 +133,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         );
 
         vm.prank(USER);
-        creditFacade.setBotPermissions(
-            creditAccount, bot, uint192(ALL_PERMISSIONS), uint72(1 ether), uint72(1 ether / 10)
-        );
+        creditFacade.setBotPermissions(creditAccount, bot, uint192(ALL_PERMISSIONS));
 
         assertTrue(creditManager.flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG > 0, "Flag was not set");
 
@@ -151,7 +143,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         );
 
         vm.prank(USER);
-        creditFacade.setBotPermissions(creditAccount, bot, 0, 0, 0);
+        creditFacade.setBotPermissions(creditAccount, bot, 0);
 
         assertTrue(creditManager.flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG == 0, "Flag was not set");
     }

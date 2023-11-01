@@ -139,13 +139,7 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
 
     function claimWithdrawals(address creditAccount, address to) external;
 
-    function setBotPermissions(
-        address creditAccount,
-        address bot,
-        uint192 permissions,
-        uint72 fundingAmount,
-        uint72 weeklyFundingAllowance
-    ) external;
+    function setBotPermissions(address creditAccount, address bot, uint192 permissions) external;
 
     // ------------- //
     // CONFIGURATION //

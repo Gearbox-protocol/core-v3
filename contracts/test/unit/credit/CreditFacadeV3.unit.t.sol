@@ -287,13 +287,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.claimWithdrawals({creditAccount: DUMB_ADDRESS, to: DUMB_ADDRESS});
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditFacade.setBotPermissions({
-            creditAccount: DUMB_ADDRESS,
-            bot: DUMB_ADDRESS,
-            permissions: 0,
-            totalFundingAllowance: 0,
-            weeklyFundingAllowance: 0
-        });
+        creditFacade.setBotPermissions({creditAccount: DUMB_ADDRESS, bot: DUMB_ADDRESS, permissions: 0});
     }
 
     /// @dev U:[FA-5]: borrower related functions revert if called not by borrower
@@ -323,13 +317,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.claimWithdrawals({creditAccount: DUMB_ADDRESS, to: DUMB_ADDRESS});
 
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
-        creditFacade.setBotPermissions({
-            creditAccount: DUMB_ADDRESS,
-            bot: DUMB_ADDRESS,
-            permissions: 0,
-            totalFundingAllowance: 0,
-            weeklyFundingAllowance: 0
-        });
+        creditFacade.setBotPermissions({creditAccount: DUMB_ADDRESS, bot: DUMB_ADDRESS, permissions: 0});
     }
 
     /// @dev U:[FA-6]: all configurator functions revert if called by non-configurator
@@ -1919,52 +1907,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         });
     }
 
-    /// @dev U:[FA-37]: multicall payBot works properly
-    function test_U_FA_37_multicall_payBot_works_properly() public notExpirableCase {
-        address creditAccount = DUMB_ADDRESS;
-
-        creditManagerMock.setBorrower(USER);
-
-        uint72 paymentAmount = 100_000;
-
-        address bot = makeAddr("BOT");
-        vm.expectCall(
-            address(botListMock),
-            abi.encodeCall(IBotListV3.payBot, (bot, address(creditManagerMock), creditAccount, USER, paymentAmount))
-        );
-
-        vm.prank(bot);
-        creditFacade.multicallInt({
-            creditAccount: creditAccount,
-            calls: MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.payBot, (paymentAmount))
-                })
-                ),
-            enabledTokensMask: 0,
-            flags: PAY_BOT_CAN_BE_CALLED
-        });
-
-        vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, PAY_BOT_CAN_BE_CALLED));
-        vm.prank(bot);
-        creditFacade.multicallInt({
-            creditAccount: creditAccount,
-            calls: MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.payBot, (paymentAmount))
-                }),
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.payBot, (paymentAmount))
-                })
-                ),
-            enabledTokensMask: 0,
-            flags: PAY_BOT_CAN_BE_CALLED
-        });
-    }
-
     struct ExternalCallTestCase {
         string name;
         uint256 quotedTokensMask;
@@ -2086,13 +2028,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         /// It reverts if passed unexpected permissions
         vm.expectRevert(UnexpectedPermissionsException.selector);
         vm.prank(USER);
-        creditFacade.setBotPermissions({
-            creditAccount: creditAccount,
-            bot: bot,
-            permissions: type(uint192).max,
-            totalFundingAllowance: 2,
-            weeklyFundingAllowance: 3
-        });
+        creditFacade.setBotPermissions({creditAccount: creditAccount, bot: bot, permissions: type(uint192).max});
 
         creditManagerMock.setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: false});
 
@@ -2106,35 +2042,23 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         );
         vm.expectCall(
             address(botListMock),
-            abi.encodeCall(IBotListV3.setBotPermissions, (bot, address(creditManagerMock), creditAccount, 1, 2, 3))
+            abi.encodeCall(IBotListV3.setBotPermissions, (bot, address(creditManagerMock), creditAccount, 1))
         );
 
         vm.prank(USER);
-        creditFacade.setBotPermissions({
-            creditAccount: creditAccount,
-            bot: bot,
-            permissions: 1,
-            totalFundingAllowance: 2,
-            weeklyFundingAllowance: 3
-        });
+        creditFacade.setBotPermissions({creditAccount: creditAccount, bot: bot, permissions: 1});
 
         /// It reverts if too many bots approved
         botListMock.setBotPermissionsReturn(creditFacade.maxApprovedBots() + 1);
         vm.expectRevert(TooManyApprovedBotsException.selector);
         vm.prank(USER);
-        creditFacade.setBotPermissions({
-            creditAccount: creditAccount,
-            bot: bot,
-            permissions: 1,
-            totalFundingAllowance: 2,
-            weeklyFundingAllowance: 3
-        });
+        creditFacade.setBotPermissions({creditAccount: creditAccount, bot: bot, permissions: 1});
 
         /// It removes flag if no bots left
         botListMock.setBotPermissionsReturn(0);
         vm.expectCall(
             address(botListMock),
-            abi.encodeCall(IBotListV3.setBotPermissions, (bot, address(creditManagerMock), creditAccount, 1, 2, 3))
+            abi.encodeCall(IBotListV3.setBotPermissions, (bot, address(creditManagerMock), creditAccount, 1))
         );
 
         vm.expectCall(
@@ -2142,13 +2066,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             abi.encodeCall(ICreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, false))
         );
         vm.prank(USER);
-        creditFacade.setBotPermissions({
-            creditAccount: creditAccount,
-            bot: bot,
-            permissions: 1,
-            totalFundingAllowance: 2,
-            weeklyFundingAllowance: 3
-        });
+        creditFacade.setBotPermissions({creditAccount: creditAccount, bot: bot, permissions: 1});
     }
 
     /// @dev U:[FA-42]: eraseAllBotPermissions works properly

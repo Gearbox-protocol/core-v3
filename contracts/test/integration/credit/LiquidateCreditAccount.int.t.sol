@@ -58,9 +58,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
         creditFacade.setBotPermissions({
             creditAccount: creditAccount,
             bot: address(adapterMock),
-            permissions: uint192(ADD_COLLATERAL_PERMISSION),
-            totalFundingAllowance: 0,
-            weeklyFundingAllowance: 0
+            permissions: uint192(ADD_COLLATERAL_PERMISSION)
         });
 
         MultiCall[] memory calls = MultiCallBuilder.build(

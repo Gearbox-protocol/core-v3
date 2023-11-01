@@ -38,15 +38,11 @@ contract BotListMock {
         revertOnErase = _value;
     }
 
-    function payBot(address bot, address creditManager, address creditAccount, address payer, uint72 paymentAmount)
-        external
-    {}
-
     function setBotPermissionsReturn(uint256 activeBotsRemaining) external {
         return_activeBotsRemaining = activeBotsRemaining;
     }
 
-    function setBotPermissions(address, address, address, uint192, uint72, uint72)
+    function setBotPermissions(address, address, address, uint192)
         external
         view
         returns (uint256 activeBotsRemaining)

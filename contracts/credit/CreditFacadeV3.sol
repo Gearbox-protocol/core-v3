@@ -466,24 +466,15 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         _claimWithdrawals(creditAccount, to, ClaimAction.CLAIM); // U:[FA-40]
     }
 
-    /// @notice Sets bot permissions to manage `creditAccount` as well as funding parameters
+    /// @notice Sets `bot`'s permissions to manage `creditAccount`
     /// @param creditAccount Account to set permissions for
     /// @param bot Bot to set permissions for
     /// @param permissions A bit mask encoding bot permissions
-    /// @param totalFundingAllowance Total amount of WETH available to bot for payments
-    /// @param weeklyFundingAllowance Amount of WETH available to bot for payments weekly
     /// @dev Reverts if caller is not `creditAccount`'s owner
     /// @dev Reverts if `permissions` has unexpected bits enabled
     /// @dev Reverts if account has more active bots than allowed after changing permissions
-    //       to prevent users from inflating liquidation gas costs
     /// @dev Changes account's `BOT_PERMISSIONS_SET_FLAG` in the credit manager if needed
-    function setBotPermissions(
-        address creditAccount,
-        address bot,
-        uint192 permissions,
-        uint72 totalFundingAllowance,
-        uint72 weeklyFundingAllowance
-    )
+    function setBotPermissions(address creditAccount, address bot, uint192 permissions)
         external
         override
         creditAccountOwnerOnly(creditAccount) // U:[FA-5]
@@ -492,12 +483,10 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         if (permissions & ~ALL_PERMISSIONS != 0) revert UnexpectedPermissionsException(); // U:[FA-41]
 
         uint256 remainingBots = IBotListV3(botList).setBotPermissions({
+            bot: bot,
             creditManager: creditManager,
             creditAccount: creditAccount,
-            bot: bot,
-            permissions: permissions,
-            totalFundingAllowance: totalFundingAllowance,
-            weeklyFundingAllowance: weeklyFundingAllowance
+            permissions: permissions
         }); // U:[FA-41]
 
         if (remainingBots > maxApprovedBots) {
@@ -905,14 +894,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     function _payBot(address creditAccount, bytes calldata callData) internal {
         uint72 paymentAmount = abi.decode(callData, (uint72));
         address payer = _getBorrowerOrRevert(creditAccount); // U:[FA-37]
-
-        IBotListV3(botList).payBot({
-            payer: payer,
-            creditManager: creditManager,
-            creditAccount: creditAccount,
-            bot: msg.sender,
-            paymentAmount: paymentAmount
-        }); // U:[FA-37]
     }
 
     // ------------- //

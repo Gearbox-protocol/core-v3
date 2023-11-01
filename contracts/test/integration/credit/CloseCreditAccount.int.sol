@@ -125,9 +125,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         creditFacade.setBotPermissions({
             creditAccount: creditAccount,
             bot: bot,
-            permissions: uint192(ADD_COLLATERAL_PERMISSION),
-            totalFundingAllowance: 0,
-            weeklyFundingAllowance: 0
+            permissions: uint192(ADD_COLLATERAL_PERMISSION)
         });
 
         // LIST OF EXPECTED CALLS
