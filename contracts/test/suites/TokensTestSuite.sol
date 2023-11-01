@@ -111,7 +111,7 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
         tokenIndexes[address(t)] = token.index;
 
         priceFeeds.push(
-            PriceFeedConfig({token: address(t), priceFeed: priceFeed, stalenessPeriod: 2 hours, trustedPriceFeed: true})
+            PriceFeedConfig({token: address(t), priceFeed: priceFeed, stalenessPeriod: 2 hours, trusted: true})
         );
         symbols[token.index] = token.symbol;
         priceFeedsMap[token.index] = priceFeed;
