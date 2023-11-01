@@ -396,7 +396,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     }
 
     /// @notice Executes a batch of calls allowing bot to manage a credit account
-    ///         - Performs a multicall (allowed calls are determined by permissions given by account's owner)
+    ///         - Performs a multicall (allowed calls are determined by permissions given by account's owner
+    ///           or by DAO in case bot has special permissions in the credit manager)
     ///         - Runs the collateral check
     /// @param creditAccount Account to perform the calls on
     /// @param calls List of calls to perform

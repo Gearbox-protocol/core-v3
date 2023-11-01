@@ -31,8 +31,6 @@ import {PriceFeedValidationTrait} from "../traits/PriceFeedValidationTrait.sol";
 ///         and reserve feed prices. There are also trusted price feeds, for which safe prices are
 ///         the same as main feed prices.
 contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPriceOracleV3 {
-    using Math for uint256;
-
     /// @notice Contract version
     uint256 public constant override version = 3_00;
 
