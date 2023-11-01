@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
-import {BalancesLogic, BalanceDelta, BalanceWithMask} from "../../../libraries/BalancesLogic.sol";
+import {BalancesLogic, BalanceDelta, BalanceWithMask, Comparison} from "../../../libraries/BalancesLogic.sol";
 
 import {TestHelper} from "../../lib/helper.sol";
 
@@ -33,7 +33,8 @@ contract BalancesLogicUnitTest is TestHelper {
     {
         _setupTokenBalances(balances, 1);
 
-        bool result = BalancesLogic.checkBalance(creditAccount, tokens[0], value, greater);
+        bool result =
+            BalancesLogic.checkBalance(creditAccount, tokens[0], value, greater ? Comparison.GREATER : Comparison.LESS);
         if (greater) {
             assertEq(result, balances[0] >= value);
         } else {
@@ -104,7 +105,8 @@ contract BalancesLogicUnitTest is TestHelper {
             storedBalances[i] = Balance({token: tokens[i], balance: expectedBalances[i]});
         }
 
-        bool result = BalancesLogic.compareBalances(creditAccount, storedBalances, greater);
+        bool result =
+            BalancesLogic.compareBalances(creditAccount, storedBalances, greater ? Comparison.GREATER : Comparison.LESS);
         assertEq(result, expectedResult, "Incorrect result");
     }
 
@@ -167,7 +169,9 @@ contract BalancesLogicUnitTest is TestHelper {
             }
         }
 
-        bool result = BalancesLogic.compareBalances(creditAccount, tokensMask, storedBalances, greater);
+        bool result = BalancesLogic.compareBalances(
+            creditAccount, tokensMask, storedBalances, greater ? Comparison.GREATER : Comparison.LESS
+        );
         assertEq(result, expectedResult, "Incorrect result");
     }
 

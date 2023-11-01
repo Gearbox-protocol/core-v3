@@ -209,12 +209,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     /// @notice Closes a credit account
     /// @param creditAccount Account to close
-    /// @param to Address to send tokens left on the account after closure
-    /// @param tokensToTransferMask Bit mask of tokens left on the account that should be sent
-    /// @param convertToETH If true and any of transferred tokens is WETH, it will be sent to withdrawal manager,
-    ///        from which credit facade should claim it as ETH to `to` at the end of the call
     /// @custom:expects Account is opened in this credit manager
-    function closeCreditAccount(address creditAccount, address to, uint256 tokensToTransferMask, bool convertToETH)
+    function closeCreditAccount(address creditAccount)
         external
         override
         nonReentrant // U:[CM-5]
@@ -233,12 +229,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             sstore(slot, 0)
         } // U:[CM-7]
 
-        _batchTokensTransfer({
-            creditAccount: creditAccount,
-            to: to,
-            convertToETH: convertToETH,
-            tokensToTransferMask: tokensToTransferMask
-        }); // U:[CM-7]
+        currentCreditAccountInfo.enabledTokensMask = 0; // U:[CM-7]
 
         IAccountFactoryBase(accountFactory).returnCreditAccount({creditAccount: creditAccount}); // U:[CM-7]
         creditAccountsSet.remove(creditAccount); // U:[CM-7]
@@ -462,7 +453,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param creditAccount Account to add collateral to
     /// @param token Token to add as collateral
     /// @param amount Amount to add
-    /// @return tokenMask Mask of the added token
+    /// @return tokensToEnable Mask of tokens that should be enabled after the operation (always `token` mask)
     /// @dev Requires approval for `token` from `payer` to this contract
     /// @dev Reverts if `token` is not recognized as collateral in the credit manager
     function addCollateral(address payer, address creditAccount, address token, uint256 amount)
@@ -470,9 +461,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         override
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
-        returns (uint256 tokenMask)
+        returns (uint256 tokensToEnable)
     {
-        tokenMask = getTokenMaskOrRevert({token: token}); // U:[CM-13]
+        tokensToEnable = getTokenMaskOrRevert({token: token}); // U:[CM-13]
         IERC20(token).safeTransferFrom({from: payer, to: creditAccount, amount: amount}); // U:[CM-13]
     }
 
@@ -482,7 +473,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param amount Amount to withdraw
     /// @param to Address to transfer token to
     /// @return tokensToDisable Mask of tokens that should be disabled after the operation
-    ///         (equals `token`'s mask if withdrawing the entire balance, zero otherwise)
+    ///         (`token` mask if withdrawing the entire balance, zero otherwise)
+    /// @dev Reverts if `token` is not recognized as collateral in the credit manager
     function withdrawCollateral(address creditAccount, address token, uint256 amount, address to)
         external
         override

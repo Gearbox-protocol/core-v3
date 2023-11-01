@@ -44,7 +44,7 @@ interface ICreditFacadeV3Events {
     );
 
     /// @notice Emitted when account is closed
-    event CloseCreditAccount(address indexed creditAccount, address indexed borrower, address indexed to);
+    event CloseCreditAccount(address indexed creditAccount, address indexed borrower);
 
     /// @notice Emitted when account is liquidated
     event LiquidateCreditAccount(
@@ -117,13 +117,7 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
         payable
         returns (address creditAccount);
 
-    function closeCreditAccount(
-        address creditAccount,
-        address to,
-        uint256 tokensToTransferMask,
-        bool convertToETH,
-        MultiCall[] calldata calls
-    ) external payable;
+    function closeCreditAccount(address creditAccount, MultiCall[] calldata calls) external payable;
 
     function liquidateCreditAccount(
         address creditAccount,

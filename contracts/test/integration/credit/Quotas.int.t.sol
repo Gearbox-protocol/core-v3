@@ -308,7 +308,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
         uint256 poolBalanceBefore = tokenTestSuite.balanceOf(Tokens.DAI, address(pool));
 
         vm.prank(USER);
-        creditFacade.closeCreditAccount(creditAccount, USER, 0, false, new MultiCall[](0));
+        creditFacade.closeCreditAccount(creditAccount, new MultiCall[](0));
 
         expectBalance(
             Tokens.DAI,
@@ -420,7 +420,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
         address[2] memory quotedTokens = [tokenTestSuite.addressOf(Tokens.USDT), tokenTestSuite.addressOf(Tokens.LINK)];
 
         vm.prank(USER);
-        creditFacade.closeCreditAccount(creditAccount, USER, 0, false, new MultiCall[](0));
+        creditFacade.closeCreditAccount(creditAccount, new MultiCall[](0));
 
         for (uint256 i = 0; i < quotedTokens.length; ++i) {
             (,,, uint96 limit,,) = poolQuotaKeeper.getTokenQuotaParams(quotedTokens[i]);

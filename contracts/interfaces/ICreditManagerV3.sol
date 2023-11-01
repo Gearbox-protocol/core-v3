@@ -106,8 +106,7 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
 
     function openCreditAccount(address onBehalfOf) external returns (address);
 
-    function closeCreditAccount(address creditAccount, address to, uint256 tokensToTransferMask, bool convertToETH)
-        external;
+    function closeCreditAccount(address creditAccount) external;
 
     function liquidateCreditAccount(
         address creditAccount,
@@ -124,7 +123,7 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
 
     function addCollateral(address payer, address creditAccount, address token, uint256 amount)
         external
-        returns (uint256 tokenMask);
+        returns (uint256 tokensToEnable);
 
     function withdrawCollateral(address creditAccount, address token, uint256 amount, address to)
         external

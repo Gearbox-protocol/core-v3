@@ -332,12 +332,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.openCreditAccount(address(this));
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
-        creditManager.closeCreditAccount({
-            creditAccount: DUMB_ADDRESS,
-            to: DUMB_ADDRESS,
-            tokensToTransferMask: type(uint256).max,
-            convertToETH: false
-        });
+        creditManager.closeCreditAccount({creditAccount: DUMB_ADDRESS});
 
         CollateralDebtData memory collateralDebtData;
         vm.expectRevert(CallerNotCreditFacadeException.selector);
@@ -433,12 +428,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.openCreditAccount(address(this));
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditManager.closeCreditAccount({
-            creditAccount: DUMB_ADDRESS,
-            to: DUMB_ADDRESS,
-            tokensToTransferMask: type(uint256).max,
-            convertToETH: false
-        });
+        creditManager.closeCreditAccount({creditAccount: DUMB_ADDRESS});
 
         CollateralDebtData memory collateralDebtData;
         vm.expectRevert("ReentrancyGuard: reentrant call");
@@ -546,7 +536,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
 
         vm.expectRevert(CloseAccountWithNonZeroDebtException.selector);
-        creditManager.closeCreditAccount(creditAccount, address(0), 0, false);
+        creditManager.closeCreditAccount(creditAccount);
 
         creditManager.addToCAList(creditAccount);
         creditManager.setCreditAccountInfoMap({
@@ -561,9 +551,11 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
 
         vm.expectCall(address(accountFactory), abi.encodeCall(accountFactory.returnCreditAccount, (creditAccount)));
-        creditManager.closeCreditAccount(creditAccount, address(0), 0, false);
+        creditManager.closeCreditAccount(creditAccount);
 
-        (,,,,, uint16 flags, uint64 lastDebtUpdate, address borrower) = creditManager.creditAccountInfo(creditAccount);
+        (,,,, uint256 enabledTokensMask, uint16 flags, uint64 lastDebtUpdate, address borrower) =
+            creditManager.creditAccountInfo(creditAccount);
+        assertEq(enabledTokensMask, 0, "enabledTokensMask not cleared");
         assertEq(borrower, address(0), "borrower not cleared");
         assertEq(lastDebtUpdate, 0, "lastDebtUpadte not cleared");
         assertEq(flags, 0, "flags not cleared");

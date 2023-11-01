@@ -12,7 +12,7 @@ import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC2
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 
 // LIBS & TRAITS
-import {BalancesLogic, Balance, BalanceDelta, BalanceWithMask} from "../libraries/BalancesLogic.sol";
+import {BalancesLogic, Balance, BalanceDelta, BalanceWithMask, Comparison} from "../libraries/BalancesLogic.sol";
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {BitMask, UNDERLYING_TOKEN_MASK} from "../libraries/BitMask.sol";
 
@@ -46,8 +46,7 @@ import "../interfaces/IExceptions.sol";
 uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS =
     ALL_PERMISSIONS & ~(DECREASE_DEBT_PERMISSION | WITHDRAW_COLLATERAL_PERMISSION);
 
-uint256 constant CLOSE_CREDIT_ACCOUNT_FLAGS =
-    ALL_PERMISSIONS & ~(INCREASE_DEBT_PERMISSION | WITHDRAW_COLLATERAL_PERMISSION);
+uint256 constant CLOSE_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS & ~INCREASE_DEBT_PERMISSION;
 
 uint256 constant LIQUIDATE_CREDIT_ACCOUNT_FLAGS = EXTERNAL_CALLS_PERMISSION | ADD_COLLATERAL_PERMISSION;
 
@@ -204,49 +203,41 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         emit OpenCreditAccount(creditAccount, onBehalfOf, msg.sender, referralCode); // U:[FA-10]
 
-        // same as `_multicallFullCollateralCheck` but leverages the fact that account is freshly opened to save gas
-        BalanceWithMask[] memory forbiddenBalances;
+        if (calls.length != 0) {
+            // same as `_multicallFullCollateralCheck` but leverages the fact that account is freshly opened to save gas
+            BalanceWithMask[] memory forbiddenBalances;
 
-        uint256 skipCalls = _applyOnDemandPriceUpdates(calls);
-        FullCheckParams memory fullCheckParams = _multicall({
-            creditAccount: creditAccount,
-            calls: calls,
-            enabledTokensMask: 0,
-            flags: OPEN_CREDIT_ACCOUNT_FLAGS,
-            skip: skipCalls
-        }); // U:[FA-10]
+            uint256 skipCalls = _applyOnDemandPriceUpdates(calls);
+            FullCheckParams memory fullCheckParams = _multicall({
+                creditAccount: creditAccount,
+                calls: calls,
+                enabledTokensMask: 0,
+                flags: OPEN_CREDIT_ACCOUNT_FLAGS,
+                skip: skipCalls
+            }); // U:[FA-10]
 
-        _fullCollateralCheck({
-            creditAccount: creditAccount,
-            enabledTokensMaskBefore: 0,
-            fullCheckParams: fullCheckParams,
-            forbiddenBalances: forbiddenBalances,
-            forbiddenTokensMask: forbiddenTokenMask
-        }); // U:[FA-10]
+            _fullCollateralCheck({
+                creditAccount: creditAccount,
+                enabledTokensMaskBefore: 0,
+                fullCheckParams: fullCheckParams,
+                forbiddenBalances: forbiddenBalances,
+                forbiddenTokensMask: forbiddenTokenMask
+            }); // U:[FA-10]
+        }
     }
 
     /// @notice Closes a credit account
     ///         - Wraps any ETH sent in the function call and sends it back to the caller
-    ///         - Claims all scheduled withdrawals
+    ///         - Performs a multicall (all calls are allowed except debt increase)
+    ///         - Closes a credit account in the credit manager
     ///         - Erases all bots permissions
-    ///         - Performs a multicall (all calls are allowed except debt increase and withdrawals)
-    ///         - Closes a credit account in the credit manager, which transfers specified tokens to the recipient
-    ///         - If facade has any WETH at the end of the function, unwraps it and sends to the recipient
     /// @param creditAccount Account to close
-    /// @param to Address to send withdrawals and any tokens left on the account after closure
-    /// @param tokensToTransferMask Bit mask of tokens left on the account that should be sent
-    /// @param convertToETH Whether to unwrap WETH before sending to `to`
     /// @param calls List of calls to perform before closing the account
     /// @dev Reverts if caller is not `creditAccount`'s owner
     /// @dev Reverts if facade is paused
+    /// @dev Reverts if account has enabled tokens after executing `calls`
     /// @dev Reverts if account's debt is not zero after executing `calls`
-    function closeCreditAccount(
-        address creditAccount,
-        address to,
-        uint256 tokensToTransferMask,
-        bool convertToETH,
-        MultiCall[] calldata calls
-    )
+    function closeCreditAccount(address creditAccount, MultiCall[] calldata calls)
         external
         payable
         override
@@ -255,26 +246,21 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         nonReentrant // U:[FA-4]
         wrapETH // U:[FA-7]
     {
-        if (calls.length != 0) {
-            uint256 skipCalls = _applyOnDemandPriceUpdates(calls);
+        uint256 enabledTokensMask = _enabledTokensMaskOf(creditAccount);
 
-            _multicall(creditAccount, calls, _enabledTokensMaskOf(creditAccount), CLOSE_CREDIT_ACCOUNT_FLAGS, skipCalls); // U:[FA-11]
+        if (calls.length != 0) {
+            FullCheckParams memory fullCheckParams =
+                _multicall(creditAccount, calls, enabledTokensMask, CLOSE_CREDIT_ACCOUNT_FLAGS, 0); // U:[FA-11]
+            enabledTokensMask = fullCheckParams.enabledTokensMaskAfter;
         }
+
+        if (enabledTokensMask != 0) revert CloseAccountWithEnabledTokensException(); // U:[FA-11]
 
         _eraseAllBotPermissions({creditAccount: creditAccount}); // U:[FA-11]
 
-        ICreditManagerV3(creditManager).closeCreditAccount({
-            creditAccount: creditAccount,
-            to: to,
-            tokensToTransferMask: tokensToTransferMask,
-            convertToETH: convertToETH
-        });
+        ICreditManagerV3(creditManager).closeCreditAccount(creditAccount); // U:[FA-11]
 
-        if (convertToETH) {
-            _unwrapWETH(to); // U:[FA-11]
-        }
-
-        emit CloseCreditAccount(creditAccount, msg.sender, to); // U:[FA-11]
+        emit CloseCreditAccount(creditAccount, msg.sender); // U:[FA-11]
     }
 
     /// @notice Liquidates a credit account
@@ -352,7 +338,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                 creditAccount: creditAccount,
                 tokensMask: remainingTokensMask,
                 balances: remainingBalances,
-                greater: false
+                comparison: Comparison.LESS
             });
 
             if (!success) revert RemainingTokenBalanceIncreasedException(); // U:[FA-16]
@@ -686,8 +672,11 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         }
 
         if (expectedBalances.length != 0) {
-            bool success =
-                BalancesLogic.compareBalances({creditAccount: creditAccount, balances: expectedBalances, greater: true});
+            bool success = BalancesLogic.compareBalances({
+                creditAccount: creditAccount,
+                balances: expectedBalances,
+                comparison: Comparison.GREATER
+            });
             if (!success) revert BalanceLessThanMinimumDesiredException(); // U:[FA-23]
         }
 
@@ -765,7 +754,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                 creditAccount: creditAccount,
                 tokensMask: enabledForbiddenTokensMask,
                 balances: forbiddenBalances,
-                greater: false
+                comparison: Comparison.LESS
             });
 
             if (!success) revert ForbiddenTokenBalanceIncreasedException();

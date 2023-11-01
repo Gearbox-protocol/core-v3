@@ -668,7 +668,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         uint256 gasBefore = gasleft();
 
         vm.prank(USER);
-        creditFacade.closeCreditAccount(creditAccount, USER, 1, false, MultiCallBuilder.build());
+        creditFacade.closeCreditAccount(creditAccount, MultiCallBuilder.build());
 
         uint256 gasSpent = gasBefore - gasleft();
 
@@ -703,9 +703,6 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         vm.prank(USER);
         creditFacade.closeCreditAccount(
             creditAccount,
-            USER,
-            1,
-            false,
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
@@ -757,9 +754,6 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         vm.prank(USER);
         creditFacade.closeCreditAccount(
             creditAccount,
-            USER,
-            mask,
-            false,
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
@@ -813,7 +807,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         uint256 gasBefore = gasleft();
 
         vm.prank(USER);
-        creditFacade.closeCreditAccount(creditAccount, USER, 1, false, calls);
+        creditFacade.closeCreditAccount(creditAccount, calls);
 
         uint256 gasSpent = gasBefore - gasleft();
 

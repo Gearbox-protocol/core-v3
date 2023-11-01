@@ -22,26 +22,31 @@ struct BalanceDelta {
     int256 amount;
 }
 
+enum Comparison {
+    GREATER,
+    LESS
+}
+
 /// @title Balances logic library
 /// @notice Implements functions for before-and-after balance comparisons
 library BalancesLogic {
     using BitMask for uint256;
     using SafeCast for int256;
     using SafeCast for uint256;
-    using SafeCast for uint256;
     using SafeERC20 for IERC20;
 
     /// @dev Compares current `token` balance with `value`
     /// @param token Token to check balance for
     /// @param value Value to compare current token balance with
-    /// @param greater Whether current balance must be greater/less than or equal to `value`
-    function checkBalance(address creditAccount, address token, uint256 value, bool greater)
+    /// @param comparison Whether current balance must be greater/less than or equal to `value`
+    function checkBalance(address creditAccount, address token, uint256 value, Comparison comparison)
         internal
         view
         returns (bool)
     {
         uint256 current = IERC20(token).safeBalanceOf(creditAccount);
-        return greater && current >= value || !greater && current <= value; // U:[BLL-1]
+        return (comparison == Comparison.GREATER && current >= value)
+            || (comparison == Comparison.LESS && current <= value); // U:[BLL-1]
     }
 
     /// @dev Returns an array of expected token balances after operations
@@ -66,9 +71,9 @@ library BalancesLogic {
     /// @dev Compares current balances with the previously stored ones
     /// @param creditAccount Credit account to compare balances for
     /// @param balances Array of previously stored balances
-    /// @param greater Whether current balances must be greater/less than or equal to stored ones
-    /// @return success True if condition specified by `greater` holds for all tokens, false otherwise
-    function compareBalances(address creditAccount, Balance[] memory balances, bool greater)
+    /// @param comparison Whether current balances must be greater/less than or equal to stored ones
+    /// @return success True if condition specified by `comparison` holds for all tokens, false otherwise
+    function compareBalances(address creditAccount, Balance[] memory balances, Comparison comparison)
         internal
         view
         returns (bool success)
@@ -76,7 +81,7 @@ library BalancesLogic {
         uint256 len = balances.length;
         unchecked {
             for (uint256 i = 0; i < len; ++i) {
-                if (!BalancesLogic.checkBalance(creditAccount, balances[i].token, balances[i].balance, greater)) {
+                if (!BalancesLogic.checkBalance(creditAccount, balances[i].token, balances[i].balance, comparison)) {
                     return false; // U:[BLL-3]
                 }
             }
@@ -117,20 +122,22 @@ library BalancesLogic {
     /// @param creditAccount Credit account to compare balances for
     /// @param tokensMask Bit mask of tokens to compare balances for
     /// @param balances Array of previously stored balances
-    /// @param greater Whether current balances must be greater/less than or equal to stored ones
-    /// @return success True if condition specified by `greater` holds for all tokens, false otherwise
-    function compareBalances(address creditAccount, uint256 tokensMask, BalanceWithMask[] memory balances, bool greater)
-        internal
-        view
-        returns (bool)
-    {
+    /// @param comparison Whether current balances must be greater/less than or equal to stored ones
+    /// @return success True if condition specified by `comparison` holds for all tokens, false otherwise
+    function compareBalances(
+        address creditAccount,
+        uint256 tokensMask,
+        BalanceWithMask[] memory balances,
+        Comparison comparison
+    ) internal view returns (bool) {
         if (tokensMask == 0) return true;
 
         unchecked {
             uint256 len = balances.length;
             for (uint256 i; i < len; ++i) {
                 if (tokensMask & balances[i].tokenMask != 0) {
-                    if (!BalancesLogic.checkBalance(creditAccount, balances[i].token, balances[i].balance, greater)) {
+                    if (!BalancesLogic.checkBalance(creditAccount, balances[i].token, balances[i].balance, comparison))
+                    {
                         return false; // U:[BLL-5]
                     }
                 }

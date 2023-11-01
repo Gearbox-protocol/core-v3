@@ -169,6 +169,9 @@ error NotAllowedWhenNotExpirableException();
 /// @notice Thrown if a selector that doesn't match any allowed function is passed to the credit facade in a multicall
 error UnknownMethodException();
 
+/// @notice Thrown when trying to close an account with enabled tokens
+error CloseAccountWithEnabledTokensException();
+
 /// @notice Thrown if a liquidator tries to liquidate an account with a health factor above 1
 error CreditAccountNotLiquidatableException();
 

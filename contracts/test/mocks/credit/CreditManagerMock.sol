@@ -160,7 +160,7 @@ contract CreditManagerMock {
         return_loss = loss;
     }
 
-    function closeCreditAccount(address, address, uint256, bool) external {}
+    function closeCreditAccount(address) external {}
 
     function liquidateCreditAccount(address, CollateralDebtData memory collateralDebtData, address, uint256, bool, bool)
         external
@@ -171,7 +171,7 @@ contract CreditManagerMock {
         loss = return_loss;
     }
 
-    function fullCollateralCheck(address, uint256 enabledTokensMask, uint256[] memory, uint16)
+    function fullCollateralCheck(address, uint256 enabledTokensMask, uint256[] memory, uint16, bool)
         external
         pure
         returns (uint256)

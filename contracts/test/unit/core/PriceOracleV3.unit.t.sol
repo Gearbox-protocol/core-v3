@@ -90,7 +90,7 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         assertEq(params.decimals, expectedParams.decimals, "Incorrect decimals");
         assertEq(params.skipCheck, expectedParams.skipCheck, "Incorrect skipCheck");
         assertEq(params.useReserve, expectedParams.useReserve, "Incorrect useReserve");
-        assertEq(params.trustedPriceFeed, expectedParams.trustedPriceFeed, "Incorrect trustedPriceFeed");
+        assertEq(params.trusted, expectedParams.trusted, "Incorrect trusted");
     }
 
     /// @notice U:[PO-3]: `_getTokenReserveKey` works as expected
@@ -215,7 +215,7 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         priceOracle.setPriceFeed(address(token), address(priceFeed), 0, false);
 
         vm.expectEmit(true, true, false, true);
-        emit SetPriceFeed(address(token), address(priceFeed), 3600, false);
+        emit SetPriceFeed(address(token), address(priceFeed), 3600, false, false);
 
         vm.prank(configurator);
         priceOracle.setPriceFeed(address(token), address(priceFeed), 3600, false);

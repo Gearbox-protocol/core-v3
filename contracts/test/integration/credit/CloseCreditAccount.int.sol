@@ -57,15 +57,12 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
     function test_I_CCA_01_closeCreditAccount_reverts_if_credit_account_does_not_exist() public creditTest {
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
         vm.prank(USER);
-        creditFacade.closeCreditAccount(DUMB_ADDRESS, FRIEND, 0, false, MultiCallBuilder.build());
+        creditFacade.closeCreditAccount(DUMB_ADDRESS, MultiCallBuilder.build());
 
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
         vm.prank(USER);
         creditFacade.closeCreditAccount(
             DUMB_ADDRESS,
-            FRIEND,
-            0,
-            false,
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
@@ -114,16 +111,13 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         // debt not repaid at all
         vm.expectRevert(CloseAccountWithNonZeroDebtException.selector);
         vm.prank(USER);
-        creditFacade.closeCreditAccount(creditAccount, USER, 1, false, MultiCallBuilder.build());
+        creditFacade.closeCreditAccount(creditAccount, MultiCallBuilder.build());
 
         // debt partially repaid
         vm.expectRevert(CloseAccountWithNonZeroDebtException.selector);
         vm.prank(USER);
         creditFacade.closeCreditAccount(
             creditAccount,
-            USER,
-            1,
-            false,
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
@@ -142,9 +136,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
 
         _prepareForWETHTest();
         vm.prank(USER);
-        creditFacade.closeCreditAccount{value: WETH_TEST_AMOUNT}(
-            creditAccount, USER, 0, false, MultiCallBuilder.build()
-        );
+        creditFacade.closeCreditAccount{value: WETH_TEST_AMOUNT}(creditAccount, MultiCallBuilder.build());
         _checkForWETHTest();
     }
 
@@ -194,13 +186,13 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         );
 
         vm.expectEmit(true, true, false, false);
-        emit CloseCreditAccount(creditAccount, USER, FRIEND);
+        emit CloseCreditAccount(creditAccount, USER);
 
         // increase block number, cause it's forbidden to close ca in the same block
         vm.roll(block.number + 1);
 
         vm.prank(USER);
-        creditFacade.closeCreditAccount(creditAccount, FRIEND, 10, false, calls);
+        creditFacade.closeCreditAccount(creditAccount, calls);
 
         assertEq0(targetMock.callData(), DUMB_CALLDATA, "Incorrect calldata");
     }
@@ -236,9 +228,6 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         vm.prank(USER);
         creditFacade.closeCreditAccount(
             creditAccount,
-            USER,
-            1,
-            false,
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
@@ -267,13 +256,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         vm.roll(block.number + 1);
 
         vm.prank(USER);
-        creditFacade.closeCreditAccount({
-            creditAccount: creditAccount,
-            to: FRIEND,
-            tokensToTransferMask: wethMask,
-            convertToETH: false,
-            calls: MultiCallBuilder.build()
-        });
+        creditFacade.closeCreditAccount({creditAccount: creditAccount, calls: MultiCallBuilder.build()});
 
         expectBalance(Tokens.WETH, creditAccount, 1);
         expectBalance(Tokens.LINK, creditAccount, LINK_EXCHANGE_AMOUNT);
@@ -292,13 +275,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         vm.roll(block.number + 1);
 
         vm.prank(USER);
-        creditFacade.closeCreditAccount({
-            creditAccount: creditAccount,
-            to: FRIEND,
-            tokensToTransferMask: wethMask,
-            convertToETH: true,
-            calls: MultiCallBuilder.build()
-        });
+        creditFacade.closeCreditAccount({creditAccount: creditAccount, calls: MultiCallBuilder.build()});
 
         expectBalance(Tokens.WETH, creditAccount, 1);
         assertEq(FRIEND.balance, WETH_EXCHANGE_AMOUNT - 2);
