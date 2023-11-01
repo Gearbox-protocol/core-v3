@@ -11,6 +11,8 @@ struct PriceFeedParams {
     bool skipCheck;
     uint8 decimals;
     bool useReserve;
+    // these parameters used in double check
+    bool trustedPriceFeed;
 }
 
 interface IPriceOracleV3Events {
@@ -33,13 +35,20 @@ interface IPriceOracleV3 is IPriceOracleBase, IPriceOracleV3Events {
     function priceFeedParams(address token)
         external
         view
-        returns (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals);
+        returns (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals, bool trustedPriceFeed);
+
+    // Reserve check\
+
+    function convertToUSDReserveCheck(uint256 amount, address token) external view returns (uint256);
+
+    /// @notice Converts `amount` of USD (with 8 decimals) into `token` amount as minimum of main and reserve price feeds
+    function convertFromUSDReserveCheck(uint256 amount, address token) external view returns (uint256);
 
     // ------------- //
     // CONFIGURATION //
     // ------------- //
 
-    function setPriceFeed(address token, address priceFeed, uint32 stalenessPeriod) external;
+    function setPriceFeed(address token, address priceFeed, uint32 stalenessPeriod, bool trustedPriceFeed) external;
 
     function setReservePriceFeed(address token, address priceFeed, uint32 stalenessPeriod) external;
 

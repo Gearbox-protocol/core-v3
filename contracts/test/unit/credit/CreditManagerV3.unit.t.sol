@@ -25,21 +25,19 @@ import {ENTERED} from "../../../traits/ReentrancyGuardTrait.sol";
 import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
 import {
     ICreditManagerV3,
-    ClosureAction,
     CollateralTokenData,
     ManageDebtAction,
     CreditAccountInfo,
     RevocationPair,
     CollateralDebtData,
     CollateralCalcTask,
-    ICreditManagerV3Events,
-    WITHDRAWAL_FLAG
+    ICreditManagerV3Events
 } from "../../../interfaces/ICreditManagerV3.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {ClaimAction, IWithdrawalManagerV3} from "../../../interfaces/IWithdrawalManagerV3.sol";
+import {IWithdrawalManagerV3} from "../../../interfaces/IWithdrawalManagerV3.sol";
 import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 
 // EXCEPTIONS
@@ -263,13 +261,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         if (task == CollateralCalcTask.DEBT_ONLY) return "DEBT_ONLY";
 
-        if (task == CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS) {
-            return "DEBT_COLLATERAL_WITHOUT_WITHDRAWALS";
-        }
-        if (task == CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS) return "DEBT_COLLATERAL_CANCEL_WITHDRAWALS";
-
-        if (task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS) {
-            return "DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS";
+        if (task == CollateralCalcTask.DEBT_COLLATERAL) {
+            return "DEBT_COLLATERAL";
         }
 
         if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) return "FULL_COLLATERAL_CHECK_LAZY";
@@ -348,17 +341,23 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.openCreditAccount(address(this));
 
-        CollateralDebtData memory collateralDebtData;
-
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.closeCreditAccount({
             creditAccount: DUMB_ADDRESS,
-            closureAction: ClosureAction.LIQUIDATE_ACCOUNT,
-            collateralDebtData: collateralDebtData,
-            payer: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
-            skipTokensMask: 0,
+            tokensToTransferMask: type(uint256).max,
             convertToETH: false
+        });
+
+        CollateralDebtData memory collateralDebtData;
+        vm.expectRevert(CallerNotCreditFacadeException.selector);
+        creditManager.liquidateCreditAccount({
+            creditAccount: DUMB_ADDRESS,
+            collateralDebtData: collateralDebtData,
+            to: DUMB_ADDRESS,
+            tokensToTransferMask: 0,
+            convertToETH: false,
+            isExpired: false
         });
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
@@ -368,16 +367,13 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.addCollateral(DUMB_ADDRESS, DUMB_ADDRESS, DUMB_ADDRESS, 100);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
-        creditManager.fullCollateralCheck(DUMB_ADDRESS, 0, new uint256[](0), 1);
+        creditManager.fullCollateralCheck(DUMB_ADDRESS, 0, new uint256[](0), 1, false);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.updateQuota(DUMB_ADDRESS, DUMB_ADDRESS, 0, 0, 0);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
-        creditManager.scheduleWithdrawal(DUMB_ADDRESS, DUMB_ADDRESS, 0);
-
-        vm.expectRevert(CallerNotCreditFacadeException.selector);
-        creditManager.claimWithdrawals(DUMB_ADDRESS, DUMB_ADDRESS, ClaimAction.CLAIM);
+        creditManager.withdraw(DUMB_ADDRESS, DUMB_ADDRESS, 0, USER);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.revokeAdapterAllowances(DUMB_ADDRESS, new RevocationPair[](0));
@@ -446,17 +442,23 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditManager.openCreditAccount(address(this));
 
-        CollateralDebtData memory collateralDebtData;
-
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditManager.closeCreditAccount({
             creditAccount: DUMB_ADDRESS,
-            closureAction: ClosureAction.LIQUIDATE_ACCOUNT,
-            collateralDebtData: collateralDebtData,
-            payer: DUMB_ADDRESS,
             to: DUMB_ADDRESS,
-            skipTokensMask: 0,
+            tokensToTransferMask: type(uint256).max,
             convertToETH: false
+        });
+
+        CollateralDebtData memory collateralDebtData;
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        creditManager.liquidateCreditAccount({
+            creditAccount: DUMB_ADDRESS,
+            collateralDebtData: collateralDebtData,
+            to: DUMB_ADDRESS,
+            tokensToTransferMask: 0,
+            convertToETH: false,
+            isExpired: false
         });
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
@@ -466,16 +468,13 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.addCollateral(DUMB_ADDRESS, DUMB_ADDRESS, DUMB_ADDRESS, 100);
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditManager.fullCollateralCheck(DUMB_ADDRESS, 0, new uint256[](0), 1);
+        creditManager.fullCollateralCheck(DUMB_ADDRESS, 0, new uint256[](0), 1, false);
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditManager.updateQuota(DUMB_ADDRESS, DUMB_ADDRESS, 0, 0, 0);
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditManager.scheduleWithdrawal(DUMB_ADDRESS, DUMB_ADDRESS, 0);
-
-        vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditManager.claimWithdrawals(DUMB_ADDRESS, DUMB_ADDRESS, ClaimAction.CLAIM);
+        creditManager.withdraw(DUMB_ADDRESS, DUMB_ADDRESS, 0, USER);
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditManager.revokeAdapterAllowances(DUMB_ADDRESS, new RevocationPair[](0));
@@ -501,542 +500,542 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
     /// @dev U:[CM-6]: open credit account works as expected
     function test_U_CM_06_open_credit_account_works_as_expected() public creditManagerTest {
-        uint256 cumulativeIndexNow = RAY * 5;
-
-        vm.roll(892323);
-        creditManager.setCollateralTokensCount(255);
-
-        poolMock.setCumulativeIndexNow(cumulativeIndexNow);
-
-        tokenTestSuite.mint(Tokens.DAI, address(poolMock), DAI_ACCOUNT_AMOUNT);
-
         assertEq(creditManager.creditAccounts().length, 0, _testCaseErr("SETUP: incorrect creditAccounts() length"));
 
-        uint128 cumulativeQuotaInterestBefore = 123412321;
-        uint256 enabledTokensMaskBefore = 231423;
+        address expectedAccount = accountFactory.usedAccount();
 
         creditManager.setCreditAccountInfoMap({
-            creditAccount: accountFactory.usedAccount(),
-            debt: 12039120,
-            cumulativeIndexLastUpdate: 23e3,
-            cumulativeQuotaInterest: cumulativeQuotaInterestBefore,
-            quotaFees: 0,
-            enabledTokensMask: enabledTokensMaskBefore,
+            creditAccount: expectedAccount,
+            debt: 0,
+            cumulativeIndexLastUpdate: 0,
+            cumulativeQuotaInterest: 12121,
+            quotaFees: 23232,
+            enabledTokensMask: 0,
             flags: 34343,
             borrower: address(0)
         });
+        creditManager.setLastDebtUpdate(expectedAccount, 123);
 
-        // todo: check why expectCall doesn't work
-        //  vm.expectCall(address(accountFactory), abi.encodeCall(IAccountFactory.takeCreditAccount, (0, 0)));
+        vm.expectCall(address(accountFactory), abi.encodeCall(accountFactory.takeCreditAccount, (0, 0)));
         address creditAccount = creditManager.openCreditAccount(USER);
-        assertEq(
-            address(creditAccount), accountFactory.usedAccount(), _testCaseErr("Incorrect credit account returned")
-        );
 
-        (
-            uint256 debt,
-            uint256 cumulativeIndexLastUpdate,
-            uint128 cumulativeQuotaInterest,
-            ,
-            uint256 enabledTokensMask,
-            uint16 flags,
-            uint64 lastDebtUpdate,
-            address borrower
-        ) = creditManager.creditAccountInfo(creditAccount);
+        assertEq(creditAccount, expectedAccount, _testCaseErr("Incorrect credit account returned"));
 
-        assertEq(debt, 0, _testCaseErr("Incorrect debt"));
-        assertEq(cumulativeIndexLastUpdate, cumulativeIndexNow, _testCaseErr("Incorrect cumulativeIndexLastUpdate"));
+        (,, uint128 cumulativeQuotaInterest, uint128 quotaFees,, uint16 flags, uint64 lastDebtUpdate, address borrower)
+        = creditManager.creditAccountInfo(creditAccount);
+
         assertEq(cumulativeQuotaInterest, 1, _testCaseErr("Incorrect cumulativeQuotaInterest"));
-        assertEq(enabledTokensMask, enabledTokensMaskBefore, _testCaseErr("Incorrect enabledTokensMask"));
-
+        assertEq(quotaFees, 0, _testCaseErr("Incorrect quotaFees"));
         assertEq(lastDebtUpdate, 0, _testCaseErr("Incorrect lastDebtUpdate"));
-
         assertEq(flags, 0, _testCaseErr("Incorrect flags"));
         assertEq(borrower, USER, _testCaseErr("Incorrect borrower"));
 
-        assertEq(creditManager.creditAccounts().length, 1, _testCaseErr("incorrect creditAccounts() length"));
-        assertEq(creditManager.creditAccounts()[0], creditAccount, _testCaseErr("incorrect creditAccounts()[0] value"));
+        assertEq(creditManager.creditAccountsLen(), 1, _testCaseErr("Incorerct creditAccounts length"));
+        assertEq(creditManager.creditAccounts()[0], creditAccount, _testCaseErr("Incorrect creditAccounts[0] value"));
     }
 
-    // //
-    // //
-    // // CLOSE CREDIT ACCOUNT
-    // //
-    // //
+    //
+    //
+    // CLOSE CREDIT ACCOUNT
+    //
+    //
 
-    /// @dev U:[CM-7]: close credit account reverts if account not exists
-    function test_U_CM_07_close_credit_account_reverts_if_account_not_exists() public creditManagerTest {
-        CollateralDebtData memory collateralDebtData;
+    /// @dev U:[CM-7]: close credit account works as expected
+    function test_U_CM_07_close_credit_account_works_as_expected() public creditManagerTest {
         address creditAccount = DUMB_ADDRESS;
 
-        vm.expectRevert(CreditAccountDoesNotExistException.selector);
-        creditManager.closeCreditAccount({
+        creditManager.setCreditAccountInfoMap({
             creditAccount: creditAccount,
-            closureAction: ClosureAction.CLOSE_ACCOUNT,
-            collateralDebtData: collateralDebtData,
-            payer: DUMB_ADDRESS,
-            to: DUMB_ADDRESS,
-            skipTokensMask: 0,
-            convertToETH: false
+            debt: 123,
+            cumulativeIndexLastUpdate: 0,
+            cumulativeQuotaInterest: 0,
+            quotaFees: 0,
+            enabledTokensMask: 0,
+            flags: 0,
+            borrower: address(0)
         });
 
-        uint64 newBlock = 12312312;
+        vm.expectRevert(CloseAccountWithNonZeroDebtException.selector);
+        creditManager.closeCreditAccount(creditAccount, address(0), 0, false);
 
-        vm.roll(newBlock);
-        creditManager.setLastDebtUpdate(creditAccount, newBlock);
-        creditManager.setBorrower(creditAccount, USER);
-
-        vm.expectRevert(DebtUpdatedTwiceInOneBlockException.selector);
-        creditManager.closeCreditAccount({
+        creditManager.addToCAList(creditAccount);
+        creditManager.setCreditAccountInfoMap({
             creditAccount: creditAccount,
-            closureAction: ClosureAction.CLOSE_ACCOUNT,
-            collateralDebtData: collateralDebtData,
-            payer: DUMB_ADDRESS,
-            to: DUMB_ADDRESS,
-            skipTokensMask: 0,
-            convertToETH: false
-        });
-    }
-
-    struct CloseCreditAccountTestCase {
-        string name;
-        ClosureAction closureAction;
-        uint256 debt;
-        uint256 accruedInterest;
-        uint256 accruedFees;
-        uint256 totalValue;
-        uint256 enabledTokensMask;
-        address[] quotedTokens;
-        uint256 underlyingBalance;
-        // EXPECTED
-        bool expectedSetLimitsToZero;
-    }
-
-    /// @dev U:[CM-8]: close credit account works as expected
-    function test_U_CM_08_close_credit_correctly_makes_payments() public withFeeTokenCase creditManagerTest {
-        uint256 debt = DAI_ACCOUNT_AMOUNT;
-
-        vm.assume(debt > 1_000);
-        vm.assume(debt < 10 ** 10 * (10 ** _decimals(underlying)));
-
-        if (isFeeToken) {
-            _setFee(debt % 50_00, debt / (debt % 49 + 1));
-        }
-
-        address[] memory hasQuotedTokens = new address[](2);
-
-        hasQuotedTokens[0] = tokenTestSuite.addressOf(Tokens.USDC);
-        hasQuotedTokens[1] = tokenTestSuite.addressOf(Tokens.LINK);
-
-        CloseCreditAccountTestCase[7] memory cases = [
-            CloseCreditAccountTestCase({
-                name: "Closure case for account with no pay from payer",
-                closureAction: ClosureAction.CLOSE_ACCOUNT,
-                debt: debt,
-                accruedInterest: 0,
-                accruedFees: 0,
-                totalValue: 0,
-                enabledTokensMask: UNDERLYING_TOKEN_MASK,
-                quotedTokens: hasQuotedTokens,
-                underlyingBalance: debt + 1,
-                // EXPECTED
-                expectedSetLimitsToZero: false
-            }),
-            CloseCreditAccountTestCase({
-                name: "Closure case for account with with charging payer",
-                closureAction: ClosureAction.CLOSE_ACCOUNT,
-                debt: debt,
-                accruedInterest: 0,
-                accruedFees: 0,
-                totalValue: 0,
-                enabledTokensMask: UNDERLYING_TOKEN_MASK,
-                quotedTokens: hasQuotedTokens,
-                underlyingBalance: debt / 2,
-                // EXPECTED
-                expectedSetLimitsToZero: false
-            }),
-            CloseCreditAccountTestCase({
-                name: "Liquidate account with profit",
-                closureAction: ClosureAction.LIQUIDATE_ACCOUNT,
-                debt: debt,
-                accruedInterest: 0,
-                accruedFees: 0,
-                totalValue: debt * 2,
-                enabledTokensMask: UNDERLYING_TOKEN_MASK,
-                quotedTokens: hasQuotedTokens,
-                underlyingBalance: debt * 2,
-                // EXPECTED
-                expectedSetLimitsToZero: false
-            }),
-            CloseCreditAccountTestCase({
-                name: "Liquidate account with profit, liquidator pays, with quotedTokens",
-                closureAction: ClosureAction.LIQUIDATE_ACCOUNT,
-                debt: debt,
-                accruedInterest: 0,
-                accruedFees: 0,
-                totalValue: _amountWithFee(debt * 100 / 95),
-                enabledTokensMask: UNDERLYING_TOKEN_MASK,
-                quotedTokens: hasQuotedTokens,
-                underlyingBalance: 0,
-                // EXPECTED
-                expectedSetLimitsToZero: false
-            }),
-            CloseCreditAccountTestCase({
-                name: "Liquidate account with loss, no quoted tokens",
-                closureAction: ClosureAction.LIQUIDATE_ACCOUNT,
-                debt: debt,
-                accruedInterest: 0,
-                accruedFees: 0,
-                totalValue: debt / 2,
-                enabledTokensMask: UNDERLYING_TOKEN_MASK,
-                quotedTokens: new address[](0),
-                underlyingBalance: debt / 2,
-                // EXPECTED
-                expectedSetLimitsToZero: false
-            }),
-            CloseCreditAccountTestCase({
-                name: "Liquidate account with loss, with quotaTokens",
-                closureAction: ClosureAction.LIQUIDATE_ACCOUNT,
-                debt: debt,
-                accruedInterest: 0,
-                accruedFees: 0,
-                totalValue: debt / 2,
-                enabledTokensMask: UNDERLYING_TOKEN_MASK,
-                quotedTokens: hasQuotedTokens,
-                underlyingBalance: debt / 2,
-                // EXPECTED
-                expectedSetLimitsToZero: true
-            }),
-            CloseCreditAccountTestCase({
-                name: "Liquidate account with loss, with quotaTokens, Liquidator pays",
-                closureAction: ClosureAction.LIQUIDATE_ACCOUNT,
-                debt: debt,
-                accruedInterest: 0,
-                accruedFees: 0,
-                totalValue: debt / 2,
-                enabledTokensMask: UNDERLYING_TOKEN_MASK,
-                quotedTokens: hasQuotedTokens,
-                underlyingBalance: 0,
-                // EXPECTED
-                expectedSetLimitsToZero: true
-            })
-        ];
-
-        address creditAccount = accountFactory.usedAccount();
-
-        creditManager.setBorrower(creditAccount, USER);
-
-        tokenTestSuite.mint({token: underlying, to: LIQUIDATOR, amount: _amountWithFee(debt * 2)});
-
-        vm.prank(LIQUIDATOR);
-        IERC20(underlying).approve({spender: address(creditManager), amount: type(uint256).max});
-
-        assertEq(accountFactory.returnedAccount(), address(0), "SETUP: returnAccount is already set");
-
-        for (uint256 i; i < cases.length; ++i) {
-            uint256 snapshot = vm.snapshot();
-
-            CloseCreditAccountTestCase memory _case = cases[i];
-
-            caseName = string.concat(caseName, _case.name);
-
-            CollateralDebtData memory collateralDebtData;
-            collateralDebtData._poolQuotaKeeper = address(poolQuotaKeeperMock);
-            collateralDebtData.debt = _case.debt;
-            collateralDebtData.accruedInterest = _case.accruedInterest;
-            collateralDebtData.accruedFees = _case.accruedFees;
-            collateralDebtData.totalValue = _case.totalValue;
-            collateralDebtData.enabledTokensMask = _case.enabledTokensMask;
-            collateralDebtData.quotedTokens = _case.quotedTokens;
-
-            /// @notice We do not test math correctness here, it could be found in lib test
-            /// We assume here, that lib is tested and provide correct results, the test checks
-            /// that te contract sends amout to correct addresses and implement another logic is need
-            uint256 amountToPool;
-            uint256 profit;
-            uint256 expectedRemainingFunds;
-            uint256 expectedLoss;
-
-            if (_case.closureAction == ClosureAction.CLOSE_ACCOUNT) {
-                (amountToPool, profit) = collateralDebtData.calcClosePayments({amountWithFeeFn: _amountWithFee});
-            } else {
-                (amountToPool, expectedRemainingFunds, profit, expectedLoss) = collateralDebtData
-                    .calcLiquidationPayments({
-                    liquidationDiscount: _case.closureAction == ClosureAction.LIQUIDATE_ACCOUNT
-                        ? PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM
-                        : PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM_EXPIRED,
-                    feeLiquidation: _case.closureAction == ClosureAction.LIQUIDATE_ACCOUNT
-                        ? DEFAULT_FEE_LIQUIDATION
-                        : DEFAULT_FEE_LIQUIDATION_EXPIRED,
-                    amountWithFeeFn: _amountWithFee,
-                    amountMinusFeeFn: _amountMinusFee
-                });
-            }
-
-            tokenTestSuite.mint(underlying, creditAccount, _case.underlyingBalance);
-
-            startTokenTrackingSession(caseName);
-
-            expectTokenTransfer({
-                reason: "debt transfer to pool",
-                token: underlying,
-                from: creditAccount,
-                to: address(poolMock),
-                amount: _amountMinusFee(amountToPool)
-            });
-
-            if (_case.underlyingBalance < amountToPool + expectedRemainingFunds + 1) {
-                expectTokenTransfer({
-                    reason: "payer to creditAccount",
-                    token: underlying,
-                    from: LIQUIDATOR,
-                    to: creditAccount,
-                    amount: amountToPool + expectedRemainingFunds - _case.underlyingBalance + 1
-                });
-            } else {
-                uint256 amount = _case.underlyingBalance - amountToPool - expectedRemainingFunds - 1;
-                if (amount > 1) {
-                    expectTokenTransfer({
-                        reason: "transfer to caller",
-                        token: underlying,
-                        from: creditAccount,
-                        to: FRIEND,
-                        amount: amount
-                    });
-                }
-            }
-
-            if (expectedRemainingFunds > 1) {
-                expectTokenTransfer({
-                    reason: "remaning funds to borrower",
-                    token: underlying,
-                    from: creditAccount,
-                    to: USER,
-                    amount: _amountMinusFee(expectedRemainingFunds)
-                });
-            }
-
-            uint256 poolBalanceBefore = IERC20(underlying).balanceOf(address(poolMock));
-
-            ///
-            /// CLOSE CREDIT ACC
-            ///
-            (uint256 remainingFunds, uint256 loss) = creditManager.closeCreditAccount({
-                creditAccount: creditAccount,
-                closureAction: _case.closureAction,
-                collateralDebtData: collateralDebtData,
-                payer: LIQUIDATOR,
-                to: FRIEND,
-                skipTokensMask: 0,
-                convertToETH: false
-            });
-
-            assertEq(poolMock.repayAmount(), collateralDebtData.debt, _testCaseErr("Incorrect repay amount"));
-            assertEq(poolMock.repayProfit(), profit, _testCaseErr("Incorrect profit"));
-            assertEq(poolMock.repayLoss(), loss, _testCaseErr("Incorrect loss"));
-
-            assertEq(remainingFunds, expectedRemainingFunds, _testCaseErr("incorrect remainingFunds"));
-
-            assertEq(loss, expectedLoss, _testCaseErr("incorrect loss"));
-
-            checkTokenTransfers({debug: false});
-
-            /// @notice Pool balance invariant keeps correct transfer to pool during closure
-
-            expectBalance({
-                token: underlying,
-                holder: address(poolMock),
-                expectedBalance: poolBalanceBefore + collateralDebtData.debt + collateralDebtData.accruedInterest + profit
-                    - loss,
-                reason: "Pool balance invariant"
-            });
-
-            (,,,,,,, address borrower) = creditManager.creditAccountInfo(creditAccount);
-            assertEq(borrower, address(0), "Borrowers wasn't cleared");
-
-            assertEq(
-                poolQuotaKeeperMock.call_creditAccount(),
-                _case.quotedTokens.length == 0 ? address(0) : creditAccount,
-                "Incorrect creditAccount call to PQK"
-            );
-
-            assertTrue(
-                poolQuotaKeeperMock.call_setLimitsToZero() == _case.expectedSetLimitsToZero, "Incorrect setLimitsToZero"
-            );
-
-            assertEq(accountFactory.returnedAccount(), creditAccount, "returnAccount wasn't called");
-
-            assertEq(creditManager.creditAccounts().length, 0, _testCaseErr("incorrect creditAccounts() length"));
-
-            vm.revertTo(snapshot);
-        }
-    }
-
-    /// @dev U:[CM-9]: close credit account works as expected
-    function test_U_CM_09_close_credit_transfers_tokens_correctly(uint256 skipTokenMask)
-        public
-        withFeeTokenCase
-        creditManagerTest
-    {
-        bool convertToEth = (skipTokenMask % 2) != 0;
-        uint8 numberOfTokens = uint8(skipTokenMask % 253);
-
-        CollateralDebtData memory collateralDebtData;
-        collateralDebtData.debt = DAI_ACCOUNT_AMOUNT;
-
-        /// @notice `+2` for underlying and WETH token
-        collateralDebtData.enabledTokensMask = getHash(skipTokenMask, 2) & ((1 << (numberOfTokens + 2)) - 1);
-
-        address creditAccount = accountFactory.usedAccount();
-
-        creditManager.setBorrower(creditAccount, USER);
-        tokenTestSuite.mint({token: underlying, to: creditAccount, amount: _amountWithFee(collateralDebtData.debt * 2)});
-
-        address weth = tokenTestSuite.addressOf(Tokens.WETH);
-
-        vm.startPrank(CONFIGURATOR);
-        creditManager.addToken(weth);
-        creditManager.setCollateralTokenData(weth, 8000, 8000, type(uint40).max, 0);
-
-        vm.stopPrank();
-
-        {
-            uint256 randomAmount = skipTokenMask % DAI_ACCOUNT_AMOUNT;
-            tokenTestSuite.mint({token: weth, to: creditAccount, amount: randomAmount});
-            _addTokensBatch({creditAccount: creditAccount, numberOfTokens: numberOfTokens, balance: randomAmount});
-        }
-
-        caseName = string.concat(caseName, "token transfer with ", Strings.toString(numberOfTokens), " on account");
-
-        startTokenTrackingSession(caseName);
-
-        uint8 len = creditManager.collateralTokensCount();
-
-        /// @notice it starts from 1, because underlying token has index 0
-        for (uint8 i = 0; i < len; ++i) {
-            uint256 tokenMask = 1 << i;
-            address token = creditManager.getTokenByMask(tokenMask);
-            uint256 balance = IERC20(token).balanceOf(creditAccount);
-
-            if (
-                (collateralDebtData.enabledTokensMask & tokenMask != 0) && (tokenMask & skipTokenMask == 0)
-                    && (balance > 1)
-            ) {
-                if (i == 0) {
-                    expectTokenTransfer({
-                        reason: "transfer underlying token ",
-                        token: underlying,
-                        from: creditAccount,
-                        to: FRIEND,
-                        amount: collateralDebtData.debt - 1
-                    });
-                } else {
-                    expectTokenTransfer({
-                        reason: string.concat("transfer token ", IERC20Metadata(token).symbol()),
-                        token: token,
-                        from: creditAccount,
-                        to: (convertToEth && token == weth) ? address(withdrawalManagerMock) : FRIEND,
-                        amount: balance - 1
-                    });
-                }
-            }
-        }
-
-        creditManager.closeCreditAccount({
-            creditAccount: creditAccount,
-            closureAction: ClosureAction.CLOSE_ACCOUNT,
-            collateralDebtData: collateralDebtData,
-            payer: USER,
-            to: FRIEND,
-            skipTokensMask: skipTokenMask,
-            convertToETH: convertToEth
+            debt: 0,
+            cumulativeIndexLastUpdate: 0,
+            cumulativeQuotaInterest: 0,
+            quotaFees: 0,
+            enabledTokensMask: 0,
+            flags: 123,
+            borrower: address(0)
         });
 
-        checkTokenTransfers({debug: true});
+        vm.expectCall(address(accountFactory), abi.encodeCall(accountFactory.returnCreditAccount, (creditAccount)));
+        creditManager.closeCreditAccount(creditAccount, address(0), 0, false);
+
+        (,,,,, uint16 flags, uint64 lastDebtUpdate, address borrower) = creditManager.creditAccountInfo(creditAccount);
+        assertEq(borrower, address(0), "borrower not cleared");
+        assertEq(lastDebtUpdate, 0, "lastDebtUpadte not cleared");
+        assertEq(flags, 0, "flags not cleared");
+
+        assertEq(creditManager.creditAccountsLen(), 0, _testCaseErr("incorrect creditAccounts length"));
     }
 
-    /// @dev U:[CM-9A]: close credit account transfers tokens correctly with zero debt
-    function test_U_CM_09A_close_credit_transfers_tokens_correctly_with_zero_debt(uint256 skipTokenMask)
-        public
-        withFeeTokenCase
-        creditManagerTest
-    {
-        bool convertToEth = (skipTokenMask % 2) != 0;
-        uint8 numberOfTokens = uint8(skipTokenMask % 253);
+    //
+    //
+    // LIQUIDATE CREDIT ACCOUNT
+    //
+    //
 
-        CollateralDebtData memory collateralDebtData;
-        collateralDebtData.debt = 0;
-
-        /// @notice `+2` for underlying and WETH token
-        collateralDebtData.enabledTokensMask = getHash(skipTokenMask, 2) & ((1 << (numberOfTokens + 2)) - 1);
-
-        address creditAccount = accountFactory.usedAccount();
-
-        creditManager.setBorrower(creditAccount, USER);
-        tokenTestSuite.mint({token: underlying, to: creditAccount, amount: DAI_ACCOUNT_AMOUNT});
-
-        address weth = tokenTestSuite.addressOf(Tokens.WETH);
-
-        vm.startPrank(CONFIGURATOR);
-        creditManager.addToken(weth);
-        creditManager.setCollateralTokenData(weth, 8000, 8000, type(uint40).max, 0);
-
-        vm.stopPrank();
-
-        {
-            uint256 randomAmount = skipTokenMask % DAI_ACCOUNT_AMOUNT;
-            tokenTestSuite.mint({token: weth, to: creditAccount, amount: randomAmount});
-            _addTokensBatch({creditAccount: creditAccount, numberOfTokens: numberOfTokens, balance: randomAmount});
-        }
-
-        caseName = string.concat(caseName, "token transfer with ", Strings.toString(numberOfTokens), " on account");
-
-        startTokenTrackingSession(caseName);
-
-        uint8 len = creditManager.collateralTokensCount();
-
-        /// @notice it starts from 1, because underlying token has index 0
-        for (uint8 i = 0; i < len; ++i) {
-            uint256 tokenMask = 1 << i;
-            address token = creditManager.getTokenByMask(tokenMask);
-            uint256 balance = IERC20(token).balanceOf(creditAccount);
-
-            if (
-                (collateralDebtData.enabledTokensMask & tokenMask != 0) && (tokenMask & skipTokenMask == 0)
-                    && (balance > 1)
-            ) {
-                if (i == 0) {
-                    expectTokenTransfer({
-                        reason: "transfer underlying token ",
-                        token: underlying,
-                        from: creditAccount,
-                        to: FRIEND,
-                        amount: _amountMinusFee(DAI_ACCOUNT_AMOUNT - 1)
-                    });
-                } else {
-                    expectTokenTransfer({
-                        reason: string.concat("transfer token ", IERC20Metadata(token).symbol()),
-                        token: token,
-                        from: creditAccount,
-                        to: (convertToEth && token == weth) ? address(withdrawalManagerMock) : FRIEND,
-                        amount: balance - 1
-                    });
-                }
-            }
-        }
-
-        creditManager.closeCreditAccount({
-            creditAccount: creditAccount,
-            closureAction: ClosureAction.CLOSE_ACCOUNT,
-            collateralDebtData: collateralDebtData,
-            payer: USER,
-            to: FRIEND,
-            skipTokensMask: skipTokenMask,
-            convertToETH: convertToEth
-        });
-
-        checkTokenTransfers({debug: true});
+    /// @dev U:[CM-8]: liquidate credit account works as expected
+    function test_U_CM_08_liquidateCreditAccount_works_as_expected() public creditManagerTest {
+        fail();
     }
+
+    /// @dev U:[CM-9]: liquidate credit account reverts on insufficient remaining funds
+    function test_U_CM_09_liquidateCreditAccount_reverts_on_insufficient_remaining_funds() public creditManagerTest {
+        fail();
+    }
+
+    // struct CloseCreditAccountTestCase {
+    //     string name;
+    //     ClosureAction closureAction;
+    //     uint256 debt;
+    //     uint256 accruedInterest;
+    //     uint256 accruedFees;
+    //     uint256 totalValue;
+    //     uint256 enabledTokensMask;
+    //     address[] quotedTokens;
+    //     uint256 underlyingBalance;
+    //     // EXPECTED
+    //     bool expectedSetLimitsToZero;
+    // }
+
+    // /// @dev U:[CM-8]: close credit account works as expected
+    // function test_U_CM_08_close_credit_correctly_makes_payments() public withFeeTokenCase creditManagerTest {
+    //     uint256 debt = DAI_ACCOUNT_AMOUNT;
+
+    //     vm.assume(debt > 1_000);
+    //     vm.assume(debt < 10 ** 10 * (10 ** _decimals(underlying)));
+
+    //     if (isFeeToken) {
+    //         _setFee(debt % 50_00, debt / (debt % 49 + 1));
+    //     }
+
+    //     address[] memory hasQuotedTokens = new address[](2);
+
+    //     hasQuotedTokens[0] = tokenTestSuite.addressOf(Tokens.USDC);
+    //     hasQuotedTokens[1] = tokenTestSuite.addressOf(Tokens.LINK);
+
+    //     CloseCreditAccountTestCase[7] memory cases = [
+    //         CloseCreditAccountTestCase({
+    //             name: "Closure case for account with no pay from payer",
+    //             closureAction: ClosureAction.CLOSE_ACCOUNT,
+    //             debt: debt,
+    //             accruedInterest: 0,
+    //             accruedFees: 0,
+    //             totalValue: 0,
+    //             enabledTokensMask: UNDERLYING_TOKEN_MASK,
+    //             quotedTokens: hasQuotedTokens,
+    //             underlyingBalance: debt + 1,
+    //             // EXPECTED
+    //             expectedSetLimitsToZero: false
+    //         }),
+    //         CloseCreditAccountTestCase({
+    //             name: "Closure case for account with with charging payer",
+    //             closureAction: ClosureAction.CLOSE_ACCOUNT,
+    //             debt: debt,
+    //             accruedInterest: 0,
+    //             accruedFees: 0,
+    //             totalValue: 0,
+    //             enabledTokensMask: UNDERLYING_TOKEN_MASK,
+    //             quotedTokens: hasQuotedTokens,
+    //             underlyingBalance: debt / 2,
+    //             // EXPECTED
+    //             expectedSetLimitsToZero: false
+    //         }),
+    //         CloseCreditAccountTestCase({
+    //             name: "Liquidate account with profit",
+    //             closureAction: ClosureAction.LIQUIDATE_ACCOUNT,
+    //             debt: debt,
+    //             accruedInterest: 0,
+    //             accruedFees: 0,
+    //             totalValue: debt * 2,
+    //             enabledTokensMask: UNDERLYING_TOKEN_MASK,
+    //             quotedTokens: hasQuotedTokens,
+    //             underlyingBalance: debt * 2,
+    //             // EXPECTED
+    //             expectedSetLimitsToZero: false
+    //         }),
+    //         CloseCreditAccountTestCase({
+    //             name: "Liquidate account with profit, liquidator pays, with quotedTokens",
+    //             closureAction: ClosureAction.LIQUIDATE_ACCOUNT,
+    //             debt: debt,
+    //             accruedInterest: 0,
+    //             accruedFees: 0,
+    //             totalValue: _amountWithFee(debt * 100 / 95),
+    //             enabledTokensMask: UNDERLYING_TOKEN_MASK,
+    //             quotedTokens: hasQuotedTokens,
+    //             underlyingBalance: 0,
+    //             // EXPECTED
+    //             expectedSetLimitsToZero: false
+    //         }),
+    //         CloseCreditAccountTestCase({
+    //             name: "Liquidate account with loss, no quoted tokens",
+    //             closureAction: ClosureAction.LIQUIDATE_ACCOUNT,
+    //             debt: debt,
+    //             accruedInterest: 0,
+    //             accruedFees: 0,
+    //             totalValue: debt / 2,
+    //             enabledTokensMask: UNDERLYING_TOKEN_MASK,
+    //             quotedTokens: new address[](0),
+    //             underlyingBalance: debt / 2,
+    //             // EXPECTED
+    //             expectedSetLimitsToZero: false
+    //         }),
+    //         CloseCreditAccountTestCase({
+    //             name: "Liquidate account with loss, with quotaTokens",
+    //             closureAction: ClosureAction.LIQUIDATE_ACCOUNT,
+    //             debt: debt,
+    //             accruedInterest: 0,
+    //             accruedFees: 0,
+    //             totalValue: debt / 2,
+    //             enabledTokensMask: UNDERLYING_TOKEN_MASK,
+    //             quotedTokens: hasQuotedTokens,
+    //             underlyingBalance: debt / 2,
+    //             // EXPECTED
+    //             expectedSetLimitsToZero: true
+    //         }),
+    //         CloseCreditAccountTestCase({
+    //             name: "Liquidate account with loss, with quotaTokens, Liquidator pays",
+    //             closureAction: ClosureAction.LIQUIDATE_ACCOUNT,
+    //             debt: debt,
+    //             accruedInterest: 0,
+    //             accruedFees: 0,
+    //             totalValue: debt / 2,
+    //             enabledTokensMask: UNDERLYING_TOKEN_MASK,
+    //             quotedTokens: hasQuotedTokens,
+    //             underlyingBalance: 0,
+    //             // EXPECTED
+    //             expectedSetLimitsToZero: true
+    //         })
+    //     ];
+
+    //     address creditAccount = accountFactory.usedAccount();
+
+    //     creditManager.setBorrower(creditAccount, USER);
+
+    //     tokenTestSuite.mint({token: underlying, to: LIQUIDATOR, amount: _amountWithFee(debt * 2)});
+
+    //     vm.prank(LIQUIDATOR);
+    //     IERC20(underlying).approve({spender: address(creditManager), amount: type(uint256).max});
+
+    //     assertEq(accountFactory.returnedAccount(), address(0), "SETUP: returnAccount is already set");
+
+    //     for (uint256 i; i < cases.length; ++i) {
+    //         uint256 snapshot = vm.snapshot();
+
+    //         CloseCreditAccountTestCase memory _case = cases[i];
+
+    //         caseName = string.concat(caseName, _case.name);
+
+    //         CollateralDebtData memory collateralDebtData;
+    //         collateralDebtData._poolQuotaKeeper = address(poolQuotaKeeperMock);
+    //         collateralDebtData.debt = _case.debt;
+    //         collateralDebtData.accruedInterest = _case.accruedInterest;
+    //         collateralDebtData.accruedFees = _case.accruedFees;
+    //         collateralDebtData.totalValue = _case.totalValue;
+    //         collateralDebtData.enabledTokensMask = _case.enabledTokensMask;
+    //         collateralDebtData.quotedTokens = _case.quotedTokens;
+
+    //         /// @notice We do not test math correctness here, it could be found in lib test
+    //         /// We assume here, that lib is tested and provide correct results, the test checks
+    //         /// that te contract sends amout to correct addresses and implement another logic is need
+    //         uint256 amountToPool;
+    //         uint256 profit;
+    //         uint256 expectedRemainingFunds;
+    //         uint256 expectedLoss;
+
+    //         if (_case.closureAction == ClosureAction.CLOSE_ACCOUNT) {
+    //             (amountToPool, profit) = collateralDebtData.calcClosePayments({amountWithFeeFn: _amountWithFee});
+    //         } else {
+    //             (amountToPool, expectedRemainingFunds, profit, expectedLoss) = collateralDebtData
+    //                 .calcLiquidationPayments({
+    //                 liquidationDiscount: _case.closureAction == ClosureAction.LIQUIDATE_ACCOUNT
+    //                     ? PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM
+    //                     : PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM_EXPIRED,
+    //                 feeLiquidation: _case.closureAction == ClosureAction.LIQUIDATE_ACCOUNT
+    //                     ? DEFAULT_FEE_LIQUIDATION
+    //                     : DEFAULT_FEE_LIQUIDATION_EXPIRED,
+    //                 amountWithFeeFn: _amountWithFee,
+    //                 amountMinusFeeFn: _amountMinusFee
+    //             });
+    //         }
+
+    //         tokenTestSuite.mint(underlying, creditAccount, _case.underlyingBalance);
+
+    //         startTokenTrackingSession(caseName);
+
+    //         expectTokenTransfer({
+    //             reason: "debt transfer to pool",
+    //             token: underlying,
+    //             from: creditAccount,
+    //             to: address(poolMock),
+    //             amount: _amountMinusFee(amountToPool)
+    //         });
+
+    //         if (_case.underlyingBalance < amountToPool + expectedRemainingFunds + 1) {
+    //             expectTokenTransfer({
+    //                 reason: "payer to creditAccount",
+    //                 token: underlying,
+    //                 from: LIQUIDATOR,
+    //                 to: creditAccount,
+    //                 amount: amountToPool + expectedRemainingFunds - _case.underlyingBalance + 1
+    //             });
+    //         } else {
+    //             uint256 amount = _case.underlyingBalance - amountToPool - expectedRemainingFunds - 1;
+    //             if (amount > 1) {
+    //                 expectTokenTransfer({
+    //                     reason: "transfer to caller",
+    //                     token: underlying,
+    //                     from: creditAccount,
+    //                     to: FRIEND,
+    //                     amount: amount
+    //                 });
+    //             }
+    //         }
+
+    //         if (expectedRemainingFunds > 1) {
+    //             expectTokenTransfer({
+    //                 reason: "remaning funds to borrower",
+    //                 token: underlying,
+    //                 from: creditAccount,
+    //                 to: USER,
+    //                 amount: _amountMinusFee(expectedRemainingFunds)
+    //             });
+    //         }
+
+    //         uint256 poolBalanceBefore = IERC20(underlying).balanceOf(address(poolMock));
+
+    //         ///
+    //         /// CLOSE CREDIT ACC
+    //         ///
+    //         (uint256 remainingFunds, uint256 loss) = creditManager.closeCreditAccount({
+    //             creditAccount: creditAccount,
+    //             closureAction: _case.closureAction,
+    //             collateralDebtData: collateralDebtData,
+    //             payer: LIQUIDATOR,
+    //             to: FRIEND,
+    //             skipTokensMask: 0,
+    //             convertToETH: false
+    //         });
+
+    //         assertEq(poolMock.repayAmount(), collateralDebtData.debt, _testCaseErr("Incorrect repay amount"));
+    //         assertEq(poolMock.repayProfit(), profit, _testCaseErr("Incorrect profit"));
+    //         assertEq(poolMock.repayLoss(), loss, _testCaseErr("Incorrect loss"));
+
+    //         assertEq(remainingFunds, expectedRemainingFunds, _testCaseErr("incorrect remainingFunds"));
+
+    //         assertEq(loss, expectedLoss, _testCaseErr("incorrect loss"));
+
+    //         checkTokenTransfers({debug: false});
+
+    //         /// @notice Pool balance invariant keeps correct transfer to pool during closure
+
+    //         expectBalance({
+    //             token: underlying,
+    //             holder: address(poolMock),
+    //             expectedBalance: poolBalanceBefore + collateralDebtData.debt + collateralDebtData.accruedInterest + profit
+    //                 - loss,
+    //             reason: "Pool balance invariant"
+    //         });
+
+    //         (,,,,,,, address borrower) = creditManager.creditAccountInfo(creditAccount);
+    //         assertEq(borrower, address(0), "Borrowers wasn't cleared");
+
+    //         assertEq(
+    //             poolQuotaKeeperMock.call_creditAccount(),
+    //             _case.quotedTokens.length == 0 ? address(0) : creditAccount,
+    //             "Incorrect creditAccount call to PQK"
+    //         );
+
+    //         assertTrue(
+    //             poolQuotaKeeperMock.call_setLimitsToZero() == _case.expectedSetLimitsToZero, "Incorrect setLimitsToZero"
+    //         );
+
+    //         assertEq(accountFactory.returnedAccount(), creditAccount, "returnAccount wasn't called");
+
+    //         assertEq(creditManager.creditAccounts().length, 0, _testCaseErr("incorrect creditAccounts() length"));
+
+    //         vm.revertTo(snapshot);
+    //     }
+    // }
+
+    // /// @dev U:[CM-9]: close credit account works as expected
+    // function test_U_CM_09_close_credit_transfers_tokens_correctly(uint256 skipTokensMask)
+    //     public
+    //     withFeeTokenCase
+    //     creditManagerTest
+    // {
+    //     bool convertToEth = (skipTokensMask % 2) != 0;
+    //     uint8 numberOfTokens = uint8(skipTokensMask % 253);
+
+    //     CollateralDebtData memory collateralDebtData;
+    //     collateralDebtData.debt = DAI_ACCOUNT_AMOUNT;
+
+    //     /// @notice `+2` for underlying and WETH token
+    //     collateralDebtData.enabledTokensMask = getHash(skipTokensMask, 2) & ((1 << (numberOfTokens + 2)) - 1);
+
+    //     address creditAccount = accountFactory.usedAccount();
+
+    //     creditManager.setBorrower(creditAccount, USER);
+    //     tokenTestSuite.mint({token: underlying, to: creditAccount, amount: _amountWithFee(collateralDebtData.debt * 2)});
+
+    //     address weth = tokenTestSuite.addressOf(Tokens.WETH);
+
+    //     vm.startPrank(CONFIGURATOR);
+    //     creditManager.addToken(weth);
+    //     creditManager.setCollateralTokenData(weth, 8000, 8000, type(uint40).max, 0);
+
+    //     vm.stopPrank();
+
+    //     {
+    //         uint256 randomAmount = skipTokensMask % DAI_ACCOUNT_AMOUNT;
+    //         tokenTestSuite.mint({token: weth, to: creditAccount, amount: randomAmount});
+    //         _addTokensBatch({creditAccount: creditAccount, numberOfTokens: numberOfTokens, balance: randomAmount});
+    //     }
+
+    //     caseName = string.concat(caseName, "token transfer with ", Strings.toString(numberOfTokens), " on account");
+
+    //     startTokenTrackingSession(caseName);
+
+    //     uint8 len = creditManager.collateralTokensCount();
+
+    //     /// @notice it starts from 1, because underlying token has index 0
+    //     for (uint8 i = 0; i < len; ++i) {
+    //         uint256 tokenMask = 1 << i;
+    //         address token = creditManager.getTokenByMask(tokenMask);
+    //         uint256 balance = IERC20(token).balanceOf(creditAccount);
+
+    //         if (
+    //             (collateralDebtData.enabledTokensMask & tokenMask != 0) && (tokenMask & skipTokensMask == 0)
+    //                 && (balance > 1)
+    //         ) {
+    //             if (i == 0) {
+    //                 expectTokenTransfer({
+    //                     reason: "transfer underlying token ",
+    //                     token: underlying,
+    //                     from: creditAccount,
+    //                     to: FRIEND,
+    //                     amount: collateralDebtData.debt - 1
+    //                 });
+    //             } else {
+    //                 expectTokenTransfer({
+    //                     reason: string.concat("transfer token ", IERC20Metadata(token).symbol()),
+    //                     token: token,
+    //                     from: creditAccount,
+    //                     to: (convertToEth && token == weth) ? address(withdrawalManagerMock) : FRIEND,
+    //                     amount: balance - 1
+    //                 });
+    //             }
+    //         }
+    //     }
+
+    //     creditManager.closeCreditAccount({
+    //         creditAccount: creditAccount,
+    //         closureAction: ClosureAction.CLOSE_ACCOUNT,
+    //         collateralDebtData: collateralDebtData,
+    //         payer: USER,
+    //         to: FRIEND,
+    //         skipTokensMask: skipTokensMask,
+    //         convertToETH: convertToEth
+    //     });
+
+    //     checkTokenTransfers({debug: true});
+    // }
+
+    // /// @dev U:[CM-9A]: close credit account transfers tokens correctly with zero debt
+    // function test_U_CM_09A_close_credit_transfers_tokens_correctly_with_zero_debt(uint256 skipTokensMask)
+    //     public
+    //     withFeeTokenCase
+    //     creditManagerTest
+    // {
+    //     bool convertToEth = (skipTokensMask % 2) != 0;
+    //     uint8 numberOfTokens = uint8(skipTokensMask % 253);
+
+    //     CollateralDebtData memory collateralDebtData;
+    //     collateralDebtData.debt = 0;
+
+    //     /// @notice `+2` for underlying and WETH token
+    //     collateralDebtData.enabledTokensMask = getHash(skipTokensMask, 2) & ((1 << (numberOfTokens + 2)) - 1);
+
+    //     address creditAccount = accountFactory.usedAccount();
+
+    //     creditManager.setBorrower(creditAccount, USER);
+    //     tokenTestSuite.mint({token: underlying, to: creditAccount, amount: DAI_ACCOUNT_AMOUNT});
+
+    //     address weth = tokenTestSuite.addressOf(Tokens.WETH);
+
+    //     vm.startPrank(CONFIGURATOR);
+    //     creditManager.addToken(weth);
+    //     creditManager.setCollateralTokenData(weth, 8000, 8000, type(uint40).max, 0);
+
+    //     vm.stopPrank();
+
+    //     {
+    //         uint256 randomAmount = skipTokensMask % DAI_ACCOUNT_AMOUNT;
+    //         tokenTestSuite.mint({token: weth, to: creditAccount, amount: randomAmount});
+    //         _addTokensBatch({creditAccount: creditAccount, numberOfTokens: numberOfTokens, balance: randomAmount});
+    //     }
+
+    //     caseName = string.concat(caseName, "token transfer with ", Strings.toString(numberOfTokens), " on account");
+
+    //     startTokenTrackingSession(caseName);
+
+    //     uint8 len = creditManager.collateralTokensCount();
+
+    //     /// @notice it starts from 1, because underlying token has index 0
+    //     for (uint8 i = 0; i < len; ++i) {
+    //         uint256 tokenMask = 1 << i;
+    //         address token = creditManager.getTokenByMask(tokenMask);
+    //         uint256 balance = IERC20(token).balanceOf(creditAccount);
+
+    //         if (
+    //             (collateralDebtData.enabledTokensMask & tokenMask != 0) && (tokenMask & skipTokensMask == 0)
+    //                 && (balance > 1)
+    //         ) {
+    //             if (i == 0) {
+    //                 expectTokenTransfer({
+    //                     reason: "transfer underlying token ",
+    //                     token: underlying,
+    //                     from: creditAccount,
+    //                     to: FRIEND,
+    //                     amount: _amountMinusFee(DAI_ACCOUNT_AMOUNT - 1)
+    //                 });
+    //             } else {
+    //                 expectTokenTransfer({
+    //                     reason: string.concat("transfer token ", IERC20Metadata(token).symbol()),
+    //                     token: token,
+    //                     from: creditAccount,
+    //                     to: (convertToEth && token == weth) ? address(withdrawalManagerMock) : FRIEND,
+    //                     amount: balance - 1
+    //                 });
+    //             }
+    //         }
+    //     }
+
+    //     creditManager.closeCreditAccount({
+    //         creditAccount: creditAccount,
+    //         closureAction: ClosureAction.CLOSE_ACCOUNT,
+    //         collateralDebtData: collateralDebtData,
+    //         payer: USER,
+    //         to: FRIEND,
+    //         skipTokensMask: skipTokensMask,
+    //         convertToETH: convertToEth
+    //     });
+
+    //     checkTokenTransfers({debug: true});
+    // }
 
     //
     //
@@ -1419,107 +1418,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         assertEq(tokensToDisable, amount != 0 ? UNDERLYING_TOKEN_MASK : 0, _testCaseErr("Incorrect tokensToDisable"));
     }
 
-    /// @dev U:[CM-11B]: manageDebt with full repayment is equivalent to closeCreditAccount
-    function test_U_CM_11B_manageDebt_full_repayment_equivalent_to_close_credit_account(uint256 _amount)
-        public
-        withFeeTokenCase
-        creditManagerTest
-    {
-        vm.assume(_amount < 10 ** 10 * (10 ** _decimals(underlying)));
-        vm.assume(_amount > 1);
-
-        /// @notice for stack optimisation
-        uint256 amount = _amount;
-
-        address creditAccount = accountFactory.usedAccount();
-
-        CollateralDebtData memory collateralDebtData;
-
-        collateralDebtData.debt = amount * (amount % 5 + 1);
-        collateralDebtData.cumulativeIndexNow = RAY * (10 + amount % 5) / 10;
-        collateralDebtData.cumulativeIndexLastUpdate = RAY;
-
-        collateralDebtData.accruedInterest = CreditLogic.calcAccruedInterest(
-            collateralDebtData.debt, collateralDebtData.cumulativeIndexLastUpdate, collateralDebtData.cumulativeIndexNow
-        );
-
-        collateralDebtData.cumulativeQuotaInterest = uint128(amount / (amount % 5 + 1));
-        collateralDebtData.accruedInterest += collateralDebtData.cumulativeQuotaInterest;
-
-        /// Quota fees
-        collateralDebtData.accruedFees += amount / (amount % 10 + 1);
-
-        {
-            (uint16 feeInterest,,,,) = creditManager.fees();
-
-            collateralDebtData.accruedFees += (collateralDebtData.accruedInterest * feeInterest) / PERCENTAGE_FACTOR;
-        }
-
-        poolMock.setCumulativeIndexNow(collateralDebtData.cumulativeIndexNow);
-
-        uint256 initialCQI = collateralDebtData.cumulativeQuotaInterest + 1;
-        creditManager
-            /// @notice enabledTokensMask is read directly from function parameters, not from this function
-            .setCreditAccountInfoMap({
-            creditAccount: creditAccount,
-            debt: collateralDebtData.debt,
-            cumulativeIndexLastUpdate: collateralDebtData.cumulativeIndexLastUpdate,
-            cumulativeQuotaInterest: uint128(initialCQI),
-            quotaFees: uint128(amount / (amount % 10 + 1)),
-            enabledTokensMask: 0,
-            flags: 0,
-            borrower: USER
-        });
-
-        {
-            uint256 amountOnAccount = _amountWithFee(collateralDebtData.calcTotalDebt()) + 1;
-            tokenTestSuite.mint(underlying, creditAccount, amountOnAccount);
-        }
-
-        for (uint256 caseId = 0; caseId <= 1; ++caseId) {
-            uint256 ss = vm.snapshot();
-
-            caseName = string.concat(caseName, caseId == 0 ? "full repayment" : "close account");
-
-            startTokenTrackingSession(caseName);
-
-            expectTokenTransfer({
-                reason: "transfer from user to pool",
-                token: underlying,
-                from: creditAccount,
-                to: address(poolMock),
-                amount: collateralDebtData.calcTotalDebt()
-            });
-
-            if (caseId == 0) {
-                creditManager.manageDebt({
-                    creditAccount: creditAccount,
-                    amount: type(uint256).max,
-                    enabledTokensMask: 0,
-                    action: ManageDebtAction.DECREASE_DEBT
-                });
-            } else {
-                creditManager.closeCreditAccount({
-                    creditAccount: creditAccount,
-                    closureAction: ClosureAction.CLOSE_ACCOUNT,
-                    collateralDebtData: collateralDebtData,
-                    payer: USER,
-                    to: USER,
-                    skipTokensMask: 0,
-                    convertToETH: false
-                });
-            }
-
-            checkTokenTransfers({debug: false});
-
-            assertEq(poolMock.repayAmount(), collateralDebtData.debt, _testCaseErr("Incorrect repay amount"));
-            assertEq(poolMock.repayProfit(), collateralDebtData.accruedFees, _testCaseErr("Incorrect repay profit"));
-            assertEq(poolMock.repayLoss(), 0, _testCaseErr("Incorrect repay loss"));
-
-            vm.revertTo(ss);
-        }
-    }
-
     /// @dev U:[CM-11C]: manageDebt reverts on full repayment with non-zero quotas
     function test_U_CM_11C_manageDebt_reverts_on_full_repayment_with_quotas()
         public
@@ -1808,7 +1706,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             creditAccount: DUMB_ADDRESS,
             enabledTokensMask: 0,
             collateralHints: new uint256[](0),
-            minHealthFactor: PERCENTAGE_FACTOR - 1
+            minHealthFactor: PERCENTAGE_FACTOR - 1,
+            reservePriceFeedCheck: false
         });
 
         uint256[] memory collateralHints = new uint256[](1);
@@ -1817,7 +1716,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             creditAccount: DUMB_ADDRESS,
             enabledTokensMask: 0,
             collateralHints: collateralHints,
-            minHealthFactor: PERCENTAGE_FACTOR
+            minHealthFactor: PERCENTAGE_FACTOR,
+            reservePriceFeedCheck: false
         });
 
         collateralHints[0] = 3;
@@ -1826,7 +1726,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             creditAccount: DUMB_ADDRESS,
             enabledTokensMask: 0,
             collateralHints: collateralHints,
-            minHealthFactor: PERCENTAGE_FACTOR
+            minHealthFactor: PERCENTAGE_FACTOR,
+            reservePriceFeedCheck: false
         });
     }
 
@@ -1868,7 +1769,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
 
         CollateralDebtData memory collateralDebtData =
-            creditManager.calcDebtAndCollateralFC(creditAccount, CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS);
+            creditManager.calcDebtAndCollateralFC(creditAccount, CollateralCalcTask.DEBT_COLLATERAL);
 
         /// @notice fuzzler could find a combination which enabled tokens with zero balances,
         /// which cause to twvUSD == 0 and arithmetic errr later
@@ -1888,7 +1789,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             creditAccount: creditAccount,
             enabledTokensMask: enabledTokensMask,
             collateralHints: new uint256[](0),
-            minHealthFactor: PERCENTAGE_FACTOR
+            minHealthFactor: PERCENTAGE_FACTOR,
+            reservePriceFeedCheck: false
         });
 
         assertTrue(
@@ -1925,7 +1827,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             creditAccount: creditAccount,
             enabledTokensMask: enabledTokensMask,
             collateralHints: new uint256[](0),
-            minHealthFactor: PERCENTAGE_FACTOR
+            minHealthFactor: PERCENTAGE_FACTOR,
+            reservePriceFeedCheck: false
         });
 
         uint256 enabledTokensMaskAfter = creditManager.enabledTokensMaskOf(creditAccount);
@@ -1973,7 +1876,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
 
         CollateralDebtData memory collateralDebtData =
-            creditManager.calcDebtAndCollateralFC(creditAccount, CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS);
+            creditManager.calcDebtAndCollateralFC(creditAccount, CollateralCalcTask.DEBT_COLLATERAL);
 
         /// @notice fuzzler could find a combination which enabled tokens with zero balances,
         /// which cause to twvUSD == 0 and arithmetic errr later
@@ -1995,7 +1898,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             creditAccount: creditAccount,
             enabledTokensMask: enabledTokensMask,
             collateralHints: new uint256[](0),
-            minHealthFactor: PERCENTAGE_FACTOR
+            minHealthFactor: PERCENTAGE_FACTOR,
+            reservePriceFeedCheck: false
         });
 
         uint256 enabledTokensMaskAfter = creditManager.enabledTokensMaskOf(creditAccount);
@@ -2270,11 +2174,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         address creditAccount = DUMB_ADDRESS;
 
-        CollateralCalcTask[3] memory tasks = [
-            CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS,
-            CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS,
-            CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
-        ];
+        CollateralCalcTask[1] memory tasks = [CollateralCalcTask.DEBT_COLLATERAL];
 
         for (uint256 taskIndex = 0; taskIndex < 1; ++taskIndex) {
             caseName = string.concat(caseName, _taskName(tasks[taskIndex]));
@@ -2361,61 +2261,14 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 cumulativeQuotaInterest: uint128(vars.get("INITIAL_INTEREST") + 1),
                 quotaFees: 0,
                 enabledTokensMask: UNDERLYING_TOKEN_MASK,
-                flags: setFlag ? WITHDRAWAL_FLAG : 0,
+                flags: 0,
                 borrower: USER
             });
 
-            withdrawalManagerMock.setCancellableWithdrawals(
-                false, tokenTestSuite.addressOf(Tokens.LINK), amount1, tokenTestSuite.addressOf(Tokens.STETH), amount2
-            );
-
-            withdrawalManagerMock.setCancellableWithdrawals(
-                true, tokenTestSuite.addressOf(Tokens.USDC), amount1, tokenTestSuite.addressOf(Tokens.DAI), amount2
-            );
-
             CollateralDebtData memory collateralDebtData = creditManager.calcDebtAndCollateral({
                 creditAccount: creditAccount,
-                task: CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS
+                task: CollateralCalcTask.DEBT_COLLATERAL
             });
-
-            CollateralDebtData memory collateralDebtDataNormal = creditManager.calcDebtAndCollateral({
-                creditAccount: creditAccount,
-                task: CollateralCalcTask.DEBT_COLLATERAL_CANCEL_WITHDRAWALS
-            });
-
-            CollateralDebtData memory collateralDebtDataForced = creditManager.calcDebtAndCollateral({
-                creditAccount: creditAccount,
-                task: CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
-            });
-
-            assertEq(
-                collateralDebtDataNormal.totalValueUSD - collateralDebtData.totalValueUSD,
-                setFlag ? amount1 * vars.get("LINK_PRICE") + amount2 * vars.get("STETH_PRICE") : 0,
-                _testCaseErr("Incorrect totalValueUSD normal case")
-            );
-
-            assertEq(
-                collateralDebtDataForced.totalValueUSD - collateralDebtData.totalValueUSD,
-                setFlag ? amount1 * vars.get("USDC_PRICE") + amount2 * vars.get("UNDERLYING_PRICE") : 0,
-                _testCaseErr("Incorrect totalValueUSD force case")
-            );
-
-            assertEq(
-                collateralDebtDataNormal.totalValue - collateralDebtData.totalValue,
-                setFlag
-                    ? (amount1 * vars.get("LINK_PRICE") + amount2 * vars.get("STETH_PRICE")) / vars.get("UNDERLYING_PRICE")
-                    : 0,
-                _testCaseErr("Incorrect totalValue normal case")
-            );
-
-            assertEq(
-                collateralDebtDataForced.totalValue - collateralDebtData.totalValue,
-                setFlag
-                    ? (amount1 * vars.get("USDC_PRICE") + amount2 * vars.get("UNDERLYING_PRICE"))
-                        / vars.get("UNDERLYING_PRICE")
-                    : 0,
-                _testCaseErr("Incorrect totalValue force case")
-            );
         }
     }
 
@@ -2613,30 +2466,24 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     // SCHEDULE WITHDRAWAL
     //
 
-    /// @dev U:[CM-26]: scheduleWithdrawal reverts for unknown token
+    /// @dev U:[CM-26]: withdraw reverts for unknown token
     function test_U_CM_26_scheduleWithdrawal_reverts_for_unknown_token() public creditManagerTest {
         address creditAccount = DUMB_ADDRESS;
         address linkToken = tokenTestSuite.addressOf(Tokens.LINK);
         /// @notice check that it reverts on unknown token
         vm.expectRevert(TokenNotAllowedException.selector);
-        creditManager.scheduleWithdrawal({creditAccount: creditAccount, token: linkToken, amount: 20000});
+        creditManager.withdraw({creditAccount: creditAccount, token: linkToken, amount: 20000, to: USER});
     }
 
-    /// @dev U:[CM-27]: scheduleWithdrawal transfers token if delay == 0
-    function test_U_CM_27_scheduleWithdrawal_transfers_token_if_delay_is_zero()
-        public
-        withFeeTokenCase
-        creditManagerTest
-    {
+    /// @dev U:[CM-27]: withdraw transfers token
+    function test_U_CM_27_withdraw_transfers_token() public withFeeTokenCase creditManagerTest {
         address creditAccount = address(new CreditAccountMock());
-
-        withdrawalManagerMock.setDelay(0);
 
         tokenTestSuite.mint(underlying, creditAccount, DAI_ACCOUNT_AMOUNT);
 
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
         (uint256 tokensToDisable) =
-            creditManager.scheduleWithdrawal({creditAccount: creditAccount, token: underlying, amount: 20_000});
+            creditManager.withdraw({creditAccount: creditAccount, token: underlying, amount: 20_000, to: USER});
 
         creditManager.setBorrower({creditAccount: creditAccount, borrower: USER});
 
@@ -2652,7 +2499,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
 
         (tokensToDisable) =
-            creditManager.scheduleWithdrawal({creditAccount: creditAccount, token: underlying, amount: 20_000});
+            creditManager.withdraw({creditAccount: creditAccount, token: underlying, amount: 20_000, to: USER});
 
         checkTokenTransfers({debug: false});
 
@@ -2674,172 +2521,11 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
 
         (tokensToDisable) =
-            creditManager.scheduleWithdrawal({creditAccount: creditAccount, token: underlying, amount: amount});
+            creditManager.withdraw({creditAccount: creditAccount, token: underlying, amount: amount, to: USER});
 
         checkTokenTransfers({debug: false});
 
         assertEq(tokensToDisable, UNDERLYING_TOKEN_MASK, _testCaseErr("Incorrect token to disable"));
-    }
-
-    /// @dev U:[CM-28]: scheduleWithdrawal works correctly if delay != 0
-    function test_U_CM_28_scheduleWithdrawal_works_correctly_if_delay_not_eq_zero()
-        public
-        withFeeTokenCase
-        creditManagerTest
-    {
-        address creditAccount = address(new CreditAccountMock());
-
-        withdrawalManagerMock.setDelay(uint40(3 days));
-
-        tokenTestSuite.mint(underlying, creditAccount, DAI_ACCOUNT_AMOUNT);
-
-        creditManager.setBorrower({creditAccount: creditAccount, borrower: USER});
-
-        string memory caseNameBak = string.concat(caseName, "a part of funds");
-        startTokenTrackingSession(caseName);
-
-        uint256 amountDelivered = _amountMinusFee(20_000);
-
-        expectTokenTransfer({
-            reason: "direct transfer to withdrawal manager",
-            token: underlying,
-            from: creditAccount,
-            to: address(withdrawalManagerMock),
-            amount: amountDelivered
-        });
-
-        vm.expectCall(
-            address(withdrawalManagerMock),
-            abi.encodeCall(IWithdrawalManagerV3.addScheduledWithdrawal, (creditAccount, underlying, amountDelivered, 0))
-        );
-
-        (uint256 tokensToDisable) =
-            creditManager.scheduleWithdrawal({creditAccount: creditAccount, token: underlying, amount: 20_000});
-
-        checkTokenTransfers({debug: false});
-
-        assertEq(tokensToDisable, 0, _testCaseErr("Incorrect token to disable"));
-
-        // KEEP 1 CASE DISABLES TOKEN
-
-        caseName = string.concat(caseNameBak, " keep 1 token");
-        uint256 amount = IERC20(underlying).balanceOf(creditAccount) - 1;
-
-        (tokensToDisable) =
-            creditManager.scheduleWithdrawal({creditAccount: creditAccount, token: underlying, amount: amount});
-
-        assertEq(tokensToDisable, UNDERLYING_TOKEN_MASK, _testCaseErr("Incorrect token to disable"));
-    }
-
-    /// @dev U:[CM-29]: claimWithdrawals works correctly
-    function test_U_CM_29_claimWithdrawals_works_correctly() public creditManagerTest {
-        address creditAccount = DUMB_ADDRESS;
-
-        uint256 tokenMask = 5 << 1;
-
-        /// @notice it does nothing if flag is not set
-        creditManager.setFlagFor(creditAccount, WITHDRAWAL_FLAG, false);
-        creditManager.claimWithdrawals(creditAccount, FRIEND, ClaimAction.CLAIM);
-
-        assertTrue(
-            !withdrawalManagerMock.claimScheduledWithdrawalsWasCalled(), "Unexpected call to claimScheduledWithdrawals"
-        );
-
-        string memory caseNameBak = caseName;
-
-        for (uint256 i = 0; i < 2; ++i) {
-            creditManager.setFlagFor(creditAccount, WITHDRAWAL_FLAG, true);
-
-            bool hasScheduled = i == 1;
-
-            caseName = string.concat(caseNameBak, "hasScheduled = ", hasScheduled ? "true" : "false");
-
-            withdrawalManagerMock.setClaimScheduledWithdrawals(hasScheduled, tokenMask);
-            (uint256 tokensToEnable) = creditManager.claimWithdrawals(creditAccount, FRIEND, ClaimAction.CLAIM);
-
-            assertTrue(
-                creditManager.hasWithdrawals(creditAccount) == hasScheduled,
-                _testCaseErr("Incorrect WITHDRAWALS FLAG setting")
-            );
-            assertEq(tokensToEnable, tokenMask, _testCaseErr("Incorrect tokensToEnable"));
-        }
-    }
-
-    struct getCancellableWithdrawalsValueTestCase {
-        string name;
-        uint256 amount1;
-        uint256 amount2;
-        uint256 expectedTotalValueUSD;
-    }
-
-    /// @dev U:[CM-30]: _getCancellableWithdrawalsValue works correctly
-    function test_U_CM_30_getCancellableWithdrawalsValue_works_correctly() public creditManagerTest {
-        priceOracleMock.setPrice(tokenTestSuite.addressOf(Tokens.DAI), 1 * (10 ** 8));
-        priceOracleMock.setPrice(tokenTestSuite.addressOf(Tokens.WETH), 2_000 * (10 ** 8));
-
-        getCancellableWithdrawalsValueTestCase[4] memory cases = [
-            getCancellableWithdrawalsValueTestCase({
-                name: "amount1 == 0, amount2 == 0",
-                amount1: 0,
-                amount2: 0,
-                expectedTotalValueUSD: 0
-            }),
-            getCancellableWithdrawalsValueTestCase({
-                name: "amount1 == 100, amount2 == 0",
-                amount1: 100,
-                amount2: 0,
-                expectedTotalValueUSD: 100 * 1
-            }),
-            getCancellableWithdrawalsValueTestCase({
-                name: "amount1 == 0, amount2 == 20",
-                amount1: 0,
-                amount2: 20,
-                expectedTotalValueUSD: 20 * 2_000
-            }),
-            getCancellableWithdrawalsValueTestCase({
-                name: "amount1 == 15_00, amount2 == 8",
-                amount1: 15_00,
-                amount2: 8,
-                expectedTotalValueUSD: 15_00 * 1 + 8 * 20_00
-            })
-        ];
-
-        address creditAccount = DUMB_ADDRESS;
-
-        for (uint256 j = 0; j < 2; ++j) {
-            bool isForceCancel = j == 1;
-
-            for (uint256 i; i < cases.length; ++i) {
-                uint256 snapshot = vm.snapshot();
-
-                getCancellableWithdrawalsValueTestCase memory _case = cases[i];
-
-                caseName = string.concat(caseName, _case.name, ", isForceCancel = ", isForceCancel ? "true" : "false");
-
-                priceOracleMock.setRevertOnGetPrice(tokenTestSuite.addressOf(Tokens.DAI), _case.amount1 == 0);
-                priceOracleMock.setRevertOnGetPrice(tokenTestSuite.addressOf(Tokens.WETH), _case.amount2 == 0);
-
-                withdrawalManagerMock.setCancellableWithdrawals({
-                    isForceCancel: isForceCancel,
-                    token1: tokenTestSuite.addressOf(Tokens.DAI),
-                    amount1: _case.amount1,
-                    token2: tokenTestSuite.addressOf(Tokens.WETH),
-                    amount2: _case.amount2
-                });
-
-                vm.expectCall(
-                    address(withdrawalManagerMock),
-                    abi.encodeCall(IWithdrawalManagerV3.cancellableScheduledWithdrawals, (creditAccount, isForceCancel))
-                );
-
-                uint256 totalValueUSD =
-                    creditManager.getCancellableWithdrawalsValue(address(priceOracleMock), creditAccount, isForceCancel);
-
-                assertEq(totalValueUSD, _case.expectedTotalValueUSD, _testCaseErr("Incorrect totalValueUSD"));
-
-                vm.revertTo(snapshot);
-            }
-        }
     }
 
     //
@@ -3077,10 +2763,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 uint16 flagToTest = uint16(1 << i);
                 creditManager.setFlagFor(creditAccount, flagToTest, value);
                 assertEq(creditManager.flagsOf(creditAccount) & flagToTest != 0, value, "Incorrect flag set");
-
-                if (flagToTest == WITHDRAWAL_FLAG) {
-                    assertEq(creditManager.hasWithdrawals(creditAccount), value, "Incorrect hasWithdrawals");
-                }
             }
         }
     }

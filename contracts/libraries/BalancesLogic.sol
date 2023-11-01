@@ -28,109 +28,114 @@ library BalancesLogic {
     using BitMask for uint256;
     using SafeCast for int256;
     using SafeCast for uint256;
+    using SafeCast for uint256;
     using SafeERC20 for IERC20;
 
+    /// @dev Compares current `token` balance with `value`
+    /// @param token Token to check balance for
+    /// @param value Value to compare current token balance with
+    /// @param greater Whether current balance must be greater/less than or equal to `value`
+    function checkBalance(address creditAccount, address token, uint256 value, bool greater)
+        internal
+        view
+        returns (bool)
+    {
+        uint256 current = IERC20(token).safeBalanceOf(creditAccount);
+        return greater && current >= value || !greater && current <= value; // U:[BLL-1]
+    }
+
     /// @dev Returns an array of expected token balances after operations
-    /// @param creditAccount Credit account to compute expected balances for
-    /// @param deltas The array of (token, amount) structs that contain expected balance increases
+    /// @param creditAccount Credit account to compute balances for
+    /// @param deltas Array of expected token balance changes
     function storeBalances(address creditAccount, BalanceDelta[] memory deltas)
         internal
         view
-        returns (Balance[] memory expected)
+        returns (Balance[] memory balances)
     {
         uint256 len = deltas.length;
-        expected = new Balance[](len); // U:[BLL-1]
+        balances = new Balance[](len); // U:[BLL-2]
         for (uint256 i = 0; i < len;) {
-            int256 balance = IERC20(deltas[i].token).safeBalanceOf({account: creditAccount}).toInt256();
-            expected[i] = Balance({token: deltas[i].token, balance: (balance + deltas[i].amount).toUint256()}); // U:[BLL-1]
+            int256 balance = IERC20(deltas[i].token).safeBalanceOf(creditAccount).toInt256();
+            balances[i] = Balance({token: deltas[i].token, balance: (balance + deltas[i].amount).toUint256()}); // U:[BLL-2]
             unchecked {
                 ++i;
             }
         }
     }
 
-    /// @dev Compares current balances to previously saved expected balances
+    /// @dev Compares current balances with the previously stored ones
     /// @param creditAccount Credit account to compare balances for
-    /// @param expected Expected balances after all operations (from `storeBalances`)
-    /// @return success False if at least one balance is lower than expected, true otherwise
-    function compareBalances(address creditAccount, Balance[] memory expected) internal view returns (bool success) {
-        uint256 len = expected.length;
+    /// @param balances Array of previously stored balances
+    /// @param greater Whether current balances must be greater/less than or equal to stored ones
+    /// @return success True if condition specified by `greater` holds for all tokens, false otherwise
+    function compareBalances(address creditAccount, Balance[] memory balances, bool greater)
+        internal
+        view
+        returns (bool success)
+    {
+        uint256 len = balances.length;
         unchecked {
             for (uint256 i = 0; i < len; ++i) {
-                if (IERC20(expected[i].token).safeBalanceOf({account: creditAccount}) < expected[i].balance) {
-                    return false; // U:[BLL-2]
+                if (!BalancesLogic.checkBalance(creditAccount, balances[i].token, balances[i].balance, greater)) {
+                    return false; // U:[BLL-3]
                 }
             }
         }
-        return true; // U:[BLL-2]
+        return true; // U:[BLL-3]
     }
 
-    /// @dev Returns balances of enabled forbidden tokens on the credit account
+    /// @dev Returns balances of specified tokens on the credit account
     /// @param creditAccount Credit account to compute balances for
-    /// @param enabledTokensMask Current mask of enabled tokens on the credit account
-    /// @param forbiddenTokenMask Mask of forbidden tokens in the credit facade
-    /// @param getTokenByMaskFn A function that returns a token's address by its mask
-    function storeForbiddenBalances(
+    /// @param tokensMask Bit mask of tokens to compute balances for
+    /// @param getTokenByMaskFn Function that returns token's address by its mask
+    function storeBalances(
         address creditAccount,
-        uint256 enabledTokensMask,
-        uint256 forbiddenTokenMask,
+        uint256 tokensMask,
         function (uint256) view returns (address) getTokenByMaskFn
-    ) internal view returns (BalanceWithMask[] memory forbiddenBalances) {
-        uint256 forbiddenTokensOnAccount = enabledTokensMask & forbiddenTokenMask; // U:[BLL-3]
+    ) internal view returns (BalanceWithMask[] memory balances) {
+        if (tokensMask == 0) return balances;
 
-        if (forbiddenTokensOnAccount != 0) {
-            uint256 i = 0;
-            forbiddenBalances = new  BalanceWithMask[](forbiddenTokensOnAccount.calcEnabledTokens());
-            unchecked {
-                while (forbiddenTokensOnAccount != 0) {
-                    uint256 tokenMask = forbiddenTokensOnAccount & uint256(-int256(forbiddenTokensOnAccount));
-                    forbiddenTokensOnAccount ^= tokenMask;
+        balances = new BalanceWithMask[](tokensMask.calcEnabledTokens()); // U:[BLL-4]
+        unchecked {
+            uint256 i;
+            while (tokensMask != 0) {
+                uint256 tokenMask = tokensMask & uint256(-int256(tokensMask));
+                tokensMask ^= tokenMask;
 
-                    address token = getTokenByMaskFn(tokenMask);
-                    forbiddenBalances[i] = BalanceWithMask({
-                        token: token,
-                        tokenMask: tokenMask,
-                        balance: IERC20(token).safeBalanceOf({account: creditAccount})
-                    }); // U:[BLL-3]
-                    ++i;
-                }
+                address token = getTokenByMaskFn(tokenMask);
+                balances[i] = BalanceWithMask({
+                    token: token,
+                    tokenMask: tokenMask,
+                    balance: IERC20(token).safeBalanceOf(creditAccount)
+                }); // U:[BLL-4]
+                ++i;
             }
         }
     }
 
-    /// @dev Compares current balances of forbidden tokens to previously saved
+    /// @dev Compares current balances of specified tokens with the previously stored ones
     /// @param creditAccount Credit account to compare balances for
-    /// @param enabledTokensMaskBefore Mask of enabled tokens on the account before operations
-    /// @param enabledTokensMaskAfter Mask of enabled tokens on the account after operations
-    /// @param forbiddenBalances Balances of forbidden tokens before operations (from `storeForbiddenBalances`)
-    /// @param forbiddenTokenMask Mask of forbidden tokens in the credit facade
-    /// @return success False if balance of at least one forbidden token increased, true otherwise
-    function checkForbiddenBalances(
-        address creditAccount,
-        uint256 enabledTokensMaskBefore,
-        uint256 enabledTokensMaskAfter,
-        BalanceWithMask[] memory forbiddenBalances,
-        uint256 forbiddenTokenMask
-    ) internal view returns (bool success) {
-        uint256 forbiddenTokensOnAccount = enabledTokensMaskAfter & forbiddenTokenMask;
-        if (forbiddenTokensOnAccount == 0) return true; // U:[BLL-4]
+    /// @param tokensMask Bit mask of tokens to compare balances for
+    /// @param balances Array of previously stored balances
+    /// @param greater Whether current balances must be greater/less than or equal to stored ones
+    /// @return success True if condition specified by `greater` holds for all tokens, false otherwise
+    function compareBalances(address creditAccount, uint256 tokensMask, BalanceWithMask[] memory balances, bool greater)
+        internal
+        view
+        returns (bool)
+    {
+        if (tokensMask == 0) return true;
 
-        // Ensure that no new forbidden tokens were enabled
-        uint256 forbiddenTokensOnAccountBefore = enabledTokensMaskBefore & forbiddenTokenMask;
-        if (forbiddenTokensOnAccount & ~forbiddenTokensOnAccountBefore != 0) return false; // U:[BLL-4]
-
-        // Then, check that any remaining forbidden tokens didn't have their balances increased
         unchecked {
-            uint256 len = forbiddenBalances.length;
-            for (uint256 i = 0; i < len; ++i) {
-                if (forbiddenTokensOnAccount & forbiddenBalances[i].tokenMask != 0) {
-                    uint256 currentBalance = IERC20(forbiddenBalances[i].token).safeBalanceOf({account: creditAccount});
-                    if (currentBalance > forbiddenBalances[i].balance) {
-                        return false; // U:[BLL-4]
+            uint256 len = balances.length;
+            for (uint256 i; i < len; ++i) {
+                if (tokensMask & balances[i].tokenMask != 0) {
+                    if (!BalancesLogic.checkBalance(creditAccount, balances[i].token, balances[i].balance, greater)) {
+                        return false; // U:[BLL-5]
                     }
                 }
             }
         }
-        return true; // U:[BLL-4]
+        return true; // U:[BLL-5]
     }
 }

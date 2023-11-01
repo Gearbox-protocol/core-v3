@@ -100,12 +100,9 @@ contract CreditManagerV3Harness is CreditManagerV3 {
             enabledTokensMask: enabledTokensMaskOf(creditAccount),
             collateralHints: collateralHints,
             minHealthFactor: PERCENTAGE_FACTOR,
-            task: task
+            task: task,
+            reservePriceFeedCheck: false
         });
-    }
-
-    function hasWithdrawals(address creditAccount) external view returns (bool) {
-        return _hasWithdrawals(creditAccount);
     }
 
     function saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) external {
@@ -128,14 +125,6 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         )
     {
         return _getQuotedTokensData(creditAccount, enabledTokensMask, collateralHints, _poolQuotaKeeper);
-    }
-
-    function getCancellableWithdrawalsValue(address _priceOracle, address creditAccount, bool isForceCancel)
-        external
-        view
-        returns (uint256 totalValueUSD)
-    {
-        return _getCancellableWithdrawalsValue(_priceOracle, creditAccount, isForceCancel);
     }
 
     function getCollateralTokensData(uint256 tokenMask) external view returns (CollateralTokenData memory) {

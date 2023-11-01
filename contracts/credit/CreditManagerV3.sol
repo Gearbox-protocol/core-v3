@@ -21,22 +21,20 @@ import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 import {IAccountFactoryBase} from "../interfaces/IAccountFactoryV3.sol";
 import {ICreditAccountBase} from "../interfaces/ICreditAccountV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
-import {ClaimAction, IWithdrawalManagerV3} from "../interfaces/IWithdrawalManagerV3.sol";
+import {IWithdrawalManagerV3} from "../interfaces/IWithdrawalManagerV3.sol";
 import {
     ICreditManagerV3,
-    ClosureAction,
     CollateralTokenData,
     ManageDebtAction,
     CreditAccountInfo,
     RevocationPair,
     CollateralDebtData,
     CollateralCalcTask,
-    WITHDRAWAL_FLAG,
     DEFAULT_MAX_ENABLED_TOKENS,
     INACTIVE_CREDIT_ACCOUNT_ADDRESS
 } from "../interfaces/ICreditManagerV3.sol";
 import "../interfaces/IAddressProviderV3.sol";
-import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
+import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 
 // CONSTANTS
@@ -195,11 +193,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         CreditAccountInfo storage newCreditAccountInfo = creditAccountInfo[creditAccount];
 
-        // accounts are reusable, so debt and interest index must be reset either when opening an account or closing it
-        // to make potential liquidations cheaper, they are reset here
-        newCreditAccountInfo.debt = 0; // U:[CM-6]
-        newCreditAccountInfo.cumulativeIndexLastUpdate = _poolBaseInterestIndex(); // U:[CM-6]
-
         // newCreditAccountInfo.flags = 0;
         // newCreditAccountInfo.lastDebtUpdate = 0;
         // newCreditAccountInfo.borrower = onBehalfOf;
@@ -219,120 +212,151 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditAccountsSet.add(creditAccount); // U:[CM-6]
     }
 
-    /// @notice Closes a credit account by repaying debt to the pool, removing quotas and returning account to the factory
+    /// @notice Closes a credit account
     /// @param creditAccount Account to close
-    /// @param closureAction Closure mode, see `ClosureAction` for details
-    /// @param collateralDebtData A struct with account's debt and collateral data
-    /// @param payer Address to transfer underlying from in case account's balance is insufficient
-    /// @param to Address to transfer tokens that left on the account after closure and repayments
-    /// @param skipTokensMask Bit mask of tokens that should be skipped
+    /// @param to Address to send tokens left on the account after closure
+    /// @param tokensToTransferMask Bit mask of tokens left on the account that should be sent
     /// @param convertToETH If true and any of transferred tokens is WETH, it will be sent to withdrawal manager,
-    ///        from which `to` can later claim it as ETH
-    /// @return remainingFunds Amount of underlying sent to account owner on liquidation
+    ///        from which credit facade should claim it as ETH to `to` at the end of the call
+    /// @custom:expects Account is opened in this credit manager
+    function closeCreditAccount(address creditAccount, address to, uint256 tokensToTransferMask, bool convertToETH)
+        external
+        override
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // U:[CM-2]
+    {
+        CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
+        if (currentCreditAccountInfo.debt != 0) {
+            revert CloseAccountWithNonZeroDebtException(); // U:[CM-7]
+        }
+
+        // currentCreditAccountInfo.borrower = address(0);
+        // currentCreditAccountInfo.lastDebtUpdate = 0;
+        // currentCreditAccountInfo.flags = 0;
+        assembly {
+            let slot := add(currentCreditAccountInfo.slot, 4)
+            sstore(slot, 0)
+        } // U:[CM-7]
+
+        _batchTokensTransfer({
+            creditAccount: creditAccount,
+            to: to,
+            convertToETH: convertToETH,
+            tokensToTransferMask: tokensToTransferMask
+        }); // U:[CM-7]
+
+        IAccountFactoryBase(accountFactory).returnCreditAccount({creditAccount: creditAccount}); // U:[CM-7]
+        creditAccountsSet.remove(creditAccount); // U:[CM-7]
+    }
+
+    /// @notice Liquidates a credit account
+    ///         - Resets account's debt, quota interest and fees to zero
+    ///         - Removes account's quotas, and, if there's loss incurred on liquidation,
+    ///           also zeros out limits for account's quoted tokens in the quota keeper
+    ///         - Repays debt to the pool
+    ///         - Ensures that the value of funds remaining on the accounts is sufficient
+    ///         - If liquidator requests to receive underlying, transfers the surplus,
+    ///           as well as full balances of other requested tokens
+    /// @param creditAccount Account to liquidate
+    /// @param collateralDebtData A struct with account's debt and collateral data
+    /// @param to Address to transfer tokens left on the account after liquidation
+    /// @param tokensToTransferMask Bit mask of tokens left on the account that should be sent
+    /// @param convertToETH If true and any of transferred tokens is WETH, it will be sent to withdrawal manager,
+    ///        from which credit facade should claim it as ETH to `to` at the end of the call
+    /// @return remainingFunds Total value of assets left on the account after liquidation
     /// @return loss Loss incurred on liquidation
-    /// @dev If `loss > 0`, zeroes out limits for account's quoted tokens in the quota keeper
-    /// @custom:expects `cdd` is a result of `calcDebtAndCollateral` in `DEBT_COLLATERAL_{x}_WITHDRAWALS` mode, where x is
-    ///                 `WITHOUT` for normal closure, `CANCEL` for liquidation and `FORCE_CANCEL` for emergency liquidation
-    /// @custom:invariant `remainingFunds * loss == 0`
-    function closeCreditAccount(
+    /// @custom:expects Account is opened in this credit manager
+    /// @custom:expects `collateralDebtData` is a result of `calcDebtAndCollateral` in `DEBT_COLLATERAL_{x}_WITHDRAWALS`
+    ///                 mode, where x is `CANCEL` for normal liquidation and `FORCE_CANCEL` for emergency liquidation
+    function liquidateCreditAccount(
         address creditAccount,
-        ClosureAction closureAction,
         CollateralDebtData calldata collateralDebtData,
-        address payer,
         address to,
-        uint256 skipTokensMask,
-        bool convertToETH
+        uint256 tokensToTransferMask,
+        bool convertToETH,
+        bool isExpired
     )
         external
         override
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
-        returns (uint256 remainingFunds, uint256 loss)
+        returns (uint256, /* remainingFunds */ uint256 /* loss */ )
     {
-        address borrower = getBorrowerOrRevert(creditAccount); // U:[CM-7]
-
         {
             CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
             if (currentCreditAccountInfo.lastDebtUpdate == block.number) {
-                revert DebtUpdatedTwiceInOneBlockException(); // U:[CM-7]
+                revert DebtUpdatedTwiceInOneBlockException(); // U:[CM-8]
             }
 
-            // currentCreditAccountInfo.borrower = address(0);
-            // currentCreditAccountInfo.lastDebtUpdate = 0;
-            // currentCreditAccountInfo.flags = 0;
+            currentCreditAccountInfo.debt = 0; // U:[CM-8]
+            currentCreditAccountInfo.lastDebtUpdate = uint64(block.number); // U:[CM-8]
+
+            // currentCreditAccountInfo.cumulativeQuotaInterest = 1;
+            // currentCreditAccountInfo.quotaFees = 0;
             assembly {
-                let slot := add(currentCreditAccountInfo.slot, 4)
-                sstore(slot, 0)
+                let slot := add(currentCreditAccountInfo.slot, 2)
+                sstore(slot, 1)
             } // U:[CM-8]
         }
 
-        uint256 amountToPool;
-        uint256 profit;
-        if (closureAction == ClosureAction.CLOSE_ACCOUNT) {
-            (amountToPool, profit) = collateralDebtData.calcClosePayments({amountWithFeeFn: _amountWithFee}); // U:[CM-8]
-        } else {
-            bool isNormalLiquidation = closureAction == ClosureAction.LIQUIDATE_ACCOUNT;
-
-            (amountToPool, remainingFunds, profit, loss) = collateralDebtData.calcLiquidationPayments({
-                liquidationDiscount: isNormalLiquidation ? liquidationDiscount : liquidationDiscountExpired,
-                feeLiquidation: isNormalLiquidation ? feeLiquidation : feeLiquidationExpired,
-                amountWithFeeFn: _amountWithFee,
-                amountMinusFeeFn: _amountMinusFee
-            }); // U:[CM-8]
-        }
-
-        {
-            uint256 underlyingBalance = IERC20(underlying).safeBalanceOf({account: creditAccount}); // U:[CM-8]
-            uint256 distributedFunds = amountToPool + remainingFunds + 1;
-
-            if (underlyingBalance < distributedFunds) {
-                unchecked {
-                    IERC20(underlying).safeTransferFrom({
-                        from: payer,
-                        to: creditAccount,
-                        amount: _amountWithFee(distributedFunds - underlyingBalance)
-                    }); // U:[CM-8]
-                }
-            }
-        }
+        (uint256 amountToPool, uint256 minRemainingFunds, uint256 profit, uint256 loss) = collateralDebtData
+            .calcLiquidationPayments({
+            liquidationDiscount: isExpired ? liquidationDiscountExpired : liquidationDiscount,
+            feeLiquidation: isExpired ? feeLiquidationExpired : feeLiquidation,
+            amountWithFeeFn: _amountWithFee,
+            amountMinusFeeFn: _amountMinusFee
+        }); // U:[CM-8]
 
         if (collateralDebtData.quotedTokens.length != 0) {
-            bool setLimitsToZero = loss > 0; // U:[CM-8]
-
             IPoolQuotaKeeperV3(collateralDebtData._poolQuotaKeeper).removeQuotas({
                 creditAccount: creditAccount,
                 tokens: collateralDebtData.quotedTokens,
-                setLimitsToZero: setLimitsToZero
+                setLimitsToZero: loss > 0
             }); // U:[CM-8]
         }
 
         if (amountToPool != 0) {
             ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amountToPool}); // U:[CM-8]
         }
+        _poolRepayCreditAccount(collateralDebtData.debt, profit, loss); // U:[CM-8]
 
-        if (collateralDebtData.debt + profit + loss != 0) {
-            _poolRepayCreditAccount(collateralDebtData.debt, profit, loss); // U:[CM-8]
+        (uint256 remainingFunds, uint256 underlyingBalance) = _getRemainingFunds({
+            creditAccount: creditAccount,
+            enabledTokensMask: collateralDebtData.enabledTokensMask,
+            tokensToTransferMask: tokensToTransferMask
+        }); // U:[CM-8]
+        if (remainingFunds < minRemainingFunds) {
+            revert InsufficientRemainingFundsException(); // U:[CM-9]
         }
 
-        if (remainingFunds > 1) {
-            _safeTokenTransfer({
-                creditAccount: creditAccount,
-                token: underlying,
-                to: borrower,
-                amount: remainingFunds,
-                convertToETH: false
-            }); // U:[CM-8]
+        if (tokensToTransferMask & UNDERLYING_TOKEN_MASK != 0) {
+            tokensToTransferMask = tokensToTransferMask.disable(UNDERLYING_TOKEN_MASK);
+
+            unchecked {
+                uint256 amountToLiquidator = remainingFunds - minRemainingFunds;
+                if (amountToLiquidator > underlyingBalance) amountToLiquidator = underlyingBalance;
+
+                if (amountToLiquidator != 0) {
+                    _safeTokenTransfer({
+                        creditAccount: creditAccount,
+                        token: underlying,
+                        to: to,
+                        amount: amountToLiquidator,
+                        convertToETH: convertToETH
+                    }); // U:[CM-8]
+                    remainingFunds -= amountToLiquidator; // U:[CM-8]
+                }
+            }
         }
 
         _batchTokensTransfer({
             creditAccount: creditAccount,
             to: to,
             convertToETH: convertToETH,
-            tokensToTransferMask: collateralDebtData.enabledTokensMask.disable(skipTokensMask)
-        }); // U:[CM-8, 9]
+            tokensToTransferMask: tokensToTransferMask
+        }); // U:[CM-8]
 
-        IAccountFactoryBase(accountFactory).returnCreditAccount({creditAccount: creditAccount}); // U:[CM-8]
-        creditAccountsSet.remove(creditAccount); // U:[CM-8]
+        return (remainingFunds, loss);
     }
 
     /// @notice Increases or decreases credit account's debt
@@ -366,7 +390,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             minHealthFactor: PERCENTAGE_FACTOR,
             task: (action == ManageDebtAction.INCREASE_DEBT)
                 ? CollateralCalcTask.GENERIC_PARAMS
-                : CollateralCalcTask.DEBT_ONLY
+                : CollateralCalcTask.DEBT_ONLY,
+            reservePriceFeedCheck: false
         }); // U:[CM-10, 11]
 
         uint256 newCumulativeIndex;
@@ -570,7 +595,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         address creditAccount,
         uint256 enabledTokensMask,
         uint256[] calldata collateralHints,
-        uint16 minHealthFactor
+        uint16 minHealthFactor,
+        bool reservePriceFeedCheck
     )
         external
         override
@@ -595,7 +621,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             minHealthFactor: minHealthFactor,
             collateralHints: collateralHints,
             enabledTokensMask: enabledTokensMask,
-            task: CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY
+            task: CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY,
+            reservePriceFeedCheck: reservePriceFeedCheck
         }); // U:[CM-18]
 
         if (cdd.twvUSD < cdd.totalDebtUSD) {
@@ -616,7 +643,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             enabledTokensMask: enabledTokensMaskOf(creditAccount),
             collateralHints: collateralHints,
             minHealthFactor: minHealthFactor,
-            task: CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY
+            task: CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY,
+            reservePriceFeedCheck: false
         }); // U:[CM-18]
 
         return cdd.twvUSD < cdd.totalDebtUSD; // U:[CM-18]
@@ -643,7 +671,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             enabledTokensMask: enabledTokensMaskOf(creditAccount),
             collateralHints: collateralHints,
             minHealthFactor: PERCENTAGE_FACTOR,
-            task: task
+            task: task,
+            reservePriceFeedCheck: false
         }); // U:[CM-20]
     }
 
@@ -659,13 +688,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         uint256 enabledTokensMask,
         uint256[] memory collateralHints,
         uint16 minHealthFactor,
-        CollateralCalcTask task
+        CollateralCalcTask task,
+        bool reservePriceFeedCheck
     ) internal view returns (CollateralDebtData memory cdd) {
         CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
 
         cdd.debt = currentCreditAccountInfo.debt; // U:[CM-20]
         cdd.cumulativeIndexLastUpdate = currentCreditAccountInfo.cumulativeIndexLastUpdate; // U:[CM-20]
-        cdd.cumulativeIndexNow = _poolBaseInterestIndex(); // U:[CM-20]
+        cdd.cumulativeIndexNow = IPoolV3(pool).baseInterestIndex(); // U:[CM-20]
 
         if (task == CollateralCalcTask.GENERIC_PARAMS) {
             return cdd; // U:[CM-20]
@@ -699,11 +729,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         address _priceOracle = priceOracle;
 
-        uint256 totalDebt = cdd.calcTotalDebt();
-        if (totalDebt != 0) {
-            cdd.totalDebtUSD = _convertToUSD({_priceOracle: _priceOracle, amountInToken: totalDebt, token: underlying}); // U:[CM-22]
-        } else if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) {
-            return cdd; // U:[CM-18A]
+        function (address, uint256, address) view returns(uint256) convertToUSDFn =
+            reservePriceFeedCheck ? _convertToUSDReserveCheck : _convertToUSD;
+        {
+            uint256 totalDebt = cdd.calcTotalDebt();
+            if (totalDebt != 0) {
+                cdd.totalDebtUSD = convertToUSDFn(_priceOracle, totalDebt, underlying); // U:[CM-22]
+            } else if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) {
+                return cdd; // U:[CM-18A]
+            }
         }
 
         uint256 targetUSD = (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY)
@@ -719,7 +753,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             quotasPacked: quotasPacked,
             priceOracle: _priceOracle,
             collateralTokenByMaskFn: _collateralTokenByMask,
-            convertToUSDFn: _convertToUSD
+            convertToUSDFn: convertToUSDFn
         }); // U:[CM-22]
         cdd.enabledTokensMask = enabledTokensMask.disable(tokensToDisable); // U:[CM-22]
 
@@ -727,15 +761,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             return cdd; // U:[CM-18]
         }
 
-        if (task != CollateralCalcTask.DEBT_COLLATERAL_WITHOUT_WITHDRAWALS && _hasWithdrawals(creditAccount)) {
-            cdd.totalValueUSD += _getCancellableWithdrawalsValue({
-                _priceOracle: _priceOracle,
-                creditAccount: creditAccount,
-                isForceCancel: task == CollateralCalcTask.DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS
-            }); // U:[CM-23]
-        }
-
-        cdd.totalValue = _convertFromUSD(_priceOracle, cdd.totalValueUSD, underlying); // U:[CM-22,23]
+        cdd.totalValue = reservePriceFeedCheck
+            ? _convertFromUSDReserveCheck(_priceOracle, cdd.totalValueUSD, underlying)
+            : _convertFromUSD(_priceOracle, cdd.totalValueUSD, underlying); // U:[CM-22,23]
     }
 
     /// @dev Returns quotas data for credit manager and credit account
@@ -810,6 +838,42 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
     }
 
+    /// @dev Returns total value of funds remaining on the credit account after liquidation, which consists of underlying
+    ///      token balance and total value of other enabled tokens remaining after transferring specified tokens
+    /// @param creditAccount Account to compute value for
+    /// @param enabledTokensMask Bit mask of tokens enabled on the account
+    /// @param tokensToTransferMask Bit mask of tokens that will be transferred
+    /// @return remainingFunds Remaining funds denominated in underlying
+    /// @return underlyingBalance Balance of underlying token
+    function _getRemainingFunds(address creditAccount, uint256 enabledTokensMask, uint256 tokensToTransferMask)
+        internal
+        view
+        returns (uint256 remainingFunds, uint256 underlyingBalance)
+    {
+        underlyingBalance = IERC20(underlying).safeBalanceOf({account: creditAccount});
+        remainingFunds = underlyingBalance;
+
+        uint256 remainingTokensMask = enabledTokensMask.disable(UNDERLYING_TOKEN_MASK).disable(tokensToTransferMask);
+        if (remainingTokensMask == 0) return (remainingFunds, underlyingBalance);
+
+        address _priceOracle = priceOracle;
+        uint256 totalValueUSD;
+        while (remainingTokensMask != 0) {
+            uint256 tokenMask = remainingTokensMask & uint256(-int256(remainingTokensMask));
+            remainingTokensMask ^= tokenMask;
+
+            address token = getTokenByMask(tokenMask);
+            uint256 balance = IERC20(token).safeBalanceOf({account: creditAccount});
+            if (balance > 1) {
+                totalValueUSD += _convertToUSD(priceOracle, balance - 1, token);
+            }
+        }
+
+        if (totalValueUSD != 0) {
+            remainingFunds += _convertFromUSD(_priceOracle, totalValueUSD, underlying);
+        }
+    }
+
     // ------ //
     // QUOTAS //
     // ------ //
@@ -869,15 +933,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     // WITHDRAWALS //
     // ----------- //
 
-    /// @notice Schedules a withdrawal from the credit account
+    /// @notice Withdraws token from the credit account
     /// @param creditAccount Credit account to schedule a withdrawal from
     /// @param token Token to withdraw
     /// @param amount Amount to withdraw
+    /// @param to receiver
     /// @return tokensToDisable Mask of tokens that should be disabled after the operation
     ///         (equals `token`'s mask if withdrawing the entire balance, zero otherwise)
-    /// @dev If withdrawal manager's delay is zero, token is immediately sent to the account owner.
-    ///      Otherwise, token is sent to the withdrawal manager and `WITHDRAWAL_FLAG` is enabled for the account.
-    function scheduleWithdrawal(address creditAccount, address token, uint256 amount)
+    function withdraw(address creditAccount, address token, uint256 amount, address to)
         external
         override
         nonReentrant // U:[CM-5]
@@ -886,84 +949,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         uint256 tokenMask = getTokenMaskOrRevert({token: token}); // U:[CM-26]
 
-        if (IWithdrawalManagerV3(withdrawalManager).delay() == 0) {
-            address borrower = getBorrowerOrRevert({creditAccount: creditAccount});
-            _safeTokenTransfer({
-                creditAccount: creditAccount,
-                token: token,
-                to: borrower,
-                amount: amount,
-                convertToETH: false
-            }); // U:[CM-27]
-        } else {
-            uint256 delivered = ICreditAccountBase(creditAccount).transferDeliveredBalanceControl({
-                token: token,
-                to: withdrawalManager,
-                amount: amount
-            }); // U:[CM-28]
-
-            IWithdrawalManagerV3(withdrawalManager).addScheduledWithdrawal({
-                creditAccount: creditAccount,
-                token: token,
-                amount: delivered,
-                tokenIndex: tokenMask.calcIndex()
-            }); // U:[CM-28]
-
-            _enableFlag({creditAccount: creditAccount, flag: WITHDRAWAL_FLAG});
-        }
+        _safeTokenTransfer({creditAccount: creditAccount, token: token, to: to, amount: amount, convertToETH: false}); // U:[CM-27]
 
         if (IERC20(token).safeBalanceOf({account: creditAccount}) <= 1) {
             tokensToDisable = tokenMask; // U:[CM-27]
         }
-    }
-
-    /// @notice Claims scheduled withdrawals from the credit account
-    /// @param creditAccount Credit account to claim withdrawals from
-    /// @param to Address to claim withdrawals to
-    /// @param action Action to perform, see `ClaimAction` for details
-    /// @return tokensToEnable Mask of tokens that should be enabled after the operation
-    ///         (non-zero when tokens are returned to the account on withdrawal cancellation)
-    /// @dev If account has no withdrawals scheduled after the operation, `WITHDRAWAL_FLAG` is disabled
-    function claimWithdrawals(address creditAccount, address to, ClaimAction action)
-        external
-        override
-        nonReentrant // U:[CM-5]
-        creditFacadeOnly // U:[CM-2]
-        returns (uint256 tokensToEnable)
-    {
-        if (_hasWithdrawals(creditAccount)) {
-            bool hasScheduled;
-
-            (hasScheduled, tokensToEnable) =
-                IWithdrawalManagerV3(withdrawalManager).claimScheduledWithdrawals(creditAccount, to, action); // U:[CM-29]
-
-            if (!hasScheduled) {
-                _disableFlag(creditAccount, WITHDRAWAL_FLAG); // U:[CM-29]
-            }
-        }
-    }
-
-    /// @dev Returns the USD value of `creditAccount`'s cancellable scheduled withdrawals
-    /// @param isForceCancel Whether to account for immature or all scheduled withdrawals
-    function _getCancellableWithdrawalsValue(address _priceOracle, address creditAccount, bool isForceCancel)
-        internal
-        view
-        returns (uint256 totalValueUSD)
-    {
-        (address token1, uint256 amount1, address token2, uint256 amount2) =
-            IWithdrawalManagerV3(withdrawalManager).cancellableScheduledWithdrawals(creditAccount, isForceCancel); // U:[CM-30]
-
-        if (amount1 != 0) {
-            totalValueUSD = _convertToUSD({_priceOracle: _priceOracle, amountInToken: amount1, token: token1}); // U:[CM-30]
-        }
-        if (amount2 != 0) {
-            totalValueUSD += _convertToUSD({_priceOracle: _priceOracle, amountInToken: amount2, token: token2}); // U:[CM-30]
-        }
-    }
-
-    /// @dev Checks whether credit account has scheduled withdrawals
-    function _hasWithdrawals(address creditAccount) internal view returns (bool) {
-        return flagsOf(creditAccount) & WITHDRAWAL_FLAG != 0; // U:[CM-36]
     }
 
     // --------------------- //
@@ -1396,16 +1386,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             ICreditAccountBase(creditAccount).transfer({token: token, to: withdrawalManager, amount: amount}); // U:[CM-31, 32]
             _addImmediateWithdrawal({token: token, to: msg.sender, amount: amount}); // U:[CM-31, 32]
         } else {
-            try ICreditAccountBase(creditAccount).safeTransfer({token: token, to: to, amount: amount}) {
-                // U:[CM-31, 32, 33]
-            } catch {
-                uint256 delivered = ICreditAccountBase(creditAccount).transferDeliveredBalanceControl({
-                    token: token,
-                    to: withdrawalManager,
-                    amount: amount
-                }); // U:[CM-33]
-                _addImmediateWithdrawal({token: token, to: to, amount: delivered}); // U:[CM-33]
-            }
+            ICreditAccountBase(creditAccount).safeTransfer({token: token, to: to, amount: amount});
         }
     }
 
@@ -1428,11 +1409,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         return amount;
     }
 
-    /// @dev Internal wrapper for `pool.baseInterestIndex` call to reduce contract size
-    function _poolBaseInterestIndex() internal view returns (uint256) {
-        return IPoolV3(pool).baseInterestIndex();
-    }
-
     /// @dev Internal wrapper for `pool.repayCreditAccount` call to reduce contract size
     function _poolRepayCreditAccount(uint256 debt, uint256 profit, uint256 loss) internal {
         IPoolV3(pool).repayCreditAccount(debt, profit, loss);
@@ -1449,7 +1425,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         view
         returns (uint256 amountInUSD)
     {
-        amountInUSD = IPriceOracleBase(_priceOracle).convertToUSD(amountInToken, token);
+        amountInUSD = IPriceOracleV3(_priceOracle).convertToUSD(amountInToken, token);
     }
 
     /// @dev Internal wrapper for `priceOracle.convertFromUSD` call to reduce contract size
@@ -1458,7 +1434,25 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         view
         returns (uint256 amountInToken)
     {
-        amountInToken = IPriceOracleBase(_priceOracle).convertFromUSD(amountInUSD, token);
+        amountInToken = IPriceOracleV3(_priceOracle).convertFromUSD(amountInUSD, token);
+    }
+
+    /// @dev Internal wrapper for `priceOracle.convertToUSD` call to reduce contract size
+    function _convertToUSDReserveCheck(address _priceOracle, uint256 amountInToken, address token)
+        internal
+        view
+        returns (uint256 amountInUSD)
+    {
+        amountInUSD = IPriceOracleV3(_priceOracle).convertToUSDReserveCheck(amountInToken, token);
+    }
+
+    /// @dev Internal wrapper for `priceOracle.convertFromUSD` call to reduce contract size
+    function _convertFromUSDReserveCheck(address _priceOracle, uint256 amountInUSD, address token)
+        internal
+        view
+        returns (uint256 amountInToken)
+    {
+        amountInToken = IPriceOracleV3(_priceOracle).convertFromUSDReserveCheck(amountInUSD, token);
     }
 
     /// @dev Internal wrapper for `withdrawalManager.addImmediateWithdrawal` call to reduce contract size

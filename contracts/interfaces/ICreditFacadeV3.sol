@@ -6,7 +6,6 @@ pragma solidity ^0.8.17;
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
-import {ClosureAction} from "../interfaces/ICreditManagerV3.sol";
 import "./ICreditFacadeV3Multicall.sol";
 import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
 
@@ -35,6 +34,7 @@ struct FullCheckParams {
     uint256[] collateralHints;
     uint16 minHealthFactor;
     uint256 enabledTokensMaskAfter;
+    bool reservePriceFeedCheck;
 }
 
 interface ICreditFacadeV3Events {
@@ -52,7 +52,6 @@ interface ICreditFacadeV3Events {
         address indexed borrower,
         address indexed liquidator,
         address to,
-        ClosureAction closureAction,
         uint256 remainingFunds
     );
 
@@ -120,7 +119,7 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
     function closeCreditAccount(
         address creditAccount,
         address to,
-        uint256 skipTokenMask,
+        uint256 tokensToTransferMask,
         bool convertToETH,
         MultiCall[] calldata calls
     ) external payable;
@@ -128,7 +127,7 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
     function liquidateCreditAccount(
         address creditAccount,
         address to,
-        uint256 skipTokenMask,
+        uint256 tokensToTransferMask,
         bool convertToETH,
         MultiCall[] calldata calls
     ) external;
@@ -136,8 +135,6 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
     function multicall(address creditAccount, MultiCall[] calldata calls) external payable;
 
     function botMulticall(address creditAccount, MultiCall[] calldata calls) external;
-
-    function claimWithdrawals(address creditAccount, address to) external;
 
     function setBotPermissions(address creditAccount, address bot, uint192 permissions) external;
 

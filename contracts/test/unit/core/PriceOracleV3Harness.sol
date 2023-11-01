@@ -13,23 +13,35 @@ contract PriceOracleV3Harness is PriceOracleV3 {
     }
 
     function getPriceFeedParams(address token) external view returns (PriceFeedParams memory) {
-        (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals, bool useReserve) =
-            _getPriceFeedParams(token);
-        return PriceFeedParams(priceFeed, stalenessPeriod, skipCheck, decimals, useReserve);
+        (
+            address priceFeed,
+            uint32 stalenessPeriod,
+            bool skipCheck,
+            uint8 decimals,
+            bool useReserve,
+            bool trustedPriceFeed
+        ) = _getPriceFeedParams(token);
+        return PriceFeedParams(priceFeed, stalenessPeriod, skipCheck, decimals, useReserve, trustedPriceFeed);
     }
 
     function getReservePriceFeedParams(address token) external view returns (PriceFeedParams memory) {
-        (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals, bool useReserve) =
-            _getPriceFeedParams(_getTokenReserveKey(token));
-        return PriceFeedParams(priceFeed, stalenessPeriod, skipCheck, decimals, useReserve);
+        (
+            address priceFeed,
+            uint32 stalenessPeriod,
+            bool skipCheck,
+            uint8 decimals,
+            bool useReserve,
+            bool trustedPriceFeed
+        ) = _getPriceFeedParams(_getTokenReserveKey(token));
+        return PriceFeedParams(priceFeed, stalenessPeriod, skipCheck, decimals, useReserve, trustedPriceFeed);
     }
 
-    function getPrice(address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals)
+    function getPriceRaw(address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals)
         external
         view
         returns (uint256 price, uint256 scale)
     {
-        return _getPrice(priceFeed, stalenessPeriod, skipCheck, decimals);
+        return _getPriceRaw(priceFeed, stalenessPeriod, skipCheck, decimals);
     }
 
     function hackPriceFeedParams(address token, PriceFeedParams memory params) external {

@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {CreditLogic} from "../../../libraries/CreditLogic.sol";
-import {ClosureAction, CollateralDebtData} from "../../../interfaces/ICreditManagerV3.sol";
+import {CollateralDebtData} from "../../../interfaces/ICreditManagerV3.sol";
 import {TestHelper} from "../../lib/helper.sol";
 import {GeneralMock} from "../../mocks/GeneralMock.sol";
 

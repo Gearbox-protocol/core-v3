@@ -49,7 +49,7 @@ contract GenesisFactory is Ownable {
 
         addressProvider.setAddress(AP_ACCOUNT_FACTORY, accountFactory, false);
 
-        WithdrawalManagerV3 wm = new WithdrawalManagerV3(address(addressProvider), 1 days);
+        WithdrawalManagerV3 wm = new WithdrawalManagerV3(address(addressProvider));
         addressProvider.setAddress(AP_WITHDRAWAL_MANAGER, address(wm), true);
 
         BotListV3 botList = new BotListV3(address(addressProvider));
@@ -68,7 +68,12 @@ contract GenesisFactory is Ownable {
     function addPriceFeeds(PriceFeedConfig[] memory priceFeeds) external onlyOwner {
         uint256 len = priceFeeds.length;
         for (uint256 i; i < len; ++i) {
-            priceOracle.setPriceFeed(priceFeeds[i].token, priceFeeds[i].priceFeed, priceFeeds[i].stalenessPeriod);
+            priceOracle.setPriceFeed(
+                priceFeeds[i].token,
+                priceFeeds[i].priceFeed,
+                priceFeeds[i].stalenessPeriod,
+                priceFeeds[i].trustedPriceFeed
+            );
         }
         acl.transferOwnership(msg.sender);
     }

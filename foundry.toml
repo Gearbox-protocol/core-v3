@@ -4,7 +4,7 @@ out = 'forge-out'
 solc_version = '0.8.17'
 evm_version = 'shanghai'
 src = 'contracts'
-optimizer_runs = 12000
+optimizer_runs = 9000
 
 # See more config options https://github.com/gakonst/foundry/tree/master/config
 block_number = 120000 

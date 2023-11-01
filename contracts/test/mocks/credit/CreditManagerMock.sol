@@ -7,15 +7,12 @@ import "../../../interfaces/IAddressProviderV3.sol";
 
 import {
     ICreditManagerV3,
-    ClosureAction,
     CollateralDebtData,
     CollateralCalcTask,
     ManageDebtAction,
     RevocationPair
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
-
-import {ClaimAction} from "../../../interfaces/IWithdrawalManagerV3.sol";
 
 import "../../../interfaces/IExceptions.sol";
 
@@ -49,7 +46,7 @@ contract CreditManagerMock {
 
     CollateralDebtData return_collateralDebtData;
 
-    CollateralDebtData _closeCollateralDebtData;
+    CollateralDebtData _liquidateCollateralDebtData;
     uint256 internal _enabledTokensMask;
 
     address nextCreditAccount;
@@ -164,16 +161,13 @@ contract CreditManagerMock {
         return_loss = loss;
     }
 
-    function closeCreditAccount(
-        address,
-        ClosureAction,
-        CollateralDebtData memory collateralDebtData,
-        address,
-        address,
-        uint256,
-        bool
-    ) external returns (uint256 remainingFunds, uint256 loss) {
-        _closeCollateralDebtData = collateralDebtData;
+    function closeCreditAccount(address, address, uint256, bool) external {}
+
+    function liquidateCreditAccount(address, CollateralDebtData memory collateralDebtData, address, uint256, bool, bool)
+        external
+        returns (uint256 remainingFunds, uint256 loss)
+    {
+        _liquidateCollateralDebtData = collateralDebtData;
         remainingFunds = return_remainingFunds;
         loss = return_loss;
     }
@@ -206,16 +200,8 @@ contract CreditManagerMock {
         return_collateralDebtData = _collateralDebtData;
     }
 
-    function closeCollateralDebtData() external view returns (CollateralDebtData memory) {
-        return _closeCollateralDebtData;
-    }
-
-    function setClaimWithdrawals(uint256 tokensToEnable) external {
-        cw_return_tokensToEnable = tokensToEnable;
-    }
-
-    function claimWithdrawals(address, address, ClaimAction) external view returns (uint256 tokensToEnable) {
-        tokensToEnable = cw_return_tokensToEnable;
+    function liquidateCollateralDebtData() external view returns (CollateralDebtData memory) {
+        return _liquidateCollateralDebtData;
     }
 
     function enabledTokensMaskOf(address) external view returns (uint256) {
@@ -293,7 +279,7 @@ contract CreditManagerMock {
         sw_tokensToDisable = tokensToDisable;
     }
 
-    function scheduleWithdrawal(address, address, uint256) external view returns (uint256 tokensToDisable) {
+    function withdraw(address, address, uint256) external view returns (uint256 tokensToDisable) {
         tokensToDisable = sw_tokensToDisable;
     }
 
