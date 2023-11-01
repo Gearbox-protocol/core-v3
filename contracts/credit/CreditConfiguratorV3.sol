@@ -67,6 +67,9 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     /// @dev Set of emergency liquidators
     EnumerableSet.AddressSet internal emergencyLiquidatorsSet;
 
+    /// @notice Address of dummy token
+    address public immutable override dummyToken;
+
     /// @dev Ensures that function is not called for underlying token
     modifier nonUnderlyingTokenOnly(address token) {
         _revertIfUnderlyingToken(token);
@@ -92,6 +95,8 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         underlying = _creditManager.underlying(); // I:[CC-1]
 
         addressProvider = _creditManager.addressProvider(); // I:[CC-1]
+
+        dummyToken = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_DUMMY_TOKEN, NO_VERSION_CONTROL);
 
         address currentConfigurator = CreditManagerV3(creditManager).creditConfigurator(); // I:[CC-41]
 
@@ -304,6 +309,11 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
 
         cf.setTokenAllowance({token: token, allowance: AllowanceAction.FORBID}); // I:[CC-9]
         emit ForbidToken({token: token}); // I:[CC-9]
+    }
+
+    function removeHackedToken(address token) external override configuratorOnly {
+        CreditManagerV3(creditManager).replaceHackedCollateralToken(token, dummyToken);
+        emit RemoveHackedCollateral(token);
     }
 
     /// @notice Allows a previously forbidden collateral token in the credit facade

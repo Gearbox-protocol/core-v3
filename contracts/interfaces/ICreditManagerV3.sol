@@ -261,6 +261,8 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
         uint24 rampDuration
     ) external;
 
+    function replaceHackedCollateralToken(address token, address newToken) external;
+
     function setFees(
         uint16 feeInterest,
         uint16 feeLiquidation,

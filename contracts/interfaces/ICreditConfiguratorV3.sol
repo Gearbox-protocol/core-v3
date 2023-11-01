@@ -63,6 +63,9 @@ interface ICreditConfiguratorV3Events {
     /// @notice Emitted when a token is made quoted
     event QuoteToken(address indexed token);
 
+    /// @notice Emitted when hacked collateral tokens is changed to dummy one
+    event RemoveHackedCollateral(address token);
+
     // -------- //
     // ADAPTERS //
     // -------- //
@@ -141,6 +144,8 @@ interface ICreditConfiguratorV3 is IVersion, ICreditConfiguratorV3Events {
 
     function underlying() external view returns (address);
 
+    function dummyToken() external view returns (address);
+
     // ------ //
     // TOKENS //
     // ------ //
@@ -157,6 +162,8 @@ interface ICreditConfiguratorV3 is IVersion, ICreditConfiguratorV3Events {
     ) external;
 
     function forbidToken(address token) external;
+
+    function removeHackedToken(address token) external;
 
     function allowToken(address token) external;
 

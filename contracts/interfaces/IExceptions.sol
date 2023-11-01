@@ -131,6 +131,8 @@ error InsufficientRemainingFundsException();
 /// @notice Thrown when Credit Facade tries to write over a non-zero active Credit Account
 error ActiveCreditAccountOverridenException();
 
+/// @notice Thrown when attempting to set a new underlying token instead of hacked
+error CantRemoveUnderlyingCollateralException();
 // ------------------- //
 // CREDIT CONFIGURATOR //
 // ------------------- //
@@ -288,12 +290,6 @@ error ParameterChangedAfterQueuedTxException();
 
 /// @notice Thrown when attempting to set non-zero permissions for a forbidden bot
 error InvalidBotException();
-
-/// @notice Thrown if payment amount bigger that remaining weekly allowance
-error InsufficientWeeklyFundingAllowance();
-
-/// @notice Thrown if payment amount bigger that remaining total allowance
-error InsufficientTotalFundingAllowance();
 
 // --------------- //
 // ACCOUNT FACTORY //
