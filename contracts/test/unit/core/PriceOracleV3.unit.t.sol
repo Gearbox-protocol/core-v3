@@ -90,6 +90,7 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         assertEq(params.decimals, expectedParams.decimals, "Incorrect decimals");
         assertEq(params.skipCheck, expectedParams.skipCheck, "Incorrect skipCheck");
         assertEq(params.useReserve, expectedParams.useReserve, "Incorrect useReserve");
+        assertEq(params.trustedPriceFeed, expectedParams.trustedPriceFeed, "Incorrect trustedPriceFeed");
     }
 
     /// @notice U:[PO-3]: `_getTokenReserveKey` works as expected
