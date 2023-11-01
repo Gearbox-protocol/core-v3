@@ -20,7 +20,6 @@ import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 import {DegenNFTMock} from "../../mocks/token/DegenNFTMock.sol";
 import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
 import {BotListMock} from "../../mocks/core/BotListMock.sol";
-import {WithdrawalManagerMock} from "../../mocks/core/WithdrawalManagerMock.sol";
 import {PriceOracleMock} from "../../mocks/oracles/PriceOracleMock.sol";
 import {PriceFeedOnDemandMock} from "../../mocks/oracles/PriceFeedOnDemandMock.sol";
 import {AdapterCallMock} from "../../mocks/core/AdapterCallMock.sol";
@@ -39,7 +38,6 @@ import {
 import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {IBotListV3} from "../../../interfaces/IBotListV3.sol";
 
-import {ETH_ADDRESS, IWithdrawalManagerV3} from "../../../interfaces/IWithdrawalManagerV3.sol";
 import {BitMask, UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
@@ -70,7 +68,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
     CreditFacadeV3Harness creditFacade;
     CreditManagerMock creditManagerMock;
-    WithdrawalManagerMock withdrawalManagerMock;
     PriceOracleMock priceOracleMock;
     PoolMock poolMock;
 
@@ -133,8 +130,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         botListMock = BotListMock(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00));
 
-        withdrawalManagerMock = WithdrawalManagerMock(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00));
-
         priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00));
 
         AddressProviderV3ACLMock(address(addressProvider)).addPausableAdmin(CONFIGURATOR);
@@ -187,8 +182,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         assertEq(address(creditFacade.creditManager()), address(creditManagerMock), "Incorrect creditManager");
 
         assertEq(creditFacade.weth(), creditManagerMock.weth(), "Incorrect weth token");
-
-        assertEq(creditFacade.withdrawalManager(), address(withdrawalManagerMock), "Incorrect withdrawalManager");
 
         assertEq(creditFacade.degenNFT(), address(degenNFTMock), "Incorrect degen NFT");
     }
@@ -510,10 +503,11 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         );
 
         if (convertToETH) {
-            vm.expectCall(
-                address(withdrawalManagerMock),
-                abi.encodeCall(IWithdrawalManagerV3.claimImmediateWithdrawal, (ETH_ADDRESS, FRIEND))
-            );
+            // TODO: replace
+            // vm.expectCall(
+            //     address(withdrawalManagerMock),
+            //     abi.encodeCall(IWithdrawalManagerV3.claimImmediateWithdrawal, (ETH_ADDRESS, FRIEND))
+            // );
         }
 
         if (hasBotPermissions) {
@@ -1070,8 +1064,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 permissionRquired: UPDATE_QUOTA_PERMISSION
             }),
             MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.withdraw, (token, 0, USER)),
-                permissionRquired: WITHDRAW_PERMISSION
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (token, 0, USER)),
+                permissionRquired: WITHDRAW_COLLATERAL_PERMISSION
             }),
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.revokeAdapterAllowances, (new RevocationPair[](0))),
@@ -1490,11 +1484,11 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.withdraw, (link, 1000, USER))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (link, 1000, USER))
                 })
                 ),
             enabledTokensMask: linkMask,
-            flags: WITHDRAW_PERMISSION
+            flags: WITHDRAW_COLLATERAL_PERMISSION
         });
     }
 
@@ -1741,18 +1735,19 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         });
     }
 
-    /// @dev U:[FA-35]: multicall `withdraw` works properly
-    function test_U_FA_35_multicall_scheduleWithdrawal_works_properly() public notExpirableCase {
+    /// @dev U:[FA-35]: multicall `withdrawCollateral` works properly
+    function test_U_FA_35_multicall_withdrawCollateral_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
         address link = tokenTestSuite.addressOf(Tokens.LINK);
         uint256 maskToDisable = 1 << 7;
 
         uint256 amount = 100;
-        creditManagerMock.setScheduleWithdrawal({tokensToDisable: maskToDisable});
+        creditManagerMock.setWithdrawCollateral({tokensToDisable: maskToDisable});
 
         vm.expectCall(
-            address(creditManagerMock), abi.encodeCall(ICreditManagerV3.withdraw, (creditAccount, link, amount, USER))
+            address(creditManagerMock),
+            abi.encodeCall(ICreditManagerV3.withdrawCollateral, (creditAccount, link, amount, USER))
         );
 
         FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
@@ -1760,11 +1755,11 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.withdraw, (link, amount, USER))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (link, amount, USER))
                 })
                 ),
             enabledTokensMask: maskToDisable | UNDERLYING_TOKEN_MASK,
-            flags: WITHDRAW_PERMISSION
+            flags: WITHDRAW_COLLATERAL_PERMISSION
         });
 
         assertEq(

@@ -82,8 +82,7 @@ contract CreditManagerMock {
 
     constructor(address _addressProvider, address _pool) {
         addressProvider = _addressProvider;
-        weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // U:[CM-1]
-        withdrawalManager = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00);
+        weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL);
         setPoolService(_pool);
         creditConfigurator = CONFIGURATOR;
         supportsQuotas = true;
@@ -223,8 +222,7 @@ contract CreditManagerMock {
 
     /// @notice Returns the mask containing miscellaneous account flags
     /// @dev Currently, the following flags are supported:
-    ///      * 1 - WITHDRAWALS_FLAG - whether the account has pending withdrawals
-    ///      * 2 - BOT_PERMISSIONS_FLAG - whether the account has non-zero permissions for at least one bot
+    ///      * 1 - BOT_PERMISSIONS_FLAG - whether the account has non-zero permissions for at least one bot
     function flagsOf(address) external view returns (uint16) {
         return flags; // U:[CM-35]
     }
@@ -275,11 +273,11 @@ contract CreditManagerMock {
         tokensToDisable = md_return_tokensToDisable;
     }
 
-    function setScheduleWithdrawal(uint256 tokensToDisable) external {
+    function setWithdrawCollateral(uint256 tokensToDisable) external {
         sw_tokensToDisable = tokensToDisable;
     }
 
-    function withdraw(address, address, uint256) external view returns (uint256 tokensToDisable) {
+    function withdrawCollateral(address, address, uint256, address) external view returns (uint256 tokensToDisable) {
         tokensToDisable = sw_tokensToDisable;
     }
 

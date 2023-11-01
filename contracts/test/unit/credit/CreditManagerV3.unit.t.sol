@@ -37,7 +37,6 @@ import {
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {IWithdrawalManagerV3} from "../../../interfaces/IWithdrawalManagerV3.sol";
 import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 
 // EXCEPTIONS
@@ -49,7 +48,6 @@ import {PoolQuotaKeeperMock} from "../../mocks/pool/PoolQuotaKeeperMock.sol";
 import {ERC20FeeMock} from "../../mocks/token/ERC20FeeMock.sol";
 import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
 import {CreditAccountMock, CreditAccountMockEvents} from "../../mocks/credit/CreditAccountMock.sol";
-import {WithdrawalManagerMock} from "../../mocks/core/WithdrawalManagerMock.sol";
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
@@ -83,7 +81,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     PoolQuotaKeeperMock poolQuotaKeeperMock;
 
     PriceOracleMock priceOracleMock;
-    WithdrawalManagerMock withdrawalManagerMock;
 
     address underlying;
 
@@ -123,7 +120,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
 
         accountFactory = AccountFactoryMock(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL));
-        withdrawalManagerMock = WithdrawalManagerMock(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00));
 
         priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00));
 
@@ -301,12 +297,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         );
 
         assertEq(
-            creditManager.withdrawalManager(),
-            addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00),
-            _testCaseErr("Incorrect withdrawalManager")
-        );
-
-        assertEq(
             address(creditManager.priceOracle()),
             addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00),
             _testCaseErr("Incorrect Price oracle")
@@ -373,7 +363,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.updateQuota(DUMB_ADDRESS, DUMB_ADDRESS, 0, 0, 0);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
-        creditManager.withdraw(DUMB_ADDRESS, DUMB_ADDRESS, 0, USER);
+        creditManager.withdrawCollateral(DUMB_ADDRESS, DUMB_ADDRESS, 0, USER);
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         creditManager.revokeAdapterAllowances(DUMB_ADDRESS, new RevocationPair[](0));
@@ -474,7 +464,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.updateQuota(DUMB_ADDRESS, DUMB_ADDRESS, 0, 0, 0);
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditManager.withdraw(DUMB_ADDRESS, DUMB_ADDRESS, 0, USER);
+        creditManager.withdrawCollateral(DUMB_ADDRESS, DUMB_ADDRESS, 0, USER);
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditManager.revokeAdapterAllowances(DUMB_ADDRESS, new RevocationPair[](0));
@@ -2466,24 +2456,28 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     // SCHEDULE WITHDRAWAL
     //
 
-    /// @dev U:[CM-26]: withdraw reverts for unknown token
-    function test_U_CM_26_scheduleWithdrawal_reverts_for_unknown_token() public creditManagerTest {
+    /// @dev U:[CM-26]: withdrawCollateral reverts for unknown token
+    function test_U_CM_26_withdrawCollateral_reverts_for_unknown_token() public creditManagerTest {
         address creditAccount = DUMB_ADDRESS;
         address linkToken = tokenTestSuite.addressOf(Tokens.LINK);
         /// @notice check that it reverts on unknown token
         vm.expectRevert(TokenNotAllowedException.selector);
-        creditManager.withdraw({creditAccount: creditAccount, token: linkToken, amount: 20000, to: USER});
+        creditManager.withdrawCollateral({creditAccount: creditAccount, token: linkToken, amount: 20000, to: USER});
     }
 
-    /// @dev U:[CM-27]: withdraw transfers token
-    function test_U_CM_27_withdraw_transfers_token() public withFeeTokenCase creditManagerTest {
+    /// @dev U:[CM-27]: withdrawCollateral transfers token
+    function test_U_CM_27_withdrawCollateral_transfers_token() public withFeeTokenCase creditManagerTest {
         address creditAccount = address(new CreditAccountMock());
 
         tokenTestSuite.mint(underlying, creditAccount, DAI_ACCOUNT_AMOUNT);
 
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
-        (uint256 tokensToDisable) =
-            creditManager.withdraw({creditAccount: creditAccount, token: underlying, amount: 20_000, to: USER});
+        (uint256 tokensToDisable) = creditManager.withdrawCollateral({
+            creditAccount: creditAccount,
+            token: underlying,
+            amount: 20_000,
+            to: USER
+        });
 
         creditManager.setBorrower({creditAccount: creditAccount, borrower: USER});
 
@@ -2498,8 +2492,12 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             amount: _amountMinusFee(20_000)
         });
 
-        (tokensToDisable) =
-            creditManager.withdraw({creditAccount: creditAccount, token: underlying, amount: 20_000, to: USER});
+        (tokensToDisable) = creditManager.withdrawCollateral({
+            creditAccount: creditAccount,
+            token: underlying,
+            amount: 20_000,
+            to: USER
+        });
 
         checkTokenTransfers({debug: false});
 
@@ -2520,8 +2518,12 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             amount: _amountMinusFee(amount)
         });
 
-        (tokensToDisable) =
-            creditManager.withdraw({creditAccount: creditAccount, token: underlying, amount: amount, to: USER});
+        (tokensToDisable) = creditManager.withdrawCollateral({
+            creditAccount: creditAccount,
+            token: underlying,
+            amount: amount,
+            to: USER
+        });
 
         checkTokenTransfers({debug: false});
 
@@ -2586,7 +2588,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                     reason: string.concat("transfer token ", IERC20Metadata(token).symbol()),
                     token: token,
                     from: creditAccount,
-                    to: (convertToEth && token == weth) ? address(withdrawalManagerMock) : FRIEND,
+                    to: (convertToEth && token == weth) ? address(this) : FRIEND,
                     amount: (tokenMask == UNDERLYING_TOKEN_MASK) ? _amountMinusFee(balance - 1) : balance - 1
                 });
             }
@@ -2626,16 +2628,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 reason: "transfer token ",
                 token: weth,
                 from: creditAccount,
-                to: convertToEth ? address(withdrawalManagerMock) : FRIEND,
+                to: convertToEth ? address(this) : FRIEND,
                 amount: amount
             });
-
-            if (convertToEth) {
-                vm.expectCall(
-                    address(withdrawalManagerMock),
-                    abi.encodeCall(IWithdrawalManagerV3.addImmediateWithdrawal, (weth, address(this), amount))
-                );
-            }
 
             creditManager.safeTokenTransfer({
                 creditAccount: creditAccount,
@@ -2665,14 +2660,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             reason: "transfer token ",
             token: underlying,
             from: creditAccount,
-            to: address(withdrawalManagerMock),
+            to: address(this),
             amount: _amountMinusFee(amount)
         });
-
-        vm.expectCall(
-            address(withdrawalManagerMock),
-            abi.encodeCall(IWithdrawalManagerV3.addImmediateWithdrawal, (underlying, FRIEND, _amountMinusFee(amount)))
-        );
 
         creditManager.safeTokenTransfer({
             creditAccount: creditAccount,

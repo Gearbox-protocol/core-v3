@@ -14,7 +14,6 @@ import {GearStakingV3} from "../../governance/GearStakingV3.sol";
 import {PriceFeedConfig} from "../interfaces/ICreditConfig.sol";
 
 import "../../interfaces/IAddressProviderV3.sol";
-import {WithdrawalManagerV3} from "../../core/WithdrawalManagerV3.sol";
 import {BotListV3} from "../../core/BotListV3.sol";
 import {PriceOracleV3} from "../../core/PriceOracleV3.sol";
 import {GearToken} from "@gearbox-protocol/core-v2/contracts/tokens/GearToken.sol";
@@ -48,9 +47,6 @@ contract GenesisFactory is Ownable {
         }
 
         addressProvider.setAddress(AP_ACCOUNT_FACTORY, accountFactory, false);
-
-        WithdrawalManagerV3 wm = new WithdrawalManagerV3(address(addressProvider));
-        addressProvider.setAddress(AP_WITHDRAWAL_MANAGER, address(wm), true);
 
         BotListV3 botList = new BotListV3(address(addressProvider));
         addressProvider.setAddress(AP_BOT_LIST, address(botList), true);

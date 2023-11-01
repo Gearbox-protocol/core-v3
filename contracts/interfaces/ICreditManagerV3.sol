@@ -24,12 +24,8 @@ enum ManageDebtAction {
 ///         - `GENERIC_PARAMS` returns generic data like account debt and cumulative indexes
 ///         - `DEBT_ONLY` is same as `GENERIC_PARAMS` but includes more detailed debt info, like accrued base/quota
 ///           interest and fees
-///         - `DEBT_COLLATERAL` is same as `DEBT_ONLY` but also returns total value and total
-///           LT-weighted value of account's tokens, this mode is used during account closure
-///         - `DEBT_COLLATERAL_CANCEL_WITHDRAWALS` is same as `DEBT_COLLATERAL` but adds the value
-///           of immature scheduled withdrawals to the total value, this mode is used during liquidations
-///         - `DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS` is same as `DEBT_COLLATERAL` but adds the
-///           value of all scheduled withdrawals to the total value, this mode is used during emergency liquidations
+///         - `DEBT_COLLATERAL` is same as `DEBT_ONLY` but also returns total value and total LT-weighted value of
+///           account's tokens, this mode is used during account closure
 ///         - `FULL_COLLATERAL_CHECK_LAZY` checks whether account is sufficiently collateralized in a lazy fashion,
 ///           i.e. it stops iterating over collateral tokens once TWV reaches the desired target.
 ///           Since it may return underestimated TWV, it's only available for internal use.
@@ -130,6 +126,10 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
         external
         returns (uint256 tokenMask);
 
+    function withdrawCollateral(address creditAccount, address token, uint256 amount, address to)
+        external
+        returns (uint256 tokensToDisable);
+
     function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external;
 
     // -------- //
@@ -180,16 +180,6 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
     function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota, uint96 maxQuota)
         external
         returns (uint256 tokensToEnable, uint256 tokensToDisable);
-
-    // ----------- //
-    // WITHDRAWALS //
-    // ----------- //
-
-    function withdrawalManager() external view returns (address);
-
-    function withdraw(address creditAccount, address token, uint256 amount, address to)
-        external
-        returns (uint256 tokensToDisable);
 
     // --------------------- //
     // CREDIT MANAGER PARAMS //

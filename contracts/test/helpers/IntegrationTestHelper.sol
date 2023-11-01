@@ -24,7 +24,6 @@ import {ICreditFacadeV3Multicall} from "../../interfaces/ICreditFacadeV3.sol";
 
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {IPriceOracleV3} from "../../interfaces/IPriceOracleV3.sol";
-import {IWithdrawalManagerV3} from "../../interfaces/IWithdrawalManagerV3.sol";
 import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
 import {PoolFactory} from "../suites/PoolFactory.sol";
 
@@ -59,7 +58,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     ContractsRegister cr;
     AccountFactory accountFactory;
     IPriceOracleV3 priceOracle;
-    IWithdrawalManagerV3 withdrawalManager;
     BotListV3 botList;
 
     /// POOL & CREDIT MANAGER
@@ -295,7 +293,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, NO_VERSION_CONTROL));
         accountFactory = AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL));
         priceOracle = IPriceOracleV3(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00));
-        withdrawalManager = IWithdrawalManagerV3(addressProvider.getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00));
         botList = BotListV3(payable(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00)));
     }
 

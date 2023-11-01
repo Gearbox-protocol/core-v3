@@ -62,7 +62,10 @@ interface ICreditFacadeV3Events {
     event DecreaseDebt(address indexed creditAccount, uint256 amount);
 
     /// @notice Emitted when collateral is added to account
-    event AddCollateral(address indexed creditAccount, address indexed token, uint256 value);
+    event AddCollateral(address indexed creditAccount, address indexed token, uint256 amount);
+
+    /// @notice Emitted when collateral is withdrawn from account
+    event WithdrawCollateral(address indexed creditAccount, address indexed token, uint256 amount);
 
     /// @notice Emitted when a multicall is started
     event StartMultiCall(address indexed creditAccount, address indexed caller);
@@ -86,8 +89,6 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
     function weth() external view returns (address);
 
     function botList() external view returns (address);
-
-    function withdrawalManager() external view returns (address);
 
     function maxDebtPerBlockMultiplier() external view returns (uint8);
 

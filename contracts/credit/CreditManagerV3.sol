@@ -21,7 +21,6 @@ import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 import {IAccountFactoryBase} from "../interfaces/IAccountFactoryV3.sol";
 import {ICreditAccountBase} from "../interfaces/ICreditAccountV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
-import {IWithdrawalManagerV3} from "../interfaces/IWithdrawalManagerV3.sol";
 import {
     ICreditManagerV3,
     CollateralTokenData,
@@ -73,9 +72,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     /// @notice WETH token address
     address public immutable override weth;
-
-    /// @notice Withdrawal manager contract address
-    address public immutable override withdrawalManager;
 
     /// @notice Address of the connected credit facade
     address public override creditFacade;
@@ -167,7 +163,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // U:[CM-1]
         priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_PRICE_ORACLE, 3_00); // U:[CM-1]
         accountFactory = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL); // U:[CM-1]
-        withdrawalManager = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00); // U:[CM-1]
 
         creditConfigurator = msg.sender; // U:[CM-1]
 
@@ -481,6 +476,29 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         IERC20(token).safeTransferFrom({from: payer, to: creditAccount, amount: amount}); // U:[CM-13]
     }
 
+    /// @notice Withdraws `amount` of `token` collateral from `creditAccount` to `to`
+    /// @param creditAccount Credit account to withdraw collateral from
+    /// @param token Token to withdraw
+    /// @param amount Amount to withdraw
+    /// @param to Address to transfer token to
+    /// @return tokensToDisable Mask of tokens that should be disabled after the operation
+    ///         (equals `token`'s mask if withdrawing the entire balance, zero otherwise)
+    function withdrawCollateral(address creditAccount, address token, uint256 amount, address to)
+        external
+        override
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // U:[CM-2]
+        returns (uint256 tokensToDisable)
+    {
+        uint256 tokenMask = getTokenMaskOrRevert({token: token}); // U:[CM-26]
+
+        _safeTokenTransfer({creditAccount: creditAccount, token: token, to: to, amount: amount, convertToETH: false}); // U:[CM-27]
+
+        if (IERC20(token).safeBalanceOf({account: creditAccount}) <= 1) {
+            tokensToDisable = tokenMask; // U:[CM-27]
+        }
+    }
+
     /// @notice Revokes credit account's allowances for specified spender/token pairs
     /// @param creditAccount Account to revoke allowances for
     /// @param revocations Array of spender/token pairs
@@ -587,6 +605,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param collateralHints Optional array of token masks to check first to reduce the amount of computation
     ///        when known subset of account's collateral tokens covers all the debt
     /// @param minHealthFactor Health factor threshold in bps, the check fails if `twvUSD < minHealthFactor * totalDebtUSD`
+    /// @param reservePriceFeedCheck Whether to use worse of main and reserve feed prices when evaluating collateral
     /// @return enabledTokensMaskAfter Bitmask of account's enabled collateral tokens after potential cleanup
     /// @dev Reverts if `collateralHints` contains masks that don't correspond to known collateral tokens
     /// @dev Even when `collateralHints` are specified, quoted tokens are evaluated before non-quoted ones
@@ -682,6 +701,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param collateralHints Optional array of token masks specifying the order of checking collateral tokens
     /// @param minHealthFactor Health factor in bps to stop the calculations after when performing collateral check
     /// @param task Calculation mode, see `CollateralCalcTask` for details
+    /// @param reservePriceFeedCheck Whether to use worse of main and reserve feed prices when evaluating collateral
     /// @return cdd A struct with debt and collateral data
     function _calcDebtAndCollateral(
         address creditAccount,
@@ -926,33 +946,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         currentCreditAccountInfo.cumulativeQuotaInterest += caInterestChange; // U:[CM-25]
         if (quotaFees != 0) {
             currentCreditAccountInfo.quotaFees += quotaFees;
-        }
-    }
-
-    // ----------- //
-    // WITHDRAWALS //
-    // ----------- //
-
-    /// @notice Withdraws token from the credit account
-    /// @param creditAccount Credit account to schedule a withdrawal from
-    /// @param token Token to withdraw
-    /// @param amount Amount to withdraw
-    /// @param to receiver
-    /// @return tokensToDisable Mask of tokens that should be disabled after the operation
-    ///         (equals `token`'s mask if withdrawing the entire balance, zero otherwise)
-    function withdraw(address creditAccount, address token, uint256 amount, address to)
-        external
-        override
-        nonReentrant // U:[CM-5]
-        creditFacadeOnly // U:[CM-2]
-        returns (uint256 tokensToDisable)
-    {
-        uint256 tokenMask = getTokenMaskOrRevert({token: token}); // U:[CM-26]
-
-        _safeTokenTransfer({creditAccount: creditAccount, token: token, to: to, amount: amount, convertToETH: false}); // U:[CM-27]
-
-        if (IERC20(token).safeBalanceOf({account: creditAccount}) <= 1) {
-            tokensToDisable = tokenMask; // U:[CM-27]
         }
     }
 
@@ -1375,19 +1368,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     /// @dev Transfers `amount` of `token` from `creditAccount` to `to`
-    /// @dev If `convertToETH` is true and `token` is WETH, it will be transferred to the withdrawal manager,
-    ///      from which the caller can later claim it as ETH to an arbitrary address
-    /// @dev If transfer fails, the token will be transferred to withdrawal manager from which `to`
-    ///      can later claim it to an arbitrary address (can be helpful for blacklistable tokens)
+    /// @dev If `convertToETH` is true and `token` is WETH, it will be transferred to the credit facade,
+    ///      which should later unwrap it and send ETH to specified address
     function _safeTokenTransfer(address creditAccount, address token, address to, uint256 amount, bool convertToETH)
         internal
     {
-        if (convertToETH && token == weth) {
-            ICreditAccountBase(creditAccount).transfer({token: token, to: withdrawalManager, amount: amount}); // U:[CM-31, 32]
-            _addImmediateWithdrawal({token: token, to: msg.sender, amount: amount}); // U:[CM-31, 32]
-        } else {
-            ICreditAccountBase(creditAccount).safeTransfer({token: token, to: to, amount: amount});
-        }
+        if (convertToETH && token == weth) to = msg.sender; // U:[CM-31, 32]
+        ICreditAccountBase(creditAccount).transfer({token: token, to: to, amount: amount}); // U:[CM-31, 32]
     }
 
     /// @dev Approves `amount` of `token` from `creditAccount` to `spender`
@@ -1437,7 +1424,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         amountInToken = IPriceOracleV3(_priceOracle).convertFromUSD(amountInUSD, token);
     }
 
-    /// @dev Internal wrapper for `priceOracle.convertToUSD` call to reduce contract size
+    /// @dev Internal wrapper for `priceOracle.convertToUSDReserveCheck` call to reduce contract size
     function _convertToUSDReserveCheck(address _priceOracle, uint256 amountInToken, address token)
         internal
         view
@@ -1446,18 +1433,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         amountInUSD = IPriceOracleV3(_priceOracle).convertToUSDReserveCheck(amountInToken, token);
     }
 
-    /// @dev Internal wrapper for `priceOracle.convertFromUSD` call to reduce contract size
+    /// @dev Internal wrapper for `priceOracle.convertFromUSDReserveCheck` call to reduce contract size
     function _convertFromUSDReserveCheck(address _priceOracle, uint256 amountInUSD, address token)
         internal
         view
         returns (uint256 amountInToken)
     {
         amountInToken = IPriceOracleV3(_priceOracle).convertFromUSDReserveCheck(amountInUSD, token);
-    }
-
-    /// @dev Internal wrapper for `withdrawalManager.addImmediateWithdrawal` call to reduce contract size
-    function _addImmediateWithdrawal(address token, address to, uint256 amount) internal {
-        IWithdrawalManagerV3(withdrawalManager).addImmediateWithdrawal({token: token, to: to, amount: amount});
     }
 
     /// @dev Reverts if `msg.sender` is not the credit facade

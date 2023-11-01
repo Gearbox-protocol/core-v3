@@ -285,9 +285,6 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         address weth = tokenTestSuite.addressOf(Tokens.WETH);
         uint256 wethMask = creditManager.getTokenMaskOrRevert(weth);
 
-        vm.prank(CONFIGURATOR);
-        withdrawalManager.addCreditManager(address(creditManager));
-
         vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(USER, MultiCallBuilder.build(), 0);
         tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);

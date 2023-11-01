@@ -29,7 +29,6 @@ import {
     INACTIVE_CREDIT_ACCOUNT_ADDRESS
 } from "../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
-import {ETH_ADDRESS, IWithdrawalManagerV3} from "../interfaces/IWithdrawalManagerV3.sol";
 import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
 import {IUpdatablePriceFeed} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceFeed.sol";
 
@@ -44,18 +43,20 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/C
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
-uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS & ~(DECREASE_DEBT_PERMISSION | WITHDRAW_PERMISSION);
+uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS =
+    ALL_PERMISSIONS & ~(DECREASE_DEBT_PERMISSION | WITHDRAW_COLLATERAL_PERMISSION);
 
-uint256 constant CLOSE_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS & ~(INCREASE_DEBT_PERMISSION | WITHDRAW_PERMISSION);
+uint256 constant CLOSE_CREDIT_ACCOUNT_FLAGS =
+    ALL_PERMISSIONS & ~(INCREASE_DEBT_PERMISSION | WITHDRAW_COLLATERAL_PERMISSION);
 
 uint256 constant LIQUIDATE_CREDIT_ACCOUNT_FLAGS = EXTERNAL_CALLS_PERMISSION | ADD_COLLATERAL_PERMISSION;
 
 /// @title Credit facade V3
 /// @notice Provides a user interface to open, close and liquidate leveraged positions in the credit manager,
 ///         and implements the main entry-point for credit accounts management: multicall.
-/// @notice Multicall allows account owners to batch all the desired operations (changing debt size, interacting with
-///         external protocols via adapters, increasing quotas or scheduling withdrawals) into one call, followed by
-///         the collateral check that ensures that account is sufficiently collateralized.
+/// @notice Multicall allows account owners to batch all the desired operations (adding or withdrawing collateral,
+///         changing debt size, interacting with external protocols via adapters or increasing quotas) into one call,
+///         followed by the collateral check that ensures that account is sufficiently collateralized.
 ///         For more details on what one can achieve with multicalls, see `_multicall` and  `ICreditFacadeV3Multicall`.
 /// @notice Users can also let external bots manage their accounts via `botMulticall`. Bots can be relatively general,
 ///         the facade only ensures that they can do no harm to the protocol by running the collateral check after the
@@ -65,6 +66,7 @@ uint256 constant LIQUIDATE_CREDIT_ACCOUNT_FLAGS = EXTERNAL_CALLS_PERMISSION | AD
 ///         (they count towards account value, but having them enabled as collateral restricts available actions).
 contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     using Address for address;
+    using Address for address payable;
     using BitMask for uint256;
     using SafeCast for uint256;
     using SafeERC20 for IERC20;
@@ -86,9 +88,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
     /// @notice WETH token address
     address public immutable override weth;
-
-    /// @notice Withdrawal manager address
-    address public immutable override withdrawalManager;
 
     /// @notice Degen NFT address
     address public immutable override degenNFT;
@@ -160,7 +159,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         creditManager = _creditManager; // U:[FA-1]
 
         weth = ICreditManagerV3(_creditManager).weth(); // U:[FA-1]
-        withdrawalManager = ICreditManagerV3(_creditManager).withdrawalManager(); // U:[FA-1]
         botList =
             IAddressProviderV3(ICreditManagerV3(_creditManager).addressProvider()).getAddressOrRevert(AP_BOT_LIST, 3_00);
 
@@ -233,6 +231,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     ///         - Erases all bots permissions
     ///         - Performs a multicall (all calls are allowed except debt increase and withdrawals)
     ///         - Closes a credit account in the credit manager, which transfers specified tokens to the recipient
+    ///         - If facade has any WETH at the end of the function, unwraps it and sends to the recipient
     /// @param creditAccount Account to close
     /// @param to Address to send withdrawals and any tokens left on the account after closure
     /// @param tokensToTransferMask Bit mask of tokens left on the account that should be sent
@@ -272,7 +271,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         });
 
         if (convertToETH) {
-            _wethWithdrawTo(to); // U:[FA-11]
+            _unwrapWETH(to); // U:[FA-11]
         }
 
         emit CloseCreditAccount(creditAccount, msg.sender, to); // U:[FA-11]
@@ -281,16 +280,14 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @notice Liquidates a credit account
     ///         - Updates price feeds before running all computations if such calls are present in the multicall
     ///         - Evaluates account's collateral and debt to determine whether liquidated account is unhealthy or expired
-    ///         - Cancels immature scheduled withdrawals and returns tokens to the account (on emergency, even mature
-    ///           withdrawals are returned)
     ///         - Performs a multicall (only `addCollateral` and adapter calls are allowed)
-    ///         - Erases all bots permissions
     ///         - Liquidates a credit account in the credit manager, which repays debt to the pool, removes quotas
     ///           and transfers specified tokens to the liquidator
     ///         - If pool incurs a loss on liquidation, further borrowing through the facade is forbidden
     ///         - If cumulative loss from bad debt liquidations exceeds the threshold, the facade is paused
-    /// @notice The function computes account’s total value (oracle value of enabled tokens and cancellable withdrawals),
-    ///         discounts it by liquidator’s premium, and uses this value to compute funds due to the pool and owner.
+    ///         - If facade has any WETH at the end of the function, unwraps it and sends to the recipient
+    /// @notice The function computes account’s total value (oracle value of enabled tokens), discounts it by liquidator’s
+    ///         premium, and uses this value to compute funds due to the pool and owner.
     ///         Debt to the pool must be repaid in underlying, while funds due to owner might be covered by underlying
     ///         as well as by tokens that counted towards total value calculation, with the only condition that balance
     ///         of such tokens can’t be increased in the multicall.
@@ -361,8 +358,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             if (!success) revert RemainingTokenBalanceIncreasedException(); // U:[FA-16]
         }
 
-        _eraseAllBotPermissions({creditAccount: creditAccount}); // U:[FA-16]
-
         (uint256 remainingFunds, uint256 reportedLoss) = ICreditManagerV3(creditManager).liquidateCreditAccount({
             creditAccount: creditAccount,
             collateralDebtData: collateralDebtData,
@@ -372,7 +367,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             isExpired: isExpired
         }); // U:[FA-16]
 
-        if (reportedLoss > 0) {
+        if (reportedLoss != 0) {
             maxDebtPerBlockMultiplier = 0; // U:[FA-17]
 
             // both cast and addition are safe because amounts are of much smaller scale
@@ -385,7 +380,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         }
 
         if (convertToETH) {
-            _wethWithdrawTo(to); // U:[FA-16]
+            _unwrapWETH(to); // U:[FA-16]
         }
 
         emit LiquidateCreditAccount(creditAccount, borrower, msg.sender, to, remainingFunds); // U:[FA-14,16,17]
@@ -581,16 +576,14 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                             _updateQuota(creditAccount, mcall.callData[4:], flags & FORBIDDEN_TOKENS_BEFORE_CALLS != 0); // U:[FA-34]
                         enabledTokensMask = enabledTokensMask.enableDisable(tokensToEnable, tokensToDisable); // U:[FA-34]
                     }
-                    // withdraw
-                    else if (method == ICreditFacadeV3Multicall.withdraw.selector) {
-                        _revertIfNoPermission(flags, WITHDRAW_PERMISSION); // U:[FA-21]
+                    // withdrawCollateral
+                    else if (method == ICreditFacadeV3Multicall.withdrawCollateral.selector) {
+                        _revertIfNoPermission(flags, WITHDRAW_COLLATERAL_PERMISSION); // U:[FA-21]
 
                         flags = flags.enable(REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS); // U:[FA-30]
-
-                        // It enabled additinal check that all collateral tokens pricefeeds work correctly
                         fullCheckParams.reservePriceFeedCheck = true;
 
-                        uint256 tokensToDisable = _withdraw(creditAccount, mcall.callData[4:]); // U:[FA-34]
+                        uint256 tokensToDisable = _withdrawCollateral(creditAccount, mcall.callData[4:]); // U:[FA-34]
 
                         quotedTokensMaskInverted = _quotedTokensMaskInvertedLoE(quotedTokensMaskInverted);
 
@@ -858,7 +851,11 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         }); // U:[FA-34]
     }
 
-    function _withdraw(address creditAccount, bytes calldata callData) internal returns (uint256 tokensToDisable) {
+    /// @dev `ICreditFacadeV3Multicall.withdrawCollateral` implementation
+    function _withdrawCollateral(address creditAccount, bytes calldata callData)
+        internal
+        returns (uint256 tokensToDisable)
+    {
         (address token, uint256 amount, address to) = abi.decode(callData, (address, uint256, address)); // U:[FA-35]
 
         if (amount == type(uint256).max) {
@@ -868,7 +865,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                 --amount;
             }
         }
-        tokensToDisable = ICreditManagerV3(creditManager).withdraw(creditAccount, token, amount, to); // U:[FA-35]
+        tokensToDisable = ICreditManagerV3(creditManager).withdrawCollateral(creditAccount, token, amount, to); // U:[FA-35]
+
+        emit WithdrawCollateral(creditAccount, token, amount); // U:[FA-35]
     }
 
     /// @dev `ICreditFacadeV3Multicall.revokeAdapterAllowances` implementation
@@ -1046,9 +1045,13 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         }
     }
 
-    /// @dev Claims ETH from withdrawal manager, expecting that WETH was deposited there earlier in the transaction
-    function _wethWithdrawTo(address to) internal {
-        IWithdrawalManagerV3(withdrawalManager).claimImmediateWithdrawal({token: ETH_ADDRESS, to: to});
+    /// @dev Unwraps WETH received previously and sends it to `to`
+    function _unwrapWETH(address to) internal {
+        uint256 balance = IERC20(weth).safeBalanceOf(address(this));
+        if (balance > 0) {
+            IWETH(weth).withdraw(balance);
+            payable(to).sendValue(balance);
+        }
     }
 
     /// @dev Whether credit facade has expired (`false` if it's not expirable or expiration timestamp is not set)

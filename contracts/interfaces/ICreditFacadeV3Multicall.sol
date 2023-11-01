@@ -15,14 +15,14 @@ uint192 constant INCREASE_DEBT_PERMISSION = 1 << 1;
 uint192 constant DECREASE_DEBT_PERMISSION = 1 << 2;
 uint192 constant ENABLE_TOKEN_PERMISSION = 1 << 3;
 uint192 constant DISABLE_TOKEN_PERMISSION = 1 << 4;
-uint192 constant WITHDRAW_PERMISSION = 1 << 5;
+uint192 constant WITHDRAW_COLLATERAL_PERMISSION = 1 << 5;
 uint192 constant UPDATE_QUOTA_PERMISSION = 1 << 6;
 uint192 constant REVOKE_ALLOWANCES_PERMISSION = 1 << 7;
 
 uint192 constant EXTERNAL_CALLS_PERMISSION = 1 << 16;
 
-uint256 constant ALL_CREDIT_FACADE_CALLS_PERMISSION = ADD_COLLATERAL_PERMISSION | INCREASE_DEBT_PERMISSION
-    | DECREASE_DEBT_PERMISSION | ENABLE_TOKEN_PERMISSION | DISABLE_TOKEN_PERMISSION | WITHDRAW_PERMISSION
+uint256 constant ALL_CREDIT_FACADE_CALLS_PERMISSION = ADD_COLLATERAL_PERMISSION | WITHDRAW_COLLATERAL_PERMISSION
+    | INCREASE_DEBT_PERMISSION | DECREASE_DEBT_PERMISSION | ENABLE_TOKEN_PERMISSION | DISABLE_TOKEN_PERMISSION
     | UPDATE_QUOTA_PERMISSION | REVOKE_ALLOWANCES_PERMISSION;
 
 uint256 constant ALL_PERMISSIONS = ALL_CREDIT_FACADE_CALLS_PERMISSION | EXTERNAL_CALLS_PERMISSION;
@@ -105,12 +105,14 @@ interface ICreditFacadeV3Multicall {
     /// @dev Resulting account's quota for token must not exceed the limit defined in the facade
     function updateQuota(address token, int96 quotaChange, uint96 minQuota) external;
 
-    /// @notice Withdraw tokens from account
+    /// @notice Withdraws collateral from account
     /// @param token Token to withdraw
-    /// @param amount Amount to withdraw
+    /// @param amount Amount to withdraw, `type(uint256).max` to withdraw all balance
+    /// @param to Token recipient
     /// @dev Withdrawals are prohibited if there are forbidden tokens enabled as collateral on the account
     /// @dev Withdrawals are prohibited when opening or closing an account
-    function withdraw(address token, uint256 amount, address to) external;
+    /// @dev Withdrawals activate a secure variant of collateral check that uses worse of main and reserve feed prices
+    function withdrawCollateral(address token, uint256 amount, address to) external;
 
     /// @notice Sets advanced collateral check parameters
     /// @param collateralHints Optional array of token masks to check first to reduce the amount of computation
