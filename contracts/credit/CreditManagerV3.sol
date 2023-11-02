@@ -1260,6 +1260,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         uint256 tokenMask = getTokenMaskOrRevert({token: token}); // U:[CM-41]
         collateralTokensData[tokenMask].token = newToken;
+
+        tokenMasksMapInternal[token] = 0;
+        tokenMasksMapInternal[newToken] = tokenMask;
     }
 
     /// @notice Sets a new quoted token mask
