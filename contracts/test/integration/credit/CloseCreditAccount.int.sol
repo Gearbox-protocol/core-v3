@@ -73,7 +73,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
 
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
         vm.prank(USER);
-        creditFacade.liquidateCreditAccount(DUMB_ADDRESS, DUMB_ADDRESS, 0, false, MultiCallBuilder.build());
+        creditFacade.liquidateCreditAccount(DUMB_ADDRESS, DUMB_ADDRESS, MultiCallBuilder.build());
 
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
         vm.prank(USER);

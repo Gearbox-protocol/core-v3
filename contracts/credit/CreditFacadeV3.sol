@@ -48,7 +48,8 @@ uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS =
 
 uint256 constant CLOSE_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS & ~INCREASE_DEBT_PERMISSION;
 
-uint256 constant LIQUIDATE_CREDIT_ACCOUNT_FLAGS = EXTERNAL_CALLS_PERMISSION | ADD_COLLATERAL_PERMISSION;
+uint256 constant LIQUIDATE_CREDIT_ACCOUNT_FLAGS =
+    EXTERNAL_CALLS_PERMISSION | ADD_COLLATERAL_PERMISSION | WITHDRAW_COLLATERAL_PERMISSION;
 
 /// @title Credit facade V3
 /// @notice Provides a user interface to open, close and liquidate leveraged positions in the credit manager,
@@ -285,20 +286,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     ///         to handle them in another way, while remaining tokens would cover funds due to owner.
     /// @param creditAccount Account to liquidate
     /// @param to Address to send tokens left on the account after liquidation
-    /// @param tokensToTransferMask Bit mask of tokens left on the account that should be sent
-    /// @param convertToETH Whether to unwrap WETH before sending to `to`
     /// @param calls List of calls to perform before liquidating the account
     /// @dev When the credit facade is paused, reverts if caller is not an approved emergency liquidator
     /// @dev Reverts if `creditAccount` is not opened in connected credit manager
     /// @dev Reverts if account is not liquidatable
     /// @dev Reverts if remaining token balances increase during the multicall
-    function liquidateCreditAccount(
-        address creditAccount,
-        address to,
-        uint256 tokensToTransferMask,
-        bool convertToETH,
-        MultiCall[] calldata calls
-    )
+    function liquidateCreditAccount(address creditAccount, address to, MultiCall[] calldata calls)
         external
         override
         whenNotPausedOrEmergency // U:[FA-2,12]
@@ -323,28 +316,32 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         if (!isLiquidatable) revert CreditAccountNotLiquidatableException(); // U:[FA-13]
 
-        if (skipCalls < calls.length) {
-            uint256 remainingTokensMask =
-                collateralDebtData.enabledTokensMask.disable(tokensToTransferMask).disable(UNDERLYING_TOKEN_MASK);
+        {
+            collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.disable(UNDERLYING_TOKEN_MASK);
+
             BalanceWithMask[] memory remainingBalances = BalancesLogic.storeBalances({
                 creditAccount: creditAccount,
-                tokensMask: remainingTokensMask,
+                tokensMask: collateralDebtData.enabledTokensMask,
                 getTokenByMaskFn: _getTokenByMask
             });
 
-            _multicall(
+            FullCheckParams memory fullCheckParams = _multicall(
                 creditAccount, calls, collateralDebtData.enabledTokensMask, LIQUIDATE_CREDIT_ACCOUNT_FLAGS, skipCalls
             ); // U:[FA-16]
 
+            collateralDebtData.enabledTokensMask &= fullCheckParams.enabledTokensMaskAfter;
+
             bool success = BalancesLogic.compareBalances({
                 creditAccount: creditAccount,
-                tokensMask: remainingTokensMask,
+                tokensMask: collateralDebtData.enabledTokensMask,
                 balances: remainingBalances,
                 comparison: Comparison.LESS
             });
 
             if (!success) revert RemainingTokenBalanceIncreasedException(); // U:[FA-16]
         }
+
+        collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(UNDERLYING_TOKEN_MASK);
 
         (uint256 remainingFunds, uint256 reportedLoss) = ICreditManagerV3(creditManager).liquidateCreditAccount({
             creditAccount: creditAccount,
@@ -363,10 +360,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             if (!paused() && lossParams.currentCumulativeLoss > lossParams.maxCumulativeLoss) {
                 _pause(); // U:[FA-17]
             }
-        }
-
-        if (convertToETH) {
-            _unwrapWETH(to); // U:[FA-16]
         }
 
         emit LiquidateCreditAccount(creditAccount, borrower, msg.sender, to, remainingFunds); // U:[FA-14,16,17]
@@ -1032,15 +1025,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         if (msg.value != 0) {
             IWETH(weth).deposit{value: msg.value}(); // U:[FA-7]
             IERC20(weth).safeTransfer(msg.sender, msg.value); // U:[FA-7]
-        }
-    }
-
-    /// @dev Unwraps WETH received previously and sends it to `to`
-    function _unwrapWETH(address to) internal {
-        uint256 balance = IERC20(weth).safeBalanceOf(address(this));
-        if (balance > 0) {
-            IWETH(weth).withdraw(balance);
-            payable(to).sendValue(balance);
         }
     }
 

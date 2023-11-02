@@ -120,13 +120,7 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
 
     function closeCreditAccount(address creditAccount, MultiCall[] calldata calls) external payable;
 
-    function liquidateCreditAccount(
-        address creditAccount,
-        address to,
-        uint256 tokensToTransferMask,
-        bool convertToETH,
-        MultiCall[] calldata calls
-    ) external;
+    function liquidateCreditAccount(address creditAccount, address to, MultiCall[] calldata calls) external;
 
     function multicall(address creditAccount, MultiCall[] calldata calls) external payable;
 

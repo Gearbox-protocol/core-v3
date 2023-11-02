@@ -842,7 +842,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         uint256 gasBefore = gasleft();
 
         vm.prank(FRIEND);
-        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 0, false, new MultiCall[](0));
+        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, new MultiCall[](0));
 
         uint256 gasSpent = gasBefore - gasleft();
 
@@ -888,7 +888,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         uint256 gasBefore = gasleft();
 
         vm.prank(FRIEND);
-        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 0, false, new MultiCall[](0));
+        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, new MultiCall[](0));
 
         uint256 gasSpent = gasBefore - gasleft();
 
@@ -945,7 +945,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         uint256 gasBefore = gasleft();
 
         vm.prank(FRIEND);
-        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 0, false, new MultiCall[](0));
+        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, new MultiCall[](0));
 
         uint256 gasSpent = gasBefore - gasleft();
 

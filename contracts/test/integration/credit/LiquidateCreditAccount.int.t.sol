@@ -30,7 +30,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
     function test_I_LCA_01_liquidateCreditAccount_reverts_if_credit_account_not_exists() public creditTest {
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
         vm.prank(USER);
-        creditFacade.liquidateCreditAccount(DUMB_ADDRESS, DUMB_ADDRESS, 0, false, MultiCallBuilder.build());
+        creditFacade.liquidateCreditAccount(DUMB_ADDRESS, DUMB_ADDRESS, MultiCallBuilder.build());
     }
 
     /// @dev I:[LCA-2]: liquidateCreditAccount reverts if hf > 1
@@ -40,7 +40,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
         vm.expectRevert(CreditAccountNotLiquidatableException.selector);
 
         vm.prank(LIQUIDATOR);
-        creditFacade.liquidateCreditAccount(creditAccount, LIQUIDATOR, 0, true, MultiCallBuilder.build());
+        creditFacade.liquidateCreditAccount(creditAccount, LIQUIDATOR, MultiCallBuilder.build());
     }
 
     /// @dev I:[LCA-3]: liquidateCreditAccount executes needed calls and emits events
@@ -117,7 +117,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
         emit LiquidateCreditAccount(creditAccount, USER, LIQUIDATOR, FRIEND, 0);
 
         vm.prank(LIQUIDATOR);
-        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 10, false, calls);
+        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, calls);
     }
 
     /// @dev I:[LCA-4]: Borrowing is prohibited after a liquidation with loss
@@ -135,7 +135,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
         _makeAccountsLiquitable();
 
         vm.prank(LIQUIDATOR);
-        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 10, false, calls);
+        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, calls);
 
         maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
 
@@ -160,7 +160,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
         _makeAccountsLiquitable();
 
         vm.prank(LIQUIDATOR);
-        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 10, false, calls);
+        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, calls);
 
         assertTrue(creditFacade.paused(), "Credit manager was not paused");
     }
@@ -187,7 +187,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
         vm.prank(LIQUIDATOR);
 
         // It's used dumb calldata, cause all calls to creditFacade are forbidden
-        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, 10, true, calls);
+        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, calls);
     }
 
     /// @dev I:[LCA-7]: liquidateCreditAccount sets correct values and transfers tokens from pool

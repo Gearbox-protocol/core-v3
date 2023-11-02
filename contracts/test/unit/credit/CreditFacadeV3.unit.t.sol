@@ -201,13 +201,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         /// @notice We'll check that it works for emergency liquidatior as exceptions in another test
         vm.expectRevert("Pausable: paused");
-        creditFacade.liquidateCreditAccount({
-            creditAccount: DUMB_ADDRESS,
-            to: DUMB_ADDRESS,
-            tokensToTransferMask: 1,
-            convertToETH: false,
-            calls: new MultiCall[](0)
-        });
+        creditFacade.liquidateCreditAccount({creditAccount: DUMB_ADDRESS, to: DUMB_ADDRESS, calls: new MultiCall[](0)});
 
         vm.expectRevert("Pausable: paused");
         creditFacade.multicall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
@@ -246,13 +240,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.closeCreditAccount({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditFacade.liquidateCreditAccount({
-            creditAccount: DUMB_ADDRESS,
-            to: DUMB_ADDRESS,
-            tokensToTransferMask: 1,
-            convertToETH: false,
-            calls: new MultiCall[](0)
-        });
+        creditFacade.liquidateCreditAccount({creditAccount: DUMB_ADDRESS, to: DUMB_ADDRESS, calls: new MultiCall[](0)});
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditFacade.multicall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
@@ -270,13 +258,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.closeCreditAccount({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
 
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
-        creditFacade.liquidateCreditAccount({
-            creditAccount: DUMB_ADDRESS,
-            to: DUMB_ADDRESS,
-            tokensToTransferMask: 1,
-            convertToETH: false,
-            calls: new MultiCall[](0)
-        });
+        creditFacade.liquidateCreditAccount({creditAccount: DUMB_ADDRESS, to: DUMB_ADDRESS, calls: new MultiCall[](0)});
 
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
         creditFacade.multicall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});

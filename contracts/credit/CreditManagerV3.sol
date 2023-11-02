@@ -326,6 +326,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             }
         }
 
+        /// Disable bits related to quotas and stores updated token mask
+        _saveEnabledTokensMask(
+            creditAccount, collateralDebtData.enabledTokensMask.disable(collateralDebtData.quotedTokensMask)
+        );
+
         return (remainingFunds, loss);
     }
 
