@@ -113,8 +113,6 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
         address creditAccount,
         CollateralDebtData calldata collateralDebtData,
         address to,
-        uint256 tokensToTransferMask,
-        bool convertToETH,
         bool isExpired
     ) external returns (uint256 remainingFunds, uint256 loss);
 

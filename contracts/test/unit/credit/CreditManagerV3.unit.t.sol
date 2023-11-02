@@ -340,8 +340,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             creditAccount: DUMB_ADDRESS,
             collateralDebtData: collateralDebtData,
             to: DUMB_ADDRESS,
-            tokensToTransferMask: 0,
-            convertToETH: false,
             isExpired: false
         });
 
@@ -436,8 +434,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             creditAccount: DUMB_ADDRESS,
             collateralDebtData: collateralDebtData,
             to: DUMB_ADDRESS,
-            tokensToTransferMask: 0,
-            convertToETH: false,
             isExpired: false
         });
 
@@ -2512,120 +2508,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         checkTokenTransfers({debug: false});
 
         assertEq(tokensToDisable, UNDERLYING_TOKEN_MASK, _testCaseErr("Incorrect token to disable"));
-    }
-
-    //
-    //
-    // TOKEN TRANSFER HELPERS
-    //
-    //
-
-    //
-    // BATCH TOKEN TRANSFER
-    //
-
-    /// @dev U:[CM-31]: batchTokensTransfer works correctly
-    function test_U_CM_31_batchTokensTransfer_works_correctly(uint256 tokensToTransferMask)
-        public
-        withFeeTokenCase
-        creditManagerTest
-    {
-        bool convertToEth = (uint256(keccak256(abi.encode((tokensToTransferMask)))) % 2) != 0;
-        uint8 numberOfTokens = uint8(tokensToTransferMask % 253);
-
-        /// @notice `+2` for underlying and WETH token
-        tokensToTransferMask &= (1 << (numberOfTokens + 2)) - 1;
-
-        address creditAccount = address(new CreditAccountMock());
-        address weth = tokenTestSuite.addressOf(Tokens.WETH);
-
-        vm.startPrank(CONFIGURATOR);
-        creditManager.addToken(weth);
-        creditManager.setCollateralTokenData(weth, 8000, 8000, type(uint40).max, 0);
-
-        vm.stopPrank();
-
-        {
-            tokenTestSuite.mint({
-                token: underlying,
-                to: creditAccount,
-                amount: uint256(keccak256(abi.encode((tokensToTransferMask)))) % type(uint192).max
-            });
-            uint256 randomAmount = tokensToTransferMask % DAI_ACCOUNT_AMOUNT;
-            tokenTestSuite.mint({token: weth, to: creditAccount, amount: randomAmount});
-            _addTokensBatch({creditAccount: creditAccount, numberOfTokens: numberOfTokens, balance: randomAmount});
-        }
-
-        caseName = string.concat(caseName, "token transfer with ", Strings.toString(numberOfTokens), " on account");
-
-        startTokenTrackingSession(caseName);
-
-        uint8 len = creditManager.collateralTokensCount();
-
-        for (uint8 i = 0; i < len; ++i) {
-            uint256 tokenMask = 1 << i;
-            address token = creditManager.getTokenByMask(tokenMask);
-            uint256 balance = IERC20(token).balanceOf(creditAccount);
-
-            if ((tokensToTransferMask & tokenMask != 0) && (balance > 1)) {
-                expectTokenTransfer({
-                    reason: string.concat("transfer token ", IERC20Metadata(token).symbol()),
-                    token: token,
-                    from: creditAccount,
-                    to: (convertToEth && token == weth) ? address(this) : FRIEND,
-                    amount: (tokenMask == UNDERLYING_TOKEN_MASK) ? _amountMinusFee(balance - 1) : balance - 1
-                });
-            }
-        }
-
-        creditManager.batchTokensTransfer({
-            creditAccount: creditAccount,
-            to: FRIEND,
-            convertToETH: convertToEth,
-            tokensToTransferMask: tokensToTransferMask
-        });
-
-        checkTokenTransfers({debug: false});
-    }
-
-    //
-    // SAFE TOKEN TRANSFER
-    //
-
-    /// @dev U:[CM-32]: safeTokenTransfer works correctly no revert case
-    function test_U_CM_32_safeTokenTransfer_works_correctly_no_revert_case() public creditManagerTest {
-        address weth = tokenTestSuite.addressOf(Tokens.WETH);
-
-        uint256 amount = 22423423;
-
-        for (uint256 i; i < 2; ++i) {
-            bool convertToEth = i == 1;
-
-            caseName = string.concat(caseName, ",  convertToEth =", convertToEth ? "true" : "false");
-
-            address creditAccount = address(new CreditAccountMock());
-            tokenTestSuite.mint({token: weth, to: creditAccount, amount: amount});
-
-            startTokenTrackingSession(caseName);
-
-            expectTokenTransfer({
-                reason: "transfer token ",
-                token: weth,
-                from: creditAccount,
-                to: convertToEth ? address(this) : FRIEND,
-                amount: amount
-            });
-
-            creditManager.safeTokenTransfer({
-                creditAccount: creditAccount,
-                token: weth,
-                to: FRIEND,
-                amount: amount,
-                convertToETH: convertToEth
-            });
-
-            checkTokenTransfers({debug: false});
-        }
     }
 
     //

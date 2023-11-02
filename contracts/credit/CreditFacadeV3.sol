@@ -350,8 +350,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             creditAccount: creditAccount,
             collateralDebtData: collateralDebtData,
             to: to,
-            tokensToTransferMask: tokensToTransferMask,
-            convertToETH: convertToETH,
             isExpired: isExpired
         }); // U:[FA-16]
 
