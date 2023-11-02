@@ -1249,17 +1249,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
     }
 
-    /// @notice Replaces hacked collateral token with dummy one
-    /// @param token Address of the token to remove
-    function replaceHackedCollateralToken(address token, address newToken) external override creditConfiguratorOnly {
-        if (token == underlying) {
-            revert CantRemoveUnderlyingCollateralException();
-        }
-
-        uint256 tokenMask = getTokenMaskOrRevert({token: token}); // U:[CM-41]
-        collateralTokensData[tokenMask].token = newToken;
-    }
-
     /// @notice Sets a new quoted token mask
     /// @param _quotedTokensMask The new quoted tokens mask
     /// @dev Excludes underlying token from the new mask
