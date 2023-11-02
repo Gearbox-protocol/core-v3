@@ -292,12 +292,6 @@ error ParameterChangedAfterQueuedTxException();
 /// @notice Thrown when attempting to set non-zero permissions for a forbidden or special bot
 error InvalidBotException();
 
-/// @notice Thrown if payment amount bigger that remaining weekly allowance
-error InsufficientWeeklyFundingAllowance();
-
-/// @notice Thrown if payment amount bigger that remaining total allowance
-error InsufficientTotalFundingAllowance();
-
 // --------------- //
 // ACCOUNT FACTORY //
 // --------------- //
