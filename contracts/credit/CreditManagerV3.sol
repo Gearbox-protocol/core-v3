@@ -770,9 +770,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             return cdd; // U:[CM-18]
         }
 
-        cdd.totalValue = useSafePrices
-            ? _safeConvertFromUSD(_priceOracle, cdd.totalValueUSD, underlying)
-            : _convertFromUSD(_priceOracle, cdd.totalValueUSD, underlying); // U:[CM-22,23]
+        cdd.totalValue = _convertFromUSD(_priceOracle, cdd.totalValueUSD, underlying); // U:[CM-22,23]
     }
 
     /// @dev Returns quotas data for credit manager and credit account

@@ -16,6 +16,9 @@ error AmountCantBeZeroException();
 /// @notice Thrown on incorrect input parameter
 error IncorrectParameterException();
 
+/// @notice Thrown when balance is insufficient to perform an operation
+error InsufficientBalanceException();
+
 /// @notice Thrown if parameter is out of range
 error ValueOutOfRangeException();
 
@@ -133,6 +136,7 @@ error ActiveCreditAccountOverridenException();
 
 /// @notice Thrown when attempting to set a new underlying token instead of hacked
 error CantRemoveUnderlyingCollateralException();
+
 // ------------------- //
 // CREDIT CONFIGURATOR //
 // ------------------- //
@@ -288,7 +292,7 @@ error ParameterChangedAfterQueuedTxException();
 // BOT LIST //
 // -------- //
 
-/// @notice Thrown when attempting to set non-zero permissions for a forbidden bot
+/// @notice Thrown when attempting to set non-zero permissions for a forbidden or special bot
 error InvalidBotException();
 
 // --------------- //
@@ -316,10 +320,3 @@ error IncorrectPriceException();
 
 /// @notice Thrown when token's price feed becomes stale
 error StalePriceException();
-
-// --------- //
-// DEGEN NFT //
-// --------- //
-
-/// @notice Thrown by Degen NFT when attempting to burn on opening an account with 0 balance
-error InsufficientBalanceException();
