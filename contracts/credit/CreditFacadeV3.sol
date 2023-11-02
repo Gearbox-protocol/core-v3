@@ -682,8 +682,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             if (!success) revert BalanceLessThanMinimumDesiredException(); // U:[FA-23]
         }
 
-        if ((flags & REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS != 0) && (enabledTokensMask & forbiddenTokenMask != 0)) {
-            revert ForbiddenTokensException(); // U:[FA-27]
+        if (enabledTokensMask & forbiddenTokenMask != 0) {
+            if (flags & REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS != 0) revert ForbiddenTokensException(); // U:[FA-27]
+            fullCheckParams.useSafePrices = true;
         }
 
         if (flags & EXTERNAL_CONTRACT_WAS_CALLED != 0) {
