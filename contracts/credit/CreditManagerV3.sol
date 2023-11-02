@@ -711,6 +711,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             revert IncorrectParameterException(); // U:[CM-19]
         }
 
+        bool useSafePrices;
+
+        if (task == CollateralCalcTask.DEBT_COLLATERAL_SAFE_PRICES) {
+            task = CollateralCalcTask.DEBT_COLLATERAL;
+            useSafePrices = true;
+        }
+
         uint256[] memory collateralHints;
         cdd = _calcDebtAndCollateral({
             creditAccount: creditAccount,
@@ -718,7 +725,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             collateralHints: collateralHints,
             minHealthFactor: PERCENTAGE_FACTOR,
             task: task,
-            useSafePrices: false
+            useSafePrices: useSafePrices
         }); // U:[CM-20]
     }
 

@@ -32,8 +32,9 @@ enum ManageDebtAction {
 enum CollateralCalcTask {
     GENERIC_PARAMS,
     DEBT_ONLY,
+    FULL_COLLATERAL_CHECK_LAZY,
     DEBT_COLLATERAL,
-    FULL_COLLATERAL_CHECK_LAZY
+    DEBT_COLLATERAL_SAFE_PRICES
 }
 
 struct CreditAccountInfo {
