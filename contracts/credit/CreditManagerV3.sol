@@ -538,6 +538,26 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }); // U:[CM-14]
     }
 
+    /// @notice Instructs active credit account to approve `amount` of `token` to adater's target contract
+    /// @param token Token to approve
+    /// @param spender Spender for appprove
+    /// @param amount Amount to approve
+    /// @dev Reverts if active credit account is not set
+    /// @dev Reverts if `msg.sender` is not a registered adapter
+    /// @dev Reverts if `token` is not recognized as collateral in the credit manager
+    function approveCreditAccount(address token, address spender, uint256 amount)
+        external
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly
+    {
+        _approveSpender({
+            creditAccount: getActiveCreditAccountOrRevert(),
+            token: token,
+            spender: spender,
+            amount: amount
+        }); // TODO: Add test
+    }
+
     /// @notice Instructs active credit account to call adapter's target contract with provided data
     /// @param data Data to call the target contract with
     /// @return result Call result
@@ -550,6 +570,22 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (bytes memory result)
     {
         address targetContract = _getTargetContractOrRevert(); // U:[CM-3]
+        address creditAccount = getActiveCreditAccountOrRevert(); // U:[CM-16]
+        return ICreditAccountBase(creditAccount).execute(targetContract, data); // U:[CM-16]
+    }
+
+    /// @notice Instructs active credit account to call adapter's target contract with provided data
+    /// @param data Data to call the target contract with
+    /// @return result Call result
+    /// @dev Reverts if active credit account is not set
+    /// @dev Reverts if `msg.sender` is not a registered adapter
+    function execute(address targetContract, bytes calldata data)
+        external
+        override
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly
+        returns (bytes memory result)
+    {
         address creditAccount = getActiveCreditAccountOrRevert(); // U:[CM-16]
         return ICreditAccountBase(creditAccount).execute(targetContract, data); // U:[CM-16]
     }

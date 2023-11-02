@@ -84,7 +84,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
 
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount)));
 
-        vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.execute, (DUMB_CALLDATA)));
+        vm.expectCall(address(creditManager), abi.encodeWithSignature("execute(bytes)", DUMB_CALLDATA));
 
         vm.expectEmit(true, false, false, true);
         emit Execute(creditAccount, address(targetMock));

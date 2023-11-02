@@ -851,7 +851,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         (address token, uint256 amount, address to) = abi.decode(callData, (address, uint256, address)); // U:[FA-35]
 
         if (amount == type(uint256).max) {
-            uint256 amount = IERC20(token).balanceOf(creditAccount);
+            amount = IERC20(token).balanceOf(creditAccount);
             if (amount <= 1) return 0;
             unchecked {
                 --amount;

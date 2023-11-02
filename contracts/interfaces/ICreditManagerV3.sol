@@ -141,7 +141,11 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
 
     function execute(bytes calldata data) external returns (bytes memory result);
 
+    function execute(address targetContract, bytes calldata data) external returns (bytes memory result);
+
     function approveCreditAccount(address token, uint256 amount) external;
+
+    function approveCreditAccount(address token, address spender, uint256 amount) external;
 
     function setActiveCreditAccount(address creditAccount) external;
 
