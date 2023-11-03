@@ -297,7 +297,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         whenNotPausedOrEmergency // U:[FA-2,12]
         nonReentrant // U:[FA-4]
     {
-        // saves gas for late liquidations
+        // checks that account is exists and get borrower address
         address borrower = _getBorrowerOrRevert(creditAccount); // U:[FA-5]
 
         uint256 skipCalls = _applyOnDemandPriceUpdates(calls);

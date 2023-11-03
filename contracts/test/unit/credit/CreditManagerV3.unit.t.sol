@@ -744,7 +744,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             (uint256 remainingFunds, uint256 loss) = creditManager.liquidateCreditAccount({
                 creditAccount: creditAccount,
                 collateralDebtData: collateralDebtData,
-                to: FRIEND
+                to: FRIEND,
+                isExpired: _case.isExpired
             });
 
             assertEq(poolMock.repayAmount(), collateralDebtData.debt, _testCaseErr("Incorrect repay amount"));

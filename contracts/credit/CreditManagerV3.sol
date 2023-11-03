@@ -261,29 +261,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         override
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
-        returns (uint256, /* remainingFunds */ uint256 /* loss */ )
+        returns (uint256 remainingFunds, uint256 loss)
     {
-        {
-            CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
-            if (currentCreditAccountInfo.lastDebtUpdate == block.number) {
-                revert DebtUpdatedTwiceInOneBlockException(); // U:[CM-8]
-            }
-
-            currentCreditAccountInfo.debt = 0; // U:[CM-8]
-            currentCreditAccountInfo.lastDebtUpdate = uint64(block.number); // U:[CM-8]
-            currentCreditAccountInfo.enabledTokensMask =
-                collateralDebtData.enabledTokensMask.disable(collateralDebtData.quotedTokensMask); // U:[CM-8]
-
-            // currentCreditAccountInfo.cumulativeQuotaInterest = 1;
-            // currentCreditAccountInfo.quotaFees = 0;
-            assembly {
-                let slot := add(currentCreditAccountInfo.slot, 2)
-                sstore(slot, 1)
-            } // U:[CM-8]
-        }
-
         uint256 minRemainingFunds;
-        uint256 loss;
         {
             uint256 amountToPool;
             uint256 profit;
@@ -310,7 +290,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             _poolRepayCreditAccount(collateralDebtData.debt, profit, loss); // U:[CM-8]
         }
 
-        (uint256 remainingFunds, uint256 underlyingBalance) =
+        uint256 underlyingBalance;
+        (remainingFunds, underlyingBalance) =
             _getRemainingFunds({creditAccount: creditAccount, enabledTokensMask: collateralDebtData.enabledTokensMask}); // U:[CM-8]
 
         if (remainingFunds < minRemainingFunds) {
@@ -325,6 +306,25 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
                 remainingFunds -= amountToLiquidator; // U:[CM-8]
             }
+        }
+
+        {
+            CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
+            if (currentCreditAccountInfo.lastDebtUpdate == block.number) {
+                revert DebtUpdatedTwiceInOneBlockException(); // U:[CM-8]
+            }
+
+            currentCreditAccountInfo.debt = 0; // U:[CM-8]
+            currentCreditAccountInfo.lastDebtUpdate = uint64(block.number); // U:[CM-8]
+            currentCreditAccountInfo.enabledTokensMask =
+                collateralDebtData.enabledTokensMask.disable(collateralDebtData.quotedTokensMask); // U:[CM-8]
+
+            // currentCreditAccountInfo.cumulativeQuotaInterest = 1;
+            // currentCreditAccountInfo.quotaFees = 0;
+            assembly {
+                let slot := add(currentCreditAccountInfo.slot, 2)
+                sstore(slot, 1)
+            } // U:[CM-8]
         }
 
         return (remainingFunds, loss);
@@ -882,7 +882,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             address token = getTokenByMask(tokenMask);
             uint256 balance = IERC20(token).safeBalanceOf({account: creditAccount});
             if (balance > 1) {
-                totalValueUSD += _convertToUSD(priceOracle, balance - 1, token);
+                totalValueUSD += _convertToUSD(_priceOracle, balance - 1, token);
             }
         }
 
