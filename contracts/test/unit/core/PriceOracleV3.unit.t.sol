@@ -334,4 +334,36 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
             priceOracle.convert(100e18, address(token2), address(token1)), 1e6, "Incorrect token2 -> token1 conversion"
         );
     }
+
+    /// @notice U:[PO-11]: Safe conversion works as expected
+    function test_U_PO_11_safe_conversion_works_as_expected() public {
+        ERC20Mock token = new ERC20Mock("Test Token", "TEST", 6);
+        PriceFeedMock mainFeed = new PriceFeedMock(2e8, 8);
+        PriceFeedMock reserveFeed = new PriceFeedMock(1.8e8, 8);
+
+        // untrusted feed without reserve feed
+        priceOracle.hackPriceFeedParams(address(token), PriceFeedParams(address(mainFeed), 0, false, 6, false, false));
+        assertEq(priceOracle.getPriceSafe(address(token)), 0, "getPriceSafe, untrusted feed without reserve feed");
+        assertEq(
+            priceOracle.safeConvertToUSD(100e6, address(token)),
+            0,
+            "safeConvertToUSD untrusted feed without reserve feed"
+        );
+
+        // untrusted feed with reserve feed
+        priceOracle.hackReservePriceFeedParams(
+            address(token), PriceFeedParams(address(reserveFeed), 0, false, 6, false, false)
+        );
+        assertEq(priceOracle.getPriceSafe(address(token)), 1.8e8, "safe price of untrusted feed with reserve feed");
+        assertEq(
+            priceOracle.safeConvertToUSD(100e6, address(token)),
+            180e8,
+            "safeConvertToUSD untrusted feed with reserve feed"
+        );
+
+        // trusted feed
+        priceOracle.hackPriceFeedParams(address(token), PriceFeedParams(address(mainFeed), 0, false, 6, false, true));
+        assertEq(priceOracle.getPriceSafe(address(token)), 2e8, "safe price of trusted feed");
+        assertEq(priceOracle.safeConvertToUSD(100e6, address(token)), 200e8, "safeConvertToUSD trusted feed");
+    }
 }
