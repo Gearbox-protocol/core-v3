@@ -152,7 +152,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
             tokenQuotaParams.totalQuoted = totalQuoted + uint96(quotaChange); // U:[PQK-15]
         } else {
-            if (quotaChange == -type(int96).max) {
+            if (quotaChange == type(int96).min) {
                 unchecked {
                     quotaChange = (quoted == 0) ? int96(0) : -int96(quoted - 1);
                 }
