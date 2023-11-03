@@ -242,12 +242,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     ///         - Removes account's quotas, and, if there's loss incurred on liquidation,
     ///           also zeros out limits for account's quoted tokens in the quota keeper
     ///         - Repays debt to the pool
-    ///         - Ensures that the value of funds remaining on the accounts is sufficient
-    ///         - If liquidator requests to receive underlying, transfers the surplus,
-    ///           as well as full balances of other requested tokens
+    ///         - Ensures that the value of funds remaining on the account is sufficient
+    ///         - Transfers underlying surplus (if any) to the liquidator
     /// @param creditAccount Account to liquidate
     /// @param collateralDebtData A struct with account's debt and collateral data
-    /// @param to Address to transfer tokens left on the account after liquidation
+    /// @param to Address to transfer underlying left after liquidation
     /// @return remainingFunds Total value of assets left on the account after liquidation
     /// @return loss Loss incurred on liquidation
     /// @custom:expects Account is opened in this credit manager
@@ -272,6 +271,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
             currentCreditAccountInfo.debt = 0; // U:[CM-8]
             currentCreditAccountInfo.lastDebtUpdate = uint64(block.number); // U:[CM-8]
+            currentCreditAccountInfo.enabledTokensMask =
+                collateralDebtData.enabledTokensMask.disable(collateralDebtData.quotedTokensMask); // U:[CM-8]
 
             // currentCreditAccountInfo.cumulativeQuotaInterest = 1;
             // currentCreditAccountInfo.quotaFees = 0;
@@ -325,11 +326,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 remainingFunds -= amountToLiquidator; // U:[CM-8]
             }
         }
-
-        /// Disable bits related to quotas and stores updated token mask
-        _saveEnabledTokensMask(
-            creditAccount, collateralDebtData.enabledTokensMask.disable(collateralDebtData.quotedTokensMask)
-        );
 
         return (remainingFunds, loss);
     }
@@ -480,6 +476,28 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
     }
 
+    /// @notice Instructs `creditAccount` to make an external call to target with `callData`
+    function externalCall(address creditAccount, address target, bytes calldata callData)
+        external
+        override
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // U:[CM-2]
+        returns (bytes memory result)
+    {
+        return _execute(creditAccount, target, callData);
+    }
+
+    /// @notice Instructs `creditAccount` to approve `amount` of `token` to `spender`
+    /// @dev Reverts if `token` is not recognized as collateral in the credit manager
+    function approveToken(address creditAccount, address token, address spender, uint256 amount)
+        external
+        override
+        nonReentrant // U:[CM-5]
+        creditFacadeOnly // U:[CM-2]
+    {
+        _approveSpender({creditAccount: creditAccount, token: token, spender: spender, amount: amount});
+    }
+
     /// @notice Revokes credit account's allowances for specified spender/token pairs
     /// @param creditAccount Account to revoke allowances for
     /// @param revocations Array of spender/token pairs
@@ -520,32 +538,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         nonReentrant // U:[CM-5]
     {
         address targetContract = _getTargetContractOrRevert(); // U:[CM-3]
-        _approveSpender({
-            creditAccount: getActiveCreditAccountOrRevert(),
-            token: token,
-            spender: targetContract,
-            amount: amount
-        }); // U:[CM-14]
-    }
-
-    /// @notice Instructs active credit account to approve `amount` of `token` to adater's target contract
-    /// @param token Token to approve
-    /// @param spender Spender for appprove
-    /// @param amount Amount to approve
-    /// @dev Reverts if active credit account is not set
-    /// @dev Reverts if `msg.sender` is not a registered adapter
-    /// @dev Reverts if `token` is not recognized as collateral in the credit manager
-    function approveCreditAccount(address token, address spender, uint256 amount)
-        external
-        nonReentrant // U:[CM-5]
-        creditFacadeOnly
-    {
-        _approveSpender({
-            creditAccount: getActiveCreditAccountOrRevert(),
-            token: token,
-            spender: spender,
-            amount: amount
-        }); // TODO: Add test
+        address creditAccount = getActiveCreditAccountOrRevert(); // U:[CM-14]
+        _approveSpender({creditAccount: creditAccount, token: token, spender: targetContract, amount: amount}); // U:[CM-14]
     }
 
     /// @notice Instructs active credit account to call adapter's target contract with provided data
@@ -561,23 +555,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         address targetContract = _getTargetContractOrRevert(); // U:[CM-3]
         address creditAccount = getActiveCreditAccountOrRevert(); // U:[CM-16]
-        return ICreditAccountBase(creditAccount).execute(targetContract, data); // U:[CM-16]
-    }
-
-    /// @notice Instructs active credit account to call adapter's target contract with provided data
-    /// @param data Data to call the target contract with
-    /// @return result Call result
-    /// @dev Reverts if active credit account is not set
-    /// @dev Reverts if `msg.sender` is not a registered adapter
-    function execute(address targetContract, bytes calldata data)
-        external
-        override
-        nonReentrant // U:[CM-5]
-        creditFacadeOnly
-        returns (bytes memory result)
-    {
-        address creditAccount = getActiveCreditAccountOrRevert(); // U:[CM-16]
-        return ICreditAccountBase(creditAccount).execute(targetContract, data); // U:[CM-16]
+        return _execute(creditAccount, targetContract, data); // U:[CM-16]
     }
 
     /// @dev Returns adapter's target contract, reverts if `msg.sender` is not a registered adapter
@@ -1377,6 +1355,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     ///      Pools with fee-on-transfer underlying should override this method
     function _amountMinusFee(uint256 amount) internal view virtual returns (uint256) {
         return amount;
+    }
+
+    /// @dev Internal wrapper for `creditAccount.execute` call to reduce contract size
+    function _execute(address creditAccount, address target, bytes calldata callData) internal returns (bytes memory) {
+        return ICreditAccountBase(creditAccount).execute(target, callData);
     }
 
     /// @dev Internal wrapper for `pool.repayCreditAccount` call to reduce contract size

@@ -30,11 +30,13 @@ struct CumulativeLossParams {
 ///        when known subset of account's collateral tokens covers all the debt
 /// @param minHealthFactor Min account's health factor in bps in order not to revert
 /// @param enabledTokensMaskAfter Bitmask of account's enabled collateral tokens after the multicall
+/// @param revertOnForbiddenTokens Whether to revert on enabled forbidden tokens after the multicall
 /// @param useSafePrices Whether to use safe pricing (min of main and reserve feeds) when evaluating collateral
 struct FullCheckParams {
     uint256[] collateralHints;
     uint16 minHealthFactor;
     uint256 enabledTokensMaskAfter;
+    bool revertOnForbiddenTokens;
     bool useSafePrices;
 }
 
@@ -76,9 +78,6 @@ interface ICreditFacadeV3Events {
 
     /// @notice Emitted when a multicall is finished
     event FinishMultiCall();
-
-    /// @notice Emitted when the mask of account's enabled tokens is updated
-    event SetEnabledTokensMask(address indexed creditAccount, uint256 enabledTokensMask);
 }
 
 /// @title Credit facade V3 interface

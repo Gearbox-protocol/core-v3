@@ -34,13 +34,9 @@ uint256 constant ALL_PERMISSIONS = ALL_CREDIT_FACADE_CALLS_PERMISSION | EXTERNAL
 /// @dev Indicates that there are enabled forbidden tokens on the account before multicall
 uint256 constant FORBIDDEN_TOKENS_BEFORE_CALLS = 1 << 192;
 
-/// @dev Indicates that there must be no enabled forbidden tokens on the account after multicall,
-///      set to true when `increaseDebt` or `withdrawCollateral` is called
-uint256 constant REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS = 1 << 193;
-
 /// @dev Indicates that external calls from credit account to adapters were made during multicall,
 ///      set to true on the first call to the adapter
-uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 1 << 194;
+uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 1 << 193;
 
 /// @title Credit facade V3 multicall interface
 /// @dev Unless specified otherwise, all these methods are only available in `openCreditAccount`,
@@ -109,7 +105,8 @@ interface ICreditFacadeV3Multicall {
     /// @param token Token to withdraw
     /// @param amount Amount to withdraw, `type(uint256).max` to withdraw all balance
     /// @param to Token recipient
-    /// @dev Withdrawals are prohibited if there are forbidden tokens enabled as collateral on the account
+    /// @dev This method can also be called during liquidation
+    /// @dev Withdrawals are prohibited in multicalls if there are forbidden tokens enabled as collateral on the account
     /// @dev Withdrawals are prohibited when opening an account
     /// @dev Withdrawals activate safe pricing (min of main and reserve feeds) in collateral check
     function withdrawCollateral(address token, uint256 amount, address to) external;

@@ -24,11 +24,12 @@ enum ManageDebtAction {
 ///         - `GENERIC_PARAMS` returns generic data like account debt and cumulative indexes
 ///         - `DEBT_ONLY` is same as `GENERIC_PARAMS` but includes more detailed debt info, like accrued base/quota
 ///           interest and fees
-///         - `DEBT_COLLATERAL` is same as `DEBT_ONLY` but also returns total value and total LT-weighted value of
-///           account's tokens, this mode is used during account closure
 ///         - `FULL_COLLATERAL_CHECK_LAZY` checks whether account is sufficiently collateralized in a lazy fashion,
 ///           i.e. it stops iterating over collateral tokens once TWV reaches the desired target.
 ///           Since it may return underestimated TWV, it's only available for internal use.
+///         - `DEBT_COLLATERAL` is same as `DEBT_ONLY` but also returns total value and total LT-weighted value of
+///           account's tokens, this mode is used during account liquidation
+///         - `DEBT_COLLATERAL_SAFE_PRICES` is same as `DEBT_COLLATERAL` but uses safe prices from price oracle
 enum CollateralCalcTask {
     GENERIC_PARAMS,
     DEBT_ONLY,
@@ -128,6 +129,12 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
         external
         returns (uint256 tokensToDisable);
 
+    function externalCall(address creditAccount, address target, bytes calldata callData)
+        external
+        returns (bytes memory result);
+
+    function approveToken(address creditAccount, address token, address spender, uint256 amount) external;
+
     function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external;
 
     // -------- //
@@ -140,11 +147,7 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
 
     function execute(bytes calldata data) external returns (bytes memory result);
 
-    function execute(address targetContract, bytes calldata data) external returns (bytes memory result);
-
     function approveCreditAccount(address token, uint256 amount) external;
-
-    function approveCreditAccount(address token, address spender, uint256 amount) external;
 
     function setActiveCreditAccount(address creditAccount) external;
 

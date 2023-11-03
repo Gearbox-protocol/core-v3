@@ -73,7 +73,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
         vm.expectEmit(true, false, false, false);
         emit StartMultiCall({creditAccount: creditAccount, caller: LIQUIDATOR});
 
-        vm.expectCall(address(creditManager), abi.encodeWithSignature("execute(bytes)", (DUMB_CALLDATA)));
+        vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.execute, (DUMB_CALLDATA)));
 
         vm.expectEmit(true, false, false, false);
         emit Execute(creditAccount, address(targetMock));
@@ -479,7 +479,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
         // vm.expectEmit(true, false, false, false);
         // emit StartMultiCall(creditAccount);
 
-        // vm.expectCall(address(creditManager), abi.encodeWithSignature("execute(bytes)", (DUMB_CALLDATA)));
+        // vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.execute, (DUMB_CALLDATA)));
 
         // vm.expectEmit(true, false, false, false);
         // emit Execute(address(targetMock));
