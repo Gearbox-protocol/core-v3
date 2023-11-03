@@ -1372,8 +1372,11 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         });
     }
 
-    /// @dev U:[FA-30]: multicall increase debt / schedule withdrawal if forbid tokens on account
-    function test_U_FA_30_multicall_increase_debt_if_forbid_tokens_on_account() public notExpirableCase {
+    /// @dev U:[FA-30]: multicall increaseDebt / withdrawCollateral set revertOnForbiddenTokens flag
+    function test_U_FA_30_multicall_increaseDebt_and_withdrawCollateral_set_revertOnForbiddenTokens()
+        public
+        notExpirableCase
+    {
         address creditAccount = DUMB_ADDRESS;
 
         address link = tokenTestSuite.addressOf(Tokens.LINK);
@@ -1390,16 +1393,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         creditManagerMock.setManageDebt({newDebt: 50, tokensToEnable: UNDERLYING_TOKEN_MASK, tokensToDisable: 0});
 
-        vm.expectRevert(ForbiddenTokensException.selector);
-        creditFacade.multicallInt({
-            creditAccount: creditAccount,
-            calls: MultiCallBuilder.build(),
-            enabledTokensMask: linkMask,
-            flags: REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS
-        });
-
-        vm.expectRevert(ForbiddenTokensException.selector);
-        creditFacade.multicallInt({
+        FullCheckParams memory params = creditFacade.multicallInt({
             creditAccount: creditAccount,
             calls: MultiCallBuilder.build(
                 MultiCall({
@@ -1410,9 +1404,9 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             enabledTokensMask: linkMask,
             flags: INCREASE_DEBT_PERMISSION
         });
+        assertTrue(params.revertOnForbiddenTokens, "revertOnForbiddenTokens is false after increaseDebt");
 
-        vm.expectRevert(ForbiddenTokensException.selector);
-        creditFacade.multicallInt({
+        params = creditFacade.multicallInt({
             creditAccount: creditAccount,
             calls: MultiCallBuilder.build(
                 MultiCall({
@@ -1423,6 +1417,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             enabledTokensMask: linkMask,
             flags: WITHDRAW_COLLATERAL_PERMISSION
         });
+        assertTrue(params.revertOnForbiddenTokens, "revertOnForbiddenTokens is false after withdrawCollateral");
     }
 
     ///

@@ -63,7 +63,8 @@ uint256 constant LIQUIDATE_CREDIT_ACCOUNT_FLAGS =
 ///         multicall and checking the permissions given to them by users. See `BotListV3` for additional details.
 /// @notice Credit facade implements a few safeguards on top of those present in the credit manager, including debt and
 ///         quota size validation, pausing on large protocol losses, Degen NFT whitelist mode, and forbidden tokens
-///         (they count towards account value, but having them enabled as collateral restricts available actions).
+///         (they count towards account value, but having them enabled as collateral restricts available actions and
+///         activates a safer version of collateral check).
 contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     using Address for address;
     using Address for address payable;
@@ -269,23 +270,22 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @notice Liquidates a credit account
     ///         - Updates price feeds before running all computations if such calls are present in the multicall
     ///         - Evaluates account's collateral and debt to determine whether liquidated account is unhealthy or expired
-    ///         - Performs a multicall (only `addCollateral` and adapter calls are allowed)
-    ///         - Liquidates a credit account in the credit manager, which repays debt to the pool, removes quotas
-    ///           and transfers specified tokens to the liquidator
+    ///         - Performs a multicall (only `addCollateral`, `withdrawCollateral` and adapter calls are allowed)
+    ///         - Liquidates a credit account in the credit manager, which repays debt to the pool, removes quotas, and
+    ///           transfers underlying to the liquidator
     ///         - If pool incurs a loss on liquidation, further borrowing through the facade is forbidden
     ///         - If cumulative loss from bad debt liquidations exceeds the threshold, the facade is paused
-    ///         - If facade has any WETH at the end of the function, unwraps it and sends to the recipient
     /// @notice The function computes account’s total value (oracle value of enabled tokens), discounts it by liquidator’s
     ///         premium, and uses this value to compute funds due to the pool and owner.
     ///         Debt to the pool must be repaid in underlying, while funds due to owner might be covered by underlying
     ///         as well as by tokens that counted towards total value calculation, with the only condition that balance
     ///         of such tokens can’t be increased in the multicall.
     ///         Typically, a liquidator would swap all holdings on the account to underlying via multicall and receive
-    ///         the premium in underlying (in this case, `tokensToTransferMask` should be set to `1`).
-    ///         An alternative strategy would be to add underlying collateral to repay debt and receive specified tokens
+    ///         the premium in underlying.
+    ///         An alternative strategy would be to add underlying collateral to repay debt and withdraw desired tokens
     ///         to handle them in another way, while remaining tokens would cover funds due to owner.
     /// @param creditAccount Account to liquidate
-    /// @param to Address to send tokens left on the account after liquidation
+    /// @param to Address to transfer underlying left after liquidation
     /// @param calls List of calls to perform before liquidating the account
     /// @dev When the credit facade is paused, reverts if caller is not an approved emergency liquidator
     /// @dev Reverts if `creditAccount` is not opened in connected credit manager
@@ -317,7 +317,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         if (!isLiquidatable) revert CreditAccountNotLiquidatableException(); // U:[FA-13]
 
         {
-            collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.disable(UNDERLYING_TOKEN_MASK);
+            collateralDebtData.enabledTokensMask &= ~UNDERLYING_TOKEN_MASK;
 
             BalanceWithMask[] memory remainingBalances = BalancesLogic.storeBalances({
                 creditAccount: creditAccount,
@@ -328,7 +328,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             FullCheckParams memory fullCheckParams = _multicall(
                 creditAccount, calls, collateralDebtData.enabledTokensMask, LIQUIDATE_CREDIT_ACCOUNT_FLAGS, skipCalls
             ); // U:[FA-16]
-
             collateralDebtData.enabledTokensMask &= fullCheckParams.enabledTokensMaskAfter;
 
             bool success = BalancesLogic.compareBalances({
@@ -337,11 +336,10 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                 balances: remainingBalances,
                 comparison: Comparison.LESS
             });
-
             if (!success) revert RemainingTokenBalanceIncreasedException(); // U:[FA-16]
-        }
 
-        collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(UNDERLYING_TOKEN_MASK);
+            collateralDebtData.enabledTokensMask |= UNDERLYING_TOKEN_MASK;
+        }
 
         (uint256 remainingFunds, uint256 reportedLoss) = ICreditManagerV3(creditManager).liquidateCreditAccount({
             creditAccount: creditAccount,
@@ -349,6 +347,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             to: to,
             isExpired: isExpired
         }); // U:[FA-16]
+
+        emit LiquidateCreditAccount(creditAccount, borrower, msg.sender, to, remainingFunds); // U:[FA-14,16,17]
 
         if (reportedLoss != 0) {
             maxDebtPerBlockMultiplier = 0; // U:[FA-17]
@@ -361,8 +361,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                 _pause(); // U:[FA-17]
             }
         }
-
-        emit LiquidateCreditAccount(creditAccount, borrower, msg.sender, to, remainingFunds); // U:[FA-14,16,17]
     }
 
     /// @notice Executes a batch of calls allowing user to manage their credit account
@@ -559,7 +557,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeV3Multicall.withdrawCollateral.selector) {
                         _revertIfNoPermission(flags, WITHDRAW_COLLATERAL_PERMISSION); // U:[FA-21]
 
-                        flags = flags.enable(REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS); // U:[FA-30]
+                        fullCheckParams.revertOnForbiddenTokens = true; // U:[FA-30]
                         fullCheckParams.useSafePrices = true;
 
                         uint256 tokensToDisable = _withdrawCollateral(creditAccount, mcall.callData[4:]); // U:[FA-34]
@@ -575,7 +573,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeV3Multicall.increaseDebt.selector) {
                         _revertIfNoPermission(flags, INCREASE_DEBT_PERMISSION); // U:[FA-21]
 
-                        flags = flags.enable(REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS); // U:[FA-30]
+                        fullCheckParams.revertOnForbiddenTokens = true; // U:[FA-30]
 
                         (uint256 tokensToEnable,) = _manageDebt(
                             creditAccount, mcall.callData[4:], enabledTokensMask, ManageDebtAction.INCREASE_DEBT
@@ -674,7 +672,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         }
 
         if (enabledTokensMask & forbiddenTokenMask != 0) {
-            if (flags & REVERT_ON_FORBIDDEN_TOKENS_AFTER_CALLS != 0) revert ForbiddenTokensException(); // U:[FA-27]
             fullCheckParams.useSafePrices = true;
         }
 
@@ -720,6 +717,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
     /// @dev Performs collateral check to ensure that
     ///      - account is sufficiently collateralized
+    ///      - account has no forbidden tokens after risky operations
     ///      - no forbidden tokens have been enabled during the multicall
     ///      - no enabled forbidden token balance has increased during the multicall
     function _fullCollateralCheck(
@@ -739,6 +737,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         uint256 enabledForbiddenTokensMask = enabledTokensMask & forbiddenTokensMask;
         if (enabledForbiddenTokensMask != 0) {
+            if (fullCheckParams.revertOnForbiddenTokens) revert ForbiddenTokensException();
+
             uint256 enabledForbiddenTokensMaskBefore = enabledTokensMaskBefore & forbiddenTokensMask;
             if (enabledForbiddenTokensMask & ~enabledForbiddenTokensMaskBefore != 0) {
                 revert ForbiddenTokenEnabledException();
@@ -753,8 +753,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
             if (!success) revert ForbiddenTokenBalanceIncreasedException();
         }
-
-        emit SetEnabledTokensMask(creditAccount, enabledTokensMask);
     }
 
     /// @dev `ICreditFacadeV3Multicall.addCollateral` implementation
