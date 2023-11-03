@@ -42,10 +42,6 @@ interface IPriceOracleV3 is IPriceOracleBase, IPriceOracleV3Events {
 
     function safeConvertToUSD(uint256 amount, address token) external view returns (uint256);
 
-    function safeConvertFromUSD(uint256 amount, address token) external view returns (uint256);
-
-    function safeConvert(uint256 amount, address tokenFrom, address tokenTo) external view returns (uint256);
-
     // ------------- //
     // CONFIGURATION //
     // ------------- //

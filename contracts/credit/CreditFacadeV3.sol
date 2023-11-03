@@ -297,49 +297,45 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         whenNotPausedOrEmergency // U:[FA-2,12]
         nonReentrant // U:[FA-4]
     {
-        // checks that account is exists and get borrower address
         address borrower = _getBorrowerOrRevert(creditAccount); // U:[FA-5]
 
         uint256 skipCalls = _applyOnDemandPriceUpdates(calls);
 
-        bool isExpired = false;
-
         CollateralDebtData memory collateralDebtData =
             ICreditManagerV3(creditManager).calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_COLLATERAL); // U:[FA-15]
 
-        bool isLiquidatable = collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD; // U:[FA-13]
-
-        if (!isLiquidatable && _isExpired()) {
-            isLiquidatable = true; // U:[FA-13]
-            isExpired = true; // U:[FA-14]
-        }
-
-        if (!isLiquidatable) revert CreditAccountNotLiquidatableException(); // U:[FA-13]
-
+        bool isExpired;
         {
-            collateralDebtData.enabledTokensMask &= ~UNDERLYING_TOKEN_MASK;
-
-            BalanceWithMask[] memory remainingBalances = BalancesLogic.storeBalances({
-                creditAccount: creditAccount,
-                tokensMask: collateralDebtData.enabledTokensMask,
-                getTokenByMaskFn: _getTokenByMask
-            });
-
-            FullCheckParams memory fullCheckParams = _multicall(
-                creditAccount, calls, collateralDebtData.enabledTokensMask, LIQUIDATE_CREDIT_ACCOUNT_FLAGS, skipCalls
-            ); // U:[FA-16]
-            collateralDebtData.enabledTokensMask &= fullCheckParams.enabledTokensMaskAfter;
-
-            bool success = BalancesLogic.compareBalances({
-                creditAccount: creditAccount,
-                tokensMask: collateralDebtData.enabledTokensMask,
-                balances: remainingBalances,
-                comparison: Comparison.LESS
-            });
-            if (!success) revert RemainingTokenBalanceIncreasedException(); // U:[FA-16]
-
-            collateralDebtData.enabledTokensMask |= UNDERLYING_TOKEN_MASK;
+            bool isLiquidatable = collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD; // U:[FA-13]
+            if (!isLiquidatable && _isExpired() && collateralDebtData.debt != 0) {
+                isLiquidatable = true; // U:[FA-13]
+                isExpired = true; // U:[FA-14]
+            }
+            if (!isLiquidatable) revert CreditAccountNotLiquidatableException(); // U:[FA-13]
         }
+
+        collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.disable(UNDERLYING_TOKEN_MASK);
+
+        BalanceWithMask[] memory initialBalances = BalancesLogic.storeBalances({
+            creditAccount: creditAccount,
+            tokensMask: collateralDebtData.enabledTokensMask,
+            getTokenByMaskFn: _getTokenByMask
+        });
+
+        FullCheckParams memory fullCheckParams = _multicall(
+            creditAccount, calls, collateralDebtData.enabledTokensMask, LIQUIDATE_CREDIT_ACCOUNT_FLAGS, skipCalls
+        ); // U:[FA-16]
+        collateralDebtData.enabledTokensMask &= fullCheckParams.enabledTokensMaskAfter;
+
+        bool success = BalancesLogic.compareBalances({
+            creditAccount: creditAccount,
+            tokensMask: collateralDebtData.enabledTokensMask,
+            balances: initialBalances,
+            comparison: Comparison.LESS
+        });
+        if (!success) revert RemainingTokenBalanceIncreasedException(); // U:[FA-16]
+
+        collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(UNDERLYING_TOKEN_MASK);
 
         (uint256 remainingFunds, uint256 reportedLoss) = ICreditManagerV3(creditManager).liquidateCreditAccount({
             creditAccount: creditAccount,

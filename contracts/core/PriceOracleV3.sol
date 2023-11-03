@@ -28,8 +28,8 @@ import {PriceFeedValidationTrait} from "../traits/PriceFeedValidationTrait.sol";
 ///         One should not expect the reserve price feed to always differ from the main one, although
 ///         most often that would be the case.
 /// @notice Price oracle additionaly provides "safe" conversion functions, which use minimum of main
-///         and reserve feed prices. There are also trusted price feeds, for which safe prices are
-///         the same as main feed prices.
+///         and reserve feed prices (the latter is assumed to be zero if reserve feed is not set).
+///         There are also trusted price feeds, for which safe prices are simply main feed prices.
 contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPriceOracleV3 {
     /// @notice Contract version
     uint256 public constant override version = 3_00;
@@ -62,21 +62,9 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
         return amount * price / scale; // U:[PO-9]
     }
 
-    /// @notice Converts `amount` of `token` into USD amount (with 8 decimals) using safe price
-    function safeConvertToUSD(uint256 amount, address token) external view override returns (uint256) {
-        (uint256 price, uint256 scale) = _getPriceSafe(token);
-        return amount * price / scale; // U:[PO-9]
-    }
-
     /// @notice Converts `amount` of USD (with 8 decimals) into `token` amount
     function convertFromUSD(uint256 amount, address token) external view override returns (uint256) {
         (uint256 price, uint256 scale) = _getPrice(token);
-        return amount * scale / price; // U:[PO-9]
-    }
-
-    /// @notice Converts `amount` of USD (with 8 decimals) into `token` amount using safe price
-    function safeConvertFromUSD(uint256 amount, address token) external view override returns (uint256) {
-        (uint256 price, uint256 scale) = _getPriceSafe(token);
         return amount * scale / price; // U:[PO-9]
     }
 
@@ -87,11 +75,10 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
         return amount * priceFrom * scaleTo / (priceTo * scaleFrom); // U:[PO-10]
     }
 
-    /// @notice Converts `amount` of `tokenFrom` into `tokenTo` amount using safe prices
-    function safeConvert(uint256 amount, address tokenFrom, address tokenTo) external view override returns (uint256) {
-        (uint256 priceFrom, uint256 scaleFrom) = _getPriceSafe(tokenFrom);
-        (uint256 priceTo, uint256 scaleTo) = _getPriceSafe(tokenTo);
-        return amount * priceFrom * scaleTo / (priceTo * scaleFrom); // U:[PO-10]
+    /// @notice Converts `amount` of `token` into USD amount (with 8 decimals) using safe price
+    function safeConvertToUSD(uint256 amount, address token) external view override returns (uint256) {
+        (uint256 price, uint256 scale) = _getPriceSafe(token);
+        return amount * price / scale; // U:[PO-11]
     }
 
     /// @notice Returns the price feed for `token` or reverts if price feed is not set
@@ -140,11 +127,12 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     function _getPriceSafe(address token) internal view returns (uint256 price, uint256 scale) {
         (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals,, bool trusted) =
             _getPriceFeedParams(token);
-        (price, scale) = _getPrice(priceFeed, stalenessPeriod, skipCheck, decimals);
+        (price, scale) = _getPrice(priceFeed, stalenessPeriod, skipCheck, decimals); // U:[PO-11]
 
         if (!trusted) {
+            if (_priceFeedsParams[_getTokenReserveKey(token)].priceFeed == address(0)) return (0, scale); // U:[PO-11]
             (uint256 reservePrice,) = _getPriceRaw(token, true);
-            price = Math.min(price, reservePrice);
+            price = Math.min(price, reservePrice); // U:[PO-11]
         }
     }
 

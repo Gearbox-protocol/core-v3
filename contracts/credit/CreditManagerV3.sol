@@ -238,12 +238,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     /// @notice Liquidates a credit account
-    ///         - Resets account's debt, quota interest and fees to zero
     ///         - Removes account's quotas, and, if there's loss incurred on liquidation,
     ///           also zeros out limits for account's quoted tokens in the quota keeper
     ///         - Repays debt to the pool
     ///         - Ensures that the value of funds remaining on the account is sufficient
     ///         - Transfers underlying surplus (if any) to the liquidator
+    ///         - Resets account's debt, quota interest and fees to zero
     /// @param creditAccount Account to liquidate
     /// @param collateralDebtData A struct with account's debt and collateral data
     /// @param to Address to transfer underlying left after liquidation
@@ -263,32 +263,28 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacadeOnly // U:[CM-2]
         returns (uint256 remainingFunds, uint256 loss)
     {
+        uint256 amountToPool;
         uint256 minRemainingFunds;
-        {
-            uint256 amountToPool;
-            uint256 profit;
+        uint256 profit;
+        (amountToPool, minRemainingFunds, profit, loss) = collateralDebtData.calcLiquidationPayments({
+            liquidationDiscount: isExpired ? liquidationDiscountExpired : liquidationDiscount,
+            feeLiquidation: isExpired ? feeLiquidationExpired : feeLiquidation,
+            amountWithFeeFn: _amountWithFee,
+            amountMinusFeeFn: _amountMinusFee
+        }); // U:[CM-8]
 
-            (amountToPool, minRemainingFunds, profit, loss) = collateralDebtData.calcLiquidationPayments({
-                liquidationDiscount: isExpired ? liquidationDiscountExpired : liquidationDiscount,
-                feeLiquidation: isExpired ? feeLiquidationExpired : feeLiquidation,
-                amountWithFeeFn: _amountWithFee,
-                amountMinusFeeFn: _amountMinusFee
+        if (collateralDebtData.quotedTokens.length != 0) {
+            IPoolQuotaKeeperV3(collateralDebtData._poolQuotaKeeper).removeQuotas({
+                creditAccount: creditAccount,
+                tokens: collateralDebtData.quotedTokens,
+                setLimitsToZero: loss > 0
             }); // U:[CM-8]
-
-            if (collateralDebtData.quotedTokens.length != 0) {
-                IPoolQuotaKeeperV3(collateralDebtData._poolQuotaKeeper).removeQuotas({
-                    creditAccount: creditAccount,
-                    tokens: collateralDebtData.quotedTokens,
-                    setLimitsToZero: loss > 0
-                }); // U:[CM-8]
-            }
-
-            if (amountToPool != 0) {
-                ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amountToPool}); // U:[CM-8]
-            }
-
-            _poolRepayCreditAccount(collateralDebtData.debt, profit, loss); // U:[CM-8]
         }
+
+        if (amountToPool != 0) {
+            ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amountToPool}); // U:[CM-8]
+        }
+        _poolRepayCreditAccount(collateralDebtData.debt, profit, loss); // U:[CM-8]
 
         uint256 underlyingBalance;
         (remainingFunds, underlyingBalance) =
@@ -308,26 +304,22 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             }
         }
 
-        {
-            CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
-            if (currentCreditAccountInfo.lastDebtUpdate == block.number) {
-                revert DebtUpdatedTwiceInOneBlockException(); // U:[CM-8]
-            }
-
-            currentCreditAccountInfo.debt = 0; // U:[CM-8]
-            currentCreditAccountInfo.lastDebtUpdate = uint64(block.number); // U:[CM-8]
-            currentCreditAccountInfo.enabledTokensMask =
-                collateralDebtData.enabledTokensMask.disable(collateralDebtData.quotedTokensMask); // U:[CM-8]
-
-            // currentCreditAccountInfo.cumulativeQuotaInterest = 1;
-            // currentCreditAccountInfo.quotaFees = 0;
-            assembly {
-                let slot := add(currentCreditAccountInfo.slot, 2)
-                sstore(slot, 1)
-            } // U:[CM-8]
+        CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
+        if (currentCreditAccountInfo.lastDebtUpdate == block.number) {
+            revert DebtUpdatedTwiceInOneBlockException(); // U:[CM-8]
         }
 
-        return (remainingFunds, loss);
+        currentCreditAccountInfo.debt = 0; // U:[CM-8]
+        currentCreditAccountInfo.lastDebtUpdate = uint64(block.number); // U:[CM-8]
+        currentCreditAccountInfo.enabledTokensMask =
+            collateralDebtData.enabledTokensMask.disable(collateralDebtData.quotedTokensMask); // U:[CM-8]
+
+        // currentCreditAccountInfo.cumulativeQuotaInterest = 1;
+        // currentCreditAccountInfo.quotaFees = 0;
+        assembly {
+            let slot := add(currentCreditAccountInfo.slot, 2)
+            sstore(slot, 1)
+        } // U:[CM-8]
     }
 
     /// @notice Increases or decreases credit account's debt
@@ -600,7 +592,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param collateralHints Optional array of token masks to check first to reduce the amount of computation
     ///        when known subset of account's collateral tokens covers all the debt
     /// @param minHealthFactor Health factor threshold in bps, the check fails if `twvUSD < minHealthFactor * totalDebtUSD`
-    /// @param useSafePrices Whether to use safe prices (min of main and reserve feeds) when evaluating collateral
+    /// @param useSafePrices Whether to use safe prices when evaluating collateral
     /// @return enabledTokensMaskAfter Bitmask of account's enabled collateral tokens after potential cleanup
     /// @dev Reverts if `collateralHints` contains masks that don't correspond to known collateral tokens
     /// @dev Even when `collateralHints` are specified, quoted tokens are evaluated before non-quoted ones
@@ -703,7 +695,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param collateralHints Optional array of token masks specifying the order of checking collateral tokens
     /// @param minHealthFactor Health factor in bps to stop the calculations after when performing collateral check
     /// @param task Calculation mode, see `CollateralCalcTask` for details
-    /// @param useSafePrices Whether to use safe pricing (min of main and reserve feeds) when evaluating collateral
+    /// @param useSafePrices Whether to use safe prices when evaluating collateral
     /// @return cdd A struct with debt and collateral data
     function _calcDebtAndCollateral(
         address creditAccount,
@@ -1391,21 +1383,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     /// @dev Internal wrapper for `priceOracle.safeConvertToUSD` call to reduce contract size
+    /// @dev `underlying` is always converted with default conversion function
     function _safeConvertToUSD(address _priceOracle, uint256 amountInToken, address token)
         internal
         view
         returns (uint256 amountInUSD)
     {
-        amountInUSD = IPriceOracleV3(_priceOracle).safeConvertToUSD(amountInToken, token);
-    }
-
-    /// @dev Internal wrapper for `priceOracle.safeConvertFromUSD` call to reduce contract size
-    function _safeConvertFromUSD(address _priceOracle, uint256 amountInUSD, address token)
-        internal
-        view
-        returns (uint256 amountInToken)
-    {
-        amountInToken = IPriceOracleV3(_priceOracle).safeConvertFromUSD(amountInUSD, token);
+        amountInUSD = (token == underlying)
+            ? _convertToUSD(_priceOracle, amountInToken, token)
+            : IPriceOracleV3(_priceOracle).safeConvertToUSD(amountInToken, token);
     }
 
     /// @dev Reverts if `msg.sender` is not the credit facade
