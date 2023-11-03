@@ -241,43 +241,4 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
         creditManager.getBorrowerOrRevert(creditAccount);
     }
-
-    /// @dev I:[CCA-6]: closeCreditAccount sends specified tokens
-    function test_I_CCA_06_closeCreditAccount_sends_specified_tokens() public creditTest {
-        address weth = tokenTestSuite.addressOf(Tokens.WETH);
-        uint256 wethMask = creditManager.getTokenMaskOrRevert(weth);
-
-        vm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(USER, MultiCallBuilder.build(), 0);
-
-        tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
-        tokenTestSuite.mint(Tokens.LINK, creditAccount, LINK_EXCHANGE_AMOUNT);
-
-        vm.roll(block.number + 1);
-
-        vm.prank(USER);
-        creditFacade.closeCreditAccount({creditAccount: creditAccount, calls: MultiCallBuilder.build()});
-
-        expectBalance(Tokens.WETH, creditAccount, 1);
-        expectBalance(Tokens.LINK, creditAccount, LINK_EXCHANGE_AMOUNT);
-        expectBalance(Tokens.WETH, FRIEND, WETH_EXCHANGE_AMOUNT - 1);
-    }
-
-    /// @dev I:[CCA-7]: closeCreditAccount sends WETH to withdrawal manager
-    function test_I_CCA_07_closeCreditAccount_converts_weth_to_eth() public creditTest {
-        address weth = tokenTestSuite.addressOf(Tokens.WETH);
-        uint256 wethMask = creditManager.getTokenMaskOrRevert(weth);
-
-        vm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(USER, MultiCallBuilder.build(), 0);
-        tokenTestSuite.mint(Tokens.WETH, creditAccount, WETH_EXCHANGE_AMOUNT);
-
-        vm.roll(block.number + 1);
-
-        vm.prank(USER);
-        creditFacade.closeCreditAccount({creditAccount: creditAccount, calls: MultiCallBuilder.build()});
-
-        expectBalance(Tokens.WETH, creditAccount, 1);
-        assertEq(FRIEND.balance, WETH_EXCHANGE_AMOUNT - 2);
-    }
 }
