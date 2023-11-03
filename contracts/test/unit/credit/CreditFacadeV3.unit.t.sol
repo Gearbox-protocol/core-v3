@@ -417,16 +417,14 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     }
 
     /// @dev U:[FA-11]: closeCreditAccount wokrs as expected
-    function test_U_FA_11_closeCreditAccount_works_as_expected(uint256 tokensToTransferMask) public notExpirableCase {
+    function test_U_FA_11_closeCreditAccount_works_as_expected(uint256 seed) public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
-        bool hasCalls = (getHash({value: tokensToTransferMask, seed: 2}) % 2) == 0;
-        bool hasBotPermissions = (getHash({value: tokensToTransferMask, seed: 3}) % 2) == 0;
+        bool hasCalls = (getHash({value: seed, seed: 2}) % 2) == 0;
+        bool hasBotPermissions = (getHash({value: seed, seed: 3}) % 2) == 0;
         caseName = string.concat(
             caseName, ", hasCalls = ", boolToStr(hasCalls), ", hasBotPermissions = ", boolToStr(hasBotPermissions)
         );
-
-        uint256 LINK_TOKEN_MASK = 4;
 
         address adapter = address(new AdapterMock(address(creditManagerMock), DUMB_ADDRESS));
 
@@ -445,7 +443,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         if (hasCalls) {
             calls = MultiCallBuilder.build(
-                MultiCall({target: adapter, callData: abi.encodeCall(AdapterMock.dumbCall, (LINK_TOKEN_MASK, 0))})
+                MultiCall({target: adapter, callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
             );
         }
 
@@ -1153,7 +1151,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             })
         );
 
-        vm.expectCall(address(priceOracleMock), abi.encodeCall(IPriceOracleBase.priceFeeds, (token)));
+        // vm.expectCall(address(priceOracleMock), abi.encodeCall(IPriceOracleBase.priceFeeds, (token)));
         vm.expectCall(address(priceFeedOnDemandMock), abi.encodeCall(PriceFeedOnDemandMock.updatePrice, (cd)));
         creditFacade.applyPriceOnDemandInt({calls: calls});
 

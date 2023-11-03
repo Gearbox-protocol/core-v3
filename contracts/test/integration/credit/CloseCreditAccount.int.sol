@@ -111,7 +111,15 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         // debt not repaid at all
         vm.expectRevert(CloseAccountWithNonZeroDebtException.selector);
         vm.prank(USER);
-        creditFacade.closeCreditAccount(creditAccount, MultiCallBuilder.build());
+        creditFacade.closeCreditAccount(
+            creditAccount,
+            MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.disableToken, (underlying))
+                })
+            )
+        );
 
         // debt partially repaid
         vm.expectRevert(CloseAccountWithNonZeroDebtException.selector);
@@ -122,6 +130,10 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (DAI_ACCOUNT_AMOUNT / 2))
+                }),
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.disableToken, (underlying))
                 })
             )
         );
@@ -203,6 +215,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         withAccountFactoryV1
         creditTest
     {
+        address daiToken = tokenTestSuite.addressOf(Tokens.DAI);
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
@@ -210,9 +223,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
             }),
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT / 2)
-                    )
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (daiToken, DAI_ACCOUNT_AMOUNT / 2))
             })
         );
 
@@ -232,6 +243,12 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (type(uint256).max))
+                }),
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(
+                        ICreditFacadeV3Multicall.withdrawCollateral, (daiToken, type(uint256).max, USER)
+                        )
                 })
             )
         );

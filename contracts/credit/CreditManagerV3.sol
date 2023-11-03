@@ -461,7 +461,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         uint256 tokenMask = getTokenMaskOrRevert({token: token}); // U:[CM-26]
 
-        ICreditAccountBase(creditAccount).transfer({token: underlying, to: to, amount: amount}); // U:[CM-27]
+        ICreditAccountBase(creditAccount).transfer({token: token, to: to, amount: amount}); // U:[CM-27]
 
         if (IERC20(token).safeBalanceOf({account: creditAccount}) <= 1) {
             tokensToDisable = tokenMask; // U:[CM-27]
