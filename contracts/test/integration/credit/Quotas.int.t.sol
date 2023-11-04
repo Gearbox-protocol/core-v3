@@ -314,13 +314,13 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(
-                        ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.LINK), -type(int96).max, 0)
+                        ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.LINK), type(int96).min, 0)
                         )
                 }),
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(
-                        ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.USDT), -type(int96).max, 0)
+                        ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.USDT), type(int96).min, 0)
                         )
                 }),
                 MultiCall({

@@ -93,7 +93,7 @@ interface ICreditFacadeV3Multicall {
 
     /// @notice Updates account's quota for a token
     /// @param token Token to update the quota for
-    /// @param quotaChange Desired quota change in underlying token units
+    /// @param quotaChange Desired quota change in underlying token units (`type(int96).min` to disable quota)
     /// @param minQuota Minimum resulting account's quota for token required not to revert
     /// @dev Enables token as collateral if quota is increased from zero, disables if decreased to zero
     /// @dev Quota increase is prohibited if there are forbidden tokens enabled as collateral on the account
