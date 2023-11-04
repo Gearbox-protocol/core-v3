@@ -291,7 +291,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             _getRemainingFunds({creditAccount: creditAccount, enabledTokensMask: collateralDebtData.enabledTokensMask}); // U:[CM-8]
 
         if (remainingFunds < minRemainingFunds) {
-            revert InsufficientRemainingFundsException(); // U:[CM-9]
+            revert InsufficientRemainingFundsException(); // U:[CM-8]
         }
 
         unchecked {
@@ -306,7 +306,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
         if (currentCreditAccountInfo.lastDebtUpdate == block.number) {
-            revert DebtUpdatedTwiceInOneBlockException(); // U:[CM-8]
+            revert DebtUpdatedTwiceInOneBlockException(); // U:[CM-9]
         }
 
         currentCreditAccountInfo.debt = 0; // U:[CM-8]
@@ -874,7 +874,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             address token = getTokenByMask(tokenMask);
             uint256 balance = IERC20(token).safeBalanceOf({account: creditAccount});
             if (balance > 1) {
-                totalValueUSD += _convertToUSD(_priceOracle, balance - 1, token);
+                totalValueUSD += _convertToUSD(_priceOracle, balance, token);
             }
         }
 
@@ -1259,7 +1259,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         override
         creditConfiguratorOnly // U:[CM-4]
     {
-        quotedTokensMask = _quotedTokensMask & ~UNDERLYING_TOKEN_MASK; // U:[CM-43]
+        quotedTokensMask = _quotedTokensMask.disable(UNDERLYING_TOKEN_MASK); // U:[CM-43]
     }
 
     /// @notice Sets a new max number of enabled tokens

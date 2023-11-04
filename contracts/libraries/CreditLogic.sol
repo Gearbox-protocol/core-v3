@@ -84,7 +84,7 @@ library CreditLogic {
         uint256 amountToPoolWithFee = amountWithFeeFn(amountToPool);
         unchecked {
             if (totalFunds > amountToPoolWithFee) {
-                remainingFunds = totalFunds - amountToPoolWithFee - 1; // U:[CL-4]
+                remainingFunds = totalFunds - amountToPoolWithFee; // U:[CL-4]
             } else {
                 amountToPoolWithFee = totalFunds;
                 amountToPool = amountMinusFeeFn(totalFunds); // U:[CL-4]
