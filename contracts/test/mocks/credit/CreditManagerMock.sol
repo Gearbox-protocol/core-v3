@@ -7,15 +7,12 @@ import "../../../interfaces/IAddressProviderV3.sol";
 
 import {
     ICreditManagerV3,
-    ClosureAction,
     CollateralDebtData,
     CollateralCalcTask,
     ManageDebtAction,
     RevocationPair
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
-
-import {ClaimAction} from "../../../interfaces/IWithdrawalManagerV3.sol";
 
 import "../../../interfaces/IExceptions.sol";
 
@@ -49,7 +46,7 @@ contract CreditManagerMock {
 
     CollateralDebtData return_collateralDebtData;
 
-    CollateralDebtData _closeCollateralDebtData;
+    CollateralDebtData _liquidateCollateralDebtData;
     uint256 internal _enabledTokensMask;
 
     address nextCreditAccount;
@@ -85,8 +82,7 @@ contract CreditManagerMock {
 
     constructor(address _addressProvider, address _pool) {
         addressProvider = _addressProvider;
-        weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // U:[CM-1]
-        withdrawalManager = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WITHDRAWAL_MANAGER, 3_00);
+        weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL);
         setPoolService(_pool);
         creditConfigurator = CONFIGURATOR;
         supportsQuotas = true;
@@ -164,21 +160,18 @@ contract CreditManagerMock {
         return_loss = loss;
     }
 
-    function closeCreditAccount(
-        address,
-        ClosureAction,
-        CollateralDebtData memory collateralDebtData,
-        address,
-        address,
-        uint256,
-        bool
-    ) external returns (uint256 remainingFunds, uint256 loss) {
-        _closeCollateralDebtData = collateralDebtData;
+    function closeCreditAccount(address) external {}
+
+    function liquidateCreditAccount(address, CollateralDebtData memory collateralDebtData, address, uint256, bool, bool)
+        external
+        returns (uint256 remainingFunds, uint256 loss)
+    {
+        _liquidateCollateralDebtData = collateralDebtData;
         remainingFunds = return_remainingFunds;
         loss = return_loss;
     }
 
-    function fullCollateralCheck(address, uint256 enabledTokensMask, uint256[] memory, uint16)
+    function fullCollateralCheck(address, uint256 enabledTokensMask, uint256[] memory, uint16, bool)
         external
         pure
         returns (uint256)
@@ -206,16 +199,8 @@ contract CreditManagerMock {
         return_collateralDebtData = _collateralDebtData;
     }
 
-    function closeCollateralDebtData() external view returns (CollateralDebtData memory) {
-        return _closeCollateralDebtData;
-    }
-
-    function setClaimWithdrawals(uint256 tokensToEnable) external {
-        cw_return_tokensToEnable = tokensToEnable;
-    }
-
-    function claimWithdrawals(address, address, ClaimAction) external view returns (uint256 tokensToEnable) {
-        tokensToEnable = cw_return_tokensToEnable;
+    function liquidateCollateralDebtData() external view returns (CollateralDebtData memory) {
+        return _liquidateCollateralDebtData;
     }
 
     function enabledTokensMaskOf(address) external view returns (uint256) {
@@ -237,8 +222,7 @@ contract CreditManagerMock {
 
     /// @notice Returns the mask containing miscellaneous account flags
     /// @dev Currently, the following flags are supported:
-    ///      * 1 - WITHDRAWALS_FLAG - whether the account has pending withdrawals
-    ///      * 2 - BOT_PERMISSIONS_FLAG - whether the account has non-zero permissions for at least one bot
+    ///      * 1 - BOT_PERMISSIONS_FLAG - whether the account has non-zero permissions for at least one bot
     function flagsOf(address) external view returns (uint16) {
         return flags; // U:[CM-35]
     }
@@ -289,11 +273,11 @@ contract CreditManagerMock {
         tokensToDisable = md_return_tokensToDisable;
     }
 
-    function setScheduleWithdrawal(uint256 tokensToDisable) external {
+    function setWithdrawCollateral(uint256 tokensToDisable) external {
         sw_tokensToDisable = tokensToDisable;
     }
 
-    function scheduleWithdrawal(address, address, uint256) external view returns (uint256 tokensToDisable) {
+    function withdrawCollateral(address, address, uint256, address) external view returns (uint256 tokensToDisable) {
         tokensToDisable = sw_tokensToDisable;
     }
 

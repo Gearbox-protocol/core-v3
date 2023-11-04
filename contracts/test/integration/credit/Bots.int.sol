@@ -12,7 +12,6 @@ import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
 import {
     ICreditManagerV3,
     ICreditManagerV3Events,
-    ClosureAction,
     ManageDebtAction,
     BOT_PERMISSIONS_SET_FLAG
 } from "../../../interfaces/ICreditManagerV3.sol";
@@ -57,9 +56,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
 
         vm.prank(address(creditFacade));
-        botList.setBotPermissions(
-            address(creditManager), creditAccount, bot, type(uint192).max, uint72(1 ether), uint72(1 ether / 10)
-        );
+        botList.setBotPermissions(bot, address(creditManager), creditAccount, uint192(ALL_PERMISSIONS));
 
         vm.expectRevert(NotApprovedBotException.selector);
         creditFacade.botMulticall(
@@ -71,14 +68,14 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         );
 
         vm.prank(CONFIGURATOR);
-        botList.setBotSpecialPermissions(address(creditManager), address(bot), type(uint192).max);
+        botList.setBotSpecialPermissions(address(bot), address(creditManager), type(uint192).max);
         vm.prank(bot);
         creditFacade.botMulticall(creditAccount, calls);
         vm.prank(CONFIGURATOR);
-        botList.setBotSpecialPermissions(address(creditManager), address(bot), 0);
+        botList.setBotSpecialPermissions(address(bot), address(creditManager), 0);
 
         vm.prank(USER);
-        creditFacade.setBotPermissions(creditAccount, bot, type(uint192).max, uint72(1 ether), uint72(1 ether / 10));
+        creditFacade.setBotPermissions(creditAccount, bot, uint192(ALL_PERMISSIONS));
 
         botList.getBotStatus({creditManager: address(creditManager), creditAccount: creditAccount, bot: bot});
 
@@ -104,7 +101,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         vm.expectCall(
             address(creditManager),
             abi.encodeCall(
-                ICreditManagerV3.fullCollateralCheck, (creditAccount, 1, new uint256[](0), PERCENTAGE_FACTOR)
+                ICreditManagerV3.fullCollateralCheck, (creditAccount, 1, new uint256[](0), PERCENTAGE_FACTOR, false)
             )
         );
 
@@ -112,7 +109,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         creditFacade.botMulticall(creditAccount, calls);
 
         vm.prank(CONFIGURATOR);
-        botList.setBotForbiddenStatus(address(creditManager), bot, true);
+        botList.setBotForbiddenStatus(bot, true);
 
         vm.expectRevert(NotApprovedBotException.selector);
         vm.prank(bot);
@@ -127,7 +124,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
 
         vm.expectRevert(CallerNotCreditAccountOwnerException.selector);
         vm.prank(FRIEND);
-        creditFacade.setBotPermissions(creditAccount, bot, type(uint192).max, uint72(1 ether), uint72(1 ether / 10));
+        creditFacade.setBotPermissions(creditAccount, bot, uint192(ALL_PERMISSIONS));
 
         vm.expectCall(
             address(creditManager),
@@ -135,7 +132,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         );
 
         vm.prank(USER);
-        creditFacade.setBotPermissions(creditAccount, bot, type(uint192).max, uint72(1 ether), uint72(1 ether / 10));
+        creditFacade.setBotPermissions(creditAccount, bot, uint192(ALL_PERMISSIONS));
 
         assertTrue(creditManager.flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG > 0, "Flag was not set");
 
@@ -145,7 +142,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         );
 
         vm.prank(USER);
-        creditFacade.setBotPermissions(creditAccount, bot, 0, 0, 0);
+        creditFacade.setBotPermissions(creditAccount, bot, 0);
 
         assertTrue(creditManager.flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG == 0, "Flag was not set");
     }

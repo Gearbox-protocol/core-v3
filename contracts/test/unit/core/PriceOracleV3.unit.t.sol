@@ -83,13 +83,20 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
     {
         priceOracle.hackPriceFeedParams(token, expectedParams);
 
+        if (expectedParams.priceFeed == address(0)) {
+            vm.expectRevert(PriceFeedDoesNotExistException.selector);
+        }
+
         PriceFeedParams memory params = priceOracle.getPriceFeedParams(token);
+
+        if (expectedParams.priceFeed == address(0)) return;
 
         assertEq(params.priceFeed, expectedParams.priceFeed, "Incorrect priceFeed");
         assertEq(params.stalenessPeriod, expectedParams.stalenessPeriod, "Incorrect stalenessPeriod");
         assertEq(params.decimals, expectedParams.decimals, "Incorrect decimals");
         assertEq(params.skipCheck, expectedParams.skipCheck, "Incorrect skipCheck");
         assertEq(params.useReserve, expectedParams.useReserve, "Incorrect useReserve");
+        assertEq(params.trusted, expectedParams.trusted, "Incorrect trusted");
     }
 
     /// @notice U:[PO-3]: `_getTokenReserveKey` works as expected
@@ -205,19 +212,19 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         PriceFeedMock priceFeed = new PriceFeedMock(42, 8);
 
         vm.expectRevert(ZeroAddressException.selector);
-        priceOracle.setPriceFeed(address(0), address(priceFeed), 0);
+        priceOracle.setPriceFeed(address(0), address(priceFeed), 0, false);
 
         vm.expectRevert(ZeroAddressException.selector);
-        priceOracle.setPriceFeed(address(token), address(0), 0);
+        priceOracle.setPriceFeed(address(token), address(0), 0, false);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        priceOracle.setPriceFeed(address(token), address(priceFeed), 0);
+        priceOracle.setPriceFeed(address(token), address(priceFeed), 0, false);
 
         vm.expectEmit(true, true, false, true);
-        emit SetPriceFeed(address(token), address(priceFeed), 3600, false);
+        emit SetPriceFeed(address(token), address(priceFeed), 3600, false, false);
 
         vm.prank(configurator);
-        priceOracle.setPriceFeed(address(token), address(priceFeed), 3600);
+        priceOracle.setPriceFeed(address(token), address(priceFeed), 3600, false);
         PriceFeedParams memory params = priceOracle.getPriceFeedParams(address(token));
         assertEq(params.priceFeed, address(priceFeed), "Incorrect priceFeed");
         assertEq(params.decimals, 18, "Incorrect decimals");
@@ -232,19 +239,19 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         PriceFeedMock priceFeed = new PriceFeedMock(42, 8);
 
         vm.expectRevert(ZeroAddressException.selector);
-        priceOracle.setPriceFeed(address(0), address(priceFeed), 0);
+        priceOracle.setPriceFeed(address(0), address(priceFeed), 0, false);
 
         vm.expectRevert(ZeroAddressException.selector);
-        priceOracle.setPriceFeed(address(token), address(0), 0);
+        priceOracle.setPriceFeed(address(token), address(0), 0, false);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        priceOracle.setPriceFeed(address(token), address(priceFeed), 0);
+        priceOracle.setPriceFeed(address(token), address(priceFeed), 0, false);
 
         vm.expectRevert(PriceFeedDoesNotExistException.selector);
         vm.prank(configurator);
         priceOracle.setReservePriceFeed(address(token), address(priceFeed), 0);
 
-        priceOracle.hackPriceFeedParams(address(token), PriceFeedParams(address(0), 0, false, 18, false));
+        priceOracle.hackPriceFeedParams(address(token), PriceFeedParams(address(0), 0, false, 18, false, false));
         priceFeed.setSkipPriceCheck(FlagState.TRUE);
 
         vm.expectEmit(true, true, false, true);
@@ -273,8 +280,12 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         vm.prank(configurator);
         priceOracle.setReservePriceFeedStatus(address(token), true);
 
-        priceOracle.hackPriceFeedParams(address(token), PriceFeedParams(address(0), 0, false, 18, false));
-        priceOracle.hackReservePriceFeedParams(address(token), PriceFeedParams(address(priceFeed), 0, false, 18, false));
+        priceOracle.hackPriceFeedParams(
+            address(token), PriceFeedParams(makeAddr("MAIN_PRICE_FEED"), 0, false, 18, false, false)
+        );
+        priceOracle.hackReservePriceFeedParams(
+            address(token), PriceFeedParams(address(priceFeed), 0, false, 18, false, false)
+        );
 
         vm.expectEmit(true, false, false, true);
         emit SetReservePriceFeedStatus(address(token), true);
@@ -295,7 +306,7 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
     function test_U_PO_09_covnertToUSD_and_convertFromUSD_work_as_expected() public {
         ERC20Mock token = new ERC20Mock("Test Token", "TEST", 6);
         PriceFeedMock priceFeed = new PriceFeedMock(2e8, 8);
-        priceOracle.hackPriceFeedParams(address(token), PriceFeedParams(address(priceFeed), 0, false, 6, false));
+        priceOracle.hackPriceFeedParams(address(token), PriceFeedParams(address(priceFeed), 0, false, 6, false, false));
 
         assertEq(priceOracle.convertToUSD(100e6, address(token)), 200e8, "Incorrect convertToUSD");
         assertEq(priceOracle.convertFromUSD(1000e8, address(token)), 500e6, "Incorrect convertFromUSD");
@@ -305,11 +316,15 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
     function test_U_PO_10_convert_works_as_expected() public {
         ERC20Mock token1 = new ERC20Mock("Test Token 1", "TEST1", 6);
         PriceFeedMock priceFeed1 = new PriceFeedMock(10e8, 8);
-        priceOracle.hackPriceFeedParams(address(token1), PriceFeedParams(address(priceFeed1), 0, false, 6, false));
+        priceOracle.hackPriceFeedParams(
+            address(token1), PriceFeedParams(address(priceFeed1), 0, false, 6, false, false)
+        );
 
         ERC20Mock token2 = new ERC20Mock("Test Token 2", "TEST2", 18);
         PriceFeedMock priceFeed2 = new PriceFeedMock(0.1e8, 8);
-        priceOracle.hackPriceFeedParams(address(token2), PriceFeedParams(address(priceFeed2), 0, false, 18, false));
+        priceOracle.hackPriceFeedParams(
+            address(token2), PriceFeedParams(address(priceFeed2), 0, false, 18, false, false)
+        );
 
         assertEq(
             priceOracle.convert(1e6, address(token1), address(token2)), 100e18, "Incorrect token1 -> token2 conversion"
@@ -318,5 +333,37 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         assertEq(
             priceOracle.convert(100e18, address(token2), address(token1)), 1e6, "Incorrect token2 -> token1 conversion"
         );
+    }
+
+    /// @notice U:[PO-11]: Safe conversion works as expected
+    function test_U_PO_11_safe_conversion_works_as_expected() public {
+        ERC20Mock token = new ERC20Mock("Test Token", "TEST", 6);
+        PriceFeedMock mainFeed = new PriceFeedMock(2e8, 8);
+        PriceFeedMock reserveFeed = new PriceFeedMock(1.8e8, 8);
+
+        // untrusted feed without reserve feed
+        priceOracle.hackPriceFeedParams(address(token), PriceFeedParams(address(mainFeed), 0, false, 6, false, false));
+        assertEq(priceOracle.getPriceSafe(address(token)), 0, "getPriceSafe, untrusted feed without reserve feed");
+        assertEq(
+            priceOracle.safeConvertToUSD(100e6, address(token)),
+            0,
+            "safeConvertToUSD untrusted feed without reserve feed"
+        );
+
+        // untrusted feed with reserve feed
+        priceOracle.hackReservePriceFeedParams(
+            address(token), PriceFeedParams(address(reserveFeed), 0, false, 6, false, false)
+        );
+        assertEq(priceOracle.getPriceSafe(address(token)), 1.8e8, "safe price of untrusted feed with reserve feed");
+        assertEq(
+            priceOracle.safeConvertToUSD(100e6, address(token)),
+            180e8,
+            "safeConvertToUSD untrusted feed with reserve feed"
+        );
+
+        // trusted feed
+        priceOracle.hackPriceFeedParams(address(token), PriceFeedParams(address(mainFeed), 0, false, 6, false, true));
+        assertEq(priceOracle.getPriceSafe(address(token)), 2e8, "safe price of trusted feed");
+        assertEq(priceOracle.safeConvertToUSD(100e6, address(token)), 200e8, "safeConvertToUSD trusted feed");
     }
 }

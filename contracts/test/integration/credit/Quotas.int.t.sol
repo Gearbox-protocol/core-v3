@@ -8,7 +8,6 @@ import "../../../interfaces/ICreditFacadeV3Multicall.sol";
 import {
     ICreditManagerV3,
     ICreditManagerV3Events,
-    ClosureAction,
     CollateralTokenData,
     ManageDebtAction,
     CollateralCalcTask,
@@ -308,8 +307,50 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
 
         uint256 poolBalanceBefore = tokenTestSuite.balanceOf(Tokens.DAI, address(pool));
 
-        vm.prank(USER);
-        creditFacade.closeCreditAccount(creditAccount, USER, 0, false, new MultiCall[](0));
+        vm.startPrank(USER);
+        creditFacade.closeCreditAccount(
+            creditAccount,
+            MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(
+                        ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.LINK), type(int96).min, 0)
+                        )
+                }),
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(
+                        ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.USDT), type(int96).min, 0)
+                        )
+                }),
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (type(uint256).max))
+                }),
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(
+                        ICreditFacadeV3Multicall.withdrawCollateral, (underlying, type(uint256).max, USER)
+                        )
+                }),
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(
+                        ICreditFacadeV3Multicall.withdrawCollateral,
+                        (tokenTestSuite.addressOf(Tokens.LINK), type(uint256).max, USER)
+                        )
+                }),
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(
+                        ICreditFacadeV3Multicall.withdrawCollateral,
+                        (tokenTestSuite.addressOf(Tokens.USDT), type(uint256).max, USER)
+                        )
+                })
+            )
+        );
+
+        vm.stopPrank();
 
         expectBalance(
             Tokens.DAI,
@@ -390,8 +431,8 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
 
     /// @dev I:[CMQ-08]: Credit Manager zeroes limits on quoted tokens upon incurring a loss
     function test_I_CMQ_08_creditManager_triggers_limit_zeroing_on_loss() public creditTest {
-        _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
-        _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
+        _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), type(uint16).max, uint96(1_000_000 * WAD));
+        _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500_00, uint96(1_000_000 * WAD));
 
         (address creditAccount,) = _openTestCreditAccount();
 
@@ -400,7 +441,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
-                    (tokenTestSuite.addressOf(Tokens.LINK), int96(uint96(100 * WAD)), 0)
+                    (tokenTestSuite.addressOf(Tokens.LINK), int96(uint96(10000000 * WAD)), 0)
                     )
             }),
             MultiCall({
@@ -421,7 +462,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
         address[2] memory quotedTokens = [tokenTestSuite.addressOf(Tokens.USDT), tokenTestSuite.addressOf(Tokens.LINK)];
 
         vm.prank(USER);
-        creditFacade.closeCreditAccount(creditAccount, USER, 0, false, new MultiCall[](0));
+        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, new MultiCall[](0));
 
         for (uint256 i = 0; i < quotedTokens.length; ++i) {
             (,,, uint96 limit,,) = poolQuotaKeeper.getTokenQuotaParams(quotedTokens[i]);

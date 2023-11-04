@@ -33,6 +33,7 @@ library CreditLogic {
         pure
         returns (uint256)
     {
+        if (amount == 0) return 0;
         return (amount * cumulativeIndexNow) / cumulativeIndexLastUpdate - amount; // U:[CL-1]
     }
 
@@ -42,23 +43,9 @@ library CreditLogic {
         return collateralDebtData.debt + collateralDebtData.accruedInterest + collateralDebtData.accruedFees;
     }
 
-    // --------------- //
-    // ACCOUNT CLOSURE //
-    // --------------- //
-
-    /// @dev Computes the amount of underlying tokens to send to the pool on credit account closure
-    /// @param collateralDebtData See `CollateralDebtData` (must have debt data filled)
-    /// @param amountWithFeeFn Function that, given the exact amount of underlying tokens to receive,
-    ///        returns the amount that needs to be sent
-    /// @return amountToPool Amount of underlying tokens to send to the pool
-    /// @return profit Amount of underlying tokens received as fees by the DAO
-    function calcClosePayments(
-        CollateralDebtData memory collateralDebtData,
-        function (uint256) view returns (uint256) amountWithFeeFn
-    ) internal view returns (uint256 amountToPool, uint256 profit) {
-        amountToPool = amountWithFeeFn(calcTotalDebt(collateralDebtData));
-        profit = collateralDebtData.accruedFees;
-    }
+    // ----------- //
+    // LIQUIDATION //
+    // ----------- //
 
     /// @dev Computes the amount of underlying tokens to send to the pool on credit account liquidation
     ///      - First, liquidation premium and fee are subtracted from account's total value
@@ -97,7 +84,7 @@ library CreditLogic {
         uint256 amountToPoolWithFee = amountWithFeeFn(amountToPool);
         unchecked {
             if (totalFunds > amountToPoolWithFee) {
-                remainingFunds = totalFunds - amountToPoolWithFee - 1; // U:[CL-4]
+                remainingFunds = totalFunds - amountToPoolWithFee; // U:[CL-4]
             } else {
                 amountToPoolWithFee = totalFunds;
                 amountToPool = amountMinusFeeFn(totalFunds); // U:[CL-4]
@@ -169,6 +156,7 @@ library CreditLogic {
         pure
         returns (uint256 newDebt, uint256 newCumulativeIndex)
     {
+        if (debt == 0) return (amount, cumulativeIndexNow);
         newDebt = debt + amount; // U:[CL-2]
         newCumulativeIndex = (
             (cumulativeIndexNow * newDebt * INDEX_PRECISION)

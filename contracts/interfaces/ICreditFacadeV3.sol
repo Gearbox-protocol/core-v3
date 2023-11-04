@@ -6,7 +6,6 @@ pragma solidity ^0.8.17;
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
-import {ClosureAction} from "../interfaces/ICreditManagerV3.sol";
 import "./ICreditFacadeV3Multicall.sol";
 import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
 
@@ -31,10 +30,14 @@ struct CumulativeLossParams {
 ///        when known subset of account's collateral tokens covers all the debt
 /// @param minHealthFactor Min account's health factor in bps in order not to revert
 /// @param enabledTokensMaskAfter Bitmask of account's enabled collateral tokens after the multicall
+/// @param revertOnForbiddenTokens Whether to revert on enabled forbidden tokens after the multicall
+/// @param useSafePrices Whether to use safe pricing (min of main and reserve feeds) when evaluating collateral
 struct FullCheckParams {
     uint256[] collateralHints;
     uint16 minHealthFactor;
     uint256 enabledTokensMaskAfter;
+    bool revertOnForbiddenTokens;
+    bool useSafePrices;
 }
 
 interface ICreditFacadeV3Events {
@@ -44,7 +47,7 @@ interface ICreditFacadeV3Events {
     );
 
     /// @notice Emitted when account is closed
-    event CloseCreditAccount(address indexed creditAccount, address indexed borrower, address indexed to);
+    event CloseCreditAccount(address indexed creditAccount, address indexed borrower);
 
     /// @notice Emitted when account is liquidated
     event LiquidateCreditAccount(
@@ -52,7 +55,6 @@ interface ICreditFacadeV3Events {
         address indexed borrower,
         address indexed liquidator,
         address to,
-        ClosureAction closureAction,
         uint256 remainingFunds
     );
 
@@ -63,7 +65,10 @@ interface ICreditFacadeV3Events {
     event DecreaseDebt(address indexed creditAccount, uint256 amount);
 
     /// @notice Emitted when collateral is added to account
-    event AddCollateral(address indexed creditAccount, address indexed token, uint256 value);
+    event AddCollateral(address indexed creditAccount, address indexed token, uint256 amount);
+
+    /// @notice Emitted when collateral is withdrawn from account
+    event WithdrawCollateral(address indexed creditAccount, address indexed token, uint256 amount);
 
     /// @notice Emitted when a multicall is started
     event StartMultiCall(address indexed creditAccount, address indexed caller);
@@ -73,9 +78,6 @@ interface ICreditFacadeV3Events {
 
     /// @notice Emitted when a multicall is finished
     event FinishMultiCall();
-
-    /// @notice Emitted when the mask of account's enabled tokens is updated
-    event SetEnabledTokensMask(address indexed creditAccount, uint256 enabledTokensMask);
 }
 
 /// @title Credit facade V3 interface
@@ -87,8 +89,6 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
     function weth() external view returns (address);
 
     function botList() external view returns (address);
-
-    function withdrawalManager() external view returns (address);
 
     function maxDebtPerBlockMultiplier() external view returns (uint8);
 
@@ -117,35 +117,15 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
         payable
         returns (address creditAccount);
 
-    function closeCreditAccount(
-        address creditAccount,
-        address to,
-        uint256 skipTokenMask,
-        bool convertToETH,
-        MultiCall[] calldata calls
-    ) external payable;
+    function closeCreditAccount(address creditAccount, MultiCall[] calldata calls) external payable;
 
-    function liquidateCreditAccount(
-        address creditAccount,
-        address to,
-        uint256 skipTokenMask,
-        bool convertToETH,
-        MultiCall[] calldata calls
-    ) external;
+    function liquidateCreditAccount(address creditAccount, address to, MultiCall[] calldata calls) external;
 
     function multicall(address creditAccount, MultiCall[] calldata calls) external payable;
 
     function botMulticall(address creditAccount, MultiCall[] calldata calls) external;
 
-    function claimWithdrawals(address creditAccount, address to) external;
-
-    function setBotPermissions(
-        address creditAccount,
-        address bot,
-        uint192 permissions,
-        uint72 fundingAmount,
-        uint72 weeklyFundingAllowance
-    ) external;
+    function setBotPermissions(address creditAccount, address bot, uint192 permissions) external;
 
     // ------------- //
     // CONFIGURATION //

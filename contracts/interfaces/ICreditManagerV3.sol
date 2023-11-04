@@ -5,29 +5,10 @@ pragma solidity ^0.8.17;
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
-import {ClaimAction} from "./IWithdrawalManagerV3.sol";
+uint8 constant BOT_PERMISSIONS_SET_FLAG = 1;
 
-uint8 constant WITHDRAWAL_FLAG = 1;
-uint8 constant BOT_PERMISSIONS_SET_FLAG = 1 << 1;
-
-uint8 constant DEFAULT_MAX_ENABLED_TOKENS = 12;
+uint8 constant DEFAULT_MAX_ENABLED_TOKENS = 4;
 address constant INACTIVE_CREDIT_ACCOUNT_ADDRESS = address(1);
-
-/// @notice Account closure mode
-///         - `CLOSE_ACCOUNT` performs normal account closure:
-//            * repays debt, interest and fees to the pool, reverts in case of underlying shortfall
-///           * transfers remaining tokens on the credit account to an owner-specified address
-///         - `LIQUIDATE_ACCOUNT`
-///           * computes amounts that should be distributed between pool and account owner and potential losses
-///           * repays due funds to the pool, charges liquidagtor in case of underlying shortfall
-///           * transfers due funds in underlying to account owner (if any)
-///           * transfers remaining tokens on the credit account to a liquidator-specified address
-///         - `LIQUIDATE_EXPIRED_ACCOUNT` is same as `LIQUIDATE_ACCOUNT` but with lower liquidation premium and fee
-enum ClosureAction {
-    CLOSE_ACCOUNT,
-    LIQUIDATE_ACCOUNT,
-    LIQUIDATE_EXPIRED_ACCOUNT
-}
 
 /// @notice Debt management type
 ///         - `INCREASE_DEBT` borrows additional funds from the pool, updates account's debt and cumulative interest index
@@ -43,22 +24,18 @@ enum ManageDebtAction {
 ///         - `GENERIC_PARAMS` returns generic data like account debt and cumulative indexes
 ///         - `DEBT_ONLY` is same as `GENERIC_PARAMS` but includes more detailed debt info, like accrued base/quota
 ///           interest and fees
-///         - `DEBT_COLLATERAL_WITHOUT_WITHDRAWALS` is same as `DEBT_ONLY` but also returns total value and total
-///           LT-weighted value of account's tokens, this mode is used during account closure
-///         - `DEBT_COLLATERAL_CANCEL_WITHDRAWALS` is same as `DEBT_COLLATERAL_WITHOUT_WITHDRAWALS` but adds the value
-///           of immature scheduled withdrawals to the total value, this mode is used during liquidations
-///         - `DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS` is same as `DEBT_COLLATERAL_WITHOUT_WITHDRAWALS` but adds the
-///           value of all scheduled withdrawals to the total value, this mode is used during emergency liquidations
 ///         - `FULL_COLLATERAL_CHECK_LAZY` checks whether account is sufficiently collateralized in a lazy fashion,
 ///           i.e. it stops iterating over collateral tokens once TWV reaches the desired target.
 ///           Since it may return underestimated TWV, it's only available for internal use.
+///         - `DEBT_COLLATERAL` is same as `DEBT_ONLY` but also returns total value and total LT-weighted value of
+///           account's tokens, this mode is used during account liquidation
+///         - `DEBT_COLLATERAL_SAFE_PRICES` is same as `DEBT_COLLATERAL` but uses safe prices from price oracle
 enum CollateralCalcTask {
     GENERIC_PARAMS,
     DEBT_ONLY,
-    DEBT_COLLATERAL_WITHOUT_WITHDRAWALS,
-    DEBT_COLLATERAL_CANCEL_WITHDRAWALS,
-    DEBT_COLLATERAL_FORCE_CANCEL_WITHDRAWALS,
-    FULL_COLLATERAL_CHECK_LAZY
+    FULL_COLLATERAL_CHECK_LAZY,
+    DEBT_COLLATERAL,
+    DEBT_COLLATERAL_SAFE_PRICES
 }
 
 struct CreditAccountInfo {
@@ -131,14 +108,13 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
 
     function openCreditAccount(address onBehalfOf) external returns (address);
 
-    function closeCreditAccount(
+    function closeCreditAccount(address creditAccount) external;
+
+    function liquidateCreditAccount(
         address creditAccount,
-        ClosureAction closureAction,
         CollateralDebtData calldata collateralDebtData,
-        address payer,
         address to,
-        uint256 skipTokensMask,
-        bool convertToETH
+        bool isExpired
     ) external returns (uint256 remainingFunds, uint256 loss);
 
     function manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)
@@ -147,7 +123,17 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
 
     function addCollateral(address payer, address creditAccount, address token, uint256 amount)
         external
-        returns (uint256 tokenMask);
+        returns (uint256 tokensToEnable);
+
+    function withdrawCollateral(address creditAccount, address token, uint256 amount, address to)
+        external
+        returns (uint256 tokensToDisable);
+
+    function externalCall(address creditAccount, address target, bytes calldata callData)
+        external
+        returns (bytes memory result);
+
+    function approveToken(address creditAccount, address token, address spender, uint256 amount) external;
 
     function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external;
 
@@ -177,7 +163,8 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
         address creditAccount,
         uint256 enabledTokensMask,
         uint256[] calldata collateralHints,
-        uint16 minHealthFactor
+        uint16 minHealthFactor,
+        bool useSafePrices
     ) external returns (uint256 enabledTokensMaskAfter);
 
     function isLiquidatable(address creditAccount, uint16 minHealthFactor) external view returns (bool);
@@ -198,20 +185,6 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
     function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota, uint96 maxQuota)
         external
         returns (uint256 tokensToEnable, uint256 tokensToDisable);
-
-    // ----------- //
-    // WITHDRAWALS //
-    // ----------- //
-
-    function withdrawalManager() external view returns (address);
-
-    function scheduleWithdrawal(address creditAccount, address token, uint256 amount)
-        external
-        returns (uint256 tokensToDisable);
-
-    function claimWithdrawals(address creditAccount, address to, ClaimAction action)
-        external
-        returns (uint256 tokensToEnable);
 
     // --------------------- //
     // CREDIT MANAGER PARAMS //

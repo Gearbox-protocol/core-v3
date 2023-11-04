@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {CreditLogic} from "../../../libraries/CreditLogic.sol";
-import {ClosureAction, CollateralDebtData} from "../../../interfaces/ICreditManagerV3.sol";
+import {CollateralDebtData} from "../../../interfaces/ICreditManagerV3.sol";
 import {TestHelper} from "../../lib/helper.sol";
 import {GeneralMock} from "../../mocks/GeneralMock.sol";
 
@@ -318,7 +318,7 @@ contract CreditLogicTest is TestHelper {
                 debt: 5000,
                 accruedInterest: 2000,
                 amountToPool: 8150,
-                remainingFunds: 1449,
+                remainingFunds: 1450,
                 profit: 1150,
                 loss: 0
             }),
@@ -360,7 +360,7 @@ contract CreditLogicTest is TestHelper {
                 debt: 5000,
                 accruedInterest: 2000,
                 amountToPool: 8100,
-                remainingFunds: 1699,
+                remainingFunds: 1700,
                 profit: 1100,
                 loss: 0
             }),
@@ -402,7 +402,7 @@ contract CreditLogicTest is TestHelper {
                 debt: 5000,
                 accruedInterest: 2000,
                 amountToPool: 8190,
-                remainingFunds: 1409,
+                remainingFunds: 1410,
                 profit: 1150,
                 loss: 0
             }),

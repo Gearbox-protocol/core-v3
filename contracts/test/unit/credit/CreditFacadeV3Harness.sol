@@ -32,10 +32,6 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
         _revertIfNoPermission(flags, permission);
     }
 
-    function eraseAllBotPermissions(address creditAccount) external {
-        _eraseAllBotPermissions(creditAccount);
-    }
-
     function revertIfOutOfBorrowingLimit(uint256 amount) external {
         _revertIfOutOfBorrowingLimit(amount);
     }

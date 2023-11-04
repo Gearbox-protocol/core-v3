@@ -11,11 +11,14 @@ struct PriceFeedParams {
     bool skipCheck;
     uint8 decimals;
     bool useReserve;
+    bool trusted;
 }
 
 interface IPriceOracleV3Events {
     /// @notice Emitted when new price feed is set for token
-    event SetPriceFeed(address indexed token, address indexed priceFeed, uint32 stalenessPeriod, bool skipCheck);
+    event SetPriceFeed(
+        address indexed token, address indexed priceFeed, uint32 stalenessPeriod, bool skipCheck, bool trusted
+    );
 
     /// @notice Emitted when new reserve price feed is set for token
     event SetReservePriceFeed(address indexed token, address indexed priceFeed, uint32 stalenessPeriod, bool skipCheck);
@@ -26,6 +29,8 @@ interface IPriceOracleV3Events {
 
 /// @title Price oracle V3 interface
 interface IPriceOracleV3 is IPriceOracleBase, IPriceOracleV3Events {
+    function getPriceSafe(address token) external view returns (uint256);
+
     function getPriceRaw(address token, bool reserve) external view returns (uint256);
 
     function priceFeedsRaw(address token, bool reserve) external view returns (address);
@@ -33,13 +38,15 @@ interface IPriceOracleV3 is IPriceOracleBase, IPriceOracleV3Events {
     function priceFeedParams(address token)
         external
         view
-        returns (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals);
+        returns (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals, bool trusted);
+
+    function safeConvertToUSD(uint256 amount, address token) external view returns (uint256);
 
     // ------------- //
     // CONFIGURATION //
     // ------------- //
 
-    function setPriceFeed(address token, address priceFeed, uint32 stalenessPeriod) external;
+    function setPriceFeed(address token, address priceFeed, uint32 stalenessPeriod, bool trusted) external;
 
     function setReservePriceFeed(address token, address priceFeed, uint32 stalenessPeriod) external;
 

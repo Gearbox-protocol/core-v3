@@ -16,6 +16,9 @@ error AmountCantBeZeroException();
 /// @notice Thrown on incorrect input parameter
 error IncorrectParameterException();
 
+/// @notice Thrown when balance is insufficient to perform an operation
+error InsufficientBalanceException();
+
 /// @notice Thrown if parameter is out of range
 error ValueOutOfRangeException();
 
@@ -64,8 +67,14 @@ error AddressNotFoundException();
 /// @notice Thrown by pool-adjacent contracts when a credit manager being connected has a wrong pool address
 error IncompatibleCreditManagerException();
 
+/// @notice Thrown when attempting to set an incompatible successor staking contract
+error IncompatibleSuccessorException();
+
 /// @notice Thrown when attempting to vote in a non-approved contract
 error VotingContractNotAllowedException();
+
+/// @notice Thrown when attempting to unvote more votes than there are
+error InsufficientVotesException();
 
 /// @notice Thrown when attempting to borrow more than the second point on a two-point curve
 error BorrowingMoreThanU2ForbiddenException();
@@ -101,6 +110,9 @@ error TooManyEnabledTokensException();
 /// @notice Thrown when a custom HF parameter lower than 10000 is passed into the full collateral check
 error CustomHealthFactorTooLowException();
 
+/// @notice Thrown when submitted collateral hint is not a valid token mask
+error InvalidCollateralHintException();
+
 /// @notice Thrown when attempting to execute a protocol interaction without active credit account set
 error ActiveCreditAccountNotSetException();
 
@@ -112,6 +124,12 @@ error DebtToZeroWithActiveQuotasException();
 
 /// @notice Thrown when a zero-debt account attempts to increase quota
 error IncreaseQuotaOnZeroDebtAccountException();
+
+/// @notice Thrown when attempting to close an account with non-zero debt
+error CloseAccountWithNonZeroDebtException();
+
+/// @notice Thrown when value of funds remaining on the account after liquidation is insufficient
+error InsufficientRemainingFundsException();
 
 /// @notice Thrown when Credit Facade tries to write over a non-zero active Credit Account
 error ActiveCreditAccountOverridenException();
@@ -154,6 +172,9 @@ error NotAllowedWhenNotExpirableException();
 /// @notice Thrown if a selector that doesn't match any allowed function is passed to the credit facade in a multicall
 error UnknownMethodException();
 
+/// @notice Thrown when trying to close an account with enabled tokens
+error CloseAccountWithEnabledTokensException();
+
 /// @notice Thrown if a liquidator tries to liquidate an account with a health factor above 1
 error CreditAccountNotLiquidatableException();
 
@@ -175,6 +196,15 @@ error ExpectedBalancesAlreadySetException();
 /// @notice Thrown when trying to perform an action that is forbidden when credit account has enabled forbidden tokens
 error ForbiddenTokensException();
 
+/// @notice Thrown when new forbidden tokens are enabled during the multicall
+error ForbiddenTokenEnabledException();
+
+/// @notice Thrown when enabled forbidden token balance is increased during the multicall
+error ForbiddenTokenBalanceIncreasedException();
+
+/// @notice Thrown when the remaining token balance is increased during the liquidation
+error RemainingTokenBalanceIncreasedException();
+
 /// @notice Thrown if `botMulticall` is called by an address that is not approved by account owner or is forbidden
 error NotApprovedBotException();
 
@@ -183,6 +213,9 @@ error NoPermissionException(uint256 permission);
 
 /// @notice Thrown when user tries to approve more bots than allowed
 error TooManyApprovedBotsException();
+
+/// @notice Thrown when attempting to give a bot unexpected permissions
+error UnexpectedPermissionsException();
 
 // ------ //
 // ACCESS //
@@ -256,24 +289,8 @@ error ParameterChangedAfterQueuedTxException();
 // BOT LIST //
 // -------- //
 
-/// @notice Thrown when attempting to set non-zero permissions for a forbidden bot
+/// @notice Thrown when attempting to set non-zero permissions for a forbidden or special bot
 error InvalidBotException();
-
-/// @notice Thrown if payment amount bigger that remaining weekly allowance
-error InsufficientWeeklyFundingAllowance();
-
-/// @notice Thrown if payment amount bigger that remaining total allowance
-error InsufficientTotalFundingAllowance();
-
-// ------------------ //
-// WITHDRAWAL MANAGER //
-// ------------------ //
-
-/// @notice Thrown when attempting to claim funds without having anything claimable
-error NothingToClaimException();
-
-/// @notice Thrown when attempting to schedule withdrawal from a credit account that has no free withdrawal slots
-error NoFreeWithdrawalSlotsException();
 
 // --------------- //
 // ACCOUNT FACTORY //
@@ -300,13 +317,3 @@ error IncorrectPriceException();
 
 /// @notice Thrown when token's price feed becomes stale
 error StalePriceException();
-
-// --------- //
-// DEGEN NFT //
-// --------- //
-
-/// @notice Thrown by Degen NFT when attempting to burn on opening an account with 0 balance
-error InsufficientBalanceException();
-
-/// @notice Thrown by Degen NFT when attempting to burn on opening an account with 0 balance
-error InsufficientVotesException();

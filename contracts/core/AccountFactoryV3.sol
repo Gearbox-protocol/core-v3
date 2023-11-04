@@ -51,8 +51,8 @@ contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait
     /// @dev Mapping credit manager => factory params
     mapping(address => FactoryParams) internal _factoryParams;
 
-    /// @dev Mapping credit manager => queued accounts
-    mapping(address => QueuedAccount[2 ** 32]) internal _queuedAccounts;
+    /// @dev Mapping (credit manager, index) => queued account
+    mapping(address => mapping(uint256 => QueuedAccount)) internal _queuedAccounts;
 
     /// @notice Constructor
     /// @param addressProvider Address provider contract address

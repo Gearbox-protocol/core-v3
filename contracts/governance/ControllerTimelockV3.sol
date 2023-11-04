@@ -286,16 +286,16 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
             signature: "rampLiquidationThreshold(address,uint16,uint40,uint24)",
             data: abi.encode(token, liquidationThresholdFinal, rampStart, rampDuration),
             delay: delay,
-            sanityCheckValue: getLTRampParamsHash(creditManager, token),
+            sanityCheckValue: uint256(getLTRampParamsHash(creditManager, token)),
             sanityCheckCallData: abi.encodeCall(this.getLTRampParamsHash, (creditManager, token))
         }); // U: [CT-6]
     }
 
     /// @dev Retrives the keccak of liquidation threshold params for a token
-    function getLTRampParamsHash(address creditManager, address token) public view returns (uint256) {
+    function getLTRampParamsHash(address creditManager, address token) public view returns (bytes32) {
         (uint16 ltInitial, uint16 ltFinal, uint40 timestampRampStart, uint24 rampDuration) =
             ICreditManagerV3(creditManager).ltParams(token);
-        return uint256(keccak256(abi.encode(ltInitial, ltFinal, timestampRampStart, rampDuration)));
+        return keccak256(abi.encode(ltInitial, ltFinal, timestampRampStart, rampDuration));
     }
 
     /// @notice Queues a transaction to forbid a third party contract adapter
@@ -637,9 +637,9 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
             revert TxExecutedOutsideTimeWindowException(); // U: [CT-9]
         }
 
-        /// In order to ensure that we do not accidentally override a change
-        /// made by configurator or another admin, the current value of the parameter
-        /// is compared to the value at the moment of tx being queued
+        // In order to ensure that we do not accidentally override a change
+        // made by configurator or another admin, the current value of the parameter
+        // is compared to the value at the moment of tx being queued
         if (qtd.sanityCheckCallData.length != 0) {
             (, bytes memory returndata) = address(this).staticcall(qtd.sanityCheckCallData);
 

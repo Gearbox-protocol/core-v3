@@ -67,18 +67,6 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         creditAccountInfo[creditAccount].borrower = borrower;
     }
 
-    function batchTokensTransfer(address creditAccount, address to, bool convertToETH, uint256 tokensToTransferMask)
-        external
-    {
-        _batchTokensTransfer(creditAccount, to, convertToETH, tokensToTransferMask);
-    }
-
-    function safeTokenTransfer(address creditAccount, address token, address to, uint256 amount, bool convertToETH)
-        external
-    {
-        _safeTokenTransfer(creditAccount, token, to, amount, convertToETH);
-    }
-
     function collateralTokenByMaskCalcLT(uint256 tokenMask, bool calcLT)
         external
         view
@@ -100,12 +88,9 @@ contract CreditManagerV3Harness is CreditManagerV3 {
             enabledTokensMask: enabledTokensMaskOf(creditAccount),
             collateralHints: collateralHints,
             minHealthFactor: PERCENTAGE_FACTOR,
-            task: task
+            task: task,
+            useSafePrices: false
         });
-    }
-
-    function hasWithdrawals(address creditAccount) external view returns (bool) {
-        return _hasWithdrawals(creditAccount);
     }
 
     function saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) external {
@@ -128,14 +113,6 @@ contract CreditManagerV3Harness is CreditManagerV3 {
         )
     {
         return _getQuotedTokensData(creditAccount, enabledTokensMask, collateralHints, _poolQuotaKeeper);
-    }
-
-    function getCancellableWithdrawalsValue(address _priceOracle, address creditAccount, bool isForceCancel)
-        external
-        view
-        returns (uint256 totalValueUSD)
-    {
-        return _getCancellableWithdrawalsValue(_priceOracle, creditAccount, isForceCancel);
     }
 
     function getCollateralTokensData(uint256 tokenMask) external view returns (CollateralTokenData memory) {
