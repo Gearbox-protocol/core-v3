@@ -7,7 +7,7 @@ import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.
 
 uint8 constant BOT_PERMISSIONS_SET_FLAG = 1;
 
-uint8 constant DEFAULT_MAX_ENABLED_TOKENS = 12;
+uint8 constant DEFAULT_MAX_ENABLED_TOKENS = 4;
 address constant INACTIVE_CREDIT_ACCOUNT_ADDRESS = address(1);
 
 /// @notice Debt management type
