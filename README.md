@@ -12,7 +12,7 @@ _Some compare composable leverage as a primitive to DeFi-native prime brokerage.
 
 ## Licensing
 
-The primary license for the Gearbox-protocol/integrations-v2 is the Business Source License 1.1 (BUSL-1.1), see [LICENSE](/LICENSE). The files which are NOT licensed under the BUSL-1.1 have appropriate SPDX headers.
+The primary license for the Gearbox-protocol/core-v3 is the Business Source License 1.1 (BUSL-1.1), see [LICENSE](/LICENSE). The files which are NOT licensed under the BUSL-1.1 have appropriate SPDX headers.
 
 
 ### Important information for contributors
