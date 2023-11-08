@@ -1,19 +1,18 @@
-# Gearbox protocol
+# Gearbox Protocol
 
-Gearbox is a generalized leverage protocol. It has two sides to it: passive liquidity providers who earn low-risk APY by providing single-asset liquidity; and active farmers, firms, or even other protocols who borrow those assets to trade or farm with even x10 leverage.
+Gearbox Protocol brings you **onchain credit**, allowing anyone to margin trade on Uniswap, leverage farm on Curve, leverage stake on Lido, and use 10X more capital on many DeFi protocols you love, as well as RWA & NFTs. Making decentralized leverage a reality thanks to Credit Account abstraction! 
 
-Gearbox Protocol allows anyone to take DeFi-native leverage and then use it across various (DeFi & more) protocols in a composable way. You take leverage with Gearbox and then use it on other protocols you already love: Uniswap, Curve, Convex, Lido, etc. For example, you can leverage trade on Uniswap, leverage farm on Yearn, make delta-neutral strategies, get Leverage-as-a-Service for your structured product, and more... Thanks to the Credit Accounts primitive!
+_[See the blog post for more information on V3 and new features.](https://blog.gearbox.fi/gearbox-protocol-v3-the-onchain-credit-layer/)_
 
-_Some compare composable leverage as a primitive to DeFi-native prime brokerage._
+Gearbox Protocol uses Credit Account abstraction to bring together lending and prime brokerage in the same protocol. Lenders deposit assets to earn passive yield, while the composable leverage side users borrow these assets to create spot leverage positions, which can be used across DeFi. That could be margin trading on Uniswap, farming on Curve and Balancer, leverage staking on Lido and Rocketpool, and a lot more. All of that is made possible with Gearbox’s innovative Credit Account abstraction, creating the base layer of DeFi leverage.
 
-## New in V3
+## Documentation
 
-
+General documentation of the Gearbox Protocol can be found [here](https://docs.gearbox.fi). Developer documentation with more tech-related infromation about the protocol, contract interfaces, integration guides and audits is available on the [Gearbox dev protal](https://dev.gearbox.fi).
 
 ## Licensing
 
 The primary license for the Gearbox-protocol/core-v3 is the Business Source License 1.1 (BUSL-1.1), see [LICENSE](/LICENSE). The files which are NOT licensed under the BUSL-1.1 have appropriate SPDX headers.
-
 
 ### Important information for contributors
 
