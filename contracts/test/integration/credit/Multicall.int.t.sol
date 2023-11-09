@@ -538,33 +538,4 @@ contract MultiCallIntegrationTest is
             )
         );
     }
-
-    /// @dev I:[MC-16]: fullCollateralCheck reverts when an illegal mask is passed in collateralHints
-    function test_I_MC_16_fullCollateralCheck_reverts_for_illegal_mask_in_hints() public creditTest {
-        (address creditAccount,) = _openTestCreditAccount();
-
-        uint256[] memory collateralHints = new uint256[](1);
-        collateralHints[0] = 3232;
-
-        uint256 enabledTokensMap = creditManager.enabledTokensMaskOf(creditAccount);
-
-        vm.expectCall(
-            address(creditManager),
-            abi.encodeCall(
-                ICreditManagerV3.fullCollateralCheck, (creditAccount, enabledTokensMap, collateralHints, 10001, false)
-            )
-        );
-
-        vm.expectRevert(InvalidCollateralHintException.selector);
-        vm.prank(USER);
-        creditFacade.multicall(
-            creditAccount,
-            MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, 10001))
-                })
-            )
-        );
-    }
 }

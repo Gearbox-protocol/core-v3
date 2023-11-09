@@ -589,6 +589,15 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeV3Multicall.setFullCheckParams.selector) {
                         (fullCheckParams.collateralHints, fullCheckParams.minHealthFactor) =
                             abi.decode(mcall.callData[4:], (uint256[], uint16)); // U:[FA-24]
+
+                        if (fullCheckParams.minHealthFactor < PERCENTAGE_FACTOR) {
+                            revert CustomHealthFactorTooLowException(); // U:[FA-24]
+                        }
+
+                        for (uint256 j; j < fullCheckParams.collateralHints.length; ++j) {
+                            uint256 mask = fullCheckParams.collateralHints[j];
+                            if (mask == 0 || mask & mask - 1 != 0) revert InvalidCollateralHintException(); // U:[FA-24]
+                        }
                     }
                     // enableToken
                     else if (method == ICreditFacadeV3Multicall.enableToken.selector) {

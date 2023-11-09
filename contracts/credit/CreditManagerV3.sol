@@ -594,7 +594,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param minHealthFactor Health factor threshold in bps, the check fails if `twvUSD < minHealthFactor * totalDebtUSD`
     /// @param useSafePrices Whether to use safe prices when evaluating collateral
     /// @return enabledTokensMaskAfter Bitmask of account's enabled collateral tokens after potential cleanup
-    /// @dev Reverts if `collateralHints` contains masks that don't correspond to known collateral tokens
     /// @dev Even when `collateralHints` are specified, quoted tokens are evaluated before non-quoted ones
     /// @custom:expects Credit facade ensures that `creditAccount` is opened in this credit manager
     function fullCollateralCheck(
@@ -610,18 +609,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacadeOnly // U:[CM-2]
         returns (uint256 enabledTokensMaskAfter)
     {
-        if (minHealthFactor < PERCENTAGE_FACTOR) {
-            revert CustomHealthFactorTooLowException(); // U:[CM-17]
-        }
-
-        unchecked {
-            uint256 len = collateralHints.length;
-            for (uint256 i; i < len; ++i) {
-                uint256 mask = collateralHints[i];
-                if (mask == 0 || mask & mask - 1 != 0) revert InvalidCollateralHintException(); // U:[CM-17]
-            }
-        }
-
         CollateralDebtData memory cdd = _calcDebtAndCollateral({
             creditAccount: creditAccount,
             minHealthFactor: minHealthFactor,

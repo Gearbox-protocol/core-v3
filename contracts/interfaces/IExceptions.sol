@@ -107,12 +107,6 @@ error TooManyTokensException();
 /// @notice Thrown if more than the maximum number of tokens were enabled on a credit account
 error TooManyEnabledTokensException();
 
-/// @notice Thrown when a custom HF parameter lower than 10000 is passed into the full collateral check
-error CustomHealthFactorTooLowException();
-
-/// @notice Thrown when submitted collateral hint is not a valid token mask
-error InvalidCollateralHintException();
-
 /// @notice Thrown when attempting to execute a protocol interaction without active credit account set
 error ActiveCreditAccountNotSetException();
 
@@ -216,6 +210,12 @@ error TooManyApprovedBotsException();
 
 /// @notice Thrown when attempting to give a bot unexpected permissions
 error UnexpectedPermissionsException();
+
+/// @notice Thrown when a custom HF parameter lower than 10000 is passed into the full collateral check
+error CustomHealthFactorTooLowException();
+
+/// @notice Thrown when submitted collateral hint is not a valid token mask
+error InvalidCollateralHintException();
 
 // ------ //
 // ACCESS //

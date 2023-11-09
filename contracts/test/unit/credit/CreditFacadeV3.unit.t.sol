@@ -1111,24 +1111,72 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     function test_U_FA_24_multicall_setFullCheckParams_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
-        uint256[] memory collateralHints = new uint256[](2);
+        uint256[] memory collateralHints;
+        uint16 minHealthFactor;
 
-        collateralHints[0] = 2323;
-        collateralHints[1] = 8823;
+        minHealthFactor = PERCENTAGE_FACTOR - 1;
+        vm.expectRevert(CustomHealthFactorTooLowException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(
+                        ICreditFacadeV3Multicall.setFullCheckParams, (new uint256[](0), PERCENTAGE_FACTOR - 1)
+                        )
+                })
+                ),
+            enabledTokensMask: 0,
+            flags: 0
+        });
 
-        uint16 hf = 12_320;
+        minHealthFactor = PERCENTAGE_FACTOR;
+        collateralHints = new uint256[](1);
+        vm.expectRevert(InvalidCollateralHintException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, PERCENTAGE_FACTOR))
+                })
+                ),
+            enabledTokensMask: 0,
+            flags: 0
+        });
 
-        MultiCall[] memory calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, hf))
-            })
-        );
+        collateralHints[0] = 3;
+        vm.expectRevert(InvalidCollateralHintException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, PERCENTAGE_FACTOR))
+                })
+                ),
+            enabledTokensMask: 0,
+            flags: 0
+        });
 
-        FullCheckParams memory fullCheckParams =
-            creditFacade.multicallInt({creditAccount: creditAccount, calls: calls, enabledTokensMask: 0, flags: 0});
+        collateralHints = new uint256[](2);
+        collateralHints[0] = 16;
+        collateralHints[1] = 32;
+        minHealthFactor = 12_320;
 
-        assertEq(fullCheckParams.minHealthFactor, hf, "Incorrect hf");
+        FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, minHealthFactor))
+                })
+                ),
+            enabledTokensMask: 0,
+            flags: 0
+        });
+
+        assertEq(fullCheckParams.minHealthFactor, minHealthFactor, "Incorrect minHealthFactor");
         assertEq(fullCheckParams.collateralHints, collateralHints, "Incorrect collateralHints");
     }
 

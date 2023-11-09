@@ -114,7 +114,7 @@ interface ICreditFacadeV3Multicall {
     /// @notice Sets advanced collateral check parameters
     /// @param collateralHints Optional array of token masks to check first to reduce the amount of computation
     ///        when known subset of account's collateral tokens covers all the debt
-    /// @param minHealthFactor Min account's health factor in bps in order not to revert, must be at least 10000 (default)
+    /// @param minHealthFactor Min account's health factor in bps in order not to revert, must be at least 10000
     function setFullCheckParams(uint256[] calldata collateralHints, uint16 minHealthFactor) external;
 
     /// @notice Enables token as account's collateral, which makes it count towards account's total value
