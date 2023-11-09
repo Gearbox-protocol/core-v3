@@ -1724,6 +1724,9 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             abi.encodeCall(ICreditManagerV3.withdrawCollateral, (creditAccount, link, amount, USER))
         );
 
+        vm.expectEmit(true, true, false, true);
+        emit WithdrawCollateral(creditAccount, link, amount, USER);
+
         FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
             creditAccount: creditAccount,
             calls: MultiCallBuilder.build(

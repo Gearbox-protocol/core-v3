@@ -853,7 +853,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         }
         tokensToDisable = ICreditManagerV3(creditManager).withdrawCollateral(creditAccount, token, amount, to); // U:[FA-35]
 
-        emit WithdrawCollateral(creditAccount, token, amount); // U:[FA-35]
+        emit WithdrawCollateral(creditAccount, token, amount, to); // U:[FA-35]
     }
 
     /// @dev `ICreditFacadeV3Multicall.revokeAdapterAllowances` implementation
