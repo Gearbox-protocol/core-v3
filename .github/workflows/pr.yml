@@ -30,7 +30,13 @@ jobs:
         with:
           version: nightly
 
-      - name: Run forge tests
+      - name: Install forge dependencies
+        run: forge install
+
+      - name: Compile contracts
+        run: forge build --sizes
+
+      - name: Run tests
         run: forge test
         timeout-minutes: 10
 
