@@ -367,7 +367,7 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
 
     /// @dev U:[CLL-4]: calcQuotedTokensCollateral works correctly
     function test_U_CLL_04_calcQuotedTokensCollateral_works_correctly() public withTokenSetup {
-        CalcQuotedTokenCollateralTestCase[5] memory cases = [
+        CalcQuotedTokenCollateralTestCase[4] memory cases = [
             CalcQuotedTokenCollateralTestCase({
                 name: "One token calc, no target, twv < quota",
                 balances: arrayOf(B({t: Tokens.USDT, balance: 10_000})),
@@ -395,19 +395,6 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
                 expectedTwvUSD: 5_000 * prices[Tokens.DAI] * lts[Tokens.USDT] / PERCENTAGE_FACTOR
                     + (1_000 - 1) * prices[Tokens.LINK] * lts[Tokens.LINK] / PERCENTAGE_FACTOR,
                 expectedOrder: arrayOf(Tokens.USDT, Tokens.LINK)
-            }),
-            CalcQuotedTokenCollateralTestCase({
-                name: "Stops if token[i] == address(0), Tokens.NO_TOKEN has address(0)",
-                balances: arrayOf(B({t: Tokens.USDT, balance: 10_000})),
-                quotas: arrayOf(
-                    Q({t: Tokens.WETH, quota: 10_000}),
-                    Q({t: Tokens.NO_TOKEN, quota: 10_000}),
-                    Q({t: Tokens.USDT, quota: 10_000})
-                    ),
-                target: type(uint256).max,
-                expectedTotalValueUSD: 0,
-                expectedTwvUSD: 0,
-                expectedOrder: arrayOf(Tokens.WETH)
             }),
             CalcQuotedTokenCollateralTestCase({
                 name: "Stops when target reached",

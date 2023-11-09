@@ -113,7 +113,7 @@ error ActiveCreditAccountNotSetException();
 /// @notice Thrown when trying to update credit account's debt more than once in the same block
 error DebtUpdatedTwiceInOneBlockException();
 
-/// @notice Thrown when a zero-debt account has non-zero quotas during a full check
+/// @notice Thrown when trying to repay all debt while having active quoted
 error DebtToZeroWithActiveQuotasException();
 
 /// @notice Thrown when a zero-debt account attempts to update quota
