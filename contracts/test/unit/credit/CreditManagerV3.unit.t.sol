@@ -1332,6 +1332,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         vm.prank(CONFIGURATOR);
         creditManager.setQuotedMask(LINK_MASK);
 
+        tokenTestSuite.mint(underlying, creditAccount, 5 * amount);
+
         uint256 initialCQI = 1;
         creditManager
             /// @notice enabledTokensMask is read directly from function parameters, not from this function

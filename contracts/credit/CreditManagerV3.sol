@@ -371,11 +371,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         } else {
             uint256 maxRepayment = _amountWithFee(collateralDebtData.calcTotalDebt());
             if (amount >= maxRepayment) {
-                // zero-debt is a special state that disables collateral checks so having quotas on
-                // the account should be forbidden as they entail debt in a form of quota interest
-                if (collateralDebtData.quotedTokens.length != 0) {
-                    revert DebtToZeroWithActiveQuotasException();
-                }
                 amount = maxRepayment;
             }
 
@@ -418,6 +413,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             if (IERC20(underlying).safeBalanceOf({account: creditAccount}) <= 1) {
                 tokensToDisable = UNDERLYING_TOKEN_MASK; // U:[CM-11]
             }
+        }
+
+        // zero-debt is a special state that disables collateral checks so having quotas on
+        // the account should be forbidden as they entail debt in a form of quota interest
+        if (newDebt == 0 && collateralDebtData.quotedTokens.length != 0) {
+            revert DebtToZeroWithActiveQuotasException();
         }
 
         currentCreditAccountInfo.debt = newDebt; // U:[CM-10, 11]
@@ -900,8 +901,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
         CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
-        if (quotaChange > 0 && currentCreditAccountInfo.debt == 0) {
-            revert IncreaseQuotaOnZeroDebtAccountException();
+        if (currentCreditAccountInfo.debt == 0) {
+            revert UpdateQuotaOnZeroDebtAccountException();
         }
 
         (uint128 caInterestChange, uint128 quotaFees, bool enable, bool disable) = IPoolQuotaKeeperV3(poolQuotaKeeper())

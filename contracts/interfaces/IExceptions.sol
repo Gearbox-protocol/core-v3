@@ -116,8 +116,8 @@ error DebtUpdatedTwiceInOneBlockException();
 /// @notice Thrown when a zero-debt account has non-zero quotas during a full check
 error DebtToZeroWithActiveQuotasException();
 
-/// @notice Thrown when a zero-debt account attempts to increase quota
-error IncreaseQuotaOnZeroDebtAccountException();
+/// @notice Thrown when a zero-debt account attempts to update quota
+error UpdateQuotaOnZeroDebtAccountException();
 
 /// @notice Thrown when attempting to close an account with non-zero debt
 error CloseAccountWithNonZeroDebtException();
