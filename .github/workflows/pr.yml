@@ -30,11 +30,8 @@ jobs:
         with:
           version: nightly
 
-      - name: Install forge dependencies
-        run: forge install
-
       - name: Compile contracts
-        run: forge build --sizes
+        run: forge build
 
       - name: Run tests
         run: forge test
