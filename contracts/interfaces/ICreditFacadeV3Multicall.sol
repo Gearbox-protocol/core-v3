@@ -50,16 +50,19 @@ interface ICreditFacadeV3Multicall {
     /// @dev This method is available in all kinds of multicalls
     function onDemandPriceUpdate(address token, bool reserve, bytes calldata data) external;
 
-    /// @notice Saves the minimal balances that are expected after a sequence of actions.
+    /// @notice Stores expected token balances (current balance + delta) after operations for a slippage check.
+    ///         Normally, a check is performed automatically at the end of the multicall, but more fine-grained
+    ///         behavior can be achieved by placing `storeExpectedBalances` and `compareBalances` where needed.
     /// @param balanceDeltas Array of (token, minBalanceDelta) pairs, deltas are allowed to be negative
-    /// @dev The expected balance is calculated as current balance + delta
+    /// @dev Reverts if expected balances are already set
     /// @dev This method is available in all kinds of multicalls
-    function saveExpectedDeltas(BalanceDelta[] calldata balanceDeltas) external;
+    function storeExpectedBalances(BalanceDelta[] calldata balanceDeltas) external;
 
-    /// @notice Checks that asset balances are not less than the balances passed in `saveExpectedDeltas`
-    /// @dev Can only be called when there are saved expected balances
+    /// @notice Performs a slippage check ensuring that current token balances are greater than saved expected ones
+    /// @dev Resets stored expected balances
+    /// @dev Reverts if expected balances are not stored
     /// @dev This method is available in all kinds of multicalls
-    function checkExpectedDeltas() external;
+    function compareBalances() external;
 
     /// @notice Adds collateral to account
     /// @param token Token to add
@@ -102,7 +105,7 @@ interface ICreditFacadeV3Multicall {
     /// @param minQuota Minimum resulting account's quota for token required not to revert
     /// @dev Enables token as collateral if quota is increased from zero, disables if decreased to zero
     /// @dev Quota increase is prohibited if there are forbidden tokens enabled as collateral on the account
-    /// @dev Quota increase is prohibited if account has zero debt
+    /// @dev Quota update is prohibited if account has zero debt
     /// @dev Resulting account's quota for token must not exceed the limit defined in the facade
     function updateQuota(address token, int96 quotaChange, uint96 minQuota) external;
 

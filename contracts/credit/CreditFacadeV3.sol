@@ -509,29 +509,21 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                 if (mcall.target == address(this)) {
                     bytes4 method = bytes4(mcall.callData);
 
-                    // saveExpectedDeltas
-                    if (method == ICreditFacadeV3Multicall.saveExpectedDeltas.selector) {
-                        if (expectedBalances.length != 0) {
-                            revert ExpectedBalancesAlreadySetException(); // U:[FA-23]
-                        }
+                    // storeExpectedBalances
+                    if (method == ICreditFacadeV3Multicall.storeExpectedBalances.selector) {
+                        if (expectedBalances.length != 0) revert ExpectedBalancesAlreadySetException(); // U:[FA-23]
 
                         BalanceDelta[] memory balanceDeltas = abi.decode(mcall.callData[4:], (BalanceDelta[])); // U:[FA-23]
                         expectedBalances = BalancesLogic.storeBalances(creditAccount, balanceDeltas); // U:[FA-23]
                     }
-                    // checkExpectedDeltas
-                    else if (method == ICreditFacadeV3Multicall.checkExpectedDeltas.selector) {
-                        if (expectedBalances.length == 0) {
-                            revert ExpectedBalancesNotSetException();
+                    // compareBalances
+                    else if (method == ICreditFacadeV3Multicall.compareBalances.selector) {
+                        if (expectedBalances.length == 0) revert ExpectedBalancesNotSetException(); // U:[FA-23]
+
+                        if (!BalancesLogic.compareBalances(creditAccount, expectedBalances, Comparison.GREATER)) {
+                            revert BalanceLessThanExpectedException(); // U:[FA-23]
                         }
-
-                        bool success = BalancesLogic.compareBalances({
-                            creditAccount: creditAccount,
-                            balances: expectedBalances,
-                            comparison: Comparison.GREATER
-                        });
-                        if (!success) revert BalanceLessThanMinimumDesiredException();
-
-                        expectedBalances = new Balance[](0);
+                        expectedBalances = new Balance[](0); // U:[FA-23]
                     }
                     // addCollateral
                     else if (method == ICreditFacadeV3Multicall.addCollateral.selector) {
@@ -681,7 +673,11 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             }
         }
 
-        if (expectedBalances.length != 0) revert ExpectedBalancesNotCheckedException();
+        if (expectedBalances.length != 0) {
+            if (!BalancesLogic.compareBalances(creditAccount, expectedBalances, Comparison.GREATER)) {
+                revert BalanceLessThanExpectedException(); // U:[FA-23]
+            }
+        }
 
         if (enabledTokensMask & forbiddenTokenMask != 0) {
             fullCheckParams.useSafePrices = true;

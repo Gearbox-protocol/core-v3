@@ -1037,8 +1037,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         });
     }
 
-    /// @dev U:[FA-23]: multicall checkExpectedDeltas works properly
-    function test_U_FA_23_multicall_checkExpectedDeltas_works_properly() public notExpirableCase {
+    /// @dev U:[FA-23]: multicall slippage check works properly
+    function test_U_FA_23_multicall_slippage_check_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
         address link = tokenTestSuite.addressOf(Tokens.LINK);
@@ -1051,35 +1051,35 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         ERC20Mock(link).set_minter(acm);
 
         for (uint256 testCase = 0; testCase < 6; ++testCase) {
-            /// case 0: no revert if expected 0
-            /// case 1: reverts because expect 1
-            /// case 2: no reverty because expect 1 and it mints 1 duyring the call
-            /// case 3: reverts because called twice
-            /// case 4: reverts because checked without saving balances
-            /// case 5: reverts because did not check saved balances
+            // case 0: no revert if expected 0
+            // case 1: reverts because expects 1
+            // case 2: no revert because expects 1 and it mints 1 during the call
+            // case 3: reverts because called twice
+            // case 4: reverts because checked without saving balances
+            // case 5: reverts because failed the second check
 
             expectedBalance[0] = BalanceDelta({token: link, amount: int256(uint256(testCase > 0 ? 1 : 0))});
 
             MultiCall[] memory calls = MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.saveExpectedDeltas, (expectedBalance))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.storeExpectedBalances, (expectedBalance))
                 }),
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.checkExpectedDeltas, ())
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.compareBalances, ())
                 })
             );
 
             if (testCase == 1) {
-                vm.expectRevert(BalanceLessThanMinimumDesiredException.selector);
+                vm.expectRevert(BalanceLessThanExpectedException.selector);
             }
 
             if (testCase == 2) {
                 calls = MultiCallBuilder.build(
                     MultiCall({
                         target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeV3Multicall.saveExpectedDeltas, (expectedBalance))
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.storeExpectedBalances, (expectedBalance))
                     }),
                     MultiCall({
                         target: acm,
@@ -1089,7 +1089,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     }),
                     MultiCall({
                         target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeV3Multicall.checkExpectedDeltas, ())
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.compareBalances, ())
                     })
                 );
             }
@@ -1098,11 +1098,11 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 calls = MultiCallBuilder.build(
                     MultiCall({
                         target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeV3Multicall.saveExpectedDeltas, (expectedBalance))
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.storeExpectedBalances, (expectedBalance))
                     }),
                     MultiCall({
                         target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeV3Multicall.saveExpectedDeltas, (expectedBalance))
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.storeExpectedBalances, (expectedBalance))
                     })
                 );
                 vm.expectRevert(ExpectedBalancesAlreadySetException.selector);
@@ -1112,7 +1112,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 calls = MultiCallBuilder.build(
                     MultiCall({
                         target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeV3Multicall.checkExpectedDeltas, ())
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.compareBalances, ())
                     })
                 );
                 vm.expectRevert(ExpectedBalancesNotSetException.selector);
@@ -1122,10 +1122,24 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 calls = MultiCallBuilder.build(
                     MultiCall({
                         target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeV3Multicall.saveExpectedDeltas, (expectedBalance))
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.storeExpectedBalances, (expectedBalance))
+                    }),
+                    MultiCall({
+                        target: acm,
+                        callData: abi.encodeCall(
+                            AdapterCallMock.makeCall, (link, abi.encodeCall(ERC20Mock.mint, (creditAccount, 1)))
+                            )
+                    }),
+                    MultiCall({
+                        target: address(creditFacade),
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.compareBalances, ())
+                    }),
+                    MultiCall({
+                        target: address(creditFacade),
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.storeExpectedBalances, (expectedBalance))
                     })
                 );
-                vm.expectRevert(ExpectedBalancesNotCheckedException.selector);
+                vm.expectRevert(BalanceLessThanExpectedException.selector);
             }
 
             creditFacade.multicallInt({

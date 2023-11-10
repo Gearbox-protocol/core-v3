@@ -178,20 +178,17 @@ error BorrowedBlockLimitException();
 /// @notice Thrown if the new debt principal for a credit account falls outside of borrowing limits
 error BorrowAmountOutOfLimitsException();
 
-/// @notice Thrown if one of the balances on a credit account is less than expected after the end of a multicall
-error BalanceLessThanMinimumDesiredException();
-
 /// @notice Thrown if a user attempts to open an account via an expired credit facade
 error NotAllowedAfterExpirationException();
 
-/// @notice Thrown if expected balances are attempted to be again before performing a slippage check
+/// @notice Thrown if expected balances are attempted to be set twice without performing a slippage check
 error ExpectedBalancesAlreadySetException();
 
-/// @notice Thrown if expected balances are not set when attempting to perform a slippage check
+/// @notice Thrown if attempting to perform a slippage check when excepted balances are not set
 error ExpectedBalancesNotSetException();
 
-/// @notice Thrown if a multicall finishes without checking saved balances
-error ExpectedBalancesNotCheckedException();
+/// @notice Thrown if balance of at least one token is less than expected during a slippage check
+error BalanceLessThanExpectedException();
 
 /// @notice Thrown when trying to perform an action that is forbidden when credit account has enabled forbidden tokens
 error ForbiddenTokensException();

@@ -352,8 +352,8 @@ contract MultiCallIntegrationTest is
         expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
     }
 
-    /// @dev I:[MC-11]: saveExpectedDeltas / checkExpectedDeltas during multicalls works correctly
-    function test_I_MC_11_slippageCheck_works_correctly() public creditTest {
+    /// @dev I:[MC-11]: slippage check works correctly
+    function test_I_MC_11_slippage_check_works_correctly() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
         uint256 expectedDAI = 1000;
@@ -379,7 +379,7 @@ contract MultiCallIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.saveExpectedDeltas, (expectedBalances))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.storeExpectedBalances, (expectedBalances))
                 }),
                 MultiCall({
                     target: address(creditFacade),
@@ -388,24 +388,20 @@ contract MultiCallIntegrationTest is
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (tokenLINK, expectedLINK))
-                }),
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.checkExpectedDeltas, ())
                 })
             )
         );
 
         for (uint256 i = 0; i < 2; i++) {
             vm.prank(USER);
-            vm.expectRevert(BalanceLessThanMinimumDesiredException.selector);
+            vm.expectRevert(BalanceLessThanExpectedException.selector);
 
             creditFacade.multicall(
                 creditAccount,
                 MultiCallBuilder.build(
                     MultiCall({
                         target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeV3Multicall.saveExpectedDeltas, (expectedBalances))
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.storeExpectedBalances, (expectedBalances))
                     }),
                     MultiCall({
                         target: address(creditFacade),
@@ -418,82 +414,49 @@ contract MultiCallIntegrationTest is
                         callData: abi.encodeCall(
                             ICreditFacadeV3Multicall.addCollateral, (tokenLINK, (i == 0) ? expectedLINK : expectedLINK - 1)
                             )
-                    }),
-                    MultiCall({
-                        target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeV3Multicall.checkExpectedDeltas, ())
                     })
                 )
             );
         }
     }
 
-    /// @dev I:[MC-12]: saveExpectedDeltas reverts if called again before checking
-    function test_I_MC_12_saveExpectedDeltas_reverts_if_called_twice() public creditTest {
+    /// @dev I:[MC-12]: slippage check reverts if called incorrectly
+    function test_I_MC_12_slippage_check_reverts_if_called_incorrectly() public creditTest {
         uint256 expectedDAI = 1000;
 
         BalanceDelta[] memory expectedBalances = new BalanceDelta[](1);
         expectedBalances[0] = BalanceDelta({token: underlying, amount: int256(expectedDAI)});
 
         (address creditAccount,) = _openTestCreditAccount();
-        vm.prank(USER);
-        vm.expectRevert(ExpectedBalancesAlreadySetException.selector);
 
+        vm.expectRevert(ExpectedBalancesAlreadySetException.selector);
+        vm.prank(USER);
         creditFacade.multicall(
             creditAccount,
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.saveExpectedDeltas, (expectedBalances))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.storeExpectedBalances, (expectedBalances))
                 }),
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.saveExpectedDeltas, (expectedBalances))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.storeExpectedBalances, (expectedBalances))
                 })
             )
         );
-    }
 
-    /// @dev I:[MC-12A]: checkExpectedDeltas reverts if called without calling saveExpectedDeltas first
-    function test_I_MC_12A_checkExpectedDeltas_reverts_without_saved_balances() public creditTest {
-        (address creditAccount,) = _openTestCreditAccount();
-        vm.prank(USER);
         vm.expectRevert(ExpectedBalancesNotSetException.selector);
-
-        creditFacade.multicall(
-            creditAccount,
-            MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.checkExpectedDeltas, ())
-                })
-            )
-        );
-    }
-
-    /// @dev I:[MC-12B]: multicall reverts if saved balances were not checked
-    function test_I_MC_12B_multicall_reverts_if_saved_balances_not_checked() public creditTest {
-        uint256 expectedDAI = 1000;
-
-        BalanceDelta[] memory expectedBalances = new BalanceDelta[](1);
-        expectedBalances[0] = BalanceDelta({token: underlying, amount: int256(expectedDAI)});
-
-        (address creditAccount,) = _openTestCreditAccount();
         vm.prank(USER);
-        vm.expectRevert(ExpectedBalancesNotCheckedException.selector);
-
         creditFacade.multicall(
             creditAccount,
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.saveExpectedDeltas, (expectedBalances))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.compareBalances, ())
                 })
             )
         );
     }
-
-    /// CREDIT FACADE WITH EXPIRATION
 
     ///
     /// ENABLE TOKEN
