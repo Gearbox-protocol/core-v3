@@ -50,11 +50,16 @@ interface ICreditFacadeV3Multicall {
     /// @dev This method is available in all kinds of multicalls
     function onDemandPriceUpdate(address token, bool reserve, bytes calldata data) external;
 
-    /// @notice Ensures that token balances increase at least by specified deltas after the following calls
+    /// @notice Saves the minimal balances that are expected after a sequence of actions.
     /// @param balanceDeltas Array of (token, minBalanceDelta) pairs, deltas are allowed to be negative
-    /// @dev The method can only be called once during the multicall, typically before all balance-changing calls
+    /// @dev The expected balance is calculated as current balance + delta
     /// @dev This method is available in all kinds of multicalls
-    function revertIfReceivedLessThan(BalanceDelta[] calldata balanceDeltas) external;
+    function saveExpectedDeltas(BalanceDelta[] calldata balanceDeltas) external;
+
+    /// @notice Checks that asset balances are not less than the balances passed in `saveExpectedDeltas`
+    /// @dev Can only be called when there are saved expected balances
+    /// @dev This method is available in all kinds of multicalls
+    function checkExpectedDeltas() external;
 
     /// @notice Adds collateral to account
     /// @param token Token to add

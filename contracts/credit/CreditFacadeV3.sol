@@ -509,14 +509,29 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                 if (mcall.target == address(this)) {
                     bytes4 method = bytes4(mcall.callData);
 
-                    // revertIfReceivedLessThan
-                    if (method == ICreditFacadeV3Multicall.revertIfReceivedLessThan.selector) {
+                    // saveExpectedDeltas
+                    if (method == ICreditFacadeV3Multicall.saveExpectedDeltas.selector) {
                         if (expectedBalances.length != 0) {
                             revert ExpectedBalancesAlreadySetException(); // U:[FA-23]
                         }
 
                         BalanceDelta[] memory balanceDeltas = abi.decode(mcall.callData[4:], (BalanceDelta[])); // U:[FA-23]
                         expectedBalances = BalancesLogic.storeBalances(creditAccount, balanceDeltas); // U:[FA-23]
+                    }
+                    // checkExpectedDeltas
+                    else if (method == ICreditFacadeV3Multicall.checkExpectedDeltas.selector) {
+                        if (expectedBalances.length == 0) {
+                            revert ExpectedBalancesNotSetException();
+                        }
+
+                        bool success = BalancesLogic.compareBalances({
+                            creditAccount: creditAccount,
+                            balances: expectedBalances,
+                            comparison: Comparison.GREATER
+                        });
+                        if (!success) revert BalanceLessThanMinimumDesiredException();
+
+                        expectedBalances = new Balance[](0);
                     }
                     // addCollateral
                     else if (method == ICreditFacadeV3Multicall.addCollateral.selector) {
@@ -666,14 +681,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             }
         }
 
-        if (expectedBalances.length != 0) {
-            bool success = BalancesLogic.compareBalances({
-                creditAccount: creditAccount,
-                balances: expectedBalances,
-                comparison: Comparison.GREATER
-            });
-            if (!success) revert BalanceLessThanMinimumDesiredException(); // U:[FA-23]
-        }
+        if (expectedBalances.length != 0) revert ExpectedBalancesNotCheckedException();
 
         if (enabledTokensMask & forbiddenTokenMask != 0) {
             fullCheckParams.useSafePrices = true;

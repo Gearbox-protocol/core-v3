@@ -184,8 +184,14 @@ error BalanceLessThanMinimumDesiredException();
 /// @notice Thrown if a user attempts to open an account via an expired credit facade
 error NotAllowedAfterExpirationException();
 
-/// @notice Thrown if expected balances are attempted to be set through `revertIfReceivedLessThan` twice
+/// @notice Thrown if expected balances are attempted to be again before performing a slippage check
 error ExpectedBalancesAlreadySetException();
+
+/// @notice Thrown if expected balances are not set when attempting to perform a slippage check
+error ExpectedBalancesNotSetException();
+
+/// @notice Thrown if a multicall finishes without checking saved balances
+error ExpectedBalancesNotCheckedException();
 
 /// @notice Thrown when trying to perform an action that is forbidden when credit account has enabled forbidden tokens
 error ForbiddenTokensException();
