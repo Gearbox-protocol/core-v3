@@ -171,7 +171,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
         assertEq(totalQuoted, 0, "totalQuoted !=0");
         assertEq(limit, 0, "limit !=0");
         assertEq(rate, 0, "rate !=0");
-        assertEq(cumulativeIndexLU_RAY, RAY, "Cumulative index !=RAY");
+        assertEq(cumulativeIndexLU_RAY, 1, "Cumulative index !=1");
     }
 
     // U:[PQK-6]: addQuotaToken reverts on adding the same token twice
@@ -263,7 +263,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
             assertEq(rate, DAI_QUOTA_RATE, _testCaseErr("Incorrect DAI rate"));
             assertEq(
                 cumulativeIndexLU_RAY,
-                RAY * (PERCENTAGE_FACTOR + DAI_QUOTA_RATE) / PERCENTAGE_FACTOR,
+                1 + RAY * DAI_QUOTA_RATE / PERCENTAGE_FACTOR,
                 _testCaseErr("Incorrect DAI cumulativeIndexLU")
             );
 
@@ -272,7 +272,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
             assertEq(rate, USDC_QUOTA_RATE, _testCaseErr("Incorrect USDC rate"));
             assertEq(
                 cumulativeIndexLU_RAY,
-                RAY * (PERCENTAGE_FACTOR + USDC_QUOTA_RATE) / PERCENTAGE_FACTOR,
+                1 + RAY * USDC_QUOTA_RATE / PERCENTAGE_FACTOR,
                 _testCaseErr("Incorrect USDC cumulativeIndexLU")
             );
 
@@ -801,7 +801,7 @@ contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV
         uint256 timestampLU = block.timestamp;
         vm.warp(block.timestamp + 365 days);
 
-        uint192 expectedIndex1 = QuotasLogic.cumulativeIndexSince(uint192(RAY), 1000, timestampLU);
+        uint192 expectedIndex1 = QuotasLogic.cumulativeIndexSince(1, 1000, timestampLU);
         // uint192 expectedIndex2 = QuotasLogic.cumulativeIndexSince(uint192(RAY), 2000, timestampLU);
 
         vm.prank(address(creditManagerMock));

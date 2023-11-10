@@ -135,6 +135,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         uint192 cumulativeIndexNow = QuotasLogic.cumulativeIndexSince(tqCumulativeIndexLU, rate, lastQuotaRateUpdate);
 
         // Accrued quota interest depends on the quota and thus must be computed before updating it
+
         caQuotaInterestChange =
             QuotasLogic.calcAccruedQuotaInterest(quoted, cumulativeIndexNow, accountQuota.cumulativeIndexLU); // U:[PQK-15]
 
@@ -375,7 +376,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
         // The rate will be set during a general epoch update in the gauge
         quotaTokensSet.add(token); // U:[PQK-5]
-        totalQuotaParams[token].cumulativeIndexLU = uint192(RAY); // U:[PQK-5]
+        totalQuotaParams[token].cumulativeIndexLU = 1; // U:[PQK-5]
 
         emit AddQuotaToken(token); // U:[PQK-5]
     }
