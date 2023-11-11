@@ -352,8 +352,8 @@ contract MultiCallIntegrationTest is
         expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
     }
 
-    /// @dev I:[MC-11]: revertIfGetLessThan during multicalls works correctly
-    function test_I_MC_11_revertIfGetLessThan_works_correctly() public creditTest {
+    /// @dev I:[MC-11]: slippage check works correctly
+    function test_I_MC_11_slippage_check_works_correctly() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
 
         uint256 expectedDAI = 1000;
@@ -379,7 +379,7 @@ contract MultiCallIntegrationTest is
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.revertIfReceivedLessThan, (expectedBalances))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.storeExpectedBalances, (expectedBalances))
                 }),
                 MultiCall({
                     target: address(creditFacade),
@@ -394,14 +394,14 @@ contract MultiCallIntegrationTest is
 
         for (uint256 i = 0; i < 2; i++) {
             vm.prank(USER);
-            vm.expectRevert(BalanceLessThanMinimumDesiredException.selector);
+            vm.expectRevert(BalanceLessThanExpectedException.selector);
 
             creditFacade.multicall(
                 creditAccount,
                 MultiCallBuilder.build(
                     MultiCall({
                         target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeV3Multicall.revertIfReceivedLessThan, (expectedBalances))
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.storeExpectedBalances, (expectedBalances))
                     }),
                     MultiCall({
                         target: address(creditFacade),
@@ -420,33 +420,43 @@ contract MultiCallIntegrationTest is
         }
     }
 
-    /// @dev I:[MC-12]: rrevertIfGetLessThan everts if called twice
-    function test_I_MC_12_revertIfGetLessThan_reverts_if_called_twice() public creditTest {
+    /// @dev I:[MC-12]: slippage check reverts if called incorrectly
+    function test_I_MC_12_slippage_check_reverts_if_called_incorrectly() public creditTest {
         uint256 expectedDAI = 1000;
 
         BalanceDelta[] memory expectedBalances = new BalanceDelta[](1);
         expectedBalances[0] = BalanceDelta({token: underlying, amount: int256(expectedDAI)});
 
         (address creditAccount,) = _openTestCreditAccount();
-        vm.prank(USER);
-        vm.expectRevert(ExpectedBalancesAlreadySetException.selector);
 
+        vm.expectRevert(ExpectedBalancesAlreadySetException.selector);
+        vm.prank(USER);
         creditFacade.multicall(
             creditAccount,
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.revertIfReceivedLessThan, (expectedBalances))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.storeExpectedBalances, (expectedBalances))
                 }),
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.revertIfReceivedLessThan, (expectedBalances))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.storeExpectedBalances, (expectedBalances))
+                })
+            )
+        );
+
+        vm.expectRevert(ExpectedBalancesNotSetException.selector);
+        vm.prank(USER);
+        creditFacade.multicall(
+            creditAccount,
+            MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.compareBalances, ())
                 })
             )
         );
     }
-
-    /// CREDIT FACADE WITH EXPIRATION
 
     ///
     /// ENABLE TOKEN
@@ -527,35 +537,6 @@ contract MultiCallIntegrationTest is
             )
         );
 
-        vm.prank(USER);
-        creditFacade.multicall(
-            creditAccount,
-            MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, 10001))
-                })
-            )
-        );
-    }
-
-    /// @dev I:[MC-16]: fullCollateralCheck reverts when an illegal mask is passed in collateralHints
-    function test_I_MC_16_fullCollateralCheck_reverts_for_illegal_mask_in_hints() public creditTest {
-        (address creditAccount,) = _openTestCreditAccount();
-
-        uint256[] memory collateralHints = new uint256[](1);
-        collateralHints[0] = 3232;
-
-        uint256 enabledTokensMap = creditManager.enabledTokensMaskOf(creditAccount);
-
-        vm.expectCall(
-            address(creditManager),
-            abi.encodeCall(
-                ICreditManagerV3.fullCollateralCheck, (creditAccount, enabledTokensMap, collateralHints, 10001, false)
-            )
-        );
-
-        vm.expectRevert(InvalidCollateralHintException.selector);
         vm.prank(USER);
         creditFacade.multicall(
             creditAccount,

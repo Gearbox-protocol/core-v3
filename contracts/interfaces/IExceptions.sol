@@ -107,23 +107,17 @@ error TooManyTokensException();
 /// @notice Thrown if more than the maximum number of tokens were enabled on a credit account
 error TooManyEnabledTokensException();
 
-/// @notice Thrown when a custom HF parameter lower than 10000 is passed into the full collateral check
-error CustomHealthFactorTooLowException();
-
-/// @notice Thrown when submitted collateral hint is not a valid token mask
-error InvalidCollateralHintException();
-
 /// @notice Thrown when attempting to execute a protocol interaction without active credit account set
 error ActiveCreditAccountNotSetException();
 
 /// @notice Thrown when trying to update credit account's debt more than once in the same block
 error DebtUpdatedTwiceInOneBlockException();
 
-/// @notice Thrown when a zero-debt account has non-zero quotas during a full check
+/// @notice Thrown when trying to repay all debt while having active quotas
 error DebtToZeroWithActiveQuotasException();
 
-/// @notice Thrown when a zero-debt account attempts to increase quota
-error IncreaseQuotaOnZeroDebtAccountException();
+/// @notice Thrown when a zero-debt account attempts to update quota
+error UpdateQuotaOnZeroDebtAccountException();
 
 /// @notice Thrown when attempting to close an account with non-zero debt
 error CloseAccountWithNonZeroDebtException();
@@ -184,14 +178,17 @@ error BorrowedBlockLimitException();
 /// @notice Thrown if the new debt principal for a credit account falls outside of borrowing limits
 error BorrowAmountOutOfLimitsException();
 
-/// @notice Thrown if one of the balances on a credit account is less than expected after the end of a multicall
-error BalanceLessThanMinimumDesiredException();
-
 /// @notice Thrown if a user attempts to open an account via an expired credit facade
 error NotAllowedAfterExpirationException();
 
-/// @notice Thrown if expected balances are attempted to be set through `revertIfReceivedLessThan` twice
+/// @notice Thrown if expected balances are attempted to be set twice without performing a slippage check
 error ExpectedBalancesAlreadySetException();
+
+/// @notice Thrown if attempting to perform a slippage check when excepted balances are not set
+error ExpectedBalancesNotSetException();
+
+/// @notice Thrown if balance of at least one token is less than expected during a slippage check
+error BalanceLessThanExpectedException();
 
 /// @notice Thrown when trying to perform an action that is forbidden when credit account has enabled forbidden tokens
 error ForbiddenTokensException();
@@ -216,6 +213,12 @@ error TooManyApprovedBotsException();
 
 /// @notice Thrown when attempting to give a bot unexpected permissions
 error UnexpectedPermissionsException();
+
+/// @notice Thrown when a custom HF parameter lower than 10000 is passed into the full collateral check
+error CustomHealthFactorTooLowException();
+
+/// @notice Thrown when submitted collateral hint is not a valid token mask
+error InvalidCollateralHintException();
 
 // ------ //
 // ACCESS //

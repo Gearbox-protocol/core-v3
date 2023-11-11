@@ -68,7 +68,7 @@ interface ICreditFacadeV3Events {
     event AddCollateral(address indexed creditAccount, address indexed token, uint256 amount);
 
     /// @notice Emitted when collateral is withdrawn from account
-    event WithdrawCollateral(address indexed creditAccount, address indexed token, uint256 amount);
+    event WithdrawCollateral(address indexed creditAccount, address indexed token, uint256 amount, address to);
 
     /// @notice Emitted when a multicall is started
     event StartMultiCall(address indexed creditAccount, address indexed caller);

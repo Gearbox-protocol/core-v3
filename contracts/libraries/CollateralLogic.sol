@@ -121,9 +121,6 @@ library CollateralLogic {
 
         for (uint256 i; i < len;) {
             address token = quotedTokens[i]; // U:[CLL-4]
-            // `quotedTokens` has fixed length (`maxEnabledTokens`), but not all of its entries are actual tokens;
-            // encountering `address(0)` for the first time indicates that all quoted tokens have been processed
-            if (token == address(0)) break; // U:[CLL-4]
 
             {
                 (uint256 quota, uint16 liquidationThreshold) = unpackQuota(quotasPacked[i]); // U:[CLL-4]

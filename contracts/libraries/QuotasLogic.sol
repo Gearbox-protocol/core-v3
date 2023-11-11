@@ -32,7 +32,7 @@ library QuotasLogic {
         returns (uint128)
     {
         // `quoted` is `uint96`, and `cumulativeIndex / RAY` won't reach `2 ** 32` in reasonable time, so casting is safe
-        return uint128(uint256(quoted) * (cumulativeIndexNow - cumulativeIndexLU) / RAY); // U:[QL-2]
+        return quoted <= 1 ? 0 : uint128(uint256(quoted) * (cumulativeIndexNow - cumulativeIndexLU) / RAY); // U:[QL-2]
     }
 
     /// @dev Computes the pool quota revenue change given the current rate and the quota change

@@ -1332,6 +1332,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         vm.prank(CONFIGURATOR);
         creditManager.setQuotedMask(LINK_MASK);
 
+        tokenTestSuite.mint(underlying, creditAccount, 5 * amount);
+
         uint256 initialCQI = 1;
         creditManager
             /// @notice enabledTokensMask is read directly from function parameters, not from this function
@@ -1594,38 +1596,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     // FULL COLLATERAL CHECK
     //
     //
-
-    /// @dev U:[CM-17]: fullCollateralCheck reverts with invalid params
-    function test_U_CM_17_fullCollateralCheck_reverts_with_invalid_params() public creditManagerTest {
-        vm.expectRevert(CustomHealthFactorTooLowException.selector);
-        creditManager.fullCollateralCheck({
-            creditAccount: DUMB_ADDRESS,
-            enabledTokensMask: 0,
-            collateralHints: new uint256[](0),
-            minHealthFactor: PERCENTAGE_FACTOR - 1,
-            useSafePrices: false
-        });
-
-        uint256[] memory collateralHints = new uint256[](1);
-        vm.expectRevert(InvalidCollateralHintException.selector);
-        creditManager.fullCollateralCheck({
-            creditAccount: DUMB_ADDRESS,
-            enabledTokensMask: 0,
-            collateralHints: collateralHints,
-            minHealthFactor: PERCENTAGE_FACTOR,
-            useSafePrices: false
-        });
-
-        collateralHints[0] = 3;
-        vm.expectRevert(InvalidCollateralHintException.selector);
-        creditManager.fullCollateralCheck({
-            creditAccount: DUMB_ADDRESS,
-            enabledTokensMask: 0,
-            collateralHints: collateralHints,
-            minHealthFactor: PERCENTAGE_FACTOR,
-            useSafePrices: false
-        });
-    }
 
     /// @dev U:[CM-18]: fullCollateralCheck reverts if not enough collateral otherwise saves enabledTokensMask
     function test_U_CM_18_fullCollateralCheck_reverts_if_not_enough_collateral_otherwise_saves_enabledTokensMask(

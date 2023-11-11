@@ -1037,8 +1037,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         });
     }
 
-    /// @dev U:[FA-23]: multicall revertIfReceivedLessThan works properly
-    function test_U_FA_23_multicall_revertIfReceivedLessThan_works_properly() public notExpirableCase {
+    /// @dev U:[FA-23]: multicall slippage check works properly
+    function test_U_FA_23_multicall_slippage_check_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
         address link = tokenTestSuite.addressOf(Tokens.LINK);
@@ -1050,36 +1050,46 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         ERC20Mock(link).set_minter(acm);
 
-        for (uint256 testCase = 0; testCase < 4; ++testCase) {
-            /// case 0: no revert if expected 0
-            /// case 1: reverts because expect 1
-            /// case 2: no reverty because expect 1 and it mints 1 duyring the call
-            /// case 3: reverts because called twice
+        for (uint256 testCase = 0; testCase < 6; ++testCase) {
+            // case 0: no revert if expected 0
+            // case 1: reverts because expects 1
+            // case 2: no revert because expects 1 and it mints 1 during the call
+            // case 3: reverts because called twice
+            // case 4: reverts because checked without saving balances
+            // case 5: reverts because failed the second check
 
             expectedBalance[0] = BalanceDelta({token: link, amount: int256(uint256(testCase > 0 ? 1 : 0))});
 
             MultiCall[] memory calls = MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.revertIfReceivedLessThan, (expectedBalance))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.storeExpectedBalances, (expectedBalance))
+                }),
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.compareBalances, ())
                 })
             );
 
             if (testCase == 1) {
-                vm.expectRevert(BalanceLessThanMinimumDesiredException.selector);
+                vm.expectRevert(BalanceLessThanExpectedException.selector);
             }
 
             if (testCase == 2) {
                 calls = MultiCallBuilder.build(
                     MultiCall({
                         target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeV3Multicall.revertIfReceivedLessThan, (expectedBalance))
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.storeExpectedBalances, (expectedBalance))
                     }),
                     MultiCall({
                         target: acm,
                         callData: abi.encodeCall(
                             AdapterCallMock.makeCall, (link, abi.encodeCall(ERC20Mock.mint, (creditAccount, 1)))
                             )
+                    }),
+                    MultiCall({
+                        target: address(creditFacade),
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.compareBalances, ())
                     })
                 );
             }
@@ -1088,14 +1098,48 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 calls = MultiCallBuilder.build(
                     MultiCall({
                         target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeV3Multicall.revertIfReceivedLessThan, (expectedBalance))
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.storeExpectedBalances, (expectedBalance))
                     }),
                     MultiCall({
                         target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeV3Multicall.revertIfReceivedLessThan, (expectedBalance))
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.storeExpectedBalances, (expectedBalance))
                     })
                 );
                 vm.expectRevert(ExpectedBalancesAlreadySetException.selector);
+            }
+
+            if (testCase == 4) {
+                calls = MultiCallBuilder.build(
+                    MultiCall({
+                        target: address(creditFacade),
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.compareBalances, ())
+                    })
+                );
+                vm.expectRevert(ExpectedBalancesNotSetException.selector);
+            }
+
+            if (testCase == 5) {
+                calls = MultiCallBuilder.build(
+                    MultiCall({
+                        target: address(creditFacade),
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.storeExpectedBalances, (expectedBalance))
+                    }),
+                    MultiCall({
+                        target: acm,
+                        callData: abi.encodeCall(
+                            AdapterCallMock.makeCall, (link, abi.encodeCall(ERC20Mock.mint, (creditAccount, 1)))
+                            )
+                    }),
+                    MultiCall({
+                        target: address(creditFacade),
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.compareBalances, ())
+                    }),
+                    MultiCall({
+                        target: address(creditFacade),
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.storeExpectedBalances, (expectedBalance))
+                    })
+                );
+                vm.expectRevert(BalanceLessThanExpectedException.selector);
             }
 
             creditFacade.multicallInt({
@@ -1111,24 +1155,72 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     function test_U_FA_24_multicall_setFullCheckParams_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
-        uint256[] memory collateralHints = new uint256[](2);
+        uint256[] memory collateralHints;
+        uint16 minHealthFactor;
 
-        collateralHints[0] = 2323;
-        collateralHints[1] = 8823;
+        minHealthFactor = PERCENTAGE_FACTOR - 1;
+        vm.expectRevert(CustomHealthFactorTooLowException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(
+                        ICreditFacadeV3Multicall.setFullCheckParams, (new uint256[](0), PERCENTAGE_FACTOR - 1)
+                        )
+                })
+                ),
+            enabledTokensMask: 0,
+            flags: 0
+        });
 
-        uint16 hf = 12_320;
+        minHealthFactor = PERCENTAGE_FACTOR;
+        collateralHints = new uint256[](1);
+        vm.expectRevert(InvalidCollateralHintException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, PERCENTAGE_FACTOR))
+                })
+                ),
+            enabledTokensMask: 0,
+            flags: 0
+        });
 
-        MultiCall[] memory calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, hf))
-            })
-        );
+        collateralHints[0] = 3;
+        vm.expectRevert(InvalidCollateralHintException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, PERCENTAGE_FACTOR))
+                })
+                ),
+            enabledTokensMask: 0,
+            flags: 0
+        });
 
-        FullCheckParams memory fullCheckParams =
-            creditFacade.multicallInt({creditAccount: creditAccount, calls: calls, enabledTokensMask: 0, flags: 0});
+        collateralHints = new uint256[](2);
+        collateralHints[0] = 16;
+        collateralHints[1] = 32;
+        minHealthFactor = 12_320;
 
-        assertEq(fullCheckParams.minHealthFactor, hf, "Incorrect hf");
+        FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, minHealthFactor))
+                })
+                ),
+            enabledTokensMask: 0,
+            flags: 0
+        });
+
+        assertEq(fullCheckParams.minHealthFactor, minHealthFactor, "Incorrect minHealthFactor");
         assertEq(fullCheckParams.collateralHints, collateralHints, "Incorrect collateralHints");
     }
 
@@ -1675,6 +1767,9 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             address(creditManagerMock),
             abi.encodeCall(ICreditManagerV3.withdrawCollateral, (creditAccount, link, amount, USER))
         );
+
+        vm.expectEmit(true, true, false, true);
+        emit WithdrawCollateral(creditAccount, link, amount, USER);
 
         FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
             creditAccount: creditAccount,

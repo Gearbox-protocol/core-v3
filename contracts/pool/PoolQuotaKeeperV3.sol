@@ -130,14 +130,13 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         (uint16 rate, uint192 tqCumulativeIndexLU, uint16 quotaIncreaseFee) =
             _getTokenQuotaParamsOrRevert(tokenQuotaParams);
 
-        uint96 newQuoted;
-
         uint192 cumulativeIndexNow = QuotasLogic.cumulativeIndexSince(tqCumulativeIndexLU, rate, lastQuotaRateUpdate);
 
         // Accrued quota interest depends on the quota and thus must be computed before updating it
         caQuotaInterestChange =
             QuotasLogic.calcAccruedQuotaInterest(quoted, cumulativeIndexNow, accountQuota.cumulativeIndexLU); // U:[PQK-15]
 
+        uint96 newQuoted;
         quotaChange = requestedChange;
         if (quotaChange > 0) {
             (uint96 totalQuoted, uint96 limit) = _getTokenQuotaTotalAndLimit(tokenQuotaParams);
@@ -375,7 +374,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
 
         // The rate will be set during a general epoch update in the gauge
         quotaTokensSet.add(token); // U:[PQK-5]
-        totalQuotaParams[token].cumulativeIndexLU = uint192(RAY); // U:[PQK-5]
+        totalQuotaParams[token].cumulativeIndexLU = 1; // U:[PQK-5]
 
         emit AddQuotaToken(token); // U:[PQK-5]
     }
@@ -403,7 +402,6 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token]; // U:[PQK-7]
             (uint16 prevRate, uint192 tqCumulativeIndexLU,) = _getTokenQuotaParamsOrRevert(tokenQuotaParams);
 
-            // Update token's cumulative index before changing the rate
             tokenQuotaParams.cumulativeIndexLU =
                 QuotasLogic.cumulativeIndexSince(tqCumulativeIndexLU, prevRate, timestampLU); // U:[PQK-7]
 

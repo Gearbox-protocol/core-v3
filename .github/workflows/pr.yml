@@ -30,7 +30,10 @@ jobs:
         with:
           version: nightly
 
-      - name: Run forge tests
+      - name: Compile contracts
+        run: forge build
+
+      - name: Run tests
         run: forge test
         timeout-minutes: 10
 

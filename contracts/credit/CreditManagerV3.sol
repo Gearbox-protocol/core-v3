@@ -371,11 +371,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         } else {
             uint256 maxRepayment = _amountWithFee(collateralDebtData.calcTotalDebt());
             if (amount >= maxRepayment) {
-                // zero-debt is a special state that disables collateral checks so having quotas on
-                // the account should be forbidden as they entail debt in a form of quota interest
-                if (collateralDebtData.quotedTokens.length != 0) {
-                    revert DebtToZeroWithActiveQuotasException();
-                }
                 amount = maxRepayment;
             }
 
@@ -418,6 +413,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             if (IERC20(underlying).safeBalanceOf({account: creditAccount}) <= 1) {
                 tokensToDisable = UNDERLYING_TOKEN_MASK; // U:[CM-11]
             }
+        }
+
+        // zero-debt is a special state that disables collateral checks so having quotas on
+        // the account should be forbidden as they entail debt in a form of quota interest
+        if (newDebt == 0 && collateralDebtData.quotedTokens.length != 0) {
+            revert DebtToZeroWithActiveQuotasException();
         }
 
         currentCreditAccountInfo.debt = newDebt; // U:[CM-10, 11]
@@ -594,7 +595,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param minHealthFactor Health factor threshold in bps, the check fails if `twvUSD < minHealthFactor * totalDebtUSD`
     /// @param useSafePrices Whether to use safe prices when evaluating collateral
     /// @return enabledTokensMaskAfter Bitmask of account's enabled collateral tokens after potential cleanup
-    /// @dev Reverts if `collateralHints` contains masks that don't correspond to known collateral tokens
     /// @dev Even when `collateralHints` are specified, quoted tokens are evaluated before non-quoted ones
     /// @custom:expects Credit facade ensures that `creditAccount` is opened in this credit manager
     function fullCollateralCheck(
@@ -610,18 +610,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacadeOnly // U:[CM-2]
         returns (uint256 enabledTokensMaskAfter)
     {
-        if (minHealthFactor < PERCENTAGE_FACTOR) {
-            revert CustomHealthFactorTooLowException(); // U:[CM-17]
-        }
-
-        unchecked {
-            uint256 len = collateralHints.length;
-            for (uint256 i; i < len; ++i) {
-                uint256 mask = collateralHints[i];
-                if (mask == 0 || mask & mask - 1 != 0) revert InvalidCollateralHintException(); // U:[CM-17]
-            }
-        }
-
         CollateralDebtData memory cdd = _calcDebtAndCollateral({
             creditAccount: creditAccount,
             minHealthFactor: minHealthFactor,
@@ -913,8 +901,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
         CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
-        if (quotaChange > 0 && currentCreditAccountInfo.debt == 0) {
-            revert IncreaseQuotaOnZeroDebtAccountException();
+        if (currentCreditAccountInfo.debt == 0) {
+            revert UpdateQuotaOnZeroDebtAccountException();
         }
 
         (uint128 caInterestChange, uint128 quotaFees, bool enable, bool disable) = IPoolQuotaKeeperV3(poolQuotaKeeper())

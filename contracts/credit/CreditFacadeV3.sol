@@ -43,8 +43,7 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/C
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
-uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS =
-    ALL_PERMISSIONS & ~(DECREASE_DEBT_PERMISSION | WITHDRAW_COLLATERAL_PERMISSION);
+uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS & ~DECREASE_DEBT_PERMISSION;
 
 uint256 constant CLOSE_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS & ~INCREASE_DEBT_PERMISSION;
 
@@ -510,14 +509,21 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                 if (mcall.target == address(this)) {
                     bytes4 method = bytes4(mcall.callData);
 
-                    // revertIfReceivedLessThan
-                    if (method == ICreditFacadeV3Multicall.revertIfReceivedLessThan.selector) {
-                        if (expectedBalances.length != 0) {
-                            revert ExpectedBalancesAlreadySetException(); // U:[FA-23]
-                        }
+                    // storeExpectedBalances
+                    if (method == ICreditFacadeV3Multicall.storeExpectedBalances.selector) {
+                        if (expectedBalances.length != 0) revert ExpectedBalancesAlreadySetException(); // U:[FA-23]
 
                         BalanceDelta[] memory balanceDeltas = abi.decode(mcall.callData[4:], (BalanceDelta[])); // U:[FA-23]
                         expectedBalances = BalancesLogic.storeBalances(creditAccount, balanceDeltas); // U:[FA-23]
+                    }
+                    // compareBalances
+                    else if (method == ICreditFacadeV3Multicall.compareBalances.selector) {
+                        if (expectedBalances.length == 0) revert ExpectedBalancesNotSetException(); // U:[FA-23]
+
+                        if (!BalancesLogic.compareBalances(creditAccount, expectedBalances, Comparison.GREATER)) {
+                            revert BalanceLessThanExpectedException(); // U:[FA-23]
+                        }
+                        expectedBalances = new Balance[](0); // U:[FA-23]
                     }
                     // addCollateral
                     else if (method == ICreditFacadeV3Multicall.addCollateral.selector) {
@@ -589,6 +595,16 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     else if (method == ICreditFacadeV3Multicall.setFullCheckParams.selector) {
                         (fullCheckParams.collateralHints, fullCheckParams.minHealthFactor) =
                             abi.decode(mcall.callData[4:], (uint256[], uint16)); // U:[FA-24]
+
+                        if (fullCheckParams.minHealthFactor < PERCENTAGE_FACTOR) {
+                            revert CustomHealthFactorTooLowException(); // U:[FA-24]
+                        }
+
+                        uint256 hintsLen = fullCheckParams.collateralHints.length;
+                        for (uint256 j; j < hintsLen; ++j) {
+                            uint256 mask = fullCheckParams.collateralHints[j];
+                            if (mask == 0 || mask & mask - 1 != 0) revert InvalidCollateralHintException(); // U:[FA-24]
+                        }
                     }
                     // enableToken
                     else if (method == ICreditFacadeV3Multicall.enableToken.selector) {
@@ -659,12 +675,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         }
 
         if (expectedBalances.length != 0) {
-            bool success = BalancesLogic.compareBalances({
-                creditAccount: creditAccount,
-                balances: expectedBalances,
-                comparison: Comparison.GREATER
-            });
-            if (!success) revert BalanceLessThanMinimumDesiredException(); // U:[FA-23]
+            if (!BalancesLogic.compareBalances(creditAccount, expectedBalances, Comparison.GREATER)) {
+                revert BalanceLessThanExpectedException(); // U:[FA-23]
+            }
         }
 
         if (enabledTokensMask & forbiddenTokenMask != 0) {
@@ -844,7 +857,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         }
         tokensToDisable = ICreditManagerV3(creditManager).withdrawCollateral(creditAccount, token, amount, to); // U:[FA-35]
 
-        emit WithdrawCollateral(creditAccount, token, amount); // U:[FA-35]
+        emit WithdrawCollateral(creditAccount, token, amount, to); // U:[FA-35]
     }
 
     /// @dev `ICreditFacadeV3Multicall.revokeAdapterAllowances` implementation

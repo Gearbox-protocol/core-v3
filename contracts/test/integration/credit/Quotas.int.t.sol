@@ -489,7 +489,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
             })
         );
 
-        vm.expectRevert(IncreaseQuotaOnZeroDebtAccountException.selector);
+        vm.expectRevert(UpdateQuotaOnZeroDebtAccountException.selector);
 
         vm.prank(USER);
         creditFacade.multicall(creditAccount, calls);
