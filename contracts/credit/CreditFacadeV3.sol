@@ -600,7 +600,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                             revert CustomHealthFactorTooLowException(); // U:[FA-24]
                         }
 
-                        for (uint256 j; j < fullCheckParams.collateralHints.length; ++j) {
+                        uint256 hintsLen = fullCheckParams.collateralHints.length;
+                        for (uint256 j; j < hintsLen; ++j) {
                             uint256 mask = fullCheckParams.collateralHints[j];
                             if (mask == 0 || mask & mask - 1 != 0) revert InvalidCollateralHintException(); // U:[FA-24]
                         }
