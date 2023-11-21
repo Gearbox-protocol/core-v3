@@ -38,10 +38,18 @@ library ParseLib {
         return string.concat(init, name, IERC20Metadata(addr).symbol());
     }
 
+    uint256 constant PRECISION = 4;
+
     function toFixString(uint256 value, uint8 decimals) internal pure returns (string memory) {
         uint8 divider = (decimals > 4) ? 4 : decimals;
         uint256 biggerPart = value / (10 ** (decimals));
-        uint256 smallerPart = value * (10 ** divider) - biggerPart * (10 ** (decimals + divider));
-        return string.concat(biggerPart.toString(), ".", smallerPart.toString());
+        uint256 smallerPart = (value - biggerPart * (10 ** (decimals))) / (10 ** (decimals - divider));
+        string memory smallPartStr = smallerPart.toString();
+        for (uint256 i = 0; i < PRECISION - 1; ++i) {
+            if (smallerPart < 10 ** (i + 1)) {
+                smallPartStr = string.concat("0", smallPartStr);
+            }
+        }
+        return string.concat(biggerPart.toString(), ".", smallPartStr);
     }
 }

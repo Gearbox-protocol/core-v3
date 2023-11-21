@@ -46,9 +46,39 @@ contract MulticallGenerator {
 
     mapping(address => uint96) quotaLimits;
 
-    function generateRandomMulticall(uint256 _seed) external returns (MultiCall[] memory calls) {
+    constructor(address _creditManager) {
+        creditManager = ICreditManagerV3(_creditManager);
+        creditFacade = ICreditFacadeV3(creditManager.creditFacade());
+        underlying = creditManager.underlying();
+    }
+
+    function setCreditAccount(address _creditAccount) external {
+        creditAccount = _creditAccount;
+    }
+
+    function generateRandomMulticalls(uint256 _seed) external returns (MultiCall[] memory calls) {
         seed = _seed;
-        calls = new MultiCall[](getRandomInRange(maxDepth));
+        uint256 len = getRandomInRange(maxDepth - 1) + 1;
+        calls = new MultiCall[](len);
+        for (uint256 i; i < len; ++i) {
+            calls[i] = generateRandomCall();
+        }
+    }
+
+    function generateRandomCall() public returns (MultiCall memory call) {
+        function() returns (MultiCall memory)[9] memory fns = [
+            randomAddCollateral,
+            randomUpdateQuota,
+            randomSetFullCheckParams,
+            randomIncreaseDebt,
+            randomDecreaseDebt,
+            randomWithdrawCollateral,
+            randomEnabledToken,
+            randomDisabledToken,
+            randomDisabledToken //randomRevokeAdapterAllowances
+        ];
+
+        return fns[getRandomInRange(9)]();
     }
 
     // function addCollateral(address token, uint256 amount) external;
@@ -109,11 +139,12 @@ contract MulticallGenerator {
     // collateralHints will be chosen properly like 1 << i, where i <= collateralTokensCound
 
     function randomSetFullCheckParams() internal returns (MultiCall memory) {
-        uint16 minHealhFactor = uint16(getNextRandomNumber());
+        uint16 minHealhFactor = uint16(getRandomP() > pThreshold ? getNextRandomNumber() : getRandomInRange(12_000));
 
         uint256 collateralTokensCount = creditManager.collateralTokensCount();
         uint256 len = getRandomInRange(collateralTokensCount);
         uint256[] memory collateralHints = new uint256[](len);
+
         unchecked {
             for (uint256 i; i < len; ++i) {
                 collateralHints[i] = 1 << getRandomInRange(collateralTokensCount);
@@ -150,7 +181,7 @@ contract MulticallGenerator {
 
         uint256 amount = getNextRandomNumber();
 
-        amount = debt - minDebt < amount && getRandomP() > pThreshold ? amount : debt;
+        amount = debt < amount + minDebt && getRandomP() > pThreshold ? amount : debt;
 
         return MultiCall({
             target: address(creditFacade),
@@ -213,7 +244,7 @@ contract MulticallGenerator {
     }
 
     function getRandomInRange(uint256 max) internal returns (uint256) {
-        return getNextRandomNumber() % max;
+        return max == 0 ? 0 : (getNextRandomNumber() % max);
     }
 
     function getNextRandomNumber() internal returns (uint256) {
