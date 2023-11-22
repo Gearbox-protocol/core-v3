@@ -1591,6 +1591,24 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         assertEq(returnValue, expectedReturnValue, "Incorrect return value");
     }
 
+    /// @dev U:[CM-17]: `calcDebtAndCollateral` reverts if account does not exist
+    function test_U_CM_17_calcDebtAndCollateral_reverts_if_account_does_not_exist() public creditManagerTest {
+        vm.expectRevert(CreditAccountDoesNotExistException.selector);
+        creditManager.calcDebtAndCollateral(DUMB_ADDRESS, CollateralCalcTask.GENERIC_PARAMS);
+
+        vm.expectRevert(CreditAccountDoesNotExistException.selector);
+        creditManager.calcDebtAndCollateral(DUMB_ADDRESS, CollateralCalcTask.DEBT_ONLY);
+
+        vm.expectRevert(CreditAccountDoesNotExistException.selector);
+        creditManager.calcDebtAndCollateral(DUMB_ADDRESS, CollateralCalcTask.DEBT_COLLATERAL);
+
+        vm.expectRevert(CreditAccountDoesNotExistException.selector);
+        creditManager.calcDebtAndCollateral(DUMB_ADDRESS, CollateralCalcTask.DEBT_COLLATERAL_SAFE_PRICES);
+
+        vm.expectRevert(CreditAccountDoesNotExistException.selector);
+        creditManager.isLiquidatable(DUMB_ADDRESS, PERCENTAGE_FACTOR);
+    }
+
     //
     //
     // FULL COLLATERAL CHECK

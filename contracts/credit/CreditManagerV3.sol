@@ -211,7 +211,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     /// @notice Closes a credit account
     /// @param creditAccount Account to close
-    /// @custom:expects Account is opened in this credit manager
+    /// @custom:expects Credit facade ensures that `creditAccount` is opened in this credit manager
     function closeCreditAccount(address creditAccount)
         external
         override
@@ -249,7 +249,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param to Address to transfer underlying left after liquidation
     /// @return remainingFunds Total value of assets left on the account after liquidation
     /// @return loss Loss incurred on liquidation
-    /// @custom:expects Account is opened in this credit manager
+    /// @custom:expects Credit facade ensures that `creditAccount` is opened in this credit manager
     /// @custom:expects `collateralDebtData` is a result of `calcDebtAndCollateral` in `DEBT_COLLATERAL` mode
     function liquidateCreditAccount(
         address creditAccount,
@@ -630,7 +630,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Whether `creditAccount`'s health factor is below `minHealthFactor`
     /// @param creditAccount Credit account to check
     /// @param minHealthFactor Health factor threshold in bps
+    /// @dev Reverts if account is not opened in this credit manager
     function isLiquidatable(address creditAccount, uint16 minHealthFactor) external view override returns (bool) {
+        getBorrowerOrRevert(creditAccount); // U:[CM-17]
+
         uint256[] memory collateralHints;
         CollateralDebtData memory cdd = _calcDebtAndCollateral({
             creditAccount: creditAccount,
@@ -648,6 +651,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param creditAccount Credit account to return data for
     /// @param task Calculation mode, see `CollateralCalcTask` for details, can't be `FULL_COLLATERAL_CHECK_LAZY`
     /// @return cdd A struct with debt and collateral data
+    /// @dev Reverts if account is not opened in this credit manager
     /// @custom:invariant From `creditAccountInfo[creditAccount].debt == 0` it follows that `cdd.totalDebtUSD == 0`
     function calcDebtAndCollateral(address creditAccount, CollateralCalcTask task)
         external
@@ -660,11 +664,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
 
         bool useSafePrices;
-
         if (task == CollateralCalcTask.DEBT_COLLATERAL_SAFE_PRICES) {
             task = CollateralCalcTask.DEBT_COLLATERAL;
             useSafePrices = true;
         }
+
+        getBorrowerOrRevert(creditAccount); // U:[CM-17]
 
         uint256[] memory collateralHints;
         cdd = _calcDebtAndCollateral({
