@@ -29,9 +29,11 @@ contract MulticallParser {
     using ParseLib for string;
 
     ICreditManagerV3 creditManager;
+    address underlying;
 
     constructor(ICreditManagerV3 _cm) {
         creditManager = _cm;
+        underlying = creditManager.underlying();
     }
 
     function print(MultiCall[] calldata calls) public {
@@ -102,18 +104,25 @@ contract MulticallParser {
                 (address token, uint256 amount, address to) = abi.decode(callData, (address, uint256, address)); // U:[FA-35]
 
                 console.log(
-                    string.concat(prefix, "creditFacade.withdrawCollateral(%s, %s, %s)"), formatToken(token), amount, to
+                    string.concat(prefix, "creditFacade.withdrawCollateral({token: %s, amount: %s, to: %s})"),
+                    formatToken(token),
+                    formatAmount(token, amount),
+                    to
                 );
             }
             // increaseDebt
             else if (method == ICreditFacadeV3Multicall.increaseDebt.selector) {
                 uint256 amount = abi.decode(callData, (uint256));
-                console.log(string.concat(prefix, "creditFacade.increaseDebt(%s)"), amount);
+                console.log(
+                    string.concat(prefix, "creditFacade.increaseDebt({amount: %s})"), formatAmount(underlying, amount)
+                );
             }
             // decreaseDebt
             else if (method == ICreditFacadeV3Multicall.decreaseDebt.selector) {
                 uint256 amount = abi.decode(callData, (uint256));
-                console.log(string.concat(prefix, "creditFacade.decreaseDebt(%s)"), amount);
+                console.log(
+                    string.concat(prefix, "creditFacade.decreaseDebt({amount: %s})"), formatAmount(underlying, amount)
+                );
             }
             // setFullCheckParams
             else if (method == ICreditFacadeV3Multicall.setFullCheckParams.selector) {
@@ -130,12 +139,12 @@ contract MulticallParser {
             // enableToken
             else if (method == ICreditFacadeV3Multicall.enableToken.selector) {
                 address token = abi.decode(callData, (address));
-                console.log(string.concat(prefix, "creditFacade.enableToken(%s)"), formatToken(token));
+                console.log(string.concat(prefix, "creditFacade.enableToken({token: %s })"), formatToken(token));
             }
             // disableToken
             else if (method == ICreditFacadeV3Multicall.disableToken.selector) {
                 address token = abi.decode(callData, (address));
-                console.log(string.concat(prefix, "creditFacade.disableToken(%s)"), formatToken(token));
+                console.log(string.concat(prefix, "creditFacade.disableToken({token: %s })"), formatToken(token));
             }
             // revokeAdapterAllowances
             else if (method == ICreditFacadeV3Multicall.revokeAdapterAllowances.selector) {

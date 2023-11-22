@@ -20,5 +20,5 @@ contract InvariantGearboxTest is Test {
         targetContract(address(handler));
     }
 
-    // function invariant_example() external {}
+    function invariant_example() external {}
 }

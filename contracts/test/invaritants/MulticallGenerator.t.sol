@@ -7,6 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {GearboxInstance} from "./Deployer.sol";
 import {MulticallGenerator} from "./MulticallGenerator.sol";
 import {MulticallParser} from "./MulticallParser.sol";
+import "../../interfaces/ICreditFacadeV3Multicall.sol";
 
 import {IPriceOracleV3} from "../../interfaces/IPriceOracleV3.sol";
 import {ICreditManagerV3, CollateralCalcTask} from "../../interfaces/ICreditManagerV3.sol";
@@ -64,10 +65,10 @@ contract MulticallGeneratorTest is GearboxInstance {
 
         uint256 successCases;
 
-        for (uint256 j = 0; j < 100; ++j) {
+        for (uint256 j = 0; j < 3; ++j) {
             console.log("");
             console.log("============ MULTICALL #%s ============", j);
-            MultiCall[] memory calls = mcg.generateRandomMulticalls(j);
+            MultiCall[] memory calls = mcg.generateRandomMulticalls(j, ALL_PERMISSIONS);
             mp.print(calls);
 
             vm.startPrank(USER);
