@@ -252,8 +252,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.setBotPermissions({creditAccount: DUMB_ADDRESS, bot: DUMB_ADDRESS, permissions: 0});
     }
 
-    /// @dev U:[FA-5]: borrower related functions revert if called not by borrower
-    function test_U_FA_05_borrower_related_functions_revert_if_called_not_by_borrower() public notExpirableCase {
+    /// @dev U:[FA-5]: Account management functions revert if account does not exist
+    function test_U_FA_05_account_management_functions_revert_if_account_does_not_exist() public notExpirableCase {
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
         creditFacade.closeCreditAccount({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
 
@@ -262,6 +262,9 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
         creditFacade.multicall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
+
+        vm.expectRevert(CreditAccountDoesNotExistException.selector);
+        creditFacade.botMulticall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
 
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
         creditFacade.setBotPermissions({creditAccount: DUMB_ADDRESS, bot: DUMB_ADDRESS, permissions: 0});
@@ -581,7 +584,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     //         : ClosureAction.LIQUIDATE_ACCOUNT;
 
     //     vm.expectEmit(true, true, true, true);
-    //     emit LiquidateCreditAccount(creditAccount, USER, LIQUIDATOR, FRIEND, closeAction, 0);
+    //     emit LiquidateCreditAccount(creditAccount, LIQUIDATOR, FRIEND, closeAction, 0);
 
     //     vm.expectCall(
     //         address(creditManagerMock),
@@ -772,7 +775,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     //     creditManagerMock.setCloseCreditAccountReturns(1_000, 0);
 
     //     vm.expectEmit(true, true, true, true);
-    //     emit LiquidateCreditAccount(creditAccount, USER, LIQUIDATOR, FRIEND, ClosureAction.LIQUIDATE_ACCOUNT, 1_000);
+    //     emit LiquidateCreditAccount(creditAccount, LIQUIDATOR, FRIEND, ClosureAction.LIQUIDATE_ACCOUNT, 1_000);
 
     //     vm.prank(LIQUIDATOR);
     //     creditFacade.liquidateCreditAccount({
@@ -834,7 +837,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     //         );
 
     //         vm.expectEmit(true, true, true, true);
-    //         emit LiquidateCreditAccount(creditAccount, USER, LIQUIDATOR, FRIEND, ClosureAction.LIQUIDATE_ACCOUNT, 1_000);
+    //         emit LiquidateCreditAccount(creditAccount, LIQUIDATOR, FRIEND, ClosureAction.LIQUIDATE_ACCOUNT, 1_000);
 
     //         vm.prank(LIQUIDATOR);
     //         creditFacade.liquidateCreditAccount({
@@ -912,6 +915,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     /// @dev U:[FA-19]: botMulticall reverts if 1. bot permissions flag is false 2. no permissions are set 3. bot is forbidden
     function test_U_FA_19_botMulticall_reverts_for_invalid_bots() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
+        creditManagerMock.setBorrower(USER);
         MultiCall[] memory calls;
 
         creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, true);

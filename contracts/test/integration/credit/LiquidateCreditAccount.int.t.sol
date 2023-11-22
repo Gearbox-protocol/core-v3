@@ -110,7 +110,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
         // );
 
         vm.expectEmit(true, true, true, true);
-        emit LiquidateCreditAccount(creditAccount, USER, LIQUIDATOR, FRIEND, 0);
+        emit LiquidateCreditAccount(creditAccount, LIQUIDATOR, FRIEND, 0);
 
         vm.prank(LIQUIDATOR);
         creditFacade.liquidateCreditAccount(creditAccount, FRIEND, calls);

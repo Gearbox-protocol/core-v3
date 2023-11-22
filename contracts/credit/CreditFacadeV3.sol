@@ -234,7 +234,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     ///         - Erases all bots permissions
     /// @param creditAccount Account to close
     /// @param calls List of calls to perform before closing the account
-    /// @dev Reverts if caller is not `creditAccount`'s owner
+    /// @dev Reverts if `creditAccount` is not opened in connected credit manager by caller
     /// @dev Reverts if facade is paused
     /// @dev Reverts if account has enabled tokens after executing `calls`
     /// @dev Reverts if account's debt is not zero after executing `calls`
@@ -296,7 +296,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         whenNotPausedOrEmergency // U:[FA-2,12]
         nonReentrant // U:[FA-4]
     {
-        address borrower = _getBorrowerOrRevert(creditAccount); // U:[FA-5]
+        _getBorrowerOrRevert(creditAccount); // U:[FA-5]
 
         uint256 skipCalls = _applyOnDemandPriceUpdates(calls);
 
@@ -343,7 +343,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             isExpired: isExpired
         }); // U:[FA-16]
 
-        emit LiquidateCreditAccount(creditAccount, borrower, msg.sender, to, remainingFunds); // U:[FA-14,16,17]
+        emit LiquidateCreditAccount(creditAccount, msg.sender, to, remainingFunds); // U:[FA-14,16,17]
 
         if (reportedLoss != 0) {
             maxDebtPerBlockMultiplier = 0; // U:[FA-17]
@@ -364,7 +364,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     ///         - Runs the collateral check
     /// @param creditAccount Account to perform the calls on
     /// @param calls List of calls to perform
-    /// @dev Reverts if caller is not `creditAccount`'s owner
+    /// @dev Reverts if `creditAccount` is not opened in connected credit manager by caller
     /// @dev Reverts if credit facade is paused or expired
     function multicall(address creditAccount, MultiCall[] calldata calls)
         external
@@ -386,6 +386,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param creditAccount Account to perform the calls on
     /// @param calls List of calls to perform
     /// @dev Reverts if credit facade is paused or expired
+    /// @dev Reverts if `creditAccount` is not opened in connected credit manager
     /// @dev Reverts if calling bot is forbidden or has no permissions to manage `creditAccount`
     function botMulticall(address creditAccount, MultiCall[] calldata calls)
         external
@@ -394,6 +395,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         whenNotExpired // U:[FA-3]
         nonReentrant // U:[FA-4]
     {
+        _getBorrowerOrRevert(creditAccount); // U:[FA-5]
+
         (uint256 botPermissions, bool forbidden, bool hasSpecialPermissions) = IBotListV3(botList).getBotStatus({
             bot: msg.sender,
             creditManager: creditManager,
@@ -414,7 +417,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param creditAccount Account to set permissions for
     /// @param bot Bot to set permissions for
     /// @param permissions A bit mask encoding bot permissions
-    /// @dev Reverts if caller is not `creditAccount`'s owner
+    /// @dev Reverts if `creditAccount` is not opened in connected credit manager by caller
     /// @dev Reverts if `permissions` has unexpected bits enabled
     /// @dev Reverts if account has more active bots than allowed after changing permissions
     /// @dev Changes account's `BOT_PERMISSIONS_SET_FLAG` in the credit manager if needed

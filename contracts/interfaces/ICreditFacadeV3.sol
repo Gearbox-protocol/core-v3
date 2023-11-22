@@ -51,11 +51,7 @@ interface ICreditFacadeV3Events {
 
     /// @notice Emitted when account is liquidated
     event LiquidateCreditAccount(
-        address indexed creditAccount,
-        address indexed borrower,
-        address indexed liquidator,
-        address to,
-        uint256 remainingFunds
+        address indexed creditAccount, address indexed liquidator, address to, uint256 remainingFunds
     );
 
     /// @notice Emitted when account's debt is increased
