@@ -5,8 +5,11 @@ pragma solidity ^0.8.17;
 
 import {GearboxInstance} from "./Deployer.sol";
 import "../../interfaces/ICreditFacadeV3Multicall.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {ICreditFacadeV3Multicall} from "../../interfaces/ICreditFacadeV3.sol";
+import {ICreditManagerV3} from "../../interfaces/ICreditManagerV3.sol";
+
 import {MultiCall} from "../../interfaces/ICreditFacadeV3.sol";
 import {MultiCallBuilder} from "../lib/MultiCallBuilder.sol";
 import {MulticallGenerator} from "./MulticallGenerator.sol";
@@ -15,16 +18,6 @@ import "forge-std/Test.sol";
 import "../lib/constants.sol";
 import "forge-std/console.sol";
 import "forge-std/Vm.sol";
-
-struct CA {
-    address creditAccount;
-    bool isZero;
-}
-
-struct Actor {
-    address actor;
-    CA[] openedCreditAccounts;
-}
 
 // Probably I can start with one actor handler which tests user realted functionality by
 // calling random numbers
@@ -52,6 +45,17 @@ contract Handler {
         gi = _gi;
         vm = gi.getVm();
         mcg = new MulticallGenerator(address(gi.creditManager()));
+
+        ICreditManagerV3 creditManager = gi.creditManager();
+
+        uint256 cTokensQty = creditManager.collateralTokensCount();
+
+        for (uint256 i; i < cTokensQty; ++i) {
+            (address token,) = creditManager.collateralTokenByMask(1 << i);
+            IERC20(token).approve(address(creditManager), type(uint256).max);
+            gi.tokenTestSuite().mint(token, address(this), type(uint80).max);
+        }
+
         b = block.timestamp;
     }
 
