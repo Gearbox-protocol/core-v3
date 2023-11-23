@@ -288,7 +288,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param calls List of calls to perform before liquidating the account
     /// @dev When the credit facade is paused, reverts if caller is not an approved emergency liquidator
     /// @dev Reverts if `creditAccount` is not opened in connected credit manager
-    /// @dev Reverts if account is not liquidatable
+    /// @dev Reverts if account has no debt or is neither unhealthy nor expired
     /// @dev Reverts if remaining token balances increase during the multicall
     function liquidateCreditAccount(address creditAccount, address to, MultiCall[] calldata calls)
         external
@@ -296,24 +296,17 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         whenNotPausedOrEmergency // U:[FA-2,12]
         nonReentrant // U:[FA-4]
     {
-        _getBorrowerOrRevert(creditAccount); // U:[FA-5]
-
         uint256 skipCalls = _applyOnDemandPriceUpdates(calls);
 
         CollateralDebtData memory collateralDebtData =
-            ICreditManagerV3(creditManager).calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_COLLATERAL); // U:[FA-15]
+            ICreditManagerV3(creditManager).calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_COLLATERAL); // U:[FA-16]
 
-        bool isExpired;
-        {
-            bool isLiquidatable = collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD; // U:[FA-13]
-            if (!isLiquidatable && _isExpired() && collateralDebtData.debt != 0) {
-                isLiquidatable = true; // U:[FA-13]
-                isExpired = true; // U:[FA-14]
-            }
-            if (!isLiquidatable) revert CreditAccountNotLiquidatableException(); // U:[FA-13]
+        bool isUnhealthy = collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD;
+        if (collateralDebtData.debt == 0 || !isUnhealthy && !_isExpired()) {
+            revert CreditAccountNotLiquidatableException(); // U:[FA-13]
         }
 
-        collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.disable(UNDERLYING_TOKEN_MASK);
+        collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.disable(UNDERLYING_TOKEN_MASK); // U:[FA-14]
 
         BalanceWithMask[] memory initialBalances = BalancesLogic.storeBalances({
             creditAccount: creditAccount,
@@ -324,7 +317,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         FullCheckParams memory fullCheckParams = _multicall(
             creditAccount, calls, collateralDebtData.enabledTokensMask, LIQUIDATE_CREDIT_ACCOUNT_FLAGS, skipCalls
         ); // U:[FA-16]
-        collateralDebtData.enabledTokensMask &= fullCheckParams.enabledTokensMaskAfter;
+        collateralDebtData.enabledTokensMask &= fullCheckParams.enabledTokensMaskAfter; // U:[FA-16]
 
         bool success = BalancesLogic.compareBalances({
             creditAccount: creditAccount,
@@ -332,18 +325,18 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             balances: initialBalances,
             comparison: Comparison.LESS
         });
-        if (!success) revert RemainingTokenBalanceIncreasedException(); // U:[FA-16]
+        if (!success) revert RemainingTokenBalanceIncreasedException(); // U:[FA-14]
 
-        collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(UNDERLYING_TOKEN_MASK);
+        collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(UNDERLYING_TOKEN_MASK); // U:[FA-16]
 
         (uint256 remainingFunds, uint256 reportedLoss) = ICreditManagerV3(creditManager).liquidateCreditAccount({
             creditAccount: creditAccount,
             collateralDebtData: collateralDebtData,
             to: to,
-            isExpired: isExpired
-        }); // U:[FA-16]
+            isExpired: !isUnhealthy
+        }); // U:[FA-15,16]
 
-        emit LiquidateCreditAccount(creditAccount, msg.sender, to, remainingFunds); // U:[FA-14,16,17]
+        emit LiquidateCreditAccount(creditAccount, msg.sender, to, remainingFunds); // U:[FA-16]
 
         if (reportedLoss != 0) {
             maxDebtPerBlockMultiplier = 0; // U:[FA-17]
@@ -745,15 +738,15 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             fullCheckParams.collateralHints,
             fullCheckParams.minHealthFactor,
             fullCheckParams.useSafePrices
-        );
+        ); // U:[FA-45]
 
         uint256 enabledForbiddenTokensMask = enabledTokensMask & forbiddenTokensMask;
         if (enabledForbiddenTokensMask != 0) {
-            if (fullCheckParams.revertOnForbiddenTokens) revert ForbiddenTokensException();
+            if (fullCheckParams.revertOnForbiddenTokens) revert ForbiddenTokensException(); // U:[FA-45]
 
             uint256 enabledForbiddenTokensMaskBefore = enabledTokensMaskBefore & forbiddenTokensMask;
             if (enabledForbiddenTokensMask & ~enabledForbiddenTokensMaskBefore != 0) {
-                revert ForbiddenTokenEnabledException();
+                revert ForbiddenTokenEnabledException(); // U:[FA-45]
             }
 
             bool success = BalancesLogic.compareBalances({
@@ -763,7 +756,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                 comparison: Comparison.LESS
             });
 
-            if (!success) revert ForbiddenTokenBalanceIncreasedException();
+            if (!success) revert ForbiddenTokenBalanceIncreasedException(); // U:[FA-45]
         }
     }
 

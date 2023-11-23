@@ -1,8 +1,12 @@
+// SPDX-License-Identifier: UNLICENSED
+// Gearbox Protocol. Generalized leverage for DeFi protocols
+// (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
 import "../../../interfaces/ICreditFacadeV3.sol";
 import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 import {ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
+import {BalanceWithMask} from "../../../libraries/BalancesLogic.sol";
 
 contract CreditFacadeV3Harness is CreditFacadeV3 {
     constructor(address _creditManager, address _degenNFT, bool _expirable)
@@ -26,6 +30,18 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
 
     function applyPriceOnDemandInt(MultiCall[] calldata calls) external returns (uint256 remainingCalls) {
         return _applyOnDemandPriceUpdates(calls);
+    }
+
+    function fullCollateralCheckInt(
+        address creditAccount,
+        uint256 enabledTokensMaskBefore,
+        FullCheckParams memory fullCheckParams,
+        BalanceWithMask[] memory forbiddenBalances,
+        uint256 forbiddenTokensMask
+    ) external {
+        _fullCollateralCheck(
+            creditAccount, enabledTokensMaskBefore, fullCheckParams, forbiddenBalances, forbiddenTokensMask
+        );
     }
 
     function revertIfNoPermission(uint256 flags, uint256 permission) external pure {

@@ -36,17 +36,18 @@ contract CreditManagerMock {
     address public withdrawalManager;
 
     mapping(address => uint256) public tokenMasksMap;
+    mapping(uint256 => address) public getTokenByMask;
 
     address public creditFacade;
 
     address public creditConfigurator;
     address borrower;
     uint256 public quotedTokensMask;
-    bool public supportsQuotas;
 
     CollateralDebtData return_collateralDebtData;
 
     CollateralDebtData _liquidateCollateralDebtData;
+    bool _liquidateIsExpired;
     uint256 internal _enabledTokensMask;
 
     address nextCreditAccount;
@@ -85,7 +86,6 @@ contract CreditManagerMock {
         weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL);
         setPoolService(_pool);
         creditConfigurator = CONFIGURATOR;
-        supportsQuotas = true;
     }
 
     function setPriceOracle(address _priceOracle) external {
@@ -95,10 +95,6 @@ contract CreditManagerMock {
     function getTokenMaskOrRevert(address token) public view returns (uint256 tokenMask) {
         tokenMask = tokenMasksMap[token];
         if (tokenMask == 0) revert TokenNotAllowedException();
-    }
-
-    function setSupportsQuotas(bool _supportsQuotas) external {
-        supportsQuotas = _supportsQuotas;
     }
 
     function setPoolService(address newPool) public {
@@ -136,6 +132,7 @@ contract CreditManagerMock {
 
     function addToken(address token, uint256 mask) external {
         tokenMasksMap[token] = mask;
+        getTokenByMask[mask] = token;
     }
 
     function setBorrower(address _borrower) external {
@@ -155,18 +152,19 @@ contract CreditManagerMock {
         return nextCreditAccount;
     }
 
-    function setCloseCreditAccountReturns(uint256 remainingFunds, uint256 loss) external {
+    function setLiquidateCreditAccountReturns(uint256 remainingFunds, uint256 loss) external {
         return_remainingFunds = remainingFunds;
         return_loss = loss;
     }
 
     function closeCreditAccount(address) external {}
 
-    function liquidateCreditAccount(address, CollateralDebtData memory collateralDebtData, address, uint256, bool, bool)
+    function liquidateCreditAccount(address, CollateralDebtData memory collateralDebtData, address, bool isExpired)
         external
         returns (uint256 remainingFunds, uint256 loss)
     {
         _liquidateCollateralDebtData = collateralDebtData;
+        _liquidateIsExpired = isExpired;
         remainingFunds = return_remainingFunds;
         loss = return_loss;
     }
@@ -201,6 +199,10 @@ contract CreditManagerMock {
 
     function liquidateCollateralDebtData() external view returns (CollateralDebtData memory) {
         return _liquidateCollateralDebtData;
+    }
+
+    function liquidateIsExpired() external view returns (bool) {
+        return _liquidateIsExpired;
     }
 
     function enabledTokensMaskOf(address) external view returns (uint256) {
