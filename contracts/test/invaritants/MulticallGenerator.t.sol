@@ -45,7 +45,7 @@ contract MulticallGeneratorTest is GearboxInstance {
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.WETH));
         vm.stopPrank();
 
-        mcg = new MulticallGenerator(address(creditManager));
+        mcg = new MulticallGenerator(address(creditManager), address(adapterAttacker));
         mp = new MulticallParser(creditManager);
 
         uint256 cTokensQty = creditManager.collateralTokensCount();

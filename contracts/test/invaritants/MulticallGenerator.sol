@@ -4,6 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {BitMask, UNDERLYING_TOKEN_MASK} from "../../libraries/BitMask.sol";
+import {Random} from "./Random.sol";
 
 import "../../interfaces/ICreditFacadeV3Multicall.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -15,6 +16,9 @@ import {ICreditFacadeV3, ICreditFacadeV3Multicall} from "../../interfaces/ICredi
 import {IPoolQuotaKeeperV3} from "../../interfaces/IPoolQuotaKeeperV3.sol";
 import {MultiCall} from "../../interfaces/ICreditFacadeV3.sol";
 import {MultiCallBuilder} from "../lib/MultiCallBuilder.sol";
+import {AdapterAttacker} from "./AdapterAttacker.sol";
+import {TargetAttacker} from "./TargetAttacker.sol";
+
 import "forge-std/Test.sol";
 import "../lib/constants.sol";
 import "forge-std/console.sol";
@@ -30,15 +34,12 @@ import "forge-std/Vm.sol";
 // This is specific case which will be tested separatedly
 
 // Multicall generator is used to
-contract MulticallGenerator {
+contract MulticallGenerator is Random {
     using BitMask for uint256;
-    // probability of fully random values
 
-    uint16 fullyRandomValues;
+    address adapterAttacker;
 
-    uint8 maxDepth = 10;
-
-    uint8 pThreshold = 95;
+    uint8 maxCallDepth = 10;
 
     uint256 debt;
 
@@ -50,18 +51,17 @@ contract MulticallGenerator {
 
     address creditAccount;
 
-    uint256 seed;
-
     mapping(address => uint96) quotaLimits;
 
     uint256 permissions;
     bool followPermissions;
 
-    constructor(address _creditManager) {
+    constructor(address _creditManager, address _adapterAttacker) {
         creditManager = ICreditManagerV3(_creditManager);
         creditFacade = ICreditFacadeV3(creditManager.creditFacade());
         priceOracle = IPriceOracleV3(creditManager.priceOracle());
         underlying = creditManager.underlying();
+        adapterAttacker = _adapterAttacker;
     }
 
     function setCreditAccount(address _creditAccount) external {
@@ -72,14 +72,14 @@ contract MulticallGenerator {
         external
         returns (MultiCall[] memory calls)
     {
-        seed = _seed;
+        setSeed(_seed);
         permissions = _permissions;
 
         followPermissions = getRandomP() <= pThreshold;
 
         debt = creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_ONLY).debt;
 
-        uint256 len = getRandomInRange(maxDepth - 1) + 1;
+        uint256 len = getRandomInRange(1, maxCallDepth);
         calls = new MultiCall[](len);
         for (uint256 i; i < len; ++i) {
             calls[i] = generateRandomCall();
@@ -104,7 +104,7 @@ contract MulticallGenerator {
 
         bool success;
         do {
-            (call, success) = fns[getRandomInRange(9)]();
+            (call, success) = fns[getRandomInRange(fns.length)]();
         } while (!success);
     }
 
@@ -121,8 +121,7 @@ contract MulticallGenerator {
                 tokenTo: token
             });
 
-            uint256 amount =
-                getRandomP() > pThreshold ? getNextRandomNumber() : getRandomInRange(reasonableMaxCollateral);
+            uint256 amount = getRandomInRange95(reasonableMaxCollateral);
             return (
                 MultiCall({
                     target: address(creditFacade),
@@ -152,7 +151,9 @@ contract MulticallGenerator {
                 uint256 collateralTokensCount = creditManager.collateralTokensCount();
                 uint256 mask;
                 do {
-                    mask = 1 << getRandomInRange(collateralTokensCount);
+                    // mask is generated in range [1; collateralTokensCount], because
+                    // underlying token could not be quoted one
+                    mask = 1 << getRandomInRange(1, collateralTokensCount);
                 } while (quotedTokensMask & mask == 0);
 
                 address token = creditManager.getTokenByMask(mask);
@@ -174,8 +175,7 @@ contract MulticallGenerator {
                     quota = type(int96).min;
                 }
 
-                uint96 minQuota =
-                    uint96(getRandomP() > pThreshold ? getNextRandomNumber() : getRandomInRange(quotaAvailable));
+                uint96 minQuota = uint96(getRandomInRange95(quotaAvailable));
 
                 return (
                     MultiCall({
@@ -191,8 +191,8 @@ contract MulticallGenerator {
     // collateralHints will be chosen properly like 1 << i, where i <= collateralTokensCound
 
     function randomSetFullCheckParams() internal returns (MultiCall memory, bool success) {
-        uint16 minHealhFactor =
-            uint16(getRandomP() > pThreshold ? getNextRandomNumber() : 10_000 + getRandomInRange(2_000));
+        // for test pufposes, it generates values 10-12K in 95% of cases
+        uint16 minHealhFactor = uint16(getRandomInRange95(10_000, 12_000));
 
         uint256 collateralTokensCount = creditManager.collateralTokensCount();
         uint256 len = getRandomInRange(collateralTokensCount);
@@ -200,6 +200,9 @@ contract MulticallGenerator {
 
         unchecked {
             for (uint256 i; i < len; ++i) {
+                // tests which check that function reverts for incorrect collateral
+                // token mask cover this cases, so for invariant testing
+                // it's assumed that function reverts for all of them
                 collateralHints[i] = 1 << getRandomInRange(collateralTokensCount);
             }
         }
@@ -223,8 +226,7 @@ contract MulticallGenerator {
 
             uint256 reasonableIncreaseDebt = maxDebt - debt;
 
-            uint256 amount =
-                getRandomP() > pThreshold ? getNextRandomNumber() : getRandomInRange(reasonableIncreaseDebt);
+            uint256 amount = getRandomInRange95(reasonableIncreaseDebt);
 
             debt += amount;
 
@@ -246,8 +248,7 @@ contract MulticallGenerator {
 
             (uint256 minDebt,) = creditFacade.debtLimits();
 
-            uint256 amount =
-                getRandomP() > pThreshold ? getNextRandomNumber() : debt == 0 ? 0 : getRandomInRange(debt - minDebt);
+            uint256 amount = debt == 0 ? 0 : getRandomInRange95(debt - minDebt);
 
             debt -= amount < debt ? amount : debt;
 
@@ -270,7 +271,7 @@ contract MulticallGenerator {
             address token = getRandomCollateralToken();
             uint256 balance = IERC20(token).balanceOf(creditAccount);
 
-            uint256 amount = getRandomP() > pThreshold ? getNextRandomNumber() : getRandomInRange(balance);
+            uint256 amount = getRandomInRange95(balance);
             return (
                 MultiCall({
                     target: address(creditFacade),
@@ -320,24 +321,11 @@ contract MulticallGenerator {
     //
     // INTERNAL
     //
-    function getRandomP() internal returns (uint8) {
-        return uint8(getRandomInRange(100));
-    }
-
     function getRandomCollateralToken() internal returns (address) {
         return creditManager.getTokenByMask(1 << getRandomCollateralTokenIndex());
     }
 
     function getRandomCollateralTokenIndex() internal returns (uint8) {
         return uint8(getRandomInRange(creditManager.collateralTokensCount()));
-    }
-
-    function getRandomInRange(uint256 max) internal returns (uint256) {
-        return max == 0 ? 0 : (getNextRandomNumber() % max);
-    }
-
-    function getNextRandomNumber() internal returns (uint256) {
-        seed = uint256(keccak256(abi.encodePacked(seed)));
-        return seed;
     }
 }

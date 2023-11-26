@@ -44,7 +44,7 @@ contract Handler {
     constructor(GearboxInstance _gi) {
         gi = _gi;
         vm = gi.getVm();
-        mcg = new MulticallGenerator(address(gi.creditManager()));
+        mcg = new MulticallGenerator(address(gi.creditManager()), address(gi.adapterAttacker()));
 
         ICreditManagerV3 creditManager = gi.creditManager();
 
@@ -106,6 +106,7 @@ contract Handler {
         }
     }
 
+    // todo: store changed account
     function multicall(uint256 _seed, uint16 account) internal {
         vm.roll(++b);
         address creditAccount = accounts[account % accounts.length];

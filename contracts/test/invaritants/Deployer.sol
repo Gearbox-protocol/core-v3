@@ -4,8 +4,8 @@
 pragma solidity ^0.8.17;
 
 import {IntegrationTestHelper} from "../helpers/IntegrationTestHelper.sol";
-import {AdapterMock} from "../mocks/core/AdapterMock.sol";
-import {TargetContractMock} from "../mocks/core/TargetContractMock.sol";
+import {AdapterAttacker} from "./AdapterAttacker.sol";
+import {TargetAttacker} from "./TargetAttacker.sol";
 
 // SUITES
 import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
@@ -14,6 +14,9 @@ import "../lib/constants.sol";
 import "forge-std/Vm.sol";
 
 contract GearboxInstance is IntegrationTestHelper {
+    address public targetAttacker;
+    address public adapterAttacker;
+
     function _setUp() public {
         _setupCore();
 
@@ -33,11 +36,11 @@ contract GearboxInstance is IntegrationTestHelper {
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.WETH));
         vm.stopPrank();
 
-        targetMock = new TargetContractMock();
-        adapterMock = new AdapterMock(address(creditManager), address(targetMock));
+        targetAttacker = address(new TargetAttacker(address(creditManager)));
+        adapterAttacker = address(new AdapterAttacker(address(creditManager), address(targetAttacker)));
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.allowAdapter(address(adapterMock));
+        creditConfigurator.allowAdapter(address(adapterAttacker));
     }
 
     function mf() external {

@@ -26,23 +26,40 @@ contract InvariantGearboxTest is Test {
         creditManager = gi.creditManager();
     }
 
-    function invariant_example() external {
+    // 20x Open CA
+    // multicall multilpe times
+
+    // liquidate -> (??)
+    // [ p ] -> EVENT LIQUIDATION -> [ ca ]  -> liquidate
+
+    //
+    // Open CA
+    // N x randomMulticall()
+    // Set paramt to liuiq
+    // M x randiomMulticall()
+    // Liquidate
+
+    // Self-liquidation [ ? ]
+
+    function invariant_credit_accounts() external {
         address[] memory accounts = creditManager.creditAccounts();
         uint256 len = accounts.length;
         unchecked {
             for (uint256 i; i < len; ++i) {
-                _checkAccountInvariants(accounts[i]);
+                address creditAccount = accounts[i];
+                CollateralDebtData memory cdd =
+                    creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_COLLATERAL);
+
+                _checkAccountInvariants(cdd);
             }
         }
     }
 
-    function _checkAccountInvariants(address creditAccount) internal {
-        CollateralDebtData memory cdd =
-            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_COLLATERAL);
-
+    function _checkAccountInvariants(CollateralDebtData memory cdd) internal {
         if (cdd.debt == 0) {
             assertEq(cdd.quotedTokens.length, 0, "Incorrect quota length");
         } else {
+            // todo: for changed account true (for all if onDemandPrice was not called)
             assertTrue(cdd.twvUSD >= cdd.totalDebtUSD, "Accounts with hf < 1 exists");
         }
     }
