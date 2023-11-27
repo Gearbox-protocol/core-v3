@@ -29,9 +29,6 @@ contract CreditManagerMock {
     address public poolService;
     address public pool;
 
-    /// @dev Address of WETH
-    address public weth;
-
     /// @dev Address of withdrawal manager
     address public withdrawalManager;
 
@@ -83,7 +80,6 @@ contract CreditManagerMock {
 
     constructor(address _addressProvider, address _pool) {
         addressProvider = _addressProvider;
-        weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL);
         setPoolService(_pool);
         creditConfigurator = CONFIGURATOR;
     }
