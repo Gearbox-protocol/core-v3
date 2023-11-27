@@ -180,7 +180,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     function test_U_FA_01_constructor_sets_correct_values() public allDegenNftCases allExpirableCases {
         assertEq(address(creditFacade.creditManager()), address(creditManagerMock), "Incorrect creditManager");
 
-        assertEq(creditFacade.weth(), creditManagerMock.weth(), "Incorrect weth token");
+        assertEq(creditFacade.weth(), tokenTestSuite.addressOf(Tokens.WETH), "Incorrect weth token");
 
         assertEq(creditFacade.degenNFT(), address(degenNFTMock), "Incorrect degen NFT");
     }
@@ -1783,12 +1783,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             abi.encodeCall(IBotListV3.setBotPermissions, (bot, address(creditManagerMock), creditAccount, 1))
         );
 
-        vm.prank(USER);
-        creditFacade.setBotPermissions({creditAccount: creditAccount, bot: bot, permissions: 1});
-
-        /// It reverts if too many bots approved
-        botListMock.setBotPermissionsReturn(creditFacade.maxApprovedBots() + 1);
-        vm.expectRevert(TooManyApprovedBotsException.selector);
         vm.prank(USER);
         creditFacade.setBotPermissions({creditAccount: creditAccount, bot: bot, permissions: 1});
 

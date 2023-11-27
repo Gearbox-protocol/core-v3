@@ -208,9 +208,6 @@ error NotApprovedBotException();
 /// @notice Thrown when attempting to perform a multicall action with no permission for it
 error NoPermissionException(uint256 permission);
 
-/// @notice Thrown when user tries to approve more bots than allowed
-error TooManyApprovedBotsException();
-
 /// @notice Thrown when attempting to give a bot unexpected permissions
 error UnexpectedPermissionsException();
 

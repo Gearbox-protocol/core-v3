@@ -72,9 +72,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Address of the pool credit manager is connected to
     address public immutable override pool;
 
-    /// @notice WETH token address
-    address public immutable override weth;
-
     /// @notice Address of the connected credit facade
     address public override creditFacade;
 
@@ -162,7 +159,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         underlying = IPoolV3(_pool).underlyingToken(); // U:[CM-1]
         _addToken(underlying); // U:[CM-1]
 
-        weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // U:[CM-1]
         priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_PRICE_ORACLE, 3_00); // U:[CM-1]
         accountFactory = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL); // U:[CM-1]
 

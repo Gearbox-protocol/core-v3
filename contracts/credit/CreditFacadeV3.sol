@@ -77,9 +77,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @notice Maximum quota size, as a multiple of `maxDebt`
     uint256 public constant override maxQuotaMultiplier = 8;
 
-    /// @notice Maximum number of approved bots for a credit account
-    uint256 public constant override maxApprovedBots = 5;
-
     /// @notice Credit manager connected to this credit facade
     address public immutable override creditManager;
 
@@ -158,9 +155,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     {
         creditManager = _creditManager; // U:[FA-1]
 
-        weth = ICreditManagerV3(_creditManager).weth(); // U:[FA-1]
-        botList =
-            IAddressProviderV3(ICreditManagerV3(_creditManager).addressProvider()).getAddressOrRevert(AP_BOT_LIST, 3_00);
+        address addressProvider = ICreditManagerV3(_creditManager).addressProvider();
+        weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // U:[FA-1]
+        botList = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_BOT_LIST, 3_00); // U:[FA-1]
 
         degenNFT = _degenNFT; // U:[FA-1]
 
@@ -428,10 +425,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             creditAccount: creditAccount,
             permissions: permissions
         }); // U:[FA-41]
-
-        if (remainingBots > maxApprovedBots) {
-            revert TooManyApprovedBotsException(); // U:[FA-41]
-        }
 
         if (remainingBots == 0) {
             _setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: false}); // U:[FA-41]

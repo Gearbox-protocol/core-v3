@@ -90,8 +90,6 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
 
     function maxQuotaMultiplier() external view returns (uint256);
 
-    function maxApprovedBots() external view returns (uint256);
-
     function expirable() external view returns (bool);
 
     function expirationDate() external view returns (uint40);

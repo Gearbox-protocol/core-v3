@@ -98,8 +98,6 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
 
     function accountFactory() external view returns (address);
 
-    function weth() external view returns (address);
-
     function name() external view returns (string memory);
 
     // ------------------ //

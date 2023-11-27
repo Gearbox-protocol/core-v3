@@ -119,7 +119,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         underlying = tokenTestSuite.addressOf(Tokens.DAI);
 
         addressProvider = new AddressProviderV3ACLMock();
-        addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
 
         accountFactory = AccountFactoryMock(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL));
 
@@ -291,12 +290,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         );
 
         // assertEq(lt, 0, _testCaseErr("Incorrect LT for underlying"));
-
-        assertEq(
-            creditManager.weth(),
-            addressProvider.getAddressOrRevert(AP_WETH_TOKEN, 0),
-            _testCaseErr("Incorrect WETH token")
-        );
 
         assertEq(
             address(creditManager.priceOracle()),
