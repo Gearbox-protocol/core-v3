@@ -101,6 +101,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
     bool runOnFork;
 
+    uint256 configAccountAmount;
     uint256 creditAccountAmount;
 
     modifier notExpirableCase() {
@@ -327,8 +328,11 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         if (!anyDegenNFT && whitelisted != (creditFacade.degenNFT() != address(0))) {
             return false;
         }
-
-        (, creditAccountAmount) = creditFacade.debtLimits();
+        if (configAccountAmount == 0) {
+            (, creditAccountAmount) = creditFacade.debtLimits();
+        } else {
+            creditAccountAmount = configAccountAmount;
+        }
 
         return true;
     }
@@ -377,6 +381,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         _deployPool(config);
 
         creditAccountAmount = config.getAccountAmount();
+        configAccountAmount = creditAccountAmount;
         CreditManagerV3DeployParams[] memory allCms = config.creditManagers();
 
         degenNFT = new DegenNFTV2(
