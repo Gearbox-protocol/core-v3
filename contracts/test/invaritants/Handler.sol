@@ -59,15 +59,7 @@ contract Handler {
         b = block.timestamp;
     }
 
-    function randomCall(uint256 _seed, uint16 _account) public {
-        if (accounts.length < 20) {
-            openCA(_seed);
-        } else {
-            multicall(_seed, _account);
-        }
-    }
-
-    function openCA(uint256 _debt) internal {
+    function openCA(uint256 _debt) public {
         vm.roll(++b);
 
         (uint256 minDebt, uint256 maxDebt) = gi.creditFacade().debtLimits();
@@ -104,16 +96,5 @@ contract Handler {
 
             accounts.push(creditAccount);
         }
-    }
-
-    // todo: store changed account
-    function multicall(uint256 _seed, uint16 account) internal {
-        vm.roll(++b);
-        address creditAccount = accounts[account % accounts.length];
-
-        mcg.setCreditAccount(creditAccount);
-
-        MultiCall[] memory calls = mcg.generateRandomMulticalls(_seed, ALL_PERMISSIONS);
-        gi.creditFacade().multicall(creditAccount, calls);
     }
 }
