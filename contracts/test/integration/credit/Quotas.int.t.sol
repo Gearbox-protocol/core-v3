@@ -373,8 +373,8 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
         public
         creditTest
     {
-        _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
-        _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
+        _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(100_000 * WAD));
+        _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(100_000 * WAD));
 
         vm.assume(quotaLink < type(uint96).max / 2);
         vm.assume(quotaUsdt < type(uint96).max / 2);
@@ -408,8 +408,8 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
 
         (uint16 feeInterest,,,,) = creditManager.fees();
 
-        quotaLink = quotaLink > uint96(1_000_000 * WAD) ? uint96(1_000_000 * WAD) : quotaLink;
-        quotaUsdt = quotaUsdt > uint96(1_000_000 * WAD) ? uint96(1_000_000 * WAD) : quotaUsdt;
+        quotaLink = quotaLink > uint96(100_000 * WAD) ? uint96(100_000 * WAD) : quotaLink;
+        quotaUsdt = quotaUsdt > uint96(100_000 * WAD) ? uint96(100_000 * WAD) : quotaUsdt;
 
         uint256 expectedTotalDebt = (borrowedAmount * cumulativeIndexAtClose) / cumulativeIndexLastUpdate;
         expectedTotalDebt += (quotaLink * 1000) / PERCENTAGE_FACTOR;
@@ -441,7 +441,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
-                    (tokenTestSuite.addressOf(Tokens.LINK), int96(uint96(10000000 * WAD)), 0)
+                    (tokenTestSuite.addressOf(Tokens.LINK), int96(uint96(100_000 * WAD)), 0)
                     )
             }),
             MultiCall({

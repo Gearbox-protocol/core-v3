@@ -75,7 +75,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     uint256 public constant override version = 3_00;
 
     /// @notice Maximum quota size, as a multiple of `maxDebt`
-    uint256 public constant override maxQuotaMultiplier = 8;
+    uint256 public constant override maxQuotaMultiplier = 2;
 
     /// @notice Credit manager connected to this credit facade
     address public immutable override creditManager;
