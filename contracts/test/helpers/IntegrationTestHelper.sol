@@ -311,7 +311,11 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         return true;
     }
 
-    function _attachCreditManager(address _creditManager) internal returns (bool isCompartible) {
+    function _attachCreditManager(address _creditManager) internal returns (bool isCompatible) {
+        return _attachCreditManager(_creditManager, false);
+    }
+
+    function _attachCreditManager(address _creditManager, bool isLive) internal returns (bool isCompartible) {
         creditManager = CreditManagerV3(_creditManager);
         creditFacade = CreditFacadeV3(creditManager.creditFacade());
         creditConfigurator = CreditConfiguratorV3(creditManager.creditConfigurator());
@@ -327,8 +331,9 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         if (!anyDegenNFT && whitelisted != (creditFacade.degenNFT() != address(0))) {
             return false;
         }
-
-        (, creditAccountAmount) = creditFacade.debtLimits();
+        if (!isLive) {
+            (, creditAccountAmount) = creditFacade.debtLimits();
+        }
 
         return true;
     }
