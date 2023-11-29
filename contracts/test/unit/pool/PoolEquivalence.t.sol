@@ -93,7 +93,7 @@ contract PoolEquivalenceTest is Test {
     /// @notice U:[PET-1]: `PoolV3.deposit` is equivalent to `PoolService.addLiquidity`
     function test_U_PET_01_deposit_is_equivalent(uint256 amount) public compareState("deposit") {
         // without expected liquidity limits, deposit amount can be arbitrarily large sane number
-        uint256 amountBounded = _boundToRange(amount, 1, 10 * INITIAL_DEPOSIT);
+        uint256 amountBounded = boundToRange(amount, 1, 10 * INITIAL_DEPOSIT);
         tokens.mint(underlying, liquidityProvider, amountBounded);
         _deposit(liquidityProvider, amountBounded);
     }
@@ -101,7 +101,7 @@ contract PoolEquivalenceTest is Test {
     /// @notice U:[PET-2]: `PoolV3.redeem` is equivalent to `PoolService.removeLiquidity`
     function test_U_PET_02_redeem_is_equivalent(uint256 amount) public compareState("redeem") {
         // can't redeem more than shares corresponding to available liquidity in the pool
-        uint256 amountBounded = _boundToRange(amount, 1, (INITIAL_DEPOSIT - INITIAL_DEBT + INITIAL_PROFIT) * 9 / 10);
+        uint256 amountBounded = boundToRange(amount, 1, (INITIAL_DEPOSIT - INITIAL_DEBT + INITIAL_PROFIT) * 9 / 10);
 
         _redeem(liquidityProvider, amountBounded);
     }
@@ -109,7 +109,7 @@ contract PoolEquivalenceTest is Test {
     /// @notice U:[PET-3]: `PoolV3.lendCreditAccount` is equivalent to `PoolService.lendCreditAccount`
     function test_U_PET_03_borrow_is_equivalent(uint256 amount) public compareState("borrow") {
         // can't borrow more than available liquidity in the pool
-        uint256 amountBounded = _boundToRange(amount, 1, INITIAL_DEPOSIT - INITIAL_DEBT + INITIAL_PROFIT);
+        uint256 amountBounded = boundToRange(amount, 1, INITIAL_DEPOSIT - INITIAL_DEBT + INITIAL_PROFIT);
         _borrow(amountBounded);
     }
 
@@ -118,9 +118,9 @@ contract PoolEquivalenceTest is Test {
         vm.assume(profit > type(int256).min);
 
         // can't repay more than borrowed
-        uint256 amountBounded = _boundToRange(amount, 1, INITIAL_DEBT);
+        uint256 amountBounded = boundToRange(amount, 1, INITIAL_DEBT);
         // let's limit profit and loss to be of roughly the same order as initial profit
-        int256 profitBounded = sign(profit) * int256(_boundToRange(abs(profit), 0, 2 * INITIAL_PROFIT));
+        int256 profitBounded = sign(profit) * int256(boundToRange(abs(profit), 0, 2 * INITIAL_PROFIT));
 
         _repay(
             amountBounded,
@@ -316,9 +316,10 @@ contract PoolEquivalenceTest is Test {
         return x >= 0 ? int256(1) : -1;
     }
 
-    function _boundToRange(uint256 value, uint256 min, uint256 max) internal pure returns (uint256) {
+    function boundToRange(uint256 value, uint256 min, uint256 max) internal pure returns (uint256) {
         require(min < max);
-        if (value >= min) value -= min;
-        return min + value % (max - min);
+        uint256 width = max - min;
+        if (value < min) value += width * ((min - value) / width + 1);
+        return min + (value - min) % width;
     }
 }
