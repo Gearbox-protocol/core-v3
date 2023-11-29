@@ -37,8 +37,8 @@ contract PolicyManagerTest is Test {
     ///
     ///
 
-    /// @dev [PM-1]: setPolicy and getPolicy work correctly
-    function test_PM_01_setPolicy_getPolicy_setGroup_getGroup_work_correctly() public {
+    /// @dev U:[PM-1]: setPolicy and getPolicy work correctly
+    function test_U_PM_01_setPolicy_getPolicy_setGroup_getGroup_work_correctly() public {
         Policy memory policy = Policy({
             enabled: false,
             admin: FRIEND,
@@ -113,8 +113,8 @@ contract PolicyManagerTest is Test {
         assertEq(policyManager.getGroup(DUMB_ADDRESS), "GROUP");
     }
 
-    /// @dev [PM-2]: checkPolicy fails on disabled policy
-    function test_PM_02_checkPolicy_false_on_disabled() public {
+    /// @dev U:[PM-2]: checkPolicy fails on disabled policy
+    function test_U_PM_02_checkPolicy_false_on_disabled() public {
         Policy memory policy = Policy({
             enabled: false,
             admin: FRIEND,
@@ -147,8 +147,8 @@ contract PolicyManagerTest is Test {
         assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), 0, 1));
     }
 
-    /// @dev [PM-3]: checkPolicy exactValue works correctly
-    function test_PM_03_checkPolicy_exactValue_works_correctly(uint256 newValue) public {
+    /// @dev U:[PM-3]: checkPolicy exactValue works correctly
+    function test_U_PM_03_checkPolicy_exactValue_works_correctly(uint256 newValue) public {
         Policy memory policy = Policy({
             enabled: false,
             admin: FRIEND,
@@ -175,8 +175,8 @@ contract PolicyManagerTest is Test {
         assertTrue(newValue == 15 || !policyManager.checkPolicy(bytes32(uint256(1)), 0, newValue));
     }
 
-    /// @dev [PM-4]: checkPolicy minValue works correctly
-    function test_PM_04_checkPolicy_minValue_works_correctly(uint256 minValue, uint256 newValue) public {
+    /// @dev U:[PM-4]: checkPolicy minValue works correctly
+    function test_U_PM_04_checkPolicy_minValue_works_correctly(uint256 minValue, uint256 newValue) public {
         Policy memory policy = Policy({
             enabled: false,
             admin: FRIEND,
@@ -203,8 +203,8 @@ contract PolicyManagerTest is Test {
         assertTrue(newValue >= minValue || !policyManager.checkPolicy(bytes32(uint256(1)), 0, newValue));
     }
 
-    /// @dev [PM-5]: checkPolicy maxValue works correctly
-    function test_PM_05_checkPolicy_maxValue_works_correctly(uint256 maxValue, uint256 newValue) public {
+    /// @dev U:[PM-5]: checkPolicy maxValue works correctly
+    function test_U_PM_05_checkPolicy_maxValue_works_correctly(uint256 maxValue, uint256 newValue) public {
         Policy memory policy = Policy({
             enabled: false,
             admin: FRIEND,
@@ -231,8 +231,8 @@ contract PolicyManagerTest is Test {
         assertTrue(newValue <= maxValue || !policyManager.checkPolicy(bytes32(uint256(1)), 0, newValue));
     }
 
-    /// @dev [PM-6]: checkPolicy correctly sets reference point and timestampLU
-    function test_PM_06_checkPolicy_correctly_sets_reference_point() public {
+    /// @dev U:[PM-6]: checkPolicy correctly sets reference point and timestampLU
+    function test_U_PM_06_checkPolicy_correctly_sets_reference_point() public {
         Policy memory policy = Policy({
             enabled: false,
             admin: FRIEND,
@@ -265,8 +265,8 @@ contract PolicyManagerTest is Test {
         assertEq(policy2.referencePointTimestampLU, block.timestamp, "Incorrect timestamp LU");
     }
 
-    /// @dev [PM-7]: checkPolicy minChange works correctly
-    function test_PM_07_checkPolicy_minChange_works_correctly(
+    /// @dev U:[PM-7]: checkPolicy minChange works correctly
+    function test_U_PM_07_checkPolicy_minChange_works_correctly(
         uint256 oldValue,
         uint256 newValue1,
         uint256 newValue2,
@@ -321,8 +321,8 @@ contract PolicyManagerTest is Test {
         assertEq(policy2.referencePointTimestampLU, block.timestamp, "Incorrect timestamp LU");
     }
 
-    /// @dev [PM-8]: checkPolicy maxChange works correctly
-    function test_PM_08_checkPolicy_maxChange_works_correctly(
+    /// @dev U:[PM-8]: checkPolicy maxChange works correctly
+    function test_U_PM_08_checkPolicy_maxChange_works_correctly(
         uint256 oldValue,
         uint256 newValue1,
         uint256 newValue2,
@@ -377,8 +377,8 @@ contract PolicyManagerTest is Test {
         assertEq(policy2.referencePointTimestampLU, block.timestamp, "Incorrect timestamp LU");
     }
 
-    /// @dev [PM-9]: checkPolicy minPctChange works correctly
-    function test_PM_09_checkPolicy_minPctChange_works_correctly(
+    /// @dev U:[PM-9]: checkPolicy minPctChange works correctly
+    function test_U_PM_09_checkPolicy_minPctChange_works_correctly(
         uint256 oldValue,
         uint256 newValue1,
         uint256 newValue2,
@@ -452,8 +452,8 @@ contract PolicyManagerTest is Test {
         assertEq(policy2.referencePointTimestampLU, block.timestamp, "Incorrect timestamp LU");
     }
 
-    /// @dev [PM-10]: checkPolicy maxPctChange works correctly
-    function test_PM_10_checkPolicy_maxPctChange_works_correctly(
+    /// @dev U:[PM-10]: checkPolicy maxPctChange works correctly
+    function test_U_PM_10_checkPolicy_maxPctChange_works_correctly(
         uint256 oldValue,
         uint256 newValue1,
         uint256 newValue2,
@@ -527,8 +527,8 @@ contract PolicyManagerTest is Test {
         assertEq(policy2.referencePointTimestampLU, block.timestamp, "Incorrect timestamp LU");
     }
 
-    /// @dev [PM-11]: checkPolicy returns false on caller not being admin
-    function test_PM_11_checkPolicy_returns_false_on_wrong_caller() public {
+    /// @dev U:[PM-11]: checkPolicy returns false on caller not being admin
+    function test_U_PM_11_checkPolicy_returns_false_on_wrong_caller() public {
         Policy memory policy = Policy({
             enabled: false,
             admin: FRIEND,
