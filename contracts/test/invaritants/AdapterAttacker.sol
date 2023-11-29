@@ -23,7 +23,7 @@ contract AdapterAttacker is IAdapter {
         targetContract = _targetContract;
     }
 
-    function executeAllApprove(address tokenIn, address tokenOut, bytes memory callData)
+    function executeAllApprove(bytes memory callData)
         external
         returns (uint256 tokensToEnable, uint256 tokensToDisable, bytes memory result)
     {

@@ -90,7 +90,7 @@ contract MulticallGenerator is Random {
     // todo: 2. make executable multicalls
 
     function generateRandomCall() public returns (MultiCall memory call) {
-        function() returns (MultiCall memory, bool)[9] memory fns = [
+        function() returns (MultiCall memory, bool)[10] memory fns = [
             randomAddCollateral,
             randomUpdateQuota,
             randomSetFullCheckParams,
@@ -99,7 +99,8 @@ contract MulticallGenerator is Random {
             randomWithdrawCollateral,
             randomEnabledToken,
             randomDisabledToken,
-            randomRevokeAdapterAllowances
+            randomRevokeAdapterAllowances,
+            randomExternalCall
         ];
 
         bool success;
@@ -146,7 +147,10 @@ contract MulticallGenerator is Random {
             if (getRandomP() > pThreshold || debt != 0) {
                 uint256 quotedTokensMask = creditManager.quotedTokensMask();
 
-                if (quotedTokensMask == 0) revert("Cant find quota token");
+                if (quotedTokensMask == 0) {
+                    MultiCall memory _call;
+                    return (_call, false);
+                }
 
                 uint256 collateralTokensCount = creditManager.collateralTokensCount();
                 uint256 mask;
@@ -316,6 +320,20 @@ contract MulticallGenerator is Random {
     // any token and revocations with be chosen
     function randomRevokeAdapterAllowances() internal returns (MultiCall memory, bool success) {
         if (!followPermissions || (permissions & REVOKE_ALLOWANCES_PERMISSION != 0)) {}
+    }
+
+    function randomExternalCall() internal returns (MultiCall memory, bool success) {
+        if (!followPermissions || (permissions & EXTERNAL_CALLS_PERMISSION != 0)) {
+            bytes memory targetCalldata = abi.encodeCall(TargetAttacker.act, (seed));
+
+            return (
+                MultiCall({
+                    target: adapterAttacker,
+                    callData: abi.encodeCall(AdapterAttacker.executeAllApprove, (targetCalldata))
+                }),
+                true
+            );
+        }
     }
 
     //

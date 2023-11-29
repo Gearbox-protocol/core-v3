@@ -56,7 +56,7 @@ contract Handler {
             gi.tokenTestSuite().mint(token, address(this), type(uint80).max);
         }
 
-        b = block.timestamp;
+        b = block.number;
     }
 
     function randomCall(uint256 _seed, uint16 _account) public {

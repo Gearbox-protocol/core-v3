@@ -25,7 +25,7 @@ contract Random {
 
     uint8 pThreshold = 95;
 
-    uint256 private seed;
+    uint256 internal seed;
 
     function setSeed(uint256 _seed) internal {
         seed = _seed;

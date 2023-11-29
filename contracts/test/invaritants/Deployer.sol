@@ -36,7 +36,8 @@ contract GearboxInstance is IntegrationTestHelper {
         creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.WETH));
         vm.stopPrank();
 
-        targetAttacker = address(new TargetAttacker(address(creditManager)));
+        targetAttacker =
+            address(new TargetAttacker(address(creditManager), address(priceOracle), address(tokenTestSuite)));
         adapterAttacker = address(new AdapterAttacker(address(creditManager), address(targetAttacker)));
 
         vm.prank(CONFIGURATOR);
