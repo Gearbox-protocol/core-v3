@@ -66,7 +66,7 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
     function test_U_AF_02A_takeCreditAccount_works_correctly_when_queue_has_no_reusable_accounts(uint8 head, uint8 tail)
         public
     {
-        vm.assume(head <= tail);
+        (head, tail) = head <= tail ? (head, tail) : (tail, head);
         FactoryParams memory fp = accountFactory.factoryParams(creditManager);
         accountFactory.setFactoryParams(creditManager, fp.masterCreditAccount, head, tail);
         if (head < tail) {
@@ -95,7 +95,8 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
         uint8 head,
         uint8 tail
     ) public {
-        vm.assume(head < tail);
+        vm.assume(head != tail);
+        (head, tail) = head < tail ? (head, tail) : (tail, head);
 
         FactoryParams memory fp = accountFactory.factoryParams(creditManager);
         accountFactory.setFactoryParams(creditManager, fp.masterCreditAccount, head, tail);

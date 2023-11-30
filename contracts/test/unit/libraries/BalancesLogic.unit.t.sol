@@ -48,7 +48,7 @@ contract BalancesLogicUnitTest is TestHelper {
         int128[16] calldata deltas,
         uint256 length
     ) public {
-        vm.assume(length <= 16);
+        length = bound(length, 0, 16);
 
         _setupTokenBalances(balances, length);
 
@@ -83,7 +83,7 @@ contract BalancesLogicUnitTest is TestHelper {
         uint256 length,
         bool greater
     ) public {
-        vm.assume(length <= 16);
+        length = bound(length, 0, 16);
 
         _setupTokenBalances(balances, length);
 
@@ -115,7 +115,7 @@ contract BalancesLogicUnitTest is TestHelper {
         uint128[16] calldata balances,
         uint256 tokensMask
     ) public {
-        tokensMask %= (2 ** 16);
+        tokensMask = bound(tokensMask, 0, type(uint16).max);
 
         _setupTokenBalances(balances, 16);
 
@@ -144,7 +144,7 @@ contract BalancesLogicUnitTest is TestHelper {
         uint256 tokensMask,
         bool greater
     ) public {
-        tokensMask %= (2 ** 16);
+        tokensMask = bound(tokensMask, 0, type(uint16).max);
 
         _setupTokenBalances(balancesBefore, 16);
 

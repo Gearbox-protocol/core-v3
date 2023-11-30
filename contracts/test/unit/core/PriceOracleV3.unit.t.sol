@@ -45,9 +45,9 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         bool skipCheck,
         uint8 decimals
     ) public {
-        vm.assume(updatedAt <= block.timestamp);
-        if (skipCheck) vm.assume(answer > 0);
-        vm.assume(decimals > 0 && decimals <= 18);
+        updatedAt = bound(updatedAt, 0, block.timestamp);
+        if (skipCheck) answer = bound(answer, 1, type(int256).max);
+        decimals = uint8(bound(decimals, 1, 18));
 
         address priceFeed = makeAddr("PRICE_FEED");
 

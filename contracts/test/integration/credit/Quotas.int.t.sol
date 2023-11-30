@@ -376,8 +376,8 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(100_000 * WAD));
         _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(100_000 * WAD));
 
-        vm.assume(quotaLink < type(uint96).max / 2);
-        vm.assume(quotaUsdt < type(uint96).max / 2);
+        quotaLink = uint96(bound(quotaLink, 0, uint96(type(int96).max)));
+        quotaUsdt = uint96(bound(quotaUsdt, 0, uint96(type(int96).max)));
 
         (address creditAccount,) = _openTestCreditAccount();
 
