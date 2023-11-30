@@ -25,7 +25,7 @@ import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
-contract GearStakingTest is Test, IGearStakingV3Events {
+contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
     address gearToken;
 
     AddressProviderV3ACLMock public addressProvider;

@@ -11,9 +11,9 @@ import {GeneralMock} from "../../mocks/GeneralMock.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {RAY, WAD} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
-/// @title BitMask logic test
-/// @notice [BM]: Unit tests for bit mask library
-contract CreditLogicTest is TestHelper {
+/// @title Credit logic unit test
+/// @notice U:[BM]: Unit tests for CreditLogic library
+contract CreditLogicUnitTest is TestHelper {
     uint256 public constant TEST_FEE = 50;
 
     address[8] tokens;

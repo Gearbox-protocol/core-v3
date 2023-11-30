@@ -38,7 +38,7 @@ import "../../../interfaces/IExceptions.sol";
 
 import {TestHelper} from "../../lib/helper.sol";
 
-contract PoolQuotaKeeperUnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV3Events {
+contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV3Events {
     using Math for uint256;
 
     ContractsRegister public cr;

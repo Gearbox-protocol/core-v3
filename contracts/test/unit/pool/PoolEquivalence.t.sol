@@ -16,7 +16,7 @@ import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMoc
 import {Tokens, TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 
 /// @title Pool equivalence test
-/// @notice [PET]: Tests that ensure that `PoolV3` without quotas behaves identically to `PoolService`
+/// @notice U:[PET]: Tests that ensure that `PoolV3` without quotas behaves identically to `PoolService`
 contract PoolEquivalenceTest is Test {
     bool v3;
 
@@ -90,35 +90,45 @@ contract PoolEquivalenceTest is Test {
     // TESTS //
     // ----- //
 
-    /// @notice [PET-1]: `PoolV3.deposit` is equivalent to `PoolService.addLiquidity`
-    function test_PET_01_deposit_is_equivalent(uint256 amount) public compareState("deposit") {
+    /// @notice U:[PET-1]: `PoolV3.deposit` is equivalent to `PoolService.addLiquidity`
+    function test_U_PET_01_deposit_is_equivalent(uint256 amount) public compareState("deposit") {
         // without expected liquidity limits, deposit amount can be arbitrarily large sane number
-        vm.assume(amount > 1 && amount < 10 * INITIAL_DEPOSIT);
-        tokens.mint(underlying, liquidityProvider, amount);
-        _deposit(liquidityProvider, amount);
+        uint256 amountBounded = bound(amount, 1, 10 * INITIAL_DEPOSIT);
+        tokens.mint(underlying, liquidityProvider, amountBounded);
+
+        _deposit(liquidityProvider, amountBounded);
     }
 
-    /// @notice [PET-2]: `PoolV3.redeem` is equivalent to `PoolService.removeLiquidity`
-    function test_PET_02_redeem_is_equivalent(uint256 amount) public compareState("redeem") {
+    /// @notice U:[PET-2]: `PoolV3.redeem` is equivalent to `PoolService.removeLiquidity`
+    function test_U_PET_02_redeem_is_equivalent(uint256 amount) public compareState("redeem") {
         // can't redeem more than shares corresponding to available liquidity in the pool
-        vm.assume(amount > 1 && amount < (INITIAL_DEPOSIT - INITIAL_DEBT + INITIAL_PROFIT) * 9 / 10);
-        _redeem(liquidityProvider, amount);
+        uint256 amountBounded = bound(amount, 1, (INITIAL_DEPOSIT - INITIAL_DEBT + INITIAL_PROFIT) * 9 / 10);
+
+        _redeem(liquidityProvider, amountBounded);
     }
 
-    /// @notice [PET-3]: `PoolV3.lendCreditAccount` is equivalent to `PoolService.lendCreditAccount`
-    function test_PET_03_borrow_is_equivalent(uint256 amount) public compareState("borrow") {
+    /// @notice U:[PET-3]: `PoolV3.lendCreditAccount` is equivalent to `PoolService.lendCreditAccount`
+    function test_U_PET_03_borrow_is_equivalent(uint256 amount) public compareState("borrow") {
         // can't borrow more than available liquidity in the pool
-        vm.assume(amount > 1 && amount < INITIAL_DEPOSIT - INITIAL_DEBT + INITIAL_PROFIT);
-        _borrow(amount);
+        uint256 amountBounded = bound(amount, 1, INITIAL_DEPOSIT - INITIAL_DEBT + INITIAL_PROFIT);
+
+        _borrow(amountBounded);
     }
 
-    /// @notice [PET-4]: `PoolV3.repayCreditAccount` is equivalent to `PoolService.repayCreditAccount`
-    function test_PET_04_repay_is_equivalent(uint256 amount, int256 profit) public compareState("repay") {
+    /// @notice U:[PET-4]: `PoolV3.repayCreditAccount` is equivalent to `PoolService.repayCreditAccount`
+    function test_U_PET_04_repay_is_equivalent(uint256 amount, int256 profit) public compareState("repay") {
+        vm.assume(profit > type(int256).min);
+
         // can't repay more than borrowed
-        vm.assume(amount > 1 && amount < INITIAL_DEBT);
+        uint256 amountBounded = bound(amount, 1, INITIAL_DEBT);
         // let's limit profit and loss to be of roughly the same order as initial profit
-        vm.assume(uint256(profit) < 2 * INITIAL_PROFIT && uint256(-profit) < 2 * INITIAL_PROFIT);
-        _repay(amount, profit > 0 ? uint256(profit) : 0, profit < 0 ? uint256(-profit) : 0);
+        int256 profitBounded = bound(profit, -2 * int256(INITIAL_PROFIT), 2 * int256(INITIAL_PROFIT));
+
+        _repay(
+            amountBounded,
+            profitBounded > 0 ? uint256(profitBounded) : 0,
+            profitBounded < 0 ? uint256(-profitBounded) : 0
+        );
     }
 
     // --------- //

@@ -59,6 +59,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
     // ----- //
 
     function setUp() public {
+        // note that the test contract becomes the recipient of transfer fees
         underlying = new ERC20FeeMock("Test Token", "TEST", 18);
 
         user = makeAddr("USER");
@@ -343,7 +344,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
     /// @notice U:[LP-6]: `deposit[WithReferral]` works as expected
     function test_U_LP_06_deposit_works_as_expected(address caller) public {
-        vm.assume(caller != address(0) && caller != address(pool));
+        vm.assume(caller != address(0) && caller != address(pool) && caller != address(this));
 
         DepositTestCase[2] memory cases = [
             DepositTestCase({
@@ -367,7 +368,6 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             if (cases[i].transferFee != 0) _activateTransferFee(cases[i].transferFee);
 
             _prepareAssets(caller, cases[i].assets);
-            uint256 sharesBefore = pool.balanceOf(caller);
 
             // receives udnerlying
             vm.expectCall(
@@ -398,9 +398,10 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             // updates balance
             assertEq(
                 pool.balanceOf(user),
-                sharesBefore + cases[i].expectedShares,
-                _testCaseErr(cases[i].name, "Incorrect shares minted to caller")
+                cases[i].expectedShares,
+                _testCaseErr(cases[i].name, "Incorrect shares minted to user")
             );
+            assertEq(underlying.balanceOf(caller), 0, _testCaseErr(cases[i].name, "Incorrect assets taken from caller"));
 
             // returns correct value
             assertEq(shares, cases[i].expectedShares, "Incorrect shares returned");
@@ -421,7 +422,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
     /// @notice U:[LP-7]: `mint[WithReferral]` works as expected
     function test_U_LP_07_mint_works_as_expected(address caller) public {
-        vm.assume(caller != address(0) && caller != address(pool));
+        vm.assume(caller != address(0) && caller != address(pool) && caller != address(this));
 
         MintTestCase[2] memory cases = [
             MintTestCase({
@@ -445,7 +446,6 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
             if (cases[i].transferFee != 0) _activateTransferFee(cases[i].transferFee);
 
             _prepareAssets(caller, cases[i].expectedAssets);
-            uint256 sharesBefore = pool.balanceOf(caller);
 
             // receives underlying
             vm.expectCall(
@@ -476,10 +476,9 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
             // updates balance
             assertEq(
-                pool.balanceOf(user),
-                sharesBefore + cases[i].shares,
-                _testCaseErr(cases[i].name, "Incorrect shares minted to user")
+                pool.balanceOf(user), cases[i].shares, _testCaseErr(cases[i].name, "Incorrect shares minted to user")
             );
+            assertEq(underlying.balanceOf(caller), 0, _testCaseErr(cases[i].name, "Incorrect assets taken from caller"));
 
             // returns correct value
             assertEq(assets, cases[i].expectedAssets, "Incorrect assets returned");
@@ -502,7 +501,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
     /// @notice U:[LP-8]: `withdraw` works as expected
     function test_U_LP_08_withdraw_works_as_expected(address owner) public {
-        vm.assume(owner != address(0) && owner != address(pool));
+        vm.assume(owner != address(0) && owner != address(pool) && owner != address(this));
 
         WithdrawTestCase[3] memory cases = [
             WithdrawTestCase({
@@ -597,7 +596,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
     /// @notice U:[LP-9]: `redeem` works as expected
     function test_U_LP_09_redeem_works_as_expected(address owner) public {
-        vm.assume(owner != address(0) && owner != address(pool));
+        vm.assume(owner != address(0) && owner != address(pool) && owner != address(this));
 
         RedeemTestCase[3] memory cases = [
             RedeemTestCase({

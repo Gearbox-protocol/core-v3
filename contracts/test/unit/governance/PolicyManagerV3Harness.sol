@@ -3,9 +3,9 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {PolicyManagerV3} from "../../../governance/PolicyManagerV3.sol";
+import {PolicyManagerV3, Policy} from "../../../governance/PolicyManagerV3.sol";
 
-contract PolicyManagerInternal is PolicyManagerV3 {
+contract PolicyManagerV3Harness is PolicyManagerV3 {
     constructor(address _addressProvider) PolicyManagerV3(_addressProvider) {}
 
     function checkPolicy(address contractAddress, string memory paramName, uint256 oldValue, uint256 newValue)

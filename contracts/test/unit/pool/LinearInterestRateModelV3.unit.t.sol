@@ -17,21 +17,13 @@ import "../../../interfaces/IExceptions.sol";
 
 import {TestHelper} from "../../lib/helper.sol";
 
-contract LinearInterestRateModelV3UniTest is TestHelper {
+contract LinearInterestRateModelV3UnitTest is TestHelper {
     using Math for uint256;
 
     LinearInterestRateModelV3 irm;
 
     function setUp() public {
-        irm = new LinearInterestRateModelV3(
-            80_00,
-            95_00,
-            10_00,
-            20_00,
-            30_00,
-            40_00,
-            true
-        );
+        irm = new LinearInterestRateModelV3(80_00, 95_00, 10_00, 20_00, 30_00, 40_00, true);
     }
 
     //
@@ -155,14 +147,14 @@ contract LinearInterestRateModelV3UniTest is TestHelper {
 
             vm.expectRevert(IncorrectParameterException.selector);
             irm = new LinearInterestRateModelV3(
-            testCase.U_1,
-             testCase.U_2,
-             testCase.R_base,
-             testCase.R_slope1,
-             testCase.R_slope2,
-             testCase.R_slope3,
-            false
-        );
+                testCase.U_1,
+                testCase.U_2,
+                testCase.R_base,
+                testCase.R_slope1,
+                testCase.R_slope2,
+                testCase.R_slope3,
+                false
+            );
         }
     }
 
@@ -439,14 +431,14 @@ contract LinearInterestRateModelV3UniTest is TestHelper {
             LinearCalculationsCase memory testCase = cases[i];
 
             irm = new LinearInterestRateModelV3(
-            testCase.U_1,
-             testCase.U_2,
-             testCase.R_base,
-             testCase.R_slope1,
-             testCase.R_slope2,
-             testCase.R_slope3,
-             testCase.isBorrowingMoreU2Forbidden
-        );
+                testCase.U_1,
+                testCase.U_2,
+                testCase.R_base,
+                testCase.R_slope1,
+                testCase.R_slope2,
+                testCase.R_slope3,
+                testCase.isBorrowingMoreU2Forbidden
+            );
 
             if (testCase.expectedRevert) {
                 vm.expectRevert(BorrowingMoreThanU2ForbiddenException.selector);

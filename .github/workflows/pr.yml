@@ -33,9 +33,16 @@ jobs:
       - name: Compile contracts
         run: forge build
 
-      - name: Run tests
-        run: forge test
+      - name: Run unit tests
+        run: forge test --mt test_U
         timeout-minutes: 10
+
+      - name: Run integration tests
+        run: forge test --mt test_I
+        timeout-minutes: 10
+
+      - name: Run gas tests
+        run: forge test --mt test_G -vv
 
       - name: Perform checks
         run: |
