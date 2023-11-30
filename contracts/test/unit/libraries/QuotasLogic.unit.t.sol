@@ -10,8 +10,8 @@ import {TestHelper} from "../../lib/helper.sol";
 import {RAY, WAD} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 /// @title Quotas logic test
-/// @notice [BM]: Unit tests for QuotasLogic library
-contract QuotasLogicTest is TestHelper {
+/// @notice U:[BM]: Unit tests for QuotasLogic library
+contract QuotasLogicUnitTest is TestHelper {
     TokenQuotaParams params;
     AccountQuota accountQuota;
 

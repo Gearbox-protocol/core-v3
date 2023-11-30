@@ -4,17 +4,24 @@
 pragma solidity ^0.8.17;
 
 import {CreditManagerV3, CreditAccountInfo} from "../../../credit/CreditManagerV3.sol";
+import {USDT_Transfer} from "../../../traits/USDT_Transfer.sol";
 
 import {CollateralDebtData, CollateralCalcTask, CollateralTokenData} from "../../../interfaces/ICreditManagerV3.sol";
+import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
-contract CreditManagerV3Harness is CreditManagerV3 {
+contract CreditManagerV3Harness is CreditManagerV3, USDT_Transfer {
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    constructor(address _addressProvider, address _pool, string memory _name)
+    bool _enableTransferFee;
+
+    constructor(address _addressProvider, address _pool, string memory _name, bool enableTransferFee)
         CreditManagerV3(_addressProvider, _pool, _name)
-    {}
+        USDT_Transfer(IPoolV3(_pool).underlyingToken())
+    {
+        _enableTransferFee = enableTransferFee;
+    }
 
     function setReentrancy(uint8 _status) external {
         _reentrancyStatus = _status;
@@ -121,5 +128,13 @@ contract CreditManagerV3Harness is CreditManagerV3 {
 
     function setCollateralTokensCount(uint8 _collateralTokensCount) external {
         collateralTokensCount = _collateralTokensCount;
+    }
+
+    function _amountWithFee(uint256 amount) internal view override returns (uint256) {
+        return _enableTransferFee ? _amountUSDTWithFee(amount) : amount;
+    }
+
+    function _amountMinusFee(uint256 amount) internal view override returns (uint256) {
+        return _enableTransferFee ? _amountUSDTMinusFee(amount) : amount;
     }
 }

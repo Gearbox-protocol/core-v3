@@ -18,7 +18,7 @@ import "../../lib/constants.sol";
 
 /// @title CreditAccountHelper logic test
 /// @notice U:[CAH]: Unit tests for credit account helper
-contract CreditAccountHelperTest is TestHelper, BalanceHelper {
+contract CreditAccountHelperUnitTest is TestHelper, BalanceHelper {
     using CreditAccountHelper for ICreditAccountBase;
 
     address creditAccount;

@@ -3,8 +3,7 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {PolicyManagerV3, Policy} from "../../../governance/PolicyManagerV3.sol";
-import {PolicyManagerInternal} from "../../mocks/governance/PolicyManagerInternal.sol";
+import {PolicyManagerV3Harness, Policy} from "./PolicyManagerV3Harness.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // TEST
@@ -16,10 +15,10 @@ import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMoc
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
-contract PolicyManagerTest is Test {
+contract PolicyManagerV3UnitTest is Test {
     AddressProviderV3ACLMock public addressProvider;
 
-    PolicyManagerInternal public policyManager;
+    PolicyManagerV3Harness public policyManager;
 
     event SetPolicy(bytes32 indexed policyHash, bool enabled);
     event SetGroup(address indexed contractAddress, string indexed group);
@@ -28,7 +27,7 @@ contract PolicyManagerTest is Test {
         vm.prank(CONFIGURATOR);
         addressProvider = new AddressProviderV3ACLMock();
 
-        policyManager = new PolicyManagerInternal(address(addressProvider));
+        policyManager = new PolicyManagerV3Harness(address(addressProvider));
     }
 
     ///

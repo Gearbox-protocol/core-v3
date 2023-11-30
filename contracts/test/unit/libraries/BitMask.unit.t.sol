@@ -10,7 +10,7 @@ import {TestHelper} from "../../lib/helper.sol";
 
 /// @title BitMask logic test
 /// @notice U:[BM]: Unit tests for bit mask library
-contract BitMaskTest is TestHelper {
+contract BitMaskUnitTest is TestHelper {
     using BitMask for uint256;
 
     /// @notice U:[BM-1]: `calcIndex` reverts for zero value

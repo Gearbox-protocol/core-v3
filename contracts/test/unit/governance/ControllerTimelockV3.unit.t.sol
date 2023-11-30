@@ -29,7 +29,7 @@ import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMoc
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
-contract ControllerTimelockTest is Test, IControllerTimelockV3Events {
+contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
     AddressProviderV3ACLMock public addressProvider;
 
     ControllerTimelockV3 public controllerTimelock;

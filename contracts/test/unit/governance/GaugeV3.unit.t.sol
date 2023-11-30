@@ -27,7 +27,7 @@ import {TestHelper} from "../../lib/helper.sol";
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
-contract GauageTest is TestHelper, IGaugeV3Events {
+contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
     address gearToken;
     address underlying;
 
@@ -207,8 +207,7 @@ contract GauageTest is TestHelper, IGaugeV3Events {
         vm.prank(CONFIGURATOR);
         gauge.changeQuotaMinRate(token, minRate);
 
-        (uint16 _minRate, uint16 _maxRate, uint96 _totalVotesLpSide, uint96 _totalVotesCaSide) =
-            gauge.quotaRateParams(token);
+        (uint16 _minRate,,,) = gauge.quotaRateParams(token);
 
         assertEq(_minRate, minRate, "Incorrect minRate");
     }
@@ -242,8 +241,7 @@ contract GauageTest is TestHelper, IGaugeV3Events {
         vm.prank(CONFIGURATOR);
         gauge.changeQuotaMaxRate(token, maxRate);
 
-        (uint16 _minRate, uint16 _maxRate, uint96 _totalVotesLpSide, uint96 _totalVotesCaSide) =
-            gauge.quotaRateParams(token);
+        (, uint16 _maxRate,,) = gauge.quotaRateParams(token);
 
         assertEq(_maxRate, maxRate, "Incorrect maxRate");
     }

@@ -9,7 +9,6 @@ import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMoc
 import {AccountFactoryMock} from "../../mocks/core/AccountFactoryMock.sol";
 
 import {CreditManagerV3Harness} from "./CreditManagerV3Harness.sol";
-import {CreditManagerV3Harness_USDT} from "./CreditManagerV3Harness_USDT.sol";
 import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // LIBS & TRAITS
@@ -139,9 +138,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         poolQuotaKeeperMock = new PoolQuotaKeeperMock(address(poolMock), underlying);
         poolMock.setPoolQuotaKeeper(address(poolQuotaKeeperMock));
 
-        creditManager = (isFeeToken)
-            ? new CreditManagerV3Harness_USDT(address(addressProvider), address(poolMock), name)
-            : new CreditManagerV3Harness(address(addressProvider), address(poolMock), name);
+        creditManager = new CreditManagerV3Harness(address(addressProvider), address(poolMock), name, isFeeToken);
         creditManager.setCreditFacade(address(this));
 
         creditManager.setFees(
@@ -236,8 +233,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
     function _addTokensBatch(address creditAccount, uint8 numberOfTokens, uint256 balance) internal {
         for (uint8 i = 0; i < numberOfTokens; ++i) {
-            ERC20Mock t =
-            new ERC20Mock(string.concat("new token ", Strings.toString(i+1)),string.concat("NT-", Strings.toString(i+1)), 18);
+            ERC20Mock t = new ERC20Mock(
+                string.concat("new token ", Strings.toString(i + 1)), string.concat("NT-", Strings.toString(i + 1)), 18
+            );
 
             _addToken({token: address(t), lt: 80_00});
 
@@ -784,9 +782,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 tokenTestSuite.mint(tokenTestSuite.addressOf(Tokens.LINK), creditAccount, _case.linkBalance);
 
                 vm.startPrank(CONFIGURATOR);
-                for (uint256 i; i < _case.quotedTokens.length; ++i) {
+                for (uint256 j; j < _case.quotedTokens.length; ++j) {
                     creditManager.setQuotedMask(
-                        creditManager.quotedTokensMask() | creditManager.getTokenMaskOrRevert(_case.quotedTokens[i])
+                        creditManager.quotedTokensMask() | creditManager.getTokenMaskOrRevert(_case.quotedTokens[j])
                     );
                 }
 
@@ -880,10 +878,10 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             }
 
             {
-                (uint256 debt,, uint128 cumulativeQuotaInterest, uint128 quotaFees,,,,) =
+                (uint256 accountDebt,, uint128 cumulativeQuotaInterest, uint128 quotaFees,,,,) =
                     creditManager.creditAccountInfo(creditAccount);
 
-                assertEq(debt, 0, _testCaseErr("Debt is not zero"));
+                assertEq(accountDebt, 0, _testCaseErr("Debt is not zero"));
                 assertEq(cumulativeQuotaInterest, 1, _testCaseErr("cumulativeQuotaInterest is not 1"));
                 assertEq(quotaFees, 0, _testCaseErr("quotaFees is not zero"));
             }
@@ -2109,43 +2107,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 );
                 vm.revertTo(snapshot);
             }
-        }
-    }
-
-    /// @dev U:[CM-23]: calcDebtAndCollateral adds withrawal for particilar cases correctly
-    function test_U_CM_23_calcDebtAndCollateral_adds_withrawal_for_particilar_cases_correctly()
-        public
-        creditManagerTest
-    {
-        uint256 debt = DAI_ACCOUNT_AMOUNT;
-        uint256 amount1 = 10_000;
-        uint256 amount2 = 999;
-
-        _collateralTestSetup(debt);
-
-        address creditAccount = DUMB_ADDRESS;
-        tokenTestSuite.mint({token: underlying, to: creditAccount, amount: 10_000});
-
-        for (uint256 i = 0; i < 2; ++i) {
-            bool setFlag = i == 1;
-            caseName =
-                string.concat(caseName, "withdrawal computation. WITHDRAWAL FLAG is ", setFlag ? "true" : "flase");
-
-            creditManager.setCreditAccountInfoMap({
-                creditAccount: creditAccount,
-                debt: debt,
-                cumulativeIndexLastUpdate: vars.get("cumulativeIndexLastUpdate"),
-                cumulativeQuotaInterest: uint128(vars.get("INITIAL_INTEREST") + 1),
-                quotaFees: 0,
-                enabledTokensMask: UNDERLYING_TOKEN_MASK,
-                flags: 0,
-                borrower: USER
-            });
-
-            CollateralDebtData memory collateralDebtData = creditManager.calcDebtAndCollateral({
-                creditAccount: creditAccount,
-                task: CollateralCalcTask.DEBT_COLLATERAL
-            });
         }
     }
 
