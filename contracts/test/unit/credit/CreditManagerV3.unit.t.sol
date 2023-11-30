@@ -166,8 +166,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         isFeeToken = underlyingIsFeeToken;
         underlying = tokenTestSuite.addressOf(underlyingIsFeeToken ? Tokens.USDT : Tokens.DAI);
 
-        uint256 _tokenFee = underlyingIsFeeToken ? 30_00 : 0;
-        uint256 _maxTokenFee = underlyingIsFeeToken ? 1000000000000 * oneUSDT : 0;
+        uint256 _tokenFee = underlyingIsFeeToken ? 20 : 0;
+        uint256 _maxTokenFee = underlyingIsFeeToken ? 50 * oneUSDT : 0;
 
         _setFee(_tokenFee, _maxTokenFee);
 
@@ -581,15 +581,12 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     uint256 constant LINK_MULTIPLIER = 4;
 
     /// @dev U:[CM-8]: liquidate credit account works as expected
-    function test_U_CM_08_liquidateCreditAccount_correctly_makes_payments() public withFeeTokenCase creditManagerTest {
-        uint256 debt = DAI_ACCOUNT_AMOUNT;
-
-        vm.assume(debt > 1_000);
-        vm.assume(debt < 10 ** 10 * (10 ** _decimals(underlying)));
-
-        if (isFeeToken) {
-            _setFee(debt % 50_00, debt / (debt % 49 + 1));
-        }
+    function test_U_CM_08_liquidateCreditAccount_correctly_makes_payments(uint256 debt)
+        public
+        withFeeTokenCase
+        creditManagerTest
+    {
+        debt = bound(debt, 10 ** 8, 1e10 * 10 ** _decimals(underlying));
 
         address[] memory hasQuotedTokens = new address[](2);
 
@@ -613,7 +610,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         LiquidateAccountTestCase[7] memory cases = [
             LiquidateAccountTestCase({
-                name: "Liquidate account with profit, undelying only",
+                name: "Liquidate account with profit, underlying only",
                 debt: debt,
                 accruedInterest: 0,
                 accruedFees: 0,
@@ -626,12 +623,12 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 isExpired: false,
                 // EXPECTED
                 expectedRevert: false,
-                amountToLiquidator: debt * 2 * DEFAULT_LIQUIDATION_PREMIUM / PERCENTAGE_FACTOR,
+                amountToLiquidator: debt * 2 - debt * 2 * (PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM) / PERCENTAGE_FACTOR,
                 enabledTokensMaskAfter: UNDERLYING_TOKEN_MASK,
                 expectedSetLimitsToZero: false
             }),
             LiquidateAccountTestCase({
-                name: "Liquidate account with profit, undelying only, revert not enough remaing funds",
+                name: "Liquidate account with profit, underlying only, revert not enough remaing funds",
                 debt: debt,
                 accruedInterest: 0,
                 accruedFees: 0,
@@ -703,7 +700,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 expectedSetLimitsToZero: false
             }),
             LiquidateAccountTestCase({
-                name: "Liquidate account with loss, without quotaTokens, undelying only",
+                name: "Liquidate account with loss, without quotaTokens, underlying only",
                 debt: debt,
                 accruedInterest: 0,
                 accruedFees: 0,
@@ -721,7 +718,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 expectedSetLimitsToZero: false
             }),
             LiquidateAccountTestCase({
-                name: "Liquidate account with loss, with quotaTokens, undelying only",
+                name: "Liquidate account with loss, with quotaTokens, underlying only",
                 debt: debt,
                 accruedInterest: 0,
                 accruedFees: 0,
@@ -808,7 +805,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                         token: underlying,
                         from: creditAccount,
                         to: FRIEND,
-                        amount: _case.amountToLiquidator
+                        amount: _amountMinusFee(_case.amountToLiquidator)
                     });
                 }
 
@@ -854,7 +851,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 expectBalance({
                     token: underlying,
                     holder: address(poolMock),
-                    expectedBalance: poolBalanceBefore + amountToPool,
+                    expectedBalance: poolBalanceBefore + _amountMinusFee(amountToPool),
                     reason: "Pool balance invariant"
                 });
 
@@ -936,7 +933,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         withFeeTokenCase
         creditManagerTest
     {
-        vm.assume(amount < 10 ** 10 * (10 ** _decimals(underlying)));
+        amount = bound(amount, 0, 1e10 * 10 ** _decimals(underlying));
 
         address creditAccount = accountFactory.usedAccount();
 
@@ -1032,9 +1029,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         withFeeTokenCase
         creditManagerTest
     {
-        vm.assume(_amount < 10 ** 10 * (10 ** _decimals(underlying)));
+        _amount = bound(_amount, 0, 1e10 * 10 ** _decimals(underlying));
 
-        // uint256 amount = 10000;
         uint8 testCase = uint8(_amount % 3);
 
         /// @notice for stack optimisation
@@ -1193,11 +1189,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         withFeeTokenCase
         creditManagerTest
     {
-        vm.assume(_amount < 10 ** 10 * (10 ** _decimals(underlying)));
-        vm.assume(_amount > 1);
-
         /// @notice for stack optimisation
-        uint256 amount = _amount;
+        uint256 amount = bound(_amount, 1, 1e10 * 10 ** _decimals(underlying));
 
         address creditAccount = accountFactory.usedAccount();
 
@@ -1613,7 +1606,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         /// @notice This test doesn't check collateral calculation, it proves that function
         /// reverts if it's not enough collateral otherwise it stores enabledTokensMask to storage
 
-        vm.assume(amount > 0 && amount < 1e20 * WAD);
+        amount = bound(amount, 1, 1e20 * WAD);
 
         // uint256 amount = DAI_ACCOUNT_AMOUNT;
         address creditAccount = DUMB_ADDRESS;
@@ -1720,7 +1713,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         /// @notice This test doesn't check collateral calculation, it proves that function
         /// reverts if it's not enough collateral otherwise it stores enabledTokensMask to storage
 
-        vm.assume(amount > 0 && amount < 1e20 * WAD);
+        amount = bound(amount, 1, 1e20 * WAD);
 
         // uint256 amount = DAI_ACCOUNT_AMOUNT;
         address creditAccount = DUMB_ADDRESS;
@@ -2377,8 +2370,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     //
 
     /// @dev U:[CM-34]: getTokenMaskOrRevert works correctly
+    /// forge-config: default.fuzz.runs = 100
     function test_U_CM_34_getTokenMaskOrRevert_works_correctly(uint8 numberOfTokens) public creditManagerTest {
-        vm.assume(numberOfTokens < 255 - 1);
+        vm.assume(numberOfTokens < 254);
 
         address creditAccount = DUMB_ADDRESS;
         _addTokensBatch({creditAccount: creditAccount, numberOfTokens: numberOfTokens, balance: 2});
@@ -2581,8 +2575,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     ) public creditManagerTest {
         vm.startPrank(CONFIGURATOR);
 
-        vm.assume(ltInitial < PERCENTAGE_FACTOR);
-        vm.assume(ltFinal < PERCENTAGE_FACTOR);
+        ltInitial = uint16(bound(ltInitial, 0, PERCENTAGE_FACTOR));
+        ltFinal = uint16(bound(ltFinal, 0, PERCENTAGE_FACTOR));
+
         vm.assume(uint256(timestampRampStart) + uint256(rampDuration) < type(uint40).max);
         // uint16 ltFinal = 2312;
         // uint40 timestampRampStart = 1233;
