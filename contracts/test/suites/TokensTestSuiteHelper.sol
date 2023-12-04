@@ -4,6 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 
@@ -15,6 +16,8 @@ import {ERC20Mock} from "../mocks/token/ERC20Mock.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract TokensTestSuiteHelper is Test, ITokenTestSuite {
+    using SafeERC20 for IERC20;
+
     uint256 chainId;
     address public wethToken;
 
@@ -49,8 +52,9 @@ contract TokensTestSuiteHelper is Test, ITokenTestSuite {
     }
 
     function approve(address token, address holder, address targetContract, uint256 amount) public override {
-        vm.prank(holder);
-        IERC20(token).approve(targetContract, amount);
+        vm.startPrank(holder);
+        IERC20(token).safeApprove(targetContract, amount);
+        vm.stopPrank();
     }
 
     function burn(address token, address from, uint256 amount) public override {
