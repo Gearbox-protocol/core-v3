@@ -362,10 +362,10 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
         (uint96 quota, uint192 cumulativeIndexLU) =
             poolQuotaKeeper.getQuota(creditAccount, tokenTestSuite.addressOf(Tokens.LINK));
 
-        assertEq(uint256(quota), 1, "Quota was not set to 0");
+        assertEq(uint256(quota), 0, "Quota was not set to 0");
 
         (quota, cumulativeIndexLU) = poolQuotaKeeper.getQuota(creditAccount, tokenTestSuite.addressOf(Tokens.USDT));
-        assertEq(uint256(quota), 1, "Quota was not set to 0");
+        assertEq(uint256(quota), 0, "Quota was not set to 0");
     }
 
     /// @dev I:[CMQ-07]: calcDebtAndCollateral correctly counts quota interest
@@ -416,17 +416,9 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
         expectedTotalDebt += (quotaUsdt * 500) / PERCENTAGE_FACTOR;
         expectedTotalDebt += (expectedTotalDebt - borrowedAmount) * feeInterest / PERCENTAGE_FACTOR;
 
-        CollateralDebtData memory cdd1 =
-            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_ONLY);
+        CollateralDebtData memory cdd = creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_ONLY);
 
-        uint256 diff = cdd1.calcTotalDebt() > expectedTotalDebt
-            ? cdd1.calcTotalDebt() - expectedTotalDebt
-            : expectedTotalDebt - cdd1.calcTotalDebt();
-
-        emit log_uint(expectedTotalDebt);
-        emit log_uint(cdd1.calcTotalDebt());
-
-        assertLe(diff, 1, "Total debt updated incorrectly");
+        assertEq(cdd.calcTotalDebt(), expectedTotalDebt, "Total debt updated incorrectly");
     }
 
     /// @dev I:[CMQ-08]: Credit Manager zeroes limits on quoted tokens upon incurring a loss
@@ -467,7 +459,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
         for (uint256 i = 0; i < quotedTokens.length; ++i) {
             (,,, uint96 limit,,) = poolQuotaKeeper.getTokenQuotaParams(quotedTokens[i]);
 
-            assertEq(limit, 1, "Limit was not zeroed");
+            assertEq(limit, 0, "Limit was not zeroed");
         }
     }
 
