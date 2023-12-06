@@ -263,7 +263,7 @@ library CollateralLogic {
             unchecked {
                 valueUSD = convertToUSDFn(priceOracle, balance - 1, token); // U:[CLL-1]
             }
-            weightedValueUSD = Math.min(valueUSD, quotaUSD) * liquidationThreshold / PERCENTAGE_FACTOR; // U:[CLL-1]
+            weightedValueUSD = Math.min(valueUSD * liquidationThreshold / PERCENTAGE_FACTOR, quotaUSD); // U:[CLL-1]
             nonZeroBalance = true; // U:[CLL-1]
         }
     }

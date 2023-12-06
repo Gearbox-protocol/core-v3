@@ -171,7 +171,7 @@ library CreditLogic {
     ///      - Debt principal, for example, only decreases if all previous components were fully repaid
     ///      - The new credit account's interest index stays the same if base interest was not repaid at all,
     ///        is set to the current interest index if base interest was repaid fully, and is a solution to
-    ///        the equation `debt * (indexNow / indexLastUpdate - 1) - delta = debt * (indexNow / indexNew)`
+    ///        the equation `debt * (indexNow / indexLastUpdate - 1) - delta = debt * (indexNow / indexNew - 1)`
     ///        when only `delta` of accrued interest was repaid
     /// @param amount Amount of debt to repay
     /// @param debt Debt principal before repayment

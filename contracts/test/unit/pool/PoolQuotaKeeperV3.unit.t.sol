@@ -621,7 +621,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
                 token1TotalQuoted: uint96(WAD),
                 token2TotalQuoted: uint96(2 * WAD),
                 setLimitsToZero: false,
-                expectedRevenueChange: -int96(uint96(WAD) - 1) / 10
+                expectedRevenueChange: -int96(uint96(WAD)) / 10
             }),
             RemoveQuotasCase({
                 token1Quota: uint96(WAD / 2),
@@ -629,7 +629,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
                 token1TotalQuoted: uint96(WAD),
                 token2TotalQuoted: uint96(2 * WAD),
                 setLimitsToZero: false,
-                expectedRevenueChange: -int96(uint96(WAD / 2) - 1) / 10 - int96(uint96(WAD / 3) - 1) / 5
+                expectedRevenueChange: -int96(uint96(WAD / 2)) / 10 - int96(uint96(WAD / 3)) / 5
             }),
             RemoveQuotasCase({
                 token1Quota: 1,
@@ -705,14 +705,14 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
                 );
             }
 
-            if (cases[i].token1Quota > 1) {
+            if (cases[i].token1Quota != 0) {
                 vm.expectEmit(true, true, false, false);
-                emit UpdateQuota(creditAccount, token1, -int96(cases[i].token1Quota - 1));
+                emit UpdateQuota(creditAccount, token1, -int96(cases[i].token1Quota));
             }
 
-            if (cases[i].token2Quota > 1) {
+            if (cases[i].token2Quota != 0) {
                 vm.expectEmit(true, true, false, false);
-                emit UpdateQuota(creditAccount, token2, -int96(cases[i].token1Quota - 1));
+                emit UpdateQuota(creditAccount, token2, -int96(cases[i].token1Quota));
             }
 
             vm.prank(address(creditManagerMock));
@@ -722,30 +722,22 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
                 (uint96 quota1,) = pqk.getQuotaAndOutstandingInterest(creditAccount, token1);
                 (uint96 quota2,) = pqk.getQuotaAndOutstandingInterest(creditAccount, token2);
 
-                assertEq(quota1, cases[i].token1Quota > 0 ? 1 : 0, "Quota 1 was not removed");
+                assertEq(quota1, 0, "Quota 1 was not removed");
 
-                assertEq(quota2, cases[i].token2Quota > 0 ? 1 : 0, "Quota 2 was not removed");
+                assertEq(quota2, 0, "Quota 2 was not removed");
             }
 
             (,,, uint96 totalQuoted1, uint96 limit1,) = pqk.getTokenQuotaParams(token1);
             (,,, uint96 totalQuoted2, uint96 limit2,) = pqk.getTokenQuotaParams(token2);
 
-            assertEq(
-                totalQuoted1,
-                cases[i].token1TotalQuoted - cases[i].token1Quota + (cases[i].token1Quota > 0 ? 1 : 0),
-                "Incorrect new total quoted 1"
-            );
+            assertEq(totalQuoted1, cases[i].token1TotalQuoted - cases[i].token1Quota, "Incorrect new total quoted 1");
 
-            assertEq(
-                totalQuoted2,
-                cases[i].token2TotalQuoted - cases[i].token2Quota + (cases[i].token2Quota > 0 ? 1 : 0),
-                "Incorrect new total quoted 2"
-            );
+            assertEq(totalQuoted2, cases[i].token2TotalQuoted - cases[i].token2Quota, "Incorrect new total quoted 2");
 
             if (cases[i].setLimitsToZero) {
-                assertEq(limit1, 1, "Limit 1 was not set to zero");
+                assertEq(limit1, 0, "Limit 1 was not set to zero");
 
-                assertEq(limit2, 1, "Limit 2 was not set to zero");
+                assertEq(limit2, 0, "Limit 2 was not set to zero");
             }
 
             vm.revertTo(snapshot);

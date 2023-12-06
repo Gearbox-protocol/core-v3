@@ -37,7 +37,6 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
     // ----------------------- //
 
     /// @notice U:[PO-1]: `_getPrice` works as expected
-    /// forge-config: default.fuzz.runs = 5000
     function test_U_PO_01_getPrice_works_as_expected(
         int256 answer,
         uint256 updatedAt,
@@ -77,7 +76,6 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
     }
 
     /// @notice U:[PO-2]: `_getPriceFeedParams` works as expected
-    /// forge-config: default.fuzz.runs = 5000
     function test_U_PO_02_getPriceFeedParams_works_as_expected(address token, PriceFeedParams memory expectedParams)
         public
     {
