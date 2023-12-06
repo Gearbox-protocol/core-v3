@@ -1825,7 +1825,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 stEthBalance: 0,
                 usdcBalance: 0,
                 expectedTotalValueUSD: 2 * vars.get("LINK_QUOTA_IN_USD"),
-                expectedTwvUSD: vars.get("LINK_QUOTA_IN_USD") * vars.get("LINK_LT") / PERCENTAGE_FACTOR,
+                expectedTwvUSD: vars.get("LINK_QUOTA_IN_USD"),
                 expectedEnabledTokensMask: LINK_TOKEN_MASK
             }),
             CollateralCalcTestCase({
