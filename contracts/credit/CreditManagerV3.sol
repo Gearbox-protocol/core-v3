@@ -106,11 +106,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     uint16 internal liquidationDiscountExpired;
 
     /// @dev Active credit account which is an account adapters can interfact with
-    /// @custom:invariant `_activeCreditAccount == INACTIVE_CREDIT_ACCOUNT_ADDRESS`
     address internal _activeCreditAccount = INACTIVE_CREDIT_ACCOUNT_ADDRESS;
 
     /// @notice Bitmask of quoted tokens
-    /// @custom:invariant `quotedTokensMask % 2 == 0`
     uint256 public override quotedTokensMask;
 
     /// @dev Mapping collateral token mask => data (packed address and LT parameters)
@@ -328,6 +326,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     ///         (underlying mask on increase, zero on decrease)
     /// @return tokensToDisable Tokens that should be disabled after the operation
     ///         (zero on increase, underlying mask on decrease if account has no underlying after repayment)
+    /// @custom:expects Credit facade ensures that `creditAccount` is opened in this credit manager
     function manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)
         external
         override
@@ -351,7 +350,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 ? CollateralCalcTask.GENERIC_PARAMS
                 : CollateralCalcTask.DEBT_ONLY,
             useSafePrices: false
-        }); // U:[CM-10, 11]
+        });
 
         uint256 newCumulativeIndex;
         if (action == ManageDebtAction.INCREASE_DEBT) {
@@ -363,11 +362,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             }); // U:[CM-10]
 
             _poolLendCreditAccount(amount, creditAccount); // U:[CM-10]
-            tokensToEnable = UNDERLYING_TOKEN_MASK; // U:[CM-10]
+            tokensToEnable = UNDERLYING_TOKEN_MASK; // U:[CM-12C]
         } else {
             uint256 maxRepayment = _amountWithFee(collateralDebtData.calcTotalDebt());
             if (amount >= maxRepayment) {
-                amount = maxRepayment;
+                amount = maxRepayment; // U:[CM-11]
             }
 
             ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amount}); // U:[CM-11]
@@ -391,15 +390,19 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     quotaFees: currentCreditAccountInfo.quotaFees,
                     feeInterest: feeInterest
                 }); // U:[CM-11]
+            }
+
+            if (collateralDebtData.quotedTokens.length != 0) {
+                // zero-debt is a special state that disables collateral checks so having quotas on
+                // the account should be forbidden as they entail debt in a form of quota interest
+                if (newDebt == 0) revert DebtToZeroWithActiveQuotasException(); // U:[CM-11A]
 
                 // quota interest is accrued in credit manager regardless of whether anything has been repaid,
                 // so they are also accrued in the quota keeper to keep the contracts in sync
-                // this step is skipped for the full repayment case since quota interest must have been accrued
-                // when quotas were disabled
                 IPoolQuotaKeeperV3(collateralDebtData._poolQuotaKeeper).accrueQuotaInterest({
                     creditAccount: creditAccount,
                     tokens: collateralDebtData.quotedTokens
-                });
+                }); // U:[CM-11A]
             }
 
             _poolRepayCreditAccount(collateralDebtData.debt - newDebt, profit, 0); // U:[CM-11]
@@ -407,19 +410,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             currentCreditAccountInfo.cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // U:[CM-11]
 
             if (IERC20(underlying).safeBalanceOf({account: creditAccount}) <= 1) {
-                tokensToDisable = UNDERLYING_TOKEN_MASK; // U:[CM-11]
+                tokensToDisable = UNDERLYING_TOKEN_MASK; // U:[CM-12C]
             }
         }
 
-        // zero-debt is a special state that disables collateral checks so having quotas on
-        // the account should be forbidden as they entail debt in a form of quota interest
-        if (newDebt == 0 && collateralDebtData.quotedTokens.length != 0) {
-            revert DebtToZeroWithActiveQuotasException();
-        }
-
-        currentCreditAccountInfo.debt = newDebt; // U:[CM-10, 11]
-        currentCreditAccountInfo.lastDebtUpdate = uint64(block.number); // U:[CM-10, 11]
-        currentCreditAccountInfo.cumulativeIndexLastUpdate = newCumulativeIndex; // U:[CM-10, 11]
+        currentCreditAccountInfo.debt = newDebt; // U:[CM-10,11]
+        currentCreditAccountInfo.lastDebtUpdate = uint64(block.number); // U:[CM-10,11]
+        currentCreditAccountInfo.cumulativeIndexLastUpdate = newCumulativeIndex; // U:[CM-10,11]
     }
 
     /// @notice Adds `amount` of `payer`'s `token` as collateral to `creditAccount`
@@ -648,7 +645,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param task Calculation mode, see `CollateralCalcTask` for details, can't be `FULL_COLLATERAL_CHECK_LAZY`
     /// @return cdd A struct with debt and collateral data
     /// @dev Reverts if account is not opened in this credit manager
-    /// @custom:invariant From `creditAccountInfo[creditAccount].debt == 0` it follows that `cdd.totalDebtUSD == 0`
     function calcDebtAndCollateral(address creditAccount, CollateralCalcTask task)
         external
         view
@@ -716,15 +712,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }); // U:[CM-21]
         cdd.cumulativeQuotaInterest += currentCreditAccountInfo.cumulativeQuotaInterest - 1; // U:[CM-21]
 
-        cdd.accruedInterest = cdd.cumulativeQuotaInterest;
-        cdd.accruedInterest += CreditLogic.calcAccruedInterest({
+        cdd.accruedInterest = CreditLogic.calcAccruedInterest({
             amount: cdd.debt,
             cumulativeIndexLastUpdate: cdd.cumulativeIndexLastUpdate,
             cumulativeIndexNow: cdd.cumulativeIndexNow
-        }); // U:[CM-21]
+        });
+        cdd.accruedFees = currentCreditAccountInfo.quotaFees + cdd.accruedInterest * feeInterest / PERCENTAGE_FACTOR;
 
-        cdd.accruedFees = currentCreditAccountInfo.quotaFees;
-        cdd.accruedFees += cdd.accruedInterest * feeInterest / PERCENTAGE_FACTOR; // U:[CM-21]
+        cdd.accruedInterest += cdd.cumulativeQuotaInterest; // U:[CM-21]
+        cdd.accruedFees += cdd.cumulativeQuotaInterest * feeInterest / PERCENTAGE_FACTOR; // U:[CM-21]
 
         if (task == CollateralCalcTask.DEBT_ONLY) {
             return cdd; // U:[CM-21]

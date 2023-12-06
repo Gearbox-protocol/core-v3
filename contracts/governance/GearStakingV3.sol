@@ -40,7 +40,6 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     uint256 public immutable override firstEpochTimestamp;
 
     /// @dev Mapping from user to their stake amount and tokens available for voting
-    /// @custom:invariant For every user `u`, `voteLockData[u].available <= voteLockData[u].totalStaked`
     mapping(address => UserVoteLockData) internal voteLockData;
 
     /// @dev Mapping from user to their future withdrawal amounts

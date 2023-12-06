@@ -145,23 +145,21 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             fees = uint128(uint256(uint96(quotaChange)) * quotaIncreaseFee / PERCENTAGE_FACTOR); // U:[PQK-15]
 
             newQuoted = quoted + uint96(quotaChange);
-            if (quoted <= 1 && newQuoted > 1) {
+            if (quoted == 0 && newQuoted != 0) {
                 enableToken = true; // U:[PQK-15]
             }
 
             tokenQuotaParams.totalQuoted = totalQuoted + uint96(quotaChange); // U:[PQK-15]
         } else {
             if (quotaChange == type(int96).min) {
-                unchecked {
-                    quotaChange = (quoted == 0) ? int96(0) : -int96(quoted - 1);
-                }
+                quotaChange = -int96(quoted);
             }
 
             uint96 absoluteChange = uint96(-quotaChange);
             newQuoted = quoted - absoluteChange;
             tokenQuotaParams.totalQuoted -= absoluteChange; // U:[PQK-15]
 
-            if (quoted > 1 && newQuoted <= 1) {
+            if (quoted != 0 && newQuoted == 0) {
                 disableToken = true; // U:[PQK-15]
             }
         }
@@ -201,20 +199,16 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
 
             uint96 quoted = accountQuota.quota;
-            if (quoted > 1) {
-                unchecked {
-                    --quoted;
-                }
-
+            if (quoted != 0) {
                 uint16 rate = tokenQuotaParams.rate;
                 quotaRevenueChange += QuotasLogic.calcQuotaRevenueChange(rate, -int256(uint256(quoted))); // U:[PQK-16]
                 tokenQuotaParams.totalQuoted -= quoted; // U:[PQK-16]
-                accountQuota.quota = 1; // U:[PQK-16]
+                accountQuota.quota = 0; // U:[PQK-16]
                 emit UpdateQuota({creditAccount: creditAccount, token: token, quotaChange: -int96(quoted)});
             }
 
             if (setLimitsToZero) {
-                _setTokenLimit({tokenQuotaParams: tokenQuotaParams, token: token, limit: 1}); // U:[PQK-16]
+                _setTokenLimit({tokenQuotaParams: tokenQuotaParams, token: token, limit: 0}); // U:[PQK-16]
             }
 
             unchecked {

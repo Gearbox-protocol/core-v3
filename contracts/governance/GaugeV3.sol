@@ -40,9 +40,6 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     mapping(address => QuotaRateParams) public override quotaRateParams;
 
     /// @notice Mapping from (user, token) to vote amounts submitted by `user` for each side
-    /// @custom:invariant For every user `u` and every token `t`,
-    ///                   `userTokenVotes[u][t].votesLpSide <= quotaRateParams[t].totalVotesLpSide` and
-    ///                   `userTokenVotes[u][t].votesCaSide <= quotaRateParams[t].totalVotesCaSide`
     mapping(address => mapping(address => UserVotes)) public override userTokenVotes;
 
     /// @notice GEAR staking and voting contract
