@@ -3,10 +3,12 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AdapterType} from "@gearbox-protocol/sdk-gov/contracts/AdapterType.sol";
 import {IAdapter} from "@gearbox-protocol/core-v2/contracts/interfaces/IAdapter.sol";
 
 import {ICreditManagerV3} from "../../interfaces/ICreditManagerV3.sol";
+import {TargetAttacker} from "./TargetAttacker.sol";
 
 /// @title Adapter Mock
 contract AdapterAttacker is IAdapter {
@@ -23,7 +25,7 @@ contract AdapterAttacker is IAdapter {
         targetContract = _targetContract;
     }
 
-    function executeAllApprove(address tokenIn, address tokenOut, bytes memory callData)
+    function executeAllApprove(uint256 _seed)
         external
         returns (uint256 tokensToEnable, uint256 tokensToDisable, bytes memory result)
     {
@@ -34,11 +36,27 @@ contract AdapterAttacker is IAdapter {
             _approveToken(token, type(uint256).max);
         }
 
-        result = _execute(callData);
+        result = _execute(abi.encodeCall(TargetAttacker.act, (_seed)));
 
         for (uint256 i; i < len; ++i) {
             (address token,) = ICreditManagerV3(creditManager).collateralTokenByMask(1 << i);
             _approveToken(token, 1);
+        }
+
+        address tokenIn = TargetAttacker(targetContract).tokenIn();
+        if (tokenIn != address(0)) {
+            uint256 balance = IERC20(tokenIn).balanceOf(TargetAttacker(targetContract).creditAccount());
+            if (balance > 1) {
+                tokensToEnable = ICreditManagerV3(creditManager).getTokenMaskOrRevert(tokenIn);
+            }
+        }
+
+        address tokenOut = TargetAttacker(targetContract).tokenOut();
+        if (tokenOut != address(0)) {
+            uint256 balance = IERC20(tokenOut).balanceOf(TargetAttacker(targetContract).creditAccount());
+            if (balance <= 1) {
+                tokensToDisable = ICreditManagerV3(creditManager).getTokenMaskOrRevert(tokenOut);
+            }
         }
     }
 

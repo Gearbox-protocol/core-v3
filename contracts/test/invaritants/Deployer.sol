@@ -41,6 +41,13 @@ contract GearboxInstance is IntegrationTestHelper {
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.allowAdapter(address(adapterAttacker));
+
+        uint256 cTokensQty = creditManager.collateralTokensCount();
+
+        for (uint256 i; i < cTokensQty; ++i) {
+            (address token,) = creditManager.collateralTokenByMask(1 << i);
+            tokenTestSuite.mint(token, address(targetAttacker), type(uint80).max);
+        }
     }
 
     function mf() external {

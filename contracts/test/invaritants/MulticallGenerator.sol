@@ -90,7 +90,7 @@ contract MulticallGenerator is Random {
     // todo: 2. make executable multicalls
 
     function generateRandomCall() public returns (MultiCall memory call) {
-        function() returns (MultiCall memory, bool)[9] memory fns = [
+        function() returns (MultiCall memory, bool)[10] memory fns = [
             randomAddCollateral,
             randomUpdateQuota,
             randomSetFullCheckParams,
@@ -99,7 +99,8 @@ contract MulticallGenerator is Random {
             randomWithdrawCollateral,
             randomEnabledToken,
             randomDisabledToken,
-            randomRevokeAdapterAllowances
+            randomRevokeAdapterAllowances,
+            randomExternalCall
         ];
 
         bool success;
@@ -316,6 +317,18 @@ contract MulticallGenerator is Random {
     // any token and revocations with be chosen
     function randomRevokeAdapterAllowances() internal returns (MultiCall memory, bool success) {
         if (!followPermissions || (permissions & REVOKE_ALLOWANCES_PERMISSION != 0)) {}
+    }
+
+    function randomExternalCall() internal returns (MultiCall memory, bool success) {
+        if (!followPermissions || (permissions & EXTERNAL_CALLS_PERMISSION != 0)) {
+            return (
+                MultiCall({
+                    target: address(adapterAttacker),
+                    callData: abi.encodeCall(AdapterAttacker.executeAllApprove, (getNextRandomNumber()))
+                }),
+                true
+            );
+        }
     }
 
     //
