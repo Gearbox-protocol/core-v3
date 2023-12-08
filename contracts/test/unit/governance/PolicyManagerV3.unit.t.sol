@@ -385,13 +385,10 @@ contract PolicyManagerV3UnitTest is Test {
         uint16 minPctChangeDown,
         uint16 minPctChangeUp
     ) public {
-        vm.assume(oldValue > 0);
-        vm.assume(newValue2 > 0);
-
-        vm.assume(oldValue < type(uint128).max);
-        vm.assume(newValue1 < type(uint128).max);
-        vm.assume(newValue2 < type(uint128).max);
-        vm.assume(newValue3 < type(uint128).max);
+        oldValue = bound(oldValue, 1, type(uint128).max);
+        newValue1 = bound(newValue1, 0, type(uint128).max);
+        newValue2 = bound(newValue2, 1, type(uint128).max);
+        newValue3 = bound(newValue3, 0, type(uint128).max);
 
         Policy memory policy = Policy({
             enabled: false,
@@ -460,13 +457,10 @@ contract PolicyManagerV3UnitTest is Test {
         uint16 maxPctChangeDown,
         uint16 maxPctChangeUp
     ) public {
-        vm.assume(oldValue > 0);
-        vm.assume(newValue2 > 0);
-
-        vm.assume(oldValue < type(uint128).max);
-        vm.assume(newValue1 < type(uint128).max);
-        vm.assume(newValue2 < type(uint128).max);
-        vm.assume(newValue3 < type(uint128).max);
+        oldValue = bound(oldValue, 1, type(uint128).max);
+        newValue1 = bound(newValue1, 0, type(uint128).max);
+        newValue2 = bound(newValue2, 1, type(uint128).max);
+        newValue3 = bound(newValue3, 0, type(uint128).max);
 
         Policy memory policy = Policy({
             enabled: false,

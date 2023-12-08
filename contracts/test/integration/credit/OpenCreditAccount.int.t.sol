@@ -261,7 +261,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         creditTest
     {
         amount = bound(amount, 10000, DAI_ACCOUNT_AMOUNT);
-        vm.assume(token1 > 0 && token1 < creditManager.collateralTokensCount());
+        token1 = uint8(bound(token1, 1, creditManager.collateralTokensCount() - 1));
 
         tokenTestSuite.mint(Tokens.DAI, address(creditManager.pool()), type(uint96).max);
 
@@ -373,7 +373,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
         assertEq(creditAccount, expectedCreditAccount, "Incorrecct credit account address");
 
-        (uint256 debt, uint256 cumulativeIndexLastUpdate,,,,,,) = creditManager.creditAccountInfo(creditAccount);
+        (uint256 debt,,,,,,,) = creditManager.creditAccountInfo(creditAccount);
 
         assertEq(debt, 0, "Incorrect borrowed amount set in CA");
 
