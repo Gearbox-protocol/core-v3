@@ -12,276 +12,195 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/C
 import {RAY, WAD} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 /// @title Credit logic unit test
-/// @notice U:[BM]: Unit tests for CreditLogic library
+/// @notice U:[CL]: Unit tests for `CreditLogic` library
 contract CreditLogicUnitTest is TestHelper {
     uint256 public constant TEST_FEE = 50;
 
-    address[8] tokens;
-    uint16[8] tokenLTsStorage;
-    uint256[8] tokenBalancesStorage;
-    uint256[8] tokenPricesStorage;
+    // ------------- //
+    // FUZZING TESTS //
+    // ------------- //
 
-    function _prepareTokens() internal {
-        for (uint256 i; i < 8; ++i) {
-            tokens[i] = address(new GeneralMock());
-        }
-    }
-
-    function _amountWithoutFee(uint256 a) internal pure returns (uint256) {
-        return a;
-    }
-
-    function _amountPlusFee(uint256 a) internal pure returns (uint256) {
-        return a * (TEST_FEE + PERCENTAGE_FACTOR) / PERCENTAGE_FACTOR;
-    }
-
-    function _amountMinusFee(uint256 a) internal pure returns (uint256) {
-        return a * (PERCENTAGE_FACTOR - TEST_FEE) / PERCENTAGE_FACTOR;
-    }
-
-    function _calcDiff(uint256 a, uint256 b) internal pure returns (uint256 diff) {
-        diff = a > b ? a - b : b - a;
-    }
-
-    function _getTokenArray() internal view returns (address[] memory tokensMemory) {
-        tokensMemory = new address[](8);
-
-        for (uint256 i = 0; i < 8; ++i) {
-            tokensMemory[i] = tokens[i];
-        }
-    }
-
-    function _getLTArray() internal view returns (uint16[] memory tokenLTsMemory) {
-        tokenLTsMemory = new uint16[](8);
-
-        for (uint256 i = 0; i < 8; ++i) {
-            tokenLTsMemory[i] = tokenLTsStorage[i];
-        }
-    }
-
-    function _getBalanceArray() internal view returns (uint256[] memory tokenBalancesMemory) {
-        tokenBalancesMemory = new uint256[](8);
-
-        for (uint256 i = 0; i < 8; ++i) {
-            tokenBalancesMemory[i] = tokenBalancesStorage[i];
-        }
-    }
-
-    function _getPriceArray() internal view returns (uint256[] memory tokenPricesMemory) {
-        tokenPricesMemory = new uint256[](8);
-
-        for (uint256 i = 0; i < 8; ++i) {
-            tokenPricesMemory[i] = tokenPricesStorage[i];
-        }
-    }
-
-    function _getCollateralHintsIdx(uint256 rand) internal pure returns (uint256[] memory collateralHints) {
-        uint256 len = uint256(keccak256(abi.encode(rand))) % 9;
-
-        uint256[] memory nums = new uint256[](8);
-        collateralHints = new uint256[](len);
-
-        for (uint256 i = 0; i < 8; ++i) {
-            nums[i] = i;
-        }
-
-        for (uint256 i = 0; i < len; ++i) {
-            rand = uint256(keccak256(abi.encode(rand)));
-            uint256 idx = rand % (8 - i);
-            collateralHints[i] = 2 ** nums[idx];
-            nums[idx] = nums[7 - i];
-        }
-    }
-
-    function _getMasksFromIdx(uint256[] memory idxArray) internal pure returns (uint256[] memory masksArray) {
-        masksArray = new uint256[](idxArray.length);
-
-        for (uint256 i = 0; i < idxArray.length; ++i) {
-            masksArray[i] = 2 ** idxArray[i];
-        }
-    }
-
-    function _calcTotalDebt(
-        uint256 debt,
-        uint256 indexNow,
-        uint256 indexOpen,
-        uint256 quotaInterest,
-        uint256 quotaFees,
-        uint16 feeInterest
-    ) internal pure returns (uint256) {
-        return debt + quotaFees
-            + (debt * indexNow / indexOpen + quotaInterest - debt) * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR;
-    }
-
-    /// @notice U:[CL-1]: `calcAccruedInterest` computes interest correctly
-    function test_U_CL_01_calcAccruedInterest_computes_interest_with_small_error(
-        uint256 debt,
-        uint256 cumulativeIndexAtOpen,
-        uint256 borrowRate,
+    /// @notice U:[CL-1]: `calcAccruedInterest` works correctly
+    function test_U_CL_01_calcAccruedInterest_works_correctly(
+        uint256 amount,
+        uint256 indexLastUpdate,
+        uint256 interestRate,
         uint256 timeDiff
     ) public {
-        debt = 100 + debt % (2 ** 128 - 101);
-        cumulativeIndexAtOpen = RAY + cumulativeIndexAtOpen % (99 * RAY);
-        borrowRate = borrowRate % (10 * RAY);
-        timeDiff = timeDiff % (2000 days);
+        amount = bound(amount, 0, type(uint128).max);
+        indexLastUpdate = bound(indexLastUpdate, RAY, 10 * RAY);
+        interestRate = bound(interestRate, RAY / 1000, RAY);
+        timeDiff = bound(timeDiff, 0, 2000 days);
 
         uint256 timestampLastUpdate = block.timestamp;
-
         vm.warp(block.timestamp + timeDiff);
+        uint256 indexNow = _getIndexNow(indexLastUpdate, interestRate, timestampLastUpdate);
 
-        uint256 interest = CreditLogic.calcLinearGrowth(debt * borrowRate, timestampLastUpdate) / RAY;
-
-        uint256 cumulativeIndexNow =
-            cumulativeIndexAtOpen * (RAY + CreditLogic.calcLinearGrowth(borrowRate, timestampLastUpdate)) / RAY;
-
-        uint256 diff =
-            _calcDiff(CreditLogic.calcAccruedInterest(debt, cumulativeIndexAtOpen, cumulativeIndexNow), interest);
-
-        assertLe(RAY * diff / debt, 10000, "Interest error is more than 10 ** -22");
+        // accrued interest computed by pool and by credit manager is roughly the same
+        uint256 expectedInterest = amount * CreditLogic.calcLinearGrowth(interestRate, timestampLastUpdate) / RAY;
+        uint256 interest = CreditLogic.calcAccruedInterest(amount, indexLastUpdate, indexNow);
+        assertApproxEqAbs(interest, expectedInterest, amount / 1e18);
     }
 
-    /// @notice U:[CL-2]: `calcIncrease` outputs new interest that is old interest with at most a small error
-    function test_U_CL_02_calcIncrease_preserves_interest(
+    /// @notice U:[CL-2]: `calcIncrease` works correctly
+    function test_U_CL_02_calcIncrease_works_correctly(
+        uint256 amount,
         uint256 debt,
-        uint256 indexNow,
-        uint256 indexAtOpen,
-        uint256 delta
+        uint256 indexLastUpdate,
+        uint256 interestRate,
+        uint256 timeDiff
     ) public {
-        vm.assume(debt > 100);
-        vm.assume(debt < 2 ** 128 - 1);
-        vm.assume(delta < 2 ** 128 - 1);
-        vm.assume(debt + delta <= 2 ** 128 - 1);
+        amount = bound(amount, 0, type(uint128).max);
+        debt = bound(debt, 0, type(uint128).max);
+        indexLastUpdate = bound(indexLastUpdate, RAY, 10 * RAY);
+        interestRate = bound(interestRate, RAY / 1000, RAY);
+        timeDiff = bound(timeDiff, 0, 2000 days);
 
-        indexNow = indexNow < RAY ? indexNow + RAY : indexNow;
-        indexAtOpen = indexAtOpen < RAY ? indexAtOpen + RAY : indexAtOpen;
+        uint256 timestampLastUpdate = block.timestamp;
+        vm.warp(block.timestamp + timeDiff);
+        uint256 indexNow = _getIndexNow(indexLastUpdate, interestRate, timestampLastUpdate);
 
-        vm.assume(indexNow <= 100 * RAY);
-        vm.assume(indexNow >= indexAtOpen);
-        vm.assume(indexNow - indexAtOpen < 10 * RAY);
+        (uint256 newDebt, uint256 newIndex) = CreditLogic.calcIncrease(amount, debt, indexNow, indexLastUpdate);
 
-        uint256 interest = uint256((debt * indexNow) / indexAtOpen - debt);
+        // new debt is correct
+        assertEq(newDebt, debt + amount, "New debt is incorrect");
 
-        vm.assume(interest > 1);
+        // index increases but not beyond current index
+        assertGe(newIndex, indexLastUpdate, "New index is smaller than old index");
+        assertLe(newIndex, indexNow, "New index is greater than current index");
 
-        (uint256 newDebt, uint256 newIndex) = CreditLogic.calcIncrease(delta, debt, indexNow, indexAtOpen);
-
-        assertEq(newDebt, debt + delta, "Debt principal not updated correctly");
-
-        uint256 newInterestError = (newDebt * indexNow) / newIndex - newDebt - ((debt * indexNow) / indexAtOpen - debt);
-
-        uint256 newTotalDebt = (newDebt * indexNow) / newIndex;
-
-        assertLe((RAY * newInterestError) / newTotalDebt, 10000, "Interest error is larger than 10 ** -23");
+        // base interest stays roughly the same (errors in favor of the pool)
+        uint256 baseInterest = CreditLogic.calcAccruedInterest(debt, indexLastUpdate, indexNow);
+        uint256 newBaseInterest = CreditLogic.calcAccruedInterest(newDebt, newIndex, indexNow);
+        assertGe(newBaseInterest, baseInterest, "Base interest decreased");
+        assertLe(newBaseInterest, baseInterest + newDebt / 1e18, "Base interest increased too much");
     }
 
-    /// @notice U:[CL-3A]: `calcDecrease` outputs newTotalDebt that is different by delta with at most a small error
-    function test_U_CL_03A_calcDecrease_outputs_correct_new_total_debt(
+    /// @notice U:[CL-3A]: `calcDecrease` works correctly
+    function test_U_CL_03_calcDecrease_works_correctly(
+        uint256 amount,
         uint256 debt,
-        uint256 indexNow,
-        uint256 indexAtOpen,
-        uint256 delta,
+        uint256 indexLastUpdate,
+        uint256 interestRate,
+        uint256 timeDiff,
         uint128 quotaInterest,
         uint128 quotaFees,
         uint16 feeInterest
     ) public {
-        debt = WAD + debt % (2 ** 128 - WAD - 1);
-        delta = delta % (2 ** 128 - 1);
-        quotaInterest = quotaInterest % (2 ** 96 - 1);
-        quotaFees = quotaInterest % (2 ** 96 - 1);
+        debt = bound(debt, 1, type(uint128).max);
+        indexLastUpdate = bound(indexLastUpdate, RAY, 10 * RAY);
+        interestRate = bound(interestRate, RAY / 1000, RAY);
+        timeDiff = bound(timeDiff, 0, 2000 days);
+        quotaInterest = uint128(bound(quotaInterest, 0, type(uint96).max));
+        quotaFees = uint128(bound(quotaFees, 0, type(uint96).max));
+        feeInterest = uint16(bound(feeInterest, 0, PERCENTAGE_FACTOR));
 
-        vm.assume(debt + delta <= 2 ** 128 - 1);
+        uint256 timestampLastUpdate = block.timestamp;
+        vm.warp(block.timestamp + timeDiff);
+        uint256 indexNow = _getIndexNow(indexLastUpdate, interestRate, timestampLastUpdate);
 
-        feeInterest %= PERCENTAGE_FACTOR + 1;
+        amount = bound(amount, 0, _getTotalDebt(debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest));
 
-        indexNow = indexNow < RAY ? indexNow + RAY : indexNow;
-        indexAtOpen = indexAtOpen < RAY ? indexAtOpen + RAY : indexAtOpen;
-
-        indexNow %= 100 * RAY + 1;
-
-        vm.assume(indexNow >= indexAtOpen);
-        vm.assume(indexNow - indexAtOpen < 10 * RAY);
-
-        uint256 interest = uint256((debt * indexNow) / indexAtOpen - debt);
-
-        vm.assume(interest > 1);
-
-        if (delta > debt + interest + quotaInterest + quotaFees) {
-            delta %= debt + interest + quotaInterest + quotaFees;
-        }
-
-        (uint256 newDebt, uint256 newCumulativeIndex,, uint256 cumulativeQuotaInterest, uint256 newQuotaFees) =
-            CreditLogic.calcDecrease(delta, debt, indexNow, indexAtOpen, quotaInterest, quotaFees, feeInterest);
-
-        uint256 oldTotalDebt = _calcTotalDebt(debt, indexNow, indexAtOpen, quotaInterest, quotaFees, feeInterest);
-        uint256 newTotalDebt =
-            _calcTotalDebt(newDebt, indexNow, newCumulativeIndex, cumulativeQuotaInterest, newQuotaFees, feeInterest);
-
-        uint256 debtError = _calcDiff(oldTotalDebt, newTotalDebt + delta);
-        uint256 rel = oldTotalDebt > newTotalDebt ? oldTotalDebt : newTotalDebt;
-
-        debtError = debtError > 10 ? debtError : 0;
-
-        assertLe((RAY * debtError) / rel, 10 ** 5, "Error is larger than 10 ** -22");
+        _calcDecrease__debtChecks(amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
+        _calcDecrease__profitChecks(amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
+        _calcDecrease__interestChecks(amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
+        _calcDecrease__quotasChecks(amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
     }
 
-    /// @notice U:[CL-3B]: `calcDecrease` correctly outputs newDebt and profit
-    function test_U_CL_03B_calcDecrease_outputs_correct_newDebt_profit(
+    function _calcDecrease__debtChecks(
+        uint256 amount,
         uint256 debt,
         uint256 indexNow,
-        uint256 indexAtOpen,
-        uint256 delta,
+        uint256 indexLastUpdate,
         uint128 quotaInterest,
         uint128 quotaFees,
         uint16 feeInterest
-    ) public {
-        debt = WAD + debt % (2 ** 128 - WAD - 1);
-        delta = delta % (2 ** 128 - 1);
-        quotaInterest = quotaInterest % (2 ** 96 - 1);
-        quotaFees = quotaInterest % (2 ** 96 - 1);
+    ) internal {
+        (uint256 newDebt, uint256 newIndex,, uint128 newQuotaInterest, uint128 newQuotaFees) =
+            CreditLogic.calcDecrease(amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
 
-        vm.assume(debt + delta <= 2 ** 128 - 1);
+        uint256 totalDebt = _getTotalDebt(debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
+        uint256 newTotalDebt = _getTotalDebt(newDebt, indexNow, newIndex, newQuotaInterest, newQuotaFees, feeInterest);
 
-        feeInterest %= PERCENTAGE_FACTOR + 1;
+        assertLe(newDebt, debt, "Debt increased");
+        assertLe(newTotalDebt, totalDebt, "Total debt increased");
+        assertApproxEqAbs(totalDebt - newTotalDebt, amount, 2 + totalDebt / 1e18, "Incorrect amount repaid");
 
-        indexNow = indexNow < RAY ? indexNow + RAY : indexNow;
-        indexAtOpen = indexAtOpen < RAY ? indexAtOpen + RAY : indexAtOpen;
-
-        indexNow %= 100 * RAY + 1;
-
-        vm.assume(indexNow >= indexAtOpen);
-        vm.assume(indexNow - indexAtOpen < 10 * RAY);
-
-        uint256 interest = uint256((debt * indexNow) / indexAtOpen - debt);
-
-        vm.assume(interest > 1);
-
-        if (delta > debt + interest + quotaInterest + quotaFees) {
-            delta %= debt + interest + quotaInterest + quotaFees;
+        if (amount < totalDebt) {
+            assertGt(newTotalDebt, 0, "Zero total debt after partial repayment");
         }
+    }
 
+    function _calcDecrease__profitChecks(
+        uint256 amount,
+        uint256 debt,
+        uint256 indexNow,
+        uint256 indexLastUpdate,
+        uint128 quotaInterest,
+        uint128 quotaFees,
+        uint16 feeInterest
+    ) internal {
         (uint256 newDebt,, uint256 profit,,) =
-            CreditLogic.calcDecrease(delta, debt, indexNow, indexAtOpen, quotaInterest, quotaFees, feeInterest);
+            CreditLogic.calcDecrease(amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
 
-        uint256 expectedProfit;
+        uint256 accruedFees = _getAccruedFees(debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
+        // NOTE: + 1 because we do have a rounding issue however it can't be used to harm the protocol
+        // namely, this line rounds up: `profit += amountToRepay - amountToPool;`
+        assertLe(profit, accruedFees + 1, "Profit more than it can be");
 
-        if (delta > quotaFees) {
-            uint256 remainingDelta = delta - quotaFees;
-            expectedProfit = quotaFees;
-            expectedProfit += remainingDelta
-                > (interest + quotaInterest) * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR
-                ? (interest + quotaInterest) * feeInterest / PERCENTAGE_FACTOR
-                : remainingDelta * feeInterest / (PERCENTAGE_FACTOR + feeInterest);
-        } else {
-            expectedProfit = delta;
+        if (newDebt < debt) {
+            assertEq(profit, accruedFees, "Incorrect profit after repaying all interest and fees");
         }
-
-        assertLe(_calcDiff(expectedProfit, profit), 100, "Profit error too large");
-
-        uint256 expectedRepaid =
-            delta > interest + quotaInterest + expectedProfit ? delta - interest - quotaInterest - expectedProfit : 0;
-
-        assertLe(_calcDiff(expectedRepaid, debt - newDebt), 100, "New debt error too large");
     }
+
+    function _calcDecrease__interestChecks(
+        uint256 amount,
+        uint256 debt,
+        uint256 indexNow,
+        uint256 indexLastUpdate,
+        uint128 quotaInterest,
+        uint128 quotaFees,
+        uint16 feeInterest
+    ) internal {
+        (uint256 newDebt, uint256 newIndex,,,) =
+            CreditLogic.calcDecrease(amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
+
+        assertGe(newIndex, indexLastUpdate, "New index is smaller than old index");
+        assertLe(newIndex, indexNow, "New index is greater than current index");
+
+        uint256 baseInterest = CreditLogic.calcAccruedInterest(debt, indexLastUpdate, indexNow);
+        uint256 newBaseInterest = CreditLogic.calcAccruedInterest(newDebt, newIndex, indexNow);
+        assertLe(newBaseInterest, baseInterest, "Base interest increased");
+
+        if (newDebt < debt) {
+            assertEq(newIndex, indexNow, "Incorrect index after repaying all interest and fees");
+        }
+    }
+
+    function _calcDecrease__quotasChecks(
+        uint256 amount,
+        uint256 debt,
+        uint256 indexNow,
+        uint256 indexLastUpdate,
+        uint128 quotaInterest,
+        uint128 quotaFees,
+        uint16 feeInterest
+    ) internal {
+        (uint256 newDebt,,, uint128 newQuotaInterest, uint128 newQuotaFees) =
+            CreditLogic.calcDecrease(amount, debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
+
+        assertLe(newQuotaInterest, quotaInterest, "Quota interest increased");
+        assertLe(newQuotaFees, quotaFees, "Quota fees increased");
+
+        if (newDebt < debt) {
+            assertEq(newQuotaInterest, 0, "Quota interest not zero after repaying all interest and fees");
+            assertEq(newQuotaFees, 0, "Quota fees not zero after repaying all interest and fees");
+        }
+    }
+
+    // ---------- //
+    // CASE TESTS //
+    // ---------- //
 
     struct CalcLiquidationPaymentsTestCase {
         string name;
@@ -449,7 +368,7 @@ contract CreditLogicUnitTest is TestHelper {
                 cdd,
                 cases[i].feeLiquidation,
                 cases[i].liquidationDiscount,
-                cases[i].withFee ? _amountPlusFee : _amountWithoutFee,
+                cases[i].withFee ? _amountWithFee : _amountWithoutFee,
                 cases[i].withFee ? _amountMinusFee : _amountWithoutFee
             );
 
@@ -538,199 +457,55 @@ contract CreditLogicUnitTest is TestHelper {
         }
     }
 
-    function _collateralTokenByMask(uint256 mask, bool computeLT) internal view returns (address token, uint16 lt) {
-        for (uint256 i = 0; i < 8; ++i) {
-            if (mask == (1 << i)) {
-                token = tokens[i];
-                lt = computeLT ? tokenLTsStorage[i] : 0;
-            }
-        }
+    // ------- //
+    // HELPERS //
+    // ------- //
 
-        if (token == address(0)) {
-            revert("Token not found");
-        }
+    function _getIndexNow(uint256 indexLastUpdate, uint256 interestRate, uint256 timestampLastUpdate)
+        internal
+        view
+        returns (uint256)
+    {
+        return indexLastUpdate * (RAY + CreditLogic.calcLinearGrowth(interestRate, timestampLastUpdate)) / RAY;
     }
 
-    function _convertToUSD(address, address token) internal view returns (uint256) {
-        uint256 tokenIdx;
-        for (uint256 i = 0; i < 8; ++i) {
-            if (tokens[i] == token) tokenIdx = i;
-        }
-        return tokenPricesStorage[tokenIdx] * tokenBalancesStorage[tokenIdx] / WAD;
+    function _getAccruedFees(
+        uint256 debt,
+        uint256 indexNow,
+        uint256 indexLastUpdate,
+        uint256 quotaInterest,
+        uint256 quotaFees,
+        uint16 feeInterest
+    ) internal pure returns (uint256) {
+        uint256 baseInterest = CreditLogic.calcAccruedInterest(debt, indexLastUpdate, indexNow);
+        // forgefmt: disable-next-item
+        return quotaFees
+            + quotaInterest * feeInterest / PERCENTAGE_FACTOR
+            + baseInterest * feeInterest / PERCENTAGE_FACTOR;
     }
 
-    //     /// @notice U:[CL-6]: `calcQuotedTokensCollateral` fuzzing test
-    //     function test_CL_06_calcQuotedTokensCollateral_fuzz_test(
-    //         uint256[8] memory tokenBalances,
-    //         uint256[8] memory tokenPrices,
-    //         uint256[8] memory tokenQuotas,
-    //         uint256 limit,
-    //         uint16[8] memory lts
-    //     ) public {
-    //         _prepareTokens();
+    function _getTotalDebt(
+        uint256 debt,
+        uint256 indexNow,
+        uint256 indexLastUpdate,
+        uint256 quotaInterest,
+        uint256 quotaFees,
+        uint16 feeInterest
+    ) internal pure returns (uint256) {
+        uint256 baseInterest = CreditLogic.calcAccruedInterest(debt, indexLastUpdate, indexNow);
+        return debt + baseInterest + quotaInterest
+            + _getAccruedFees(debt, indexNow, indexLastUpdate, quotaInterest, quotaFees, feeInterest);
+    }
 
-    //         CollateralDebtData memory cdd;
+    function _amountWithoutFee(uint256 a) internal pure returns (uint256) {
+        return a;
+    }
 
-    //         address creditAccount = makeAddr("CREDIT_ACCOUNT");
-    //         address underlying = makeAddr("UNDERLYING");
+    function _amountWithFee(uint256 a) internal pure returns (uint256) {
+        return a * (TEST_FEE + PERCENTAGE_FACTOR) / PERCENTAGE_FACTOR;
+    }
 
-    //         for (uint256 i = 0; i < 8; ++i) {
-    //             tokenBalances[i] = tokenBalances[i] % (WAD * 10 ** 9);
-    //             tokenQuotas[i] = tokenQuotas[i] % (WAD * 10 ** 9);
-    //             lts[i] = lts[i] % 9451;
-    //             tokenPrices[i] = 10 ** 5 + tokenPrices[i] % (100000 * 10 ** 8);
-
-    //             emit log_string("TOKEN");
-    //             emit log_uint(i);
-    //             emit log_string("BALANCE");
-    //             emit log_uint(tokenBalances[i]);
-    //             emit log_string("QUOTA");
-    //             emit log_uint(tokenQuotas[i]);
-    //             emit log_string("LT");
-    //             emit log_uint(lts[i]);
-    //             emit log_string("TOKEN PRICE");
-    //             emit log_uint(tokenPrices[i]);
-
-    //             vm.mockCall(tokens[i], abi.encodeCall(IERC20.balanceOf, (creditAccount)), abi.encode(tokenBalances[i]));
-    //         }
-
-    //         tokenBalancesStorage = tokenBalances;
-    //         tokenPricesStorage = tokenPrices;
-    //         tokenLTsStorage = lts;
-
-    //         cdd.quotedTokens = _getTokenArray();
-    //         cdd.quotedLts = _getLTArray();
-
-    //         {
-    //             uint256[] memory quotas = new uint256[](8);
-
-    //             for (uint256 i = 0; i < 8; ++i) {
-    //                 quotas[i] = tokenQuotas[i];
-    //             }
-
-    //             cdd.quotas = quotas;
-    //         }
-
-    //         (cdd.totalValueUSD, cdd.twvUSD) = CreditLogic.calcQuotedTokensCollateral(
-    //             cdd, creditAccount, 10 ** 8 * RAY / WAD, limit, _convertToUSD, address(0)
-    //         );
-
-    //         uint256 twvExpected;
-    //         uint256 totalValueExpected;
-    //         uint256 interestExpected;
-
-    //         for (uint256 i = 0; i < 8; ++i) {
-    //             uint256 balanceValue = tokenBalances[i] * tokenPrices[i] / WAD;
-    //             uint256 quotaValue = tokenQuotas[i] / 10 ** 10;
-    //             totalValueExpected += balanceValue;
-    //             twvExpected += (balanceValue < quotaValue ? balanceValue : quotaValue) * lts[i] / PERCENTAGE_FACTOR;
-
-    //             if (twvExpected >= limit) break;
-    //         }
-
-    //         assertLe(_calcDiff(cdd.twvUSD, twvExpected), 1, "Incorrect twv");
-
-    //         assertEq(cdd.totalValueUSD, totalValueExpected, "Incorrect total value");
-    //     }
-
-    //     /// @notice U:[CL-7]: `calcNonQuotedTokensCollateral` fuzzing test
-    //     function test_CL_07_calcNonQuotedTokensCollateral_fuzz_test(
-    //         uint256 collateralHintsRand,
-    //         uint256 tokensToCheck,
-    //         uint256[8] memory tokenBalances,
-    //         uint256[8] memory tokenPrices,
-    //         uint256 limit,
-    //         uint16[8] memory lts
-    //     ) public {
-    //         _prepareTokens();
-
-    //         tokensToCheck %= 2 ** 8;
-
-    //         emit log_string("LIMIT");
-    //         emit log_uint(limit);
-
-    //         for (uint256 i = 0; i < 8; ++i) {
-    //             tokenBalances[i] = tokenBalances[i] % (WAD * 10 ** 9);
-    //             lts[i] = lts[i] % 9451;
-    //             tokenPrices[i] = 10 ** 5 + tokenPrices[i] % (100000 * 10 ** 8);
-
-    //             emit log_string("TOKEN");
-    //             emit log_uint(i);
-    //             emit log_string("BALANCE");
-    //             emit log_uint(tokenBalances[i]);
-    //             emit log_string("LT");
-    //             emit log_uint(lts[i]);
-    //             emit log_string("TOKEN PRICE");
-    //             emit log_uint(tokenPrices[i]);
-    //             emit log_string("CHECKED");
-    //             emit log_uint(tokensToCheck & (1 << i) == 0 ? 0 : 1);
-
-    //             vm.mockCall(
-    //                 tokens[i], abi.encodeCall(IERC20.balanceOf, (makeAddr("CREDIT_ACCOUNT"))), abi.encode(tokenBalances[i])
-    //             );
-    //         }
-
-    //         uint256[] memory colHints = _getCollateralHintsIdx(collateralHintsRand);
-
-    //         emit log_string("COLLATERAL HINTS");
-    //         for (uint256 i = 0; i < colHints.length; ++i) {
-    //             emit log_uint(colHints[i]);
-    //         }
-
-    //         tokenBalancesStorage = tokenBalances;
-    //         tokenPricesStorage = tokenPrices;
-    //         tokenLTsStorage = lts;
-
-    //         (uint256 totalValueUSD, uint256 twvUSD, uint256 tokensToDisable) = CreditLogic.calcNonQuotedTokensCollateral(
-    //             makeAddr("CREDIT_ACCOUNT"),
-    //             limit,
-    //             _getMasksFromIdx(colHints),
-    //             _convertToUSD,
-    //             _collateralTokenByMask,
-    //             tokensToCheck,
-    //             address(0)
-    //         );
-
-    //         uint256 twvExpected;
-    //         uint256 totalValueExpected;
-    //         uint256 tokensToDisableExpected;
-
-    //         for (uint256 i = 0; i < colHints.length; ++i) {
-    //             uint256 idx = colHints[i];
-
-    //             if (tokensToCheck & (1 << idx) != 0) {
-    //                 if (tokenBalances[idx] > 1) {
-    //                     uint256 balanceValue = tokenBalances[idx] * tokenPrices[idx] / WAD;
-    //                     totalValueExpected += balanceValue;
-    //                     twvExpected += balanceValue * lts[idx] / PERCENTAGE_FACTOR;
-
-    //                     if (twvExpected >= limit) break;
-    //                 } else {
-    //                     tokensToDisableExpected += 1 << idx;
-    //                 }
-    //             }
-
-    //             tokensToCheck = tokensToCheck & ~(1 << idx);
-    //         }
-
-    //         for (uint256 i = 0; i < 8; ++i) {
-    //             if (tokensToCheck & (1 << i) != 0) {
-    //                 if (tokenBalances[i] > 1) {
-    //                     uint256 balanceValue = tokenBalances[i] * tokenPrices[i] / WAD;
-    //                     totalValueExpected += balanceValue;
-    //                     twvExpected += balanceValue * lts[i] / PERCENTAGE_FACTOR;
-
-    //                     if (twvExpected >= limit) break;
-    //                 } else {
-    //                     tokensToDisableExpected += 1 << i;
-    //                 }
-    //             }
-    //         }
-
-    //         assertLe(_calcDiff(twvUSD, twvExpected), 1, "Incorrect twv");
-
-    //         assertEq(totalValueUSD, totalValueExpected, "Incorrect total value");
-
-    //         assertEq(tokensToDisable, tokensToDisableExpected, "Incorrect tokens to disable");
-    //     }
+    function _amountMinusFee(uint256 a) internal pure returns (uint256) {
+        return a * (PERCENTAGE_FACTOR - TEST_FEE) / PERCENTAGE_FACTOR;
+    }
 }

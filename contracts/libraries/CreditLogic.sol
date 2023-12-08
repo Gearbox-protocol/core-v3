@@ -209,12 +209,12 @@ library CreditLogic {
         unchecked {
             if (quotaFees != 0) {
                 if (amountToRepay > quotaFees) {
-                    newQuotaFees = 0;
+                    newQuotaFees = 0; // U:[CL-3]
                     amountToRepay -= quotaFees;
-                    profit = quotaFees;
+                    profit = quotaFees; // U:[CL-3]
                 } else {
-                    newQuotaFees = quotaFees - uint128(amountToRepay);
-                    profit = amountToRepay;
+                    newQuotaFees = quotaFees - uint128(amountToRepay); // U:[CL-3]
+                    profit = amountToRepay; // U:[CL-3]
                     amountToRepay = 0;
                 }
             }
@@ -224,18 +224,18 @@ library CreditLogic {
             uint256 quotaProfit = (cumulativeQuotaInterest * feeInterest) / PERCENTAGE_FACTOR;
 
             if (amountToRepay >= cumulativeQuotaInterest + quotaProfit) {
-                amountToRepay -= cumulativeQuotaInterest + quotaProfit; // U:[CL-3B]
-                profit += quotaProfit; // U:[CL-3B]
+                amountToRepay -= cumulativeQuotaInterest + quotaProfit; // U:[CL-3]
+                profit += quotaProfit; // U:[CL-3]
 
-                newCumulativeQuotaInterest = 0; // U:[CL-3A]
+                newCumulativeQuotaInterest = 0; // U:[CL-3]
             } else {
                 // If amount is not enough to repay quota interest + DAO fee, then it is split pro-rata between them
                 uint256 amountToPool = (amountToRepay * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
 
-                profit += amountToRepay - amountToPool; // U:[CL-3B]
-                amountToRepay = 0; // U:[CL-3B]
+                profit += amountToRepay - amountToPool; // U:[CL-3]
+                amountToRepay = 0; // U:[CL-3]
 
-                newCumulativeQuotaInterest = uint128(cumulativeQuotaInterest - amountToPool); // U:[CL-3A]
+                newCumulativeQuotaInterest = uint128(cumulativeQuotaInterest - amountToPool); // U:[CL-3]
             }
         } else {
             newCumulativeQuotaInterest = cumulativeQuotaInterest;
@@ -246,31 +246,31 @@ library CreditLogic {
                 amount: debt,
                 cumulativeIndexLastUpdate: cumulativeIndexLastUpdate,
                 cumulativeIndexNow: cumulativeIndexNow
-            }); // U:[CL-3A]
-            uint256 profitFromInterest = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR; // U:[CL-3A]
+            }); // U:[CL-3]
+            uint256 profitFromInterest = (interestAccrued * feeInterest) / PERCENTAGE_FACTOR; // U:[CL-3]
 
             if (amountToRepay >= interestAccrued + profitFromInterest) {
                 amountToRepay -= interestAccrued + profitFromInterest;
 
-                profit += profitFromInterest; // U:[CL-3B]
+                profit += profitFromInterest; // U:[CL-3]
 
-                newCumulativeIndex = cumulativeIndexNow; // U:[CL-3A]
+                newCumulativeIndex = cumulativeIndexNow; // U:[CL-3]
             } else {
                 // If amount is not enough to repay base interest + DAO fee, then it is split pro-rata between them
                 uint256 amountToPool = (amountToRepay * PERCENTAGE_FACTOR) / (PERCENTAGE_FACTOR + feeInterest);
 
-                profit += amountToRepay - amountToPool; // U:[CL-3B]
-                amountToRepay = 0; // U:[CL-3B]
+                profit += amountToRepay - amountToPool; // U:[CL-3]
+                amountToRepay = 0; // U:[CL-3]
 
                 newCumulativeIndex = (INDEX_PRECISION * cumulativeIndexNow * cumulativeIndexLastUpdate)
                     / (
                         INDEX_PRECISION * cumulativeIndexNow
                             - (INDEX_PRECISION * amountToPool * cumulativeIndexLastUpdate) / debt
-                    ); // U:[CL-3A]
+                    ); // U:[CL-3]
             }
         } else {
-            newCumulativeIndex = cumulativeIndexLastUpdate; // U:[CL-3A]
+            newCumulativeIndex = cumulativeIndexLastUpdate; // U:[CL-3]
         }
-        newDebt = debt - amountToRepay; // U:[CL-3A]
+        newDebt = debt - amountToRepay; // U:[CL-3]
     }
 }
