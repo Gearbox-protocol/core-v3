@@ -242,7 +242,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             t.mint(creditAccount, balance * ((i + 2) % 5));
 
             /// sets price between $0.01 and $60K
-            uint256 randomPrice = (uint256(keccak256(abi.encode(numberOfTokens, i, balance))) % 600_0000) * 10 ** 6;
+            uint256 randomPrice =
+                (uint256(keccak256(abi.encode(numberOfTokens, i, balance))) % (6000000 - 1) + 1) * 10 ** 6;
             priceOracleMock.setPrice(address(t), randomPrice);
         }
     }
@@ -1407,7 +1408,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         amount = bound(amount, 1, 1e20 * WAD);
 
-        // uint256 amount = DAI_ACCOUNT_AMOUNT;
         address creditAccount = DUMB_ADDRESS;
         uint8 numberOfTokens = uint8(amount % 253);
 
@@ -1438,8 +1438,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         CollateralDebtData memory collateralDebtData =
             creditManager.calcDebtAndCollateralFC(creditAccount, CollateralCalcTask.DEBT_COLLATERAL);
 
-        /// @notice fuzzler could find a combination which enabled tokens with zero balances,
-        /// which cause to twvUSD == 0 and arithmetic errr later
+        /// @notice fuzzer could find a combination which enabled tokens with zero balances,
+        /// which causes twvUSD to be 0 and arithmetic error later
         vm.assume(collateralDebtData.twvUSD > 0);
 
         creditManager.setDebt(creditAccount, collateralDebtData.twvUSD + 1);
@@ -2378,9 +2378,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         ltFinal = uint16(bound(ltFinal, 0, PERCENTAGE_FACTOR));
 
         vm.assume(uint256(timestampRampStart) + uint256(rampDuration) < type(uint40).max);
-        // uint16 ltFinal = 2312;
-        // uint40 timestampRampStart = 1233;
-        // uint24 rampDuration = 33;
 
         uint256 snapshot = vm.snapshot();
 

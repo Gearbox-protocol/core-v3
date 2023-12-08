@@ -63,10 +63,12 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
     }
 
     /// @notice U:[AF-2A]: `takeCreditAccount` works correctly when queue has no reusable accounts
-    function test_U_AF_02A_takeCreditAccount_works_correctly_when_queue_has_no_reusable_accounts(uint8 head, uint8 tail)
-        public
-    {
-        (head, tail) = head <= tail ? (head, tail) : (tail, head);
+    function test_U_AF_02A_takeCreditAccount_works_correctly_when_queue_has_no_reusable_accounts(
+        uint40 head,
+        uint40 tail
+    ) public {
+        tail = uint40(bound(tail, 0, 512));
+        head = uint40(bound(head, 0, tail));
         FactoryParams memory fp = accountFactory.factoryParams(creditManager);
         accountFactory.setFactoryParams(creditManager, fp.masterCreditAccount, head, tail);
         if (head < tail) {
@@ -92,11 +94,11 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
     /// @notice U:[AF-2B]: `takeCreditAccount` works correctly when queue has reusable accounts
     function test_U_AF_02B_takeCreditAccount_works_correctly_when_queue_has_reusable_accounts(
         address creditAccount,
-        uint8 head,
-        uint8 tail
+        uint40 head,
+        uint40 tail
     ) public {
-        vm.assume(head != tail);
-        (head, tail) = head < tail ? (head, tail) : (tail, head);
+        tail = uint40(bound(tail, 1, 512));
+        head = uint40(bound(head, 0, tail - 1));
 
         FactoryParams memory fp = accountFactory.factoryParams(creditManager);
         accountFactory.setFactoryParams(creditManager, fp.masterCreditAccount, head, tail);
