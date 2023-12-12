@@ -28,7 +28,7 @@ struct LinearIRMV3DeployParams {
 
 struct PoolV3DeployParams {
     uint16 withdrawalFee;
-    uint256 expectedLiquidityLimit;
+    uint256 totalDebtLimit;
 }
 
 struct BalancerPool {
@@ -56,6 +56,16 @@ struct CreditManagerV3DeployParams {
     uint128 minDebt;
     /// @dev The maximal debt principal amount
     uint128 maxDebt;
+    /// @dev Percentage DAO fee on interest
+    uint16 feeInterest;
+    /// @dev Percentage DAO fee on liquidation amount for normal liquidations
+    uint16 feeLiquidation;
+    /// @dev Liquidation premium for normal liquidations
+    uint16 liquidationPremium;
+    /// @dev Percentage DAO fee on liquidation amount for liquidations due to expiration
+    uint16 feeLiquidationExpired;
+    /// @dev Liquidation premium for liquidations due to expiration
+    uint16 liquidationPremiumExpired;
     /// @dev The initial list of collateral tokens to allow
     CollateralTokenHuman[] collateralTokens;
     /// @dev Address of DegenNFT, address(0) if whitelisted mode is not used
