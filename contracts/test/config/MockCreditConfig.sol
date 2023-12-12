@@ -24,6 +24,7 @@ import {
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 
 import "../lib/constants.sol";
+import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 contract MockCreditConfig is Test, IPoolV3DeployConfig {
     string public id;
@@ -76,11 +77,11 @@ contract MockCreditConfig is Test, IPoolV3DeployConfig {
 
         cp.minDebt = minDebt;
         cp.maxDebt = maxDebt;
-        cp.feeInterest = 2500;
-        cp.feeLiquidation = 150;
-        cp.liquidationPremium = 400;
-        cp.feeLiquidationExpired = 100;
-        cp.liquidationPremiumExpired = 200;
+        cp.feeInterest = DEFAULT_FEE_INTEREST;
+        cp.feeLiquidation = DEFAULT_FEE_LIQUIDATION;
+        cp.liquidationPremium = DEFAULT_LIQUIDATION_PREMIUM;
+        cp.feeLiquidationExpired = DEFAULT_FEE_LIQUIDATION_EXPIRED;
+        cp.liquidationPremiumExpired = DEFAULT_LIQUIDATION_PREMIUM_EXPIRED;
         cp.whitelisted = false;
         cp.expirable = false;
         cp.skipInit = false;
