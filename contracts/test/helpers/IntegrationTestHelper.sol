@@ -345,7 +345,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
         supportsQuotas = anySupportsQuotas ? config.supportsQuotas() : supportsQuotas;
 
-        PoolFactory pf = new PoolFactory(address(addressProvider),  config, underlying, supportsQuotas, tokenTestSuite);
+        PoolFactory pf = new PoolFactory(address(addressProvider), config, underlying, supportsQuotas, tokenTestSuite);
 
         pool = pf.pool();
         gauge = pf.gauge();
@@ -364,10 +364,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     }
 
     function _deployMockCreditAndPool() internal {
-        IPoolV3DeployConfig creditConfig = new MockCreditConfig(
-            tokenTestSuite,
-            underlyingT
-        );
+        IPoolV3DeployConfig creditConfig = new MockCreditConfig(tokenTestSuite, underlyingT);
 
         _deployCreditAndPool(creditConfig);
     }
@@ -384,11 +381,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         configAccountAmount = creditAccountAmount;
         CreditManagerV3DeployParams[] memory allCms = config.creditManagers();
 
-        degenNFT = new DegenNFTV2(
-            address(addressProvider),
-            "DegenNFTV2",
-            "Gear-Degen"
-        );
+        degenNFT = new DegenNFTV2(address(addressProvider), "DegenNFTV2", "Gear-Degen");
 
         vm.prank(CONFIGURATOR);
         degenNFT.setMinter(CONFIGURATOR);
@@ -411,12 +404,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 name: cmParams.name
             });
 
-            CreditManagerFactory cmf = new CreditManagerFactory(
-            address(addressProvider),
-            address(pool),
-            cmOpts,
-            0
-        );
+            CreditManagerFactory cmf = new CreditManagerFactory(address(addressProvider), address(pool), cmOpts, 0);
 
             creditManager = cmf.creditManager();
             creditFacade = cmf.creditFacade();
@@ -450,6 +438,15 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
             vm.prank(CONFIGURATOR);
             botList.setCreditManagerApprovedStatus(address(creditManager), true);
+
+            vm.prank(CONFIGURATOR);
+            creditConfigurator.setFees(
+                cmParams.feeInterest,
+                cmParams.feeLiquidation,
+                cmParams.liquidationPremium,
+                cmParams.feeLiquidationExpired,
+                cmParams.liquidationPremiumExpired
+            );
 
             vm.label(address(creditFacade), "CreditFacadeV3");
             vm.label(address(creditManager), "CreditManagerV3");
@@ -501,7 +498,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     function _addAndEnableTokens(address creditAccount, uint256 numTokens, uint256 balance) internal {
         for (uint256 i = 0; i < numTokens; i++) {
             ERC20Mock t = new ERC20Mock("new token", "nt", 18);
-            PriceFeedMock pf = new PriceFeedMock(10**8, 8);
+            PriceFeedMock pf = new PriceFeedMock(10 ** 8, 8);
 
             vm.startPrank(CONFIGURATOR);
             creditManager.addToken(address(t));
