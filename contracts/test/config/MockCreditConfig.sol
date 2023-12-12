@@ -65,7 +65,7 @@ contract MockCreditConfig is Test, IPoolV3DeployConfig {
 
         uint256 accountAmount = getAccountAmount();
 
-        _poolParams = PoolV3DeployParams({withdrawalFee: 0, expectedLiquidityLimit: type(uint256).max});
+        _poolParams = PoolV3DeployParams({withdrawalFee: 0, totalDebtLimit: type(uint256).max});
 
         // uint8 decimals = ERC20(tokenTestSuite_.addressOf(_underlying)).decimals();
 
@@ -76,6 +76,11 @@ contract MockCreditConfig is Test, IPoolV3DeployConfig {
 
         cp.minDebt = minDebt;
         cp.maxDebt = maxDebt;
+        cp.feeInterest = 2500;
+        cp.feeLiquidation = 150;
+        cp.liquidationPremium = 400;
+        cp.feeLiquidationExpired = 100;
+        cp.liquidationPremiumExpired = 200;
         cp.whitelisted = false;
         cp.expirable = false;
         cp.skipInit = false;
