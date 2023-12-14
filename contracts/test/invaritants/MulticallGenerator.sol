@@ -147,7 +147,10 @@ contract MulticallGenerator is Random {
             if (getRandomP() > pThreshold || debt != 0) {
                 uint256 quotedTokensMask = creditManager.quotedTokensMask();
 
-                if (quotedTokensMask == 0) revert("Cant find quota token");
+                if (quotedTokensMask == 0) {
+                    MultiCall memory _call;
+                    return (_call, false);
+                }
 
                 uint256 collateralTokensCount = creditManager.collateralTokensCount();
                 uint256 mask;
@@ -321,10 +324,12 @@ contract MulticallGenerator is Random {
 
     function randomExternalCall() internal returns (MultiCall memory, bool success) {
         if (!followPermissions || (permissions & EXTERNAL_CALLS_PERMISSION != 0)) {
+            bytes memory targetCalldata = abi.encodeCall(TargetAttacker.act, (seed));
+
             return (
                 MultiCall({
-                    target: address(adapterAttacker),
-                    callData: abi.encodeCall(AdapterAttacker.executeAllApprove, (getNextRandomNumber()))
+                    target: adapterAttacker,
+                    callData: abi.encodeCall(AdapterAttacker.executeAllApprove, (targetCalldata))
                 }),
                 true
             );
