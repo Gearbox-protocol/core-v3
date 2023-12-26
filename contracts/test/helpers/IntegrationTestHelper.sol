@@ -317,6 +317,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         creditFacade = CreditFacadeV3(creditManager.creditFacade());
         creditConfigurator = CreditConfiguratorV3(creditManager.creditConfigurator());
 
+        address degenNFT = creditFacade.degenNFT();
+
         if (!_attachPool(creditManager.pool())) {
             return false;
         }
@@ -325,13 +327,20 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             return false;
         }
 
-        if (!anyDegenNFT && whitelisted != (creditFacade.degenNFT() != address(0))) {
+        if (!anyDegenNFT && whitelisted != (degenNFT != address(0))) {
             return false;
         }
         if (configAccountAmount == 0) {
             (, creditAccountAmount) = creditFacade.debtLimits();
         } else {
             creditAccountAmount = configAccountAmount;
+        }
+
+        if (degenNFT != address(0)) {
+            address minter = DegenNFTV2(degenNFT).minter();
+
+            vm.prank(minter);
+            DegenNFTV2(degenNFT).mint(USER, 1000);
         }
 
         return true;
@@ -385,6 +394,9 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
         vm.prank(CONFIGURATOR);
         degenNFT.setMinter(CONFIGURATOR);
+
+        vm.prank(CONFIGURATOR);
+        degenNFT.mint(USER, 1000);
 
         uint256 len = allCms.length;
 
