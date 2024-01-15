@@ -19,6 +19,9 @@ import {IUpdatablePriceFeed} from "@gearbox-protocol/core-v2/contracts/interface
 
 import "../interfaces/IExceptions.sol";
 
+/// @title Partial liquidation bot
+/// @notice A bot that allows to swap collateral assets of unhealthy accounts to underlying with a discount (equal to the Credit Manager's liquidation premium)
+/// @dev It is expected that this is set as a special permission bot in BotListV3 for all Credit Managers
 contract PartialLiquidationBot is IPartialLiquidationBot {
     /// @notice Performs a partial liquidation by swapping some collateral asset for underlying with a discount
     /// @param params A struct encoding liquidation params:
