@@ -317,3 +317,17 @@ error IncorrectPriceException();
 
 /// @notice Thrown when token's price feed becomes stale
 error StalePriceException();
+
+// ---- //
+// BOTS //
+// ---- //
+
+/// @notice Thrown when resulting debt after liquidation would be below the minimal debt,
+///         when using a partial liquidation bot
+/// @dev Below minimal debt only a full liquidation is possible, which should be done through the
+///      standard Credit Facade function
+error CantPartialLiquidateBelowMinDebt();
+
+/// @notice Thrown when the underlying amount charged from liquidator during a partial liquidation
+///         would be larger than the limit defined by the liquidator
+error AmountUnderlyingLargerThanMax();
