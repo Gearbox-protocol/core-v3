@@ -24,15 +24,15 @@ import "../interfaces/IExceptions.sol";
 /// @dev It is expected that this is set as a special permission bot in BotListV3 for all Credit Managers
 contract PartialLiquidationBot is IPartialLiquidationBot {
     /// @notice Performs a partial liquidation by swapping some collateral asset for underlying with a discount
+    /// @dev Returns the amount of underlying charged and amount of assetOut received
     /// @param params A struct encoding liquidation params:
     ///               * creditManager - Credit Manager where the liquidated CA currently resides
     ///               * creditAccount - Credit Account to liquidate
     ///               * assetOut - asset that the liquidator wishes to receive
     ///               * amountOut - amount of the asset the liquidator wants to receive
-    ///               * maxAmountInUnderlying - the maximal amount of underlying that the liquidator will be charged
     ///               * repay - whether to repay debt after swapping into underlying
     ///               * priceUpdates - data for price feeds to update before liquidation
-    function liquidatePartialSingleAsset(LiquidationParams memory params) external {
+    function liquidatePartialSingleAsset(LiquidationParams memory params) external returns (uint256, uint256) {
         address priceOracle = ICreditManagerV3(params.creditManager).priceOracle();
 
         /// Since we are computing debt and collateral before liquidation,
@@ -52,109 +52,85 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
         // in a revert due to failed collateral check on CM side
         address underlying = ICreditManagerV3(params.creditManager).underlying();
 
-        uint256 amountInUnderlying =
-            _getAmountIn(priceOracle, params.creditManager, underlying, params.assetOut, params.amountOut);
+        // In case the liquidator wants to get as much assetOut as possible,
+        // they would pass uint256.max
+        params.amountOut = params.amountOut == type(uint256).max
+            ? IERC20(params.assetOut).balanceOf(params.creditAccount)
+            : params.amountOut;
 
-        if (params.repay) {
-            /// If debt is being repaid, we will revert early here if the
-            /// minimal debt limit is violated as a result
+        // There is a limit imposed on the maximal amount of underlying that the liquidator can swap
+        // If the debt is repaid, then that limit is totalDebt - minDebt - underlyingBalance (i.e., exactly enough to reduce debt to minDebt)
+        // If the debt is not repaid, then that limit is totalDebt - underlyingBalance (i.e., exactly enough to fully liquidate the user in the future)
+
+        uint256 amountInUnderlying;
+        {
+            uint256 underlyingBalance = IERC20(underlying).balanceOf(params.creditAccount);
             (uint256 minDebt,) = ICreditFacadeV3(creditFacade).debtLimits();
-            if (amountInUnderlying > CreditLogic.calcTotalDebt(cdd) - minDebt) {
-                revert CantPartialLiquidateBelowMinDebt();
-            }
+
+            uint256 repayable = CreditLogic.calcTotalDebt(cdd) - (params.repay ? minDebt : 0);
+
+            if (underlyingBalance >= repayable) revert NothingToLiquidateException();
+
+            uint256 maxAmountIn = repayable - underlyingBalance;
+
+            (amountInUnderlying, params.amountOut) = _getAmounts(params, priceOracle, underlying, maxAmountIn);
+
+            IERC20(underlying).transferFrom(msg.sender, params.creditAccount, amountInUnderlying);
         }
-
-        if (amountInUnderlying > params.maxAmountInUnderlying) revert AmountUnderlyingLargerThanMax();
-
-        IERC20(underlying).transferFrom(msg.sender, address(this), amountInUnderlying);
-        IERC20(underlying).approve(params.creditManager, amountInUnderlying);
 
         ICreditFacadeV3(creditFacade).botMulticall(
-            params.creditAccount,
-            _getMultiCall(creditFacade, underlying, amountInUnderlying, params.assetOut, params.amountOut, params.repay)
+            params.creditAccount, _getMultiCall(params, creditFacade, underlying)
         );
+
+        return (amountInUnderlying, params.amountOut);
     }
 
-    /// @notice Returns the maximal asset out amount that can be received from a partial liquidation,
-    ///         and the corresponding amount of udnerlying that will be charged
-    /// @param creditManager Credit Manager where the liquidated CA resides
-    /// @param creditAccount Credit Account to liquidate
-    /// @param assetOut Asset to receive
-    /// @param priceUpdates Price updates required to compute account values
-    /// @dev Intended to be used with an external static call
-    function getLiquidationWithRepayMaxAmount(
-        address creditManager,
-        address creditAccount,
-        address assetOut,
-        PriceUpdate[] memory priceUpdates
-    ) external returns (uint256 maxAmountAssetOut, uint256 amountAssetIn) {
-        address priceOracle = ICreditManagerV3(creditManager).priceOracle();
+    /// @dev Computes the amount of underlying to pay and assetOut to receive
+    function _getAmounts(LiquidationParams memory params, address priceOracle, address underlying, uint256 maxAmountIn)
+        internal
+        view
+        returns (uint256, uint256)
+    {
+        (,, uint16 liquidationDiscount,,) = ICreditManagerV3(params.creditManager).fees();
 
-        _applyPriceUpdates(priceUpdates, priceOracle);
+        uint256 underlyingEquivalent = IPriceOracleV3(priceOracle).convert(
+            params.amountOut, params.assetOut, underlying
+        ) * liquidationDiscount / PERCENTAGE_FACTOR;
 
-        CollateralDebtData memory cdd =
-            ICreditManagerV3(creditManager).calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_COLLATERAL);
-
-        if (cdd.twvUSD >= cdd.totalDebtUSD) return (0, 0);
-
-        uint256 assetOutBalance = IERC20(assetOut).balanceOf(creditAccount);
-
-        uint256 balanceSwapAmountIn = _getAmountIn(
-            priceOracle, creditManager, ICreditManagerV3(creditManager).underlying(), assetOut, assetOutBalance
-        );
-
-        uint256 maxRepay;
-
-        {
-            address creditFacade = ICreditManagerV3(creditManager).creditFacade();
-            (uint256 minDebt,) = ICreditFacadeV3(creditFacade).debtLimits();
-            maxRepay = CreditLogic.calcTotalDebt(cdd) - minDebt;
-        }
-
-        if (balanceSwapAmountIn > maxRepay) {
-            return (assetOutBalance * maxRepay / (balanceSwapAmountIn + 1), maxRepay);
+        // If the computed amount of underlying is larger than max amount, then only the max amount is paid,
+        // and the amount of assetOut is adjusted proportionally
+        if (underlyingEquivalent > maxAmountIn) {
+            return (maxAmountIn, maxAmountIn * params.amountOut / underlyingEquivalent);
         } else {
-            return (assetOutBalance, balanceSwapAmountIn);
+            return (underlyingEquivalent, params.amountOut);
         }
-    }
-
-    /// @dev Computes the amount of underlying to pay for a corresponding amount of assetOut
-    function _getAmountIn(
-        address priceOracle,
-        address creditManager,
-        address underlying,
-        address assetOut,
-        uint256 amountOut
-    ) internal view returns (uint256) {
-        (,, uint16 liquidationDiscount,,) = ICreditManagerV3(creditManager).fees();
-        return IPriceOracleV3(priceOracle).convert(amountOut, assetOut, underlying) * liquidationDiscount
-            / PERCENTAGE_FACTOR;
     }
 
     /// @dev Returns the multicall to execute in Credit Facade
-    function _getMultiCall(
-        address creditFacade,
-        address underlying,
-        uint256 amountInUnderlying,
-        address assetOut,
-        uint256 amountOut,
-        bool repay
-    ) internal view returns (MultiCall[] memory calls) {
-        calls = new MultiCall[](repay ? 3 : 2);
+    function _getMultiCall(LiquidationParams memory params, address creditFacade, address underlying)
+        internal
+        view
+        returns (MultiCall[] memory calls)
+    {
+        calls = new MultiCall[](params.repay ? 3 : 2);
 
         calls[0] = MultiCall({
             target: creditFacade,
-            callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, amountInUnderlying))
+            callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (underlying))
         });
 
         calls[1] = MultiCall({
             target: creditFacade,
-            callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (assetOut, amountOut, msg.sender))
+            callData: abi.encodeCall(
+                ICreditFacadeV3Multicall.withdrawCollateral, (params.assetOut, params.amountOut, msg.sender)
+                )
         });
-        if (repay) {
+        if (params.repay) {
             calls[2] = MultiCall({
                 target: creditFacade,
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (amountInUnderlying))
+                callData: abi.encodeCall(
+                    ICreditFacadeV3Multicall.decreaseDebt, (IERC20(underlying).balanceOf(params.creditAccount))
+                    )
             });
         }
     }

@@ -322,12 +322,8 @@ error StalePriceException();
 // BOTS //
 // ---- //
 
-/// @notice Thrown when resulting debt after liquidation would be below the minimal debt,
-///         when using a partial liquidation bot
+/// @notice Thrown when there is enough underlying on the account to fully liquidate debt,
+///         and a partial liquidation through a bot is not needed
 /// @dev Below minimal debt only a full liquidation is possible, which should be done through the
 ///      standard Credit Facade function
-error CantPartialLiquidateBelowMinDebt();
-
-/// @notice Thrown when the underlying amount charged from liquidator during a partial liquidation
-///         would be larger than the limit defined by the liquidator
-error AmountUnderlyingLargerThanMax();
+error NothingToLiquidateException();

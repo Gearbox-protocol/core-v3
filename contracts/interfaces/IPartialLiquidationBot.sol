@@ -26,18 +26,10 @@ struct LiquidationParams {
     address creditAccount;
     address assetOut;
     uint256 amountOut;
-    uint256 maxAmountInUnderlying;
     bool repay;
     PriceUpdate[] priceUpdates;
 }
 
 interface IPartialLiquidationBot {
-    function liquidatePartialSingleAsset(LiquidationParams memory params) external;
-
-    function getLiquidationWithRepayMaxAmount(
-        address creditManager,
-        address creditAccount,
-        address assetOut,
-        PriceUpdate[] memory priceUpdates
-    ) external returns (uint256 maxAmountAssetOut, uint256 amountAssetIn);
+    function liquidatePartialSingleAsset(LiquidationParams memory params) external returns (uint256, uint256);
 }
