@@ -410,7 +410,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             CreditManagerOpts memory cmOpts = CreditManagerOpts({
                 minDebt: cmParams.minDebt,
                 maxDebt: cmParams.maxDebt,
-                collateralTokens: _convertCollateral(cmParams.collateralTokens),
+                collateralTokens: new CollateralToken[](0), //_convertCollateral(cmParams.collateralTokens),
                 degenNFT: (whitelisted) ? address(degenNFT) : address(0),
                 expirable: (anyExpirable) ? cmParams.expirable : expirable,
                 name: cmParams.name
@@ -421,6 +421,17 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             creditManager = cmf.creditManager();
             creditFacade = cmf.creditFacade();
             creditConfigurator = cmf.creditConfigurator();
+
+            vm.prank(CONFIGURATOR);
+            creditConfigurator.setFees(
+                cmParams.feeInterest,
+                cmParams.feeLiquidation,
+                cmParams.liquidationPremium,
+                cmParams.feeLiquidationExpired,
+                cmParams.liquidationPremiumExpired
+            );
+
+            _addCollateralTokens(cmParams.collateralTokens);
 
             vm.prank(CONFIGURATOR);
             cr.addCreditManager(address(creditManager));
@@ -450,15 +461,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
             vm.prank(CONFIGURATOR);
             botList.setCreditManagerApprovedStatus(address(creditManager), true);
-
-            vm.prank(CONFIGURATOR);
-            creditConfigurator.setFees(
-                cmParams.feeInterest,
-                cmParams.feeLiquidation,
-                cmParams.liquidationPremium,
-                cmParams.feeLiquidationExpired,
-                cmParams.liquidationPremiumExpired
-            );
 
             vm.label(address(creditFacade), "CreditFacadeV3");
             vm.label(address(creditManager), "CreditManagerV3");
@@ -680,6 +682,15 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         for (uint256 i = 0; i < len; i++) {
             result[i] =
                 CollateralToken({token: tokenTestSuite.addressOf(clts[i].token), liquidationThreshold: clts[i].lt});
+        }
+    }
+
+    function _addCollateralTokens(CollateralTokenHuman[] memory clts) internal {
+        for (uint256 i = 0; i < clts.length; ++i) {
+            address token = tokenTestSuite.addressOf(clts[i].token);
+
+            vm.prank(CONFIGURATOR);
+            creditConfigurator.addCollateralToken(token, clts[i].lt);
         }
     }
 }
