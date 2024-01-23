@@ -11,7 +11,6 @@ import {ICreditFacadeV3} from "../interfaces/ICreditFacadeV3.sol";
 import {ICreditFacadeV3Multicall} from "../interfaces/ICreditFacadeV3Multicall.sol";
 import {ICreditManagerV3, CollateralDebtData, CollateralCalcTask} from "../interfaces/ICreditManagerV3.sol";
 import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
-import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {CreditLogic} from "../libraries/CreditLogic.sol";
 
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
