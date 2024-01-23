@@ -13,23 +13,37 @@ struct PriceUpdate {
     bytes data;
 }
 
-/// @notice Struct with params for a partial liquidation
-/// @param creditManager Credit Manager where the liquidated CA currently resides
-/// @param creditAccount Credit Account to liquidate
-/// @param assetOut Asset that the liquidator wishes to receive
-/// @param amountOut Amount of the asset the liquidator wants to receive
-/// @param maxAmountInUnderlying The maximal amount of underlying that the liquidator will be charged
-/// @param repay Whether to repay debt after swapping into underlying
-/// @param priceUpdates Data for price feeds to update before liquidation
+/// @dev Struct with params for a partial liquidation. This is used unternally by the partial liquidation bot
 struct LiquidationParams {
     address creditManager;
     address creditAccount;
+    address creditFacade;
+    address priceOracle;
+    address underlying;
     address assetOut;
+    uint256 amountIn;
     uint256 amountOut;
+    uint256 totalDebt;
+    bool exactIn;
     bool repay;
-    PriceUpdate[] priceUpdates;
 }
 
 interface IPartialLiquidationBot {
-    function liquidatePartialSingleAsset(LiquidationParams memory params) external returns (uint256, uint256);
+    function partialLiquidateExactIn(
+        address creditManager,
+        address creditAccount,
+        address assetOut,
+        uint256 amountIn,
+        bool repay,
+        PriceUpdate[] memory priceUpdates
+    ) external returns (uint256, uint256);
+
+    function partialLiquidateExactOut(
+        address creditManager,
+        address creditAccount,
+        address assetOut,
+        uint256 amountOut,
+        bool repay,
+        PriceUpdate[] memory priceUpdates
+    ) external returns (uint256, uint256);
 }

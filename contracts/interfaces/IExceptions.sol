@@ -327,3 +327,13 @@ error StalePriceException();
 /// @dev Below minimal debt only a full liquidation is possible, which should be done through the
 ///      standard Credit Facade function
 error NothingToLiquidateException();
+
+/// @notice Thrown when a partial liquidation attempts to swap underlying for underlying
+error CantPartialLiquidateUnderlying();
+
+/// @notice Thrown when the account health factor after liquidation is below the permissible threshold
+error HealthFactorTooLowException();
+
+/// @notice Thrown when the liquidation passes an exact underlying amount that is larger than the maximal
+///         swappable amount
+error AmountInLargerThanMaxSwappableException();
