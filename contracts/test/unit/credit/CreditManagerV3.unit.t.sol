@@ -107,7 +107,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         vm.revertTo(snapshot);
         _setUnderlying({underlyingIsFeeToken: true});
-        // set fee
         _;
     }
 
@@ -128,6 +127,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         tokenFee = 0;
         maxTokenFee = 0;
     }
+
     ///
     /// HELPERS
     ///
@@ -1393,144 +1393,30 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.isLiquidatable(DUMB_ADDRESS, PERCENTAGE_FACTOR);
     }
 
-    //
-    //
-    // FULL COLLATERAL CHECK
-    //
-    //
+    // ---------------- //
+    // COLLATERAL CHECK //
+    // ---------------- //
 
-    /// @dev U:[CM-18]: fullCollateralCheck reverts if not enough collateral otherwise saves enabledTokensMask
-    function test_U_CM_18_fullCollateralCheck_reverts_if_not_enough_collateral_otherwise_saves_enabledTokensMask(
-        uint256 amount
+    /// @dev U:[CM-18]: fullCollateralCheck works as expected
+    function test_U_CM_18_fullCollateralCheck_works_as_expected(
+        uint256 amount,
+        uint256 enabledTokensMask,
+        uint8 numberOfTokens
     ) public withFeeTokenCase creditManagerTest {
-        /// @notice This test doesn't check collateral calculation, it proves that function
-        /// reverts if it's not enough collateral otherwise it stores enabledTokensMask to storage
+        amount = bound(amount, 1e4, 1e10 * 10 ** _decimals(underlying));
+        numberOfTokens = uint8(bound(numberOfTokens, 1, 20));
+        enabledTokensMask = bound(enabledTokensMask, 1, 2 ** numberOfTokens - 1);
 
-        amount = bound(amount, 1, 1e20 * WAD);
-
-        address creditAccount = DUMB_ADDRESS;
-        uint8 numberOfTokens = uint8(amount % 253);
-
-        /// @notice `+1` for underlying token
-        uint256 enabledTokensMask = uint256(keccak256(abi.encode(amount))) & ((1 << (numberOfTokens + 1)) - 1);
-
-        vm.prank(CONFIGURATOR);
-        creditManager.setMaxEnabledTokens(numberOfTokens + 1);
-
-        tokenTestSuite.mint({token: underlying, to: creditAccount, amount: amount});
-
-        /// @notice sets price 1 USD for underlying
+        // sets underlying price to 1 USD
         priceOracleMock.setPrice(underlying, 10 ** 8);
 
-        _addTokensBatch({creditAccount: creditAccount, numberOfTokens: numberOfTokens, balance: amount});
-
-        creditManager.setCreditAccountInfoMap({
-            creditAccount: creditAccount,
-            debt: 100330010,
-            cumulativeIndexLastUpdate: RAY,
-            cumulativeQuotaInterest: 1,
-            quotaFees: 0,
-            enabledTokensMask: enabledTokensMask,
-            flags: 0,
-            borrower: USER
-        });
-
-        CollateralDebtData memory collateralDebtData =
-            creditManager.calcDebtAndCollateralFC(creditAccount, CollateralCalcTask.DEBT_COLLATERAL);
-
-        /// @notice fuzzer could find a combination which enabled tokens with zero balances,
-        /// which causes twvUSD to be 0 and arithmetic error later
-        vm.assume(collateralDebtData.twvUSD > 0);
-
-        creditManager.setDebt(creditAccount, collateralDebtData.twvUSD + 1);
-
-        collateralDebtData =
-            creditManager.calcDebtAndCollateralFC(creditAccount, CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY);
-
-        assertEq(
-            collateralDebtData.twvUSD + 1, collateralDebtData.totalDebtUSD, "SETUP: incorrect params for liquidation"
-        );
-
-        vm.expectRevert(NotEnoughCollateralException.selector);
-        creditManager.fullCollateralCheck({
-            creditAccount: creditAccount,
-            enabledTokensMask: enabledTokensMask,
-            collateralHints: new uint256[](0),
-            minHealthFactor: PERCENTAGE_FACTOR,
-            useSafePrices: false
-        });
-
-        assertTrue(
-            creditManager.isLiquidatable(creditAccount, PERCENTAGE_FACTOR),
-            "isLiquidatable returns false for liqudatable acc"
-        );
-
-        /// @notice we run calcDebtAndCollateral to get enabledTokensMask as it should be after check
-        creditManager.setDebt(creditAccount, collateralDebtData.twvUSD - 1);
-
-        collateralDebtData =
-            creditManager.calcDebtAndCollateralFC(creditAccount, CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY);
-
-        uint256 enabledTokenMaskWithDisableTokens = collateralDebtData.enabledTokensMask;
-
-        assertTrue(
-            !creditManager.isLiquidatable(creditAccount, PERCENTAGE_FACTOR),
-            "isLiquidatable returns true for non-liqudatable acc"
-        );
-
-        /// @notice it makes account non liquidatable and clears mask - to check that it's set
-        creditManager.setCreditAccountInfoMap({
-            creditAccount: creditAccount,
-            debt: collateralDebtData.twvUSD - 1,
-            cumulativeIndexLastUpdate: RAY,
-            cumulativeQuotaInterest: 1,
-            quotaFees: 0,
-            enabledTokensMask: 0,
-            flags: 0,
-            borrower: USER
-        });
-
-        creditManager.fullCollateralCheck({
-            creditAccount: creditAccount,
-            enabledTokensMask: enabledTokensMask,
-            collateralHints: new uint256[](0),
-            minHealthFactor: PERCENTAGE_FACTOR,
-            useSafePrices: false
-        });
-
-        uint256 enabledTokensMaskAfter = creditManager.enabledTokensMaskOf(creditAccount);
-
-        assertEq(enabledTokensMaskAfter, enabledTokenMaskWithDisableTokens, "enabledTokensMask wasn't set correctly");
-    }
-
-    /// @dev U:[CM-18A]: fullCollateralCheck always succeeds for 0 total debt
-    function test_U_CM_18A_fullCollateralCheck_succeeds_for_zero_debt(uint256 amount)
-        public
-        withFeeTokenCase
-        creditManagerTest
-    {
-        /// @notice This test doesn't check collateral calculation, it proves that function
-        /// reverts if it's not enough collateral otherwise it stores enabledTokensMask to storage
-
-        amount = bound(amount, 1, 1e20 * WAD);
-
-        // uint256 amount = DAI_ACCOUNT_AMOUNT;
-        address creditAccount = DUMB_ADDRESS;
-        uint8 numberOfTokens = uint8(amount % 253);
-
-        /// @notice `+1` for underlying token
-        uint256 enabledTokensMask = uint256(keccak256(abi.encode(amount))) & ((1 << (numberOfTokens + 1)) - 1);
-
         vm.prank(CONFIGURATOR);
-        creditManager.setMaxEnabledTokens(numberOfTokens + 1);
+        creditManager.setMaxEnabledTokens(20);
 
+        // sets up a credit account
+        address creditAccount = DUMB_ADDRESS;
         tokenTestSuite.mint({token: underlying, to: creditAccount, amount: amount});
-
-        /// @notice sets price 1 USD for underlying
-        priceOracleMock.setPrice(underlying, 10 ** 8);
-
-        _addTokensBatch({creditAccount: creditAccount, numberOfTokens: numberOfTokens, balance: amount});
-
+        _addTokensBatch({creditAccount: creditAccount, numberOfTokens: numberOfTokens - 1, balance: amount});
         creditManager.setCreditAccountInfoMap({
             creditAccount: creditAccount,
             debt: 0,
@@ -1542,25 +1428,18 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             borrower: USER
         });
 
-        CollateralDebtData memory collateralDebtData =
-            creditManager.calcDebtAndCollateralFC(creditAccount, CollateralCalcTask.DEBT_COLLATERAL);
+        CollateralDebtData memory cdd =
+            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_COLLATERAL);
+        vm.assume(cdd.twvUSD != 0);
 
-        /// @notice fuzzler could find a combination which enabled tokens with zero balances,
-        /// which cause to twvUSD == 0 and arithmetic errr later
-        vm.assume(collateralDebtData.twvUSD > 0);
-
-        collateralDebtData =
-            creditManager.calcDebtAndCollateralFC(creditAccount, CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY);
-
-        assertEq(collateralDebtData.twvUSD, 0, "TWV computation was not skipped for 0 debt");
-
-        uint256 enabledTokenMaskWithDisableTokens = collateralDebtData.enabledTokensMask;
+        // makes account liquidatable
+        creditManager.setDebt(creditAccount, _amountMinusFee(cdd.twvUSD + 1));
 
         assertTrue(
-            !creditManager.isLiquidatable(creditAccount, PERCENTAGE_FACTOR),
-            "isLiquidatable returns true for non-liqudatable acc"
+            creditManager.isLiquidatable(creditAccount, PERCENTAGE_FACTOR),
+            "isLiquidatable is false for liquidatable account"
         );
-
+        vm.expectRevert(NotEnoughCollateralException.selector);
         creditManager.fullCollateralCheck({
             creditAccount: creditAccount,
             enabledTokensMask: enabledTokensMask,
@@ -1569,9 +1448,63 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             useSafePrices: false
         });
 
-        uint256 enabledTokensMaskAfter = creditManager.enabledTokensMaskOf(creditAccount);
+        // makes account non-liquidatable
+        creditManager.setDebt(creditAccount, _amountMinusFee(cdd.twvUSD - 1));
 
-        assertEq(enabledTokensMaskAfter, enabledTokenMaskWithDisableTokens, "enabledTokensMask was not set correctly");
+        assertFalse(
+            creditManager.isLiquidatable(creditAccount, PERCENTAGE_FACTOR),
+            "isLiquidatable is true for non-liquidatable account"
+        );
+        uint256 enabledTokensMaskAfter = creditManager.fullCollateralCheck({
+            creditAccount: creditAccount,
+            enabledTokensMask: enabledTokensMask,
+            collateralHints: new uint256[](0),
+            minHealthFactor: PERCENTAGE_FACTOR,
+            useSafePrices: false
+        });
+
+        assertEq(
+            creditManager.enabledTokensMaskOf(creditAccount), enabledTokensMaskAfter, "enabledTokensMask not updated"
+        );
+    }
+
+    /// @dev U:[CM-18A]: fullCollateralCheck succeeds for zero debt
+    function test_U_CM_18A_fullCollateralCheck_succeeds_for_zero_debt(uint256 amount, uint16 minHealthFactor)
+        public
+        withFeeTokenCase
+        creditManagerTest
+    {
+        amount = bound(amount, 1e4, 1e10 * 10 ** _decimals(underlying));
+
+        // sets underlying price to 1 USD
+        priceOracleMock.setPrice(underlying, 10 ** 8);
+
+        // sets up an account with given collateral amount and zero debt
+        address creditAccount = DUMB_ADDRESS;
+        tokenTestSuite.mint({token: underlying, to: creditAccount, amount: amount});
+        creditManager.setCreditAccountInfoMap({
+            creditAccount: creditAccount,
+            debt: 0,
+            cumulativeIndexLastUpdate: RAY,
+            cumulativeQuotaInterest: 1,
+            quotaFees: 0,
+            enabledTokensMask: UNDERLYING_TOKEN_MASK,
+            flags: 0,
+            borrower: USER
+        });
+
+        assertFalse(
+            creditManager.isLiquidatable(creditAccount, minHealthFactor),
+            "isLiquidatable is true for account with no debt"
+        );
+
+        creditManager.fullCollateralCheck({
+            creditAccount: creditAccount,
+            enabledTokensMask: UNDERLYING_TOKEN_MASK,
+            collateralHints: new uint256[](0),
+            minHealthFactor: minHealthFactor,
+            useSafePrices: false
+        });
     }
 
     /// @dev U:[CM-18B]: fullCollateralCheck handles minHealthFactor correctly
@@ -1580,7 +1513,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         uint256 healthFactor,
         uint16 minHealthFactor
     ) public withFeeTokenCase creditManagerTest {
-        amount = bound(amount, 100, 1e20 * WAD);
+        amount = bound(amount, 1e4, 1e10 * 10 ** _decimals(underlying));
         healthFactor = bound(healthFactor, 0.2 ether, 5 ether);
 
         // sets underlying price to 1 USD
@@ -1601,7 +1534,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         });
         CollateralDebtData memory cdd =
             creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_COLLATERAL);
-        creditManager.setDebt(creditAccount, cdd.twvUSD * 1 ether / healthFactor);
+        creditManager.setDebt(creditAccount, _amountMinusFee(cdd.twvUSD * 1 ether / healthFactor));
 
         bool liquidatable = healthFactor / 1e14 < minHealthFactor;
         assertEq(creditManager.isLiquidatable(creditAccount, minHealthFactor), liquidatable, "Incorrect isLiquidatable");

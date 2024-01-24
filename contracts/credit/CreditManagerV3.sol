@@ -729,7 +729,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         address _priceOracle = priceOracle;
 
         {
-            uint256 totalDebt = cdd.calcTotalDebt();
+            uint256 totalDebt = _amountWithFee(cdd.calcTotalDebt());
             if (totalDebt != 0) {
                 cdd.totalDebtUSD = _convertToUSD(_priceOracle, totalDebt, underlying); // U:[CM-22]
             } else if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) {
@@ -755,7 +755,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         cdd.enabledTokensMask = enabledTokensMask.disable(tokensToDisable); // U:[CM-22]
 
         if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) {
-            return cdd; // U:[CM-18]
+            return cdd;
         }
 
         cdd.totalValue = _convertFromUSD(_priceOracle, cdd.totalValueUSD, underlying); // U:[CM-22,23]
