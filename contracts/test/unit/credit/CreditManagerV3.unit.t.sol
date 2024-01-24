@@ -1574,6 +1574,48 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         assertEq(enabledTokensMaskAfter, enabledTokenMaskWithDisableTokens, "enabledTokensMask wasn't set correctly");
     }
 
+    /// @dev U:[CM-18B]: fullCollateralCheck handles minHealthFactor correctly
+    function test_U_CM_18B_fullCollateralCheck_handles_minHealthFactor_correctly(
+        uint256 amount,
+        uint256 healthFactor,
+        uint16 minHealthFactor
+    ) public withFeeTokenCase creditManagerTest {
+        amount = bound(amount, 100, 1e20 * WAD);
+        healthFactor = bound(healthFactor, 0.2 ether, 5 ether);
+
+        // sets underlying price to 1 USD
+        priceOracleMock.setPrice(underlying, 10 ** 8);
+
+        // sets up an account with given collateral amount and health factor
+        address creditAccount = DUMB_ADDRESS;
+        tokenTestSuite.mint({token: underlying, to: creditAccount, amount: amount});
+        creditManager.setCreditAccountInfoMap({
+            creditAccount: creditAccount,
+            debt: 0,
+            cumulativeIndexLastUpdate: RAY,
+            cumulativeQuotaInterest: 1,
+            quotaFees: 0,
+            enabledTokensMask: UNDERLYING_TOKEN_MASK,
+            flags: 0,
+            borrower: USER
+        });
+        CollateralDebtData memory cdd =
+            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_COLLATERAL);
+        creditManager.setDebt(creditAccount, cdd.twvUSD * 1 ether / healthFactor);
+
+        bool liquidatable = healthFactor / 1e14 < minHealthFactor;
+        assertEq(creditManager.isLiquidatable(creditAccount, minHealthFactor), liquidatable, "Incorrect isLiquidatable");
+
+        if (liquidatable) vm.expectRevert(NotEnoughCollateralException.selector);
+        creditManager.fullCollateralCheck({
+            creditAccount: creditAccount,
+            enabledTokensMask: UNDERLYING_TOKEN_MASK,
+            collateralHints: new uint256[](0),
+            minHealthFactor: minHealthFactor,
+            useSafePrices: false
+        });
+    }
+
     //
     //
     // CALC DEBT AND COLLATERAL
