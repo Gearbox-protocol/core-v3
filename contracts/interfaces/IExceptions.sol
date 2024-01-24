@@ -150,9 +150,6 @@ error IncompatibleContractException();
 /// @notice Thrown if attempting to forbid an adapter that is not registered in the credit manager
 error AdapterIsNotRegisteredException();
 
-/// @notice Thrown when trying to manually set total debt parameters in a credit facade that doesn't track them
-error TotalDebtNotTrackedException();
-
 // ------------- //
 // CREDIT FACADE //
 // ------------- //
