@@ -612,8 +612,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             useSafePrices: useSafePrices
         }); // U:[CM-18]
 
-        if (cdd.twvUSD < cdd.totalDebtUSD) {
-            revert NotEnoughCollateralException(); // U:[CM-18]
+        if (cdd.twvUSD < cdd.totalDebtUSD * minHealthFactor / PERCENTAGE_FACTOR) {
+            revert NotEnoughCollateralException(); // U:[CM-18B]
         }
 
         enabledTokensMaskAfter = cdd.enabledTokensMask;
@@ -637,7 +637,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             useSafePrices: false
         }); // U:[CM-18]
 
-        return cdd.twvUSD < cdd.totalDebtUSD; // U:[CM-18]
+        return cdd.twvUSD < cdd.totalDebtUSD * minHealthFactor / PERCENTAGE_FACTOR; // U:[CM-18B]
     }
 
     /// @notice Returns `creditAccount`'s debt and collateral data with level of detail controlled by `task`

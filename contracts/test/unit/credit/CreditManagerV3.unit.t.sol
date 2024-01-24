@@ -1571,7 +1571,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         uint256 enabledTokensMaskAfter = creditManager.enabledTokensMaskOf(creditAccount);
 
-        assertEq(enabledTokensMaskAfter, enabledTokenMaskWithDisableTokens, "enabledTokensMask wasn't set correctly");
+        assertEq(enabledTokensMaskAfter, enabledTokenMaskWithDisableTokens, "enabledTokensMask was not set correctly");
     }
 
     /// @dev U:[CM-18B]: fullCollateralCheck handles minHealthFactor correctly
