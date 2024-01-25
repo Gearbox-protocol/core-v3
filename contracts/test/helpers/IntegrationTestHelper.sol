@@ -4,6 +4,7 @@
 pragma solidity ^0.8.17;
 
 import "../../interfaces/IAddressProviderV3.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
 
@@ -329,12 +330,17 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             return false;
         }
         if (configAccountAmount == 0) {
-            (, creditAccountAmount) = creditFacade.debtLimits();
+            uint256 minDebt;
+            (minDebt, creditAccountAmount) = creditFacade.debtLimits();
 
             uint256 remainingBorrowable = pool.creditManagerBorrowable(address(creditManager));
 
-            creditAccountAmount =
-                creditAccountAmount > remainingBorrowable / 2 ? remainingBorrowable / 2 : creditAccountAmount;
+            if (remainingBorrowable < minDebt) {
+                console.log("Cant setup credit amount because remaing funds < MIN_DEBT");
+                revert("Cant setup credit amount because remaing funds < MIN_DEBT");
+            }
+
+            creditAccountAmount = Math.min(creditAccountAmount, Math.max(remainingBorrowable / 2, minDebt));
         } else {
             creditAccountAmount = configAccountAmount;
         }
