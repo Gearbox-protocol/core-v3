@@ -332,6 +332,11 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         }
         if (configAccountAmount == 0) {
             (, creditAccountAmount) = creditFacade.debtLimits();
+
+            uint256 remainingBorrowable = pool.creditManagerBorrowable(address(creditManager));
+
+            creditAccountAmount =
+                creditAccountAmount > remainingBorrowable / 2 ? remainingBorrowable / 2 : creditAccountAmount;
         } else {
             creditAccountAmount = configAccountAmount;
         }
