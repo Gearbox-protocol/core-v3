@@ -48,6 +48,13 @@ struct UniswapV3Pair {
     uint24 fee;
 }
 
+struct VelodromeV2Pool {
+    Tokens token0;
+    Tokens token1;
+    bool stable;
+    address factory;
+}
+
 /// @dev A struct representing the initial Credit Manager configuration parameters
 struct CreditManagerV3DeployParams {
     /// @dev The Credit Manager's name
@@ -83,6 +90,7 @@ struct CreditManagerV3DeployParams {
     BalancerPool[] balancerPools;
     UniswapV3Pair[] uniswapV3Pairs;
     UniswapV2Pair[] uniswapV2Pairs;
+    VelodromeV2Pool[] velodromeV2Pools;
 }
 
 struct GaugeRate {
