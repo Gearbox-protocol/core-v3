@@ -247,12 +247,14 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         _;
     }
 
-    function _setupCore() internal {
+    constructor() {
         new Roles();
         NetworkDetector nd = new NetworkDetector();
 
         chainId = nd.chainId();
+    }
 
+    function _setupCore() internal {
         tokenTestSuite = new TokensTestSuite();
         vm.deal(address(this), 100 * WAD);
         tokenTestSuite.topUpWETH{value: 100 * WAD}();
@@ -275,10 +277,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     }
 
     function _attachCore() internal {
-        new Roles();
-        NetworkDetector nd = new NetworkDetector();
-        chainId = nd.chainId();
-
         tokenTestSuite = new TokensTestSuite();
         try vm.envAddress("ATTACH_ADDRESS_PROVIDER") returns (address val) {
             addressProvider = IAddressProviderV3(val);
