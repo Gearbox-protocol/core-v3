@@ -58,7 +58,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     using CreditAccountHelper for ICreditAccountBase;
 
     /// @notice Contract version
-    uint256 public constant override version = 3_00;
+    uint256 public constant override version = 3_01;
 
     /// @notice Address provider contract address
     address public immutable override addressProvider;
