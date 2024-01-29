@@ -27,6 +27,7 @@ struct LiquidationParams {
     address to;
     bool exactIn;
     bool repay;
+    uint256 cmVersion;
 }
 
 interface IPartialLiquidationBot {

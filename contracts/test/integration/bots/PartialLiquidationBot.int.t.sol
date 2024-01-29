@@ -403,7 +403,7 @@ contract PartialLiquidationBotIntegrationTest is IntegrationTestHelper {
         vm.expectCall(link, abi.encodeCall(IERC20.transfer, (FRIEND2, linkAmount / 2)));
 
         vm.startPrank(FRIEND);
-        (uint256 underlyingAmountIn,) = plb.partialLiquidateExactOut({
+        plb.partialLiquidateExactOut({
             creditManager: address(creditManager),
             creditAccount: creditAccount,
             assetOut: link,
@@ -458,7 +458,7 @@ contract PartialLiquidationBotIntegrationTest is IntegrationTestHelper {
         vm.expectCall(underlying, abi.encodeCall(IERC20.transferFrom, (FRIEND, creditAccount, DAI_ACCOUNT_AMOUNT / 2)));
 
         vm.startPrank(FRIEND);
-        (uint256 underlyingAmountIn,) = plb.partialLiquidateExactIn({
+        plb.partialLiquidateExactIn({
             creditManager: address(creditManager),
             creditAccount: creditAccount,
             assetOut: link,

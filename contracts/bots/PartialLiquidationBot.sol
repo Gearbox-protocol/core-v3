@@ -24,7 +24,7 @@ import "../interfaces/IExceptions.sol";
 /// @dev It is expected that this is set as a special permission bot in BotListV3 for all Credit Managers
 contract PartialLiquidationBot is IPartialLiquidationBot {
     /// @notice Minimal health factor of account after liquidation
-    uint256 public constant THRESHOLD_HEALTH_FACTOR = 10200;
+    uint16 public constant THRESHOLD_HEALTH_FACTOR = 10200;
 
     /// @notice Performs a partial liquidation by swapping some CA collateral to underlying at a discount.
     ///         Accepts the amount of underlying that the liquidator is willing to spend
@@ -111,6 +111,7 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
         params.repay = repay;
         params.to = to;
         params.creditFacade = ICreditManagerV3(params.creditManager).creditFacade();
+        params.cmVersion = ICreditManagerV3(params.creditManager).version();
         params.underlying = ICreditManagerV3(params.creditManager).underlying();
         params.priceOracle = ICreditManagerV3(creditManager).priceOracle();
 
@@ -173,12 +174,14 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
 
         ICreditFacadeV3(params.creditFacade).botMulticall(params.creditAccount, _getMultiCall(params));
 
-        CollateralDebtData memory cdd = ICreditManagerV3(params.creditManager).calcDebtAndCollateral(
-            params.creditAccount, CollateralCalcTask.DEBT_COLLATERAL
-        );
+        if (params.cmVersion == 3_00) {
+            CollateralDebtData memory cdd = ICreditManagerV3(params.creditManager).calcDebtAndCollateral(
+                params.creditAccount, CollateralCalcTask.DEBT_COLLATERAL
+            );
 
-        if (cdd.twvUSD * PERCENTAGE_FACTOR < cdd.totalDebtUSD * THRESHOLD_HEALTH_FACTOR) {
-            revert HealthFactorTooLowException();
+            if (cdd.twvUSD * PERCENTAGE_FACTOR < cdd.totalDebtUSD * THRESHOLD_HEALTH_FACTOR) {
+                revert HealthFactorTooLowException();
+            }
         }
     }
 
@@ -234,7 +237,7 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
 
     /// @dev Returns the multicall to execute in Credit Facade
     function _getMultiCall(LiquidationParams memory params) internal view returns (MultiCall[] memory calls) {
-        calls = new MultiCall[](params.repay ? 3 : 2);
+        calls = new MultiCall[](2 + (params.repay ? 1 : 0) + (params.cmVersion > 3_00 ? 1 : 0));
 
         calls[0] = MultiCall({
             target: params.creditFacade,
@@ -252,6 +255,15 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
                 target: params.creditFacade,
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.decreaseDebt, (IERC20(params.underlying).balanceOf(params.creditAccount))
+                    )
+            });
+        }
+
+        if (params.cmVersion > 3_00) {
+            calls[4] = MultiCall({
+                target: params.creditFacade,
+                callData: abi.encodeCall(
+                    ICreditFacadeV3Multicall.setFullCheckParams, (new uint256[](0), THRESHOLD_HEALTH_FACTOR)
                     )
             });
         }
