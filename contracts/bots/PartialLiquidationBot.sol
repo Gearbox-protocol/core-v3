@@ -110,9 +110,9 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
         params.exactIn = exactIn;
         params.repay = repay;
         params.to = to;
-        params.creditFacade = ICreditManagerV3(params.creditManager).creditFacade();
-        params.cmVersion = ICreditManagerV3(params.creditManager).version();
-        params.underlying = ICreditManagerV3(params.creditManager).underlying();
+        params.creditFacade = ICreditManagerV3(creditManager).creditFacade();
+        params.cmVersion = ICreditManagerV3(creditManager).version();
+        params.underlying = ICreditManagerV3(creditManager).underlying();
         params.priceOracle = ICreditManagerV3(creditManager).priceOracle();
 
         // Passing the underlying as assetOut and repaying would allow the liquidator to make
@@ -164,9 +164,7 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
         if (params.exactIn) {
             (params.amountIn, params.amountOut) = _getAmountsExactIn(params, maxAmountIn, maxAmountOut);
         } else {
-            params.amountOut = params.amountOut == type(uint256).max
-                ? IERC20(params.assetOut).balanceOf(params.creditAccount)
-                : params.amountOut;
+            params.amountOut = params.amountOut == type(uint256).max ? maxAmountOut : params.amountOut;
             (params.amountIn, params.amountOut) = _getAmountsExactOut(params, maxAmountIn, maxAmountOut);
         }
 
@@ -260,7 +258,7 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
         }
 
         if (params.cmVersion > 3_00) {
-            calls[4] = MultiCall({
+            calls[calls.length - 1] = MultiCall({
                 target: params.creditFacade,
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.setFullCheckParams, (new uint256[](0), THRESHOLD_HEALTH_FACTOR)
