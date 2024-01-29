@@ -121,6 +121,7 @@ contract PartialLiquidationBotIntegrationTest is IntegrationTestHelper {
             creditAccount: creditAccount,
             assetOut: tokenTestSuite.addressOf(Tokens.LINK),
             amountOut: type(uint256).max,
+            to: FRIEND,
             repay: false,
             priceUpdates: pUpdates
         });
@@ -171,6 +172,7 @@ contract PartialLiquidationBotIntegrationTest is IntegrationTestHelper {
             creditAccount: creditAccount,
             assetOut: link,
             amountOut: type(uint256).max,
+            to: FRIEND,
             repay: false,
             priceUpdates: new PriceUpdate[](0)
         });
@@ -222,13 +224,14 @@ contract PartialLiquidationBotIntegrationTest is IntegrationTestHelper {
             creditAccount: creditAccount,
             assetOut: underlying,
             amountOut: type(uint256).max,
+            to: FRIEND,
             repay: false,
             priceUpdates: new PriceUpdate[](0)
         });
         vm.stopPrank();
     }
 
-    /// @dev I:[PLB-04]: liquidatePartialSingleAsset allows correct max repayment amount for both repayment cases
+    /// @dev I:[PLB-04]: liquidatePartialSingleAsset computes correct max repayment amount for both repayment cases
     function test_I_PLB_04_liquidatePartialSingleAsset_max_swap_is_correct() public creditTest {
         _setUp();
 
@@ -274,9 +277,8 @@ contract PartialLiquidationBotIntegrationTest is IntegrationTestHelper {
 
             (uint256 minDebt,) = creditFacade.debtLimits();
 
-            uint256 maxRepayable = i == 0
-                ? CreditLogic.calcTotalDebt(cdd) * plb.DEBT_BUFFER() / PERCENTAGE_FACTOR - WAD
-                : CreditLogic.calcTotalDebt(cdd) - minDebt - WAD;
+            uint256 maxRepayable =
+                i == 0 ? CreditLogic.calcTotalDebt(cdd) - WAD : CreditLogic.calcTotalDebt(cdd) - minDebt - WAD;
 
             address link = tokenTestSuite.addressOf(Tokens.LINK);
 
@@ -288,6 +290,7 @@ contract PartialLiquidationBotIntegrationTest is IntegrationTestHelper {
                 creditAccount: creditAccount,
                 assetOut: link,
                 amountOut: type(uint256).max,
+                to: FRIEND,
                 repay: i == 1,
                 priceUpdates: new PriceUpdate[](0)
             });
@@ -350,6 +353,117 @@ contract PartialLiquidationBotIntegrationTest is IntegrationTestHelper {
             creditAccount: creditAccount,
             assetOut: link,
             amountOut: type(uint256).max,
+            to: FRIEND,
+            repay: false,
+            priceUpdates: new PriceUpdate[](0)
+        });
+        vm.stopPrank();
+    }
+
+    /// @dev I:[PLB-06]: partialLiquidateExactOut sends assetOut to correct address
+    function test_I_PLB_06_partialLiquidateExactOut_sends_assetOut_to_correct_address() public creditTest {
+        _setUp();
+
+        // Exactly enough LINK to cover debt + 100 WAD
+        uint256 linkAmount = 100 * WAD
+            + priceOracle.convert(DAI_ACCOUNT_AMOUNT, underlying, tokenTestSuite.addressOf(Tokens.LINK)) * PERCENTAGE_FACTOR
+                / creditManager.liquidationThresholds(tokenTestSuite.addressOf(Tokens.LINK));
+
+        tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
+        tokenTestSuite.mint(Tokens.LINK, USER, linkAmount);
+        tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
+
+        tokenTestSuite.mint(Tokens.DAI, FRIEND, DAI_ACCOUNT_AMOUNT * 100);
+        tokenTestSuite.approve(Tokens.DAI, FRIEND, address(plb));
+
+        MultiCall[] memory calls = MultiCallBuilder.build(
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_ACCOUNT_AMOUNT))
+            }),
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), linkAmount)
+                    )
+            })
+        );
+
+        vm.prank(USER);
+        address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
+
+        vm.roll(block.number + 1);
+
+        // Account should be liquidatable after
+        _purgeToken(creditAccount, tokenTestSuite.addressOf(Tokens.LINK), 101 * WAD);
+        _purgeToken(creditAccount, underlying, DAI_ACCOUNT_AMOUNT - WAD);
+
+        address link = tokenTestSuite.addressOf(Tokens.LINK);
+
+        vm.expectCall(link, abi.encodeCall(IERC20.transfer, (FRIEND2, linkAmount / 2)));
+
+        vm.startPrank(FRIEND);
+        (uint256 underlyingAmountIn,) = plb.partialLiquidateExactOut({
+            creditManager: address(creditManager),
+            creditAccount: creditAccount,
+            assetOut: link,
+            amountOut: linkAmount / 2,
+            to: FRIEND2,
+            repay: false,
+            priceUpdates: new PriceUpdate[](0)
+        });
+        vm.stopPrank();
+    }
+
+    /// @dev I:[PLB-07]: partialLiquidateExactIn sends correct underlying amount
+    function test_I_PLB_07_partialLiquidateExactIn_sends_correct_underlying_amount() public creditTest {
+        _setUp();
+
+        // Exactly enough LINK to cover debt + 100 WAD
+        uint256 linkAmount = 100 * WAD
+            + priceOracle.convert(DAI_ACCOUNT_AMOUNT, underlying, tokenTestSuite.addressOf(Tokens.LINK)) * PERCENTAGE_FACTOR
+                / creditManager.liquidationThresholds(tokenTestSuite.addressOf(Tokens.LINK));
+
+        tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
+        tokenTestSuite.mint(Tokens.LINK, USER, linkAmount);
+        tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
+
+        tokenTestSuite.mint(Tokens.DAI, FRIEND, DAI_ACCOUNT_AMOUNT * 100);
+        tokenTestSuite.approve(Tokens.DAI, FRIEND, address(plb));
+
+        MultiCall[] memory calls = MultiCallBuilder.build(
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_ACCOUNT_AMOUNT))
+            }),
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), linkAmount)
+                    )
+            })
+        );
+
+        vm.prank(USER);
+        address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
+
+        vm.roll(block.number + 1);
+
+        // Account should be liquidatable after
+        _purgeToken(creditAccount, tokenTestSuite.addressOf(Tokens.LINK), 101 * WAD);
+        _purgeToken(creditAccount, underlying, DAI_ACCOUNT_AMOUNT - WAD);
+
+        address link = tokenTestSuite.addressOf(Tokens.LINK);
+
+        vm.expectCall(underlying, abi.encodeCall(IERC20.transferFrom, (FRIEND, creditAccount, DAI_ACCOUNT_AMOUNT / 2)));
+
+        vm.startPrank(FRIEND);
+        (uint256 underlyingAmountIn,) = plb.partialLiquidateExactIn({
+            creditManager: address(creditManager),
+            creditAccount: creditAccount,
+            assetOut: link,
+            amountIn: DAI_ACCOUNT_AMOUNT / 2,
+            to: FRIEND2,
             repay: false,
             priceUpdates: new PriceUpdate[](0)
         });

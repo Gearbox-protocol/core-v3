@@ -26,10 +26,6 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
     /// @notice Minimal health factor of account after liquidation
     uint256 public constant THRESHOLD_HEALTH_FACTOR = 10200;
 
-    /// @notice The percentage of total debt that can be covered by partial liquidaitons,
-    ///         accounting for possible future interest
-    uint256 public constant DEBT_BUFFER = 10100;
-
     /// @notice Performs a partial liquidation by swapping some CA collateral to underlying at a discount.
     ///         Accepts the amount of underlying that the liquidator is willing to spend
     /// @param creditManager Credit Manager where the account resides
@@ -44,11 +40,12 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
         address creditAccount,
         address assetOut,
         uint256 amountIn,
+        address to,
         bool repay,
         PriceUpdate[] memory priceUpdates
     ) external returns (uint256, uint256) {
         LiquidationParams memory params =
-            _prepareParams(creditManager, creditAccount, assetOut, amountIn, 0, repay, true);
+            _prepareParams(creditManager, creditAccount, assetOut, amountIn, 0, to, repay, true);
 
         /// Since we are computing debt and collateral before liquidation,
         /// we need to update prices beforehand, if needed
@@ -76,11 +73,12 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
         address creditAccount,
         address assetOut,
         uint256 amountOut,
+        address to,
         bool repay,
         PriceUpdate[] memory priceUpdates
     ) external returns (uint256, uint256) {
         LiquidationParams memory params =
-            _prepareParams(creditManager, creditAccount, assetOut, 0, amountOut, repay, false);
+            _prepareParams(creditManager, creditAccount, assetOut, 0, amountOut, to, repay, false);
 
         /// Since we are computing debt and collateral before liquidation,
         /// we need to update prices beforehand, if needed
@@ -100,6 +98,7 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
         address assetOut,
         uint256 amountIn,
         uint256 amountOut,
+        address to,
         bool repay,
         bool exactIn
     ) internal view returns (LiquidationParams memory params) {
@@ -110,6 +109,7 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
         params.amountOut = amountOut;
         params.exactIn = exactIn;
         params.repay = repay;
+        params.to = to;
         params.creditFacade = ICreditManagerV3(params.creditManager).creditFacade();
         params.underlying = ICreditManagerV3(params.creditManager).underlying();
         params.priceOracle = ICreditManagerV3(creditManager).priceOracle();
@@ -151,7 +151,7 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
             if (params.repay) {
                 repayable = params.totalDebt - minDebt;
             } else {
-                repayable = params.totalDebt * DEBT_BUFFER / PERCENTAGE_FACTOR;
+                repayable = params.totalDebt;
             }
 
             if (underlyingBalance >= repayable) revert NothingToLiquidateException();
@@ -244,7 +244,7 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
         calls[1] = MultiCall({
             target: params.creditFacade,
             callData: abi.encodeCall(
-                ICreditFacadeV3Multicall.withdrawCollateral, (params.assetOut, params.amountOut, msg.sender)
+                ICreditFacadeV3Multicall.withdrawCollateral, (params.assetOut, params.amountOut, params.to)
                 )
         });
         if (params.repay) {

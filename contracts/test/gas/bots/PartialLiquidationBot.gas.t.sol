@@ -101,6 +101,7 @@ contract PartialLiquidationBotGasTest is IntegrationTestHelper {
             creditAccount: creditAccount,
             assetOut: tokenTestSuite.addressOf(Tokens.LINK),
             amountOut: type(uint256).max,
+            to: FRIEND,
             repay: false,
             priceUpdates: new PriceUpdate[](0)
         });
@@ -160,6 +161,7 @@ contract PartialLiquidationBotGasTest is IntegrationTestHelper {
             creditAccount: creditAccount,
             assetOut: tokenTestSuite.addressOf(Tokens.LINK),
             amountOut: type(uint256).max,
+            to: FRIEND,
             repay: true,
             priceUpdates: new PriceUpdate[](0)
         });
@@ -236,6 +238,7 @@ contract PartialLiquidationBotGasTest is IntegrationTestHelper {
             creditAccount: creditAccount,
             assetOut: tokenTestSuite.addressOf(Tokens.LINK),
             amountOut: type(uint256).max,
+            to: FRIEND,
             repay: false,
             priceUpdates: new PriceUpdate[](0)
         });
@@ -314,6 +317,7 @@ contract PartialLiquidationBotGasTest is IntegrationTestHelper {
             creditAccount: creditAccount,
             assetOut: tokenTestSuite.addressOf(Tokens.LINK),
             amountOut: type(uint256).max,
+            to: FRIEND,
             repay: true,
             priceUpdates: new PriceUpdate[](0)
         });

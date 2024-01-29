@@ -24,6 +24,7 @@ struct LiquidationParams {
     uint256 amountIn;
     uint256 amountOut;
     uint256 totalDebt;
+    address to;
     bool exactIn;
     bool repay;
 }
@@ -34,6 +35,7 @@ interface IPartialLiquidationBot {
         address creditAccount,
         address assetOut,
         uint256 amountIn,
+        address to,
         bool repay,
         PriceUpdate[] memory priceUpdates
     ) external returns (uint256, uint256);
@@ -43,6 +45,7 @@ interface IPartialLiquidationBot {
         address creditAccount,
         address assetOut,
         uint256 amountOut,
+        address to,
         bool repay,
         PriceUpdate[] memory priceUpdates
     ) external returns (uint256, uint256);
