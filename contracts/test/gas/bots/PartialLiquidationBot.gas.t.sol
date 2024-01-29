@@ -34,7 +34,7 @@ contract PartialLiquidationBotGasTest is IntegrationTestHelper {
     PartialLiquidationBot plb;
 
     function _setUp() public {
-        plb = new PartialLiquidationBot();
+        plb = new PartialLiquidationBot(address(addressProvider));
 
         vm.prank(CONFIGURATOR);
         botList.setBotSpecialPermissions(

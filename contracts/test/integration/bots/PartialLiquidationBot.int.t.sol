@@ -38,8 +38,10 @@ import "../../../interfaces/IExceptions.sol";
 contract PartialLiquidationBotIntegrationTest is IntegrationTestHelper {
     PartialLiquidationBot plb;
 
+    address treasury = DUMB_ADDRESS;
+
     function _setUp() public {
-        plb = new PartialLiquidationBot();
+        plb = new PartialLiquidationBot(address(addressProvider));
 
         vm.prank(CONFIGURATOR);
         botList.setBotSpecialPermissions(
@@ -267,7 +269,7 @@ contract PartialLiquidationBotIntegrationTest is IntegrationTestHelper {
 
         // Account should be liquidatable after
         _purgeToken(creditAccount, tokenTestSuite.addressOf(Tokens.LINK), 101 * WAD);
-        _purgeToken(creditAccount, underlying, DAI_ACCOUNT_AMOUNT - WAD);
+        _purgeToken(creditAccount, underlying, DAI_ACCOUNT_AMOUNT);
 
         for (uint256 i = 0; i < 2; ++i) {
             uint256 snapshot = vm.snapshot();
@@ -277,12 +279,14 @@ contract PartialLiquidationBotIntegrationTest is IntegrationTestHelper {
 
             (uint256 minDebt,) = creditFacade.debtLimits();
 
-            uint256 maxRepayable =
-                i == 0 ? CreditLogic.calcTotalDebt(cdd) - WAD : CreditLogic.calcTotalDebt(cdd) - minDebt - WAD;
+            uint256 maxRepayable = i == 0 ? CreditLogic.calcTotalDebt(cdd) : CreditLogic.calcTotalDebt(cdd) - minDebt;
+
+            (, uint16 liquidationFee,,,) = creditManager.fees();
+
+            maxRepayable = maxRepayable * PERCENTAGE_FACTOR / (PERCENTAGE_FACTOR - liquidationFee) - 1;
+            uint256 fee = maxRepayable * liquidationFee / PERCENTAGE_FACTOR;
 
             address link = tokenTestSuite.addressOf(Tokens.LINK);
-
-            vm.expectCall(underlying, abi.encodeCall(IERC20.transferFrom, (FRIEND, creditAccount, maxRepayable)));
 
             vm.startPrank(FRIEND);
             (uint256 underlyingAmountIn,) = plb.partialLiquidateExactOut({
@@ -453,9 +457,16 @@ contract PartialLiquidationBotIntegrationTest is IntegrationTestHelper {
         _purgeToken(creditAccount, tokenTestSuite.addressOf(Tokens.LINK), 101 * WAD);
         _purgeToken(creditAccount, underlying, DAI_ACCOUNT_AMOUNT - WAD);
 
+        (, uint16 liquidationFee,,,) = creditManager.fees();
+
+        uint256 fee = (DAI_ACCOUNT_AMOUNT / 2) * liquidationFee / PERCENTAGE_FACTOR;
+
         address link = tokenTestSuite.addressOf(Tokens.LINK);
 
-        vm.expectCall(underlying, abi.encodeCall(IERC20.transferFrom, (FRIEND, creditAccount, DAI_ACCOUNT_AMOUNT / 2)));
+        vm.expectCall(
+            underlying, abi.encodeCall(IERC20.transferFrom, (FRIEND, creditAccount, DAI_ACCOUNT_AMOUNT / 2 - fee))
+        );
+        vm.expectCall(underlying, abi.encodeCall(IERC20.transferFrom, (FRIEND, treasury, fee)));
 
         vm.startPrank(FRIEND);
         plb.partialLiquidateExactIn({

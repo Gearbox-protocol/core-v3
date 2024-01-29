@@ -6,6 +6,7 @@ pragma solidity ^0.8.17;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import "../interfaces/IAddressProviderV3.sol";
 import {IPartialLiquidationBot, LiquidationParams, PriceUpdate} from "../interfaces/IPartialLiquidationBot.sol";
 import {ICreditFacadeV3} from "../interfaces/ICreditFacadeV3.sol";
 import {ICreditFacadeV3Multicall} from "../interfaces/ICreditFacadeV3Multicall.sol";
@@ -25,6 +26,13 @@ import "../interfaces/IExceptions.sol";
 contract PartialLiquidationBot is IPartialLiquidationBot {
     /// @notice Minimal health factor of account after liquidation
     uint16 public constant THRESHOLD_HEALTH_FACTOR = 10200;
+
+    /// @notice Address of the Gearbox DAO treasury
+    address public immutable treasury;
+
+    constructor(address _addressProvider) {
+        treasury = IAddressProviderV3(_addressProvider).getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL);
+    }
 
     /// @notice Performs a partial liquidation by swapping some CA collateral to underlying at a discount.
     ///         Accepts the amount of underlying that the liquidator is willing to spend
@@ -162,13 +170,16 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
         }
 
         if (params.exactIn) {
-            (params.amountIn, params.amountOut) = _getAmountsExactIn(params, maxAmountIn, maxAmountOut);
+            (params.amountIn, params.amountOut, params.amountFee) =
+                _getAmountsExactIn(params, maxAmountIn, maxAmountOut);
         } else {
             params.amountOut = params.amountOut == type(uint256).max ? maxAmountOut : params.amountOut;
-            (params.amountIn, params.amountOut) = _getAmountsExactOut(params, maxAmountIn, maxAmountOut);
+            (params.amountIn, params.amountOut, params.amountFee) =
+                _getAmountsExactOut(params, maxAmountIn, maxAmountOut);
         }
 
-        IERC20(params.underlying).transferFrom(msg.sender, params.creditAccount, params.amountIn);
+        IERC20(params.underlying).transferFrom(msg.sender, params.creditAccount, params.amountIn - params.amountFee);
+        IERC20(params.underlying).transferFrom(msg.sender, treasury, params.amountFee);
 
         ICreditFacadeV3(params.creditFacade).botMulticall(params.creditAccount, _getMultiCall(params));
 
@@ -189,11 +200,21 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
     function _getAmountsExactIn(LiquidationParams memory params, uint256 maxAmountIn, uint256 maxAmountOut)
         internal
         view
-        returns (uint256, uint256)
+        returns (uint256, uint256, uint256)
     {
-        (,, uint16 liquidationDiscount,,) = ICreditManagerV3(params.creditManager).fees();
+        uint16 liquidationDiscount;
+        uint256 amountIn;
+        uint256 amountFee;
 
-        uint256 amountIn = Math.min(params.amountIn, maxAmountIn);
+        {
+            uint16 feeLiquidation;
+            (, feeLiquidation, liquidationDiscount,,) = ICreditManagerV3(params.creditManager).fees();
+
+            maxAmountIn = maxAmountIn * PERCENTAGE_FACTOR / (PERCENTAGE_FACTOR - feeLiquidation) - 1;
+
+            amountIn = Math.min(params.amountIn, maxAmountIn);
+            amountFee = amountIn * feeLiquidation / PERCENTAGE_FACTOR;
+        }
 
         uint256 assetOutEquivalent = IPriceOracleV3(params.priceOracle).convert(
             amountIn, params.underlying, params.assetOut
@@ -202,9 +223,13 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
         // If the computed amount of assetOut is larger than balance, then only the max amount is bought,
         // and the amount of underlying is adjusted proportionally
         if (assetOutEquivalent > maxAmountOut) {
-            return (amountIn * maxAmountOut / assetOutEquivalent, maxAmountOut);
+            return (
+                amountIn * maxAmountOut / assetOutEquivalent,
+                maxAmountOut,
+                amountFee * maxAmountOut / assetOutEquivalent
+            );
         } else {
-            return (amountIn, assetOutEquivalent);
+            return (amountIn, assetOutEquivalent, amountFee);
         }
     }
 
@@ -214,22 +239,29 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
     function _getAmountsExactOut(LiquidationParams memory params, uint256 maxAmountIn, uint256 maxAmountOut)
         internal
         view
-        returns (uint256, uint256)
+        returns (uint256, uint256, uint256)
     {
-        (,, uint16 liquidationDiscount,,) = ICreditManagerV3(params.creditManager).fees();
+        (, uint16 feeLiquidation, uint16 liquidationDiscount,,) = ICreditManagerV3(params.creditManager).fees();
+
+        maxAmountIn = maxAmountIn * PERCENTAGE_FACTOR / (PERCENTAGE_FACTOR - feeLiquidation) - 1;
 
         uint256 amountOut = Math.min(params.amountOut, maxAmountOut);
 
         uint256 underlyingEquivalent = IPriceOracleV3(params.priceOracle).convert(
             amountOut, params.assetOut, params.underlying
         ) * liquidationDiscount / PERCENTAGE_FACTOR;
+        uint256 amountFee = underlyingEquivalent * feeLiquidation / PERCENTAGE_FACTOR;
 
         // If the computed amount of underlying is larger than max amount, then only the max amount is paid,
         // and the amount of assetOut is adjusted proportionally
         if (underlyingEquivalent > maxAmountIn) {
-            return (maxAmountIn, amountOut * maxAmountIn / underlyingEquivalent);
+            return (
+                maxAmountIn,
+                amountOut * maxAmountIn / underlyingEquivalent,
+                amountFee * maxAmountIn / underlyingEquivalent
+            );
         } else {
-            return (underlyingEquivalent, amountOut);
+            return (underlyingEquivalent, amountOut, amountFee);
         }
     }
 

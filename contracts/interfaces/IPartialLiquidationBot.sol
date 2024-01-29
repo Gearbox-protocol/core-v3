@@ -23,6 +23,7 @@ struct LiquidationParams {
     address assetOut;
     uint256 amountIn;
     uint256 amountOut;
+    uint256 amountFee;
     uint256 totalDebt;
     address to;
     bool exactIn;
