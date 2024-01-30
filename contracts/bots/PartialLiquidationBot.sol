@@ -12,6 +12,7 @@ import {ICreditFacadeV3} from "../interfaces/ICreditFacadeV3.sol";
 import {ICreditFacadeV3Multicall} from "../interfaces/ICreditFacadeV3Multicall.sol";
 import {ICreditManagerV3, CollateralDebtData, CollateralCalcTask} from "../interfaces/ICreditManagerV3.sol";
 import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
+import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {CreditLogic} from "../libraries/CreditLogic.sol";
 
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
@@ -122,10 +123,18 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
         params.cmVersion = ICreditManagerV3(creditManager).version();
         params.underlying = ICreditManagerV3(creditManager).underlying();
         params.priceOracle = ICreditManagerV3(creditManager).priceOracle();
+        (params.minDebt,) = ICreditFacadeV3(params.creditFacade).debtLimits();
 
         // Passing the underlying as assetOut and repaying would allow the liquidator to make
         // profit without actually meaningfully changing account health, hence this is prohibited
         if (params.underlying == params.assetOut) revert CantPartialLiquidateUnderlying();
+
+        address poolQuotaKeeper = ICreditManagerV3(creditManager).poolQuotaKeeper();
+
+        params.assetOutIsQuoted = IPoolQuotaKeeperV3(poolQuotaKeeper).isQuotedToken(assetOut);
+        if (params.assetOutIsQuoted) {
+            (params.assetOutQuota,) = IPoolQuotaKeeperV3(poolQuotaKeeper).getQuota(creditAccount, assetOut);
+        }
     }
 
     /// @dev Internal function that retrieves the current account's debt and checks that it is liquidatable
@@ -141,33 +150,13 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
 
     /// @dev Internal function implementing the main liquidation logic
     ///      1. Determines the maximal amount of underlying that can be sold and maximal amount of assetOut that can be bought
-    ///      2. Computes the input and output amounts
-    ///      3. Transfers underlying from caller to Credit Account
+    ///      2. Computes the input and output amounts, as well as the liquidation fee
+    ///      3. Transfers underlying from caller to Credit Account and treasury (for liquidation fee)
     ///      4. Performs a multicall to enable the underlying and transfer assetOut to caller (and optionally decrease debt)
     ///      5. Checks that the resulting HF is above the minimal threshold
     function _liquidate(LiquidationParams memory params) internal {
-        uint256 maxAmountIn;
-        uint256 maxAmountOut;
-        {
-            uint256 underlyingBalance = IERC20(params.underlying).balanceOf(params.creditAccount);
-            (uint256 minDebt,) = ICreditFacadeV3(params.creditFacade).debtLimits();
-
-            uint256 repayable;
-
-            // If the liquidation is with repayment, the maximal amount of underlying is exactly enough to repay until minDebt
-            // If there is no repayment, we allow to fill up the account up to the totalDebt + a 1% buffer to cover future interest
-
-            if (params.repay) {
-                repayable = params.totalDebt - minDebt;
-            } else {
-                repayable = params.totalDebt;
-            }
-
-            if (underlyingBalance >= repayable) revert NothingToLiquidateException();
-
-            maxAmountIn = repayable - underlyingBalance;
-            maxAmountOut = IERC20(params.assetOut).balanceOf(params.creditAccount);
-        }
+        uint256 maxAmountIn = _getMaxAmountIn(params);
+        uint256 maxAmountOut = IERC20(params.assetOut).balanceOf(params.creditAccount);
 
         if (params.exactIn) {
             (params.amountIn, params.amountOut, params.amountFee) =
@@ -265,6 +254,15 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
         }
     }
 
+    /// @dev Returns the maximal amount of underlying that can be swapped for collateral
+    function _getMaxAmountIn(LiquidationParams memory params) internal view returns (uint256) {
+        if (params.assetOutIsQuoted) {
+            return params.assetOutQuota;
+        } else {
+            return params.totalDebt;
+        }
+    }
+
     /// @dev Returns the multicall to execute in Credit Facade
     function _getMultiCall(LiquidationParams memory params) internal view returns (MultiCall[] memory calls) {
         calls = new MultiCall[](2 + (params.repay ? 1 : 0) + (params.cmVersion > 3_00 ? 1 : 0));
@@ -281,11 +279,12 @@ contract PartialLiquidationBot is IPartialLiquidationBot {
                 )
         });
         if (params.repay) {
+            uint256 maxRepayable =
+                Math.min(params.totalDebt - params.minDebt, IERC20(params.underlying).balanceOf(params.creditAccount));
+
             calls[2] = MultiCall({
                 target: params.creditFacade,
-                callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.decreaseDebt, (IERC20(params.underlying).balanceOf(params.creditAccount))
-                    )
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (maxRepayable))
             });
         }
 

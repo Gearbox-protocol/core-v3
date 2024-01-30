@@ -233,7 +233,7 @@ contract PartialLiquidationBotIntegrationTest is IntegrationTestHelper {
         vm.stopPrank();
     }
 
-    /// @dev I:[PLB-04]: liquidatePartialSingleAsset computes correct max repayment amount for both repayment cases
+    /// @dev I:[PLB-04]: liquidatePartialSingleAsset computes correct max repayment amount for non-quoted tokens
     function test_I_PLB_04_liquidatePartialSingleAsset_max_swap_is_correct() public creditTest {
         _setUp();
 
@@ -271,39 +271,117 @@ contract PartialLiquidationBotIntegrationTest is IntegrationTestHelper {
         _purgeToken(creditAccount, tokenTestSuite.addressOf(Tokens.LINK), 101 * WAD);
         _purgeToken(creditAccount, underlying, DAI_ACCOUNT_AMOUNT);
 
-        for (uint256 i = 0; i < 2; ++i) {
-            uint256 snapshot = vm.snapshot();
+        CollateralDebtData memory cdd =
+            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_COLLATERAL);
 
-            CollateralDebtData memory cdd =
-                creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_COLLATERAL);
+        (uint256 minDebt,) = creditFacade.debtLimits();
 
-            (uint256 minDebt,) = creditFacade.debtLimits();
+        uint256 maxRepayable = CreditLogic.calcTotalDebt(cdd);
 
-            uint256 maxRepayable = i == 0 ? CreditLogic.calcTotalDebt(cdd) : CreditLogic.calcTotalDebt(cdd) - minDebt;
+        (, uint16 liquidationFee,,,) = creditManager.fees();
 
-            (, uint16 liquidationFee,,,) = creditManager.fees();
+        maxRepayable = maxRepayable * PERCENTAGE_FACTOR / (PERCENTAGE_FACTOR - liquidationFee) - 1;
+        uint256 fee = maxRepayable * liquidationFee / PERCENTAGE_FACTOR;
 
-            maxRepayable = maxRepayable * PERCENTAGE_FACTOR / (PERCENTAGE_FACTOR - liquidationFee) - 1;
-            uint256 fee = maxRepayable * liquidationFee / PERCENTAGE_FACTOR;
+        address link = tokenTestSuite.addressOf(Tokens.LINK);
 
-            address link = tokenTestSuite.addressOf(Tokens.LINK);
+        vm.startPrank(FRIEND);
+        (uint256 underlyingAmountIn,) = plb.partialLiquidateExactOut({
+            creditManager: address(creditManager),
+            creditAccount: creditAccount,
+            assetOut: link,
+            amountOut: type(uint256).max,
+            to: FRIEND,
+            repay: false,
+            priceUpdates: new PriceUpdate[](0)
+        });
+        vm.stopPrank();
 
-            vm.startPrank(FRIEND);
-            (uint256 underlyingAmountIn,) = plb.partialLiquidateExactOut({
-                creditManager: address(creditManager),
-                creditAccount: creditAccount,
-                assetOut: link,
-                amountOut: type(uint256).max,
-                to: FRIEND,
-                repay: i == 1,
-                priceUpdates: new PriceUpdate[](0)
-            });
-            vm.stopPrank();
+        assertEq(underlyingAmountIn, maxRepayable, "Incorrect amount of spent underlying returned");
+    }
 
-            assertEq(underlyingAmountIn, maxRepayable, "Incorrect amount of spent underlying returned");
+    /// @dev I:[PLB-04A]: liquidatePartialSingleAsset computes correct max repayment amount for quoted token
+    function test_I_PLB_04A_liquidatePartialSingleAsset_max_swap_is_correct_quoted() public creditTest {
+        _setUp();
 
-            vm.revertTo(snapshot);
-        }
+        // Exactly enough LINK to cover debt + 100 WAD
+        uint256 linkAmount = 100 * WAD
+            + priceOracle.convert(DAI_ACCOUNT_AMOUNT, underlying, tokenTestSuite.addressOf(Tokens.LINK)) * PERCENTAGE_FACTOR
+                / creditManager.liquidationThresholds(tokenTestSuite.addressOf(Tokens.LINK));
+
+        vm.startPrank(CONFIGURATOR);
+        gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
+        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
+        creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 7 days);
+        gauge.updateEpoch();
+        vm.stopPrank();
+
+        tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
+        tokenTestSuite.mint(Tokens.LINK, USER, linkAmount);
+        tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
+
+        tokenTestSuite.mint(Tokens.DAI, FRIEND, DAI_ACCOUNT_AMOUNT * 100);
+        tokenTestSuite.approve(Tokens.DAI, FRIEND, address(plb));
+
+        MultiCall[] memory calls = MultiCallBuilder.build(
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_ACCOUNT_AMOUNT))
+            }),
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(
+                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), linkAmount)
+                    )
+            }),
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(
+                    ICreditFacadeV3Multicall.updateQuota,
+                    (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(DAI_ACCOUNT_AMOUNT)), uint96(DAI_ACCOUNT_AMOUNT))
+                    )
+            })
+        );
+
+        vm.prank(USER);
+        address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
+
+        vm.roll(block.number + 1);
+
+        // Account should be liquidatable after
+        _purgeToken(creditAccount, tokenTestSuite.addressOf(Tokens.LINK), 101 * WAD);
+        _purgeToken(creditAccount, underlying, DAI_ACCOUNT_AMOUNT);
+
+        CollateralDebtData memory cdd =
+            creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_COLLATERAL);
+
+        (uint256 minDebt,) = creditFacade.debtLimits();
+
+        uint256 maxRepayable = DAI_ACCOUNT_AMOUNT;
+
+        (, uint16 liquidationFee,,,) = creditManager.fees();
+
+        maxRepayable = maxRepayable * PERCENTAGE_FACTOR / (PERCENTAGE_FACTOR - liquidationFee) - 1;
+        uint256 fee = maxRepayable * liquidationFee / PERCENTAGE_FACTOR;
+
+        address link = tokenTestSuite.addressOf(Tokens.LINK);
+
+        vm.startPrank(FRIEND);
+        (uint256 underlyingAmountIn,) = plb.partialLiquidateExactOut({
+            creditManager: address(creditManager),
+            creditAccount: creditAccount,
+            assetOut: link,
+            amountOut: type(uint256).max,
+            to: FRIEND,
+            repay: false,
+            priceUpdates: new PriceUpdate[](0)
+        });
+        vm.stopPrank();
+
+        assertEq(underlyingAmountIn, maxRepayable, "Incorrect amount of spent underlying returned");
     }
 
     /// @dev I:[PLB-05]: liquidatePartialSingleAsset revert on too low health factor post liqudiation

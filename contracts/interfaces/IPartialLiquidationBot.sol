@@ -25,6 +25,9 @@ struct LiquidationParams {
     uint256 amountOut;
     uint256 amountFee;
     uint256 totalDebt;
+    uint256 minDebt;
+    uint256 assetOutQuota;
+    bool assetOutIsQuoted;
     address to;
     bool exactIn;
     bool repay;
