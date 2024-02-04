@@ -4,31 +4,72 @@
 pragma solidity ^0.8.17;
 
 import {GearboxInstance} from "./Deployer.sol";
+import "../../interfaces/ICreditFacadeV3Multicall.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {ICreditFacadeV3Multicall} from "../../interfaces/ICreditFacadeV3.sol";
+import {ICreditManagerV3} from "../../interfaces/ICreditManagerV3.sol";
+
 import {MultiCall} from "../../interfaces/ICreditFacadeV3.sol";
 import {MultiCallBuilder} from "../lib/MultiCallBuilder.sol";
+import {MulticallGenerator} from "./MulticallGenerator.sol";
+
 import "forge-std/Test.sol";
 import "../lib/constants.sol";
 import "forge-std/console.sol";
 import "forge-std/Vm.sol";
 
+// Probably I can start with one actor handler which tests user realted functionality by
+// calling random numbers
+// Then, it could be added liquidation layer if prices are manipulatable
+// Then adapter to manipulate prices during multicall (Or simply set via priceUpdater)
+// How to build a random miulticall (?)
+//    - open multicall (generate random call during open CA)
+//    - multicall with open CA and nonZero debt
+//    - mutlicall with open CA and zeroDebt
+//    - multicall during closing CA
+//    - multicall during liquidation
+//    - multicall for withdrawing
+//
+// In other words, to find a weak place, we should build possible attack vector behavior via handler and then keep all invariants there
 contract Handler {
     Vm internal vm;
     GearboxInstance gi;
 
+    MulticallGenerator mcg;
+
     uint256 b;
-    uint256 counter;
+    address[] accounts;
 
     constructor(GearboxInstance _gi) {
         gi = _gi;
         vm = gi.getVm();
-        b = block.timestamp;
+        mcg = new MulticallGenerator(address(gi.creditManager()), address(gi.adapterAttacker()));
+
+        ICreditManagerV3 creditManager = gi.creditManager();
+
+        uint256 cTokensQty = creditManager.collateralTokensCount();
+
+        for (uint256 i; i < cTokensQty; ++i) {
+            (address token,) = creditManager.collateralTokenByMask(1 << i);
+            IERC20(token).approve(address(creditManager), type(uint256).max);
+            gi.tokenTestSuite().mint(token, address(this), type(uint80).max);
+        }
+
+        b = block.number;
     }
 
-    function openCA(uint256 _debt) public {
+    function randomCall(uint256 _seed, uint16 _account) public {
+        if (accounts.length < 20) {
+            openCA(_seed);
+        } else {
+            multicall(_seed, _account);
+        }
+    }
+
+    function openCA(uint256 _debt) internal {
         vm.roll(++b);
-        console.log(++counter);
+
         (uint256 minDebt, uint256 maxDebt) = gi.creditFacade().debtLimits();
 
         uint256 debt = minDebt + (_debt % (maxDebt - minDebt));
@@ -46,7 +87,7 @@ contract Handler {
             gi.tokenTestSuite().mint(gi.underlyingT(), address(this), debt);
             gi.tokenTestSuite().approve(gi.underlyingT(), address(this), address(gi.creditManager()));
 
-            gi.creditFacade().openCreditAccount(
+            address creditAccount = gi.creditFacade().openCreditAccount(
                 address(this),
                 MultiCallBuilder.build(
                     MultiCall({
@@ -60,6 +101,19 @@ contract Handler {
                 ),
                 0
             );
+
+            accounts.push(creditAccount);
         }
+    }
+
+    // todo: store changed account
+    function multicall(uint256 _seed, uint16 account) internal {
+        vm.roll(++b);
+        address creditAccount = accounts[account % accounts.length];
+
+        mcg.setCreditAccount(creditAccount);
+
+        MultiCall[] memory calls = mcg.generateRandomMulticalls(_seed, ALL_PERMISSIONS);
+        gi.creditFacade().multicall(creditAccount, calls);
     }
 }
