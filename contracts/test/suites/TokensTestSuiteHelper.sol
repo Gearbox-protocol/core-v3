@@ -53,7 +53,7 @@ contract TokensTestSuiteHelper is Test, ITokenTestSuite {
 
     function approve(address token, address holder, address targetContract, uint256 amount) public override {
         vm.startPrank(holder);
-        IERC20(token).safeApprove(targetContract, amount);
+        IERC20(token).forceApprove(targetContract, amount);
         vm.stopPrank();
     }
 
