@@ -10,25 +10,15 @@ enum AllowanceAction {
     ALLOW
 }
 
-/// @notice Struct with collateral token parameters
-/// @param token Token address
-/// @param liquidationThreshold Liquidation threshold in bps
-struct CollateralToken {
-    address token;
-    uint16 liquidationThreshold;
-}
-
 /// @notice Struct with credit manager configuration parameters
 /// @param minDebt Minimum debt amount per account
 /// @param maxDebt Maximum debt amount per account
-/// @param collateralTokens Array of collateral tokens
 /// @param degenNFT Whether to apply Degen NFT whitelist logic
 /// @param expirable Whether facade must be expirable
 /// @param name Credit manager name
 struct CreditManagerOpts {
     uint128 minDebt;
     uint128 maxDebt;
-    CollateralToken[] collateralTokens;
     address degenNFT;
     bool expirable;
     string name;

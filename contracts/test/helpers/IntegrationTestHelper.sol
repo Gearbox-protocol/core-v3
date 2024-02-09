@@ -25,7 +25,7 @@ import {ICreditFacadeV3Multicall} from "../../interfaces/ICreditFacadeV3.sol";
 
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {IPriceOracleV3} from "../../interfaces/IPriceOracleV3.sol";
-import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
+import {CreditManagerOpts} from "../../credit/CreditConfiguratorV3.sol";
 import {PoolFactory} from "../suites/PoolFactory.sol";
 
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
@@ -419,7 +419,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             CreditManagerOpts memory cmOpts = CreditManagerOpts({
                 minDebt: cmParams.minDebt,
                 maxDebt: cmParams.maxDebt,
-                collateralTokens: new CollateralToken[](0), //_convertCollateral(cmParams.collateralTokens),
                 degenNFT: (whitelisted) ? address(degenNFT) : address(0),
                 expirable: (anyExpirable) ? cmParams.expirable : expirable,
                 name: cmParams.name
@@ -679,19 +678,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
     function executeOneLineMulticall(address creditAccount, address target, bytes memory callData) internal {
         creditFacade.multicall(creditAccount, MultiCallBuilder.build(MultiCall({target: target, callData: callData})));
-    }
-
-    function _convertCollateral(CollateralTokenHuman[] memory clts)
-        internal
-        view
-        returns (CollateralToken[] memory result)
-    {
-        uint256 len = clts.length;
-        result = new CollateralToken[](len);
-        for (uint256 i = 0; i < len; i++) {
-            result[i] =
-                CollateralToken({token: tokenTestSuite.addressOf(clts[i].token), liquidationThreshold: clts[i].lt});
-        }
     }
 
     function _addCollateralTokens(CollateralTokenHuman[] memory clts) internal {

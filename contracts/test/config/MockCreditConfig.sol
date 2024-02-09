@@ -9,7 +9,7 @@ import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {NetworkDetector} from "@gearbox-protocol/sdk-gov/contracts/NetworkDetector.sol";
 import {Contracts} from "@gearbox-protocol/sdk-gov/contracts/SupportedContracts.sol";
 import "forge-std/console.sol";
-import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
+import {CreditManagerOpts} from "../../credit/CreditConfiguratorV3.sol";
 
 import {
     LinearIRMV3DeployParams,
@@ -17,7 +17,6 @@ import {
     CreditManagerV3DeployParams,
     GaugeRate,
     PoolQuotaLimit,
-    CollateralToken,
     IPoolV3DeployConfig,
     CollateralTokenHuman
 } from "../interfaces/ICreditConfig.sol";

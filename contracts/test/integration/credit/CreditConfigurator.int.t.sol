@@ -11,7 +11,6 @@ import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 import {
     CreditConfiguratorV3,
     CreditManagerOpts,
-    CollateralToken,
     AllowanceAction,
     IVersion
 } from "../../../credit/CreditConfiguratorV3.sol";
@@ -237,26 +236,16 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
     /// @dev I:[CC-1A]: constructor emits all events
     function test_I_CC_01A_constructor_emits_all_events() public creditTest {
-        CollateralToken[] memory cTokens = new CollateralToken[](1);
-
-        cTokens[0] = CollateralToken({token: tokenTestSuite.addressOf(Tokens.USDC), liquidationThreshold: 6000});
-
         CreditManagerOpts memory creditOpts = CreditManagerOpts({
             minDebt: uint128(50 * WAD),
             maxDebt: uint128(150000 * WAD),
-            collateralTokens: cTokens,
             degenNFT: address(0),
             expirable: false,
             name: "Test Credit Manager"
         });
 
         creditManager = new CreditManagerV3(address(addressProvider), address(pool), "Test Credit Manager");
-        creditFacade = new CreditFacadeV3(
-            address(creditManager),
-            creditOpts.degenNFT,
-
-            creditOpts.expirable
-        );
+        creditFacade = new CreditFacadeV3(address(creditManager), creditOpts.degenNFT, creditOpts.expirable);
 
         address priceOracleAddress = address(creditManager.priceOracle());
         address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
@@ -280,12 +269,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             DEFAULT_FEE_LIQUIDATION_EXPIRED,
             DEFAULT_LIQUIDATION_PREMIUM_EXPIRED
         );
-
-        vm.expectEmit(true, false, false, false);
-        emit AddCollateralToken(usdcToken);
-
-        vm.expectEmit(true, false, false, true);
-        emit SetTokenLiquidationThreshold(usdcToken, 6000);
 
         vm.expectEmit(true, false, false, false);
         emit SetCreditFacade(address(creditFacade));
@@ -404,7 +387,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
         address unknownPricefeedToken = address(new ERC20("TWPF", "Token without priceFeed"));
 
-        vm.expectRevert(IncorrectPriceFeedException.selector);
+        vm.expectRevert(PriceFeedDoesNotExistException.selector);
         creditConfigurator.addCollateralToken(unknownPricefeedToken, 9300);
 
         vm.stopPrank();
@@ -640,10 +623,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.prank(CONFIGURATOR);
         creditConfigurator.allowAdapter(address(adapterMock));
 
-        AdapterMock adapter2 = new AdapterMock(
-            address(creditManager),
-            address(targetMock)
-        );
+        AdapterMock adapter2 = new AdapterMock(address(creditManager), address(targetMock));
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.allowAdapter(address(adapter2));
@@ -908,11 +888,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             bool migrateSettings = ms != 0;
 
             if (expirable) {
-                CreditFacadeV3 initialCf = new CreditFacadeV3(
-                            address(creditManager),
-                            address(0),
-                            true
-                        );
+                CreditFacadeV3 initialCf = new CreditFacadeV3(address(creditManager), address(0), true);
 
                 vm.prank(CONFIGURATOR);
                 creditConfigurator.setCreditFacade(address(initialCf), migrateSettings);
@@ -926,11 +902,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             vm.prank(CONFIGURATOR);
             creditConfigurator.setMaxCumulativeLoss(1e18);
 
-            CreditFacadeV3 cf = new CreditFacadeV3(
-                        address(creditManager),
-                        address(0),
-                        expirable
-                    );
+            CreditFacadeV3 cf = new CreditFacadeV3(address(creditManager), address(0), expirable);
 
             uint8 maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
 
@@ -988,11 +960,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
             address botList = creditFacade.botList();
 
-            CreditFacadeV3 cf = new CreditFacadeV3(
-                address(creditManager),
-                address(0),
-                false
-            );
+            CreditFacadeV3 cf = new CreditFacadeV3(address(creditManager), address(0), false);
 
             vm.prank(CONFIGURATOR);
             creditConfigurator.setCreditFacade(address(cf), migrateSettings);
@@ -1031,11 +999,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
             vm.stopPrank();
 
-            CreditFacadeV3 cf = new CreditFacadeV3(
-                        address(creditManager),
-                        address(0),
-                        false
-                    );
+            CreditFacadeV3 cf = new CreditFacadeV3(address(creditManager), address(0), false);
 
             vm.prank(CONFIGURATOR);
             creditConfigurator.setCreditFacade(address(cf), migrateSettings);
@@ -1194,22 +1158,15 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS2);
         vm.stopPrank();
 
-        CollateralToken[] memory cTokens;
-
         CreditManagerOpts memory creditOpts = CreditManagerOpts({
             minDebt: uint128(50 * WAD),
             maxDebt: uint128(150000 * WAD),
-            collateralTokens: cTokens,
             degenNFT: address(0),
             expirable: false,
             name: "Test Credit Manager"
         });
 
-        CreditConfiguratorV3 newCC = new CreditConfiguratorV3(
-            creditManager,
-            creditFacade,
-            creditOpts
-        );
+        CreditConfiguratorV3 newCC = new CreditConfiguratorV3(creditManager, creditFacade, creditOpts);
 
         assertEq(
             creditConfigurator.allowedAdapters().length,
@@ -1308,11 +1265,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
     /// @dev I:[CC-32] resetCumulativeLoss works correctly
     function test_I_CC_32_resetCumulativeLoss_works_correctly() public creditTest {
-        CreditFacadeV3Harness cf = new CreditFacadeV3Harness(
-                            address(creditManager),
-                            address(0),
-                            false
-                        );
+        CreditFacadeV3Harness cf = new CreditFacadeV3Harness(address(creditManager), address(0), false);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.setCreditFacade(address(cf), true);
