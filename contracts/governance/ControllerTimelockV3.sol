@@ -23,7 +23,7 @@ import "../interfaces/IExceptions.sol";
 ///      for it. The policy also determines the address that can change a particular parameter.
 contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @notice Contract version
-    uint256 public constant override version = 3_00;
+    uint256 public constant override version = 3_01;
 
     /// @dev Minimum liquidation threshold ramp duration
     uint256 constant MIN_LT_RAMP_DURATION = 7 days;
@@ -274,11 +274,14 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
 
         uint256 delay = _getPolicyDelay(policyHash);
 
-        if (
-            !_checkPolicy(policyHash, uint256(ltCurrent), uint256(liquidationThresholdFinal))
-                || rampDuration < MIN_LT_RAMP_DURATION || rampStart < block.timestamp + delay
-        ) {
-            revert ParameterChecksFailedException(); // U: [CT-6]
+        {
+            bytes32 referenceHash = keccak256(abi.encode(creditManager, token, "TOKEN_LT"));
+            if (
+                !_checkPolicy(policyHash, referenceHash, uint256(ltCurrent), uint256(liquidationThresholdFinal))
+                    || rampDuration < MIN_LT_RAMP_DURATION || rampStart < block.timestamp + delay
+            ) {
+                revert ParameterChecksFailedException(); // U: [CT-6]
+            }
         }
 
         _queueTransaction({
@@ -304,13 +307,11 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @param creditManager Adress of CM to forbid an adapter for
     /// @param adapter Address of adapter to forbid
     function forbidAdapter(address creditManager, address adapter) external override {
-        bytes32 policyHash = keccak256(abi.encode(_group[creditManager], "FORBID_ADAPTER"));
-
         address creditConfigurator = ICreditManagerV3(creditManager).creditConfigurator();
 
         // For `forbidAdapter`, there is no value to modify
         // A policy check simply verifies that this controller has access to the function in a given group
-        if (!_checkPolicy(policyHash, 0, 0)) {
+        if (!_checkPolicy(creditManager, "FORBID_ADAPTER", 0, 0)) {
             revert ParameterChecksFailedException(); // U: [CT-10]
         }
 
@@ -318,7 +319,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
             target: creditConfigurator,
             signature: "forbidAdapter(address)",
             data: abi.encode(adapter),
-            delay: _getPolicyDelay(policyHash),
+            delay: _getPolicyDelay(creditManager, "FORBID_ADAPTER"),
             sanityCheckValue: 0,
             sanityCheckCallData: ""
         }); // U: [CT-10]
@@ -332,12 +333,13 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @param limit The new value of the limit
     function setTokenLimit(address pool, address token, uint96 limit) external override {
         bytes32 policyHash = keccak256(abi.encode(_group[pool], _group[token], "TOKEN_LIMIT"));
+        bytes32 referenceHash = keccak256(abi.encode(pool, token, "TOKEN_LIMIT"));
 
         address poolQuotaKeeper = IPoolV3(pool).poolQuotaKeeper();
 
         uint96 oldLimit = getTokenLimit(poolQuotaKeeper, token);
 
-        if (!_checkPolicy(policyHash, uint256(oldLimit), uint256(limit))) {
+        if (!_checkPolicy(policyHash, referenceHash, uint256(oldLimit), uint256(limit))) {
             revert ParameterChecksFailedException(); // U: [CT-11]
         }
 
@@ -365,12 +367,13 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @param quotaIncreaseFee The new value of the fee in bp
     function setTokenQuotaIncreaseFee(address pool, address token, uint16 quotaIncreaseFee) external override {
         bytes32 policyHash = keccak256(abi.encode(_group[pool], _group[token], "TOKEN_QUOTA_INCREASE_FEE"));
+        bytes32 referenceHash = keccak256(abi.encode(pool, token, "TOKEN_QUOTA_INCREASE_FEE"));
 
         address poolQuotaKeeper = IPoolV3(pool).poolQuotaKeeper();
 
         uint16 quotaIncreaseFeeOld = getTokenQuotaIncreaseFee(poolQuotaKeeper, token);
 
-        if (!_checkPolicy(policyHash, uint256(quotaIncreaseFeeOld), uint256(quotaIncreaseFee))) {
+        if (!_checkPolicy(policyHash, referenceHash, uint256(quotaIncreaseFeeOld), uint256(quotaIncreaseFee))) {
             revert ParameterChecksFailedException(); // U: [CT-12]
         }
 
@@ -396,11 +399,9 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @param pool Pool to update the limit for
     /// @param newLimit The new value of the limit
     function setTotalDebtLimit(address pool, uint256 newLimit) external override {
-        bytes32 policyHash = keccak256(abi.encode(_group[pool], "TOTAL_DEBT_LIMIT"));
-
         uint256 totalDebtLimitOld = getTotalDebtLimit(pool);
 
-        if (!_checkPolicy(policyHash, uint256(totalDebtLimitOld), uint256(newLimit))) {
+        if (!_checkPolicy(pool, "TOTAL_DEBT_LIMIT", uint256(totalDebtLimitOld), uint256(newLimit))) {
             revert ParameterChecksFailedException(); // U: [CT-13]
         }
 
@@ -408,7 +409,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
             target: pool,
             signature: "setTotalDebtLimit(uint256)",
             data: abi.encode(newLimit),
-            delay: _getPolicyDelay(policyHash),
+            delay: _getPolicyDelay(pool, "TOTAL_DEBT_LIMIT"),
             sanityCheckValue: totalDebtLimitOld,
             sanityCheckCallData: abi.encodeCall(this.getTotalDebtLimit, (pool))
         }); // U: [CT-13]
@@ -425,11 +426,9 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @param pool Pool to update the limit for
     /// @param newFee The new value of the fee in bp
     function setWithdrawFee(address pool, uint256 newFee) external override {
-        bytes32 policyHash = keccak256(abi.encode(_group[pool], "WITHDRAW_FEE"));
-
         uint256 withdrawFeeOld = IPoolV3(pool).withdrawFee();
 
-        if (!_checkPolicy(policyHash, withdrawFeeOld, newFee)) {
+        if (!_checkPolicy(pool, "WITHDRAW_FEE", withdrawFeeOld, newFee)) {
             revert ParameterChecksFailedException(); // U: [CT-14]
         }
 
@@ -437,7 +436,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
             target: pool,
             signature: "setWithdrawFee(uint256)",
             data: abi.encode(newFee),
-            delay: _getPolicyDelay(policyHash),
+            delay: _getPolicyDelay(pool, "WITHDRAW_FEE"),
             sanityCheckValue: withdrawFeeOld,
             sanityCheckCallData: abi.encodeCall(this.getWithdrawFee, (pool))
         }); // U: [CT-14]
@@ -456,6 +455,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @param rate The new minimal rate
     function setMinQuotaRate(address pool, address token, uint16 rate) external override {
         bytes32 policyHash = keccak256(abi.encode(_group[pool], _group[token], "TOKEN_QUOTA_MIN_RATE"));
+        bytes32 referenceHash = keccak256(abi.encode(pool, token, "TOKEN_QUOTA_MIN_RATE"));
 
         address poolQuotaKeeper = IPoolV3(pool).poolQuotaKeeper();
 
@@ -463,7 +463,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
 
         uint16 minRateCurrent = getMinQuotaRate(gauge, token);
 
-        if (!_checkPolicy(policyHash, uint256(minRateCurrent), uint256(rate))) {
+        if (!_checkPolicy(policyHash, referenceHash, uint256(minRateCurrent), uint256(rate))) {
             revert ParameterChecksFailedException(); // U: [CT-15A]
         }
 
@@ -491,6 +491,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @param rate The new maximal rate
     function setMaxQuotaRate(address pool, address token, uint16 rate) external override {
         bytes32 policyHash = keccak256(abi.encode(_group[pool], _group[token], "TOKEN_QUOTA_MAX_RATE"));
+        bytes32 referenceHash = keccak256(abi.encode(pool, token, "TOKEN_QUOTA_MAX_RATE"));
 
         address poolQuotaKeeper = IPoolV3(pool).poolQuotaKeeper();
 
@@ -498,7 +499,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
 
         uint16 maxRateCurrent = getMaxQuotaRate(gauge, token);
 
-        if (!_checkPolicy(policyHash, uint256(maxRateCurrent), uint256(rate))) {
+        if (!_checkPolicy(policyHash, referenceHash, uint256(maxRateCurrent), uint256(rate))) {
             revert ParameterChecksFailedException(); // U: [CT-15B]
         }
 
@@ -526,8 +527,9 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @param active New reserve price feed status (`true` to activate, `false` to deactivate)
     function setReservePriceFeedStatus(address priceOracle, address token, bool active) external override {
         bytes32 policyHash = keccak256(abi.encode(_group[priceOracle], _group[token], "RESERVE_PRICE_FEED_STATUS"));
+        bytes32 referenceHash = keccak256(abi.encode(priceOracle, token, "RESERVE_PRICE_FEED_STATUS"));
 
-        if (!_checkPolicy(policyHash, 0, 0)) {
+        if (!_checkPolicy(policyHash, referenceHash, 0, 0)) {
             revert ParameterChecksFailedException(); // U:[CT-16]
         }
 
