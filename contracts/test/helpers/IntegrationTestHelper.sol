@@ -336,8 +336,11 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             uint256 remainingBorrowable = pool.creditManagerBorrowable(address(creditManager));
 
             if (remainingBorrowable < minDebt) {
-                console.log("Cant setup credit amount because remaing funds < MIN_DEBT");
-                revert("Cant setup credit amount because remaing funds < MIN_DEBT");
+                tokenTestSuite.mint(underlying, INITIAL_LP, 5 * minDebt);
+                tokenTestSuite.approve(underlying, INITIAL_LP, address(pool));
+
+                vm.startPrank(INITIAL_LP);
+                pool.deposit(5 * minDebt, INITIAL_LP);
             }
 
             creditAccountAmount = Math.min(creditAccountAmount, Math.max(remainingBorrowable / 2, minDebt));
