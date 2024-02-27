@@ -7,6 +7,7 @@ import "../../interfaces/IAddressProviderV3.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
+import {IACL} from "@gearbox-protocol/core-v2/contracts/interfaces/IACL.sol";
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -341,6 +342,11 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
                 vm.prank(INITIAL_LP);
                 pool.deposit(5 * minDebt, INITIAL_LP);
+
+                address configurator = IACL(addressProvider.getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL)).owner();
+                uint256 currentLimit = pool.creditManagerDebtLimit(address(creditManager));
+                vm.prank(configurator);
+                pool.setCreditManagerDebtLimit(address(creditManager), currentLimit + 5 * minDebt);
             }
 
             creditAccountAmount = Math.min(creditAccountAmount, Math.max(remainingBorrowable / 2, minDebt));
