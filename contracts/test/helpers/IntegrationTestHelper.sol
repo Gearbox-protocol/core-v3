@@ -339,7 +339,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 tokenTestSuite.mint(underlying, INITIAL_LP, 5 * minDebt);
                 tokenTestSuite.approve(underlying, INITIAL_LP, address(pool));
 
-                vm.startPrank(INITIAL_LP);
+                vm.prank(INITIAL_LP);
                 pool.deposit(5 * minDebt, INITIAL_LP);
             }
 
