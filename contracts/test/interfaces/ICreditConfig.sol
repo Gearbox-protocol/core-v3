@@ -36,7 +36,7 @@ struct BalancerPool {
     uint8 status;
 }
 
-struct UniswapV2Pair {
+struct GenericSwapPair {
     Contracts router;
     Tokens token0;
     Tokens token1;
@@ -89,7 +89,7 @@ struct CreditManagerV3DeployParams {
     // ADAPTER CIONFIGURATION
     BalancerPool[] balancerPools;
     UniswapV3Pair[] uniswapV3Pairs;
-    UniswapV2Pair[] uniswapV2Pairs;
+    GenericSwapPair[] genericSwapPairs;
     VelodromeV2Pool[] velodromeV2Pools;
 }
 
