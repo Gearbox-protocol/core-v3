@@ -28,8 +28,8 @@ import {PriceFeedValidationTrait} from "../traits/PriceFeedValidationTrait.sol";
 ///         One should not expect the reserve price feed to always differ from the main one, although
 ///         most often that would be the case.
 /// @notice Price oracle additionaly provides "safe" conversion functions, which use minimum of main
-///         and reserve feed prices (the latter is assumed to be zero if reserve feed is not set).
-///         There are also trusted price feeds, for which safe prices are simply main feed prices.
+///         and reserve feed prices under normal conditions or 0 if reserve feed is active or not set.
+///         This logic is skipped if active price feed is trusted, in which case its answer is used.
 contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPriceOracleV3 {
     /// @notice Contract version
     uint256 public constant override version = 3_00;
@@ -52,141 +52,59 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     }
 
     /// @notice Returns `token`'s price in USD (with 8 decimals) from the specified price feed
-    function getPriceRaw(address token, bool reserve) external view returns (uint256 price) {
+    function getPriceRaw(address token, bool reserve) external view override returns (uint256 price) {
         (price,) = _getPriceRaw(token, reserve);
     }
 
     /// @notice Converts `amount` of `token` into USD amount (with 8 decimals)
     function convertToUSD(uint256 amount, address token) external view override returns (uint256) {
         (uint256 price, uint256 scale) = _getPrice(token);
-        return amount * price / scale; // U:[PO-9]
+        return amount * price / scale;
     }
 
     /// @notice Converts `amount` of USD (with 8 decimals) into `token` amount
     function convertFromUSD(uint256 amount, address token) external view override returns (uint256) {
         (uint256 price, uint256 scale) = _getPrice(token);
-        return amount * scale / price; // U:[PO-9]
+        return amount * scale / price;
     }
 
     /// @notice Converts `amount` of `tokenFrom` into `tokenTo` amount
     function convert(uint256 amount, address tokenFrom, address tokenTo) external view override returns (uint256) {
         (uint256 priceFrom, uint256 scaleFrom) = _getPrice(tokenFrom);
         (uint256 priceTo, uint256 scaleTo) = _getPrice(tokenTo);
-        return amount * priceFrom * scaleTo / (priceTo * scaleFrom); // U:[PO-10]
+        return amount * priceFrom * scaleTo / (priceTo * scaleFrom);
     }
 
     /// @notice Converts `amount` of `token` into USD amount (with 8 decimals) using safe price
     function safeConvertToUSD(uint256 amount, address token) external view override returns (uint256) {
         (uint256 price, uint256 scale) = _getPriceSafe(token);
-        return amount * price / scale; // U:[PO-11]
+        return amount * price / scale;
     }
 
-    /// @notice Returns the price feed for `token` or reverts if price feed is not set
+    /// @notice Returns the currently active price feed for `token`
     function priceFeeds(address token) external view override returns (address priceFeed) {
-        (priceFeed,,,,) = priceFeedParams(token); // U:[PO-8]
+        priceFeed = priceFeedParams(token).priceFeed;
     }
 
     /// @notice Returns the specified price feed for `token`
     function priceFeedsRaw(address token, bool reserve) external view override returns (address priceFeed) {
-        (priceFeed,,,,,) = _getPriceFeedParams(reserve ? _getTokenReserveKey(token) : token);
+        priceFeed = priceFeedParamsRaw(token, reserve).priceFeed;
     }
 
-    /// @notice Returns currently active price feed parameters for `token` or reverts if price feed is not set
-    function priceFeedParams(address token)
+    /// @notice Returns the currently active price feed parameters for `token`
+    function priceFeedParams(address token) public view override returns (PriceFeedParams memory params) {
+        params = _priceFeedsParams[token];
+        if (params.priceFeed != address(0) && !params.active) params = _priceFeedsParams[_getTokenReserveKey(token)];
+    }
+
+    /// @notice Returns the specified price feed parameters for `token`
+    function priceFeedParamsRaw(address token, bool reserve)
         public
         view
         override
-        returns (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals, bool trusted)
+        returns (PriceFeedParams memory params)
     {
-        bool useReserve;
-        (priceFeed, stalenessPeriod, skipCheck, decimals, useReserve, trusted) = _getPriceFeedParams(token);
-        if (useReserve) {
-            (priceFeed, stalenessPeriod, skipCheck, decimals,, trusted) =
-                _getPriceFeedParams(_getTokenReserveKey(token));
-        }
-    }
-
-    // --------- //
-    // INTERNALS //
-    // --------- //
-
-    /// @dev Returns `token`'s price and scale from the currently active price feed
-    function _getPrice(address token) internal view returns (uint256 price, uint256 scale) {
-        (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals,) = priceFeedParams(token);
-        return _getPrice(priceFeed, stalenessPeriod, skipCheck, decimals);
-    }
-
-    /// @dev Returns `token`'s price and scale from the explicitly specified price feed
-    function _getPriceRaw(address token, bool reserve) internal view returns (uint256 price, uint256 scale) {
-        (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals,,) =
-            _getPriceFeedParams(reserve ? _getTokenReserveKey(token) : token);
-        return _getPrice(priceFeed, stalenessPeriod, skipCheck, decimals);
-    }
-
-    /// @dev Returns `token`'s safe price and scale
-    function _getPriceSafe(address token) internal view returns (uint256 price, uint256 scale) {
-        (address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals,, bool trusted) =
-            _getPriceFeedParams(token);
-        (price, scale) = _getPrice(priceFeed, stalenessPeriod, skipCheck, decimals); // U:[PO-11]
-
-        if (!trusted) {
-            if (_priceFeedsParams[_getTokenReserveKey(token)].priceFeed == address(0)) return (0, scale); // U:[PO-11]
-            (uint256 reservePrice,) = _getPriceRaw(token, true);
-            price = Math.min(price, reservePrice); // U:[PO-11]
-        }
-    }
-
-    /// @dev Returns price feed answer and scale, optionally performs sanity and staleness checks
-    function _getPrice(address priceFeed, uint32 stalenessPeriod, bool skipCheck, uint8 decimals)
-        internal
-        view
-        returns (uint256 price, uint256 scale)
-    {
-        int256 answer = _getValidatedPrice(priceFeed, stalenessPeriod, skipCheck); // U:[PO-1]
-
-        // answer should not be negative (price feeds with `skipCheck = true` must ensure that!)
-        price = uint256(answer); // U:[PO-1]
-
-        // 1 <= decimals <= 18, so the operation is safe
-        unchecked {
-            scale = 10 ** decimals; // U:[PO-1]
-        }
-    }
-
-    /// @dev Efficiently loads `token`'s price feed parameters from storage
-    function _getPriceFeedParams(address token)
-        internal
-        view
-        returns (
-            address priceFeed,
-            uint32 stalenessPeriod,
-            bool skipCheck,
-            uint8 decimals,
-            bool useReserve,
-            bool trusted
-        )
-    {
-        PriceFeedParams storage params = _priceFeedsParams[token];
-        assembly {
-            let data := sload(params.slot)
-            priceFeed := data
-            stalenessPeriod := shr(160, data)
-            skipCheck := and(shr(192, data), 0x01)
-            decimals := shr(200, data)
-            useReserve := and(shr(208, data), 0x01)
-            trusted := and(shr(216, data), 0x01)
-        } // U:[PO-2]
-
-        if (priceFeed == address(0)) revert PriceFeedDoesNotExistException(); // U:[PO-2]
-    }
-
-    /// @dev Returns key that is used to store `token`'s reserve feed in `_priceFeedParams`
-    function _getTokenReserveKey(address token) internal pure returns (address key) {
-        // address(uint160(uint256(keccak256(abi.encodePacked("RESERVE", token)))))
-        assembly {
-            mstore(0x0, or("RESERVE", shl(0x28, token)))
-            key := keccak256(0x0, 0x1b)
-        } // U:[PO-3]
+        params = _priceFeedsParams[reserve ? _getTokenReserveKey(token) : token];
     }
 
     // ------------- //
@@ -197,47 +115,50 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     function setPriceFeed(address token, address priceFeed, uint32 stalenessPeriod, bool trusted)
         external
         override
-        nonZeroAddress(token) // U:[PO-6]
-        nonZeroAddress(priceFeed) // U:[PO-6]
-        configuratorOnly // U:[PO-6]
+        nonZeroAddress(token) // U:[PO-3]
+        nonZeroAddress(priceFeed) // U:[PO-3]
+        configuratorOnly // U:[PO-3]
     {
-        uint8 decimals = _priceFeedsParams[token].decimals;
-        decimals = decimals == 0 ? _validateToken(token) : decimals; // U:[PO-6]
+        PriceFeedParams memory params = priceFeedParamsRaw(token, false);
+        if (params.priceFeed == address(0)) {
+            params.decimals = _validateToken(token); // U:[PO-3]
+            params.active = true; // U:[PO-3]
+        }
 
-        bool skipCheck = _validatePriceFeed(priceFeed, stalenessPeriod); // U:[PO-6]
+        bool skipCheck = _validatePriceFeed(priceFeed, stalenessPeriod); // U:[PO-3]
         _priceFeedsParams[token] = PriceFeedParams({
             priceFeed: priceFeed,
             stalenessPeriod: stalenessPeriod,
             skipCheck: skipCheck,
-            decimals: decimals,
-            useReserve: false,
+            decimals: params.decimals,
+            active: params.active,
             trusted: trusted
-        }); // U:[PO-6]
-        emit SetPriceFeed(token, priceFeed, stalenessPeriod, skipCheck, trusted); // U:[PO-6]
+        }); // U:[PO-3]
+        emit SetPriceFeed(token, priceFeed, stalenessPeriod, skipCheck, trusted); // U:[PO-3]
     }
 
     /// @notice Sets reserve price feed for a given token
     /// @dev Main price feed for the token must already be set
-    function setReservePriceFeed(address token, address priceFeed, uint32 stalenessPeriod)
+    function setReservePriceFeed(address token, address priceFeed, uint32 stalenessPeriod, bool trusted)
         external
         override
-        nonZeroAddress(token) // U:[PO-7]
-        nonZeroAddress(priceFeed) // U:[PO-7]
-        configuratorOnly // U:[PO-7]
+        nonZeroAddress(token) // U:[PO-4]
+        nonZeroAddress(priceFeed) // U:[PO-4]
+        configuratorOnly // U:[PO-4]
     {
-        uint8 decimals = _priceFeedsParams[token].decimals;
-        if (decimals == 0) revert PriceFeedDoesNotExistException(); // U:[PO-7]
+        PriceFeedParams memory params = priceFeedParamsRaw(token, false);
+        if (params.priceFeed == address(0)) revert PriceFeedDoesNotExistException(); // U:[PO-4]
 
-        bool skipCheck = _validatePriceFeed(priceFeed, stalenessPeriod); // U:[PO-7]
+        bool skipCheck = _validatePriceFeed(priceFeed, stalenessPeriod); // U:[PO-4]
         _priceFeedsParams[_getTokenReserveKey(token)] = PriceFeedParams({
             priceFeed: priceFeed,
             stalenessPeriod: stalenessPeriod,
             skipCheck: skipCheck,
-            decimals: decimals,
-            useReserve: false,
-            trusted: false
-        }); // U:[PO-7]
-        emit SetReservePriceFeed(token, priceFeed, stalenessPeriod, skipCheck); // U:[PO-7]
+            decimals: params.decimals,
+            active: !params.active,
+            trusted: trusted
+        }); // U:[PO-4]
+        emit SetReservePriceFeed(token, priceFeed, stalenessPeriod, skipCheck, trusted); // U:[PO-4]
     }
 
     /// @notice Sets `token`'s reserve price feed status to `active`
@@ -245,26 +166,80 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     function setReservePriceFeedStatus(address token, bool active)
         external
         override
-        controllerOnly // U:[PO-8]
+        controllerOnly // U:[PO-5]
     {
-        if (_priceFeedsParams[_getTokenReserveKey(token)].priceFeed == address(0)) {
-            revert PriceFeedDoesNotExistException(); // U:[PO-8]
-        }
+        PriceFeedParams memory params = priceFeedParamsRaw(token, true);
+        if (params.priceFeed == address(0)) revert PriceFeedDoesNotExistException(); // U:[PO-5]
 
-        if (_priceFeedsParams[token].useReserve != active) {
-            _priceFeedsParams[token].useReserve = active; // U:[PO-8]
-            emit SetReservePriceFeedStatus(token, active); // U:[PO-8]
+        if (params.active != active) {
+            _priceFeedsParams[token].active = !active; // U:[PO-5]
+            _priceFeedsParams[_getTokenReserveKey(token)].active = active; // U:[PO-5]
+            emit SetReservePriceFeedStatus(token, active); // U:[PO-5]
         }
+    }
+
+    // --------- //
+    // INTERNALS //
+    // --------- //
+
+    /// @dev Returns `token`'s price and scale from the currently active price feed
+    function _getPrice(address token) internal view returns (uint256 price, uint256 scale) {
+        PriceFeedParams memory params = priceFeedParams(token);
+        if (params.priceFeed == address(0)) revert PriceFeedDoesNotExistException(); // U:[PO-1]
+        return (_getPrice(params), _getScale(params)); // U:[PO-1]
+    }
+
+    /// @dev Returns `token`'s price and scale from the specified price feed
+    function _getPriceRaw(address token, bool reserve) internal view returns (uint256 price, uint256 scale) {
+        PriceFeedParams memory params = priceFeedParamsRaw(token, reserve);
+        if (params.priceFeed == address(0)) revert PriceFeedDoesNotExistException();
+        return (_getPrice(params), _getScale(params));
+    }
+
+    /// @dev Returns `token`'s safe price and scale
+    function _getPriceSafe(address token) internal view returns (uint256 price, uint256 scale) {
+        PriceFeedParams memory params = priceFeedParamsRaw(token, false);
+        if (params.priceFeed == address(0)) revert PriceFeedDoesNotExistException(); // U:[PO-2]
+        if (params.active && params.trusted) return (_getPrice(params), _getScale(params)); // U:[PO-2]
+
+        PriceFeedParams memory reserveParams = priceFeedParamsRaw(token, true);
+        if (reserveParams.active && reserveParams.trusted) return (_getPrice(reserveParams), _getScale(params)); // U:[PO-2]
+
+        if (reserveParams.active || reserveParams.priceFeed == address(0)) return (0, _getScale(params)); // U:[PO-2]
+        return (Math.min(_getPrice(params), _getPrice(reserveParams)), _getScale(params)); // U:[PO-2]
+    }
+
+    /// @dev Returns token's price, optionally performs sanity and staleness checks
+    function _getPrice(PriceFeedParams memory params) internal view returns (uint256 price) {
+        int256 answer = _getValidatedPrice(params.priceFeed, params.stalenessPeriod, params.skipCheck);
+        // answer should not be negative (price feeds with `skipCheck = true` must ensure that!)
+        price = uint256(answer);
+    }
+
+    /// @dev Returns token's scale
+    function _getScale(PriceFeedParams memory params) internal pure returns (uint256 scale) {
+        unchecked {
+            scale = 10 ** params.decimals;
+        }
+    }
+
+    /// @dev Returns key that is used to store `token`'s reserve feed in `_priceFeedParams`
+    function _getTokenReserveKey(address token) internal pure returns (address key) {
+        // address(uint160(uint256(keccak256(abi.encodePacked("RESERVE", token)))))
+        assembly {
+            mstore(0x0, or("RESERVE", shl(0x28, token)))
+            key := keccak256(0x0, 0x1b)
+        } // U:[PO-6]
     }
 
     /// @dev Validates that `token` is a contract that returns `decimals` within allowed range
     function _validateToken(address token) internal view returns (uint8 decimals) {
-        if (!Address.isContract(token)) revert AddressIsNotContractException(token); // U:[PO-4]
+        if (!Address.isContract(token)) revert AddressIsNotContractException(token); // U:[PO-7]
         try ERC20(token).decimals() returns (uint8 _decimals) {
-            if (_decimals == 0 || _decimals > 18) revert IncorrectTokenContractException(); // U:[PO-4]
-            decimals = _decimals; // U:[PO-4]
+            if (_decimals == 0 || _decimals > 18) revert IncorrectTokenContractException(); // U:[PO-7]
+            decimals = _decimals; // U:[PO-7]
         } catch {
-            revert IncorrectTokenContractException(); // U:[PO-4]
+            revert IncorrectTokenContractException(); // U:[PO-7]
         }
     }
 }

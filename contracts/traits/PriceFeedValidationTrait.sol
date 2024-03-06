@@ -21,8 +21,8 @@ abstract contract PriceFeedValidationTrait {
 
     /// @dev Ensures that price is positive and not stale
     function _checkAnswer(int256 price, uint256 updatedAt, uint32 stalenessPeriod) internal view {
-        if (price <= 0) revert IncorrectPriceException();
-        if (block.timestamp >= updatedAt + stalenessPeriod) revert StalePriceException();
+        if (price <= 0) revert IncorrectPriceException(); // U:[PO-9]
+        if (block.timestamp >= updatedAt + stalenessPeriod) revert StalePriceException(); // U:[PO-9]
     }
 
     /// @dev Valites that `priceFeed` is a contract that adheres to Chainlink interface and passes sanity checks
@@ -30,33 +30,33 @@ abstract contract PriceFeedValidationTrait {
     ///      issues during deployment and configuration, so for such price feeds staleness check is skipped, and
     ///      special care must be taken to ensure all parameters are in tune.
     function _validatePriceFeed(address priceFeed, uint32 stalenessPeriod) internal view returns (bool skipCheck) {
-        if (!priceFeed.isContract()) revert AddressIsNotContractException(priceFeed); // U:[PO-5]
+        if (!priceFeed.isContract()) revert AddressIsNotContractException(priceFeed); // U:[PO-8]
 
         try IPriceFeed(priceFeed).decimals() returns (uint8 _decimals) {
-            if (_decimals != 8) revert IncorrectPriceFeedException(); // U:[PO-5]
+            if (_decimals != 8) revert IncorrectPriceFeedException(); // U:[PO-8]
         } catch {
-            revert IncorrectPriceFeedException(); // U:[PO-5]
+            revert IncorrectPriceFeedException(); // U:[PO-8]
         }
 
         try IPriceFeed(priceFeed).skipPriceCheck() returns (bool _skipCheck) {
-            skipCheck = _skipCheck; // U:[PO-5]
+            skipCheck = _skipCheck; // U:[PO-8]
         } catch {}
 
         try IPriceFeed(priceFeed).latestRoundData() returns (uint80, int256 answer, uint256, uint256 updatedAt, uint80)
         {
             if (skipCheck) {
-                if (stalenessPeriod != 0) revert IncorrectParameterException(); // U:[PO-5]
+                if (stalenessPeriod != 0) revert IncorrectParameterException(); // U:[PO-8]
             } else {
-                if (stalenessPeriod == 0) revert IncorrectParameterException(); // U:[PO-5]
+                if (stalenessPeriod == 0) revert IncorrectParameterException(); // U:[PO-8]
 
                 bool updatable;
                 try IUpdatablePriceFeed(priceFeed).updatable() returns (bool _updatable) {
                     updatable = _updatable;
                 } catch {}
-                if (!updatable) _checkAnswer(answer, updatedAt, stalenessPeriod); // U:[PO-5]
+                if (!updatable) _checkAnswer(answer, updatedAt, stalenessPeriod); // U:[PO-8]
             }
         } catch {
-            revert IncorrectPriceFeedException(); // U:[PO-5]
+            revert IncorrectPriceFeedException(); // U:[PO-8]
         }
     }
 
@@ -67,7 +67,7 @@ abstract contract PriceFeedValidationTrait {
         returns (int256 answer)
     {
         uint256 updatedAt;
-        (, answer,, updatedAt,) = IPriceFeed(priceFeed).latestRoundData(); // U:[PO-1]
-        if (!skipCheck) _checkAnswer(answer, updatedAt, stalenessPeriod); // U:[PO-1]
+        (, answer,, updatedAt,) = IPriceFeed(priceFeed).latestRoundData(); // U:[PO-9]
+        if (!skipCheck) _checkAnswer(answer, updatedAt, stalenessPeriod); // U:[PO-9]
     }
 }
