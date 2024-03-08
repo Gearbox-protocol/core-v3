@@ -337,19 +337,30 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             uint256 remainingBorrowable = pool.creditManagerBorrowable(address(creditManager));
 
             if (remainingBorrowable < minDebt) {
-                tokenTestSuite.mint(underlying, INITIAL_LP, 5 * minDebt);
+                uint256 depositAmount = 5 * minDebt;
+                {
+                    uint256 utilization =
+                        WAD * (pool.expectedLiquidity() - pool.availableLiquidity()) / pool.expectedLiquidity();
+                    if (utilization > 85 * WAD / 100) {
+                        depositAmount =
+                            pool.expectedLiquidity() * utilization / (75 * WAD / 100) - pool.expectedLiquidity();
+                    }
+                }
+
+                tokenTestSuite.mint(underlying, INITIAL_LP, depositAmount);
                 tokenTestSuite.approve(underlying, INITIAL_LP, address(pool));
 
                 vm.prank(INITIAL_LP);
-                pool.deposit(5 * minDebt, INITIAL_LP);
+                pool.deposit(depositAmount, INITIAL_LP);
 
                 address configurator = IACL(addressProvider.getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL)).owner();
                 uint256 currentLimit = pool.creditManagerDebtLimit(address(creditManager));
                 vm.prank(configurator);
-                pool.setCreditManagerDebtLimit(address(creditManager), currentLimit + 5 * minDebt);
+                pool.setCreditManagerDebtLimit(address(creditManager), currentLimit + depositAmount);
             }
 
             creditAccountAmount = Math.min(creditAccountAmount, Math.max(remainingBorrowable / 2, minDebt));
+            creditAccountAmount = Math.min(creditAccountAmount, minDebt * 5);
         } else {
             creditAccountAmount = configAccountAmount;
         }
