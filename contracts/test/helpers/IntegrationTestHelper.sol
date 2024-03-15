@@ -498,11 +498,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             tokenTestSuite.mint(underlying, USER, creditAccountAmount);
             tokenTestSuite.mint(underlying, FRIEND, creditAccountAmount);
 
-            vm.prank(USER);
-            IERC20(underlying).approve(address(creditManager), type(uint256).max);
-
-            vm.prank(FRIEND);
-            IERC20(underlying).approve(address(creditManager), type(uint256).max);
+            tokenTestSuite.approve(underlying, USER, address(creditManager));
+            tokenTestSuite.approve(underlying, FRIEND, address(creditManager));
 
             creditManagers.push(creditManager);
             creditFacades.push(creditFacade);
