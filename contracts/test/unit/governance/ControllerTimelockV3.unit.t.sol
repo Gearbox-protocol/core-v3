@@ -157,13 +157,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
-            abi.encode(
-                admin,
-                creditConfigurator,
-                "setExpirationDate(uint40)",
-                abi.encode(block.timestamp + 5),
-                block.timestamp + 1 days
-            )
+            abi.encode(admin, creditConfigurator, "setExpirationDate(uint40)", abi.encode(block.timestamp + 5))
         );
 
         vm.expectEmit(true, false, false, true);
@@ -248,8 +242,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.setLPPriceFeedLimiter(lpPriceFeed, 8);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash =
-            keccak256(abi.encode(admin, lpPriceFeed, "setLimiter(uint256)", abi.encode(7), block.timestamp + 1 days));
+        bytes32 txHash = keccak256(abi.encode(admin, lpPriceFeed, "setLimiter(uint256)", abi.encode(7)));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
@@ -324,15 +317,8 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.setMaxDebtPerBlockMultiplier(creditManager, 5);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash = keccak256(
-            abi.encode(
-                admin,
-                creditConfigurator,
-                "setMaxDebtPerBlockMultiplier(uint8)",
-                abi.encode(4),
-                block.timestamp + 2 days
-            )
-        );
+        bytes32 txHash =
+            keccak256(abi.encode(admin, creditConfigurator, "setMaxDebtPerBlockMultiplier(uint8)", abi.encode(4)));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
@@ -412,9 +398,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.setMinDebtLimit(creditManager, 5);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash = keccak256(
-            abi.encode(admin, creditConfigurator, "setMinDebtLimit(uint128)", abi.encode(15), block.timestamp + 3 days)
-        );
+        bytes32 txHash = keccak256(abi.encode(admin, creditConfigurator, "setMinDebtLimit(uint128)", abi.encode(15)));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
@@ -492,9 +476,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.setMaxDebtLimit(creditManager, 5);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash = keccak256(
-            abi.encode(admin, creditConfigurator, "setMaxDebtLimit(uint128)", abi.encode(25), block.timestamp + 1 days)
-        );
+        bytes32 txHash = keccak256(abi.encode(admin, creditConfigurator, "setMaxDebtLimit(uint128)", abi.encode(25)));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
@@ -578,13 +560,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
-            abi.encode(
-                admin,
-                pool,
-                "setCreditManagerDebtLimit(address,uint256)",
-                abi.encode(creditManager, 2e18),
-                block.timestamp + 1 days
-            )
+            abi.encode(admin, pool, "setCreditManagerDebtLimit(address,uint256)", abi.encode(creditManager, 2e18))
         );
 
         vm.expectEmit(true, false, false, true);
@@ -702,8 +678,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
                 admin,
                 creditConfigurator,
                 "rampLiquidationThreshold(address,uint16,uint40,uint24)",
-                abi.encode(token, 6000, block.timestamp + 14 days, 7 days),
-                block.timestamp + 1 days
+                abi.encode(token, 6000, block.timestamp + 14 days, 7 days)
             )
         );
 
@@ -788,13 +763,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
-            abi.encode(
-                admin,
-                creditConfigurator,
-                "setExpirationDate(uint40)",
-                abi.encode(block.timestamp + 5),
-                block.timestamp + 1 days
-            )
+            abi.encode(admin, creditConfigurator, "setExpirationDate(uint40)", abi.encode(block.timestamp + 5))
         );
 
         vm.prank(admin);
@@ -874,15 +843,8 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.setPolicy(POLICY_CODE, policy);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash = keccak256(
-            abi.encode(
-                FRIEND,
-                creditConfigurator,
-                "setExpirationDate(uint40)",
-                abi.encode(expirationDate),
-                block.timestamp + 2 days
-            )
-        );
+        bytes32 txHash =
+            keccak256(abi.encode(FRIEND, creditConfigurator, "setExpirationDate(uint40)", abi.encode(expirationDate)));
 
         vm.prank(FRIEND);
         controllerTimelock.setExpirationDate(creditManager, expirationDate);
@@ -979,11 +941,8 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.forbidAdapter(creditManager, DUMB_ADDRESS);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash = keccak256(
-            abi.encode(
-                admin, creditConfigurator, "forbidAdapter(address)", abi.encode(DUMB_ADDRESS), block.timestamp + 1 days
-            )
-        );
+        bytes32 txHash =
+            keccak256(abi.encode(admin, creditConfigurator, "forbidAdapter(address)", abi.encode(DUMB_ADDRESS)));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
@@ -1073,13 +1032,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
-            abi.encode(
-                admin,
-                poolQuotaKeeper,
-                "setTokenLimit(address,uint96)",
-                abi.encode(token, uint96(1e19)),
-                block.timestamp + 1 days
-            )
+            abi.encode(admin, poolQuotaKeeper, "setTokenLimit(address,uint96)", abi.encode(token, uint96(1e19)))
         );
 
         vm.expectEmit(true, false, false, true);
@@ -1169,11 +1122,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
             abi.encode(
-                admin,
-                poolQuotaKeeper,
-                "setTokenQuotaIncreaseFee(address,uint16)",
-                abi.encode(token, uint16(20)),
-                block.timestamp + 1 days
+                admin, poolQuotaKeeper, "setTokenQuotaIncreaseFee(address,uint16)", abi.encode(token, uint16(20))
             )
         );
 
@@ -1255,8 +1204,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.setTotalDebtLimit(pool, 3e18);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash =
-            keccak256(abi.encode(admin, pool, "setTotalDebtLimit(uint256)", abi.encode(2e18), block.timestamp + 1 days));
+        bytes32 txHash = keccak256(abi.encode(admin, pool, "setTotalDebtLimit(uint256)", abi.encode(2e18)));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
@@ -1329,8 +1277,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.setWithdrawFee(pool, 30);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash =
-            keccak256(abi.encode(admin, pool, "setWithdrawFee(uint256)", abi.encode(20), block.timestamp + 1 days));
+        bytes32 txHash = keccak256(abi.encode(admin, pool, "setWithdrawFee(uint256)", abi.encode(20)));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
@@ -1416,15 +1363,8 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.setMinQuotaRate(pool, token, 25);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash = keccak256(
-            abi.encode(
-                admin,
-                gauge,
-                "changeQuotaMinRate(address,uint16)",
-                abi.encode(token, uint16(15)),
-                block.timestamp + 1 days
-            )
-        );
+        bytes32 txHash =
+            keccak256(abi.encode(admin, gauge, "changeQuotaMinRate(address,uint16)", abi.encode(token, uint16(15))));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
@@ -1515,15 +1455,8 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.setMaxQuotaRate(pool, token, 35);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash = keccak256(
-            abi.encode(
-                admin,
-                gauge,
-                "changeQuotaMaxRate(address,uint16)",
-                abi.encode(token, uint16(25)),
-                block.timestamp + 1 days
-            )
-        );
+        bytes32 txHash =
+            keccak256(abi.encode(admin, gauge, "changeQuotaMaxRate(address,uint16)", abi.encode(token, uint16(25))));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
@@ -1602,13 +1535,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
-            abi.encode(
-                admin,
-                priceOracle,
-                "setReservePriceFeedStatus(address,bool)",
-                abi.encode(token, true),
-                block.timestamp + 1 days
-            )
+            abi.encode(admin, priceOracle, "setReservePriceFeedStatus(address,bool)", abi.encode(token, true))
         );
 
         vm.expectEmit(true, false, false, true);
@@ -1684,7 +1611,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.forbidBoundsUpdate(priceFeed);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash = keccak256(abi.encode(admin, priceFeed, "forbidBoundsUpdate()", "", block.timestamp + 1 days));
+        bytes32 txHash = keccak256(abi.encode(admin, priceFeed, "forbidBoundsUpdate()", ""));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(txHash, admin, priceFeed, "forbidBoundsUpdate()", "", uint40(block.timestamp + 1 days));
@@ -1821,13 +1748,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.setTokenLimit(pool, token, 2e18);
 
         bytes32 txHash = keccak256(
-            abi.encode(
-                admin,
-                poolQuotaKeeper,
-                "setTokenLimit(address,uint96)",
-                abi.encode(token, uint96(2e18)),
-                block.timestamp + 1 days
-            )
+            abi.encode(admin, poolQuotaKeeper, "setTokenLimit(address,uint96)", abi.encode(token, uint96(2e18)))
         );
 
         vm.warp(block.timestamp + 1 days);

@@ -580,7 +580,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     ) internal returns (bytes32) {
         uint256 eta = block.timestamp + delay;
 
-        bytes32 txHash = keccak256(abi.encode(msg.sender, target, signature, data, eta));
+        bytes32 txHash = keccak256(abi.encode(msg.sender, target, signature, data));
 
         queuedTransactions[txHash] = QueuedTransactionData({
             queued: true,
