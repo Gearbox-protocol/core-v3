@@ -7,7 +7,7 @@ import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.
 
 struct QueuedTransactionData {
     bool queued;
-    address executor;
+    address initiator;
     address target;
     uint40 eta;
     string signature;
@@ -20,9 +20,12 @@ interface IControllerTimelockV3Events {
     /// @notice Emitted when the veto admin of the controller is updated
     event SetVetoAdmin(address indexed newAdmin);
 
+    /// @notice Emitted when an address' status as executor is changed
+    event SetExecutor(address indexed executor, bool status);
+
     /// @notice Emitted when a transaction is queued
     event QueueTransaction(
-        bytes32 indexed txHash, address indexed executor, address target, string signature, bytes data, uint40 eta
+        bytes32 indexed txHash, address indexed initiator, address target, string signature, bytes data, uint40 eta
     );
 
     /// @notice Emitted when a transaction is executed
@@ -87,7 +90,7 @@ interface IControllerTimelockV3 is IControllerTimelockV3Events, IVersion {
         view
         returns (
             bool queued,
-            address executor,
+            address initiator,
             address target,
             uint40 eta,
             string memory signature,
@@ -106,5 +109,9 @@ interface IControllerTimelockV3 is IControllerTimelockV3Events, IVersion {
 
     function vetoAdmin() external view returns (address);
 
+    function isExecutor(address addr) external view returns (bool);
+
     function setVetoAdmin(address newAdmin) external;
+
+    function setExecutor(address executor, bool status) external;
 }

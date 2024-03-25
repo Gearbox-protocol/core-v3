@@ -34,6 +34,9 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     /// @notice Admin address that can cancel transactions
     address public override vetoAdmin;
 
+    /// @notice Mapping from address to their status as executor
+    mapping(address => bool) public override isExecutor;
+
     /// @notice Mapping from transaction hashes to their data
     mapping(bytes32 => QueuedTransactionData) public override queuedTransactions;
 
@@ -581,7 +584,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
 
         queuedTransactions[txHash] = QueuedTransactionData({
             queued: true,
-            executor: msg.sender,
+            initiator: msg.sender,
             target: target,
             eta: uint40(eta),
             signature: signature,
@@ -592,7 +595,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
 
         emit QueueTransaction({
             txHash: txHash,
-            executor: msg.sender,
+            initiator: msg.sender,
             target: target,
             signature: signature,
             data: data,
@@ -626,7 +629,7 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
             revert TxNotQueuedException(); // U: [CT-7]
         }
 
-        if (msg.sender != qtd.executor) {
+        if (msg.sender != qtd.initiator && !isExecutor[msg.sender]) {
             revert CallerNotExecutorException(); // U: [CT-9]
         }
 
@@ -682,6 +685,14 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
         if (vetoAdmin != newAdmin) {
             vetoAdmin = newAdmin; // U: [CT-8]
             emit SetVetoAdmin(newAdmin); // U: [CT-8]
+        }
+    }
+
+    /// @notice Changes status of an address as an executor
+    function setExecutor(address executorAddress, bool status) external override configuratorOnly {
+        if (isExecutor[executorAddress] != status) {
+            isExecutor[executorAddress] = status;
+            emit SetExecutor(executorAddress, status);
         }
     }
 }

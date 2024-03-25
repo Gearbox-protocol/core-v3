@@ -1771,4 +1771,68 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         assertEq(rd.referencePoint, 1e19, "Incorrect reference point for token 2");
     }
+
+    /// @dev U:[CT-19]: executor logic is correct
+    function test_U_CT_19_executor_logic_is_correct() public {
+        (,,, address pool, address poolQuotaKeeper) = _makeMocks();
+
+        address token = makeAddr("TOKEN");
+
+        vm.startPrank(CONFIGURATOR);
+
+        vm.expectEmit(true, false, false, true);
+        emit SetExecutor(FRIEND2, true);
+
+        controllerTimelock.setExecutor(FRIEND2, true);
+
+        controllerTimelock.setGroup(token, "TOKEN");
+
+        vm.stopPrank();
+
+        vm.mockCall(
+            poolQuotaKeeper,
+            abi.encodeCall(IPoolQuotaKeeperV3.getTokenQuotaParams, (token)),
+            abi.encode(uint16(10), uint192(1e27), uint16(15), uint96(1e17), uint96(1e18), true)
+        );
+
+        bytes32 POLICY_CODE = keccak256(abi.encode("POOL", "TOKEN", "TOKEN_LIMIT"));
+
+        Policy memory policy = Policy({
+            enabled: false,
+            admin: admin,
+            delay: 1 days,
+            flags: 64,
+            exactValue: 0,
+            minValue: 0,
+            maxValue: 0,
+            referencePointUpdatePeriod: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 10000,
+            minChange: 0,
+            maxChange: 0
+        });
+
+        vm.prank(CONFIGURATOR);
+        controllerTimelock.setPolicy(POLICY_CODE, policy);
+
+        vm.prank(admin);
+        controllerTimelock.setTokenLimit(pool, token, 2e18);
+
+        bytes32 txHash = keccak256(
+            abi.encode(
+                admin,
+                poolQuotaKeeper,
+                "setTokenLimit(address,uint96)",
+                abi.encode(token, uint96(2e18)),
+                block.timestamp + 1 days
+            )
+        );
+
+        vm.warp(block.timestamp + 1 days);
+
+        vm.prank(FRIEND2);
+        controllerTimelock.executeTransaction(txHash);
+    }
 }
