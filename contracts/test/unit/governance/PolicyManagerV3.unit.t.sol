@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {PolicyManagerV3Harness, Policy} from "./PolicyManagerV3Harness.sol";
+import {PolicyManagerV3Harness, Policy, ReferenceData} from "./PolicyManagerV3Harness.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // TEST
@@ -46,9 +46,7 @@ contract PolicyManagerV3UnitTest is Test {
             exactValue: 15,
             minValue: 10,
             maxValue: 20,
-            referencePoint: 0,
             referencePointUpdatePeriod: 1 days,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 1,
             minPctChangeUp: 1,
             maxPctChangeDown: 2,
@@ -81,11 +79,7 @@ contract PolicyManagerV3UnitTest is Test {
 
         assertEq(policy2.maxValue, 20, "maxValue is incorrect");
 
-        assertEq(policy2.referencePoint, 0, "referencePoint is incorrect");
-
         assertEq(policy2.referencePointUpdatePeriod, 1 days, "referencePointUpdatePeriod is incorrect");
-
-        assertEq(policy2.referencePointTimestampLU, 0, "referencePointTimestampLU is incorrect");
 
         assertEq(policy2.minPctChangeDown, 1, "minPctChangeDown is incorrect");
 
@@ -122,9 +116,7 @@ contract PolicyManagerV3UnitTest is Test {
             exactValue: 15,
             minValue: 10,
             maxValue: 20,
-            referencePoint: 0,
             referencePointUpdatePeriod: 1 days,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 1,
             minPctChangeUp: 1,
             maxPctChangeDown: 2,
@@ -143,7 +135,7 @@ contract PolicyManagerV3UnitTest is Test {
         policyManager.disablePolicy(bytes32(uint256(1)));
 
         vm.prank(FRIEND);
-        assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), 0, 1));
+        assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), bytes32(uint256(2)), 0, 1));
     }
 
     /// @dev U:[PM-3]: checkPolicy exactValue works correctly
@@ -156,9 +148,7 @@ contract PolicyManagerV3UnitTest is Test {
             exactValue: 15,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -171,7 +161,7 @@ contract PolicyManagerV3UnitTest is Test {
         policyManager.setPolicy(bytes32(uint256(1)), policy);
 
         vm.prank(FRIEND);
-        assertTrue(newValue == 15 || !policyManager.checkPolicy(bytes32(uint256(1)), 0, newValue));
+        assertTrue(newValue == 15 || !policyManager.checkPolicy(bytes32(uint256(1)), bytes32(uint256(2)), 0, newValue));
     }
 
     /// @dev U:[PM-4]: checkPolicy minValue works correctly
@@ -184,9 +174,7 @@ contract PolicyManagerV3UnitTest is Test {
             exactValue: 0,
             minValue: minValue,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -199,7 +187,9 @@ contract PolicyManagerV3UnitTest is Test {
         policyManager.setPolicy(bytes32(uint256(1)), policy);
 
         vm.prank(FRIEND);
-        assertTrue(newValue >= minValue || !policyManager.checkPolicy(bytes32(uint256(1)), 0, newValue));
+        assertTrue(
+            newValue >= minValue || !policyManager.checkPolicy(bytes32(uint256(1)), bytes32(uint256(2)), 0, newValue)
+        );
     }
 
     /// @dev U:[PM-5]: checkPolicy maxValue works correctly
@@ -212,9 +202,7 @@ contract PolicyManagerV3UnitTest is Test {
             exactValue: 0,
             minValue: 0,
             maxValue: maxValue,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -227,7 +215,9 @@ contract PolicyManagerV3UnitTest is Test {
         policyManager.setPolicy(bytes32(uint256(1)), policy);
 
         vm.prank(FRIEND);
-        assertTrue(newValue <= maxValue || !policyManager.checkPolicy(bytes32(uint256(1)), 0, newValue));
+        assertTrue(
+            newValue <= maxValue || !policyManager.checkPolicy(bytes32(uint256(1)), bytes32(uint256(2)), 0, newValue)
+        );
     }
 
     /// @dev U:[PM-6]: checkPolicy correctly sets reference point and timestampLU
@@ -240,9 +230,7 @@ contract PolicyManagerV3UnitTest is Test {
             exactValue: 0,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 1 days,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -255,13 +243,13 @@ contract PolicyManagerV3UnitTest is Test {
         policyManager.setPolicy(bytes32(uint256(1)), policy);
 
         vm.prank(FRIEND);
-        policyManager.checkPolicy(bytes32(uint256(1)), 20, 20);
+        policyManager.checkPolicy(bytes32(uint256(1)), bytes32(uint256(2)), 20, 20);
 
-        Policy memory policy2 = policyManager.getPolicy(bytes32(uint256(1)));
+        ReferenceData memory rd = policyManager.getReference(bytes32(uint256(2)));
 
-        assertEq(policy2.referencePoint, 20, "Incorrect reference point");
+        assertEq(rd.referencePoint, 20, "Incorrect reference point");
 
-        assertEq(policy2.referencePointTimestampLU, block.timestamp, "Incorrect timestamp LU");
+        assertEq(rd.referencePointTimestampLU, block.timestamp, "Incorrect timestamp LU");
     }
 
     /// @dev U:[PM-7]: checkPolicy minChange works correctly
@@ -272,6 +260,11 @@ contract PolicyManagerV3UnitTest is Test {
         uint256 newValue3,
         uint256 minChange
     ) public {
+        oldValue = bound(oldValue, 1, type(uint128).max);
+        newValue1 = bound(newValue1, 0, type(uint128).max);
+        newValue2 = bound(newValue2, 1, type(uint128).max);
+        newValue3 = bound(newValue3, 0, type(uint128).max);
+
         Policy memory policy = Policy({
             enabled: false,
             admin: FRIEND,
@@ -280,9 +273,7 @@ contract PolicyManagerV3UnitTest is Test {
             exactValue: 0,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 1 days,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -297,27 +288,36 @@ contract PolicyManagerV3UnitTest is Test {
         uint256 diff = newValue1 > oldValue ? newValue1 - oldValue : oldValue - newValue1;
 
         vm.prank(FRIEND);
-        assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), oldValue, newValue1) || diff >= minChange);
+        assertTrue(
+            !policyManager.checkPolicy(bytes32(uint256(1)), bytes32(uint256(2)), oldValue, newValue1)
+                || diff >= minChange
+        );
 
         vm.warp(block.timestamp + 1);
 
         diff = newValue2 > oldValue ? newValue2 - oldValue : oldValue - newValue2;
 
         vm.prank(FRIEND);
-        assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), newValue1, newValue2) || diff >= minChange);
+        assertTrue(
+            !policyManager.checkPolicy(bytes32(uint256(1)), bytes32(uint256(2)), newValue1, newValue2)
+                || diff >= minChange
+        );
 
         vm.warp(block.timestamp + 1 days);
 
         diff = newValue3 > newValue2 ? newValue3 - newValue2 : newValue2 - newValue3;
 
         vm.prank(FRIEND);
-        assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), newValue2, newValue3) || diff >= minChange);
+        assertTrue(
+            !policyManager.checkPolicy(bytes32(uint256(1)), bytes32(uint256(2)), newValue2, newValue3)
+                || diff >= minChange
+        );
 
-        Policy memory policy2 = policyManager.getPolicy(bytes32(uint256(1)));
+        ReferenceData memory rd = policyManager.getReference(bytes32(uint256(2)));
 
-        assertEq(policy2.referencePoint, newValue2, "Incorrect reference point");
+        assertEq(rd.referencePoint, newValue2, "Incorrect reference point");
 
-        assertEq(policy2.referencePointTimestampLU, block.timestamp, "Incorrect timestamp LU");
+        assertEq(rd.referencePointTimestampLU, block.timestamp, "Incorrect timestamp LU");
     }
 
     /// @dev U:[PM-8]: checkPolicy maxChange works correctly
@@ -328,6 +328,11 @@ contract PolicyManagerV3UnitTest is Test {
         uint256 newValue3,
         uint256 maxChange
     ) public {
+        oldValue = bound(oldValue, 1, type(uint128).max);
+        newValue1 = bound(newValue1, 0, type(uint128).max);
+        newValue2 = bound(newValue2, 1, type(uint128).max);
+        newValue3 = bound(newValue3, 0, type(uint128).max);
+
         Policy memory policy = Policy({
             enabled: false,
             admin: FRIEND,
@@ -336,9 +341,7 @@ contract PolicyManagerV3UnitTest is Test {
             exactValue: 0,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 1 days,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -353,27 +356,36 @@ contract PolicyManagerV3UnitTest is Test {
         uint256 diff = newValue1 > oldValue ? newValue1 - oldValue : oldValue - newValue1;
 
         vm.prank(FRIEND);
-        assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), oldValue, newValue1) || diff <= maxChange);
+        assertTrue(
+            !policyManager.checkPolicy(bytes32(uint256(1)), bytes32(uint256(2)), oldValue, newValue1)
+                || diff <= maxChange
+        );
 
         vm.warp(block.timestamp + 1);
 
         diff = newValue2 > oldValue ? newValue2 - oldValue : oldValue - newValue2;
 
         vm.prank(FRIEND);
-        assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), newValue1, newValue2) || diff <= maxChange);
+        assertTrue(
+            !policyManager.checkPolicy(bytes32(uint256(1)), bytes32(uint256(2)), newValue1, newValue2)
+                || diff <= maxChange
+        );
 
         vm.warp(block.timestamp + 1 days);
 
         diff = newValue3 > newValue2 ? newValue3 - newValue2 : newValue2 - newValue3;
 
         vm.prank(FRIEND);
-        assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), newValue2, newValue3) || diff <= maxChange);
+        assertTrue(
+            !policyManager.checkPolicy(bytes32(uint256(1)), bytes32(uint256(2)), newValue2, newValue3)
+                || diff <= maxChange
+        );
 
-        Policy memory policy2 = policyManager.getPolicy(bytes32(uint256(1)));
+        ReferenceData memory rd = policyManager.getReference(bytes32(uint256(2)));
 
-        assertEq(policy2.referencePoint, newValue2, "Incorrect reference point");
+        assertEq(rd.referencePoint, newValue2, "Incorrect reference point");
 
-        assertEq(policy2.referencePointTimestampLU, block.timestamp, "Incorrect timestamp LU");
+        assertEq(rd.referencePointTimestampLU, block.timestamp, "Incorrect timestamp LU");
     }
 
     /// @dev U:[PM-9]: checkPolicy minPctChange works correctly
@@ -398,9 +410,7 @@ contract PolicyManagerV3UnitTest is Test {
             exactValue: 0,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 1 days,
-            referencePointTimestampLU: 0,
             minPctChangeDown: minPctChangeDown,
             minPctChangeUp: minPctChangeUp,
             maxPctChangeDown: 0,
@@ -417,7 +427,7 @@ contract PolicyManagerV3UnitTest is Test {
 
         vm.prank(FRIEND);
         assertTrue(
-            !policyManager.checkPolicy(bytes32(uint256(1)), oldValue, newValue1)
+            !policyManager.checkPolicy(bytes32(uint256(1)), bytes32(uint256(2)), oldValue, newValue1)
                 || (newValue1 > oldValue ? pctDiff >= minPctChangeUp : pctDiff >= minPctChangeDown)
         );
         vm.warp(block.timestamp + 1);
@@ -426,7 +436,7 @@ contract PolicyManagerV3UnitTest is Test {
 
         vm.prank(FRIEND);
         assertTrue(
-            !policyManager.checkPolicy(bytes32(uint256(1)), newValue1, newValue2)
+            !policyManager.checkPolicy(bytes32(uint256(1)), bytes32(uint256(2)), newValue1, newValue2)
                 || (newValue2 > oldValue ? pctDiff >= minPctChangeUp : pctDiff >= minPctChangeDown)
         );
 
@@ -437,15 +447,15 @@ contract PolicyManagerV3UnitTest is Test {
 
         vm.prank(FRIEND);
         assertTrue(
-            !policyManager.checkPolicy(bytes32(uint256(1)), newValue2, newValue3)
+            !policyManager.checkPolicy(bytes32(uint256(1)), bytes32(uint256(2)), newValue2, newValue3)
                 || (newValue3 > newValue2 ? pctDiff >= minPctChangeUp : pctDiff >= minPctChangeDown)
         );
 
-        Policy memory policy2 = policyManager.getPolicy(bytes32(uint256(1)));
+        ReferenceData memory rd = policyManager.getReference(bytes32(uint256(2)));
 
-        assertEq(policy2.referencePoint, newValue2, "Incorrect reference point");
+        assertEq(rd.referencePoint, newValue2, "Incorrect reference point");
 
-        assertEq(policy2.referencePointTimestampLU, block.timestamp, "Incorrect timestamp LU");
+        assertEq(rd.referencePointTimestampLU, block.timestamp, "Incorrect timestamp LU");
     }
 
     /// @dev U:[PM-10]: checkPolicy maxPctChange works correctly
@@ -470,9 +480,7 @@ contract PolicyManagerV3UnitTest is Test {
             exactValue: 0,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 1 days,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: maxPctChangeDown,
@@ -489,7 +497,7 @@ contract PolicyManagerV3UnitTest is Test {
 
         vm.prank(FRIEND);
         assertTrue(
-            !policyManager.checkPolicy(bytes32(uint256(1)), oldValue, newValue1)
+            !policyManager.checkPolicy(bytes32(uint256(1)), bytes32(uint256(2)), oldValue, newValue1)
                 || (newValue1 > oldValue ? pctDiff <= maxPctChangeUp : pctDiff <= maxPctChangeDown)
         );
         vm.warp(block.timestamp + 1);
@@ -498,7 +506,7 @@ contract PolicyManagerV3UnitTest is Test {
 
         vm.prank(FRIEND);
         assertTrue(
-            !policyManager.checkPolicy(bytes32(uint256(1)), newValue1, newValue2)
+            !policyManager.checkPolicy(bytes32(uint256(1)), bytes32(uint256(2)), newValue1, newValue2)
                 || (newValue2 > oldValue ? pctDiff <= maxPctChangeUp : pctDiff <= maxPctChangeDown)
         );
 
@@ -509,15 +517,15 @@ contract PolicyManagerV3UnitTest is Test {
 
         vm.prank(FRIEND);
         assertTrue(
-            !policyManager.checkPolicy(bytes32(uint256(1)), newValue2, newValue3)
+            !policyManager.checkPolicy(bytes32(uint256(1)), bytes32(uint256(2)), newValue2, newValue3)
                 || (newValue3 > newValue2 ? pctDiff <= maxPctChangeUp : pctDiff <= maxPctChangeDown)
         );
 
-        Policy memory policy2 = policyManager.getPolicy(bytes32(uint256(1)));
+        ReferenceData memory rd = policyManager.getReference(bytes32(uint256(2)));
 
-        assertEq(policy2.referencePoint, newValue2, "Incorrect reference point");
+        assertEq(rd.referencePoint, newValue2, "Incorrect reference point");
 
-        assertEq(policy2.referencePointTimestampLU, block.timestamp, "Incorrect timestamp LU");
+        assertEq(rd.referencePointTimestampLU, block.timestamp, "Incorrect timestamp LU");
     }
 
     /// @dev U:[PM-11]: checkPolicy returns false on caller not being admin
@@ -530,9 +538,7 @@ contract PolicyManagerV3UnitTest is Test {
             exactValue: 0,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -545,9 +551,9 @@ contract PolicyManagerV3UnitTest is Test {
         policyManager.setPolicy(bytes32(uint256(1)), policy);
 
         vm.prank(USER);
-        assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), 0, 0));
+        assertTrue(!policyManager.checkPolicy(bytes32(uint256(1)), bytes32(uint256(2)), 0, 0));
 
         vm.prank(FRIEND);
-        assertTrue(policyManager.checkPolicy(bytes32(uint256(1)), 0, 0));
+        assertTrue(policyManager.checkPolicy(bytes32(uint256(1)), bytes32(uint256(2)), 0, 0));
     }
 }

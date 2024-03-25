@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {ControllerTimelockV3} from "../../../governance/ControllerTimelockV3.sol";
-import {Policy} from "../../../governance/PolicyManagerV3.sol";
+import {Policy, ReferenceData} from "../../../governance/PolicyManagerV3.sol";
 import {GeneralMock} from "../../mocks/GeneralMock.sol";
 
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
@@ -121,9 +121,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
             exactValue: block.timestamp + 5,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -159,13 +157,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
-            abi.encode(
-                admin,
-                creditConfigurator,
-                "setExpirationDate(uint40)",
-                abi.encode(block.timestamp + 5),
-                block.timestamp + 1 days
-            )
+            abi.encode(admin, creditConfigurator, "setExpirationDate(uint40)", abi.encode(block.timestamp + 5))
         );
 
         vm.expectEmit(true, false, false, true);
@@ -222,9 +214,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
             exactValue: 7,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -252,8 +242,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.setLPPriceFeedLimiter(lpPriceFeed, 8);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash =
-            keccak256(abi.encode(admin, lpPriceFeed, "setLimiter(uint256)", abi.encode(7), block.timestamp + 1 days));
+        bytes32 txHash = keccak256(abi.encode(admin, lpPriceFeed, "setLimiter(uint256)", abi.encode(7)));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
@@ -300,9 +289,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
             exactValue: 4,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -330,15 +317,8 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.setMaxDebtPerBlockMultiplier(creditManager, 5);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash = keccak256(
-            abi.encode(
-                admin,
-                creditConfigurator,
-                "setMaxDebtPerBlockMultiplier(uint8)",
-                abi.encode(4),
-                block.timestamp + 2 days
-            )
-        );
+        bytes32 txHash =
+            keccak256(abi.encode(admin, creditConfigurator, "setMaxDebtPerBlockMultiplier(uint8)", abi.encode(4)));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
@@ -390,9 +370,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
             exactValue: 15,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -420,9 +398,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.setMinDebtLimit(creditManager, 5);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash = keccak256(
-            abi.encode(admin, creditConfigurator, "setMinDebtLimit(uint128)", abi.encode(15), block.timestamp + 3 days)
-        );
+        bytes32 txHash = keccak256(abi.encode(admin, creditConfigurator, "setMinDebtLimit(uint128)", abi.encode(15)));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
@@ -472,9 +448,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
             exactValue: 25,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -502,9 +476,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.setMaxDebtLimit(creditManager, 5);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash = keccak256(
-            abi.encode(admin, creditConfigurator, "setMaxDebtLimit(uint128)", abi.encode(25), block.timestamp + 1 days)
-        );
+        bytes32 txHash = keccak256(abi.encode(admin, creditConfigurator, "setMaxDebtLimit(uint128)", abi.encode(25)));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
@@ -559,9 +531,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
             exactValue: 2e18,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -590,13 +560,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
-            abi.encode(
-                admin,
-                pool,
-                "setCreditManagerDebtLimit(address,uint256)",
-                abi.encode(creditManager, 2e18),
-                block.timestamp + 1 days
-            )
+            abi.encode(admin, pool, "setCreditManagerDebtLimit(address,uint256)", abi.encode(creditManager, 2e18))
         );
 
         vm.expectEmit(true, false, false, true);
@@ -662,9 +626,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
             exactValue: 6000,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -716,8 +678,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
                 admin,
                 creditConfigurator,
                 "rampLiquidationThreshold(address,uint16,uint40,uint24)",
-                abi.encode(token, 6000, block.timestamp + 14 days, 7 days),
-                block.timestamp + 1 days
+                abi.encode(token, 6000, block.timestamp + 14 days, 7 days)
             )
         );
 
@@ -788,9 +749,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
             exactValue: block.timestamp + 5,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -804,13 +763,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
-            abi.encode(
-                admin,
-                creditConfigurator,
-                "setExpirationDate(uint40)",
-                abi.encode(block.timestamp + 5),
-                block.timestamp + 1 days
-            )
+            abi.encode(admin, creditConfigurator, "setExpirationDate(uint40)", abi.encode(block.timestamp + 5))
         );
 
         vm.prank(admin);
@@ -877,9 +830,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
             exactValue: expirationDate,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -892,15 +843,8 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.setPolicy(POLICY_CODE, policy);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash = keccak256(
-            abi.encode(
-                FRIEND,
-                creditConfigurator,
-                "setExpirationDate(uint40)",
-                abi.encode(expirationDate),
-                block.timestamp + 2 days
-            )
-        );
+        bytes32 txHash =
+            keccak256(abi.encode(FRIEND, creditConfigurator, "setExpirationDate(uint40)", abi.encode(expirationDate)));
 
         vm.prank(FRIEND);
         controllerTimelock.setExpirationDate(creditManager, expirationDate);
@@ -974,9 +918,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
             exactValue: 0,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -999,11 +941,8 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.forbidAdapter(creditManager, DUMB_ADDRESS);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash = keccak256(
-            abi.encode(
-                admin, creditConfigurator, "forbidAdapter(address)", abi.encode(DUMB_ADDRESS), block.timestamp + 1 days
-            )
-        );
+        bytes32 txHash =
+            keccak256(abi.encode(admin, creditConfigurator, "forbidAdapter(address)", abi.encode(DUMB_ADDRESS)));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
@@ -1064,9 +1003,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
             exactValue: 1e19,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -1095,13 +1032,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
-            abi.encode(
-                admin,
-                poolQuotaKeeper,
-                "setTokenLimit(address,uint96)",
-                abi.encode(token, uint96(1e19)),
-                block.timestamp + 1 days
-            )
+            abi.encode(admin, poolQuotaKeeper, "setTokenLimit(address,uint96)", abi.encode(token, uint96(1e19)))
         );
 
         vm.expectEmit(true, false, false, true);
@@ -1161,9 +1092,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
             exactValue: 20,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -1193,11 +1122,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
             abi.encode(
-                admin,
-                poolQuotaKeeper,
-                "setTokenQuotaIncreaseFee(address,uint16)",
-                abi.encode(token, uint16(20)),
-                block.timestamp + 1 days
+                admin, poolQuotaKeeper, "setTokenQuotaIncreaseFee(address,uint16)", abi.encode(token, uint16(20))
             )
         );
 
@@ -1251,9 +1176,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
             exactValue: 2e18,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -1281,8 +1204,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.setTotalDebtLimit(pool, 3e18);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash =
-            keccak256(abi.encode(admin, pool, "setTotalDebtLimit(uint256)", abi.encode(2e18), block.timestamp + 1 days));
+        bytes32 txHash = keccak256(abi.encode(admin, pool, "setTotalDebtLimit(uint256)", abi.encode(2e18)));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
@@ -1327,9 +1249,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
             exactValue: 20,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -1357,8 +1277,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.setWithdrawFee(pool, 30);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash =
-            keccak256(abi.encode(admin, pool, "setWithdrawFee(uint256)", abi.encode(20), block.timestamp + 1 days));
+        bytes32 txHash = keccak256(abi.encode(admin, pool, "setWithdrawFee(uint256)", abi.encode(20)));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
@@ -1416,9 +1335,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
             exactValue: 15,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -1446,15 +1363,8 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.setMinQuotaRate(pool, token, 25);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash = keccak256(
-            abi.encode(
-                admin,
-                gauge,
-                "changeQuotaMinRate(address,uint16)",
-                abi.encode(token, uint16(15)),
-                block.timestamp + 1 days
-            )
-        );
+        bytes32 txHash =
+            keccak256(abi.encode(admin, gauge, "changeQuotaMinRate(address,uint16)", abi.encode(token, uint16(15))));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
@@ -1517,9 +1427,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
             exactValue: 25,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -1547,15 +1455,8 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.setMaxQuotaRate(pool, token, 35);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash = keccak256(
-            abi.encode(
-                admin,
-                gauge,
-                "changeQuotaMaxRate(address,uint16)",
-                abi.encode(token, uint16(25)),
-                block.timestamp + 1 days
-            )
-        );
+        bytes32 txHash =
+            keccak256(abi.encode(admin, gauge, "changeQuotaMaxRate(address,uint16)", abi.encode(token, uint16(25))));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(
@@ -1610,9 +1511,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
             exactValue: 0,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -1636,13 +1535,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
         bytes32 txHash = keccak256(
-            abi.encode(
-                admin,
-                priceOracle,
-                "setReservePriceFeedStatus(address,bool)",
-                abi.encode(token, true),
-                block.timestamp + 1 days
-            )
+            abi.encode(admin, priceOracle, "setReservePriceFeedStatus(address,bool)", abi.encode(token, true))
         );
 
         vm.expectEmit(true, false, false, true);
@@ -1695,9 +1588,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
             exactValue: 0,
             minValue: 0,
             maxValue: 0,
-            referencePoint: 0,
             referencePointUpdatePeriod: 0,
-            referencePointTimestampLU: 0,
             minPctChangeDown: 0,
             minPctChangeUp: 0,
             maxPctChangeDown: 0,
@@ -1720,7 +1611,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         controllerTimelock.forbidBoundsUpdate(priceFeed);
 
         // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
-        bytes32 txHash = keccak256(abi.encode(admin, priceFeed, "forbidBoundsUpdate()", "", block.timestamp + 1 days));
+        bytes32 txHash = keccak256(abi.encode(admin, priceFeed, "forbidBoundsUpdate()", ""));
 
         vm.expectEmit(true, false, false, true);
         emit QueueTransaction(txHash, admin, priceFeed, "forbidBoundsUpdate()", "", uint40(block.timestamp + 1 days));
@@ -1745,5 +1636,124 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         (bool queued,,,,,,,) = controllerTimelock.queuedTransactions(txHash);
 
         assertTrue(!queued, "Transaction is still queued after execution");
+    }
+
+    /// @dev U:[CT-18]: references for different contracts under same policies are set separately
+    function test_U_CT_18_referencePoints_are_different_for_different_contracts() public {
+        (,,, address pool, address poolQuotaKeeper) = _makeMocks();
+
+        address token = makeAddr("TOKEN");
+        address token2 = makeAddr("TOKEN2");
+
+        vm.startPrank(CONFIGURATOR);
+        controllerTimelock.setGroup(token, "TOKEN");
+        controllerTimelock.setGroup(token2, "TOKEN");
+        vm.stopPrank();
+
+        vm.mockCall(
+            poolQuotaKeeper,
+            abi.encodeCall(IPoolQuotaKeeperV3.getTokenQuotaParams, (token)),
+            abi.encode(uint16(10), uint192(1e27), uint16(15), uint96(1e17), uint96(1e18), true)
+        );
+
+        vm.mockCall(
+            poolQuotaKeeper,
+            abi.encodeCall(IPoolQuotaKeeperV3.getTokenQuotaParams, (token2)),
+            abi.encode(uint16(10), uint192(1e27), uint16(15), uint96(1e17), uint96(1e19), true)
+        );
+
+        bytes32 POLICY_CODE = keccak256(abi.encode("POOL", "TOKEN", "TOKEN_LIMIT"));
+
+        Policy memory policy = Policy({
+            enabled: false,
+            admin: admin,
+            delay: 1 days,
+            flags: 64,
+            exactValue: 0,
+            minValue: 0,
+            maxValue: 0,
+            referencePointUpdatePeriod: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 10000,
+            minChange: 0,
+            maxChange: 0
+        });
+
+        vm.prank(CONFIGURATOR);
+        controllerTimelock.setPolicy(POLICY_CODE, policy);
+
+        vm.prank(admin);
+        controllerTimelock.setTokenLimit(pool, token, 2e18);
+
+        vm.prank(admin);
+        controllerTimelock.setTokenLimit(pool, token2, 2e19);
+
+        ReferenceData memory rd = controllerTimelock.getReference(keccak256(abi.encode(pool, token, "TOKEN_LIMIT")));
+
+        assertEq(rd.referencePoint, 1e18, "Incorrect reference point for token 1");
+
+        rd = controllerTimelock.getReference(keccak256(abi.encode(pool, token2, "TOKEN_LIMIT")));
+
+        assertEq(rd.referencePoint, 1e19, "Incorrect reference point for token 2");
+    }
+
+    /// @dev U:[CT-19]: executor logic is correct
+    function test_U_CT_19_executor_logic_is_correct() public {
+        (,,, address pool, address poolQuotaKeeper) = _makeMocks();
+
+        address token = makeAddr("TOKEN");
+
+        vm.startPrank(CONFIGURATOR);
+
+        vm.expectEmit(true, false, false, true);
+        emit SetExecutor(FRIEND2, true);
+
+        controllerTimelock.setExecutor(FRIEND2, true);
+
+        controllerTimelock.setGroup(token, "TOKEN");
+
+        vm.stopPrank();
+
+        vm.mockCall(
+            poolQuotaKeeper,
+            abi.encodeCall(IPoolQuotaKeeperV3.getTokenQuotaParams, (token)),
+            abi.encode(uint16(10), uint192(1e27), uint16(15), uint96(1e17), uint96(1e18), true)
+        );
+
+        bytes32 POLICY_CODE = keccak256(abi.encode("POOL", "TOKEN", "TOKEN_LIMIT"));
+
+        Policy memory policy = Policy({
+            enabled: false,
+            admin: admin,
+            delay: 1 days,
+            flags: 64,
+            exactValue: 0,
+            minValue: 0,
+            maxValue: 0,
+            referencePointUpdatePeriod: 0,
+            minPctChangeDown: 0,
+            minPctChangeUp: 0,
+            maxPctChangeDown: 0,
+            maxPctChangeUp: 10000,
+            minChange: 0,
+            maxChange: 0
+        });
+
+        vm.prank(CONFIGURATOR);
+        controllerTimelock.setPolicy(POLICY_CODE, policy);
+
+        vm.prank(admin);
+        controllerTimelock.setTokenLimit(pool, token, 2e18);
+
+        bytes32 txHash = keccak256(
+            abi.encode(admin, poolQuotaKeeper, "setTokenLimit(address,uint96)", abi.encode(token, uint96(2e18)))
+        );
+
+        vm.warp(block.timestamp + 1 days);
+
+        vm.prank(FRIEND2);
+        controllerTimelock.executeTransaction(txHash);
     }
 }

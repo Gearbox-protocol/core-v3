@@ -23,13 +23,7 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/C
 /// @param exactValue Exact value to check the incoming parameter value against, if applies
 /// @param minValue Min value to check the incoming parameter value against, if applies
 /// @param maxValue Max value to check the incoming parameter value against, if applies
-/// @param referencePoint A reference value of a parameter to check change magnitudes against;
-///        When the reference update period has elapsed since the last reference point update,
-///        the reference point is updated to the 'current' value on the next parameter change
-///        NB: Should not be changed manually in most cases
 /// @param referencePointUpdatePeriod The minimal time period after which the RP can be updated
-/// @param referencePointTimestampLU  Last timestamp at which the reference point was updated
-///        NB: Should not be changed manually in most cases
 /// @param minPctChangeDown Min percentage decrease for new values, relative to reference point
 /// @param minPctChangeUp Min percentage increase for new values, relative to reference point
 /// @param maxPctChangeDown Max percentage decrease for new values, relative to reference point
@@ -44,15 +38,22 @@ struct Policy {
     uint256 exactValue;
     uint256 minValue;
     uint256 maxValue;
-    uint256 referencePoint;
     uint40 referencePointUpdatePeriod;
-    uint40 referencePointTimestampLU;
     uint16 minPctChangeDown;
     uint16 minPctChangeUp;
     uint16 maxPctChangeDown;
     uint16 maxPctChangeUp;
     uint256 minChange;
     uint256 maxChange;
+}
+
+/// @param referencePoint A reference value of a parameter to check change magnitudes against;
+///        When the reference update period has elapsed since the last reference point update,
+///        the reference point is updated to the 'current' value on the next parameter change
+/// @param referencePointTimestampLU  Last timestamp at which the reference point was updated
+struct ReferenceData {
+    uint224 referencePoint;
+    uint40 referencePointTimestampLU;
 }
 
 /// @title Policy manager V3
@@ -66,11 +67,14 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
     uint256 internal constant CHECK_MIN_PCT_CHANGE_FLAG = 1 << 5;
     uint256 internal constant CHECK_MAX_PCT_CHANGE_FLAG = 1 << 6;
 
-    /// @dev Mapping from parameter hashes to metaparameters
+    /// @dev Mapping from group-derived key to policy
     mapping(bytes32 => Policy) internal _policies;
 
     /// @dev Mapping from a contract address to its group
     mapping(address => string) internal _group;
+
+    /// @dev Mapping from address-derived key to reference point and last updated timestamp
+    mapping(bytes32 => ReferenceData) internal _references;
 
     /// @notice Emitted when new policy is set
     event SetPolicy(bytes32 indexed policyHash, bool enabled);
@@ -118,6 +122,18 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
         return _group[contractAddress]; // U:[PM-1]
     }
 
+    /// @notice Manually sets the reference data for a particular hash
+    /// @dev This is a manual override to use in case something goes wrong with reference value
+    ///      Should not be touched in most cases
+    function setReference(bytes32 referenceHash, ReferenceData memory ref) external {
+        _references[referenceHash] = ref;
+    }
+
+    /// @notice Returns reference point and last update timestamp for a particular reference key
+    function getReference(bytes32 referenceHash) external view returns (ReferenceData memory) {
+        return _references[referenceHash];
+    }
+
     /// @dev Returns policy transaction delay, with policy retrieved based on contract and parameter name
     function _getPolicyDelay(address contractAddress, string memory paramName) internal view returns (uint256) {
         bytes32 policyHash = keccak256(abi.encode(_group[contractAddress], paramName));
@@ -135,12 +151,17 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
         returns (bool)
     {
         bytes32 policyHash = keccak256(abi.encode(_group[contractAddress], paramName));
-        return _checkPolicy(policyHash, oldValue, newValue);
+        bytes32 referenceHash = keccak256(abi.encode(contractAddress, paramName));
+        return _checkPolicy(policyHash, referenceHash, oldValue, newValue);
     }
 
     /// @dev Performs parameter checks, with policy retrieved based on policy UID
-    function _checkPolicy(bytes32 policyHash, uint256 oldValue, uint256 newValue) internal returns (bool) {
+    function _checkPolicy(bytes32 policyHash, bytes32 referenceHash, uint256 oldValue, uint256 newValue)
+        internal
+        returns (bool)
+    {
         Policy storage policy = _policies[policyHash];
+        ReferenceData storage referenceData = _references[referenceHash];
 
         if (!policy.enabled) return false; // U:[PM-2]
 
@@ -171,12 +192,12 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
                 & (CHECK_MIN_CHANGE_FLAG | CHECK_MAX_CHANGE_FLAG | CHECK_MIN_PCT_CHANGE_FLAG | CHECK_MAX_PCT_CHANGE_FLAG)
                 != 0
         ) {
-            if (block.timestamp > policy.referencePointTimestampLU + policy.referencePointUpdatePeriod) {
+            if (block.timestamp > referenceData.referencePointTimestampLU + policy.referencePointUpdatePeriod) {
                 referencePoint = oldValue;
-                policy.referencePoint = referencePoint; // U:[PM-6]
-                policy.referencePointTimestampLU = uint40(block.timestamp); // U:[PM-6]
+                referenceData.referencePoint = uint224(referencePoint); // U:[PM-6]
+                referenceData.referencePointTimestampLU = uint40(block.timestamp); // U:[PM-6]
             } else {
-                referencePoint = policy.referencePoint;
+                referencePoint = uint256(referenceData.referencePoint);
             }
 
             (uint256 diff, bool isIncrease) = calcDiff(newValue, referencePoint);
