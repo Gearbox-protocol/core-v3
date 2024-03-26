@@ -343,7 +343,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                         uint256 utilization =
                             WAD * (pool.expectedLiquidity() - pool.availableLiquidity()) / pool.expectedLiquidity();
                         if (utilization > 85 * WAD / 100) {
-                            depositAmount =
+                            depositAmount +=
                                 pool.expectedLiquidity() * utilization / (75 * WAD / 100) - pool.expectedLiquidity();
                         }
                     }
