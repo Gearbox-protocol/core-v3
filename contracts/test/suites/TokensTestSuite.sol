@@ -69,6 +69,8 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
 
             unchecked {
                 for (uint256 i; i < tokenCount; ++i) {
+                    if (td[i].addr.code.length == 0) continue;
+
                     addressOf[td[i].id] = td[i].addr;
                     tokenIndexes[td[i].addr] = td[i].id;
                     symbols[td[i].id] = td[i].symbol;
@@ -90,11 +92,7 @@ contract TokensTestSuite is Test, TokensTestSuiteHelper {
             t = new WETHMock();
             wethToken = address(t);
         } else if (token.index == Tokens.USDC) {
-            t = new ERC20BlacklistableMock(
-                token.symbol,
-                token.symbol,
-                token.decimals
-            );
+            t = new ERC20BlacklistableMock(token.symbol, token.symbol, token.decimals);
         } else if (token.index == Tokens.USDT) {
             t = new ERC20FeeMock(token.symbol, token.symbol, token.decimals);
         } else {
