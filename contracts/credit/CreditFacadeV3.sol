@@ -72,7 +72,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     using SafeERC20 for IERC20;
 
     /// @notice Contract version
-    uint256 public constant override version = 3_00;
+    uint256 public constant override version = 3_01;
 
     /// @notice Maximum quota size, as a multiple of `maxDebt`
     uint256 public constant override maxQuotaMultiplier = 2;
@@ -824,7 +824,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         (tokensToEnable, tokensToDisable) = ICreditManagerV3(creditManager).updateQuota({
             creditAccount: creditAccount,
             token: token,
-            quotaChange: quotaChange,
+            quotaChange: quotaChange != type(int96).min ? quotaChange / 10_000 * 10_000 : quotaChange,
             minQuota: minQuota,
             maxQuota: uint96(Math.min(type(uint96).max, maxQuotaMultiplier * debtLimits.maxDebt))
         }); // U:[FA-34]
