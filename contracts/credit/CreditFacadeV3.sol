@@ -824,7 +824,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         (tokensToEnable, tokensToDisable) = ICreditManagerV3(creditManager).updateQuota({
             creditAccount: creditAccount,
             token: token,
-            quotaChange: quotaChange != type(int96).min ? quotaChange / 10_000 * 10_000 : quotaChange,
+            quotaChange: quotaChange != type(int96).min
+                ? quotaChange / int96(uint96(PERCENTAGE_FACTOR)) * int96(uint96(PERCENTAGE_FACTOR))
+                : quotaChange,
             minQuota: minQuota,
             maxQuota: uint96(Math.min(type(uint96).max, maxQuotaMultiplier * debtLimits.maxDebt))
         }); // U:[FA-34]
