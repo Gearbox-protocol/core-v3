@@ -1515,7 +1515,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         uint256 maskToEnable = 1 << 4;
         uint256 maskToDisable = 1 << 7;
 
-        int96 change = -990;
+        int96 change = -19900;
 
         creditManagerMock.setUpdateQuota({tokensToEnable: maskToEnable, tokensToDisable: maskToDisable});
 
@@ -1523,7 +1523,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             address(creditManagerMock),
             abi.encodeCall(
                 ICreditManagerV3.updateQuota,
-                (creditAccount, link, change, 0, uint96(maxDebt * creditFacade.maxQuotaMultiplier()))
+                (creditAccount, link, change / 10_000 * 10_000, 0, uint96(maxDebt * creditFacade.maxQuotaMultiplier()))
             )
         );
 
