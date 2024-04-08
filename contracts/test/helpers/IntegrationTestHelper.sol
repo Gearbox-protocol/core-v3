@@ -336,8 +336,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
             uint256 remainingBorrowable = pool.creditManagerBorrowable(address(creditManager));
 
-            if (remainingBorrowable < minDebt) {
-                uint256 depositAmount = 5 * minDebt;
+            if (remainingBorrowable < 10 * minDebt) {
+                uint256 depositAmount = 10 * minDebt;
                 {
                     if (pool.expectedLiquidity() != 0) {
                         uint256 utilization =
