@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {IBotListV3, BotInfo} from "../interfaces/IBotListV3.sol";
+import {ICreditAccountBase} from "../interfaces/ICreditAccountV3.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {
     AddressIsNotContractException,
@@ -27,7 +28,7 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice Contract version
-    uint256 public constant override version = 3_00;
+    uint256 public constant override version = 3_10;
 
     /// @notice Credit manager's approved status
     mapping(address => bool) public override approvedCreditManager;
@@ -37,12 +38,6 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
 
     /// @dev Mapping credit manager => credit account => set of bots with non-zero permissions
     mapping(address => mapping(address => EnumerableSet.AddressSet)) internal _activeBots;
-
-    /// @dev Ensures that function can only be called by a facade connected to approved `creditManager`
-    modifier onlyValidCreditFacade(address creditManager) {
-        _revertIfCallerNotValidCreditFacade(creditManager);
-        _;
-    }
 
     /// @notice Constructor
     /// @param addressProvider Address provider contract address
@@ -55,29 +50,21 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
     // PERMISSIONS //
     // ----------- //
 
-    /// @notice Returns `bot`'s permissions for `creditAccount` in `creditManager`
-    function botPermissions(address bot, address creditManager, address creditAccount)
-        external
-        view
-        override
-        returns (uint192)
-    {
+    /// @notice Returns `bot`'s permissions for `creditAccount` in its credit manager
+    function botPermissions(address bot, address creditAccount) external view override returns (uint192) {
+        address creditManager = ICreditAccountBase(creditAccount).creditManager();
         return _botInfo[bot].permissions[creditManager][creditAccount];
     }
 
-    /// @notice Returns all bots with non-zero permissions for `creditAccount` in `creditManager`
-    function activeBots(address creditManager, address creditAccount)
-        external
-        view
-        override
-        returns (address[] memory)
-    {
+    /// @notice Returns all bots with non-zero permissions for `creditAccount` in its credit manager
+    function activeBots(address creditAccount) external view override returns (address[] memory) {
+        address creditManager = ICreditAccountBase(creditAccount).creditManager();
         return _activeBots[creditManager][creditAccount].values();
     }
 
-    /// @notice Returns `bot`'s permissions for `creditAccount` in `creditManager`, including information
+    /// @notice Returns `bot`'s permissions for `creditAccount` in its credit manager`, including information
     ///         on whether bot is forbidden or has special permissions in the credit manager
-    function getBotStatus(address bot, address creditManager, address creditAccount)
+    function getBotStatus(address bot, address creditAccount)
         external
         view
         override
@@ -86,25 +73,28 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
         BotInfo storage info = _botInfo[bot];
         if (info.forbidden) return (0, true, false);
 
+        address creditManager = ICreditAccountBase(creditAccount).creditManager();
         uint192 specialPermissions = info.specialPermissions[creditManager];
         if (specialPermissions != 0) return (specialPermissions, false, true);
 
         return (info.permissions[creditManager][creditAccount], false, false);
     }
 
-    /// @notice Sets `bot`'s permissions for `creditAccount` in `creditManager` to `permissions`
+    /// @notice Sets `bot`'s permissions for `creditAccount` in its credit manager to `permissions`
     /// @return activeBotsRemaining Number of bots with non-zero permissions remaining after the update
     /// @dev Reverts if caller is not a facade connected to approved `creditManager`
     /// @dev Reverts if `bot` is zero address or not a contract
     /// @dev Reverts if trying to set non-zero permissions for a forbidden bot or for a bot with special permissions
-    function setBotPermissions(address bot, address creditManager, address creditAccount, uint192 permissions)
+    function setBotPermissions(address bot, address creditAccount, uint192 permissions)
         external
         override
         nonZeroAddress(bot)
-        onlyValidCreditFacade(creditManager)
         returns (uint256 activeBotsRemaining)
     {
         if (!bot.isContract()) revert AddressIsNotContractException(bot);
+
+        address creditManager = ICreditAccountBase(creditAccount).creditManager();
+        _revertIfCallerNotValidCreditFacade(creditManager);
 
         EnumerableSet.AddressSet storage accountBots = _activeBots[creditManager][creditAccount];
 
@@ -125,12 +115,11 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
         activeBotsRemaining = accountBots.length();
     }
 
-    /// @notice Removes all bots' permissions for `creditAccount` in `creditManager`
-    function eraseAllBotPermissions(address creditManager, address creditAccount)
-        external
-        override
-        onlyValidCreditFacade(creditManager)
-    {
+    /// @notice Removes all bots' permissions for `creditAccount` in its credit manager
+    function eraseAllBotPermissions(address creditAccount) external override {
+        address creditManager = ICreditAccountBase(creditAccount).creditManager();
+        _revertIfCallerNotValidCreditFacade(creditManager);
+
         EnumerableSet.AddressSet storage accountBots = _activeBots[creditManager][creditAccount];
         unchecked {
             for (uint256 i = accountBots.length(); i != 0; --i) {

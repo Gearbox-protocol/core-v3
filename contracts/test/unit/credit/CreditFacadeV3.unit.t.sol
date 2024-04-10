@@ -129,7 +129,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
 
-        botListMock = BotListMock(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00));
+        botListMock = BotListMock(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_10));
 
         priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00));
 
@@ -438,10 +438,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         }
 
         if (hasBotPermissions) {
-            vm.expectCall(
-                address(botListMock),
-                abi.encodeCall(IBotListV3.eraseAllBotPermissions, (address(creditManagerMock), creditAccount))
-            );
+            vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.eraseAllBotPermissions, (creditAccount)));
         }
 
         vm.expectEmit(true, true, true, true);
@@ -1769,20 +1766,14 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             address(creditManagerMock),
             abi.encodeCall(ICreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, true))
         );
-        vm.expectCall(
-            address(botListMock),
-            abi.encodeCall(IBotListV3.setBotPermissions, (bot, address(creditManagerMock), creditAccount, 1))
-        );
+        vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.setBotPermissions, (bot, creditAccount, 1)));
 
         vm.prank(USER);
         creditFacade.setBotPermissions({creditAccount: creditAccount, bot: bot, permissions: 1});
 
         /// It removes flag if no bots left
         botListMock.setBotPermissionsReturn(0);
-        vm.expectCall(
-            address(botListMock),
-            abi.encodeCall(IBotListV3.setBotPermissions, (bot, address(creditManagerMock), creditAccount, 1))
-        );
+        vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.setBotPermissions, (bot, creditAccount, 1)));
 
         vm.expectCall(
             address(creditManagerMock),
