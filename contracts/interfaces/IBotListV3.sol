@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
@@ -48,23 +48,20 @@ interface IBotListV3 is IBotListV3Events, IVersion {
     // PERMISSIONS //
     // ----------- //
 
-    function botPermissions(address bot, address creditManager, address creditAccount)
-        external
-        view
-        returns (uint192);
+    function botPermissions(address bot, address creditAccount) external view returns (uint192);
 
-    function activeBots(address creditManager, address creditAccount) external view returns (address[] memory);
+    function activeBots(address creditAccount) external view returns (address[] memory);
 
-    function getBotStatus(address bot, address creditManager, address creditAccount)
+    function getBotStatus(address bot, address creditAccount)
         external
         view
         returns (uint192 permissions, bool forbidden, bool hasSpecialPermissions);
 
-    function setBotPermissions(address bot, address creditManager, address creditAccount, uint192 permissions)
+    function setBotPermissions(address bot, address creditAccount, uint192 permissions)
         external
         returns (uint256 activeBotsRemaining);
 
-    function eraseAllBotPermissions(address creditManager, address creditAccount) external;
+    function eraseAllBotPermissions(address creditAccount) external;
 
     // ------------- //
     // CONFIGURATION //

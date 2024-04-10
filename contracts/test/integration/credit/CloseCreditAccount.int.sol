@@ -193,9 +193,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         vm.expectEmit(false, false, false, true);
         emit FinishMultiCall();
 
-        vm.expectCall(
-            address(botList), abi.encodeCall(BotListV3.eraseAllBotPermissions, (address(creditManager), creditAccount))
-        );
+        vm.expectCall(address(botList), abi.encodeCall(BotListV3.eraseAllBotPermissions, (creditAccount)));
 
         vm.expectEmit(true, true, false, false);
         emit CloseCreditAccount(creditAccount, USER);

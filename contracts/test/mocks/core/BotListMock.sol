@@ -18,7 +18,7 @@ contract BotListMock {
         return_hasSpecialPermissions = hasSpecialPermissions;
     }
 
-    function getBotStatus(address, address, address)
+    function getBotStatus(address, address)
         external
         view
         returns (uint256 botPermissions, bool forbidden, bool hasSpecialPermissions)
@@ -28,7 +28,7 @@ contract BotListMock {
         hasSpecialPermissions = return_hasSpecialPermissions;
     }
 
-    function eraseAllBotPermissions(address, address) external view {
+    function eraseAllBotPermissions(address) external view {
         if (revertOnErase) {
             revert("Unexpected call to eraseAllBotPermissions");
         }
@@ -42,11 +42,7 @@ contract BotListMock {
         return_activeBotsRemaining = activeBotsRemaining;
     }
 
-    function setBotPermissions(address, address, address, uint192)
-        external
-        view
-        returns (uint256 activeBotsRemaining)
-    {
+    function setBotPermissions(address, address, uint192) external view returns (uint256 activeBotsRemaining) {
         activeBotsRemaining = return_activeBotsRemaining;
     }
 }

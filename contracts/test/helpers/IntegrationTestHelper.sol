@@ -294,7 +294,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, NO_VERSION_CONTROL));
         accountFactory = AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL));
         priceOracle = IPriceOracleV3(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00));
-        botList = BotListV3(payable(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00)));
+        botList = BotListV3(payable(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_10)));
     }
 
     function _attachPool(address _pool) internal returns (bool isCompartible) {
