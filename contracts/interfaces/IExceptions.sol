@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
 // ------- //
@@ -288,6 +288,9 @@ error ParameterChangedAfterQueuedTxException();
 
 /// @notice Thrown when attempting to set non-zero permissions for a forbidden or special bot
 error InvalidBotException();
+
+/// @notice Thrown when attempting to set permissions for the bot that don't meet its requirements
+error InsufficientBotPermissionsException();
 
 // --------------- //
 // ACCOUNT FACTORY //

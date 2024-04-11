@@ -405,7 +405,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param bot Bot to set permissions for
     /// @param permissions A bit mask encoding bot permissions
     /// @dev Reverts if `creditAccount` is not opened in connected credit manager by caller
-    /// @dev Reverts if `permissions` has unexpected bits enabled
+    /// @dev Reverts if `permissions` has unexpected bits enabled or some bits required by `bot` disabled
     /// @dev Reverts if account has more active bots than allowed after changing permissions
     /// @dev Changes account's `BOT_PERMISSIONS_SET_FLAG` in the credit manager if needed
     function setBotPermissions(address creditAccount, address bot, uint192 permissions)

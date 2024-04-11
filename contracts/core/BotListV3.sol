@@ -3,15 +3,16 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {IBotListV3, BotInfo} from "../interfaces/IBotListV3.sol";
+import {IBotV3} from "../interfaces/IBotV3.sol";
 import {ICreditAccountBase} from "../interfaces/ICreditAccountV3.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {
     AddressIsNotContractException,
     CallerNotCreditFacadeException,
+    InsufficientBotPermissionsException,
     InvalidBotException
 } from "../interfaces/IExceptions.sol";
 
@@ -24,7 +25,6 @@ import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 ///         in a given credit manager and can be used to extend the core system or enforce additional safety measures
 ///         with special DAO-approved bots.
 contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
-    using Address for address;
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice Contract version
@@ -82,8 +82,8 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
 
     /// @notice Sets `bot`'s permissions for `creditAccount` in its credit manager to `permissions`
     /// @return activeBotsRemaining Number of bots with non-zero permissions remaining after the update
-    /// @dev Reverts if caller is not a facade connected to approved `creditManager`
-    /// @dev Reverts if `bot` is zero address or not a contract
+    /// @dev Reverts if `creditAccount`'s credit manager is not approved or caller is not a facade connected to it
+    /// @dev Reverts if trying to set non-zero permissions that don't meet bot's requirements
     /// @dev Reverts if trying to set non-zero permissions for a forbidden bot or for a bot with special permissions
     function setBotPermissions(address bot, address creditAccount, uint192 permissions)
         external
@@ -91,10 +91,9 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
         nonZeroAddress(bot)
         returns (uint256 activeBotsRemaining)
     {
-        if (!bot.isContract()) revert AddressIsNotContractException(bot);
-
         address creditManager = ICreditAccountBase(creditAccount).creditManager();
         _revertIfCallerNotValidCreditFacade(creditManager);
+        _revertIfPermissionsNotSufficient(bot, permissions);
 
         EnumerableSet.AddressSet storage accountBots = _activeBots[creditManager][creditAccount];
 
@@ -116,6 +115,7 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
     }
 
     /// @notice Removes all bots' permissions for `creditAccount` in its credit manager
+    /// @dev Reverts if `creditAccount`'s credit manager is not approved or caller is not a facade connected to it
     function eraseAllBotPermissions(address creditAccount) external override {
         address creditManager = ICreditAccountBase(creditAccount).creditManager();
         _revertIfCallerNotValidCreditFacade(creditManager);
@@ -154,11 +154,13 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
     }
 
     /// @notice Sets `bot`'s special permissions in `creditManager` to `permissions`
+    /// @dev Reverts if trying to set non-zero permissions that don't meet bot's requirements
     function setBotSpecialPermissions(address bot, address creditManager, uint192 permissions)
         external
         override
         configuratorOnly
     {
+        _revertIfPermissionsNotSufficient(bot, permissions);
         BotInfo storage info = _botInfo[bot];
         if (info.specialPermissions[creditManager] != permissions) {
             info.specialPermissions[creditManager] = permissions;
@@ -183,10 +185,17 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
     // INTERNALS //
     // --------- //
 
-    /// @dev Reverts if `creditManager` is not approved or caller is not a facade connected to `creditManager`
+    /// @dev Reverts if `creditManager` is not approved or caller is not a facade connected to it
     function _revertIfCallerNotValidCreditFacade(address creditManager) internal view {
         if (!approvedCreditManager[creditManager] || ICreditManagerV3(creditManager).creditFacade() != msg.sender) {
             revert CallerNotCreditFacadeException();
+        }
+    }
+
+    /// @dev Reverts if trying to set non-zero permissions that don't meet bot's requirements
+    function _revertIfPermissionsNotSufficient(address bot, uint192 permissions) internal view {
+        if (permissions != 0 && IBotV3(bot).requiredPermissions() & ~permissions != 0) {
+            revert InsufficientBotPermissionsException();
         }
     }
 
