@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
 import {BotListV3} from "../../../core/BotListV3.sol";
@@ -11,6 +11,7 @@ import "../../lib/constants.sol";
 
 // MOCKS
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
+import {BotMock} from "../../mocks/core/BotMock.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
@@ -30,15 +31,13 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
     address invalidFacade;
 
     function setUp() public {
-        bot = makeAddr("BOT");
-        otherBot = makeAddr("OTHER_BOT");
+        bot = address(new BotMock());
+        otherBot = address(new BotMock());
         creditManager = makeAddr("CREDIT_MANAGER");
         creditFacade = makeAddr("CREDIT_FACADE");
         creditAccount = makeAddr("CREDIT_ACCOUNT");
         invalidFacade = makeAddr("INVALID_FACADE");
 
-        vm.etch(bot, "RANDOM CODE");
-        vm.etch(otherBot, "RANDOM CODE");
         vm.mockCall(creditManager, abi.encodeWithSignature("creditFacade()"), abi.encode(creditFacade));
         vm.mockCall(creditFacade, abi.encodeWithSignature("creditManager()"), abi.encode(creditManager));
         vm.mockCall(invalidFacade, abi.encodeWithSignature("creditManager()"), abi.encode(creditManager));
@@ -58,9 +57,13 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
         vm.prank(invalidFacade);
         botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: type(uint192).max});
 
-        vm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, DUMB_ADDRESS));
+        BotMock(bot).setRequiredPermissions(1);
+        BotMock(bot).requiredPermissions();
+
+        vm.expectRevert(InsufficientBotPermissionsException.selector);
         vm.prank(creditFacade);
-        botList.setBotPermissions({bot: DUMB_ADDRESS, creditAccount: creditAccount, permissions: type(uint192).max});
+        botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: 2});
+        BotMock(bot).setRequiredPermissions(0);
 
         vm.prank(CONFIGURATOR);
         botList.setBotForbiddenStatus(bot, true);
@@ -157,6 +160,12 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
     function test_U_BL_03_setBotSpecialPermissions_works_correctly() public {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         botList.setBotSpecialPermissions(bot, creditManager, 2);
+
+        BotMock(bot).setRequiredPermissions(1);
+        vm.expectRevert(InsufficientBotPermissionsException.selector);
+        vm.prank(CONFIGURATOR);
+        botList.setBotSpecialPermissions(bot, creditManager, 2);
+        BotMock(bot).setRequiredPermissions(2);
 
         vm.expectEmit(true, true, false, true);
         emit SetBotSpecialPermissions(bot, creditManager, 2);
