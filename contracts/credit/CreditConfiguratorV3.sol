@@ -28,12 +28,7 @@ import {CreditManagerV3} from "./CreditManagerV3.sol";
 
 // INTERFACES
 import {IAdapter} from "@gearbox-protocol/core-v2/contracts/interfaces/IAdapter.sol";
-import {
-    ICreditConfiguratorV3,
-    CollateralToken,
-    CreditManagerOpts,
-    AllowanceAction
-} from "../interfaces/ICreditConfiguratorV3.sol";
+import {ICreditConfiguratorV3, CreditManagerOpts, AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
 import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import "../interfaces/IAddressProviderV3.sol";
@@ -50,7 +45,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     using BitMask for uint256;
 
     /// @notice Contract version
-    uint256 public constant override version = 3_00;
+    uint256 public constant override version = 3_01;
 
     /// @notice Address provider contract address
     address public immutable override addressProvider;
@@ -75,7 +70,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
 
     /// @notice Constructor
     ///         - For a newly deployed credit manager, performs initial configuration:
-    ///           * sets its fee parameters to default values and adds collateral tokens
+    ///           * sets its fee parameters to default values
     ///           * connects the credit facade and sets debt limits in it
     ///         - For an existing credit manager, simply copies lists of allowed adapters and emergency liquidators
     ///           from the currently connected credit configurator
@@ -123,20 +118,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
                 liquidationDiscountExpired: PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM_EXPIRED
             }); // I:[CC-1]
 
-            uint256 len = opts.collateralTokens.length;
-            unchecked {
-                for (uint256 i = 0; i < len; ++i) {
-                    address token = opts.collateralTokens[i].token;
-                    if (token == address(0)) revert ZeroAddressException();
-
-                    _addCollateralToken({token: token}); // I:[CC-1]
-                    _setLiquidationThreshold({
-                        token: token,
-                        liquidationThreshold: opts.collateralTokens[i].liquidationThreshold
-                    }); // I:[CC-1]
-                }
-            }
-
             CreditManagerV3(creditManager).setCreditFacade(address(_creditFacade)); // I:[CC-1]
 
             emit SetCreditFacade(address(_creditFacade)); // I:[CC-1A]
@@ -183,9 +164,8 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             revert IncorrectTokenContractException(); // I:[CC-3]
         }
 
-        try IPriceOracleBase(CreditManagerV3(creditManager).priceOracle()).convertToUSD({amount: WAD, token: token})
-        returns (uint256) {} catch {
-            revert IncorrectPriceFeedException(); // I:[CC-3]
+        if (IPriceOracleBase(CreditManagerV3(creditManager).priceOracle()).priceFeeds(token) == address(0)) {
+            revert PriceFeedDoesNotExistException(); // I:[CC-3]
         }
 
         CreditManagerV3(creditManager).addToken({token: token}); // I:[CC-4]

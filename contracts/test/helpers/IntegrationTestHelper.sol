@@ -7,6 +7,7 @@ import "../../interfaces/IAddressProviderV3.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
+import {IACL} from "@gearbox-protocol/core-v2/contracts/interfaces/IACL.sol";
 
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -25,7 +26,7 @@ import {ICreditFacadeV3Multicall} from "../../interfaces/ICreditFacadeV3.sol";
 
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {IPriceOracleV3} from "../../interfaces/IPriceOracleV3.sol";
-import {CreditManagerOpts, CollateralToken} from "../../credit/CreditConfiguratorV3.sol";
+import {CreditManagerOpts} from "../../credit/CreditConfiguratorV3.sol";
 import {PoolFactory} from "../suites/PoolFactory.sol";
 
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
@@ -316,7 +317,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         creditFacade = CreditFacadeV3(creditManager.creditFacade());
         creditConfigurator = CreditConfiguratorV3(creditManager.creditConfigurator());
 
-        address degenNFT = creditFacade.degenNFT();
+        address _degenNFT = creditFacade.degenNFT();
 
         if (!_attachPool(creditManager.pool())) {
             return false;
@@ -326,7 +327,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             return false;
         }
 
-        if (!anyDegenNFT && whitelisted != (degenNFT != address(0))) {
+        if (!anyDegenNFT && whitelisted != (_degenNFT != address(0))) {
             return false;
         }
         if (configAccountAmount == 0) {
@@ -335,21 +336,42 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
             uint256 remainingBorrowable = pool.creditManagerBorrowable(address(creditManager));
 
-            if (remainingBorrowable < minDebt) {
-                console.log("Cant setup credit amount because remaing funds < MIN_DEBT");
-                revert("Cant setup credit amount because remaing funds < MIN_DEBT");
+            if (remainingBorrowable < 10 * minDebt) {
+                uint256 depositAmount = 10 * minDebt;
+                {
+                    if (pool.expectedLiquidity() != 0) {
+                        uint256 utilization =
+                            WAD * (pool.expectedLiquidity() - pool.availableLiquidity()) / pool.expectedLiquidity();
+                        if (utilization > 85 * WAD / 100) {
+                            depositAmount +=
+                                pool.expectedLiquidity() * utilization / (75 * WAD / 100) - pool.expectedLiquidity();
+                        }
+                    }
+                }
+
+                tokenTestSuite.mint(underlying, INITIAL_LP, depositAmount);
+                tokenTestSuite.approve(underlying, INITIAL_LP, address(pool));
+
+                vm.prank(INITIAL_LP);
+                pool.deposit(depositAmount, INITIAL_LP);
+
+                address configurator = IACL(addressProvider.getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL)).owner();
+                uint256 currentLimit = pool.creditManagerDebtLimit(address(creditManager));
+                vm.prank(configurator);
+                pool.setCreditManagerDebtLimit(address(creditManager), currentLimit + depositAmount);
             }
 
             creditAccountAmount = Math.min(creditAccountAmount, Math.max(remainingBorrowable / 2, minDebt));
+            creditAccountAmount = Math.min(creditAccountAmount, minDebt * 5);
         } else {
             creditAccountAmount = configAccountAmount;
         }
 
-        if (degenNFT != address(0)) {
-            address minter = DegenNFTV2(degenNFT).minter();
+        if (_degenNFT != address(0)) {
+            address minter = DegenNFTV2(_degenNFT).minter();
 
             vm.prank(minter);
-            DegenNFTV2(degenNFT).mint(USER, 1000);
+            DegenNFTV2(_degenNFT).mint(USER, 1000);
         }
 
         return true;
@@ -419,7 +441,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             CreditManagerOpts memory cmOpts = CreditManagerOpts({
                 minDebt: cmParams.minDebt,
                 maxDebt: cmParams.maxDebt,
-                collateralTokens: new CollateralToken[](0), //_convertCollateral(cmParams.collateralTokens),
                 degenNFT: (whitelisted) ? address(degenNFT) : address(0),
                 expirable: (anyExpirable) ? cmParams.expirable : expirable,
                 name: cmParams.name
@@ -478,11 +499,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             tokenTestSuite.mint(underlying, USER, creditAccountAmount);
             tokenTestSuite.mint(underlying, FRIEND, creditAccountAmount);
 
-            vm.prank(USER);
-            IERC20(underlying).approve(address(creditManager), type(uint256).max);
-
-            vm.prank(FRIEND);
-            IERC20(underlying).approve(address(creditManager), type(uint256).max);
+            tokenTestSuite.approve(underlying, USER, address(creditManager));
+            tokenTestSuite.approve(underlying, FRIEND, address(creditManager));
 
             creditManagers.push(creditManager);
             creditFacades.push(creditFacade);
@@ -679,19 +697,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
     function executeOneLineMulticall(address creditAccount, address target, bytes memory callData) internal {
         creditFacade.multicall(creditAccount, MultiCallBuilder.build(MultiCall({target: target, callData: callData})));
-    }
-
-    function _convertCollateral(CollateralTokenHuman[] memory clts)
-        internal
-        view
-        returns (CollateralToken[] memory result)
-    {
-        uint256 len = clts.length;
-        result = new CollateralToken[](len);
-        for (uint256 i = 0; i < len; i++) {
-            result[i] =
-                CollateralToken({token: tokenTestSuite.addressOf(clts[i].token), liquidationThreshold: clts[i].lt});
-        }
     }
 
     function _addCollateralTokens(CollateralTokenHuman[] memory clts) internal {

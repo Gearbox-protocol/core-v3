@@ -72,7 +72,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     using SafeERC20 for IERC20;
 
     /// @notice Contract version
-    uint256 public constant override version = 3_00;
+    uint256 public constant override version = 3_01;
 
     /// @notice Maximum quota size, as a multiple of `maxDebt`
     uint256 public constant override maxQuotaMultiplier = 2;
@@ -595,35 +595,35 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                             if (mask == 0 || mask & mask - 1 != 0) revert InvalidCollateralHintException(); // U:[FA-24]
                         }
                     }
-                    // enableToken
-                    else if (method == ICreditFacadeV3Multicall.enableToken.selector) {
-                        _revertIfNoPermission(flags, ENABLE_TOKEN_PERMISSION); // U:[FA-21]
-                        address token = abi.decode(mcall.callData[4:], (address)); // U:[FA-33]
+                    // // enableToken
+                    // else if (method == ICreditFacadeV3Multicall.enableToken.selector) {
+                    //     _revertIfNoPermission(flags, ENABLE_TOKEN_PERMISSION); // U:[FA-21]
+                    //     address token = abi.decode(mcall.callData[4:], (address)); // U:[FA-33]
 
-                        quotedTokensMaskInverted = _quotedTokensMaskInvertedLoE(quotedTokensMaskInverted);
+                    //     quotedTokensMaskInverted = _quotedTokensMaskInvertedLoE(quotedTokensMaskInverted);
 
-                        enabledTokensMask = enabledTokensMask.enable({
-                            bitsToEnable: _getTokenMaskOrRevert(token),
-                            invertedSkipMask: quotedTokensMaskInverted
-                        }); // U:[FA-33]
-                    }
-                    // disableToken
-                    else if (method == ICreditFacadeV3Multicall.disableToken.selector) {
-                        _revertIfNoPermission(flags, DISABLE_TOKEN_PERMISSION); // U:[FA-21]
-                        address token = abi.decode(mcall.callData[4:], (address)); // U:[FA-33]
+                    //     enabledTokensMask = enabledTokensMask.enable({
+                    //         bitsToEnable: _getTokenMaskOrRevert(token),
+                    //         invertedSkipMask: quotedTokensMaskInverted
+                    //     }); // U:[FA-33]
+                    // }
+                    // // disableToken
+                    // else if (method == ICreditFacadeV3Multicall.disableToken.selector) {
+                    //     _revertIfNoPermission(flags, DISABLE_TOKEN_PERMISSION); // U:[FA-21]
+                    //     address token = abi.decode(mcall.callData[4:], (address)); // U:[FA-33]
 
-                        quotedTokensMaskInverted = _quotedTokensMaskInvertedLoE(quotedTokensMaskInverted);
+                    //     quotedTokensMaskInverted = _quotedTokensMaskInvertedLoE(quotedTokensMaskInverted);
 
-                        enabledTokensMask = enabledTokensMask.disable({
-                            bitsToDisable: _getTokenMaskOrRevert(token),
-                            invertedSkipMask: quotedTokensMaskInverted
-                        }); // U:[FA-33]
-                    }
-                    // revokeAdapterAllowances
-                    else if (method == ICreditFacadeV3Multicall.revokeAdapterAllowances.selector) {
-                        _revertIfNoPermission(flags, REVOKE_ALLOWANCES_PERMISSION); // U:[FA-21]
-                        _revokeAdapterAllowances(creditAccount, mcall.callData[4:]); // U:[FA-36]
-                    }
+                    //     enabledTokensMask = enabledTokensMask.disable({
+                    //         bitsToDisable: _getTokenMaskOrRevert(token),
+                    //         invertedSkipMask: quotedTokensMaskInverted
+                    //     }); // U:[FA-33]
+                    // }
+                    // // revokeAdapterAllowances
+                    // else if (method == ICreditFacadeV3Multicall.revokeAdapterAllowances.selector) {
+                    //     _revertIfNoPermission(flags, REVOKE_ALLOWANCES_PERMISSION); // U:[FA-21]
+                    //     _revokeAdapterAllowances(creditAccount, mcall.callData[4:]); // U:[FA-36]
+                    // }
                     // unknown method
                     else {
                         revert UnknownMethodException(); // U:[FA-22]
@@ -824,7 +824,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         (tokensToEnable, tokensToDisable) = ICreditManagerV3(creditManager).updateQuota({
             creditAccount: creditAccount,
             token: token,
-            quotaChange: quotaChange,
+            quotaChange: quotaChange != type(int96).min
+                ? quotaChange / int96(uint96(PERCENTAGE_FACTOR)) * int96(uint96(PERCENTAGE_FACTOR))
+                : quotaChange,
             minQuota: minQuota,
             maxQuota: uint96(Math.min(type(uint96).max, maxQuotaMultiplier * debtLimits.maxDebt))
         }); // U:[FA-34]

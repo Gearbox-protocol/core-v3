@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
 import {ITokenTestSuite} from "./ITokenTestSuite.sol";
-import {CreditManagerOpts, CollateralToken} from "../../interfaces/ICreditConfiguratorV3.sol";
+import {CreditManagerOpts} from "../../interfaces/ICreditConfiguratorV3.sol";
 import {Contracts} from "@gearbox-protocol/sdk-gov/contracts/SupportedContracts.sol";
 
 struct PriceFeedConfig {
@@ -36,7 +36,7 @@ struct BalancerPool {
     uint8 status;
 }
 
-struct UniswapV2Pair {
+struct GenericSwapPair {
     Contracts router;
     Tokens token0;
     Tokens token1;
@@ -89,7 +89,7 @@ struct CreditManagerV3DeployParams {
     // ADAPTER CIONFIGURATION
     BalancerPool[] balancerPools;
     UniswapV3Pair[] uniswapV3Pairs;
-    UniswapV2Pair[] uniswapV2Pairs;
+    GenericSwapPair[] genericSwapPairs;
     VelodromeV2Pool[] velodromeV2Pools;
 }
 
