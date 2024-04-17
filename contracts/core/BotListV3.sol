@@ -62,7 +62,7 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
         return _activeBots[creditManager][creditAccount].values();
     }
 
-    /// @notice Returns `bot`'s permissions for `creditAccount` in its credit manager`, including information
+    /// @notice Returns `bot`'s permissions for `creditAccount` in its credit manager, including information
     ///         on whether bot is forbidden or has special permissions in the credit manager
     function getBotStatus(address bot, address creditAccount)
         external
