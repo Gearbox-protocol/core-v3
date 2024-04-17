@@ -31,6 +31,8 @@ interface IPriceOracleV3Events {
 
 /// @title Price oracle V3 interface
 interface IPriceOracleV3 is IPriceOracleBase, IPriceOracleV3Events {
+    function getTokens() external view returns (address[] memory);
+
     function getPriceSafe(address token) external view returns (uint256);
 
     function getPriceRaw(address token, bool reserve) external view returns (uint256);

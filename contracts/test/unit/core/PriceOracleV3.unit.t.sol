@@ -127,6 +127,7 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         // setting the price feed
         // - must validate token and set decimals
         // - must set active status to true
+        // - must add token to the set
         vm.mockCall(token, abi.encodeCall(ERC20.decimals, ()), abi.encode(uint8(18)));
 
         vm.expectCall(token, abi.encodeCall(ERC20.decimals, ()));
@@ -145,6 +146,10 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         assertEq(params.decimals, 18, "Incorrect decimals");
         assertEq(params.trusted, true, "Incorrect trusted");
         assertTrue(params.active, "active status not set to true when setting a price feed");
+
+        address[] memory tokens = priceOracle.getTokens();
+        assertEq(tokens.length, 1, "Incorrect number of tokens");
+        assertEq(tokens[0], token, "Incorrect token");
 
         // updating the price feed
         // - must not validate token
