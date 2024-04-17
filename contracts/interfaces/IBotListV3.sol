@@ -20,13 +20,10 @@ interface IBotListV3Events {
     // PERMISSIONS //
     // ----------- //
 
-    /// @notice Emitted when new `bot`'s permissions and funding params are set for `creditAccount` in `creditManager`
+    /// @notice Emitted when new `bot`'s permissions are set for `creditAccount` in `creditManager`
     event SetBotPermissions(
         address indexed bot, address indexed creditManager, address indexed creditAccount, uint192 permissions
     );
-
-    /// @notice Emitted when `bot`'s permissions and funding params are removed for `creditAccount` in `creditManager`
-    event EraseBot(address indexed bot, address indexed creditManager, address indexed creditAccount);
 
     // ------------- //
     // CONFIGURATION //
