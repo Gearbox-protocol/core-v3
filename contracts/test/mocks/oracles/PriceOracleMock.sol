@@ -15,7 +15,7 @@ import "forge-std/console.sol";
 contract PriceOracleMock is Test, IPriceOracleBase {
     mapping(address => uint256) public priceInUSD;
 
-    uint256 public constant override version = 3_00;
+    uint256 public constant override version = 3_10;
 
     mapping(address => bool) revertsOnGetPrice;
     mapping(address => mapping(bool => address)) priceFeedsInt;

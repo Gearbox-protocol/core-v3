@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
 // THIRD-PARTY
@@ -58,7 +58,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     using CreditAccountHelper for ICreditAccountBase;
 
     /// @notice Contract version
-    uint256 public constant override version = 3_01;
+    uint256 public constant override version = 3_10;
 
     /// @notice Address provider contract address
     address public immutable override addressProvider;
@@ -157,7 +157,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         underlying = IPoolV3(_pool).underlyingToken(); // U:[CM-1]
         _addToken(underlying); // U:[CM-1]
 
-        priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_PRICE_ORACLE, 3_00); // U:[CM-1]
+        priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_PRICE_ORACLE, 3_10); // U:[CM-1]
         accountFactory = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL); // U:[CM-1]
 
         creditConfigurator = msg.sender; // U:[CM-1]
