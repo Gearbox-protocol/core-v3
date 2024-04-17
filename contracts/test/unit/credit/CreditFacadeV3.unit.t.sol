@@ -131,7 +131,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         botListMock = BotListMock(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00));
 
-        priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00));
+        priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_10));
 
         AddressProviderV3ACLMock(address(addressProvider)).addPausableAdmin(CONFIGURATOR);
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
@@ -32,7 +32,7 @@ import {PriceFeedValidationTrait} from "../traits/PriceFeedValidationTrait.sol";
 ///         This logic is skipped if active price feed is trusted, in which case its answer is used.
 contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPriceOracleV3 {
     /// @notice Contract version
-    uint256 public constant override version = 3_00;
+    uint256 public constant override version = 3_10;
 
     /// @dev Mapping from token address to price feed parameters
     mapping(address => PriceFeedParams) internal _priceFeedsParams;

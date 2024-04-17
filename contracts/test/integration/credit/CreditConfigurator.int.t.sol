@@ -917,7 +917,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             vm.prank(CONFIGURATOR);
             creditConfigurator.setCreditFacade(address(cf), migrateSettings);
 
-            assertEq(address(creditManager.priceOracle()), addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00));
+            assertEq(address(creditManager.priceOracle()), addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_10));
 
             assertEq(address(creditManager.creditFacade()), address(cf));
             assertEq(address(creditConfigurator.creditFacade()), address(cf));
