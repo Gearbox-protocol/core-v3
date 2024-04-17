@@ -95,23 +95,22 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
         _revertIfCallerNotValidCreditFacade(creditManager);
         _revertIfPermissionsNotSufficient(bot, permissions);
 
+        BotInfo storage info = _botInfo[bot];
         EnumerableSet.AddressSet storage accountBots = _activeBots[creditManager][creditAccount];
-
         if (permissions != 0) {
-            BotInfo storage info = _botInfo[bot];
             if (info.forbidden || info.specialPermissions[creditManager] != 0) {
                 revert InvalidBotException();
             }
-
             accountBots.add(bot);
-            info.permissions[creditManager][creditAccount] = permissions;
-            emit SetBotPermissions(bot, creditManager, creditAccount, permissions);
         } else {
-            _eraseBot(bot, creditManager, creditAccount);
             accountBots.remove(bot);
         }
-
         activeBotsRemaining = accountBots.length();
+
+        if (info.permissions[creditManager][creditAccount] != permissions) {
+            info.permissions[creditManager][creditAccount] = permissions;
+            emit SetBotPermissions(bot, creditManager, creditAccount, permissions);
+        }
     }
 
     /// @notice Removes all bots' permissions for `creditAccount` in its credit manager
@@ -124,8 +123,9 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
         unchecked {
             for (uint256 i = accountBots.length(); i != 0; --i) {
                 address bot = accountBots.at(i - 1);
-                _eraseBot(bot, creditManager, creditAccount);
                 accountBots.remove(bot);
+                _botInfo[bot].permissions[creditManager][creditAccount] = 0;
+                emit SetBotPermissions(bot, creditManager, creditAccount, 0);
             }
         }
     }
@@ -197,11 +197,5 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
         if (permissions != 0 && IBotV3(bot).requiredPermissions() & ~permissions != 0) {
             revert InsufficientBotPermissionsException();
         }
-    }
-
-    /// @dev Removes `bot`'s permissions for `creditAccount` in `creditManager`
-    function _eraseBot(address bot, address creditManager, address creditAccount) internal {
-        delete _botInfo[bot].permissions[creditManager][creditAccount];
-        emit EraseBot(bot, creditManager, creditAccount);
     }
 }

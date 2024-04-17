@@ -112,8 +112,8 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
         vm.prank(CONFIGURATOR);
         botList.setBotForbiddenStatus(bot, true);
 
-        vm.expectEmit(true, true, true, false);
-        emit EraseBot(bot, creditManager, creditAccount);
+        vm.expectEmit(true, true, true, true);
+        emit SetBotPermissions(bot, creditManager, creditAccount, 0);
 
         vm.prank(creditFacade);
         activeBotsRemaining = botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: 0});
@@ -140,11 +140,11 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
         vm.prank(invalidFacade);
         botList.eraseAllBotPermissions(creditAccount);
 
-        vm.expectEmit(true, true, true, false);
-        emit EraseBot(otherBot, creditManager, creditAccount);
+        vm.expectEmit(true, true, true, true);
+        emit SetBotPermissions(otherBot, creditManager, creditAccount, 0);
 
-        vm.expectEmit(true, true, true, false);
-        emit EraseBot(bot, creditManager, creditAccount);
+        vm.expectEmit(true, true, true, true);
+        emit SetBotPermissions(bot, creditManager, creditAccount, 0);
 
         vm.prank(creditFacade);
         botList.eraseAllBotPermissions(creditAccount);
