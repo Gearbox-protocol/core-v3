@@ -43,6 +43,7 @@ struct GenericSwapPair {
 }
 
 struct UniswapV3Pair {
+    Contracts router;
     Tokens token0;
     Tokens token1;
     uint24 fee;
