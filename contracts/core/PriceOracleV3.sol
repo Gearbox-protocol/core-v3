@@ -3,9 +3,10 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {
     AddressIsNotContractException,
@@ -31,15 +32,25 @@ import {PriceFeedValidationTrait} from "../traits/PriceFeedValidationTrait.sol";
 ///         and reserve feed prices under normal conditions or 0 if reserve feed is active or not set.
 ///         This logic is skipped if active price feed is trusted, in which case its answer is used.
 contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPriceOracleV3 {
+    using EnumerableSet for EnumerableSet.AddressSet;
+
     /// @notice Contract version
     uint256 public constant override version = 3_10;
 
     /// @dev Mapping from token address to price feed parameters
     mapping(address => PriceFeedParams) internal _priceFeedsParams;
 
+    /// @dev Set of all tokens that have price feeds
+    EnumerableSet.AddressSet internal _tokensSet;
+
     /// @notice Constructor
     /// @param addressProvider Address provider contract address
     constructor(address addressProvider) ACLNonReentrantTrait(addressProvider) {}
+
+    /// @notice Returns all tokens that have price feeds
+    function getTokens() external view override returns (address[] memory) {
+        return _tokensSet.values();
+    }
 
     /// @notice Returns `token`'s price in USD (with 8 decimals) from the currently active price feed
     function getPrice(address token) external view override returns (uint256 price) {
@@ -123,6 +134,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
         if (params.priceFeed == address(0)) {
             params.decimals = _validateToken(token); // U:[PO-3]
             params.active = true; // U:[PO-3]
+            _tokensSet.add(token); // U:[PO-3]
         }
 
         bool skipCheck = _validatePriceFeed(priceFeed, stalenessPeriod); // U:[PO-3]
