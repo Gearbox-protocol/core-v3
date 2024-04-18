@@ -36,6 +36,9 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
     /// @dev Mapping bot => info
     mapping(address => BotInfo) internal _botInfo;
 
+    /// @dev Mapping credit manager => set of bots with non-zero special permissions
+    mapping(address => EnumerableSet.AddressSet) internal _specialBots;
+
     /// @dev Mapping credit manager => credit account => set of bots with non-zero permissions
     mapping(address => mapping(address => EnumerableSet.AddressSet)) internal _activeBots;
 
@@ -144,6 +147,11 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
         return _botInfo[bot].specialPermissions[creditManager];
     }
 
+    /// @notice Returns all bots with non-zero special permissions in `creditManager`
+    function specialBots(address creditManager) external view override returns (address[] memory) {
+        return _specialBots[creditManager].values();
+    }
+
     /// @notice Sets `bot`'s status to `forbidden`
     function setBotForbiddenStatus(address bot, bool forbidden) external override configuratorOnly {
         BotInfo storage info = _botInfo[bot];
@@ -155,6 +163,7 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
 
     /// @notice Sets `bot`'s special permissions in `creditManager` to `permissions`
     /// @dev Reverts if trying to set non-zero permissions that don't meet bot's requirements
+    /// @dev Reverts if trying to set non-zero permissions for a forbidden bot
     function setBotSpecialPermissions(address bot, address creditManager, uint192 permissions)
         external
         override
@@ -162,6 +171,13 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
     {
         _revertIfPermissionsNotSufficient(bot, permissions);
         BotInfo storage info = _botInfo[bot];
+        if (permissions != 0) {
+            if (info.forbidden) revert InvalidBotException();
+            _specialBots[creditManager].add(bot);
+        } else {
+            _specialBots[creditManager].remove(bot);
+        }
+
         if (info.specialPermissions[creditManager] != permissions) {
             info.specialPermissions[creditManager] = permissions;
             emit SetBotSpecialPermissions(bot, creditManager, permissions);

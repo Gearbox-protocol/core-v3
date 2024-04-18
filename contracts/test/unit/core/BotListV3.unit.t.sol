@@ -174,8 +174,11 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
         botList.setBotSpecialPermissions(bot, creditManager, 2);
 
         (uint192 permissions,, bool hasSpecialPermissions) = botList.getBotStatus(bot, creditAccount);
+        address[] memory specialBots = botList.specialBots(creditManager);
 
         assertEq(permissions, 2, "Special permissions are incorrect");
         assertTrue(hasSpecialPermissions, "Special permissions status returned incorrectly");
+        assertEq(specialBots.length, 1, "Incorrect list of special bots");
+        assertEq(specialBots[0], bot, "Incorrect list of special bots");
     }
 }

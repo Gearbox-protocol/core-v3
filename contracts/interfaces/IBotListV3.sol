@@ -68,6 +68,8 @@ interface IBotListV3 is IBotListV3Events, IVersion {
 
     function botSpecialPermissions(address bot, address creditManager) external view returns (uint192);
 
+    function specialBots(address creditManager) external view returns (address[] memory);
+
     function approvedCreditManager(address creditManager) external view returns (bool);
 
     function setBotForbiddenStatus(address bot, bool forbidden) external;
