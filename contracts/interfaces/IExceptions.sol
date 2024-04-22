@@ -309,6 +309,9 @@ error IncorrectPriceFeedException();
 /// @notice Thrown on attempting to interact with a price feed for a token not added to the price oracle
 error PriceFeedDoesNotExistException();
 
+/// @notice Thrown when trying to apply an on-demand price update to a non-updatable price feed
+error PriceFeedIsNotUpdatableException();
+
 /// @notice Thrown when price feed returns incorrect price for a token
 error IncorrectPriceException();
 
