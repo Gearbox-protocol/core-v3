@@ -5,6 +5,7 @@ pragma solidity ^0.8.17;
 //pragma abicoder v1;
 
 import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
+import {PriceUpdate} from "../../../interfaces/IPriceOracleV3.sol";
 
 // EXCEPTIONS
 
@@ -23,6 +24,8 @@ contract PriceOracleMock is Test, IPriceOracleBase {
     constructor() {
         vm.label(address(this), "PRICE_ORACLE");
     }
+
+    function updatePrices(PriceUpdate[] calldata) external pure {}
 
     function priceFeeds(address token) public view returns (address) {
         return priceFeedsInt[token][false];

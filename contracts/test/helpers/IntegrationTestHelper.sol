@@ -543,7 +543,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
             vm.startPrank(CONFIGURATOR);
             creditManager.addToken(address(t));
-            IPriceOracleV3(address(priceOracle)).setPriceFeed(address(t), address(pf), 1 hours, false);
+            IPriceOracleV3(address(priceOracle)).setPriceFeed(address(t), address(pf), 1 hours);
             creditManager.setCollateralTokenData(address(t), 8000, 8000, type(uint40).max, 0);
             vm.stopPrank();
 
