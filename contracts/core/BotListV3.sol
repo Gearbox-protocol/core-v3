@@ -88,6 +88,7 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
     /// @dev Reverts if `creditAccount`'s credit manager is not approved or caller is not a facade connected to it
     /// @dev Reverts if trying to set non-zero permissions that don't meet bot's requirements
     /// @dev Reverts if trying to set non-zero permissions for a forbidden bot or for a bot with special permissions
+    /// @custom:tests U:[BL-1]
     function setBotPermissions(address bot, address creditAccount, uint192 permissions)
         external
         override
@@ -118,6 +119,7 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
 
     /// @notice Removes all bots' permissions for `creditAccount` in its credit manager
     /// @dev Reverts if `creditAccount`'s credit manager is not approved or caller is not a facade connected to it
+    /// @custom:tests U:[BL-2]
     function eraseAllBotPermissions(address creditAccount) external override {
         address creditManager = ICreditAccountBase(creditAccount).creditManager();
         _revertIfCallerNotValidCreditFacade(creditManager);
@@ -164,6 +166,7 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
     /// @notice Sets `bot`'s special permissions in `creditManager` to `permissions`
     /// @dev Reverts if trying to set non-zero permissions that don't meet bot's requirements
     /// @dev Reverts if trying to set non-zero permissions for a forbidden bot
+    /// @custom:tests U:[BL-3]
     function setBotSpecialPermissions(address bot, address creditManager, uint192 permissions)
         external
         override
