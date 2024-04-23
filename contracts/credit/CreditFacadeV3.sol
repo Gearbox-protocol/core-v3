@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
 // THIRD-PARTY
@@ -72,7 +72,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     using SafeERC20 for IERC20;
 
     /// @notice Contract version
-    uint256 public constant override version = 3_01;
+    uint256 public constant override version = 3_10;
 
     /// @notice Maximum quota size, as a multiple of `maxDebt`
     uint256 public constant override maxQuotaMultiplier = 2;
@@ -157,7 +157,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         address addressProvider = ICreditManagerV3(_creditManager).addressProvider();
         weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // U:[FA-1]
-        botList = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_BOT_LIST, 3_00); // U:[FA-1]
+        botList = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_BOT_LIST, 3_10); // U:[FA-1]
 
         degenNFT = _degenNFT; // U:[FA-1]
 
@@ -255,7 +255,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         if (enabledTokensMask != 0) revert CloseAccountWithEnabledTokensException(); // U:[FA-11]
 
         if (_flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG != 0) {
-            IBotListV3(botList).eraseAllBotPermissions(creditManager, creditAccount); // U:[FA-11]
+            IBotListV3(botList).eraseAllBotPermissions(creditAccount); // U:[FA-11]
         }
 
         ICreditManagerV3(creditManager).closeCreditAccount(creditAccount); // U:[FA-11]
@@ -370,8 +370,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     }
 
     /// @notice Executes a batch of calls allowing bot to manage a credit account
-    ///         - Performs a multicall (allowed calls are determined by permissions given by account's owner
-    ///           or by DAO in case bot has special permissions in the credit manager)
+    ///         - Performs a multicall (allowed calls are determined by permissions given by account's owner)
     ///         - Runs the collateral check
     /// @param creditAccount Account to perform the calls on
     /// @param calls List of calls to perform
@@ -387,16 +386,10 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     {
         _getBorrowerOrRevert(creditAccount); // U:[FA-5]
 
-        (uint256 botPermissions, bool forbidden, bool hasSpecialPermissions) = IBotListV3(botList).getBotStatus({
-            bot: msg.sender,
-            creditManager: creditManager,
-            creditAccount: creditAccount
-        });
+        (uint256 botPermissions, bool forbidden) =
+            IBotListV3(botList).getBotStatus({bot: msg.sender, creditAccount: creditAccount});
 
-        if (
-            botPermissions == 0 || forbidden
-                || (!hasSpecialPermissions && (_flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG == 0))
-        ) {
+        if (forbidden || botPermissions == 0 || _flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG == 0) {
             revert NotApprovedBotException(); // U:[FA-19]
         }
 
@@ -408,7 +401,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param bot Bot to set permissions for
     /// @param permissions A bit mask encoding bot permissions
     /// @dev Reverts if `creditAccount` is not opened in connected credit manager by caller
-    /// @dev Reverts if `permissions` has unexpected bits enabled
+    /// @dev Reverts if `permissions` has unexpected bits enabled or some bits required by `bot` disabled
     /// @dev Reverts if account has more active bots than allowed after changing permissions
     /// @dev Changes account's `BOT_PERMISSIONS_SET_FLAG` in the credit manager if needed
     function setBotPermissions(address creditAccount, address bot, uint192 permissions)
@@ -419,12 +412,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     {
         if (permissions & ~ALL_PERMISSIONS != 0) revert UnexpectedPermissionsException(); // U:[FA-41]
 
-        uint256 remainingBots = IBotListV3(botList).setBotPermissions({
-            bot: bot,
-            creditManager: creditManager,
-            creditAccount: creditAccount,
-            permissions: permissions
-        }); // U:[FA-41]
+        uint256 remainingBots =
+            IBotListV3(botList).setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: permissions}); // U:[FA-41]
 
         if (remainingBots == 0) {
             _setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: false}); // U:[FA-41]

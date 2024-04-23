@@ -1,16 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {BotListV3} from "../../../core/BotListV3.sol";
 import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
-import {
-    ICreditManagerV3,
-    ICreditManagerV3Events,
-    ManageDebtAction,
-    BOT_PERMISSIONS_SET_FLAG
-} from "../../../interfaces/ICreditManagerV3.sol";
+import {ICreditManagerV3, ICreditManagerV3Events, ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
 
 import "../../../interfaces/ICreditFacadeV3.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
@@ -52,13 +46,6 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
         (address creditAccount,) = _openTestCreditAccount();
 
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
-
-        vm.prank(USER);
-        creditFacade.setBotPermissions({
-            creditAccount: creditAccount,
-            bot: address(adapterMock),
-            permissions: uint192(ADD_COLLATERAL_PERMISSION)
-        });
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})

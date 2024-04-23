@@ -969,7 +969,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
             assertEq(
                 botList2,
-                migrateSettings ? botList : addressProvider.getAddressOrRevert(AP_BOT_LIST, 300),
+                migrateSettings ? botList : addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_10),
                 "Bot list was not transferred"
             );
 
