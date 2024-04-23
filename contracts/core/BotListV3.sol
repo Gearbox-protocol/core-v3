@@ -21,9 +21,6 @@ import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
 /// @title Bot list V3
 /// @notice Stores bot permissions (bit masks dictating which actions can be performed with credit accounts in multicall).
-///         Besides normal per-account permissions, there are special per-manager permissions that apply to all accounts
-///         in a given credit manager and can be used to extend the core system or enforce additional safety measures
-///         with special DAO-approved bots.
 contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -35,9 +32,6 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
 
     /// @dev Mapping bot => info
     mapping(address => BotInfo) internal _botInfo;
-
-    /// @dev Mapping credit manager => set of bots with non-zero special permissions
-    mapping(address => EnumerableSet.AddressSet) internal _specialBots;
 
     /// @dev Mapping credit manager => credit account => set of bots with non-zero permissions
     mapping(address => mapping(address => EnumerableSet.AddressSet)) internal _activeBots;
@@ -65,29 +59,25 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
         return _activeBots[creditManager][creditAccount].values();
     }
 
-    /// @notice Returns `bot`'s permissions for `creditAccount` in its credit manager, including information
-    ///         on whether bot is forbidden or has special permissions in the credit manager
+    /// @notice Returns `bot`'s permissions for `creditAccount` in its credit manager and whether it is forbidden
     function getBotStatus(address bot, address creditAccount)
         external
         view
         override
-        returns (uint192 permissions, bool forbidden, bool hasSpecialPermissions)
+        returns (uint192 permissions, bool forbidden)
     {
         BotInfo storage info = _botInfo[bot];
-        if (info.forbidden) return (0, true, false);
+        if (info.forbidden) return (0, true);
 
         address creditManager = ICreditAccountBase(creditAccount).creditManager();
-        uint192 specialPermissions = info.specialPermissions[creditManager];
-        if (specialPermissions != 0) return (specialPermissions, false, true);
-
-        return (info.permissions[creditManager][creditAccount], false, false);
+        return (info.permissions[creditManager][creditAccount], false);
     }
 
     /// @notice Sets `bot`'s permissions for `creditAccount` in its credit manager to `permissions`
     /// @return activeBotsRemaining Number of bots with non-zero permissions remaining after the update
     /// @dev Reverts if `creditAccount`'s credit manager is not approved or caller is not a facade connected to it
     /// @dev Reverts if trying to set non-zero permissions that don't meet bot's requirements
-    /// @dev Reverts if trying to set non-zero permissions for a forbidden bot or for a bot with special permissions
+    /// @dev Reverts if trying to set non-zero permissions for a forbidden bot
     /// @custom:tests U:[BL-1]
     function setBotPermissions(address bot, address creditAccount, uint192 permissions)
         external
@@ -97,14 +87,12 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
     {
         address creditManager = ICreditAccountBase(creditAccount).creditManager();
         _revertIfCallerNotValidCreditFacade(creditManager);
-        _revertIfPermissionsNotSufficient(bot, permissions);
 
         BotInfo storage info = _botInfo[bot];
         EnumerableSet.AddressSet storage accountBots = _activeBots[creditManager][creditAccount];
         if (permissions != 0) {
-            if (info.forbidden || info.specialPermissions[creditManager] != 0) {
-                revert InvalidBotException();
-            }
+            if (IBotV3(bot).requiredPermissions() & ~permissions != 0) revert InsufficientBotPermissionsException();
+            if (info.forbidden) revert InvalidBotException();
             accountBots.add(bot);
         } else {
             accountBots.remove(bot);
@@ -144,46 +132,12 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
         return _botInfo[bot].forbidden;
     }
 
-    /// @notice Returns `bot`'s special permissions in `creditManager`
-    function botSpecialPermissions(address bot, address creditManager) external view override returns (uint192) {
-        return _botInfo[bot].specialPermissions[creditManager];
-    }
-
-    /// @notice Returns all bots with non-zero special permissions in `creditManager`
-    function specialBots(address creditManager) external view override returns (address[] memory) {
-        return _specialBots[creditManager].values();
-    }
-
     /// @notice Sets `bot`'s status to `forbidden`
     function setBotForbiddenStatus(address bot, bool forbidden) external override configuratorOnly {
         BotInfo storage info = _botInfo[bot];
         if (info.forbidden != forbidden) {
             info.forbidden = forbidden;
             emit SetBotForbiddenStatus(bot, forbidden);
-        }
-    }
-
-    /// @notice Sets `bot`'s special permissions in `creditManager` to `permissions`
-    /// @dev Reverts if trying to set non-zero permissions that don't meet bot's requirements
-    /// @dev Reverts if trying to set non-zero permissions for a forbidden bot
-    /// @custom:tests U:[BL-3]
-    function setBotSpecialPermissions(address bot, address creditManager, uint192 permissions)
-        external
-        override
-        configuratorOnly
-    {
-        _revertIfPermissionsNotSufficient(bot, permissions);
-        BotInfo storage info = _botInfo[bot];
-        if (permissions != 0) {
-            if (info.forbidden) revert InvalidBotException();
-            _specialBots[creditManager].add(bot);
-        } else {
-            _specialBots[creditManager].remove(bot);
-        }
-
-        if (info.specialPermissions[creditManager] != permissions) {
-            info.specialPermissions[creditManager] = permissions;
-            emit SetBotSpecialPermissions(bot, creditManager, permissions);
         }
     }
 
@@ -208,13 +162,6 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
     function _revertIfCallerNotValidCreditFacade(address creditManager) internal view {
         if (!approvedCreditManager[creditManager] || ICreditManagerV3(creditManager).creditFacade() != msg.sender) {
             revert CallerNotCreditFacadeException();
-        }
-    }
-
-    /// @dev Reverts if trying to set non-zero permissions that don't meet bot's requirements
-    function _revertIfPermissionsNotSufficient(address bot, uint192 permissions) internal view {
-        if (permissions != 0 && IBotV3(bot).requiredPermissions() & ~permissions != 0) {
-            revert InsufficientBotPermissionsException();
         }
     }
 }

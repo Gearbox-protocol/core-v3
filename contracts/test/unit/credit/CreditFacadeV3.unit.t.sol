@@ -710,7 +710,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         uint256 enabledTokensMaskBefore = 123123123;
 
-        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false, false);
+        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false);
 
         creditManagerMock.setEnabledTokensMask(enabledTokensMaskBefore);
         creditManagerMock.setBorrower(USER);
@@ -752,25 +752,21 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, true);
 
-        botListMock.setBotStatusReturns(ALL_PERMISSIONS, true, false);
+        botListMock.setBotStatusReturns(ALL_PERMISSIONS, true);
 
         vm.expectRevert(NotApprovedBotException.selector);
         creditFacade.botMulticall(creditAccount, calls);
 
-        botListMock.setBotStatusReturns(0, false, false);
+        botListMock.setBotStatusReturns(0, false);
 
         vm.expectRevert(NotApprovedBotException.selector);
         creditFacade.botMulticall(creditAccount, calls);
 
         creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, false);
 
-        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false, false);
+        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false);
 
         vm.expectRevert(NotApprovedBotException.selector);
-        creditFacade.botMulticall(creditAccount, calls);
-
-        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false, true);
-
         creditFacade.botMulticall(creditAccount, calls);
     }
 

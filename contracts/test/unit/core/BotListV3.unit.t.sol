@@ -75,16 +75,6 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
         vm.prank(CONFIGURATOR);
         botList.setBotForbiddenStatus(bot, false);
 
-        vm.prank(CONFIGURATOR);
-        botList.setBotSpecialPermissions(bot, creditManager, 1);
-
-        vm.expectRevert(InvalidBotException.selector);
-        vm.prank(creditFacade);
-        botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: type(uint192).max});
-
-        vm.prank(CONFIGURATOR);
-        botList.setBotSpecialPermissions(bot, creditManager, 0);
-
         vm.expectEmit(true, true, true, true);
         emit SetBotPermissions(bot, creditManager, creditAccount, 1);
 
@@ -154,31 +144,5 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
 
         address[] memory activeBots = botList.activeBots(creditAccount);
         assertEq(activeBots.length, 0, "Not all active bots were disabled");
-    }
-
-    /// @dev U:[BL-3]: `setBotSpecialPermissions` works correctly
-    function test_U_BL_03_setBotSpecialPermissions_works_correctly() public {
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        botList.setBotSpecialPermissions(bot, creditManager, 2);
-
-        BotMock(bot).setRequiredPermissions(1);
-        vm.expectRevert(InsufficientBotPermissionsException.selector);
-        vm.prank(CONFIGURATOR);
-        botList.setBotSpecialPermissions(bot, creditManager, 2);
-        BotMock(bot).setRequiredPermissions(2);
-
-        vm.expectEmit(true, true, false, true);
-        emit SetBotSpecialPermissions(bot, creditManager, 2);
-
-        vm.prank(CONFIGURATOR);
-        botList.setBotSpecialPermissions(bot, creditManager, 2);
-
-        (uint192 permissions,, bool hasSpecialPermissions) = botList.getBotStatus(bot, creditAccount);
-        address[] memory specialBots = botList.specialBots(creditManager);
-
-        assertEq(permissions, 2, "Special permissions are incorrect");
-        assertTrue(hasSpecialPermissions, "Special permissions status returned incorrectly");
-        assertEq(specialBots.length, 1, "Incorrect list of special bots");
-        assertEq(specialBots[0], bot, "Incorrect list of special bots");
     }
 }

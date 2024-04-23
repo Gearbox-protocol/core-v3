@@ -7,11 +7,9 @@ import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.
 
 /// @notice Bot info
 /// @param forbidden Whether bot is forbidden
-/// @param specialPermissions Mapping credit manager => bot's special permissions
 /// @param permissions Mapping credit manager => credit account => bot's permissions
 struct BotInfo {
     bool forbidden;
-    mapping(address => uint192) specialPermissions;
     mapping(address => mapping(address => uint192)) permissions;
 }
 
@@ -32,9 +30,6 @@ interface IBotListV3Events {
     /// @notice Emitted when `bot`'s forbidden status is set
     event SetBotForbiddenStatus(address indexed bot, bool forbidden);
 
-    /// @notice Emitted when `bot`'s special permissions in `creditManager` are set
-    event SetBotSpecialPermissions(address indexed bot, address indexed creditManager, uint192 permissions);
-
     /// @notice Emitted when `creditManager`'s approved status is set
     event SetCreditManagerApprovedStatus(address indexed creditManager, bool approved);
 }
@@ -52,7 +47,7 @@ interface IBotListV3 is IBotListV3Events, IVersion {
     function getBotStatus(address bot, address creditAccount)
         external
         view
-        returns (uint192 permissions, bool forbidden, bool hasSpecialPermissions);
+        returns (uint192 permissions, bool forbidden);
 
     function setBotPermissions(address bot, address creditAccount, uint192 permissions)
         external
@@ -66,15 +61,9 @@ interface IBotListV3 is IBotListV3Events, IVersion {
 
     function botForbiddenStatus(address bot) external view returns (bool);
 
-    function botSpecialPermissions(address bot, address creditManager) external view returns (uint192);
-
-    function specialBots(address creditManager) external view returns (address[] memory);
-
     function approvedCreditManager(address creditManager) external view returns (bool);
 
     function setBotForbiddenStatus(address bot, bool forbidden) external;
-
-    function setBotSpecialPermissions(address bot, address creditManager, uint192 permissions) external;
 
     function setCreditManagerApprovedStatus(address creditManager, bool approved) external;
 }

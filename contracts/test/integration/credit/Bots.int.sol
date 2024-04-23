@@ -66,13 +66,6 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
             MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
         );
 
-        vm.prank(CONFIGURATOR);
-        botList.setBotSpecialPermissions(address(bot), address(creditManager), type(uint192).max);
-        vm.prank(bot);
-        creditFacade.botMulticall(creditAccount, calls);
-        vm.prank(CONFIGURATOR);
-        botList.setBotSpecialPermissions(address(bot), address(creditManager), 0);
-
         vm.prank(USER);
         creditFacade.setBotPermissions(creditAccount, bot, uint192(ALL_PERMISSIONS));
 

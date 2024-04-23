@@ -286,10 +286,10 @@ error ParameterChangedAfterQueuedTxException();
 // BOT LIST //
 // -------- //
 
-/// @notice Thrown when attempting to set non-zero permissions for a forbidden or special bot
+/// @notice Thrown when attempting to set non-zero permissions for a forbidden bot
 error InvalidBotException();
 
-/// @notice Thrown when attempting to set permissions for the bot that don't meet its requirements
+/// @notice Thrown when attempting to set permissions for a bot that don't meet its requirements
 error InsufficientBotPermissionsException();
 
 // --------------- //

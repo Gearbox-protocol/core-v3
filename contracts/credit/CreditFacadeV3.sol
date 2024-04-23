@@ -370,8 +370,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     }
 
     /// @notice Executes a batch of calls allowing bot to manage a credit account
-    ///         - Performs a multicall (allowed calls are determined by permissions given by account's owner
-    ///           or by DAO in case bot has special permissions in the credit manager)
+    ///         - Performs a multicall (allowed calls are determined by permissions given by account's owner)
     ///         - Runs the collateral check
     /// @param creditAccount Account to perform the calls on
     /// @param calls List of calls to perform
@@ -387,13 +386,10 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     {
         _getBorrowerOrRevert(creditAccount); // U:[FA-5]
 
-        (uint256 botPermissions, bool forbidden, bool hasSpecialPermissions) =
+        (uint256 botPermissions, bool forbidden) =
             IBotListV3(botList).getBotStatus({bot: msg.sender, creditAccount: creditAccount});
 
-        if (
-            botPermissions == 0 || forbidden
-                || (!hasSpecialPermissions && (_flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG == 0))
-        ) {
+        if (forbidden || botPermissions == 0 || _flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG == 0) {
             revert NotApprovedBotException(); // U:[FA-19]
         }
 
