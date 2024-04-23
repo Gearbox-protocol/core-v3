@@ -155,7 +155,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     {
         PriceFeedParams memory params = priceFeedParams(token);
         if (params.priceFeed == address(0)) {
-            params.decimals = _validateToken(token);
+            params.tokenDecimals = _validateToken(token);
             _tokensSet.add(token);
         }
 
@@ -164,7 +164,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
             priceFeed: priceFeed,
             stalenessPeriod: stalenessPeriod,
             skipCheck: skipCheck,
-            decimals: params.decimals
+            tokenDecimals: params.tokenDecimals
         });
         emit SetPriceFeed(token, priceFeed, stalenessPeriod, skipCheck);
 
@@ -192,7 +192,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
             priceFeed: priceFeed,
             stalenessPeriod: stalenessPeriod,
             skipCheck: skipCheck,
-            decimals: params.decimals
+            tokenDecimals: params.tokenDecimals
         });
         emit SetReservePriceFeed(token, priceFeed, stalenessPeriod, skipCheck);
     }
@@ -250,7 +250,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     /// @dev Returns token's scale
     function _getScale(PriceFeedParams memory params) internal pure returns (uint256 scale) {
         unchecked {
-            scale = 10 ** params.decimals;
+            scale = 10 ** params.tokenDecimals;
         }
     }
 

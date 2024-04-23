@@ -9,12 +9,12 @@ import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/I
 /// @param priceFeed Price feed address
 /// @param stalenessPeriod Period (in seconds) after which price feed's answer should be considered stale
 /// @param skipCheck Whether price feed implements its own safety and staleness checks
-/// @param decimals Token decimals
+/// @param tokenDecimals Token decimals
 struct PriceFeedParams {
     address priceFeed;
     uint32 stalenessPeriod;
     bool skipCheck;
-    uint8 decimals;
+    uint8 tokenDecimals;
 }
 
 /// @notice On-demand price update params

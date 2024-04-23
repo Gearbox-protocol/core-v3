@@ -137,7 +137,7 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         assertEq(params.priceFeed, priceFeed, "Incorrect priceFeed");
         assertEq(params.stalenessPeriod, 3600, "Incorrect stalenessPeriod");
         assertEq(params.skipCheck, false, "Incorrect skipCheck");
-        assertEq(params.decimals, 18, "Incorrect decimals");
+        assertEq(params.tokenDecimals, 18, "Incorrect decimals");
 
         address[] memory tokens = priceOracle.getTokens();
         assertEq(tokens.length, 1, "Incorrect number of tokens");
@@ -164,13 +164,13 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         assertEq(params.priceFeed, priceFeed, "Incorrect priceFeed");
         assertEq(params.stalenessPeriod, 3600, "Incorrect stalenessPeriod");
         assertEq(params.skipCheck, false, "Incorrect skipCheck");
-        assertEq(params.decimals, 18, "Incorrect decimals");
+        assertEq(params.tokenDecimals, 18, "Incorrect decimals");
 
         PriceFeedParams memory reserveParams = priceOracle.reservePriceFeedParams(token);
         assertEq(reserveParams.priceFeed, address(0), "Reserve priceFeed not unset");
         assertEq(reserveParams.stalenessPeriod, 0, "Reserve stalenessPeriod not unset");
         assertEq(reserveParams.skipCheck, false, "Reserve skipCheck not unset");
-        assertEq(reserveParams.decimals, 0, "Reserve decimals not unset");
+        assertEq(reserveParams.tokenDecimals, 0, "Reserve decimals not unset");
     }
 
     /// @notice U:[PO-4]: `setReservePriceFeed` works as expected
@@ -210,7 +210,7 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         assertEq(params.priceFeed, reserveFeed, "Incorrect priceFeed");
         assertEq(params.stalenessPeriod, 3600, "Incorrect stalenessPeriod");
         assertEq(params.skipCheck, false, "Incorrect skipCheck");
-        assertEq(params.decimals, 18, "Incorrect decimals");
+        assertEq(params.tokenDecimals, 18, "Incorrect decimals");
     }
 
     /// @notice U:[PO-5]: `addUpdatablePriceFeed` works as expected
