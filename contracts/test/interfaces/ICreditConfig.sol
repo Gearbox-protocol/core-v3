@@ -13,7 +13,6 @@ struct PriceFeedConfig {
     address token;
     address priceFeed;
     uint32 stalenessPeriod;
-    bool trusted;
 }
 
 struct LinearIRMV3DeployParams {

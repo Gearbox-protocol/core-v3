@@ -5,6 +5,7 @@ pragma solidity ^0.8.17;
 
 import {BalanceDelta} from "../libraries/BalancesLogic.sol";
 import {RevocationPair} from "./ICreditManagerV3.sol";
+import {PriceUpdate} from "./IPriceOracleV3.sol";
 
 // ----------- //
 // PERMISSIONS //
@@ -42,13 +43,11 @@ uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 1 << 193;
 /// @dev Unless specified otherwise, all these methods are only available in `openCreditAccount`,
 ///      `closeCreditAccount`, `multicall`, and, with account owner's permission, `botMulticall`
 interface ICreditFacadeV3Multicall {
-    /// @notice Updates the price for a token with on-demand updatable price feed
-    /// @param token Token to push the price update for
-    /// @param reserve Whether to update reserve price feed or main price feed
-    /// @param data Data to call `updatePrice` with
-    /// @dev Calls of this type must be placed before all other calls in the multicall not to revert
+    /// @notice Applies on-demand price feed updates
+    /// @param updates Array of price updates, see `PriceUpdate` for details
+    /// @dev Reverts if placed not at the first position in the multicall
     /// @dev This method is available in all kinds of multicalls
-    function onDemandPriceUpdate(address token, bool reserve, bytes calldata data) external;
+    function onDemandPriceUpdates(PriceUpdate[] calldata updates) external;
 
     /// @notice Stores expected token balances (current balance + delta) after operations for a slippage check.
     ///         Normally, a check is performed automatically at the end of the multicall, but more fine-grained

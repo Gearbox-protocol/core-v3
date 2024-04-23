@@ -21,7 +21,7 @@ import {DegenNFTMock} from "../../mocks/token/DegenNFTMock.sol";
 import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
 import {BotListMock} from "../../mocks/core/BotListMock.sol";
 import {PriceOracleMock} from "../../mocks/oracles/PriceOracleMock.sol";
-import {PriceFeedOnDemandMock} from "../../mocks/oracles/PriceFeedOnDemandMock.sol";
+import {UpdatablePriceFeedMock} from "../../mocks/oracles/UpdatablePriceFeedMock.sol";
 import {AdapterCallMock} from "../../mocks/core/AdapterCallMock.sol";
 import {PoolMock} from "../../mocks/pool/PoolMock.sol";
 
@@ -37,6 +37,7 @@ import {
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {IBotListV3} from "../../../interfaces/IBotListV3.sol";
+import {IPriceOracleV3, PriceUpdate} from "../../../interfaces/IPriceOracleV3.sol";
 
 import {BitMask, UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
 import {BalanceWithMask} from "../../../libraries/BalancesLogic.sol";
@@ -131,7 +132,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         botListMock = BotListMock(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_10));
 
-        priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00));
+        priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_10));
 
         AddressProviderV3ACLMock(address(addressProvider)).addPausableAdmin(CONFIGURATOR);
 
@@ -789,9 +790,9 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         creditManagerMock.setPriceOracle(address(priceOracleMock));
 
-        address priceFeedOnDemandMock = address(new PriceFeedOnDemandMock());
+        address priceFeed = address(new UpdatablePriceFeedMock());
 
-        priceOracleMock.addPriceFeed(token, priceFeedOnDemandMock);
+        priceOracleMock.addPriceFeed(token, priceFeed);
 
         creditManagerMock.setBorrower(USER);
 
@@ -1056,39 +1057,24 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         assertEq(fullCheckParams.collateralHints, collateralHints, "Incorrect collateralHints");
     }
 
-    /// @dev U:[FA-25]: multicall onDemandPriceUpdate works properly
-    function test_U_FA_25_multicall_onDemandPriceUpdate_works_properly() public notExpirableCase {
-        bytes memory cd = bytes("Hellew");
-
-        address token = tokenTestSuite.addressOf(Tokens.LINK);
-
+    /// @dev U:[FA-25]: multicall onDemandPriceUpdates works properly
+    function test_U_FA_25_multicall_onDemandPriceUpdates_works_properly() public notExpirableCase {
         creditManagerMock.setPriceOracle(address(priceOracleMock));
 
-        address priceFeedOnDemandMock = address(new PriceFeedOnDemandMock());
-
-        priceOracleMock.addPriceFeed(token, priceFeedOnDemandMock);
+        PriceUpdate[] memory updates = new PriceUpdate[](2);
+        updates[0] = PriceUpdate(makeAddr("token0"), "data0");
+        updates[1] = PriceUpdate(makeAddr("token1"), "data1");
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.onDemandPriceUpdate, (token, false, cd))
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.onDemandPriceUpdates, (updates))
             })
         );
 
-        // vm.expectCall(address(priceOracleMock), abi.encodeCall(IPriceOracleBase.priceFeeds, (token)));
-        vm.expectCall(address(priceFeedOnDemandMock), abi.encodeCall(PriceFeedOnDemandMock.updatePrice, (cd)));
-        creditFacade.applyPriceOnDemandInt({calls: calls});
-
-        /// @notice it reverts for zero value
-        calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.onDemandPriceUpdate, (DUMB_ADDRESS, false, cd))
-            })
-        );
-
-        vm.expectRevert(PriceFeedDoesNotExistException.selector);
-        creditFacade.applyPriceOnDemandInt({calls: calls});
+        vm.expectCall(address(priceOracleMock), abi.encodeCall(IPriceOracleV3.updatePrices, (updates)));
+        bool result = creditFacade.applyOnDemandPriceUpdatesInt({calls: calls});
+        assertTrue(result, "applyOnDemandPriceUpdates returned wrong value");
     }
 
     /// @dev U:[FA-26]: multicall addCollateral works properly
