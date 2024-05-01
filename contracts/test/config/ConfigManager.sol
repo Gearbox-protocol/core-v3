@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2023
 pragma solidity ^0.8.17;
 
-import {CollateralToken, IPoolV3DeployConfig, CollateralTokenHuman} from "../interfaces/ICreditConfig.sol";
+import {IPoolV3DeployConfig, CollateralTokenHuman} from "../interfaces/ICreditConfig.sol";
 
 contract ConfigManager {
     error ConfigNotFound(string id);

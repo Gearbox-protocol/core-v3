@@ -34,7 +34,7 @@ contract AddressProviderV3ACLMock is Test, AddressProviderV3 {
         _setAddress(AP_ACCOUNT_FACTORY, address(accountFactoryMock), NO_VERSION_CONTROL);
 
         BotListMock botListMock = new BotListMock();
-        _setAddress(AP_BOT_LIST, address(botListMock), 3_00);
+        _setAddress(AP_BOT_LIST, address(botListMock), 3_10);
 
         _setAddress(AP_CONTRACTS_REGISTER, address(this), 0);
 

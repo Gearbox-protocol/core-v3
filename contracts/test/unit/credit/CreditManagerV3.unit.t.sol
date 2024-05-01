@@ -120,7 +120,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         accountFactory = AccountFactoryMock(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL));
 
-        priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00));
+        priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_10));
 
         /// Inits all state
         isFeeToken = false;
@@ -315,7 +315,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         assertEq(
             address(creditManager.priceOracle()),
-            addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00),
+            addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_10),
             _testCaseErr("Incorrect Price oracle")
         );
 

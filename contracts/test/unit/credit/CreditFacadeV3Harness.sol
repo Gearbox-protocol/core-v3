@@ -25,10 +25,10 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
         external
         returns (FullCheckParams memory fullCheckParams)
     {
-        return _multicall(creditAccount, calls, enabledTokensMask, flags, 0);
+        return _multicall(creditAccount, calls, enabledTokensMask, flags, false);
     }
 
-    function applyPriceOnDemandInt(MultiCall[] calldata calls) external returns (uint256 remainingCalls) {
+    function applyOnDemandPriceUpdatesInt(MultiCall[] calldata calls) external returns (bool) {
         return _applyOnDemandPriceUpdates(calls);
     }
 

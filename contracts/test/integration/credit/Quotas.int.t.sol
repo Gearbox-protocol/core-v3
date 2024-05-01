@@ -408,8 +408,8 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
 
         (uint16 feeInterest,,,,) = creditManager.fees();
 
-        quotaLink = quotaLink > uint96(100_000 * WAD) ? uint96(100_000 * WAD) : quotaLink;
-        quotaUsdt = quotaUsdt > uint96(100_000 * WAD) ? uint96(100_000 * WAD) : quotaUsdt;
+        quotaLink = quotaLink > uint96(100_000 * WAD) ? uint96(100_000 * WAD) : quotaLink / 10_000 * 10_000;
+        quotaUsdt = quotaUsdt > uint96(100_000 * WAD) ? uint96(100_000 * WAD) : quotaUsdt / 10_000 * 10_000;
 
         uint256 expectedTotalDebt = (borrowedAmount * cumulativeIndexAtClose) / cumulativeIndexLastUpdate;
         expectedTotalDebt += (quotaLink * 1000) / PERCENTAGE_FACTOR;
