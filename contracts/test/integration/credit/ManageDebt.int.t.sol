@@ -72,7 +72,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.increaseDebt, (maxDebt * maxDebtPerBlockMultiplier + 1)
-                        )
+                    )
                 })
             )
         );
@@ -131,17 +131,6 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
         vm.roll(block.number + 1);
 
         address link = tokenTestSuite.addressOf(Tokens.LINK);
-
-        vm.prank(USER);
-        creditFacade.multicall(
-            creditAccount,
-            MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (link))
-                })
-            )
-        );
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.forbidToken(link);

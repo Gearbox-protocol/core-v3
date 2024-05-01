@@ -248,7 +248,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditFacade = new CreditFacadeV3(address(creditManager), creditOpts.degenNFT, creditOpts.expirable);
 
         address priceOracleAddress = address(creditManager.priceOracle());
-        address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
 
         bytes memory configuratorByteCode = abi.encodePacked(
             type(CreditConfiguratorV3).creationCode, abi.encode(creditManager, creditFacade, creditOpts)
@@ -331,9 +330,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.removeEmergencyLiquidator(address(0));
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.makeTokenQuoted(address(0));
 
         vm.stopPrank();
     }

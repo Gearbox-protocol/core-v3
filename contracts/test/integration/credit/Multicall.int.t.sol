@@ -325,33 +325,6 @@ contract MultiCallIntegrationTest is
         creditFacade.multicall(creditAccount, calls);
     }
 
-    //
-    // ENABLE TOKEN
-    //
-
-    /// @dev I:[MC-10]: enable token works as expected
-    function test_I_MC_10_enable_token_is_correct() public creditTest {
-        (address creditAccount,) = _openTestCreditAccount();
-
-        address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
-        expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
-
-        tokenTestSuite.mint(Tokens.USDC, creditAccount, 100);
-
-        vm.prank(USER);
-        creditFacade.multicall(
-            creditAccount,
-            MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (usdcToken))
-                })
-            )
-        );
-
-        expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
-    }
-
     /// @dev I:[MC-11]: slippage check works correctly
     function test_I_MC_11_slippage_check_works_correctly() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
@@ -407,13 +380,13 @@ contract MultiCallIntegrationTest is
                         target: address(creditFacade),
                         callData: abi.encodeCall(
                             ICreditFacadeV3Multicall.addCollateral, (underlying, (i == 0) ? expectedDAI - 1 : expectedDAI)
-                            )
+                        )
                     }),
                     MultiCall({
                         target: address(creditFacade),
                         callData: abi.encodeCall(
                             ICreditFacadeV3Multicall.addCollateral, (tokenLINK, (i == 0) ? expectedLINK : expectedLINK - 1)
-                            )
+                        )
                     })
                 )
             );
@@ -456,65 +429,6 @@ contract MultiCallIntegrationTest is
                 })
             )
         );
-    }
-
-    ///
-    /// ENABLE TOKEN
-    ///
-
-    /// @dev I:[MC-13]: enableToken works as expected
-    function test_I_MC_13_enableToken_works_as_expected() public creditTest {
-        (address creditAccount,) = _openTestCreditAccount();
-
-        address token = tokenTestSuite.addressOf(Tokens.USDC);
-
-        expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
-
-        vm.prank(USER);
-        creditFacade.multicall(
-            creditAccount,
-            MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (token))
-                })
-            )
-        );
-
-        expectTokenIsEnabled(creditAccount, Tokens.USDC, true);
-    }
-
-    /// @dev I:[MC-14]: disableToken works as expected in a multicall
-    function test_I_MC_14_disableToken_works_as_expected_multicall() public creditTest {
-        (address creditAccount,) = _openTestCreditAccount();
-
-        address token = tokenTestSuite.addressOf(Tokens.USDC);
-
-        vm.prank(USER);
-        creditFacade.multicall(
-            creditAccount,
-            MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (token))
-                })
-            )
-        );
-
-        // vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.disableToken.selector, token));
-
-        vm.prank(USER);
-        creditFacade.multicall(
-            creditAccount,
-            MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.disableToken, (token))
-                })
-            )
-        );
-
-        expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
     }
 
     //

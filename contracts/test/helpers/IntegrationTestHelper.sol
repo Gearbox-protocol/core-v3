@@ -93,9 +93,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     bool anyExpirable = true;
     bool expirable;
 
-    bool anySupportsQuotas = true;
-    bool supportsQuotas;
-
     bool anyAccountFactory = true;
     uint256 accountFactoryVersion = 1;
 
@@ -383,9 +380,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
         underlying = tokenTestSuite.addressOf(underlyingT);
 
-        supportsQuotas = anySupportsQuotas ? config.supportsQuotas() : supportsQuotas;
-
-        PoolFactory pf = new PoolFactory(address(addressProvider), config, underlying, supportsQuotas, tokenTestSuite);
+        PoolFactory pf = new PoolFactory(address(addressProvider), config, underlying, true, tokenTestSuite);
 
         pool = pf.pool();
         gauge = pf.gauge();
@@ -481,10 +476,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 AccountFactoryV3(address(accountFactory)).addCreditManager(address(creditManager));
             }
 
-            if (supportsQuotas) {
-                vm.prank(CONFIGURATOR);
-                poolQuotaKeeper.addCreditManager(address(creditManager));
-            }
+            vm.prank(CONFIGURATOR);
+            poolQuotaKeeper.addCreditManager(address(creditManager));
 
             vm.prank(CONFIGURATOR);
             pool.setCreditManagerDebtLimit(address(creditManager), cmParams.poolLimit);
@@ -678,8 +671,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     }
 
     function makeTokenQuoted(address token, uint16 rate, uint96 limit) internal {
-        require(supportsQuotas, "Test suite does not support quotas");
-
         vm.startPrank(CONFIGURATOR);
         gauge.addQuotaToken(token, rate, rate);
         poolQuotaKeeper.setTokenLimit(token, limit);
@@ -689,8 +680,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
         // uint256 tokenMask = creditManager.getTokenMaskOrRevert(token);
         // uint256 limitedMask = creditManager.quotedTokensMask();
-
-        creditConfigurator.makeTokenQuoted(token);
 
         vm.stopPrank();
     }

@@ -4,29 +4,21 @@
 pragma solidity ^0.8.17;
 
 import {BalanceDelta} from "../libraries/BalancesLogic.sol";
-import {RevocationPair} from "./ICreditManagerV3.sol";
 import {PriceUpdate} from "./IPriceOracleV3.sol";
 
 // ----------- //
 // PERMISSIONS //
 // ----------- //
 
-uint192 constant ADD_COLLATERAL_PERMISSION = 1;
-uint192 constant INCREASE_DEBT_PERMISSION = 1 << 1;
-uint192 constant DECREASE_DEBT_PERMISSION = 1 << 2;
-uint192 constant ENABLE_TOKEN_PERMISSION = 1 << 3;
-uint192 constant DISABLE_TOKEN_PERMISSION = 1 << 4;
-uint192 constant WITHDRAW_COLLATERAL_PERMISSION = 1 << 5;
-uint192 constant UPDATE_QUOTA_PERMISSION = 1 << 6;
-uint192 constant REVOKE_ALLOWANCES_PERMISSION = 1 << 7;
+uint192 constant ADD_COLLATERAL_PERMISSION = 1 << 0;
+uint192 constant WITHDRAW_COLLATERAL_PERMISSION = 1 << 1;
+uint192 constant INCREASE_DEBT_PERMISSION = 1 << 2;
+uint192 constant DECREASE_DEBT_PERMISSION = 1 << 3;
+uint192 constant UPDATE_QUOTA_PERMISSION = 1 << 4;
+uint192 constant EXTERNAL_CALLS_PERMISSION = 1 << 5;
 
-uint192 constant EXTERNAL_CALLS_PERMISSION = 1 << 16;
-
-uint256 constant ALL_CREDIT_FACADE_CALLS_PERMISSION = ADD_COLLATERAL_PERMISSION | WITHDRAW_COLLATERAL_PERMISSION
-    | INCREASE_DEBT_PERMISSION | DECREASE_DEBT_PERMISSION | ENABLE_TOKEN_PERMISSION | DISABLE_TOKEN_PERMISSION
-    | UPDATE_QUOTA_PERMISSION | REVOKE_ALLOWANCES_PERMISSION;
-
-uint256 constant ALL_PERMISSIONS = ALL_CREDIT_FACADE_CALLS_PERMISSION | EXTERNAL_CALLS_PERMISSION;
+uint256 constant ALL_PERMISSIONS = ADD_COLLATERAL_PERMISSION | WITHDRAW_COLLATERAL_PERMISSION | INCREASE_DEBT_PERMISSION
+    | DECREASE_DEBT_PERMISSION | UPDATE_QUOTA_PERMISSION | EXTERNAL_CALLS_PERMISSION;
 
 // ----- //
 // FLAGS //
@@ -119,23 +111,9 @@ interface ICreditFacadeV3Multicall {
 
     /// @notice Sets advanced collateral check parameters
     /// @param collateralHints Optional array of token masks to check first to reduce the amount of computation
-    ///        when known subset of account's collateral tokens covers all the debt
+    ///        when known subset of account's collateral tokens covers all the debt. Underlying token is always
+    ///        checked last so it's forbidden to pass its mask.
     /// @param minHealthFactor Min account's health factor in bps in order not to revert, must be at least 10000
+    /// @dev This method is available in all kinds of multicalls
     function setFullCheckParams(uint256[] calldata collateralHints, uint16 minHealthFactor) external;
-
-    /// @notice Enables token as account's collateral, which makes it count towards account's total value
-    /// @param token Token to enable as collateral
-    /// @dev Enabling forbidden tokens is prohibited
-    /// @dev Quoted tokens can only be enabled via `updateQuota`, this method is no-op for them
-    function enableToken(address token) external;
-
-    /// @notice Disables token as account's collateral
-    /// @param token Token to disable as collateral
-    /// @dev Quoted tokens can only be disabled via `updateQuota`, this method is no-op for them
-    function disableToken(address token) external;
-
-    /// @notice Revokes account's allowances for specified spender/token pairs
-    /// @param revocations Array of spender/token pairs
-    /// @dev Exists primarily to allow users to revoke allowances on accounts from old account factory on mainnet
-    function revokeAdapterAllowances(RevocationPair[] calldata revocations) external;
 }

@@ -63,7 +63,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT / 2)
-                    )
+                )
             })
         );
 
@@ -193,10 +193,6 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
     /// @dev I:[OCA-6]: openCreditAccount runs operations in correct order
     function test_I_OCA_06_openCreditAccount_runs_operations_in_correct_order() public creditTest {
-        RevocationPair[] memory revocations = new RevocationPair[](1);
-
-        revocations[0] = RevocationPair({spender: address(this), token: underlying});
-
         tokenTestSuite.mint(Tokens.DAI, USER, WAD);
         tokenTestSuite.approve(Tokens.DAI, USER, address(creditManager));
 
@@ -210,10 +206,6 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, DAI_ACCOUNT_AMOUNT))
-            }),
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.revokeAdapterAllowances, (revocations))
             })
         );
 
@@ -236,11 +228,6 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
         vm.expectEmit(true, true, false, true);
         emit AddCollateral(expectedCreditAccountAddress, underlying, DAI_ACCOUNT_AMOUNT);
-
-        vm.expectCall(
-            address(creditManager),
-            abi.encodeCall(ICreditManagerV3.revokeAdapterAllowances, (expectedCreditAccountAddress, revocations))
-        );
 
         vm.expectEmit(false, false, false, true);
         emit FinishMultiCall();

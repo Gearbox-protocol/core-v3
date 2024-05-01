@@ -300,7 +300,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (weth, 1 ether))
                 })
-                ),
+            ),
             referralCode: 0
         });
 
@@ -399,7 +399,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (debt))
                 })
-                ),
+            ),
             referralCode: REFERRAL_CODE
         });
 
@@ -552,7 +552,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                             (addNonUnderlying ? link : dai, abi.encodeCall(ERC20Mock.mint, (creditAccount, 10)))
                         )
                     )
-                    )
+                )
             });
         }
     }
@@ -644,7 +644,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 MultiCall(
                     address(creditFacade), abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (usdc, 2, FRIEND))
                 )
-                )
+            )
         });
     }
 
@@ -796,15 +796,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         creditManagerMock.setBorrower(USER);
 
-        MultiCallPermissionTestCase[9] memory cases = [
-            MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (token)),
-                permissionRquired: ENABLE_TOKEN_PERMISSION
-            }),
-            MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.disableToken, (token)),
-                permissionRquired: DISABLE_TOKEN_PERMISSION
-            }),
+        MultiCallPermissionTestCase[6] memory cases = [
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (token, 0)),
                 permissionRquired: ADD_COLLATERAL_PERMISSION
@@ -812,7 +804,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateralWithPermit, (token, 0, 0, 0, bytes32(0), bytes32(0))
-                    ),
+                ),
                 permissionRquired: ADD_COLLATERAL_PERMISSION
             }),
             MultiCallPermissionTestCase({
@@ -830,10 +822,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (token, 0, USER)),
                 permissionRquired: WITHDRAW_COLLATERAL_PERMISSION
-            }),
-            MultiCallPermissionTestCase({
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.revokeAdapterAllowances, (new RevocationPair[](0))),
-                permissionRquired: REVOKE_ALLOWANCES_PERMISSION
             })
         ];
 
@@ -918,7 +906,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                         target: acm,
                         callData: abi.encodeCall(
                             AdapterCallMock.makeCall, (link, abi.encodeCall(ERC20Mock.mint, (creditAccount, 1)))
-                            )
+                        )
                     }),
                     MultiCall({
                         target: address(creditFacade),
@@ -961,7 +949,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                         target: acm,
                         callData: abi.encodeCall(
                             AdapterCallMock.makeCall, (link, abi.encodeCall(ERC20Mock.mint, (creditAccount, 1)))
-                            )
+                        )
                     }),
                     MultiCall({
                         target: address(creditFacade),
@@ -1000,9 +988,9 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.setFullCheckParams, (new uint256[](0), PERCENTAGE_FACTOR - 1)
-                        )
+                    )
                 })
-                ),
+            ),
             enabledTokensMask: 0,
             flags: 0
         });
@@ -1017,7 +1005,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, PERCENTAGE_FACTOR))
                 })
-                ),
+            ),
             enabledTokensMask: 0,
             flags: 0
         });
@@ -1031,7 +1019,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, PERCENTAGE_FACTOR))
                 })
-                ),
+            ),
             enabledTokensMask: 0,
             flags: 0
         });
@@ -1048,7 +1036,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.setFullCheckParams, (collateralHints, minHealthFactor))
                 })
-                ),
+            ),
             enabledTokensMask: 0,
             flags: 0
         });
@@ -1146,7 +1134,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.addCollateralWithPermit, (address(token), amount, deadline, v, r, s)
-                        )
+                    )
                 })
             );
 
@@ -1255,7 +1243,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (maxDebt + 1))
                 })
-                ),
+            ),
             enabledTokensMask: mask,
             flags: INCREASE_DEBT_PERMISSION
         });
@@ -1274,7 +1262,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (1))
                 })
-                ),
+            ),
             enabledTokensMask: mask,
             flags: INCREASE_DEBT_PERMISSION
         });
@@ -1308,7 +1296,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (10))
                 })
-                ),
+            ),
             enabledTokensMask: linkMask,
             flags: INCREASE_DEBT_PERMISSION
         });
@@ -1321,7 +1309,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (link, 1000, USER))
                 })
-                ),
+            ),
             enabledTokensMask: linkMask,
             flags: WITHDRAW_COLLATERAL_PERMISSION
         });
@@ -1358,7 +1346,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (amount))
                 })
-                ),
+            ),
             enabledTokensMask: mask,
             flags: DECREASE_DEBT_PERMISSION
         });
@@ -1395,7 +1383,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (1))
                 })
-                ),
+            ),
             enabledTokensMask: mask,
             flags: DECREASE_DEBT_PERMISSION
         });
@@ -1421,64 +1409,10 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (1))
                 })
-                ),
+            ),
             enabledTokensMask: mask,
             flags: DECREASE_DEBT_PERMISSION
         });
-    }
-
-    /// @dev U:[FA-33]: multicall enableToken works properly
-    function test_U_FA_33_multicall_enableToken_works_properly() public notExpirableCase {
-        address creditAccount = DUMB_ADDRESS;
-
-        address link = tokenTestSuite.addressOf(Tokens.LINK);
-        uint256 mask = 1 << 5;
-
-        creditManagerMock.addToken(link, mask);
-
-        string memory caseNameBak = caseName;
-
-        for (uint256 testCase = 0; testCase < 2; ++testCase) {
-            caseName = string.concat(caseNameBak, testCase == 0 ? "not in quoted mask" : "in quoted mask");
-
-            creditManagerMock.setQuotedTokensMask(testCase == 0 ? 0 : mask);
-
-            FullCheckParams memory fullCheckParams = creditFacade.multicallInt({
-                creditAccount: creditAccount,
-                calls: MultiCallBuilder.build(
-                    MultiCall({
-                        target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (link))
-                    })
-                    ),
-                enabledTokensMask: UNDERLYING_TOKEN_MASK,
-                flags: ENABLE_TOKEN_PERMISSION
-            });
-
-            assertEq(
-                fullCheckParams.enabledTokensMaskAfter,
-                testCase == 0 ? (mask | UNDERLYING_TOKEN_MASK) : UNDERLYING_TOKEN_MASK,
-                _testCaseErr("Incorrect enabledTokenMask for enableToken")
-            );
-
-            fullCheckParams = creditFacade.multicallInt({
-                creditAccount: creditAccount,
-                calls: MultiCallBuilder.build(
-                    MultiCall({
-                        target: address(creditFacade),
-                        callData: abi.encodeCall(ICreditFacadeV3Multicall.disableToken, (link))
-                    })
-                    ),
-                enabledTokensMask: UNDERLYING_TOKEN_MASK | mask,
-                flags: DISABLE_TOKEN_PERMISSION
-            });
-
-            assertEq(
-                fullCheckParams.enabledTokensMaskAfter,
-                testCase == 0 ? UNDERLYING_TOKEN_MASK : (mask | UNDERLYING_TOKEN_MASK),
-                _testCaseErr("Incorrect enabledTokenMask for disableToken")
-            );
-        }
     }
 
     /// @dev U:[FA-34]: multicall updateQuota works properly
@@ -1513,7 +1447,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (link, change, 0))
                 })
-                ),
+            ),
             enabledTokensMask: maskToDisable | UNDERLYING_TOKEN_MASK,
             flags: UPDATE_QUOTA_PERMISSION
         });
@@ -1553,7 +1487,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (link, change, 0))
                 })
-                ),
+            ),
             enabledTokensMask: linkMask,
             flags: UPDATE_QUOTA_PERMISSION | FORBIDDEN_TOKENS_BEFORE_CALLS
         });
@@ -1565,7 +1499,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (link, -change, 0))
                 })
-                ),
+            ),
             enabledTokensMask: linkMask,
             flags: UPDATE_QUOTA_PERMISSION | FORBIDDEN_TOKENS_BEFORE_CALLS
         });
@@ -1596,7 +1530,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (link, amount, USER))
                 })
-                ),
+            ),
             enabledTokensMask: maskToDisable | UNDERLYING_TOKEN_MASK,
             flags: WITHDRAW_COLLATERAL_PERMISSION
         });
@@ -1604,31 +1538,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         assertEq(
             fullCheckParams.enabledTokensMaskAfter, UNDERLYING_TOKEN_MASK, _testCaseErr("Incorrect enabledTokenMask")
         );
-    }
-
-    /// @dev U:[FA-36]: multicall revokeAdapterAllowances works properly
-    function test_U_FA_36_multicall_revokeAdapterAllowances_works_properly() public notExpirableCase {
-        address creditAccount = DUMB_ADDRESS;
-
-        RevocationPair[] memory rp = new RevocationPair[](1);
-        rp[0].token = tokenTestSuite.addressOf(Tokens.LINK);
-        rp[0].spender = DUMB_ADDRESS;
-
-        vm.expectCall(
-            address(creditManagerMock), abi.encodeCall(ICreditManagerV3.revokeAdapterAllowances, (creditAccount, rp))
-        );
-
-        creditFacade.multicallInt({
-            creditAccount: creditAccount,
-            calls: MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.revokeAdapterAllowances, (rp))
-                })
-                ),
-            enabledTokensMask: 0,
-            flags: REVOKE_ALLOWANCES_PERMISSION
-        });
     }
 
     struct ExternalCallTestCase {
@@ -1699,7 +1608,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                         target: adapter,
                         callData: abi.encodeCall(AdapterMock.dumbCall, (tokensToEnable, tokensToDisable))
                     })
-                    ),
+                ),
                 enabledTokensMask: _case.tokenMaskBefore,
                 flags: EXTERNAL_CALLS_PERMISSION
             });

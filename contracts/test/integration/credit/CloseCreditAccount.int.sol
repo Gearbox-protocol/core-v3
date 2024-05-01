@@ -99,7 +99,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT / 2)
-                    )
+                )
             })
         );
 
@@ -111,15 +111,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         // debt not repaid at all
         vm.expectRevert(CloseAccountWithNonZeroDebtException.selector);
         vm.prank(USER);
-        creditFacade.closeCreditAccount(
-            creditAccount,
-            MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.disableToken, (underlying))
-                })
-            )
-        );
+        creditFacade.closeCreditAccount(creditAccount, MultiCallBuilder.build());
 
         // debt partially repaid
         vm.expectRevert(CloseAccountWithNonZeroDebtException.selector);
@@ -130,10 +122,6 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (DAI_ACCOUNT_AMOUNT / 2))
-                }),
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.disableToken, (underlying))
                 })
             )
         );
@@ -246,7 +234,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.withdrawCollateral, (daiToken, type(uint256).max, USER)
-                        )
+                    )
                 })
             )
         );

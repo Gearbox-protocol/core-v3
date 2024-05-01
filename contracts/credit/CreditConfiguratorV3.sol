@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
 // THIRD-PARTY
@@ -29,8 +29,8 @@ import {CreditManagerV3} from "./CreditManagerV3.sol";
 // INTERFACES
 import {IAdapter} from "@gearbox-protocol/core-v2/contracts/interfaces/IAdapter.sol";
 import {ICreditConfiguratorV3, CreditManagerOpts, AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
-import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
+import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
 import "../interfaces/IAddressProviderV3.sol";
 
 // EXCEPTIONS
@@ -45,7 +45,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     using BitMask for uint256;
 
     /// @notice Contract version
-    uint256 public constant override version = 3_01;
+    uint256 public constant override version = 3_10;
 
     /// @notice Address provider contract address
     address public immutable override addressProvider;
@@ -138,12 +138,12 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     // ------ //
 
     /// @notice Makes token recognizable as collateral in the credit manager and sets its liquidation threshold
-    /// @notice In case token is quoted in the quota keeper, also makes it quoted in the credit manager
     /// @param token Token to add
     /// @param liquidationThreshold LT to set in bps
     /// @dev Reverts if `token` is not a valid ERC-20 token
     /// @dev Reverts if `token` does not have a price feed in the price oracle
     /// @dev Reverts if `token` is underlying
+    /// @dev Reverts if `token` is not quoted in the quota keeper
     /// @dev Reverts if `liquidationThreshold` is greater than underlying's LT
     function addCollateralToken(address token, uint16 liquidationThreshold)
         external
@@ -164,16 +164,15 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             revert IncorrectTokenContractException(); // I:[CC-3]
         }
 
-        if (IPriceOracleBase(CreditManagerV3(creditManager).priceOracle()).priceFeeds(token) == address(0)) {
+        if (IPriceOracleV3(CreditManagerV3(creditManager).priceOracle()).priceFeeds(token) == address(0)) {
             revert PriceFeedDoesNotExistException(); // I:[CC-3]
         }
 
-        CreditManagerV3(creditManager).addToken({token: token}); // I:[CC-4]
-
-        if (_isQuotedToken(token)) {
-            _makeTokenQuoted(token);
+        if (!IPoolQuotaKeeperV3(CreditManagerV3(creditManager).poolQuotaKeeper()).isQuotedToken(token)) {
+            revert TokenIsNotQuotedException(); // I:[CC-3]
         }
 
+        CreditManagerV3(creditManager).addToken({token: token}); // I:[CC-4]
         emit AddCollateralToken({token: token}); // I:[CC-4]
     }
 
@@ -304,31 +303,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
 
         cf.setTokenAllowance({token: token, allowance: AllowanceAction.ALLOW}); // I:[CC-8]
         emit AllowToken({token: token}); // I:[CC-8]
-    }
-
-    /// @notice Makes token quoted
-    /// @param token Token to make quoted
-    /// @dev Reverts if `token` is not quoted in the quota keeper
-    /// @dev Reverts if `token` is not recognized as collateral in the credit manager
-    function makeTokenQuoted(address token)
-        external
-        override
-        configuratorOnly // I:[CC-2]
-    {
-        if (!_isQuotedToken(token)) {
-            revert TokenIsNotQuotedException();
-        }
-        _makeTokenQuoted(token);
-    }
-
-    /// @dev `makeTokenQuoted` implementation
-    function _makeTokenQuoted(address token) internal nonUnderlyingTokenOnly(token) {
-        uint256 tokenMask = _getTokenMaskOrRevert({token: token});
-        uint256 quotedTokensMask = CreditManagerV3(creditManager).quotedTokensMask();
-        if (quotedTokensMask & tokenMask != 0) return;
-
-        CreditManagerV3(creditManager).setQuotedMask(quotedTokensMask.enable(tokenMask));
-        emit QuoteToken(token);
     }
 
     // -------- //
@@ -841,13 +815,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     // --------- //
     // INTERNALS //
     // --------- //
-
-    /// @dev Checks whether the quota keeper (if it is set) has a token registered as quoted
-    function _isQuotedToken(address token) internal view returns (bool) {
-        address quotaKeeper = CreditManagerV3(creditManager).poolQuotaKeeper();
-        if (quotaKeeper == address(0)) return false;
-        return IPoolQuotaKeeperV3(quotaKeeper).isQuotedToken(token);
-    }
 
     /// @dev Internal wrapper for `creditManager.getTokenMaskOrRevert` call to reduce contract size
     function _getTokenMaskOrRevert(address token) internal view returns (uint256 tokenMask) {
