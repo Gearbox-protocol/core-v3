@@ -50,7 +50,6 @@ import {CreditAccountMock, CreditAccountMockEvents} from "../../mocks/credit/Cre
 // SUITES
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
-import {MockCreditConfig} from "../../config/MockCreditConfig.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
@@ -84,8 +83,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
     PriceOracleMock priceOracleMock;
 
     address underlying;
-
-    MockCreditConfig creditConfig;
 
     // Fee token settings
     bool isFeeToken;

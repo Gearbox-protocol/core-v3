@@ -106,6 +106,7 @@ contract MultiCallIntegrationTest is
 
     /// @dev I:[MC-5]: addCollateral executes function as expected
     function test_I_MC_05_addCollateral_executes_actions_as_expected() public creditTest {
+        (, uint256 maxDebt) = creditFacade.debtLimits();
         (address creditAccount,) = _openTestCreditAccount();
 
         expectTokenIsEnabled(creditAccount, Tokens.USDC, false);
@@ -123,12 +124,19 @@ contract MultiCallIntegrationTest is
         vm.expectEmit(true, true, false, true);
         emit AddCollateral(creditAccount, usdcToken, 512);
 
-        // TODO: change test
+        vm.expectCall(
+            address(creditManager),
+            abi.encodeCall(ICreditManagerV3.updateQuota, (creditAccount, usdcToken, 10000, 0, uint96(2 * maxDebt)))
+        );
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (usdcToken, 512))
+            }),
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (usdcToken, 10000, 0))
             })
         );
 
@@ -144,6 +152,7 @@ contract MultiCallIntegrationTest is
         public
         creditTest
     {
+        (, uint256 maxDebt) = creditFacade.debtLimits();
         (address creditAccount,) = _openTestCreditAccount();
         vm.roll(block.number + 1);
 
@@ -163,6 +172,11 @@ contract MultiCallIntegrationTest is
 
         vm.expectEmit(true, true, false, true);
         emit AddCollateral(creditAccount, usdcToken, USDC_EXCHANGE_AMOUNT);
+
+        vm.expectCall(
+            address(creditManager),
+            abi.encodeCall(ICreditManagerV3.updateQuota, (creditAccount, usdcToken, 10000, 0, uint96(2 * maxDebt)))
+        );
 
         vm.expectCall(
             address(creditManager),
@@ -194,6 +208,10 @@ contract MultiCallIntegrationTest is
                 }),
                 MultiCall({
                     target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (usdcToken, 10000, 0))
+                }),
+                MultiCall({
+                    target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (256))
                 })
             )
@@ -205,6 +223,7 @@ contract MultiCallIntegrationTest is
         public
         creditTest
     {
+        (, uint256 maxDebt) = creditFacade.debtLimits();
         (address creditAccount,) = _openTestCreditAccount();
         vm.roll(block.number + 1);
 
@@ -224,6 +243,11 @@ contract MultiCallIntegrationTest is
 
         vm.expectEmit(true, true, false, true);
         emit AddCollateral(creditAccount, usdcToken, USDC_EXCHANGE_AMOUNT);
+
+        vm.expectCall(
+            address(creditManager),
+            abi.encodeCall(ICreditManagerV3.updateQuota, (creditAccount, usdcToken, 10000, 0, uint96(2 * maxDebt)))
+        );
 
         vm.expectCall(
             address(creditManager),
@@ -252,6 +276,10 @@ contract MultiCallIntegrationTest is
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (usdcToken, USDC_EXCHANGE_AMOUNT))
+                }),
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (usdcToken, 10000, 0))
                 }),
                 MultiCall({
                     target: address(creditFacade),

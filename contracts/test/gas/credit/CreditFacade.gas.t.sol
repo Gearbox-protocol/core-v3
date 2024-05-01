@@ -7,7 +7,7 @@ import {ICreditFacadeV3Multicall} from "../../../interfaces/ICreditFacadeV3.sol"
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // DATA
-import {MultiCall, MultiCallOps} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
+import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 
 // TESTS
 import "../../lib/constants.sol";
@@ -148,20 +148,9 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
 
     /// @dev G:[FA-5]: openCreditAccount with adding quoted collateral and updating quota
     function test_G_FA_05_openCreditAccountMulticall_gas_estimate_4() public creditTest {
-        vm.startPrank(CONFIGURATOR);
-        gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
-        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-
-        gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.USDC), 500, 500);
-        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.USDC), type(uint96).max);
-
-        gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.WETH), 500, 500);
-        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.WETH), type(uint96).max);
-
         vm.warp(block.timestamp + 7 days);
+        vm.prank(CONFIGURATOR);
         gauge.updateEpoch();
-
-        vm.stopPrank();
 
         tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
         tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
@@ -213,12 +202,9 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
 
     /// @dev G:[FA-6]: openCreditAccount with swapping and updating quota
     function test_G_FA_06_openCreditAccountMulticall_gas_estimate_5() public withAdapterMock creditTest {
-        vm.startPrank(CONFIGURATOR);
-        gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
-        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
         vm.warp(block.timestamp + 7 days);
+        vm.prank(CONFIGURATOR);
         gauge.updateEpoch();
-        vm.stopPrank();
 
         tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
         tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
@@ -345,13 +331,9 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
 
     /// @dev G:[FA-9]: multicall with decreaseDebt and active quota interest
     function test_G_FA_09_decreaseDebt_gas_estimate_2() public creditTest {
-        vm.startPrank(CONFIGURATOR);
-        gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
-        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-
         vm.warp(block.timestamp + 7 days);
+        vm.prank(CONFIGURATOR);
         gauge.updateEpoch();
-        vm.stopPrank();
 
         tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
         tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
@@ -498,13 +480,9 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
 
     /// @dev G:[FA-13]: multicall with a single swap into quoted token
     function test_G_FA_13_multicall_gas_estimate_2() public withAdapterMock creditTest {
-        vm.startPrank(CONFIGURATOR);
-        gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
-        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-
         vm.warp(block.timestamp + 7 days);
+        vm.prank(CONFIGURATOR);
         gauge.updateEpoch();
-        vm.stopPrank();
 
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
@@ -850,13 +828,9 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
 
     /// @dev G:[FA-20]: liquidateCreditAccount with 2 tokens and active quota interest
     function test_G_FA_20_liquidateCreditAccount_gas_estimate_3() public creditTest {
-        vm.startPrank(CONFIGURATOR);
-        gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
-        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-
         vm.warp(block.timestamp + 7 days);
+        vm.prank(CONFIGURATOR);
         gauge.updateEpoch();
-        vm.stopPrank();
 
         tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
         tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));

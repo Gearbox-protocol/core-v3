@@ -250,7 +250,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         creditTest
     {
         amount = bound(amount, 10000, DAI_ACCOUNT_AMOUNT);
-        token1 = uint8(bound(token1, 1, creditManager.collateralTokensCount() - 1));
+        token1 = uint8(bound(token1, 2, creditManager.collateralTokensCount() - 1));
 
         tokenTestSuite.mint(Tokens.DAI, address(creditManager.pool()), type(uint96).max);
 
@@ -293,6 +293,12 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (collateral, amount))
+                }),
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(
+                        ICreditFacadeV3Multicall.updateQuota, (collateral, int96(uint96(DAI_ACCOUNT_AMOUNT)), 0)
+                    )
                 })
             ),
             REFERRAL_CODE

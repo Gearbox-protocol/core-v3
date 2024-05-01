@@ -401,7 +401,7 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
                 balances: arrayOf(B({t: Tokens.USDT, balance: 20_000})),
                 quotas: arrayOf(
                     Q({t: Tokens.USDT, quota: 5_000}), Q({t: Tokens.WETH, quota: 50}), Q({t: Tokens.LINK, quota: 50_000})
-                    ),
+                ),
                 target: 5_000 * prices[Tokens.DAI],
                 expectedTotalValueUSD: (20_000 - 1) * prices[Tokens.USDT],
                 expectedTwvUSD: 5_000 * prices[Tokens.DAI],

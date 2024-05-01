@@ -40,8 +40,15 @@ import "../../../interfaces/IExceptions.sol";
 contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events {
     using CreditLogic for CollateralDebtData;
 
-    function _addQuotedToken(address token, uint16 rate, uint96 limit) internal {
-        makeTokenQuoted(token, rate, limit);
+    function _setQuotaParams(address token, uint16 rate, uint96 limit) internal {
+        vm.startPrank(CONFIGURATOR);
+        gauge.changeQuotaMaxRate(token, type(uint16).max);
+        gauge.changeQuotaMinRate(token, rate);
+        gauge.changeQuotaMaxRate(token, rate);
+        poolQuotaKeeper.setTokenLimit(token, limit);
+        vm.warp(block.timestamp + 7 days);
+        gauge.updateEpoch();
+        vm.stopPrank();
     }
 
     ///
@@ -50,21 +57,10 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
     ///
     ///
 
-    /// @dev I:[CMQ-2]: setQuotedMask works correctly
-    function test_I_CMQ_02_setQuotedMask_works_correctly() public creditTest {
-        _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
-        _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
-
-        uint256 usdtMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.USDT));
-        uint256 linkMask = creditManager.getTokenMaskOrRevert(tokenTestSuite.addressOf(Tokens.LINK));
-
-        assertEq(creditManager.quotedTokensMask(), usdtMask | linkMask, "New limited mask is incorrect");
-    }
-
     /// @dev I:[CMQ-3]: updateQuotas works correctly
     function test_I_CMQ_03_updateQuotas_works_correctly() public creditTest {
-        _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
-        _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
+        _setQuotaParams(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
+        _setQuotaParams(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
         (address creditAccount,) = _openTestCreditAccount();
 
@@ -93,7 +89,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.LINK), 100_000, 0)
-                    )
+                )
             })
         );
 
@@ -117,7 +113,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.LINK), -100_000, 0)
-                    )
+                )
             })
         );
 
@@ -134,12 +130,10 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
             "Cumulative quota interest was not updated correctly"
         );
 
-        address usdc = tokenTestSuite.addressOf(Tokens.USDC);
-
         calls = MultiCallBuilder.build(
             MultiCall({
                 target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (usdc, 100_000, 0))
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (underlying, 100_000, 0))
             })
         );
 
@@ -150,8 +144,8 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
 
     /// @dev I:[CMQ-4]: Quotas are handled correctly on debt decrease: amount < quota interest case
     function test_I_CMQ_04_quotas_are_handled_correctly_at_repayment_partial_case() public creditTest {
-        _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
-        _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
+        _setQuotaParams(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
+        _setQuotaParams(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
         (address creditAccount,) = _openTestCreditAccount();
         vm.roll(block.timestamp + 1);
@@ -161,13 +155,13 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.LINK), 100_000, 0)
-                    )
+                )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.USDT), 200_000, 0)
-                    )
+                )
             })
         );
 
@@ -211,8 +205,8 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
 
     /// @dev I:[CMQ-5]: Quotas are handled correctly on debt decrease: amount >= quota interest case
     function test_I_CMQ_05_quotas_are_handled_correctly_at_repayment_full_case() public creditTest {
-        _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 1000, uint96(1_000_000 * WAD));
-        _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
+        _setQuotaParams(tokenTestSuite.addressOf(Tokens.LINK), 1000, uint96(1_000_000 * WAD));
+        _setQuotaParams(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(1_000_000 * WAD));
 
         (address creditAccount,) = _openTestCreditAccount();
         vm.roll(block.timestamp + 1);
@@ -222,13 +216,13 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.LINK), 100_000, 0)
-                    )
+                )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.USDT), 200_000, 0)
-                    )
+                )
             })
         );
 
@@ -262,8 +256,8 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
 
     /// @dev I:[CMQ-6]: Quotas are disabled on closing an account
     function test_I_CMQ_06_quotas_are_disabled_on_close_account_and_all_quota_fees_are_repaid() public creditTest {
-        _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
-        _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 5_00, uint96(1_000_000 * WAD));
+        _setQuotaParams(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
+        _setQuotaParams(tokenTestSuite.addressOf(Tokens.USDT), 5_00, uint96(1_000_000 * WAD));
 
         (address creditAccount,) = _openTestCreditAccount();
 
@@ -276,14 +270,14 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
                     (tokenTestSuite.addressOf(Tokens.LINK), int96(uint96(100 * WAD)), 0)
-                    )
+                )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
                     (tokenTestSuite.addressOf(Tokens.USDT), int96(uint96(200 * WAD)), 0)
-                    )
+                )
             })
         );
 
@@ -315,13 +309,13 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.LINK), type(int96).min, 0)
-                        )
+                    )
                 }),
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.USDT), type(int96).min, 0)
-                        )
+                    )
                 }),
                 MultiCall({
                     target: address(creditFacade),
@@ -331,21 +325,21 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.withdrawCollateral, (underlying, type(uint256).max, USER)
-                        )
+                    )
                 }),
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.withdrawCollateral,
                         (tokenTestSuite.addressOf(Tokens.LINK), type(uint256).max, USER)
-                        )
+                    )
                 }),
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.withdrawCollateral,
                         (tokenTestSuite.addressOf(Tokens.USDT), type(uint256).max, USER)
-                        )
+                    )
                 })
             )
         );
@@ -373,8 +367,8 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
         public
         creditTest
     {
-        _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(100_000 * WAD));
-        _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500, uint96(100_000 * WAD));
+        _setQuotaParams(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(100_000 * WAD));
+        _setQuotaParams(tokenTestSuite.addressOf(Tokens.USDT), 5_00, uint96(100_000 * WAD));
 
         quotaLink = uint96(bound(quotaLink, 0, uint96(type(int96).max)));
         quotaUsdt = uint96(bound(quotaUsdt, 0, uint96(type(int96).max)));
@@ -389,13 +383,13 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.LINK), int96(quotaLink), 0)
-                    )
+                )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.USDT), int96(quotaUsdt), 0)
-                    )
+                )
             })
         );
 
@@ -423,8 +417,8 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
 
     /// @dev I:[CMQ-08]: Credit Manager zeroes limits on quoted tokens upon incurring a loss
     function test_I_CMQ_08_creditManager_triggers_limit_zeroing_on_loss() public creditTest {
-        _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), type(uint16).max, uint96(1_000_000 * WAD));
-        _addQuotedToken(tokenTestSuite.addressOf(Tokens.USDT), 500_00, uint96(1_000_000 * WAD));
+        _setQuotaParams(tokenTestSuite.addressOf(Tokens.LINK), type(uint16).max, uint96(1_000_000 * WAD));
+        _setQuotaParams(tokenTestSuite.addressOf(Tokens.USDT), 500_00, uint96(1_000_000 * WAD));
 
         (address creditAccount,) = _openTestCreditAccount();
 
@@ -434,14 +428,14 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
                     (tokenTestSuite.addressOf(Tokens.LINK), int96(uint96(100_000 * WAD)), 0)
-                    )
+                )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
                     (tokenTestSuite.addressOf(Tokens.USDT), int96(uint96(200 * WAD)), 0)
-                    )
+                )
             })
         );
 
@@ -465,7 +459,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
 
     /// @dev I:[CMQ-09]: positive updateQuotas reverts on zero debt
     function test_I_CMQ_09_updateQuotas_with_positive_value_reverts_on_zero_debt() public creditTest {
-        _addQuotedToken(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
+        _setQuotaParams(tokenTestSuite.addressOf(Tokens.LINK), 10_00, uint96(1_000_000 * WAD));
 
         address creditAccount = _openCreditAccount(0, USER, 0, 0);
 
@@ -477,7 +471,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.LINK), 100_000, 0)
-                    )
+                )
             })
         );
 
