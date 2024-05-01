@@ -6,75 +6,25 @@ pragma solidity ^0.8.17;
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
-/// @notice Policy that determines checks performed on a parameter
-///         Each policy is defined for a contract group, which is a string
-///         identifier for a set of contracts
-/// @param enabled Determines whether the policy is enabled. A disabled policy will auto-fail the policy check.
-/// @param admin The admin that can change the parameter under the given policy
-/// @param delay The delay before the transaction can be triggered under a given policy
-/// @param flags Bitmask of flags that determine which policy checks to apply on parameter change:
-///        * 0 - check exact value
-///        * 1 - check min value
-///        * 2 - check max value
-///        * 3 - check min change
-///        * 4 - check max change
-///        * 5 - check min pct change
-///        * 6 - check max pct change
-/// @param exactValue Exact value to check the incoming parameter value against, if applies
-/// @param minValue Min value to check the incoming parameter value against, if applies
-/// @param maxValue Max value to check the incoming parameter value against, if applies
-/// @param referencePointUpdatePeriod The minimal time period after which the RP can be updated
-/// @param minPctChangeDown Min percentage decrease for new values, relative to reference point
-/// @param minPctChangeUp Min percentage increase for new values, relative to reference point
-/// @param maxPctChangeDown Max percentage decrease for new values, relative to reference point
-/// @param maxPctChangeUp Max percentage increase for new values, relative to reference point
-/// @param minChange Min absolute changes for new values, relative to reference point
-/// @param maxChange Max absolute changes for new values, relative to reference point
 struct Policy {
     bool enabled;
     address admin;
     uint40 delay;
-    uint8 flags;
-    uint256 exactValue;
-    uint256 minValue;
-    uint256 maxValue;
-    uint40 referencePointUpdatePeriod;
-    uint16 minPctChangeDown;
-    uint16 minPctChangeUp;
-    uint16 maxPctChangeDown;
-    uint16 maxPctChangeUp;
-    uint256 minChange;
-    uint256 maxChange;
-}
-
-/// @param referencePoint A reference value of a parameter to check change magnitudes against;
-///        When the reference update period has elapsed since the last reference point update,
-///        the reference point is updated to the 'current' value on the next parameter change
-/// @param referencePointTimestampLU  Last timestamp at which the reference point was updated
-struct ReferenceData {
-    uint224 referencePoint;
-    uint40 referencePointTimestampLU;
+    bool checkInterval;
+    bool checkSet;
+    uint256 intervalMinValue;
+    uint256 intervalMaxValue;
+    uint256[] setValues;
 }
 
 /// @title Policy manager V3
 /// @dev A contract for managing bounds and conditions for mission-critical protocol params
 abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
-    uint256 internal constant CHECK_EXACT_VALUE_FLAG = 1;
-    uint256 internal constant CHECK_MIN_VALUE_FLAG = 1 << 1;
-    uint256 internal constant CHECK_MAX_VALUE_FLAG = 1 << 2;
-    uint256 internal constant CHECK_MIN_CHANGE_FLAG = 1 << 3;
-    uint256 internal constant CHECK_MAX_CHANGE_FLAG = 1 << 4;
-    uint256 internal constant CHECK_MIN_PCT_CHANGE_FLAG = 1 << 5;
-    uint256 internal constant CHECK_MAX_PCT_CHANGE_FLAG = 1 << 6;
-
     /// @dev Mapping from group-derived key to policy
     mapping(bytes32 => Policy) internal _policies;
 
     /// @dev Mapping from a contract address to its group
     mapping(address => string) internal _group;
-
-    /// @dev Mapping from address-derived key to reference point and last updated timestamp
-    mapping(bytes32 => ReferenceData) internal _references;
 
     /// @notice Emitted when new policy is set
     event SetPolicy(bytes32 indexed policyHash, bool enabled);
@@ -122,18 +72,6 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
         return _group[contractAddress]; // U:[PM-1]
     }
 
-    /// @notice Manually sets the reference data for a particular hash
-    /// @dev This is a manual override to use in case something goes wrong with reference value
-    ///      Should not be touched in most cases
-    function setReference(bytes32 referenceHash, ReferenceData memory ref) external {
-        _references[referenceHash] = ref;
-    }
-
-    /// @notice Returns reference point and last update timestamp for a particular reference key
-    function getReference(bytes32 referenceHash) external view returns (ReferenceData memory) {
-        return _references[referenceHash];
-    }
-
     /// @dev Returns policy transaction delay, with policy retrieved based on contract and parameter name
     function _getPolicyDelay(address contractAddress, string memory paramName) internal view returns (uint256) {
         bytes32 policyHash = keccak256(abi.encode(_group[contractAddress], paramName));
@@ -146,88 +84,42 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
     }
 
     /// @dev Performs parameter checks, with policy retrieved based on contract and parameter name
-    function _checkPolicy(address contractAddress, string memory paramName, uint256 oldValue, uint256 newValue)
-        internal
-        returns (bool)
-    {
+    function _checkPolicy(address contractAddress, string memory paramName, uint256 newValue) internal returns (bool) {
         bytes32 policyHash = keccak256(abi.encode(_group[contractAddress], paramName));
-        bytes32 referenceHash = keccak256(abi.encode(contractAddress, paramName));
-        return _checkPolicy(policyHash, referenceHash, oldValue, newValue);
+        return _checkPolicy(policyHash, newValue);
     }
 
     /// @dev Performs parameter checks, with policy retrieved based on policy UID
-    function _checkPolicy(bytes32 policyHash, bytes32 referenceHash, uint256 oldValue, uint256 newValue)
-        internal
-        returns (bool)
-    {
+    function _checkPolicy(bytes32 policyHash, uint256 newValue) internal returns (bool) {
         Policy storage policy = _policies[policyHash];
-        ReferenceData storage referenceData = _references[referenceHash];
 
         if (!policy.enabled) return false; // U:[PM-2]
 
-        if (policy.admin != msg.sender) return false;
+        if (policy.admin != msg.sender) return false; // U: [PM-5]
 
-        uint8 flags = policy.flags;
-
-        if (flags & CHECK_EXACT_VALUE_FLAG != 0) {
-            if (newValue != policy.exactValue) return false; // U:[PM-3]
+        if (policy.checkInterval) {
+            if (newValue < policy.intervalMinValue || newValue > policy.intervalMaxValue) return false; // U: [PM-3]
         }
 
-        if (flags & CHECK_MIN_VALUE_FLAG != 0) {
-            if (newValue < policy.minValue) return false; // U:[PM-4]
-        }
-
-        if (flags & CHECK_MAX_VALUE_FLAG != 0) {
-            if (newValue > policy.maxValue) return false; // U:[PM-5]
-        }
-
-        uint256 referencePoint;
-
-        // The policy uses a reference point to gauge relative parameter changes. A reference point
-        // is a value that is set to current value on updating a parameter. All future values for a period
-        // will be rubber-banded to the reference point, until the refresh period elapses and it is updated again.
-
-        if (
-            flags
-                & (CHECK_MIN_CHANGE_FLAG | CHECK_MAX_CHANGE_FLAG | CHECK_MIN_PCT_CHANGE_FLAG | CHECK_MAX_PCT_CHANGE_FLAG)
-                != 0
-        ) {
-            if (block.timestamp > referenceData.referencePointTimestampLU + policy.referencePointUpdatePeriod) {
-                referencePoint = oldValue;
-                referenceData.referencePoint = uint224(referencePoint); // U:[PM-6]
-                referenceData.referencePointTimestampLU = uint40(block.timestamp); // U:[PM-6]
-            } else {
-                referencePoint = uint256(referenceData.referencePoint);
-            }
-
-            (uint256 diff, bool isIncrease) = calcDiff(newValue, referencePoint);
-
-            if (flags & CHECK_MIN_CHANGE_FLAG != 0) {
-                if (diff < policy.minChange) return false; // U:[PM-7]
-            }
-
-            if (flags & CHECK_MAX_CHANGE_FLAG != 0) {
-                if (diff > policy.maxChange) return false; // U:[PM-8]
-            }
-
-            if (flags & (CHECK_MIN_PCT_CHANGE_FLAG | CHECK_MAX_PCT_CHANGE_FLAG) != 0) {
-                uint256 pctDiff = diff * PERCENTAGE_FACTOR / referencePoint;
-                if (
-                    flags & CHECK_MIN_PCT_CHANGE_FLAG != 0
-                        && pctDiff < (isIncrease ? policy.minPctChangeUp : policy.minPctChangeDown)
-                ) return false; // U:[PM-9]
-                if (
-                    flags & CHECK_MAX_PCT_CHANGE_FLAG != 0
-                        && pctDiff > (isIncrease ? policy.maxPctChangeUp : policy.maxPctChangeDown)
-                ) return false; // U:[PM-10]
-            }
+        if (policy.checkSet) {
+            if (!_isIn(policy.setValues, newValue)) return false; // U: [PM-4]
         }
 
         return true;
     }
 
-    /// @dev Returns the absolute difference between two numbers and the flag whether the first one is greater
-    function calcDiff(uint256 a, uint256 b) internal pure returns (uint256, bool) {
-        return a > b ? (a - b, true) : (b - a, false);
+    /// @dev Returns whether the value is an element of `arr`
+    function _isIn(uint256[] memory arr, uint256 value) internal pure returns (bool) {
+        uint256 len = arr.length;
+
+        for (uint256 i = 0; i < len;) {
+            if (value == arr[i]) return true;
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        return false;
     }
 }

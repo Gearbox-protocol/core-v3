@@ -4,13 +4,13 @@
 pragma solidity ^0.8.17;
 
 import {ControllerTimelockV3} from "../../../governance/ControllerTimelockV3.sol";
-import {Policy, ReferenceData} from "../../../governance/PolicyManagerV3.sol";
+import {Policy} from "../../../governance/PolicyManagerV3.sol";
 import {GeneralMock} from "../../mocks/GeneralMock.sol";
 
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import {ICreditFacadeV3} from "../../../interfaces/ICreditFacadeV3.sol";
 import {ICreditConfiguratorV3} from "../../../interfaces/ICreditConfiguratorV3.sol";
-import {IPriceOracleV3} from "../../../interfaces/IPriceOracleV3.sol";
+import {IPriceOracleV3, PriceFeedParams} from "../../../interfaces/IPriceOracleV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {IGaugeV3} from "../../../interfaces/IGaugeV3.sol";
@@ -113,21 +113,18 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
             pool, abi.encodeWithSelector(IPoolV3.creditManagerBorrowed.selector, creditManager), abi.encode(1234)
         );
 
+        uint256[] memory setValues = new uint256[](1);
+        setValues[0] = block.timestamp + 5;
+
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
             delay: 1 days,
-            flags: 1,
-            exactValue: block.timestamp + 5,
-            minValue: 0,
-            maxValue: 0,
-            referencePointUpdatePeriod: 0,
-            minPctChangeDown: 0,
-            minPctChangeUp: 0,
-            maxPctChangeDown: 0,
-            maxPctChangeUp: 0,
-            minChange: 0,
-            maxChange: 0
+            checkInterval: false,
+            checkSet: true,
+            intervalMinValue: 0,
+            intervalMaxValue: 0,
+            setValues: setValues
         });
 
         // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
@@ -178,7 +175,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         assertEq(sanityCheckValue, initialExpirationDate, "Sanity check value written incorrectly");
 
-        assertEq(sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getExpirationDate, (creditFacade)));
+        assertEq(sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getExpirationDate, (creditManager)));
 
         vm.expectCall(
             creditConfigurator,
@@ -206,21 +203,18 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         bytes32 POLICY_CODE = keccak256(abi.encode("LP_PRICE_FEED", "LP_PRICE_FEED_LIMITER"));
 
+        uint256[] memory setValues = new uint256[](1);
+        setValues[0] = 7;
+
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
             delay: 1 days,
-            flags: 1,
-            exactValue: 7,
-            minValue: 0,
-            maxValue: 0,
-            referencePointUpdatePeriod: 0,
-            minPctChangeDown: 0,
-            minPctChangeUp: 0,
-            maxPctChangeDown: 0,
-            maxPctChangeUp: 0,
-            minChange: 0,
-            maxChange: 0
+            checkInterval: false,
+            checkSet: true,
+            intervalMinValue: 0,
+            intervalMaxValue: 0,
+            setValues: setValues
         });
 
         // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
@@ -281,21 +275,18 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
             creditFacade, abi.encodeWithSelector(ICreditFacadeV3.maxDebtPerBlockMultiplier.selector), abi.encode(3)
         );
 
+        uint256[] memory setValues = new uint256[](1);
+        setValues[0] = 4;
+
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
             delay: 2 days,
-            flags: 1,
-            exactValue: 4,
-            minValue: 0,
-            maxValue: 0,
-            referencePointUpdatePeriod: 0,
-            minPctChangeDown: 0,
-            minPctChangeUp: 0,
-            maxPctChangeDown: 0,
-            maxPctChangeUp: 0,
-            minChange: 0,
-            maxChange: 0
+            checkInterval: false,
+            checkSet: true,
+            intervalMinValue: 0,
+            intervalMaxValue: 0,
+            setValues: setValues
         });
 
         // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
@@ -338,7 +329,9 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         assertEq(sanityCheckValue, 3, "Sanity check value written incorrectly");
 
-        assertEq(sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getMaxDebtPerBlockMultiplier, (creditFacade)));
+        assertEq(
+            sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getMaxDebtPerBlockMultiplier, (creditManager))
+        );
 
         vm.expectCall(
             creditConfigurator, abi.encodeWithSelector(ICreditConfiguratorV3.setMaxDebtPerBlockMultiplier.selector, 4)
@@ -362,21 +355,18 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         vm.mockCall(creditFacade, abi.encodeWithSelector(ICreditFacadeV3.debtLimits.selector), abi.encode(10, 20));
 
+        uint256[] memory setValues = new uint256[](1);
+        setValues[0] = 15;
+
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
             delay: 3 days,
-            flags: 1,
-            exactValue: 15,
-            minValue: 0,
-            maxValue: 0,
-            referencePointUpdatePeriod: 0,
-            minPctChangeDown: 0,
-            minPctChangeUp: 0,
-            maxPctChangeDown: 0,
-            maxPctChangeUp: 0,
-            minChange: 0,
-            maxChange: 0
+            checkInterval: false,
+            checkSet: true,
+            intervalMinValue: 0,
+            intervalMaxValue: 0,
+            setValues: setValues
         });
 
         // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
@@ -418,7 +408,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         assertEq(sanityCheckValue, 10, "Sanity check value written incorrectly");
 
-        assertEq(sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getMinDebtLimit, (creditFacade)));
+        assertEq(sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getMinDebtLimit, (creditManager)));
 
         vm.expectCall(creditConfigurator, abi.encodeWithSelector(ICreditConfiguratorV3.setMinDebtLimit.selector, 15));
 
@@ -440,21 +430,18 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         vm.mockCall(creditFacade, abi.encodeWithSelector(ICreditFacadeV3.debtLimits.selector), abi.encode(10, 20));
 
+        uint256[] memory setValues = new uint256[](1);
+        setValues[0] = 25;
+
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
             delay: 1 days,
-            flags: 1,
-            exactValue: 25,
-            minValue: 0,
-            maxValue: 0,
-            referencePointUpdatePeriod: 0,
-            minPctChangeDown: 0,
-            minPctChangeUp: 0,
-            maxPctChangeDown: 0,
-            maxPctChangeUp: 0,
-            minChange: 0,
-            maxChange: 0
+            checkInterval: false,
+            checkSet: true,
+            intervalMinValue: 0,
+            intervalMaxValue: 0,
+            setValues: setValues
         });
 
         // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
@@ -496,7 +483,7 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         assertEq(sanityCheckValue, 20, "Sanity check value written incorrectly");
 
-        assertEq(sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getMaxDebtLimit, (creditFacade)));
+        assertEq(sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getMaxDebtLimit, (creditManager)));
 
         vm.expectCall(creditConfigurator, abi.encodeWithSelector(ICreditConfiguratorV3.setMaxDebtLimit.selector, 25));
 
@@ -514,30 +501,24 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
     function test_U_CT_05_setCreditManagerDebtLimit_works_correctly() public {
         (address creditManager, /* address creditFacade */,, address pool,) = _makeMocks();
 
-        // TODO: double check
-        // vm.mockCall(creditFacade, abi.encodeCall(ICreditFacadeV3.trackTotalDebt, ()), abi.encode(false));
-
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "CREDIT_MANAGER_DEBT_LIMIT"));
 
         vm.mockCall(
             pool, abi.encodeWithSelector(IPoolV3.creditManagerDebtLimit.selector, creditManager), abi.encode(1e18)
         );
 
+        uint256[] memory setValues = new uint256[](1);
+        setValues[0] = 2e18;
+
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
             delay: 1 days,
-            flags: 1,
-            exactValue: 2e18,
-            minValue: 0,
-            maxValue: 0,
-            referencePointUpdatePeriod: 0,
-            minPctChangeDown: 0,
-            minPctChangeUp: 0,
-            maxPctChangeDown: 0,
-            maxPctChangeUp: 0,
-            minChange: 0,
-            maxChange: 0
+            checkInterval: false,
+            checkSet: true,
+            intervalMinValue: 0,
+            intervalMaxValue: 0,
+            setValues: setValues
         });
 
         // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
@@ -618,21 +599,18 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
             abi.encode(uint16(5000), uint16(5000), type(uint40).max, uint24(0))
         );
 
+        uint256[] memory setValues = new uint256[](1);
+        setValues[0] = 6000;
+
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
             delay: 1 days,
-            flags: 1,
-            exactValue: 6000,
-            minValue: 0,
-            maxValue: 0,
-            referencePointUpdatePeriod: 0,
-            minPctChangeDown: 0,
-            minPctChangeUp: 0,
-            maxPctChangeDown: 0,
-            maxPctChangeUp: 0,
-            minChange: 0,
-            maxChange: 0
+            checkInterval: false,
+            checkSet: true,
+            intervalMinValue: 0,
+            intervalMaxValue: 0,
+            setValues: setValues
         });
 
         // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
@@ -741,21 +719,18 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         vm.mockCall(pool, abi.encodeWithSelector(IPoolV3.creditManagerBorrowed.selector, creditManager), abi.encode(0));
 
+        uint256[] memory setValues = new uint256[](1);
+        setValues[0] = block.timestamp + 5;
+
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
             delay: 1 days,
-            flags: 1,
-            exactValue: block.timestamp + 5,
-            minValue: 0,
-            maxValue: 0,
-            referencePointUpdatePeriod: 0,
-            minPctChangeDown: 0,
-            minPctChangeUp: 0,
-            maxPctChangeDown: 0,
-            maxPctChangeUp: 0,
-            minChange: 0,
-            maxChange: 0
+            checkInterval: false,
+            checkSet: true,
+            intervalMinValue: 0,
+            intervalMaxValue: 0,
+            setValues: setValues
         });
 
         vm.prank(CONFIGURATOR);
@@ -822,21 +797,18 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         uint40 expirationDate = uint40(block.timestamp + 2 days);
 
+        uint256[] memory setValues = new uint256[](1);
+        setValues[0] = expirationDate;
+
         Policy memory policy = Policy({
             enabled: false,
             admin: FRIEND,
-            flags: 1,
             delay: 2 days,
-            exactValue: expirationDate,
-            minValue: 0,
-            maxValue: 0,
-            referencePointUpdatePeriod: 0,
-            minPctChangeDown: 0,
-            minPctChangeUp: 0,
-            maxPctChangeDown: 0,
-            maxPctChangeUp: 0,
-            minChange: 0,
-            maxChange: 0
+            checkInterval: false,
+            checkSet: true,
+            intervalMinValue: 0,
+            intervalMaxValue: 0,
+            setValues: setValues
         });
 
         vm.prank(CONFIGURATOR);
@@ -910,21 +882,17 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         bytes32 POLICY_CODE = keccak256(abi.encode("CM", "FORBID_ADAPTER"));
 
+        uint256[] memory setValues = new uint256[](0);
+
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
             delay: 1 days,
-            flags: 0,
-            exactValue: 0,
-            minValue: 0,
-            maxValue: 0,
-            referencePointUpdatePeriod: 0,
-            minPctChangeDown: 0,
-            minPctChangeUp: 0,
-            maxPctChangeDown: 0,
-            maxPctChangeUp: 0,
-            minChange: 0,
-            maxChange: 0
+            checkInterval: false,
+            checkSet: false,
+            intervalMinValue: 0,
+            intervalMaxValue: 0,
+            setValues: setValues
         });
 
         // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
@@ -995,21 +963,18 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         bytes32 POLICY_CODE = keccak256(abi.encode("POOL", "TOKEN", "TOKEN_LIMIT"));
 
+        uint256[] memory setValues = new uint256[](1);
+        setValues[0] = 1e19;
+
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
             delay: 1 days,
-            flags: 1,
-            exactValue: 1e19,
-            minValue: 0,
-            maxValue: 0,
-            referencePointUpdatePeriod: 0,
-            minPctChangeDown: 0,
-            minPctChangeUp: 0,
-            maxPctChangeDown: 0,
-            maxPctChangeUp: 0,
-            minChange: 0,
-            maxChange: 0
+            checkInterval: false,
+            checkSet: true,
+            intervalMinValue: 0,
+            intervalMaxValue: 0,
+            setValues: setValues
         });
 
         // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
@@ -1084,21 +1049,18 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         bytes32 POLICY_CODE = keccak256(abi.encode("POOL", "TOKEN", "TOKEN_QUOTA_INCREASE_FEE"));
 
+        uint256[] memory setValues = new uint256[](1);
+        setValues[0] = 20;
+
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
             delay: 1 days,
-            flags: 1,
-            exactValue: 20,
-            minValue: 0,
-            maxValue: 0,
-            referencePointUpdatePeriod: 0,
-            minPctChangeDown: 0,
-            minPctChangeUp: 0,
-            maxPctChangeDown: 0,
-            maxPctChangeUp: 0,
-            minChange: 0,
-            maxChange: 0
+            checkInterval: false,
+            checkSet: true,
+            intervalMinValue: 0,
+            intervalMaxValue: 0,
+            setValues: setValues
         });
 
         // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
@@ -1168,21 +1130,18 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         bytes32 POLICY_CODE = keccak256(abi.encode("POOL", "TOTAL_DEBT_LIMIT"));
 
+        uint256[] memory setValues = new uint256[](1);
+        setValues[0] = 2e18;
+
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
             delay: 1 days,
-            flags: 1,
-            exactValue: 2e18,
-            minValue: 0,
-            maxValue: 0,
-            referencePointUpdatePeriod: 0,
-            minPctChangeDown: 0,
-            minPctChangeUp: 0,
-            maxPctChangeDown: 0,
-            maxPctChangeUp: 0,
-            minChange: 0,
-            maxChange: 0
+            checkInterval: false,
+            checkSet: true,
+            intervalMinValue: 0,
+            intervalMaxValue: 0,
+            setValues: setValues
         });
 
         // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
@@ -1241,21 +1200,18 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         bytes32 POLICY_CODE = keccak256(abi.encode("POOL", "WITHDRAW_FEE"));
 
+        uint256[] memory setValues = new uint256[](1);
+        setValues[0] = 20;
+
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
             delay: 1 days,
-            flags: 1,
-            exactValue: 20,
-            minValue: 0,
-            maxValue: 0,
-            referencePointUpdatePeriod: 0,
-            minPctChangeDown: 0,
-            minPctChangeUp: 0,
-            maxPctChangeDown: 0,
-            maxPctChangeUp: 0,
-            minChange: 0,
-            maxChange: 0
+            checkInterval: false,
+            checkSet: true,
+            intervalMinValue: 0,
+            intervalMaxValue: 0,
+            setValues: setValues
         });
 
         // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
@@ -1327,21 +1283,18 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         bytes32 POLICY_CODE = keccak256(abi.encode("POOL", "TOKEN", "TOKEN_QUOTA_MIN_RATE"));
 
+        uint256[] memory setValues = new uint256[](1);
+        setValues[0] = 15;
+
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
             delay: 1 days,
-            flags: 1,
-            exactValue: 15,
-            minValue: 0,
-            maxValue: 0,
-            referencePointUpdatePeriod: 0,
-            minPctChangeDown: 0,
-            minPctChangeUp: 0,
-            maxPctChangeDown: 0,
-            maxPctChangeUp: 0,
-            minChange: 0,
-            maxChange: 0
+            checkInterval: false,
+            checkSet: true,
+            intervalMinValue: 0,
+            intervalMaxValue: 0,
+            setValues: setValues
         });
 
         // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
@@ -1419,21 +1372,18 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         bytes32 POLICY_CODE = keccak256(abi.encode("POOL", "TOKEN", "TOKEN_QUOTA_MAX_RATE"));
 
+        uint256[] memory setValues = new uint256[](1);
+        setValues[0] = 25;
+
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
             delay: 1 days,
-            flags: 1,
-            exactValue: 25,
-            minValue: 0,
-            maxValue: 0,
-            referencePointUpdatePeriod: 0,
-            minPctChangeDown: 0,
-            minPctChangeUp: 0,
-            maxPctChangeDown: 0,
-            maxPctChangeUp: 0,
-            minChange: 0,
-            maxChange: 0
+            checkInterval: false,
+            checkSet: true,
+            intervalMinValue: 0,
+            intervalMaxValue: 0,
+            setValues: setValues
         });
 
         // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
@@ -1500,21 +1450,17 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         bytes32 POLICY_CODE = keccak256(abi.encode("PRICE_FEED", "UPDATE_BOUNDS_ALLOWED"));
 
+        uint256[] memory setValues = new uint256[](0);
+
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
             delay: 1 days,
-            flags: 0,
-            exactValue: 0,
-            minValue: 0,
-            maxValue: 0,
-            referencePointUpdatePeriod: 0,
-            minPctChangeDown: 0,
-            minPctChangeUp: 0,
-            maxPctChangeDown: 0,
-            maxPctChangeUp: 0,
-            minChange: 0,
-            maxChange: 0
+            checkInterval: false,
+            checkSet: false,
+            intervalMinValue: 0,
+            intervalMaxValue: 0,
+            setValues: setValues
         });
 
         // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
@@ -1558,65 +1504,92 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
         assertTrue(!queued, "Transaction is still queued after execution");
     }
 
-    /// @dev U:[CT-18]: references for different contracts under same policies are set separately
-    function test_U_CT_18_referencePoints_are_different_for_different_contracts() public {
-        (,,, address pool, address poolQuotaKeeper) = _makeMocks();
-
+    /// @dev U:[CT-18]: setPriceFeed works correctly
+    function test_U_CT_18_setPriceFeed_works_correctly() public {
         address token = makeAddr("TOKEN");
-        address token2 = makeAddr("TOKEN2");
+        address priceFeed = makeAddr("PRICE_FEED");
+        address priceOracle = makeAddr("PRICE_ORACLE");
+        vm.mockCall(priceOracle, abi.encodeCall(IPriceOracleV3.setPriceFeed, (token, priceFeed, 4500)), "");
+        vm.mockCall(
+            priceOracle,
+            abi.encodeCall(IPriceOracleV3.priceFeedParams, (token)),
+            abi.encode(PriceFeedParams(priceFeed, 3000, false, 18))
+        );
 
         vm.startPrank(CONFIGURATOR);
+        controllerTimelock.setGroup(priceOracle, "PRICE_ORACLE");
         controllerTimelock.setGroup(token, "TOKEN");
-        controllerTimelock.setGroup(token2, "TOKEN");
         vm.stopPrank();
 
-        vm.mockCall(
-            poolQuotaKeeper,
-            abi.encodeCall(IPoolQuotaKeeperV3.getTokenQuotaParams, (token)),
-            abi.encode(uint16(10), uint192(1e27), uint16(15), uint96(1e17), uint96(1e18), true)
-        );
+        bytes32 POLICY_CODE = keccak256(abi.encode("PRICE_ORACLE", "TOKEN", "PRICE_FEED"));
 
-        vm.mockCall(
-            poolQuotaKeeper,
-            abi.encodeCall(IPoolQuotaKeeperV3.getTokenQuotaParams, (token2)),
-            abi.encode(uint16(10), uint192(1e27), uint16(15), uint96(1e17), uint96(1e19), true)
-        );
-
-        bytes32 POLICY_CODE = keccak256(abi.encode("POOL", "TOKEN", "TOKEN_LIMIT"));
+        uint256 pfKeccak = uint256(keccak256(abi.encode(priceFeed, uint32(4500))));
+        uint256[] memory setValues = new uint256[](1);
+        setValues[0] = pfKeccak;
 
         Policy memory policy = Policy({
             enabled: false,
             admin: admin,
             delay: 1 days,
-            flags: 64,
-            exactValue: 0,
-            minValue: 0,
-            maxValue: 0,
-            referencePointUpdatePeriod: 0,
-            minPctChangeDown: 0,
-            minPctChangeUp: 0,
-            maxPctChangeDown: 0,
-            maxPctChangeUp: 10000,
-            minChange: 0,
-            maxChange: 0
+            checkInterval: false,
+            checkSet: true,
+            intervalMinValue: 0,
+            intervalMaxValue: 0,
+            setValues: setValues
         });
+
+        // VERIFY THAT THE FUNCTION CANNOT BE CALLED WITHOUT RESPECTIVE POLICY
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(admin);
+        controllerTimelock.setPriceFeed(priceOracle, token, priceFeed, 4500);
 
         vm.prank(CONFIGURATOR);
         controllerTimelock.setPolicy(POLICY_CODE, policy);
 
-        vm.prank(admin);
-        controllerTimelock.setTokenLimit(pool, token, 2e18);
+        // VERIFY THAT THE FUNCTION IS ONLY CALLABLE BY ADMIN
+        vm.expectRevert(ParameterChecksFailedException.selector);
+        vm.prank(USER);
+        controllerTimelock.setPriceFeed(priceOracle, token, priceFeed, 4500);
+
+        // VERIFY THAT THE FUNCTION IS QUEUED AND EXECUTED CORRECTLY
+        bytes32 txHash = keccak256(
+            abi.encode(admin, priceOracle, "setPriceFeed(address,address,uint32)", abi.encode(token, priceFeed, 4500))
+        );
+
+        vm.expectEmit(true, false, false, true);
+        emit QueueTransaction(
+            txHash,
+            admin,
+            priceOracle,
+            "setPriceFeed(address,address,uint32)",
+            abi.encode(token, priceFeed, 4500),
+            uint40(block.timestamp + 1 days)
+        );
 
         vm.prank(admin);
-        controllerTimelock.setTokenLimit(pool, token2, 2e19);
+        controllerTimelock.setPriceFeed(priceOracle, token, priceFeed, 4500);
 
-        ReferenceData memory rd = controllerTimelock.getReference(keccak256(abi.encode(pool, token, "TOKEN_LIMIT")));
+        (,,,,,, uint256 sanityCheckValue, bytes memory sanityCheckCallData) =
+            controllerTimelock.queuedTransactions(txHash);
 
-        assertEq(rd.referencePoint, 1e18, "Incorrect reference point for token 1");
+        assertEq(
+            sanityCheckValue, uint256(keccak256(abi.encode(priceFeed, 3000))), "Sanity check value written incorrectly"
+        );
 
-        rd = controllerTimelock.getReference(keccak256(abi.encode(pool, token2, "TOKEN_LIMIT")));
+        assertEq(
+            sanityCheckCallData, abi.encodeCall(ControllerTimelockV3.getCurrentPriceFeedHash, (priceOracle, token))
+        );
 
-        assertEq(rd.referencePoint, 1e19, "Incorrect reference point for token 2");
+        vm.expectCall(priceOracle, abi.encodeCall(IPriceOracleV3.setPriceFeed, (token, priceFeed, 4500)));
+
+        vm.warp(block.timestamp + 1 days);
+
+        vm.prank(admin);
+        controllerTimelock.executeTransaction(txHash);
+
+        (bool queued,,,,,,,) = controllerTimelock.queuedTransactions(txHash);
+
+        assertTrue(!queued, "Transaction is still queued after execution");
     }
 
     /// @dev U:[CT-19]: executor logic is correct
@@ -1644,31 +1617,28 @@ contract ControllerTimelockV3UnitTest is Test, IControllerTimelockV3Events {
 
         bytes32 POLICY_CODE = keccak256(abi.encode("POOL", "TOKEN", "TOKEN_LIMIT"));
 
+        uint256[] memory setValues = new uint256[](1);
+        setValues[0] = 2e18;
+
         Policy memory policy = Policy({
             enabled: false,
-            admin: admin,
+            admin: FRIEND,
             delay: 1 days,
-            flags: 64,
-            exactValue: 0,
-            minValue: 0,
-            maxValue: 0,
-            referencePointUpdatePeriod: 0,
-            minPctChangeDown: 0,
-            minPctChangeUp: 0,
-            maxPctChangeDown: 0,
-            maxPctChangeUp: 10000,
-            minChange: 0,
-            maxChange: 0
+            checkInterval: false,
+            checkSet: true,
+            intervalMinValue: 0,
+            intervalMaxValue: 0,
+            setValues: setValues
         });
 
         vm.prank(CONFIGURATOR);
         controllerTimelock.setPolicy(POLICY_CODE, policy);
 
-        vm.prank(admin);
+        vm.prank(FRIEND);
         controllerTimelock.setTokenLimit(pool, token, 2e18);
 
         bytes32 txHash = keccak256(
-            abi.encode(admin, poolQuotaKeeper, "setTokenLimit(address,uint96)", abi.encode(token, uint96(2e18)))
+            abi.encode(FRIEND, poolQuotaKeeper, "setTokenLimit(address,uint96)", abi.encode(token, uint96(2e18)))
         );
 
         vm.warp(block.timestamp + 1 days);
