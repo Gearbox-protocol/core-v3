@@ -29,9 +29,6 @@ contract CreditManagerMock {
     address public poolService;
     address public pool;
 
-    /// @dev Address of withdrawal manager
-    address public withdrawalManager;
-
     mapping(address => uint256) public tokenMasksMap;
     mapping(uint256 => address) public getTokenByMask;
 
@@ -48,7 +45,6 @@ contract CreditManagerMock {
     uint256 internal _enabledTokensMask;
 
     address nextCreditAccount;
-    uint256 cw_return_tokensToEnable;
 
     address activeCreditAccount;
     bool revertOnSetActiveAccount;
@@ -67,10 +63,6 @@ contract CreditManagerMock {
     uint256 return_loss;
 
     uint256 return_newDebt;
-    uint256 md_return_tokensToEnable;
-    uint256 md_return_tokensToDisable;
-
-    uint256 ad_tokenMask;
 
     int96 qu_change;
     uint256 qu_tokensToEnable;
@@ -247,37 +239,23 @@ contract CreditManagerMock {
         flags &= ~flag; // U:[CM-36]
     }
 
-    function setAddCollateral(uint256 tokenMask) external {
-        ad_tokenMask = tokenMask;
+    function addCollateral(address, address, address, uint256) external pure returns (uint256) {
+        return 0;
     }
 
-    function addCollateral(address, address, address, uint256) external view returns (uint256 tokenMask) {
-        tokenMask = ad_tokenMask;
-    }
-
-    function setManageDebt(uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable) external {
+    function setManageDebt(uint256 newDebt) external {
         return_newDebt = newDebt;
-        md_return_tokensToEnable = tokensToEnable;
-        md_return_tokensToDisable = tokensToDisable;
     }
 
     function manageDebt(address, uint256, uint256, ManageDebtAction)
         external
         view
-        returns (uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable)
+        returns (uint256, uint256, uint256)
     {
-        newDebt = return_newDebt;
-        tokensToEnable = md_return_tokensToEnable;
-        tokensToDisable = md_return_tokensToDisable;
+        return (return_newDebt, 0, 0);
     }
 
-    function setWithdrawCollateral(uint256 tokensToDisable) external {
-        sw_tokensToDisable = tokensToDisable;
+    function withdrawCollateral(address, address, uint256, address) external pure returns (uint256) {
+        return 0;
     }
-
-    function withdrawCollateral(address, address, uint256, address) external view returns (uint256 tokensToDisable) {
-        tokensToDisable = sw_tokensToDisable;
-    }
-
-    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external {}
 }

@@ -493,7 +493,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     // addCollateral
                     else if (method == ICreditFacadeV3Multicall.addCollateral.selector) {
                         _revertIfNoPermission(flags, ADD_COLLATERAL_PERMISSION); // U:[FA-21]
-                        _addCollateral(creditAccount, mcall.callData[4:]); // U:[FA-26]
+                        _addCollateral(creditAccount, mcall.callData[4:]); // U:[FA-26A]
                     }
                     // addCollateralWithPermit
                     else if (method == ICreditFacadeV3Multicall.addCollateralWithPermit.selector) {
@@ -651,11 +651,11 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
     /// @dev `ICreditFacadeV3Multicall.addCollateral` implementation
     function _addCollateral(address creditAccount, bytes calldata callData) internal {
-        (address token, uint256 amount) = abi.decode(callData, (address, uint256)); // U:[FA-26]
+        (address token, uint256 amount) = abi.decode(callData, (address, uint256)); // U:[FA-26A]
 
-        _addCollateral({payer: msg.sender, creditAccount: creditAccount, token: token, amount: amount}); // U:[FA-26]
+        _addCollateral({payer: msg.sender, creditAccount: creditAccount, token: token, amount: amount}); // U:[FA-26A]
 
-        emit AddCollateral(creditAccount, token, amount); // U:[FA-26]
+        emit AddCollateral(creditAccount, token, amount); // U:[FA-26A]
     }
 
     /// @dev `ICreditFacadeV3Multicall.addCollateralWithPermit` implementation
@@ -688,7 +688,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         (uint256 newDebt,,) =
             ICreditManagerV3(creditManager).manageDebt(creditAccount, amount, enabledTokensMask, action); // U:[FA-27,31]
 
-        _revertIfOutOfDebtLimits(newDebt); // U:[FA-28, 32, 33, 33A]
+        _revertIfOutOfDebtLimits(newDebt); // U:[FA-28, 32, 33]
 
         if (action == ManageDebtAction.INCREASE_DEBT) {
             emit IncreaseDebt({creditAccount: creditAccount, amount: amount}); // U:[FA-27]
@@ -709,7 +709,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         // Thus some gas is saved in this case by not querying token's mask.
         if (hasForbiddenTokens && quotaChange > 0) {
             if (_getTokenMaskOrRevert(token) & forbiddenTokenMask != 0) {
-                revert ForbiddenTokensException();
+                revert ForbiddenTokensException(); // U:[FA-35]
             }
         }
 
@@ -726,7 +726,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
     /// @dev `ICreditFacadeV3Multicall.withdrawCollateral` implementation
     function _withdrawCollateral(address creditAccount, bytes calldata callData) internal {
-        (address token, uint256 amount, address to) = abi.decode(callData, (address, uint256, address)); // U:[FA-35]
+        (address token, uint256 amount, address to) = abi.decode(callData, (address, uint256, address)); // U:[FA-36]
 
         if (amount == type(uint256).max) {
             amount = IERC20(token).balanceOf(creditAccount);
@@ -735,9 +735,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                 --amount;
             }
         }
-        ICreditManagerV3(creditManager).withdrawCollateral(creditAccount, token, amount, to); // U:[FA-35]
+        ICreditManagerV3(creditManager).withdrawCollateral(creditAccount, token, amount, to); // U:[FA-36]
 
-        emit WithdrawCollateral(creditAccount, token, amount, to); // U:[FA-35]
+        emit WithdrawCollateral(creditAccount, token, amount, to); // U:[FA-36]
     }
 
     // ------------- //
