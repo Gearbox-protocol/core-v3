@@ -74,11 +74,6 @@ struct CollateralTokenData {
     uint24 rampDuration;
 }
 
-struct RevocationPair {
-    address spender;
-    address token;
-}
-
 interface ICreditManagerV3Events {
     /// @notice Emitted when new credit configurator is set
     event SetCreditConfigurator(address indexed newConfigurator);
@@ -117,23 +112,21 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
 
     function manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)
         external
-        returns (uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable);
+        returns (uint256 newDebt, uint256, uint256);
 
     function addCollateral(address payer, address creditAccount, address token, uint256 amount)
         external
-        returns (uint256 tokensToEnable);
+        returns (uint256);
 
     function withdrawCollateral(address creditAccount, address token, uint256 amount, address to)
         external
-        returns (uint256 tokensToDisable);
+        returns (uint256);
 
     function externalCall(address creditAccount, address target, bytes calldata callData)
         external
         returns (bytes memory result);
 
     function approveToken(address creditAccount, address token, address spender, uint256 amount) external;
-
-    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations) external;
 
     // -------- //
     // ADAPTERS //
@@ -272,8 +265,6 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
         uint16 feeLiquidationExpired,
         uint16 liquidationDiscountExpired
     ) external;
-
-    function setQuotedMask(uint256 quotedTokensMask) external;
 
     function setMaxEnabledTokens(uint8 maxEnabledTokens) external;
 

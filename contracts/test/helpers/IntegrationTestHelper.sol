@@ -677,8 +677,5 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             vm.prank(CONFIGURATOR);
             creditConfigurator.addCollateralToken(token, clts[i].lt);
         }
-
-        vm.prank(address(creditConfigurator));
-        creditManager.setQuotedMask(type(uint256).max - 1);
     }
 }

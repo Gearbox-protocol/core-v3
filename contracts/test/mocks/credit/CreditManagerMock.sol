@@ -9,8 +9,7 @@ import {
     ICreditManagerV3,
     CollateralDebtData,
     CollateralCalcTask,
-    ManageDebtAction,
-    RevocationPair
+    ManageDebtAction
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 
