@@ -711,15 +711,13 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         address creditAccount = DUMB_ADDRESS;
         MultiCall[] memory calls;
 
-        uint256 enabledTokensMaskBefore = 123123123;
+        uint256 enabledTokensMask = 123123123;
 
         botListMock.setBotStatusReturns(ALL_PERMISSIONS, false);
 
-        creditManagerMock.setEnabledTokensMask(enabledTokensMaskBefore);
+        creditManagerMock.setEnabledTokensMask(enabledTokensMask);
         creditManagerMock.setBorrower(USER);
         creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, true);
-
-        uint256 enabledTokensMaskAfter = enabledTokensMaskBefore;
 
         for (uint256 testCase = 0; testCase < 2; ++testCase) {
             bool botMulticallCase = testCase == 1;
@@ -728,7 +726,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 address(creditManagerMock),
                 abi.encodeCall(
                     ICreditManagerV3.fullCollateralCheck,
-                    (creditAccount, enabledTokensMaskAfter, new uint256[](0), PERCENTAGE_FACTOR, false)
+                    (creditAccount, enabledTokensMask, new uint256[](0), PERCENTAGE_FACTOR, false)
                 )
             );
 
@@ -1405,7 +1403,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         });
 
         assertEq(
-            fullCheckParams.enabledTokensMaskAfter,
+            fullCheckParams.enabledTokensMask,
             maskToEnable | UNDERLYING_TOKEN_MASK,
             _testCaseErr("Incorrect enabledTokenMask")
         );
@@ -1431,7 +1429,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         int96 change = 990;
 
-        vm.expectRevert(ForbiddenTokensException.selector);
+        vm.expectRevert(ForbiddenTokenQuotaIncreasedException.selector);
         creditFacade.multicallInt({
             creditAccount: creditAccount,
             calls: MultiCallBuilder.build(
@@ -1441,7 +1439,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 })
             ),
             enabledTokensMask: linkMask,
-            flags: UPDATE_QUOTA_PERMISSION | FORBIDDEN_TOKENS_BEFORE_CALLS
+            flags: UPDATE_QUOTA_PERMISSION
         });
 
         creditFacade.multicallInt({
@@ -1453,7 +1451,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 })
             ),
             enabledTokensMask: linkMask,
-            flags: UPDATE_QUOTA_PERMISSION | FORBIDDEN_TOKENS_BEFORE_CALLS
+            flags: UPDATE_QUOTA_PERMISSION
         });
     }
 
@@ -1635,30 +1633,21 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         FullCheckParams memory params = FullCheckParams({
             collateralHints: collateralHints,
             minHealthFactor: 123,
-            enabledTokensMaskAfter: enabledTokensMaskBefore | linkMask,
+            enabledTokensMask: enabledTokensMaskBefore | linkMask,
             useSafePrices: true,
             revertOnForbiddenTokens: true
         });
 
         vm.expectRevert(ForbiddenTokensException.selector);
-        creditFacade.fullCollateralCheckInt(
-            creditAccount, enabledTokensMaskBefore, params, new BalanceWithMask[](0), forbiddenTokensMask
-        );
+        creditFacade.fullCollateralCheckInt(creditAccount, params, new BalanceWithMask[](0), forbiddenTokensMask);
 
         params.revertOnForbiddenTokens = false;
-        vm.expectRevert(ForbiddenTokenEnabledException.selector);
-        creditFacade.fullCollateralCheckInt(
-            creditAccount, enabledTokensMaskBefore, params, new BalanceWithMask[](0), forbiddenTokensMask
-        );
-
         enabledTokensMaskBefore |= linkMask;
 
         BalanceWithMask[] memory forbiddenBalances = new BalanceWithMask[](1);
         forbiddenBalances[0] = BalanceWithMask(link, linkMask, 900);
         vm.expectRevert(ForbiddenTokenBalanceIncreasedException.selector);
-        creditFacade.fullCollateralCheckInt(
-            creditAccount, enabledTokensMaskBefore, params, forbiddenBalances, forbiddenTokensMask
-        );
+        creditFacade.fullCollateralCheckInt(creditAccount, params, forbiddenBalances, forbiddenTokensMask);
 
         forbiddenBalances[0] = BalanceWithMask(link, linkMask, 1100);
         vm.expectCall(
@@ -1668,9 +1657,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 (creditAccount, enabledTokensMaskBefore, collateralHints, 123, true)
             )
         );
-        creditFacade.fullCollateralCheckInt(
-            creditAccount, enabledTokensMaskBefore, params, forbiddenBalances, forbiddenTokensMask
-        );
+        creditFacade.fullCollateralCheckInt(creditAccount, params, forbiddenBalances, forbiddenTokensMask);
     }
 
     /// @dev U:[FA-46]: isExpired works properly

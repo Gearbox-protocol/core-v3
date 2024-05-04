@@ -30,7 +30,6 @@ import {
 import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
 import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
 
-import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IDegenNFTV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFTV2.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
 import {IBotListV3} from "../interfaces/IBotListV3.sol";
@@ -202,22 +201,23 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         if (calls.length != 0) {
             // same as `_multicallFullCollateralCheck` but leverages the fact that account is freshly opened to save gas
             BalanceWithMask[] memory forbiddenBalances;
+            uint256 forbiddenTokensMask = forbiddenTokenMask;
 
             bool skipFirst = _applyOnDemandPriceUpdates(calls);
             FullCheckParams memory fullCheckParams = _multicall({
                 creditAccount: creditAccount,
                 calls: calls,
                 enabledTokensMask: 0,
+                forbiddenTokensMask: forbiddenTokensMask,
                 flags: OPEN_CREDIT_ACCOUNT_FLAGS,
                 skipFirst: skipFirst
             }); // U:[FA-10]
 
             _fullCollateralCheck({
                 creditAccount: creditAccount,
-                enabledTokensMaskBefore: 0,
                 fullCheckParams: fullCheckParams,
                 forbiddenBalances: forbiddenBalances,
-                forbiddenTokensMask: forbiddenTokenMask
+                forbiddenTokensMask: forbiddenTokensMask
             }); // U:[FA-10]
         }
     }
@@ -242,7 +242,14 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         wrapETH // U:[FA-7]
     {
         if (calls.length != 0) {
-            _multicall(creditAccount, calls, _enabledTokensMaskOf(creditAccount), CLOSE_CREDIT_ACCOUNT_FLAGS, false); // U:[FA-11]
+            _multicall({
+                creditAccount: creditAccount,
+                calls: calls,
+                enabledTokensMask: _enabledTokensMaskOf(creditAccount),
+                forbiddenTokensMask: forbiddenTokenMask,
+                flags: CLOSE_CREDIT_ACCOUNT_FLAGS,
+                skipFirst: false
+            }); // U:[FA-11]
         }
 
         if (_flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG != 0) {
@@ -300,9 +307,14 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             getTokenByMaskFn: _getTokenByMask
         });
 
-        _multicall(
-            creditAccount, calls, collateralDebtData.enabledTokensMask, LIQUIDATE_CREDIT_ACCOUNT_FLAGS, skipFirst
-        ); // U:[FA-16]
+        _multicall({
+            creditAccount: creditAccount,
+            calls: calls,
+            enabledTokensMask: collateralDebtData.enabledTokensMask,
+            forbiddenTokensMask: forbiddenTokenMask,
+            flags: LIQUIDATE_CREDIT_ACCOUNT_FLAGS,
+            skipFirst: skipFirst
+        }); // U:[FA-16]
 
         bool success = BalancesLogic.compareBalances({
             creditAccount: creditAccount,
@@ -417,25 +429,25 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @dev Batches price feed updates, multicall and collateral check into a single function
     function _multicallFullCollateralCheck(address creditAccount, MultiCall[] calldata calls, uint256 flags) internal {
         uint256 forbiddenTokensMask = forbiddenTokenMask;
-        uint256 enabledTokensMaskBefore = _enabledTokensMaskOf(creditAccount); // U:[FA-18]
+        uint256 enabledTokensMask = _enabledTokensMaskOf(creditAccount); // U:[FA-18]
         BalanceWithMask[] memory forbiddenBalances = BalancesLogic.storeBalances({
             creditAccount: creditAccount,
-            tokensMask: forbiddenTokensMask & enabledTokensMaskBefore,
+            tokensMask: forbiddenTokensMask & enabledTokensMask,
             getTokenByMaskFn: _getTokenByMask
         });
 
         bool skipFirst = _applyOnDemandPriceUpdates(calls);
-        FullCheckParams memory fullCheckParams = _multicall(
-            creditAccount,
-            calls,
-            enabledTokensMaskBefore,
-            forbiddenBalances.length != 0 ? flags.enable(FORBIDDEN_TOKENS_BEFORE_CALLS) : flags,
-            skipFirst
-        );
+        FullCheckParams memory fullCheckParams = _multicall({
+            creditAccount: creditAccount,
+            calls: calls,
+            enabledTokensMask: enabledTokensMask,
+            forbiddenTokensMask: forbiddenTokensMask,
+            flags: flags,
+            skipFirst: skipFirst
+        });
 
         _fullCollateralCheck({
             creditAccount: creditAccount,
-            enabledTokensMaskBefore: enabledTokensMaskBefore,
             fullCheckParams: fullCheckParams,
             forbiddenBalances: forbiddenBalances,
             forbiddenTokensMask: forbiddenTokensMask
@@ -447,9 +459,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param calls Array of `(target, callData)` tuples representing a sequence of calls to perform
     ///        - if `target` is this contract's address, `callData` must be an ABI-encoded calldata of a method
     ///          from `ICreditFacadeV3Multicall`, which is dispatched and handled appropriately
-    ///        - otherwise, `target` must be an allowed adapter, which is called with `callData`, and is expected to
-    ///          return two ABI-encoded `uint256` masks of tokens that should be enabled/disabled after the call
+    ///        - otherwise, `target` must be an allowed adapter, which is called with `callData`
     /// @param enabledTokensMask Bitmask of account's enabled collateral tokens before the multicall
+    /// @param forbiddenTokensMask Bitmask of forbidden tokens
     /// @param flags Permissions and flags that dictate what methods can be called
     /// @param skipFirst Whether to skip the first call with price feed updates that was handled earlier
     /// @return fullCheckParams Collateral check parameters, see `FullCheckParams` for details
@@ -457,6 +469,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         address creditAccount,
         MultiCall[] calldata calls,
         uint256 enabledTokensMask,
+        uint256 forbiddenTokensMask,
         uint256 flags,
         bool skipFirst
     ) internal returns (FullCheckParams memory fullCheckParams) {
@@ -505,7 +518,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         _revertIfNoPermission(flags, UPDATE_QUOTA_PERMISSION); // U:[FA-21]
 
                         (uint256 tokensToEnable, uint256 tokensToDisable) =
-                            _updateQuota(creditAccount, mcall.callData[4:], flags & FORBIDDEN_TOKENS_BEFORE_CALLS != 0); // U:[FA-34]
+                            _updateQuota(creditAccount, mcall.callData[4:], forbiddenTokensMask); // U:[FA-34]
                         enabledTokensMask = enabledTokensMask.enableDisable(tokensToEnable, tokensToDisable); // U:[FA-34]
                     }
                     // withdrawCollateral
@@ -584,7 +597,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             }
         }
 
-        if (enabledTokensMask & forbiddenTokenMask != 0) {
+        if (enabledTokensMask & forbiddenTokensMask != 0) {
             fullCheckParams.useSafePrices = true;
         }
 
@@ -592,7 +605,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             _unsetActiveCreditAccount(); // U:[FA-38]
         }
 
-        fullCheckParams.enabledTokensMaskAfter = enabledTokensMask.enable(UNDERLYING_TOKEN_MASK); // U:[FA-38]
+        fullCheckParams.enabledTokensMask = enabledTokensMask.enable(UNDERLYING_TOKEN_MASK); // U:[FA-38]
 
         emit FinishMultiCall(); // U:[FA-18]
     }
@@ -612,31 +625,24 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @dev Performs collateral check to ensure that
     ///      - account is sufficiently collateralized
     ///      - account has no forbidden tokens after risky operations
-    ///      - no forbidden tokens have been enabled during the multicall
     ///      - no enabled forbidden token balance has increased during the multicall
     function _fullCollateralCheck(
         address creditAccount,
-        uint256 enabledTokensMaskBefore,
         FullCheckParams memory fullCheckParams,
         BalanceWithMask[] memory forbiddenBalances,
         uint256 forbiddenTokensMask
     ) internal {
-        uint256 enabledTokensMask = ICreditManagerV3(creditManager).fullCollateralCheck(
+        ICreditManagerV3(creditManager).fullCollateralCheck(
             creditAccount,
-            fullCheckParams.enabledTokensMaskAfter,
+            fullCheckParams.enabledTokensMask,
             fullCheckParams.collateralHints,
             fullCheckParams.minHealthFactor,
             fullCheckParams.useSafePrices
         ); // U:[FA-45]
 
-        uint256 enabledForbiddenTokensMask = enabledTokensMask & forbiddenTokensMask;
+        uint256 enabledForbiddenTokensMask = fullCheckParams.enabledTokensMask & forbiddenTokensMask;
         if (enabledForbiddenTokensMask != 0) {
             if (fullCheckParams.revertOnForbiddenTokens) revert ForbiddenTokensException(); // U:[FA-45]
-
-            uint256 enabledForbiddenTokensMaskBefore = enabledTokensMaskBefore & forbiddenTokensMask;
-            if (enabledForbiddenTokensMask & ~enabledForbiddenTokensMaskBefore != 0) {
-                revert ForbiddenTokenEnabledException(); // U:[FA-45]
-            }
 
             bool success = BalancesLogic.compareBalances({
                 creditAccount: creditAccount,
@@ -698,19 +704,14 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     }
 
     /// @dev `ICreditFacadeV3Multicall.updateQuota` implementation
-    function _updateQuota(address creditAccount, bytes calldata callData, bool hasForbiddenTokens)
+    function _updateQuota(address creditAccount, bytes calldata callData, uint256 forbiddenTokensMask)
         internal
         returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
         (address token, int96 quotaChange, uint96 minQuota) = abi.decode(callData, (address, int96, uint96)); // U:[FA-34]
 
-        // Ensures that user is not trying to increase quota for a forbidden token. This happens implicitly when user
-        // has no enabled forbidden tokens because quota increase would try to enable the token, which is prohibited.
-        // Thus some gas is saved in this case by not querying token's mask.
-        if (hasForbiddenTokens && quotaChange > 0) {
-            if (_getTokenMaskOrRevert(token) & forbiddenTokenMask != 0) {
-                revert ForbiddenTokensException(); // U:[FA-35]
-            }
+        if (quotaChange > 0 && forbiddenTokensMask != 0 && _getTokenMaskOrRevert(token) & forbiddenTokensMask != 0) {
+            revert ForbiddenTokenQuotaIncreasedException(); // U:[FA-35]
         }
 
         (tokensToEnable, tokensToDisable) = ICreditManagerV3(creditManager).updateQuota({

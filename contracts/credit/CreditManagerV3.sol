@@ -547,11 +547,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param creditAccount Credit account to check
     /// @param enabledTokensMask Bitmask of account's enabled collateral tokens
     /// @param collateralHints Optional array of token masks to check first to reduce the amount of computation
-    ///        when known subset of account's collateral tokens covers all the debt
+    ///        when known subset of account's collateral tokens covers all the debt (underlying is always checked last)
     /// @param minHealthFactor Health factor threshold in bps, the check fails if `twvUSD < minHealthFactor * totalDebtUSD`
     /// @param useSafePrices Whether to use safe prices when evaluating collateral
-    /// @return enabledTokensMaskAfter Bitmask of account's enabled collateral tokens after potential cleanup
-    /// @dev Even when `collateralHints` are specified, quoted tokens are evaluated before non-quoted ones
+    /// @return enabledTokensMaskAfter Always 0, exists for backward compatibility
     /// @custom:expects Credit facade ensures that `creditAccount` is opened in this credit manager
     function fullCollateralCheck(
         address creditAccount,
@@ -564,7 +563,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         override
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
-        returns (uint256 enabledTokensMaskAfter)
+        returns (uint256)
     {
         CollateralDebtData memory cdd = _calcDebtAndCollateral({
             creditAccount: creditAccount,
@@ -579,8 +578,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             revert NotEnoughCollateralException(); // U:[CM-18B]
         }
 
-        enabledTokensMaskAfter = cdd.enabledTokensMask;
-        _saveEnabledTokensMask(creditAccount, enabledTokensMaskAfter); // U:[CM-18]
+        _saveEnabledTokensMask(creditAccount, cdd.enabledTokensMask); // U:[CM-18]
+        return 0;
     }
 
     /// @notice Whether `creditAccount`'s health factor is below `minHealthFactor`

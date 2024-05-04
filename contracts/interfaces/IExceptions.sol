@@ -187,8 +187,8 @@ error BalanceLessThanExpectedException();
 /// @notice Thrown when trying to perform an action that is forbidden when credit account has enabled forbidden tokens
 error ForbiddenTokensException();
 
-/// @notice Thrown when new forbidden tokens are enabled during the multicall
-error ForbiddenTokenEnabledException();
+/// @notice Thrown when forbidden token quota is increased during the multicall
+error ForbiddenTokenQuotaIncreasedException();
 
 /// @notice Thrown when enabled forbidden token balance is increased during the multicall
 error ForbiddenTokenBalanceIncreasedException();
