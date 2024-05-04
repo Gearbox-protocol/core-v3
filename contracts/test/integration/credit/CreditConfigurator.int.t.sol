@@ -39,44 +39,12 @@ import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
-import {MockCreditConfig, CollateralTokenHuman} from "../../config/MockCreditConfig.sol";
+import {CollateralTokenHuman} from "../../interfaces/ICreditConfig.sol";
 
 import "forge-std/console.sol";
 
 contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConfiguratorV3Events {
     using AddressList for address[];
-
-    // function setUp() public creditTest {
-    //     _setUp(false, false, false);
-    // }
-
-    // function _setUp(bool withDegenNFT, bool expirable, bool supportQuotas) public creditTest {
-    //     tokenTestSuite = new TokensTestSuite();
-    //     tokenTestSuite.topUpWETH{value: 100 * WAD}();
-
-    //     MockCreditConfig creditConfig = new MockCreditConfig(
-    //         tokenTestSuite,
-    //         Tokens.DAI
-    //     );
-
-    //     // cct = new CreditFacadeTestSuite(creditConfig,  withDegenNFT,  expirable,  supportQuotas, 1);
-
-    //     // underlying = cct.underlying();
-    //     // creditManager = cct.creditManager();
-    //     // creditFacade = cct.creditFacade();
-    //     // creditConfigurator = cct.creditConfigurator();
-    //     // withdrawalManager = cct.withdrawalManager();
-
-    //     address(targetMock) = address(new TargetContractMock());
-
-    //     adapterMock = new AdapterMock(address(creditManager), address(targetMock));
-
-    //     // adapterDifferentCM = new AdapterMock(
-    //     //     address(new CreditFacadeTestSuite(creditConfig, withDegenNFT,  expirable,  supportQuotas,1).creditManager()), address(targetMock)
-    //     // );
-
-    //     address(adapterMock) = address(adapterMock);
-    // }
 
     function getAdapterDifferentCM() internal returns (AdapterMock) {
         address CM = makeAddr("Different CM");
@@ -248,7 +216,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditFacade = new CreditFacadeV3(address(creditManager), creditOpts.degenNFT, creditOpts.expirable);
 
         address priceOracleAddress = address(creditManager.priceOracle());
-        address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
 
         bytes memory configuratorByteCode = abi.encodePacked(
             type(CreditConfiguratorV3).creationCode, abi.encode(creditManager, creditFacade, creditOpts)
@@ -332,9 +299,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.removeEmergencyLiquidator(address(0));
 
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.makeTokenQuoted(address(0));
-
         vm.stopPrank();
     }
 
@@ -372,8 +336,8 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     // TOKEN MANAGEMENT
     //
 
-    /// @dev I:[CC-3]: addCollateralToken reverts for zero address or in priceFeed
-    function test_I_CC_03_addCollateralToken_reverts_for_zero_address_or_in_priceFeed() public creditTest {
+    /// @dev I:[CC-3]: addCollateralToken reverts as expected
+    function test_I_CC_03_addCollateralToken_reverts_as_expected() public creditTest {
         vm.startPrank(CONFIGURATOR);
 
         vm.expectRevert(ZeroAddressException.selector);
@@ -390,6 +354,10 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.expectRevert(PriceFeedDoesNotExistException.selector);
         creditConfigurator.addCollateralToken(unknownPricefeedToken, 9300);
 
+        address nonQuotedToken = tokenTestSuite.addressOf(Tokens.wstETH);
+        vm.expectRevert(TokenIsNotQuotedException.selector);
+        creditConfigurator.addCollateralToken(nonQuotedToken, 9300);
+
         vm.stopPrank();
     }
 
@@ -398,6 +366,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         uint256 tokensCountBefore = creditManager.collateralTokensCount();
 
         address newToken = tokenTestSuite.addressOf(Tokens.wstETH);
+        makeTokenQuoted(newToken, 1, type(uint96).max);
 
         vm.expectEmit(true, false, false, false);
         emit AddCollateralToken(newToken);

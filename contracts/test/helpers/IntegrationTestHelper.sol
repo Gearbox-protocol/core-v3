@@ -93,9 +93,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     bool anyExpirable = true;
     bool expirable;
 
-    bool anySupportsQuotas = true;
-    bool supportsQuotas;
-
     bool anyAccountFactory = true;
     uint256 accountFactoryVersion = 1;
 
@@ -227,28 +224,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         }
     }
 
-    modifier attachAllV3CMTest() {
-        _attachCore();
-
-        address creditManagerAddr;
-        bool skipTest = false;
-
-        // address[] memory cms = cr.getCreditManagers();
-        // uint256 len = cms.length;
-        // unchecked {
-        //     for (uint256 i = 0; i < len; i++) {
-        //         address poolAddr = cr.poolByIndex(i);
-        //         if (!_attachPool(poolAddr)) {
-        //             console.log("Skipped");
-        //             skipTest = true;
-        //             break;
-        //         } else {}
-        //     }
-        // }
-
-        _;
-    }
-
     constructor() {
         new Roles();
         NetworkDetector nd = new NetworkDetector();
@@ -297,7 +272,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         botList = BotListV3(payable(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_10)));
     }
 
-    function _attachPool(address _pool) internal returns (bool isCompartible) {
+    function _attachPool(address _pool) internal returns (bool isCompatible) {
         pool = PoolV3(_pool);
 
         poolQuotaKeeper = PoolQuotaKeeperV3(pool.poolQuotaKeeper());
@@ -312,7 +287,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         return true;
     }
 
-    function _attachCreditManager(address _creditManager) internal returns (bool isCompartible) {
+    function _attachCreditManager(address _creditManager) internal returns (bool isCompatible) {
         creditManager = CreditManagerV3(_creditManager);
         creditFacade = CreditFacadeV3(creditManager.creditFacade());
         creditConfigurator = CreditConfiguratorV3(creditManager.creditConfigurator());
@@ -383,13 +358,15 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
         underlying = tokenTestSuite.addressOf(underlyingT);
 
-        supportsQuotas = anySupportsQuotas ? config.supportsQuotas() : supportsQuotas;
-
-        PoolFactory pf = new PoolFactory(address(addressProvider), config, underlying, supportsQuotas, tokenTestSuite);
+        PoolFactory pf = new PoolFactory(address(addressProvider), config, underlying, true, tokenTestSuite);
 
         pool = pf.pool();
         gauge = pf.gauge();
         poolQuotaKeeper = pf.poolQuotaKeeper();
+
+        vm.warp(block.timestamp + 7 days);
+        vm.prank(CONFIGURATOR);
+        gauge.updateEpoch();
 
         tokenTestSuite.mint(underlying, INITIAL_LP, initialBalance);
         tokenTestSuite.approve(underlying, INITIAL_LP, address(pool));
@@ -404,8 +381,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     }
 
     function _deployMockCreditAndPool() internal {
-        IPoolV3DeployConfig creditConfig = new MockCreditConfig(tokenTestSuite, underlyingT);
-
+        require(underlyingT == Tokens.DAI, "IntegrationTestHelper: Only DAI mock config is supported");
+        IPoolV3DeployConfig creditConfig = new MockCreditConfig();
         _deployCreditAndPool(creditConfig);
     }
 
@@ -481,10 +458,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 AccountFactoryV3(address(accountFactory)).addCreditManager(address(creditManager));
             }
 
-            if (supportsQuotas) {
-                vm.prank(CONFIGURATOR);
-                poolQuotaKeeper.addCreditManager(address(creditManager));
-            }
+            vm.prank(CONFIGURATOR);
+            poolQuotaKeeper.addCreditManager(address(creditManager));
 
             vm.prank(CONFIGURATOR);
             pool.setCreditManagerDebtLimit(address(creditManager), cmParams.poolLimit);
@@ -678,8 +653,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     }
 
     function makeTokenQuoted(address token, uint16 rate, uint96 limit) internal {
-        require(supportsQuotas, "Test suite does not support quotas");
-
         vm.startPrank(CONFIGURATOR);
         gauge.addQuotaToken(token, rate, rate);
         poolQuotaKeeper.setTokenLimit(token, limit);
@@ -689,8 +662,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
         // uint256 tokenMask = creditManager.getTokenMaskOrRevert(token);
         // uint256 limitedMask = creditManager.quotedTokensMask();
-
-        creditConfigurator.makeTokenQuoted(token);
 
         vm.stopPrank();
     }

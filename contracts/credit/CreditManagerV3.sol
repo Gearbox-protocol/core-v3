@@ -27,7 +27,6 @@ import {
     CollateralTokenData,
     ManageDebtAction,
     CreditAccountInfo,
-    RevocationPair,
     CollateralDebtData,
     CollateralCalcTask,
     DEFAULT_MAX_ENABLED_TOKENS,
@@ -53,7 +52,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     using BitMask for uint256;
     using Math for uint256;
     using CreditLogic for CollateralDebtData;
-    using CollateralLogic for CollateralDebtData;
     using SafeERC20 for IERC20;
     using CreditAccountHelper for ICreditAccountBase;
 
@@ -108,8 +106,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @dev Active credit account which is an account adapters can interfact with
     address internal _activeCreditAccount = INACTIVE_CREDIT_ACCOUNT_ADDRESS;
 
-    /// @notice Bitmask of quoted tokens
-    uint256 public override quotedTokensMask;
+    /// @notice Bitmask of quoted tokens, always `type(uint256).max - 1`, exists for backward compatibility
+    uint256 public constant override quotedTokensMask = ~UNDERLYING_TOKEN_MASK;
 
     /// @dev Mapping collateral token mask => data (packed address and LT parameters)
     mapping(uint256 => CollateralTokenData) internal collateralTokensData;
@@ -305,8 +303,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         currentCreditAccountInfo.debt = 0; // U:[CM-8]
         currentCreditAccountInfo.lastDebtUpdate = uint64(block.number); // U:[CM-8]
-        currentCreditAccountInfo.enabledTokensMask =
-            collateralDebtData.enabledTokensMask.disable(collateralDebtData.quotedTokensMask); // U:[CM-8]
+        currentCreditAccountInfo.enabledTokensMask = UNDERLYING_TOKEN_MASK; // U:[CM-8]
 
         // currentCreditAccountInfo.cumulativeQuotaInterest = 1;
         // currentCreditAccountInfo.quotaFees = 0;
@@ -322,17 +319,15 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param enabledTokensMask  Bitmask of account's enabled collateral tokens
     /// @param action Manage debt type, see `ManageDebtAction`
     /// @return newDebt Debt principal after update
-    /// @return tokensToEnable Tokens that should be enabled after the operation
-    ///         (underlying mask on increase, zero on decrease)
-    /// @return tokensToDisable Tokens that should be disabled after the operation
-    ///         (zero on increase, underlying mask on decrease if account has no underlying after repayment)
+    /// @return tokensToEnable Always 0, exists for backward compatibility
+    /// @return tokensToDisable Always 0, exists for backward compatibility
     /// @custom:expects Credit facade ensures that `creditAccount` is opened in this credit manager
     function manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)
         external
         override
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
-        returns (uint256 newDebt, uint256 tokensToEnable, uint256 tokensToDisable)
+        returns (uint256 newDebt, uint256, uint256)
     {
         CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
         if (currentCreditAccountInfo.lastDebtUpdate == block.number) {
@@ -362,7 +357,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             }); // U:[CM-10]
 
             _poolLendCreditAccount(amount, creditAccount); // U:[CM-10]
-            tokensToEnable = UNDERLYING_TOKEN_MASK; // U:[CM-12C]
         } else {
             uint256 maxRepayment = _amountWithFee(collateralDebtData.calcTotalDebt());
             if (amount >= maxRepayment) {
@@ -408,15 +402,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             _poolRepayCreditAccount(collateralDebtData.debt - newDebt, profit, 0); // U:[CM-11]
 
             currentCreditAccountInfo.cumulativeQuotaInterest = newCumulativeQuotaInterest + 1; // U:[CM-11]
-
-            if (IERC20(underlying).safeBalanceOf({account: creditAccount}) <= 1) {
-                tokensToDisable = UNDERLYING_TOKEN_MASK; // U:[CM-12C]
-            }
         }
 
         currentCreditAccountInfo.debt = newDebt; // U:[CM-10,11]
         currentCreditAccountInfo.lastDebtUpdate = uint64(block.number); // U:[CM-10,11]
         currentCreditAccountInfo.cumulativeIndexLastUpdate = newCumulativeIndex; // U:[CM-10,11]
+        return (newDebt, 0, 0);
     }
 
     /// @notice Adds `amount` of `payer`'s `token` as collateral to `creditAccount`
@@ -424,7 +415,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param creditAccount Account to add collateral to
     /// @param token Token to add as collateral
     /// @param amount Amount to add
-    /// @return tokensToEnable Mask of tokens that should be enabled after the operation (always `token` mask)
+    /// @return tokensToEnable Always 0, exists for backward compatibility
     /// @dev Requires approval for `token` from `payer` to this contract
     /// @dev Reverts if `token` is not recognized as collateral in the credit manager
     function addCollateral(address payer, address creditAccount, address token, uint256 amount)
@@ -432,10 +423,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         override
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
-        returns (uint256 tokensToEnable)
+        returns (uint256)
     {
-        tokensToEnable = getTokenMaskOrRevert({token: token}); // U:[CM-13]
+        getTokenMaskOrRevert({token: token}); // U:[CM-13]
         IERC20(token).safeTransferFrom({from: payer, to: creditAccount, amount: amount}); // U:[CM-13]
+        return 0;
     }
 
     /// @notice Withdraws `amount` of `token` collateral from `creditAccount` to `to`
@@ -443,23 +435,18 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param token Token to withdraw
     /// @param amount Amount to withdraw
     /// @param to Address to transfer token to
-    /// @return tokensToDisable Mask of tokens that should be disabled after the operation
-    ///         (`token` mask if withdrawing the entire balance, zero otherwise)
+    /// @return tokensToDisable Always 0, exists for backward compatibility
     /// @dev Reverts if `token` is not recognized as collateral in the credit manager
     function withdrawCollateral(address creditAccount, address token, uint256 amount, address to)
         external
         override
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
-        returns (uint256 tokensToDisable)
+        returns (uint256)
     {
-        uint256 tokenMask = getTokenMaskOrRevert({token: token}); // U:[CM-26]
-
+        getTokenMaskOrRevert({token: token}); // U:[CM-26]
         ICreditAccountBase(creditAccount).transfer({token: token, to: to, amount: amount}); // U:[CM-27]
-
-        if (IERC20(token).safeBalanceOf({account: creditAccount}) <= 1) {
-            tokensToDisable = tokenMask; // U:[CM-27]
-        }
+        return 0;
     }
 
     /// @notice Instructs `creditAccount` to make an external call to target with `callData`
@@ -482,30 +469,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacadeOnly // U:[CM-2]
     {
         _approveSpender({creditAccount: creditAccount, token: token, spender: spender, amount: amount});
-    }
-
-    /// @notice Revokes credit account's allowances for specified spender/token pairs
-    /// @param creditAccount Account to revoke allowances for
-    /// @param revocations Array of spender/token pairs
-    /// @dev Exists primarily to allow users to revoke allowances on accounts from old account factory on mainnet
-    /// @dev Reverts if any of provided tokens is not recognized as collateral in the credit manager
-    function revokeAdapterAllowances(address creditAccount, RevocationPair[] calldata revocations)
-        external
-        override
-        nonReentrant // U:[CM-5]
-        creditFacadeOnly // U:[CM-2]
-    {
-        uint256 numRevocations = revocations.length;
-        unchecked {
-            for (uint256 i; i < numRevocations; ++i) {
-                address spender = revocations[i].spender;
-                address token = revocations[i].token;
-                if (spender == address(0) || token == address(0)) {
-                    revert ZeroAddressException(); // U:[CM-15]
-                }
-                _approveSpender({creditAccount: creditAccount, token: token, spender: spender, amount: 0}); // U:[CM-15]
-            }
-        }
     }
 
     // -------- //
@@ -704,13 +667,14 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         cdd._poolQuotaKeeper = poolQuotaKeeper(); // U:[CM-21]
 
         uint256[] memory quotasPacked;
-        (cdd.quotedTokens, cdd.cumulativeQuotaInterest, quotasPacked, cdd.quotedTokensMask) = _getQuotedTokensData({
+        (cdd.quotedTokens, cdd.cumulativeQuotaInterest, quotasPacked) = _getQuotedTokensData({
             creditAccount: creditAccount,
             enabledTokensMask: enabledTokensMask,
             collateralHints: collateralHints,
             _poolQuotaKeeper: cdd._poolQuotaKeeper
         }); // U:[CM-21]
         cdd.cumulativeQuotaInterest += currentCreditAccountInfo.cumulativeQuotaInterest - 1; // U:[CM-21]
+        cdd.quotedTokensMask = quotedTokensMask; // U:[CM-21]
 
         cdd.accruedInterest = CreditLogic.calcAccruedInterest({
             amount: cdd.debt,
@@ -741,18 +705,16 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             ? cdd.totalDebtUSD * minHealthFactor / PERCENTAGE_FACTOR
             : type(uint256).max;
 
-        uint256 tokensToDisable;
-        (cdd.totalValueUSD, cdd.twvUSD, tokensToDisable) = cdd.calcCollateral({
+        (cdd.totalValueUSD, cdd.twvUSD) = CollateralLogic.calcCollateral({
             creditAccount: creditAccount,
             underlying: underlying,
+            ltUnderlying: ltUnderlying,
             twvUSDTarget: targetUSD,
-            collateralHints: collateralHints,
+            quotedTokens: cdd.quotedTokens,
             quotasPacked: quotasPacked,
             priceOracle: _priceOracle,
-            collateralTokenByMaskFn: _collateralTokenByMask,
             convertToUSDFn: useSafePrices ? _safeConvertToUSD : _convertToUSD
         }); // U:[CM-22]
-        cdd.enabledTokensMask = enabledTokensMask.disable(tokensToDisable); // U:[CM-22]
 
         if (task == CollateralCalcTask.FULL_COLLATERAL_CHECK_LAZY) {
             return cdd;
@@ -770,7 +732,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     ///         sorted according to `collateralHints` if specified
     /// @return outstandingQuotaInterest Account's quota interest that has not yet been accounted for
     /// @return quotasPacked Array of quotas packed with tokens' LTs
-    /// @return _quotedTokensMask The bitmask of all quoted tokens in the credit manager
     function _getQuotedTokensData(
         address creditAccount,
         uint256 enabledTokensMask,
@@ -779,18 +740,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     )
         internal
         view
-        returns (
-            address[] memory quotedTokens,
-            uint128 outstandingQuotaInterest,
-            uint256[] memory quotasPacked,
-            uint256 _quotedTokensMask
-        )
+        returns (address[] memory quotedTokens, uint128 outstandingQuotaInterest, uint256[] memory quotasPacked)
     {
-        _quotedTokensMask = quotedTokensMask; // U:[CM-24]
-
-        uint256 tokensToCheckMask = enabledTokensMask & _quotedTokensMask; // U:[CM-24]
+        uint256 tokensToCheckMask = enabledTokensMask.disable(UNDERLYING_TOKEN_MASK); // U:[CM-24]
         if (tokensToCheckMask == 0) {
-            return (quotedTokens, 0, quotasPacked, _quotedTokensMask);
+            return (quotedTokens, 0, quotasPacked);
         }
 
         uint256 tokensIdx;
@@ -1234,17 +1188,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             tokenData.timestampRampStart = timestampRampStart; // U:[CM-42]
             tokenData.rampDuration = rampDuration; // U:[CM-42]
         }
-    }
-
-    /// @notice Sets a new quoted token mask
-    /// @param _quotedTokensMask The new quoted tokens mask
-    /// @dev Excludes underlying token from the new mask
-    function setQuotedMask(uint256 _quotedTokensMask)
-        external
-        override
-        creditConfiguratorOnly // U:[CM-4]
-    {
-        quotedTokensMask = _quotedTokensMask.disable(UNDERLYING_TOKEN_MASK); // U:[CM-43]
     }
 
     /// @notice Sets a new max number of enabled tokens
