@@ -263,7 +263,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
     // VOTE AND UNVOTE WORKS CORRECTLY
     //
 
-    // @dev U:[GA-10]: vote and unvote reverts in token isn't added
+    /// @dev U:[GA-10]: vote and unvote reverts in token isn't added
     function test_U_GA_10_vote_and_unvote_reverts_in_token_isnt_added() public {
         vm.startPrank(address(gearStakingMock));
         vm.expectRevert(TokenNotAllowedException.selector);
@@ -275,7 +275,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         vm.stopPrank();
     }
 
-    // @dev U:[GA-11]: vote and unvote checks and updates epoch
+    /// @dev U:[GA-11]: vote and unvote checks and updates epoch
     function test_U_GA_11_vote_unvote_and_updates_epoch() public {
         address token = makeAddr("TOKEN");
 
@@ -304,7 +304,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         vm.stopPrank();
     }
 
-    // @dev U:[GA-12]: vote correctly updates votes
+    /// @dev U:[GA-12]: vote correctly updates votes
     function test_U_GA_12_vote_correctly_updates_votes(uint96 votes) public {
         vm.assume(votes < type(uint96).max - 200);
 
@@ -337,7 +337,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         assertEq(votesCaSide, (lpSide ? 0 : votes), "Incorrect userTokenVotes votesCaSide update");
     }
 
-    // @dev U:[GA-13]: unvote correctly updates votes
+    /// @dev U:[GA-13]: unvote correctly updates votes
     function test_U_GA_13_unvote_correctly_updates_votes(uint96 votes) public {
         address token = makeAddr("TOKEN");
 
@@ -386,7 +386,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         assertEq(votesCaSide, userCaVotes - (lpSide ? 0 : unvote), "Incorrect userTokenVotes votesCaSide update");
     }
 
-    // @dev U:[GA-14]: updateEpoch updates epoch
+    /// @dev U:[GA-14]: updateEpoch updates epoch
     function test_U_GA_14_updateEpoch_updates_epoch() public {
         vm.prank(CONFIGURATOR);
         gauge.setFrozenEpoch(false);
@@ -410,7 +410,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         }
     }
 
-    // @dev U:[GA-15]: updateEpoch updates epoch
+    /// @dev U:[GA-15]: updateEpoch updates epoch
     function test_U_GA_15_updateEpoch_updates_epoch() public {
         address link = makeAddr("LINK");
         address pepe = makeAddr("PEPE");
