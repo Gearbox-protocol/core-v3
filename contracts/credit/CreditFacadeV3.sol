@@ -209,8 +209,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                 calls: calls,
                 enabledTokensMask: 0,
                 forbiddenTokensMask: forbiddenTokensMask,
-                flags: OPEN_CREDIT_ACCOUNT_FLAGS,
-                skipFirst: skipFirst
+                flags: OPEN_CREDIT_ACCOUNT_FLAGS.enable(skipFirst ? SKIP_FIRST_CALL : 0)
             }); // U:[FA-10]
 
             _fullCollateralCheck({
@@ -247,8 +246,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                 calls: calls,
                 enabledTokensMask: _enabledTokensMaskOf(creditAccount),
                 forbiddenTokensMask: forbiddenTokenMask,
-                flags: CLOSE_CREDIT_ACCOUNT_FLAGS,
-                skipFirst: false
+                flags: CLOSE_CREDIT_ACCOUNT_FLAGS
             }); // U:[FA-11]
         }
 
@@ -312,8 +310,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             calls: calls,
             enabledTokensMask: collateralDebtData.enabledTokensMask,
             forbiddenTokensMask: forbiddenTokenMask,
-            flags: LIQUIDATE_CREDIT_ACCOUNT_FLAGS,
-            skipFirst: skipFirst
+            flags: LIQUIDATE_CREDIT_ACCOUNT_FLAGS.enable(skipFirst ? SKIP_FIRST_CALL : 0)
         }); // U:[FA-16]
 
         bool success = BalancesLogic.compareBalances({
@@ -396,32 +393,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         _multicallFullCollateralCheck(creditAccount, calls, botPermissions); // U:[FA-19, 20]
     }
 
-    /// @notice Sets `bot`'s permissions to manage `creditAccount`
-    /// @param creditAccount Account to set permissions for
-    /// @param bot Bot to set permissions for
-    /// @param permissions A bit mask encoding bot permissions
-    /// @dev Reverts if `creditAccount` is not opened in connected credit manager by caller
-    /// @dev Reverts if `permissions` has unexpected bits enabled or some bits required by `bot` disabled
-    /// @dev Reverts if account has more active bots than allowed after changing permissions
-    /// @dev Changes account's `BOT_PERMISSIONS_SET_FLAG` in the credit manager if needed
-    function setBotPermissions(address creditAccount, address bot, uint192 permissions)
-        external
-        override
-        creditAccountOwnerOnly(creditAccount) // U:[FA-5]
-        nonReentrant // U:[FA-4]
-    {
-        if (permissions & ~ALL_PERMISSIONS != 0) revert UnexpectedPermissionsException(); // U:[FA-41]
-
-        uint256 remainingBots =
-            IBotListV3(botList).setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: permissions}); // U:[FA-41]
-
-        if (remainingBots == 0) {
-            _setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: false}); // U:[FA-41]
-        } else if (_flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG == 0) {
-            _setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: true}); // U:[FA-41]
-        }
-    }
-
     // --------- //
     // MULTICALL //
     // --------- //
@@ -442,8 +413,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             calls: calls,
             enabledTokensMask: enabledTokensMask,
             forbiddenTokensMask: forbiddenTokensMask,
-            flags: flags,
-            skipFirst: skipFirst
+            flags: flags.enable(skipFirst ? SKIP_FIRST_CALL : 0)
         });
 
         _fullCollateralCheck({
@@ -463,15 +433,13 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param enabledTokensMask Bitmask of account's enabled collateral tokens before the multicall
     /// @param forbiddenTokensMask Bitmask of forbidden tokens
     /// @param flags Permissions and flags that dictate what methods can be called
-    /// @param skipFirst Whether to skip the first call with price feed updates that was handled earlier
     /// @return fullCheckParams Collateral check parameters, see `FullCheckParams` for details
     function _multicall(
         address creditAccount,
         MultiCall[] calldata calls,
         uint256 enabledTokensMask,
         uint256 forbiddenTokensMask,
-        uint256 flags,
-        bool skipFirst
+        uint256 flags
     ) internal returns (FullCheckParams memory fullCheckParams) {
         emit StartMultiCall({creditAccount: creditAccount, caller: msg.sender}); // U:[FA-18]
 
@@ -480,7 +448,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         unchecked {
             uint256 len = calls.length;
-            for (uint256 i = skipFirst ? 1 : 0; i < len; ++i) {
+            for (uint256 i = (flags & SKIP_FIRST_CALL != 0) ? 1 : 0; i < len; ++i) {
                 MultiCall calldata mcall = calls[i];
 
                 // credit facade calls
@@ -547,6 +515,11 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                         _manageDebt(
                             creditAccount, mcall.callData[4:], enabledTokensMask, ManageDebtAction.DECREASE_DEBT
                         ); // U:[FA-31]
+                    }
+                    // setBotPermissions
+                    else if (method == ICreditFacadeV3Multicall.setBotPermissions.selector) {
+                        _revertIfNoPermission(flags, SET_BOT_PERMISSIONS_PERMISSION); // U:[FA-21]
+                        _setBotPermissions(creditAccount, mcall.callData[4:]); // U:[FA-37]
                     }
                     // setFullCheckParams
                     else if (method == ICreditFacadeV3Multicall.setFullCheckParams.selector) {
@@ -739,6 +712,23 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         ICreditManagerV3(creditManager).withdrawCollateral(creditAccount, token, amount, to); // U:[FA-36]
 
         emit WithdrawCollateral(creditAccount, token, amount, to); // U:[FA-36]
+    }
+
+    /// @dev `ICreditFacadeV3Multicall.setBotPermissions` implementation
+    function _setBotPermissions(address creditAccount, bytes calldata callData) internal {
+        (address bot, uint192 permissions) = abi.decode(callData, (address, uint192));
+
+        uint192 allowedPermissions = ALL_PERMISSIONS & ~SET_BOT_PERMISSIONS_PERMISSION;
+        if (permissions & ~allowedPermissions != 0) revert UnexpectedPermissionsException(); // U:[FA-37]
+
+        uint256 remainingBots =
+            IBotListV3(botList).setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: permissions}); // U:[FA-37]
+
+        if (remainingBots == 0) {
+            _setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: false}); // U:[FA-37]
+        } else if (_flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG == 0) {
+            _setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: true}); // U:[FA-37]
+        }
     }
 
     // ------------- //

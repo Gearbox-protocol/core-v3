@@ -154,11 +154,15 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         address bot = address(new BotMock());
 
         vm.prank(USER);
-        creditFacade.setBotPermissions({
-            creditAccount: creditAccount,
-            bot: bot,
-            permissions: uint192(ADD_COLLATERAL_PERMISSION)
-        });
+        creditFacade.multicall(
+            creditAccount,
+            MultiCallBuilder.build(
+                MultiCall(
+                    address(creditFacade),
+                    abi.encodeCall(ICreditFacadeV3Multicall.setBotPermissions, (bot, ADD_COLLATERAL_PERMISSION))
+                )
+            )
+        );
 
         // LIST OF EXPECTED CALLS
 

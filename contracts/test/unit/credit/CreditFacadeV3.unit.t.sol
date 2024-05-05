@@ -238,9 +238,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditFacade.botMulticall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
-
-        vm.expectRevert("ReentrancyGuard: reentrant call");
-        creditFacade.setBotPermissions({creditAccount: DUMB_ADDRESS, bot: DUMB_ADDRESS, permissions: 0});
     }
 
     /// @dev U:[FA-5]: Account management functions revert if account does not exist
@@ -253,9 +250,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
         creditFacade.botMulticall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
-
-        vm.expectRevert(CreditAccountDoesNotExistException.selector);
-        creditFacade.setBotPermissions({creditAccount: DUMB_ADDRESS, bot: DUMB_ADDRESS, permissions: 0});
     }
 
     /// @dev U:[FA-6]: all configurator functions revert if called by non-configurator
@@ -773,7 +767,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
     struct MultiCallPermissionTestCase {
         bytes callData;
-        uint256 permissionRquired;
+        uint192 permissionRequired;
     }
 
     /// @dev U:[FA-21]: multicall reverts if called without particaular permission
@@ -796,52 +790,57 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         creditManagerMock.setBorrower(USER);
 
-        MultiCallPermissionTestCase[6] memory cases = [
+        MultiCallPermissionTestCase[7] memory cases = [
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (token, 0)),
-                permissionRquired: ADD_COLLATERAL_PERMISSION
+                permissionRequired: ADD_COLLATERAL_PERMISSION
             }),
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateralWithPermit, (token, 0, 0, 0, bytes32(0), bytes32(0))
                 ),
-                permissionRquired: ADD_COLLATERAL_PERMISSION
+                permissionRequired: ADD_COLLATERAL_PERMISSION
             }),
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (1)),
-                permissionRquired: INCREASE_DEBT_PERMISSION
+                permissionRequired: INCREASE_DEBT_PERMISSION
             }),
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (0)),
-                permissionRquired: DECREASE_DEBT_PERMISSION
+                permissionRequired: DECREASE_DEBT_PERMISSION
             }),
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (token, 0, 0)),
-                permissionRquired: UPDATE_QUOTA_PERMISSION
+                permissionRequired: UPDATE_QUOTA_PERMISSION
             }),
             MultiCallPermissionTestCase({
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (token, 0, USER)),
-                permissionRquired: WITHDRAW_COLLATERAL_PERMISSION
+                permissionRequired: WITHDRAW_COLLATERAL_PERMISSION
+            }),
+            MultiCallPermissionTestCase({
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.setBotPermissions, (address(0), 0)),
+                permissionRequired: SET_BOT_PERMISSIONS_PERMISSION
             })
         ];
 
         uint256 len = cases.length;
         for (uint256 i = 0; i < len; ++i) {
-            vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, cases[i].permissionRquired));
+            vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, cases[i].permissionRequired));
 
             creditFacade.multicallInt({
                 creditAccount: creditAccount,
                 calls: MultiCallBuilder.build(MultiCall({target: address(creditFacade), callData: cases[i].callData})),
                 enabledTokensMask: 0,
-                flags: type(uint256).max.disable(cases[i].permissionRquired)
+                flags: ALL_PERMISSIONS & ~cases[i].permissionRequired
             });
         }
 
-        uint256 flags = type(uint256).max.disable(EXTERNAL_CALLS_PERMISSION);
-
         vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, EXTERNAL_CALLS_PERMISSION));
         creditFacade.multicallInt(
-            creditAccount, MultiCallBuilder.build(MultiCall({target: DUMB_ADDRESS4, callData: bytes("")})), 0, flags
+            creditAccount,
+            MultiCallBuilder.build(MultiCall({target: DUMB_ADDRESS4, callData: bytes("")})),
+            0,
+            ALL_PERMISSIONS & ~EXTERNAL_CALLS_PERMISSION
         );
     }
 
@@ -1484,6 +1483,63 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         });
     }
 
+    /// @dev U:[FA-37]: multicall `setBotPermissions` works properly
+    function test_U_FA_37_setBotPermissions_warks_properly() public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+        address bot = makeAddr("BOT");
+
+        creditManagerMock.setBorrower(USER);
+
+        // It reverts if passed unexpected permissions, e.g. `SET_BOT_PERMISSIONS_PEMISSION`
+        vm.expectRevert(UnexpectedPermissionsException.selector);
+        vm.prank(USER);
+        creditFacade.multicall(
+            creditAccount,
+            MultiCallBuilder.build(
+                MultiCall(
+                    address(creditFacade),
+                    abi.encodeCall(ICreditFacadeV3Multicall.setBotPermissions, (bot, SET_BOT_PERMISSIONS_PERMISSION))
+                )
+            )
+        );
+
+        creditManagerMock.setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: false});
+
+        botListMock.setBotPermissionsReturn(1);
+
+        // It sets `BOT_PERMISSIONS_SET_FLAG` flag in the credit manager to `true` if it was `false` before
+        vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.flagsOf, (creditAccount)));
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(ICreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, true))
+        );
+        vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.setBotPermissions, (bot, creditAccount, 1)));
+
+        vm.prank(USER);
+        creditFacade.multicall(
+            creditAccount,
+            MultiCallBuilder.build(
+                MultiCall(address(creditFacade), abi.encodeCall(ICreditFacadeV3Multicall.setBotPermissions, (bot, 1)))
+            )
+        );
+
+        // It resets flag to `false` if there are no active bots left on the account
+        botListMock.setBotPermissionsReturn(0);
+        vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.setBotPermissions, (bot, creditAccount, 1)));
+
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(ICreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, false))
+        );
+        vm.prank(USER);
+        creditFacade.multicall(
+            creditAccount,
+            MultiCallBuilder.build(
+                MultiCall(address(creditFacade), abi.encodeCall(ICreditFacadeV3Multicall.setBotPermissions, (bot, 1)))
+            )
+        );
+    }
+
     /// @dev U:[FA-38]: multicall external calls works properly
     function test_U_FA_38_multicall_external_calls_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
@@ -1522,45 +1578,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.expectRevert(abi.encodeWithSelector(NoPermissionException.selector, permission));
 
         creditFacade.revertIfNoPermission(mask & ~(permission), permission);
-    }
-
-    /// @dev U:[FA-41]: setBotPermissions calls works properly
-    function test_U_FA_41_setBotPermissions_calls_properly() public notExpirableCase {
-        address creditAccount = DUMB_ADDRESS;
-        address bot = makeAddr("BOT");
-
-        creditManagerMock.setBorrower(USER);
-
-        /// It reverts if passed unexpected permissions
-        vm.expectRevert(UnexpectedPermissionsException.selector);
-        vm.prank(USER);
-        creditFacade.setBotPermissions({creditAccount: creditAccount, bot: bot, permissions: type(uint192).max});
-
-        creditManagerMock.setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: false});
-
-        botListMock.setBotPermissionsReturn(1);
-
-        /// It sets flag to true if it was false before
-        vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.flagsOf, (creditAccount)));
-        vm.expectCall(
-            address(creditManagerMock),
-            abi.encodeCall(ICreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, true))
-        );
-        vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.setBotPermissions, (bot, creditAccount, 1)));
-
-        vm.prank(USER);
-        creditFacade.setBotPermissions({creditAccount: creditAccount, bot: bot, permissions: 1});
-
-        /// It removes flag if no bots left
-        botListMock.setBotPermissionsReturn(0);
-        vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.setBotPermissions, (bot, creditAccount, 1)));
-
-        vm.expectCall(
-            address(creditManagerMock),
-            abi.encodeCall(ICreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, false))
-        );
-        vm.prank(USER);
-        creditFacade.setBotPermissions({creditAccount: creditAccount, bot: bot, permissions: 1});
     }
 
     /// @dev U:[FA-43]: revertIfOutOfBorrowingLimit works properly
