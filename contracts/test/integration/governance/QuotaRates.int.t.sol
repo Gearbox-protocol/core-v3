@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {Test} from "forge-std/Test.sol";
 
-import {RateKeeperV3, QuotaRate} from "../../../governance/RateKeeperV3.sol";
+import {RateKeeperV3, TokenRate} from "../../../governance/RateKeeperV3.sol";
 import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
 
 import {PoolMock} from "../../mocks/pool/PoolMock.sol";
@@ -34,15 +34,15 @@ contract QuotaRatesIntegrationTest is Test {
         quotaKeeper = new PoolQuotaKeeperV3(address(pool));
         pool.setPoolQuotaKeeper(address(quotaKeeper));
 
-        rateKeeper = new RateKeeperV3(address(pool));
+        rateKeeper = new RateKeeperV3(address(pool), 1 days);
         quotaKeeper.setGauge(address(rateKeeper));
     }
 
     /// @notice I:[QR-1]: `RateKeeperV3` allows to change rates in `PoolQuotaKeeperV3`
     function test_I_QR_01_rateKeeper_allows_to_change_rates_in_poolQuotaKeeper() public {
-        QuotaRate[] memory rates = new QuotaRate[](2);
-        rates[0] = QuotaRate(address(token1), 4200);
-        rates[1] = QuotaRate(address(token2), 12000);
+        TokenRate[] memory rates = new TokenRate[](2);
+        rates[0] = TokenRate(address(token1), 4200);
+        rates[1] = TokenRate(address(token2), 12000);
 
         address[] memory tokens = new address[](2);
         tokens[0] = address(token1);
@@ -51,7 +51,7 @@ contract QuotaRatesIntegrationTest is Test {
         vm.expectCall(address(quotaKeeper), abi.encodeCall(quotaKeeper.updateRates, ()));
         vm.expectCall(address(rateKeeper), abi.encodeCall(rateKeeper.getRates, (tokens)));
 
-        rateKeeper.setQuotaRates(rates);
+        rateKeeper.setRates(rates);
         assertEq(quotaKeeper.getQuotaRate(address(token1)), 4200, "Incorrect token1 rate");
         assertEq(quotaKeeper.getQuotaRate(address(token2)), 12000, "Incorrect token2 rate");
     }

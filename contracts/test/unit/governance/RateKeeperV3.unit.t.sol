@@ -12,7 +12,7 @@ import {
     TokenNotAllowedException,
     ZeroAddressException
 } from "../../../interfaces/IExceptions.sol";
-import {IRateKeeperV3Events, QuotaRate} from "../../../interfaces/IRateKeeperV3.sol";
+import {IRateKeeperV3Events, TokenRate} from "../../../interfaces/IRateKeeperV3.sol";
 
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 import {PoolMock} from "../../mocks/pool/PoolMock.sol";
@@ -37,9 +37,10 @@ contract RateKeeperV3UnitTest is Test, IRateKeeperV3Events {
         addressProvider = new AddressProviderV3ACLMock();
         pool = new PoolMock(address(addressProvider), underlying);
         poolQuotaKeeper = new PoolQuotaKeeperMock(address(pool), underlying);
+        poolQuotaKeeper.set_lastQuotaRateUpdate(uint40(block.timestamp));
         pool.setPoolQuotaKeeper(address(poolQuotaKeeper));
 
-        rateKeeper = new RateKeeperV3Harness(address(pool));
+        rateKeeper = new RateKeeperV3Harness(address(pool), 1 days);
     }
 
     /// @notice U:[RK-1]: Constructor works as expected
@@ -47,7 +48,8 @@ contract RateKeeperV3UnitTest is Test, IRateKeeperV3Events {
         assertEq(rateKeeper.pool(), address(pool), "Incorrect pool");
         assertEq(rateKeeper.underlying(), underlying, "Incorrect underlying");
         assertEq(rateKeeper.poolQuotaKeeper(), address(poolQuotaKeeper), "Incorrect poolQuotaKeeper");
-        assertEq(rateKeeper.getQuotedTokens().length, 0, "Non-empty quoted tokens set");
+        assertEq(rateKeeper.epochLength(), 1 days, "Incorrect epochLength");
+        assertEq(rateKeeper.getTokens().length, 0, "Non-empty quoted tokens set");
     }
 
     /// @notice U:[RK-2]: `_addToken` works as expected
@@ -66,13 +68,13 @@ contract RateKeeperV3UnitTest is Test, IRateKeeperV3Events {
         vm.expectCall(address(poolQuotaKeeper), abi.encodeCall(poolQuotaKeeper.addQuotaToken, (token1)));
 
         vm.expectEmit(true, true, true, true);
-        emit AddQuotedToken(token1);
+        emit AddToken(token1);
 
         rateKeeper.exposed_addToken(token1);
 
-        address[] memory quotedTokens = rateKeeper.getQuotedTokens();
-        assertEq(quotedTokens.length, 1, "Incorrect getQuotedTokens.length");
-        assertEq(quotedTokens[0], token1, "Incorrect getQuotedTokens[0]");
+        address[] memory quotedTokens = rateKeeper.getTokens();
+        assertEq(quotedTokens.length, 1, "Incorrect getTokens.length");
+        assertEq(quotedTokens[0], token1, "Incorrect getTokens[0]");
 
         // skips everything if token is already added
         vm.mockCallRevert(address(poolQuotaKeeper), abi.encodeCall(poolQuotaKeeper.isQuotedToken, (token1)), "");
@@ -85,14 +87,14 @@ contract RateKeeperV3UnitTest is Test, IRateKeeperV3Events {
         vm.mockCallRevert(address(poolQuotaKeeper), abi.encodeCall(poolQuotaKeeper.addQuotaToken, (token2)), "");
 
         vm.expectEmit(true, true, true, true);
-        emit AddQuotedToken(token2);
+        emit AddToken(token2);
 
         rateKeeper.exposed_addToken(token2);
 
-        quotedTokens = rateKeeper.getQuotedTokens();
-        assertEq(quotedTokens.length, 2, "Incorrect getQuotedTokens.length");
-        assertEq(quotedTokens[0], token1, "Incorrect getQuotedTokens[0]");
-        assertEq(quotedTokens[1], token2, "Incorrect getQuotedTokens[1]");
+        quotedTokens = rateKeeper.getTokens();
+        assertEq(quotedTokens.length, 2, "Incorrect getTokens.length");
+        assertEq(quotedTokens[0], token1, "Incorrect getTokens[0]");
+        assertEq(quotedTokens[1], token2, "Incorrect getTokens[1]");
     }
 
     /// @notice U:[RK-3]: `_setRate` works as expected
@@ -110,7 +112,7 @@ contract RateKeeperV3UnitTest is Test, IRateKeeperV3Events {
 
         // setRate properly sets rate
         vm.expectEmit(true, true, true, true);
-        emit SetQuotaRate(token1, 4200);
+        emit SetRate(token1, 4200);
 
         rateKeeper.exposed_setRate(token1, 4200);
 
@@ -120,32 +122,41 @@ contract RateKeeperV3UnitTest is Test, IRateKeeperV3Events {
         assertEq(rates[0], 4200, "Incorrect rates[0]");
     }
 
-    /// @notice U:[RK-4]: `setQuotaRates` works as expected
+    /// @notice U:[RK-4]: `setRates` works as expected
     function test_U_RK_04_setQuotaRates_works_as_expected() public {
         // reverts on unauthorized caller
         vm.expectRevert(CallerNotControllerException.selector);
         vm.prank(makeAddr("dude"));
-        rateKeeper.setQuotaRates(new QuotaRate[](0));
+        rateKeeper.setRates(new TokenRate[](0));
+
+        // skips update in quota keeper
+        vm.expectCall(address(poolQuotaKeeper), abi.encodeCall(poolQuotaKeeper.lastQuotaRateUpdate, ()));
+        vm.mockCallRevert(address(poolQuotaKeeper), abi.encodeCall(poolQuotaKeeper.updateRates, ()), "");
+
+        rateKeeper.setRates(new TokenRate[](0));
+
+        vm.clearMockedCalls();
+        vm.warp(block.timestamp + 1 days);
 
         // sets rates for all tokens and updates them in quota keeper
-        QuotaRate[] memory rates = new QuotaRate[](2);
-        rates[0] = QuotaRate(token1, 4200);
-        rates[1] = QuotaRate(token2, 12000);
+        TokenRate[] memory rates = new TokenRate[](2);
+        rates[0] = TokenRate(token1, 4200);
+        rates[1] = TokenRate(token2, 12000);
 
         vm.expectEmit(true, true, true, true);
-        emit AddQuotedToken(token1);
+        emit AddToken(token1);
 
         vm.expectEmit(true, true, true, true);
-        emit SetQuotaRate(token1, 4200);
+        emit SetRate(token1, 4200);
 
         vm.expectEmit(true, true, true, true);
-        emit AddQuotedToken(token2);
+        emit AddToken(token2);
 
         vm.expectEmit(true, true, true, true);
-        emit SetQuotaRate(token2, 12000);
+        emit SetRate(token2, 12000);
 
         vm.expectCall(address(poolQuotaKeeper), abi.encodeCall(poolQuotaKeeper.updateRates, ()));
 
-        rateKeeper.setQuotaRates(rates);
+        rateKeeper.setRates(rates);
     }
 }

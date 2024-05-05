@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 import {RateKeeperV3} from "../../../governance/RateKeeperV3.sol";
 
 contract RateKeeperV3Harness is RateKeeperV3 {
-    constructor(address pool_) RateKeeperV3(pool_) {}
+    constructor(address pool_, uint256 epochLength_) RateKeeperV3(pool_, epochLength_) {}
 
     function exposed_addToken(address token) external {
         _addToken(token);

@@ -129,6 +129,10 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
         return_isQuotedToken = value;
     }
 
+    function set_lastQuotaRateUpdate(uint40 value) external {
+        lastQuotaRateUpdate = value;
+    }
+
     /// @dev Returns quota parameters for a single (account, token) pair
     function getQuota(address, address) external view returns (uint96 quota, uint192 cumulativeIndexLU) {
         AccountQuota storage aq = accountQuota;
