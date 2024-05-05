@@ -24,9 +24,6 @@ uint256 constant ALL_PERMISSIONS = ADD_COLLATERAL_PERMISSION | WITHDRAW_COLLATER
 // FLAGS //
 // ----- //
 
-/// @dev Indicates that there are enabled forbidden tokens on the account before multicall
-uint256 constant FORBIDDEN_TOKENS_BEFORE_CALLS = 1 << 192;
-
 /// @dev Indicates that external calls from credit account to adapters were made during multicall,
 ///      set to true on the first call to the adapter
 uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 1 << 193;
@@ -95,7 +92,7 @@ interface ICreditFacadeV3Multicall {
     /// @param quotaChange Desired quota change in underlying token units (`type(int96).min` to disable quota)
     /// @param minQuota Minimum resulting account's quota for token required not to revert
     /// @dev Enables token as collateral if quota is increased from zero, disables if decreased to zero
-    /// @dev Quota increase is prohibited if there are forbidden tokens enabled as collateral on the account
+    /// @dev Quota increase is prohibited for forbidden tokens
     /// @dev Quota update is prohibited if account has zero debt
     /// @dev Resulting account's quota for token must not exceed the limit defined in the facade
     function updateQuota(address token, int96 quotaChange, uint96 minQuota) external;

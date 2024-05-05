@@ -1319,7 +1319,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             cumulativeIndexLastUpdate: RAY,
             cumulativeQuotaInterest: 1,
             quotaFees: 0,
-            enabledTokensMask: enabledTokensMask,
+            enabledTokensMask: 0,
             flags: 0,
             borrower: USER
         });
@@ -1351,7 +1351,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             creditManager.isLiquidatable(creditAccount, PERCENTAGE_FACTOR),
             "isLiquidatable is true for non-liquidatable account"
         );
-        uint256 enabledTokensMaskAfter = creditManager.fullCollateralCheck({
+        creditManager.fullCollateralCheck({
             creditAccount: creditAccount,
             enabledTokensMask: enabledTokensMask,
             collateralHints: new uint256[](0),
@@ -1359,9 +1359,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             useSafePrices: false
         });
 
-        assertEq(
-            creditManager.enabledTokensMaskOf(creditAccount), enabledTokensMaskAfter, "enabledTokensMask not updated"
-        );
+        assertEq(creditManager.enabledTokensMaskOf(creditAccount), enabledTokensMask, "enabledTokensMask not updated");
     }
 
     /// @dev U:[CM-18A]: fullCollateralCheck succeeds for zero debt

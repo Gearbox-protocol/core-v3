@@ -135,7 +135,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
         vm.prank(CONFIGURATOR);
         creditConfigurator.forbidToken(link);
 
-        vm.expectRevert(ForbiddenTokensException.selector);
+        vm.expectRevert(ForbiddenTokenQuotaIncreasedException.selector);
 
         vm.prank(USER);
         creditFacade.multicall(
