@@ -5,7 +5,6 @@ pragma solidity ^0.8.17;
 
 import {Test} from "forge-std/Test.sol";
 
-import {PoolV3} from "../../../pool/PoolV3.sol";
 import {GaugeV3} from "../../../governance/GaugeV3.sol";
 import {EPOCH_LENGTH, GearStakingV3, MultiVote, VotingContractStatus} from "../../../governance/GearStakingV3.sol";
 import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
