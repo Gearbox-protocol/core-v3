@@ -40,15 +40,6 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/C
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
-uint256 constant OPEN_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS & ~DECREASE_DEBT_PERMISSION;
-
-uint256 constant CLOSE_CREDIT_ACCOUNT_FLAGS = ALL_PERMISSIONS & ~INCREASE_DEBT_PERMISSION | SKIP_COLLATERAL_CHECK;
-
-uint256 constant LIQUIDATE_CREDIT_ACCOUNT_FLAGS =
-    EXTERNAL_CALLS_PERMISSION | ADD_COLLATERAL_PERMISSION | WITHDRAW_COLLATERAL_PERMISSION | SKIP_COLLATERAL_CHECK;
-
-uint256 constant MULTICALL_FLAGS = ALL_PERMISSIONS;
-
 /// @title Credit facade V3
 /// @notice Provides a user interface to open, close and liquidate leveraged positions in the credit manager,
 ///         and implements the main entry-point for credit accounts management: multicall.
@@ -65,7 +56,6 @@ uint256 constant MULTICALL_FLAGS = ALL_PERMISSIONS;
 ///         activates a safer version of collateral check).
 contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     using Address for address;
-    using Address for address payable;
     using BitMask for uint256;
     using SafeCast for uint256;
     using SafeERC20 for IERC20;
@@ -78,6 +68,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
     /// @notice Credit manager connected to this credit facade
     address public immutable override creditManager;
+
+    /// @notice Credit manager's underlying token
+    address public immutable override underlying;
 
     /// @notice Whether credit facade is expirable
     bool public immutable override expirable;
@@ -153,6 +146,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         ACLNonReentrantTrait(ICreditManagerV3(_creditManager).addressProvider())
     {
         creditManager = _creditManager; // U:[FA-1]
+        underlying = ICreditManagerV3(_creditManager).underlying(); // U:[FA-1]
 
         address addressProvider = ICreditManagerV3(_creditManager).addressProvider();
         weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // U:[FA-1]
@@ -205,7 +199,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                 creditAccount: creditAccount,
                 calls: calls,
                 enabledTokensMask: 0,
-                flags: OPEN_CREDIT_ACCOUNT_FLAGS
+                flags: OPEN_CREDIT_ACCOUNT_PERMISSIONS
             }); // U:[FA-10]
         }
     }
@@ -230,7 +224,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         wrapETH // U:[FA-7]
     {
         if (calls.length != 0) {
-            _multicall(creditAccount, calls, _enabledTokensMaskOf(creditAccount), CLOSE_CREDIT_ACCOUNT_FLAGS); // U:[FA-11]
+            _multicall({
+                creditAccount: creditAccount,
+                calls: calls,
+                enabledTokensMask: _enabledTokensMaskOf(creditAccount),
+                flags: CLOSE_CREDIT_ACCOUNT_PERMISSIONS | SKIP_COLLATERAL_CHECK
+            }); // U:[FA-11]
         }
 
         if (_flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG != 0) {
@@ -272,7 +271,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         whenNotPausedOrEmergency // U:[FA-2,12]
         nonReentrant // U:[FA-4]
     {
-        uint256 flags = LIQUIDATE_CREDIT_ACCOUNT_FLAGS;
+        uint256 flags = LIQUIDATE_CREDIT_ACCOUNT_PERMISSIONS | SKIP_COLLATERAL_CHECK;
         if (
             calls.length != 0 && calls[0].target == address(this)
                 && bytes4(calls[0].callData) == ICreditFacadeV3Multicall.onDemandPriceUpdates.selector
@@ -347,7 +346,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         nonReentrant // U:[FA-4]
         wrapETH // U:[FA-7]
     {
-        _multicall(creditAccount, calls, _enabledTokensMaskOf(creditAccount), MULTICALL_FLAGS); // U:[FA-18]
+        _multicall(creditAccount, calls, _enabledTokensMaskOf(creditAccount), ALL_PERMISSIONS); // U:[FA-18]
     }
 
     /// @notice Executes a batch of calls allowing bot to manage a credit account

@@ -71,8 +71,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     CreditFacadeV3Harness creditFacade;
     CreditManagerMock creditManagerMock;
     PriceOracleMock priceOracleMock;
-    PoolMock poolMock;
-
     BotListMock botListMock;
 
     DegenNFTMock degenNFTMock;
@@ -136,7 +134,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         AddressProviderV3ACLMock(address(addressProvider)).addPausableAdmin(CONFIGURATOR);
 
-        poolMock = new PoolMock(address(addressProvider), tokenTestSuite.addressOf(Tokens.DAI));
+        PoolMock poolMock = new PoolMock(address(addressProvider), tokenTestSuite.addressOf(Tokens.DAI));
 
         creditManagerMock =
             new CreditManagerMock({_addressProvider: address(addressProvider), _pool: address(poolMock)});
@@ -162,7 +160,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     }
 
     function _deploy() internal {
-        poolMock.setVersion(3_00);
         creditFacade = new CreditFacadeV3Harness(address(creditManagerMock), address(degenNFTMock), expirable);
 
         creditManagerMock.setCreditFacade(address(creditFacade));
@@ -170,7 +167,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
     /// @dev U:[FA-1]: constructor sets correct values
     function test_U_FA_01_constructor_sets_correct_values() public allDegenNftCases allExpirableCases {
-        assertEq(address(creditFacade.creditManager()), address(creditManagerMock), "Incorrect creditManager");
+        assertEq(creditFacade.creditManager(), address(creditManagerMock), "Incorrect creditManager");
+        assertEq(creditFacade.underlying(), tokenTestSuite.addressOf(Tokens.DAI), "Incorrect underlying");
 
         assertEq(creditFacade.weth(), tokenTestSuite.addressOf(Tokens.WETH), "Incorrect weth token");
 

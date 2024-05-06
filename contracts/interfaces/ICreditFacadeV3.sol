@@ -74,6 +74,8 @@ interface ICreditFacadeV3Events {
 interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
     function creditManager() external view returns (address);
 
+    function underlying() external view returns (address);
+
     function degenNFT() external view returns (address);
 
     function weth() external view returns (address);
