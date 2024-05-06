@@ -23,22 +23,8 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
 
     function multicallInt(address creditAccount, MultiCall[] calldata calls, uint256 enabledTokensMask, uint256 flags)
         external
-        returns (FullCheckParams memory fullCheckParams)
     {
-        return _multicall(creditAccount, calls, enabledTokensMask, forbiddenTokenMask, flags);
-    }
-
-    function applyOnDemandPriceUpdatesInt(MultiCall[] calldata calls) external returns (bool) {
-        return _applyOnDemandPriceUpdates(calls);
-    }
-
-    function fullCollateralCheckInt(
-        address creditAccount,
-        FullCheckParams memory fullCheckParams,
-        BalanceWithMask[] memory forbiddenBalances,
-        uint256 forbiddenTokensMask
-    ) external {
-        _fullCollateralCheck(creditAccount, fullCheckParams, forbiddenBalances, forbiddenTokensMask);
+        _multicall(creditAccount, calls, enabledTokensMask, flags);
     }
 
     function revertIfNoPermission(uint256 flags, uint256 permission) external pure {

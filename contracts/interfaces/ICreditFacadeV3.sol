@@ -29,15 +29,9 @@ struct CumulativeLossParams {
 /// @param collateralHints Optional array of token masks to check first to reduce the amount of computation
 ///        when known subset of account's collateral tokens covers all the debt
 /// @param minHealthFactor Min account's health factor in bps in order not to revert
-/// @param enabledTokensMask Bitmask of account's enabled collateral tokens after the multicall
-/// @param revertOnForbiddenTokens Whether to revert on enabled forbidden tokens after the multicall
-/// @param useSafePrices Whether to use safe pricing (min of main and reserve feeds) when evaluating collateral
 struct FullCheckParams {
     uint256[] collateralHints;
     uint16 minHealthFactor;
-    uint256 enabledTokensMask;
-    bool revertOnForbiddenTokens;
-    bool useSafePrices;
 }
 
 interface ICreditFacadeV3Events {

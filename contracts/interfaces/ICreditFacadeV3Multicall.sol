@@ -27,13 +27,24 @@ uint192 constant ALL_PERMISSIONS = ADD_COLLATERAL_PERMISSION | WITHDRAW_COLLATER
 // FLAGS //
 // ----- //
 
-/// @dev Indicates that the first call of the multicall should be skipped since it is
-///      an `onDemandPriceUpdates` call handler earlier
-uint256 constant SKIP_FIRST_CALL = 1 << 192;
+/// @dev Indicates that collateral check after the multicall can be skipped, set to true on account closure or liquidation
+uint256 constant SKIP_COLLATERAL_CHECK = 1 << 192;
 
 /// @dev Indicates that external calls from credit account to adapters were made during multicall,
 ///      set to true on the first call to the adapter
 uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 1 << 193;
+
+/// @dev Indicates that the price updates call should be skipped, set to true on liquidation when the first call
+///      of the multicall is `onDemandPriceUpdates`
+uint256 constant SKIP_PRICE_UPDATES_CALL = 1 << 194;
+
+/// @dev Indicates that collateral check must revert if any forbidden token is encountered on the account,
+///      set to true after risky operations, such as `increaseDebt` or `withdrawCollateral`
+uint256 constant REVERT_ON_FORBIDDEN_TOKENS = 1 << 195;
+
+/// @dev Indicates that collateral check must be performed using safe prices, set to true on `withdrawCollateral`
+///      or if account has enabled forbidden tokens
+uint256 constant USE_SAFE_PRICES = 1 << 196;
 
 /// @title Credit facade V3 multicall interface
 /// @dev Unless specified otherwise, all these methods are only available in `openCreditAccount`,
@@ -118,7 +129,7 @@ interface ICreditFacadeV3Multicall {
     ///        when known subset of account's collateral tokens covers all the debt. Underlying token is always
     ///        checked last so it's forbidden to pass its mask.
     /// @param minHealthFactor Min account's health factor in bps in order not to revert, must be at least 10000
-    /// @dev This method is available in all kinds of multicalls
+    /// @dev This method can't be called during closure or liquidation
     function setFullCheckParams(uint256[] calldata collateralHints, uint16 minHealthFactor) external;
 
     /// @notice Sets `bot`'s permissions to manage account to `permissions`
