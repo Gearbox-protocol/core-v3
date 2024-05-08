@@ -99,7 +99,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT / 2)
-                    )
+                )
             })
         );
 
@@ -234,7 +234,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.withdrawCollateral, (daiToken, type(uint256).max, USER)
-                        )
+                    )
                 })
             )
         );
