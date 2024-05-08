@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
@@ -49,9 +49,6 @@ interface ICreditConfiguratorV3Events {
 
     /// @notice Emitted when a previously forbidden collateral token is allowed
     event AllowToken(address indexed token);
-
-    /// @notice Emitted when a token is made quoted
-    event QuoteToken(address indexed token);
 
     // -------- //
     // ADAPTERS //
@@ -149,8 +146,6 @@ interface ICreditConfiguratorV3 is IVersion, ICreditConfiguratorV3Events {
     function forbidToken(address token) external;
 
     function allowToken(address token) external;
-
-    function makeTokenQuoted(address token) external;
 
     // -------- //
     // ADAPTERS //

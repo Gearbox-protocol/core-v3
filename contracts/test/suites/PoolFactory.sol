@@ -55,13 +55,13 @@ contract PoolFactory is Test {
         // string memory namePrefix_,
         // string memory symbolPrefix_
         pool = new PoolV3({
-           addressProvider_: addressProvider,
-           underlyingToken_: underlying,
-           interestRateModel_: address(irm),
-           totalDebtLimit_: type(uint256).max,
-           name_: config.name(),
-           symbol_: config.symbol()
-     } );
+            addressProvider_: addressProvider,
+            underlyingToken_: underlying,
+            interestRateModel_: address(irm),
+            totalDebtLimit_: type(uint256).max,
+            name_: config.name(),
+            symbol_: config.symbol()
+        });
 
         if (supportQuotas) {
             address gearStaking = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_GEAR_STAKING, 3_00);

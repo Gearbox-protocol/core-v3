@@ -19,11 +19,7 @@ contract CreditManagerFactory {
 
     constructor(address _ap, address _pool, CreditManagerOpts memory opts, bytes32 salt) {
         creditManager = new CreditManagerV3(_ap, _pool, opts.name);
-        creditFacade = new CreditFacadeV3(
-            address(creditManager),
-            opts.degenNFT,
-            opts.expirable
-        );
+        creditFacade = new CreditFacadeV3(address(creditManager), opts.degenNFT, opts.expirable);
 
         bytes memory configuratorByteCode =
             abi.encodePacked(type(CreditConfiguratorV3).creationCode, abi.encode(creditManager, creditFacade, opts));

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
 import "../../../interfaces/IAddressProviderV3.sol";
@@ -39,7 +39,7 @@ import "../../../interfaces/IExceptions.sol";
 // MOCKS
 import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
 import {PriceFeedMock} from "../../mocks/oracles/PriceFeedMock.sol";
-import {GeneralMock} from "../../mocks/GeneralMock.sol";
+import {BotMock} from "../../mocks/core/BotMock.sol";
 
 // SUITES
 
@@ -111,15 +111,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         // debt not repaid at all
         vm.expectRevert(CloseAccountWithNonZeroDebtException.selector);
         vm.prank(USER);
-        creditFacade.closeCreditAccount(
-            creditAccount,
-            MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.disableToken, (underlying))
-                })
-            )
-        );
+        creditFacade.closeCreditAccount(creditAccount, MultiCallBuilder.build());
 
         // debt partially repaid
         vm.expectRevert(CloseAccountWithNonZeroDebtException.selector);
@@ -130,10 +122,6 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (DAI_ACCOUNT_AMOUNT / 2))
-                }),
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.disableToken, (underlying))
                 })
             )
         );
@@ -163,7 +151,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
             MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
         );
 
-        address bot = address(new GeneralMock());
+        address bot = address(new BotMock());
 
         vm.prank(USER);
         creditFacade.setBotPermissions({
@@ -193,9 +181,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         vm.expectEmit(false, false, false, true);
         emit FinishMultiCall();
 
-        vm.expectCall(
-            address(botList), abi.encodeCall(BotListV3.eraseAllBotPermissions, (address(creditManager), creditAccount))
-        );
+        vm.expectCall(address(botList), abi.encodeCall(BotListV3.eraseAllBotPermissions, (creditAccount)));
 
         vm.expectEmit(true, true, false, false);
         emit CloseCreditAccount(creditAccount, USER);

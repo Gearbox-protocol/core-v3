@@ -7,7 +7,7 @@ import {ICreditFacadeV3Multicall} from "../../../interfaces/ICreditFacadeV3.sol"
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // DATA
-import {MultiCall, MultiCallOps} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
+import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 
 // TESTS
 import "../../lib/constants.sol";
@@ -148,23 +148,9 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
 
     /// @dev G:[FA-5]: openCreditAccount with adding quoted collateral and updating quota
     function test_G_FA_05_openCreditAccountMulticall_gas_estimate_4() public creditTest {
-        vm.startPrank(CONFIGURATOR);
-        gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
-        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-        creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
-
-        gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.USDC), 500, 500);
-        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.USDC), type(uint96).max);
-        creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.USDC));
-
-        gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.WETH), 500, 500);
-        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.WETH), type(uint96).max);
-        creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.WETH));
-
         vm.warp(block.timestamp + 7 days);
+        vm.prank(CONFIGURATOR);
         gauge.updateEpoch();
-
-        vm.stopPrank();
 
         tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
         tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
@@ -216,13 +202,9 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
 
     /// @dev G:[FA-6]: openCreditAccount with swapping and updating quota
     function test_G_FA_06_openCreditAccountMulticall_gas_estimate_5() public withAdapterMock creditTest {
-        vm.startPrank(CONFIGURATOR);
-        gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
-        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
         vm.warp(block.timestamp + 7 days);
+        vm.prank(CONFIGURATOR);
         gauge.updateEpoch();
-        creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
-        vm.stopPrank();
 
         tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
         tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
@@ -349,14 +331,9 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
 
     /// @dev G:[FA-9]: multicall with decreaseDebt and active quota interest
     function test_G_FA_09_decreaseDebt_gas_estimate_2() public creditTest {
-        vm.startPrank(CONFIGURATOR);
-        gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
-        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-        creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
-
         vm.warp(block.timestamp + 7 days);
+        vm.prank(CONFIGURATOR);
         gauge.updateEpoch();
-        vm.stopPrank();
 
         tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
         tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));
@@ -409,86 +386,6 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         uint256 gasSpent = gasBefore - gasleft();
 
         emit log_string(string(abi.encodePacked("Gas spent - multicall with decreaseDebt with quoted tokens: ")));
-        emit log_uint(gasSpent);
-    }
-
-    /// @dev G:[FA-10]: multicall with enableToken
-    function test_G_FA_10_enableToken_gas_estimate_1() public creditTest {
-        tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
-
-        MultiCall[] memory calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_ACCOUNT_AMOUNT))
-            }),
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-                    )
-            })
-        );
-
-        vm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
-
-        calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (tokenTestSuite.addressOf(Tokens.LINK)))
-            })
-        );
-
-        uint256 gasBefore = gasleft();
-
-        vm.prank(USER);
-        creditFacade.multicall(creditAccount, calls);
-
-        uint256 gasSpent = gasBefore - gasleft();
-
-        emit log_string(string(abi.encodePacked("Gas spent - multicall with enableToken: ")));
-        emit log_uint(gasSpent);
-    }
-
-    /// @dev G:[FA-11]: multicall with disableToken
-    function test_G_FA_11_disableToken_gas_estimate_1() public creditTest {
-        tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
-
-        MultiCall[] memory calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (DAI_ACCOUNT_AMOUNT))
-            }),
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(
-                    ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-                    )
-            }),
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (tokenTestSuite.addressOf(Tokens.LINK)))
-            })
-        );
-
-        vm.prank(USER);
-        address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
-
-        calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(creditFacade),
-                callData: abi.encodeCall(ICreditFacadeV3Multicall.disableToken, (tokenTestSuite.addressOf(Tokens.LINK)))
-            })
-        );
-
-        uint256 gasBefore = gasleft();
-
-        vm.prank(USER);
-        creditFacade.multicall(creditAccount, calls);
-
-        uint256 gasSpent = gasBefore - gasleft();
-
-        emit log_string(string(abi.encodePacked("Gas spent - multicall with disableToken: ")));
         emit log_uint(gasSpent);
     }
 
@@ -583,14 +480,9 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
 
     /// @dev G:[FA-13]: multicall with a single swap into quoted token
     function test_G_FA_13_multicall_gas_estimate_2() public withAdapterMock creditTest {
-        vm.startPrank(CONFIGURATOR);
-        gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
-        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-        creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
-
         vm.warp(block.timestamp + 7 days);
+        vm.prank(CONFIGURATOR);
         gauge.updateEpoch();
-        vm.stopPrank();
 
         tokenTestSuite.mint(underlying, USER, DAI_ACCOUNT_AMOUNT);
 
@@ -936,14 +828,9 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
 
     /// @dev G:[FA-20]: liquidateCreditAccount with 2 tokens and active quota interest
     function test_G_FA_20_liquidateCreditAccount_gas_estimate_3() public creditTest {
-        vm.startPrank(CONFIGURATOR);
-        gauge.addQuotaToken(tokenTestSuite.addressOf(Tokens.LINK), 500, 500);
-        poolQuotaKeeper.setTokenLimit(tokenTestSuite.addressOf(Tokens.LINK), type(uint96).max);
-        creditConfigurator.makeTokenQuoted(tokenTestSuite.addressOf(Tokens.LINK));
-
         vm.warp(block.timestamp + 7 days);
+        vm.prank(CONFIGURATOR);
         gauge.updateEpoch();
-        vm.stopPrank();
 
         tokenTestSuite.mint(Tokens.LINK, USER, LINK_ACCOUNT_AMOUNT);
         tokenTestSuite.approve(Tokens.LINK, USER, address(creditManager));

@@ -8,11 +8,12 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {IPriceFeed, IUpdatablePriceFeed} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceFeed.sol";
 
-import {IPriceOracleV3Events, PriceFeedParams} from "../../../interfaces/IPriceOracleV3.sol";
+import {IPriceOracleV3Events, PriceFeedParams, PriceUpdate} from "../../../interfaces/IPriceOracleV3.sol";
 import "../../../interfaces/IExceptions.sol";
 
 import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
-import {PriceFeedMock, FlagState} from "../../mocks/oracles/PriceFeedMock.sol";
+import {PriceFeedMock} from "../../mocks/oracles/PriceFeedMock.sol";
+import {UpdatablePriceFeedMock} from "../../mocks/oracles/UpdatablePriceFeedMock.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
 import {PriceOracleV3Harness} from "./PriceOracleV3Harness.sol";
@@ -32,132 +33,289 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         priceOracle = new PriceOracleV3Harness(address(ap));
     }
 
-    // ----------------------- //
-    // CORE INTERNAL FUNCTIONS //
-    // ----------------------- //
+    // -------------------- //
+    // CONVERSION FUNCTIONS //
+    // -------------------- //
 
-    /// @notice U:[PO-1]: `_getPrice` works as expected
-    function test_U_PO_01_getPrice_works_as_expected(
-        int256 answer,
-        uint256 updatedAt,
-        uint32 stalenessPeriod,
-        bool skipCheck,
-        uint8 decimals
-    ) public {
-        updatedAt = bound(updatedAt, 0, block.timestamp);
-        if (skipCheck) answer = bound(answer, 1, type(int256).max);
-        decimals = uint8(bound(decimals, 1, 18));
+    /// @notice U:[PO-1]: `getPrice` works as expected
+    function test_U_PO_01_getPrice_works_as_expected() public {
+        address token = address(new ERC20Mock("Test Token", "TEST", 18));
+        address mainFeed = address(new PriceFeedMock(2e8, 8));
 
-        address priceFeed = makeAddr("PRICE_FEED");
+        vm.expectRevert(PriceFeedDoesNotExistException.selector);
+        priceOracle.getPrice(token);
+        vm.expectRevert(PriceFeedDoesNotExistException.selector);
+        priceOracle.convertToUSD(2e18, token);
+        vm.expectRevert(PriceFeedDoesNotExistException.selector);
+        priceOracle.convertFromUSD(3.6e8, token);
 
-        vm.mockCall(
-            priceFeed,
-            abi.encodeCall(IPriceFeed.latestRoundData, ()),
-            abi.encode(uint80(0), answer, uint256(0), updatedAt, uint80(0))
-        );
-
-        vm.expectCall(priceFeed, abi.encodeCall(IPriceFeed.latestRoundData, ()));
-
-        bool mustRevert;
-        if (answer <= 0) {
-            vm.expectRevert(IncorrectPriceException.selector);
-            mustRevert = true;
-        } else if (!skipCheck && block.timestamp >= updatedAt + stalenessPeriod) {
-            vm.expectRevert(StalePriceException.selector);
-            mustRevert = true;
-        }
-
-        (uint256 price, uint256 scale) = priceOracle.getPrice(priceFeed, stalenessPeriod, skipCheck, decimals);
-
-        if (!mustRevert) {
-            assertEq(price, uint256(answer), "Incorrect price");
-            assertEq(scale, 10 ** decimals, "Incorrect scale");
-        }
+        vm.prank(configurator);
+        priceOracle.setPriceFeed(token, mainFeed, 3600);
+        assertEq(priceOracle.getPrice(token), 2e8);
+        assertEq(priceOracle.convertToUSD(2e18, token), 4e8);
+        assertEq(priceOracle.convertFromUSD(3.6e8, token), 1.8e18);
     }
 
-    /// @notice U:[PO-2]: `_getPriceFeedParams` works as expected
-    function test_U_PO_02_getPriceFeedParams_works_as_expected(address token, PriceFeedParams memory expectedParams)
-        public
-    {
-        priceOracle.hackPriceFeedParams(token, expectedParams);
+    /// @notice U:[PO-2]: `getSafePrice` and `getReservePrice` work as expected
+    function test_U_PO_02_getSafePrice_and_getReservePrice_work_as_expected() public {
+        address token = address(new ERC20Mock("Test Token", "TEST", 18));
+        address mainFeed = address(new PriceFeedMock(2e8, 8));
+        address reserveFeed = address(new PriceFeedMock(1.8e8, 8));
 
-        if (expectedParams.priceFeed == address(0)) {
-            vm.expectRevert(PriceFeedDoesNotExistException.selector);
-        }
+        vm.expectRevert(PriceFeedDoesNotExistException.selector);
+        priceOracle.getSafePrice(token);
+        vm.expectRevert(PriceFeedDoesNotExistException.selector);
+        priceOracle.getReservePrice(token);
+        vm.expectRevert(PriceFeedDoesNotExistException.selector);
+        priceOracle.safeConvertToUSD(2e18, token);
 
-        PriceFeedParams memory params = priceOracle.getPriceFeedParams(token);
+        // no reserve price feed => safe price = 0
+        vm.prank(configurator);
+        priceOracle.setPriceFeed(token, mainFeed, 3600);
+        assertEq(priceOracle.getSafePrice(token), 0);
+        assertEq(priceOracle.safeConvertToUSD(2e18, token), 0);
+        vm.expectRevert(PriceFeedDoesNotExistException.selector);
+        priceOracle.getReservePrice(token);
 
-        if (expectedParams.priceFeed == address(0)) return;
+        // safe price = min(main price, reserve price)
+        vm.prank(configurator);
+        priceOracle.setReservePriceFeed(token, reserveFeed, 3600);
+        assertEq(priceOracle.getSafePrice(token), 1.8e8);
+        assertEq(priceOracle.safeConvertToUSD(2e18, token), 3.6e8);
+        assertEq(priceOracle.getReservePrice(token), 1.8e8);
 
-        assertEq(params.priceFeed, expectedParams.priceFeed, "Incorrect priceFeed");
-        assertEq(params.stalenessPeriod, expectedParams.stalenessPeriod, "Incorrect stalenessPeriod");
-        assertEq(params.decimals, expectedParams.decimals, "Incorrect decimals");
-        assertEq(params.skipCheck, expectedParams.skipCheck, "Incorrect skipCheck");
-        assertEq(params.useReserve, expectedParams.useReserve, "Incorrect useReserve");
-        assertEq(params.trusted, expectedParams.trusted, "Incorrect trusted");
+        // trusted main price feed => safe price = main price
+        vm.prank(configurator);
+        priceOracle.setReservePriceFeed(token, mainFeed, 3600);
+        assertEq(priceOracle.getSafePrice(token), 2e8);
+        assertEq(priceOracle.safeConvertToUSD(2e18, token), 4e8);
+        assertEq(priceOracle.getReservePrice(token), 2e8);
+
+        // unset reserve price feed => safe price = 0
+        vm.prank(configurator);
+        priceOracle.setPriceFeed(token, mainFeed, 3600);
+        assertEq(priceOracle.getSafePrice(token), 0);
+        assertEq(priceOracle.safeConvertToUSD(2e18, token), 0);
+        vm.expectRevert(PriceFeedDoesNotExistException.selector);
+        priceOracle.getReservePrice(token);
     }
 
-    /// @notice U:[PO-3]: `_getTokenReserveKey` works as expected
-    /// forge-config: default.fuzz.runs = 5000
-    function test_U_PO_03_getTokenReserveKey_works_as_expected(address token) public {
+    // ----------------------- //
+    // CONFIGURATION FUNCTIONS //
+    // ----------------------- //
+
+    /// @notice U:[PO-3]: `setPriceFeed` works as expected
+    function test_U_PO_03_setPriceFeed_works_as_expected() public {
+        address token = makeAddr("TOKEN");
+        address priceFeed = address(new PriceFeedMock(42, 8));
+
+        // revert cases
+        vm.expectRevert(ZeroAddressException.selector);
+        priceOracle.setPriceFeed(address(0), priceFeed, 0);
+
+        vm.expectRevert(ZeroAddressException.selector);
+        priceOracle.setPriceFeed(token, address(0), 0);
+
+        vm.expectRevert(CallerNotControllerException.selector);
+        priceOracle.setPriceFeed(token, priceFeed, 0);
+
+        // setting the price feed
+        // - must validate token and set decimals
+        // - must add token to the set
+        vm.mockCall(token, abi.encodeCall(ERC20.decimals, ()), abi.encode(uint8(18)));
+
+        vm.expectCall(token, abi.encodeCall(ERC20.decimals, ()));
+        vm.expectCall(priceFeed, abi.encodeCall(IPriceFeed.skipPriceCheck, ()));
+
+        vm.expectEmit(true, true, true, true);
+        emit SetPriceFeed(token, priceFeed, 3600, false);
+
+        vm.prank(configurator);
+        priceOracle.setPriceFeed(token, priceFeed, 3600);
+
+        PriceFeedParams memory params = priceOracle.priceFeedParams(token);
+        assertEq(params.priceFeed, priceFeed, "Incorrect priceFeed");
+        assertEq(params.stalenessPeriod, 3600, "Incorrect stalenessPeriod");
+        assertEq(params.skipCheck, false, "Incorrect skipCheck");
+        assertEq(params.tokenDecimals, 18, "Incorrect decimals");
+
+        address[] memory tokens = priceOracle.getTokens();
+        assertEq(tokens.length, 1, "Incorrect number of tokens");
+        assertEq(tokens[0], token, "Incorrect token");
+
+        // updating the price feed
+        // - must not validate token for the second time
+        // - must unset reserve feed if it is equal to the new main feed
+        vm.mockCallRevert(token, abi.encodeCall(ERC20.decimals, ()), "should not be called");
+        priceOracle.hackReservePriceFeedParams(token, params);
+
+        vm.expectCall(priceFeed, abi.encodeCall(IPriceFeed.skipPriceCheck, ()));
+
+        vm.expectEmit(true, true, true, true);
+        emit SetPriceFeed(token, priceFeed, 3600, false);
+
+        vm.expectEmit(true, true, true, true);
+        emit SetReservePriceFeed(token, address(0), 0, false);
+
+        vm.prank(configurator);
+        priceOracle.setPriceFeed(token, priceFeed, 3600);
+
+        params = priceOracle.priceFeedParams(token);
+        assertEq(params.priceFeed, priceFeed, "Incorrect priceFeed");
+        assertEq(params.stalenessPeriod, 3600, "Incorrect stalenessPeriod");
+        assertEq(params.skipCheck, false, "Incorrect skipCheck");
+        assertEq(params.tokenDecimals, 18, "Incorrect decimals");
+
+        PriceFeedParams memory reserveParams = priceOracle.reservePriceFeedParams(token);
+        assertEq(reserveParams.priceFeed, address(0), "Reserve priceFeed not unset");
+        assertEq(reserveParams.stalenessPeriod, 0, "Reserve stalenessPeriod not unset");
+        assertEq(reserveParams.skipCheck, false, "Reserve skipCheck not unset");
+        assertEq(reserveParams.tokenDecimals, 0, "Reserve decimals not unset");
+    }
+
+    /// @notice U:[PO-4]: `setReservePriceFeed` works as expected
+    function test_U_PO_04_setReservePriceFeed_works_as_expected() public {
+        address token = makeAddr("TOKEN");
+        address mainFeed = makeAddr("MAIN_FEED");
+        address reserveFeed = address(new PriceFeedMock(42, 8));
+
+        // revert cases
+        vm.expectRevert(ZeroAddressException.selector);
+        priceOracle.setReservePriceFeed(address(0), reserveFeed, 0);
+
+        vm.expectRevert(ZeroAddressException.selector);
+        priceOracle.setReservePriceFeed(token, address(0), 0);
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        priceOracle.setReservePriceFeed(token, reserveFeed, 0);
+
+        vm.expectRevert(PriceFeedDoesNotExistException.selector);
+        vm.prank(configurator);
+        priceOracle.setReservePriceFeed(token, reserveFeed, 0);
+
+        // setting the reserve price feed
+        // - must copy decimals from main feed
+        // - must invert main feed active status
+        priceOracle.hackPriceFeedParams(token, PriceFeedParams(mainFeed, 0, false, 18));
+
+        vm.expectCall(reserveFeed, abi.encodeCall(IPriceFeed.skipPriceCheck, ()));
+
+        vm.expectEmit(true, true, true, true);
+        emit SetReservePriceFeed(token, reserveFeed, 3600, false);
+
+        vm.prank(configurator);
+        priceOracle.setReservePriceFeed(token, reserveFeed, 3600);
+
+        PriceFeedParams memory params = priceOracle.reservePriceFeedParams(token);
+        assertEq(params.priceFeed, reserveFeed, "Incorrect priceFeed");
+        assertEq(params.stalenessPeriod, 3600, "Incorrect stalenessPeriod");
+        assertEq(params.skipCheck, false, "Incorrect skipCheck");
+        assertEq(params.tokenDecimals, 18, "Incorrect decimals");
+    }
+
+    /// @notice U:[PO-5]: `addUpdatablePriceFeed` works as expected
+    function test_U_PO_05_addUpdatablePriceFeed_works_as_expected() public {
+        UpdatablePriceFeedMock priceFeed = new UpdatablePriceFeedMock();
+        priceFeed.setUpdatable(UpdatablePriceFeedMock.FlagState.REVERT);
+        PriceUpdate[] memory updates = new PriceUpdate[](1);
+        updates[0] = PriceUpdate(address(priceFeed), "DUMMY DATA");
+
+        // revert cases
+        vm.expectRevert(ZeroAddressException.selector);
+        priceOracle.addUpdatablePriceFeed(address(0));
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        priceOracle.addUpdatablePriceFeed(address(priceFeed));
+
+        vm.expectRevert(PriceFeedIsNotUpdatableException.selector);
+        vm.prank(configurator);
+        priceOracle.addUpdatablePriceFeed(address(priceFeed));
+
+        vm.expectRevert(PriceFeedIsNotUpdatableException.selector);
+        priceOracle.updatePrices(updates);
+
+        // adding price feed
+        priceFeed.setUpdatable(UpdatablePriceFeedMock.FlagState.TRUE);
+
+        vm.expectEmit(true, true, true, true);
+        emit AddUpdatablePriceFeed(address(priceFeed));
+
+        vm.prank(configurator);
+        priceOracle.addUpdatablePriceFeed(address(priceFeed));
+
+        address[] memory feeds = priceOracle.getUpdatablePriceFeeds();
+        assertEq(feeds.length, 1, "Price feed not added to the set");
+        assertEq(feeds[0], address(priceFeed), "Wrong price feed added to the set");
+
+        //  updating price feed
+        vm.expectCall(address(priceFeed), abi.encodeCall(priceFeed.updatePrice, ("DUMMY DATA")));
+        priceOracle.updatePrices(updates);
+    }
+
+    // ------------------ //
+    // INTERNAL FUNCTIONS //
+    // ------------------ //
+
+    /// @notice U:[PO-6]: `_getTokenReserveKey` works as expected
+    function test_U_PO_06_getTokenReserveKey_works_as_expected(address token) public {
         address expectedKey = address(uint160(uint256(keccak256(abi.encodePacked("RESERVE", token)))));
-        assertEq(priceOracle.getTokenReserveKey(token), expectedKey);
+        assertEq(priceOracle.exposed_getTokenReserveKey(token), expectedKey);
     }
 
-    /// @notice U:[PO-4]: `_validateToken` works as expected
-    function test_U_PO_04_validateToken_works_as_expected() public {
+    /// @notice U:[PO-7]: `_validateToken` works as expected
+    function test_U_PO_07_validateToken_works_as_expected() public {
         address token = makeAddr("TOKEN");
 
         vm.etch(token, "");
         vm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, token));
-        priceOracle.validateToken(token);
+        priceOracle.exposed_validateToken(token);
 
         vm.etch(token, "CODE");
 
         vm.mockCallRevert(token, abi.encodeCall(ERC20.decimals, ()), "");
         vm.expectRevert(IncorrectTokenContractException.selector);
-        priceOracle.validateToken(token);
+        priceOracle.exposed_validateToken(token);
 
         vm.mockCall(token, abi.encodeCall(ERC20.decimals, ()), abi.encode(uint8(0)));
         vm.expectRevert(IncorrectTokenContractException.selector);
-        priceOracle.validateToken(token);
+        priceOracle.exposed_validateToken(token);
 
         vm.mockCall(token, abi.encodeCall(ERC20.decimals, ()), abi.encode(uint8(19)));
         vm.expectRevert(IncorrectTokenContractException.selector);
-        priceOracle.validateToken(token);
+        priceOracle.exposed_validateToken(token);
 
         vm.mockCall(token, abi.encodeCall(ERC20.decimals, ()), abi.encode(uint8(6)));
-        uint8 decimals = priceOracle.validateToken(token);
+        uint8 decimals = priceOracle.exposed_validateToken(token);
         assertEq(decimals, 6, "Incorrect decimals");
     }
 
-    /// @notice U:[PO-5]: `_validatePriceFeed` works as expected
-    function test_U_PO_05_validatePriceFeed_works_as_expected() public {
+    /// @notice U:[PO-8]: `_validatePriceFeed` works as expected
+    function test_U_PO_08_validatePriceFeed_works_as_expected() public {
         address priceFeed = makeAddr("PRICE_FEED");
 
         // not a contract
         vm.etch(priceFeed, "");
         vm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, priceFeed));
-        priceOracle.validatePriceFeed(priceFeed, 0);
+        priceOracle.exposed_validatePriceFeed(priceFeed, 0);
 
         vm.etch(priceFeed, "CODE");
 
         // does not implement `decimals()`
         vm.mockCallRevert(priceFeed, abi.encodeCall(IPriceFeed.decimals, ()), "");
         vm.expectRevert(IncorrectPriceFeedException.selector);
-        priceOracle.validatePriceFeed(priceFeed, 0);
+        priceOracle.exposed_validatePriceFeed(priceFeed, 0);
 
         // wrong decimals
         vm.mockCall(priceFeed, abi.encodeCall(IPriceFeed.decimals, ()), abi.encode(uint8(6)));
         vm.expectRevert(IncorrectPriceFeedException.selector);
-        priceOracle.validatePriceFeed(priceFeed, 0);
+        priceOracle.exposed_validatePriceFeed(priceFeed, 0);
 
         vm.mockCall(priceFeed, abi.encodeCall(IPriceFeed.decimals, ()), abi.encode(uint8(8)));
 
         // does not implement `latestRoundData()`
         vm.mockCallRevert(priceFeed, abi.encodeCall(IPriceFeed.latestRoundData, ()), "");
         vm.expectRevert(IncorrectPriceFeedException.selector);
-        priceOracle.validatePriceFeed(priceFeed, 0);
+        priceOracle.exposed_validatePriceFeed(priceFeed, 0);
 
         // zero staleness period while shipCheck = false
         vm.mockCall(
@@ -166,7 +324,7 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
             abi.encode(uint80(0), int256(42), uint256(0), block.timestamp, uint80(0))
         );
         vm.expectRevert(IncorrectParameterException.selector);
-        priceOracle.validatePriceFeed(priceFeed, 0);
+        priceOracle.exposed_validatePriceFeed(priceFeed, 0);
 
         // negative price
         vm.mockCall(
@@ -175,7 +333,7 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
             abi.encode(uint80(0), int256(-1), uint256(0), block.timestamp, uint80(0))
         );
         vm.expectRevert(IncorrectPriceException.selector);
-        priceOracle.validatePriceFeed(priceFeed, 3600);
+        priceOracle.exposed_validatePriceFeed(priceFeed, 3600);
 
         // stale price
         vm.mockCall(
@@ -184,184 +342,63 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
             abi.encode(uint80(0), int256(42), uint256(0), block.timestamp - 7200, uint80(0))
         );
         vm.expectRevert(StalePriceException.selector);
-        priceOracle.validatePriceFeed(priceFeed, 3600);
+        priceOracle.exposed_validatePriceFeed(priceFeed, 3600);
 
         // staleness check is skipped for updatable feed
         vm.mockCall(priceFeed, abi.encodeCall(IUpdatablePriceFeed.updatable, ()), abi.encode(true));
-        bool skipCheck = priceOracle.validatePriceFeed(priceFeed, 3600);
+        bool skipCheck = priceOracle.exposed_validatePriceFeed(priceFeed, 3600);
         assertFalse(skipCheck, "skipCheck is unexpectedly true");
 
         // non-zero staleness period while skipCheck = true
         vm.mockCall(priceFeed, abi.encodeCall(IPriceFeed.skipPriceCheck, ()), abi.encode(true));
         vm.expectRevert(IncorrectParameterException.selector);
-        priceOracle.validatePriceFeed(priceFeed, 3600);
+        priceOracle.exposed_validatePriceFeed(priceFeed, 3600);
 
-        skipCheck = priceOracle.validatePriceFeed(priceFeed, 0);
+        skipCheck = priceOracle.exposed_validatePriceFeed(priceFeed, 0);
         assertTrue(skipCheck, "skipCheck is unexpectedly false");
     }
 
-    // ----------------------- //
-    // CONFIGURATION FUNCTIONS //
-    // ----------------------- //
+    /// @notice U:[PO-9]: `_getValidatedPrice` works as expected
+    function test_U_PO_09_getValidatedPrice_works_as_expected() public {
+        address priceFeed = makeAddr("PRICE_FEED");
+        uint256 stalenessPeriod = 20;
 
-    /// @notice U:[PO-6]: `setPriceFeed` works as expected
-    function test_U_PO_06_setPriceFeed_works_as_expected() public {
-        ERC20Mock token = new ERC20Mock("Test Token", "TEST", 18);
-        PriceFeedMock priceFeed = new PriceFeedMock(42, 8);
-
-        vm.expectRevert(ZeroAddressException.selector);
-        priceOracle.setPriceFeed(address(0), address(priceFeed), 0, false);
-
-        vm.expectRevert(ZeroAddressException.selector);
-        priceOracle.setPriceFeed(address(token), address(0), 0, false);
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        priceOracle.setPriceFeed(address(token), address(priceFeed), 0, false);
-
-        vm.expectEmit(true, true, false, true);
-        emit SetPriceFeed(address(token), address(priceFeed), 3600, false, false);
-
-        vm.prank(configurator);
-        priceOracle.setPriceFeed(address(token), address(priceFeed), 3600, false);
-        PriceFeedParams memory params = priceOracle.getPriceFeedParams(address(token));
-        assertEq(params.priceFeed, address(priceFeed), "Incorrect priceFeed");
-        assertEq(params.decimals, 18, "Incorrect decimals");
-        assertEq(params.skipCheck, false, "Incorrect skipCheck");
-        assertEq(params.stalenessPeriod, 3600, "Incorrect stalenessPeriod");
-        assertEq(params.useReserve, false, "Incorrect useReserve");
-    }
-
-    /// @notice U:[PO-7]: `setReservePriceFeed` works as expected
-    function test_U_PO_07_setReservePriceFeed_works_as_expected() public {
-        ERC20Mock token = new ERC20Mock("Test Token", "TEST", 18);
-        PriceFeedMock priceFeed = new PriceFeedMock(42, 8);
-
-        vm.expectRevert(ZeroAddressException.selector);
-        priceOracle.setPriceFeed(address(0), address(priceFeed), 0, false);
-
-        vm.expectRevert(ZeroAddressException.selector);
-        priceOracle.setPriceFeed(address(token), address(0), 0, false);
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
-        priceOracle.setPriceFeed(address(token), address(priceFeed), 0, false);
-
-        vm.expectRevert(PriceFeedDoesNotExistException.selector);
-        vm.prank(configurator);
-        priceOracle.setReservePriceFeed(address(token), address(priceFeed), 0);
-
-        priceOracle.hackPriceFeedParams(address(token), PriceFeedParams(address(0), 0, false, 18, false, false));
-        priceFeed.setSkipPriceCheck(FlagState.TRUE);
-
-        vm.expectEmit(true, true, false, true);
-        emit SetReservePriceFeed(address(token), address(priceFeed), 0, true);
-
-        vm.prank(configurator);
-        priceOracle.setReservePriceFeed(address(token), address(priceFeed), 0);
-
-        PriceFeedParams memory params = priceOracle.getReservePriceFeedParams(address(token));
-        assertEq(params.priceFeed, address(priceFeed), "Incorrect priceFeed");
-        assertEq(params.decimals, 18, "Incorrect decimals");
-        assertEq(params.skipCheck, true, "Incorrect skipCheck");
-        assertEq(params.stalenessPeriod, 0, "Incorrect stalenessPeriod");
-        assertEq(params.useReserve, false, "Incorrect useReserve");
-    }
-
-    /// @notice U:[PO-8]: `setReservePriceFeedStatus` works as expected
-    function test_U_PO_08_setReservePriceFeedStatus_works_as_expected() public {
-        ERC20Mock token = new ERC20Mock("Test Token", "TEST", 18);
-        PriceFeedMock priceFeed = new PriceFeedMock(42, 8);
-
-        vm.expectRevert(CallerNotControllerException.selector);
-        priceOracle.setReservePriceFeedStatus(address(token), true);
-
-        vm.expectRevert(PriceFeedDoesNotExistException.selector);
-        vm.prank(configurator);
-        priceOracle.setReservePriceFeedStatus(address(token), true);
-
-        priceOracle.hackPriceFeedParams(
-            address(token), PriceFeedParams(makeAddr("MAIN_PRICE_FEED"), 0, false, 18, false, false)
+        // returns answer if `skipCheck` is true
+        vm.mockCall(
+            priceFeed,
+            abi.encodeCall(IPriceFeed.latestRoundData, ()),
+            abi.encode(uint80(0), -123, uint256(0), block.timestamp - stalenessPeriod - 1, uint80(0))
         );
-        priceOracle.hackReservePriceFeedParams(
-            address(token), PriceFeedParams(address(priceFeed), 0, false, 18, false, false)
+        vm.expectCall(priceFeed, abi.encodeCall(IPriceFeed.latestRoundData, ()));
+        assertEq(priceOracle.exposed_getValidatedPrice(priceFeed, 20, true), -123, "Incorrect price");
+
+        // reverts on negative price if `skipCheck` is false
+        vm.mockCall(
+            priceFeed,
+            abi.encodeCall(IPriceFeed.latestRoundData, ()),
+            abi.encode(uint80(0), -123, uint256(0), block.timestamp - stalenessPeriod + 1, uint80(0))
         );
+        vm.expectCall(priceFeed, abi.encodeCall(IPriceFeed.latestRoundData, ()));
+        vm.expectRevert(IncorrectPriceException.selector);
+        priceOracle.exposed_getValidatedPrice(priceFeed, 20, false);
 
-        vm.expectEmit(true, false, false, true);
-        emit SetReservePriceFeedStatus(address(token), true);
-
-        vm.prank(configurator);
-        priceOracle.setReservePriceFeedStatus(address(token), true);
-
-        assertTrue(priceOracle.getPriceFeedParams(address(token)).useReserve, "useReserve is unexpectedly false");
-        // make sure all functions now switch to reserve price feed
-        assertEq(priceOracle.priceFeeds(address(token)), address(priceFeed), "Incorrect priceFeed");
-    }
-
-    // -------------------- //
-    // CONVERSION FUNCTIONS //
-    // -------------------- //
-
-    /// @notice U:[PO-9]: `convertToUSD` works as expected
-    function test_U_PO_09_covnertToUSD_and_convertFromUSD_work_as_expected() public {
-        ERC20Mock token = new ERC20Mock("Test Token", "TEST", 6);
-        PriceFeedMock priceFeed = new PriceFeedMock(2e8, 8);
-        priceOracle.hackPriceFeedParams(address(token), PriceFeedParams(address(priceFeed), 0, false, 6, false, false));
-
-        assertEq(priceOracle.convertToUSD(100e6, address(token)), 200e8, "Incorrect convertToUSD");
-        assertEq(priceOracle.convertFromUSD(1000e8, address(token)), 500e6, "Incorrect convertFromUSD");
-    }
-
-    /// @notice U:[PO-10]: `convert` works as epxected
-    function test_U_PO_10_convert_works_as_expected() public {
-        ERC20Mock token1 = new ERC20Mock("Test Token 1", "TEST1", 6);
-        PriceFeedMock priceFeed1 = new PriceFeedMock(10e8, 8);
-        priceOracle.hackPriceFeedParams(
-            address(token1), PriceFeedParams(address(priceFeed1), 0, false, 6, false, false)
+        // reverts on stale price if `skipCheck` is false
+        vm.mockCall(
+            priceFeed,
+            abi.encodeCall(IPriceFeed.latestRoundData, ()),
+            abi.encode(uint80(0), 123, uint256(0), block.timestamp - stalenessPeriod - 1, uint80(0))
         );
+        vm.expectCall(priceFeed, abi.encodeCall(IPriceFeed.latestRoundData, ()));
+        vm.expectRevert(StalePriceException.selector);
+        priceOracle.exposed_getValidatedPrice(priceFeed, 20, false);
 
-        ERC20Mock token2 = new ERC20Mock("Test Token 2", "TEST2", 18);
-        PriceFeedMock priceFeed2 = new PriceFeedMock(0.1e8, 8);
-        priceOracle.hackPriceFeedParams(
-            address(token2), PriceFeedParams(address(priceFeed2), 0, false, 18, false, false)
+        // returns answer if `skipCheck` is false
+        vm.mockCall(
+            priceFeed,
+            abi.encodeCall(IPriceFeed.latestRoundData, ()),
+            abi.encode(uint80(0), 123, uint256(0), block.timestamp - stalenessPeriod + 1, uint80(0))
         );
-
-        assertEq(
-            priceOracle.convert(1e6, address(token1), address(token2)), 100e18, "Incorrect token1 -> token2 conversion"
-        );
-
-        assertEq(
-            priceOracle.convert(100e18, address(token2), address(token1)), 1e6, "Incorrect token2 -> token1 conversion"
-        );
-    }
-
-    /// @notice U:[PO-11]: Safe conversion works as expected
-    function test_U_PO_11_safe_conversion_works_as_expected() public {
-        ERC20Mock token = new ERC20Mock("Test Token", "TEST", 6);
-        PriceFeedMock mainFeed = new PriceFeedMock(2e8, 8);
-        PriceFeedMock reserveFeed = new PriceFeedMock(1.8e8, 8);
-
-        // untrusted feed without reserve feed
-        priceOracle.hackPriceFeedParams(address(token), PriceFeedParams(address(mainFeed), 0, false, 6, false, false));
-        assertEq(priceOracle.getPriceSafe(address(token)), 0, "getPriceSafe, untrusted feed without reserve feed");
-        assertEq(
-            priceOracle.safeConvertToUSD(100e6, address(token)),
-            0,
-            "safeConvertToUSD untrusted feed without reserve feed"
-        );
-
-        // untrusted feed with reserve feed
-        priceOracle.hackReservePriceFeedParams(
-            address(token), PriceFeedParams(address(reserveFeed), 0, false, 6, false, false)
-        );
-        assertEq(priceOracle.getPriceSafe(address(token)), 1.8e8, "safe price of untrusted feed with reserve feed");
-        assertEq(
-            priceOracle.safeConvertToUSD(100e6, address(token)),
-            180e8,
-            "safeConvertToUSD untrusted feed with reserve feed"
-        );
-
-        // trusted feed
-        priceOracle.hackPriceFeedParams(address(token), PriceFeedParams(address(mainFeed), 0, false, 6, false, true));
-        assertEq(priceOracle.getPriceSafe(address(token)), 2e8, "safe price of trusted feed");
-        assertEq(priceOracle.safeConvertToUSD(100e6, address(token)), 200e8, "safeConvertToUSD trusted feed");
+        vm.expectCall(priceFeed, abi.encodeCall(IPriceFeed.latestRoundData, ()));
+        assertEq(priceOracle.exposed_getValidatedPrice(priceFeed, 20, false), 123, "Incorrect price");
     }
 }

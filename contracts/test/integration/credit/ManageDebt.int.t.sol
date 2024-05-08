@@ -132,21 +132,10 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
 
         address link = tokenTestSuite.addressOf(Tokens.LINK);
 
-        vm.prank(USER);
-        creditFacade.multicall(
-            creditAccount,
-            MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (link))
-                })
-            )
-        );
-
         vm.prank(CONFIGURATOR);
         creditConfigurator.forbidToken(link);
 
-        vm.expectRevert(ForbiddenTokensException.selector);
+        vm.expectRevert(ForbiddenTokenQuotaIncreasedException.selector);
 
         vm.prank(USER);
         creditFacade.multicall(
@@ -155,6 +144,10 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (1))
+                }),
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (link, 10000, 0))
                 })
             )
         );

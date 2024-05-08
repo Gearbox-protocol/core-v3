@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
 // ------- //
@@ -163,9 +163,6 @@ error NotAllowedWhenNotExpirableException();
 /// @notice Thrown if a selector that doesn't match any allowed function is passed to the credit facade in a multicall
 error UnknownMethodException();
 
-/// @notice Thrown when trying to close an account with enabled tokens
-error CloseAccountWithEnabledTokensException();
-
 /// @notice Thrown if a liquidator tries to liquidate an account with a health factor above 1
 error CreditAccountNotLiquidatableException();
 
@@ -190,8 +187,8 @@ error BalanceLessThanExpectedException();
 /// @notice Thrown when trying to perform an action that is forbidden when credit account has enabled forbidden tokens
 error ForbiddenTokensException();
 
-/// @notice Thrown when new forbidden tokens are enabled during the multicall
-error ForbiddenTokenEnabledException();
+/// @notice Thrown when forbidden token quota is increased during the multicall
+error ForbiddenTokenQuotaIncreasedException();
 
 /// @notice Thrown when enabled forbidden token balance is increased during the multicall
 error ForbiddenTokenBalanceIncreasedException();
@@ -286,8 +283,11 @@ error ParameterChangedAfterQueuedTxException();
 // BOT LIST //
 // -------- //
 
-/// @notice Thrown when attempting to set non-zero permissions for a forbidden or special bot
+/// @notice Thrown when attempting to set non-zero permissions for a forbidden bot
 error InvalidBotException();
+
+/// @notice Thrown when attempting to set permissions for a bot that don't meet its requirements
+error InsufficientBotPermissionsException();
 
 // --------------- //
 // ACCOUNT FACTORY //
@@ -308,6 +308,9 @@ error IncorrectPriceFeedException();
 
 /// @notice Thrown on attempting to interact with a price feed for a token not added to the price oracle
 error PriceFeedDoesNotExistException();
+
+/// @notice Thrown when trying to apply an on-demand price update to a non-updatable price feed
+error PriceFeedIsNotUpdatableException();
 
 /// @notice Thrown when price feed returns incorrect price for a token
 error IncorrectPriceException();

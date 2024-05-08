@@ -5,6 +5,7 @@ pragma solidity ^0.8.17;
 //pragma abicoder v1;
 
 import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
+import {PriceUpdate} from "../../../interfaces/IPriceOracleV3.sol";
 
 // EXCEPTIONS
 
@@ -15,7 +16,7 @@ import "forge-std/console.sol";
 contract PriceOracleMock is Test, IPriceOracleBase {
     mapping(address => uint256) public priceInUSD;
 
-    uint256 public constant override version = 3_00;
+    uint256 public constant override version = 3_10;
 
     mapping(address => bool) revertsOnGetPrice;
     mapping(address => mapping(bool => address)) priceFeedsInt;
@@ -23,6 +24,8 @@ contract PriceOracleMock is Test, IPriceOracleBase {
     constructor() {
         vm.label(address(this), "PRICE_ORACLE");
     }
+
+    function updatePrices(PriceUpdate[] calldata) external pure {}
 
     function priceFeeds(address token) public view returns (address) {
         return priceFeedsInt[token][false];
