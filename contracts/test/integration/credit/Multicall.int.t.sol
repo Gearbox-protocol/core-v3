@@ -13,6 +13,7 @@ import {
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import "../../../interfaces/ICreditFacadeV3.sol";
+import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
 
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
@@ -40,7 +41,8 @@ contract MultiCallIntegrationTest is
     BalanceHelper,
     IntegrationTestHelper,
     ICreditManagerV3Events,
-    ICreditFacadeV3Events
+    ICreditFacadeV3Events,
+    IPoolV3Events
 {
     /// @dev I:[MC-1]: multicall reverts if borrower has no account
     function test_I_MC_01_multicall_reverts_if_credit_account_not_exists() public creditTest {
@@ -83,7 +85,7 @@ contract MultiCallIntegrationTest is
 
         bytes memory DUMB_CALLDATA = abi.encodeWithSignature("hello(string)", "world");
 
-        vm.expectRevert(UnknownMethodException.selector);
+        vm.expectRevert(abi.encodeWithSelector(UnknownMethodException.selector, (bytes4(DUMB_CALLDATA))));
 
         vm.prank(USER);
         creditFacade.multicall(
@@ -185,8 +187,8 @@ contract MultiCallIntegrationTest is
             )
         );
 
-        vm.expectEmit(true, false, false, true);
-        emit IncreaseDebt(creditAccount, 256);
+        vm.expectEmit(true, true, true, true, address(pool));
+        emit Borrow(address(creditManager), creditAccount, 256);
 
         vm.expectEmit(false, false, false, true);
         emit FinishMultiCall();
@@ -256,8 +258,8 @@ contract MultiCallIntegrationTest is
             )
         );
 
-        vm.expectEmit(true, false, false, true);
-        emit DecreaseDebt(creditAccount, 256);
+        vm.expectEmit(true, true, true, true, address(pool));
+        emit Repay(address(creditManager), 256, 0, 0);
 
         vm.expectEmit(false, false, false, true);
         emit FinishMultiCall();
@@ -395,7 +397,9 @@ contract MultiCallIntegrationTest is
 
         for (uint256 i = 0; i < 2; i++) {
             vm.prank(USER);
-            vm.expectRevert(BalanceLessThanExpectedException.selector);
+            vm.expectRevert(
+                abi.encodeWithSelector(BalanceLessThanExpectedException.selector, (i == 0 ? underlying : tokenLINK))
+            );
 
             creditFacade.multicall(
                 creditAccount,

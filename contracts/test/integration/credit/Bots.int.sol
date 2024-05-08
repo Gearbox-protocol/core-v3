@@ -55,9 +55,9 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
 
         vm.prank(address(creditFacade));
-        botList.setBotPermissions(bot, creditAccount, uint192(ALL_PERMISSIONS));
+        botList.setBotPermissions(bot, creditAccount, ALL_PERMISSIONS & ~SET_BOT_PERMISSIONS_PERMISSION);
 
-        vm.expectRevert(NotApprovedBotException.selector);
+        vm.expectRevert(abi.encodeWithSelector(NotApprovedBotException.selector, (address(this))));
         creditFacade.botMulticall(
             creditAccount, MultiCallBuilder.build(MultiCall({target: address(adapterMock), callData: DUMB_CALLDATA}))
         );
@@ -66,8 +66,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
             MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
         );
 
-        vm.prank(USER);
-        creditFacade.setBotPermissions(creditAccount, bot, uint192(ALL_PERMISSIONS));
+        _setBotPermissions(USER, creditAccount, bot, ALL_PERMISSIONS & ~SET_BOT_PERMISSIONS_PERMISSION);
 
         botList.getBotStatus({creditAccount: creditAccount, bot: bot});
 
@@ -103,7 +102,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         vm.prank(CONFIGURATOR);
         botList.setBotForbiddenStatus(bot, true);
 
-        vm.expectRevert(NotApprovedBotException.selector);
+        vm.expectRevert(abi.encodeWithSelector(NotApprovedBotException.selector, (bot)));
         vm.prank(bot);
         creditFacade.botMulticall(creditAccount, calls);
     }
@@ -114,17 +113,12 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
 
         address bot = address(new BotMock());
 
-        vm.expectRevert(CallerNotCreditAccountOwnerException.selector);
-        vm.prank(FRIEND);
-        creditFacade.setBotPermissions(creditAccount, bot, uint192(ALL_PERMISSIONS));
-
         vm.expectCall(
             address(creditManager),
             abi.encodeCall(CreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, true))
         );
 
-        vm.prank(USER);
-        creditFacade.setBotPermissions(creditAccount, bot, uint192(ALL_PERMISSIONS));
+        _setBotPermissions(USER, creditAccount, bot, ALL_PERMISSIONS & ~SET_BOT_PERMISSIONS_PERMISSION);
 
         assertTrue(creditManager.flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG > 0, "Flag was not set");
 
@@ -133,9 +127,21 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
             abi.encodeCall(CreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, false))
         );
 
-        vm.prank(USER);
-        creditFacade.setBotPermissions(creditAccount, bot, 0);
+        _setBotPermissions(USER, creditAccount, bot, 0);
 
         assertTrue(creditManager.flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG == 0, "Flag was not set");
+    }
+
+    function _setBotPermissions(address user, address creditAccount, address bot, uint192 permissions) internal {
+        vm.prank(user);
+        creditFacade.multicall(
+            creditAccount,
+            MultiCallBuilder.build(
+                MultiCall(
+                    address(creditFacade),
+                    abi.encodeCall(ICreditFacadeV3Multicall.setBotPermissions, (bot, permissions))
+                )
+            )
+        );
     }
 }
