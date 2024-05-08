@@ -175,7 +175,7 @@ interface ICreditConfiguratorV3 is IVersion, ICreditConfiguratorV3Events {
     // UPGRADES //
     // -------- //
 
-    function setPriceOracle(uint256 newVersion) external;
+    function setPriceOracle(address newOracle) external;
 
     function setBotList(uint256 newVersion) external;
 

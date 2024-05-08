@@ -12,7 +12,7 @@ import {PoolFactoryV3} from "../factories/PoolFactoryV3.sol";
 import {CreditFactoryV3} from "../factories/CreditFactoryV3.sol";
 import {AdapterFactoryV3} from "../factories/AdapterFactoryV3.sol";
 
-import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
+import {IPriceOracleV3, PriceFeedParams, PriceUpdate} from "../interfaces/IPriceOracleV3.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {ICreditConfiguratorV3} from "../interfaces/ICreditConfiguratorV3.sol";
 import {IContractsRegister} from "@gearbox-protocol/core-v2/contracts/interfaces/IContractsRegister.sol";
@@ -72,7 +72,7 @@ contract RiskConfigurator is Ownable2Step {
         }
 
         IPriceOracleV3(priceOracles[pool]).setPriceFeed(
-            token, priceFeed, PriceOracleFactoryV3(priceOracleFactory).stalenessPeriod(priceFeed), trusted
+            token, priceFeed, PriceOracleFactoryV3(priceOracleFactory).stalenessPeriod(priceFeed)
         );
 
         emit SetPriceFeedFromStore(token, priceFeed, trusted);
@@ -105,26 +105,25 @@ contract RiskConfigurator is Ownable2Step {
         creditConfigurator.upgradeCreditConfigurator(newCreditConfigurator);
     }
 
-    function changePriceOracle(
-        address pool,
-        uint256 version // , PriceUpdates[] calldata priceUpdates)
-    ) external onlyOwner {
+    function changePriceOracle(address pool, uint256 version, PriceUpdate[] calldata priceUpdates) external onlyOwner {
         // Check that prices for all tokens exists
 
         address oldOracle = priceOracles[pool];
         address newPriceOracle = PriceOracleFactoryV3(priceOracleFactory).deployPriceOracle(version);
         address[] memory collateralTokens = IPoolQuotaKeeperV3(IPoolV3(pool).poolQuotaKeeper()).quotedTokens();
-
         uint256 len = collateralTokens.length;
+
+        // Updates prices via old oracle to make it possible to set (validate price) in new one
+        IPriceOracleV3(oldOracle).updatePrices(priceUpdates);
         unchecked {
             for (uint256 i; i < len; ++i) {
                 address token = collateralTokens[i];
-                try IPriceOracleV3(oldOracle).priceFeedsRaw(token, false) returns (address pf) {
-                    IPriceOracleV3(newPriceOracle).setPriceFeed(token, pf, 0, false);
+                try IPriceOracleV3(oldOracle).priceFeedParams(token) returns (PriceFeedParams memory pfp) {
+                    IPriceOracleV3(newPriceOracle).setPriceFeed(token, pfp.priceFeed, pfp.stalenessPeriod);
                 } catch {}
 
-                try IPriceOracleV3(oldOracle).priceFeedsRaw(token, true) returns (address pf) {
-                    IPriceOracleV3(newPriceOracle).setReservePriceFeed(token, pf, 0);
+                try IPriceOracleV3(oldOracle).reservePriceFeedParams(token) returns (PriceFeedParams memory pfp) {
+                    IPriceOracleV3(newPriceOracle).setReservePriceFeed(token, pfp.priceFeed, pfp.stalenessPeriod);
                 } catch {}
             }
         }
@@ -133,7 +132,7 @@ contract RiskConfigurator is Ownable2Step {
         len = cms.length;
         unchecked {
             for (uint256 i; i < len; ++i) {
-                // _creditConfigurator(cms[i]).setPriceOracle(newPriceOracle);
+                _creditConfigurator(cms[i]).setPriceOracle(newPriceOracle);
             }
         }
     }

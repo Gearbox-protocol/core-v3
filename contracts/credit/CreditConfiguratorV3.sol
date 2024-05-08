@@ -518,15 +518,13 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     // -------- //
 
     /// @notice Sets the new price oracle contract in the credit manager
-    /// @param newVersion Version of the new price oracle to take from the address provider
+    /// @param priceOracle Version of the new price oracle to take from the address provider
     /// @dev Reverts if price oracle of given version is not found in the address provider
-    function setPriceOracle(uint256 newVersion)
+    function setPriceOracle(address priceOracle)
         external
         override
         configuratorOnly // I:[CC-2]
     {
-        address priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_PRICE_ORACLE, newVersion); // I:[CC-21]
-
         if (priceOracle == CreditManagerV3(creditManager).priceOracle()) return;
 
         CreditManagerV3(creditManager).setPriceOracle(priceOracle); // I:[CC-21]

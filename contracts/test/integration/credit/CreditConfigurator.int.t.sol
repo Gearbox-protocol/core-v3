@@ -273,7 +273,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.setFees(0, 0, 0, 0, 0);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.setPriceOracle(0);
+        creditConfigurator.setPriceOracle(address(1));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.setCreditFacade(DUMB_ADDRESS, false);
@@ -831,15 +831,10 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
     /// @dev I:[CC-21]: setPriceOracle upgrades priceOracle correctly
     function test_I_CC_21_setPriceOracle_upgrades_priceOracle_correctly() public creditTest {
-        vm.mockCall(DUMB_ADDRESS, abi.encodeCall(IVersion.version, ()), abi.encode(1));
-
-        vm.startPrank(CONFIGURATOR);
-        addressProvider.setAddress(AP_PRICE_ORACLE, DUMB_ADDRESS, true);
-
         vm.expectEmit(true, false, false, false);
         emit SetPriceOracle(DUMB_ADDRESS);
 
-        creditConfigurator.setPriceOracle(1);
+        creditConfigurator.setPriceOracle(DUMB_ADDRESS);
 
         assertEq(address(creditManager.priceOracle()), DUMB_ADDRESS);
         vm.stopPrank();
