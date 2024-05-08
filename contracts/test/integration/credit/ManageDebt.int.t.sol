@@ -128,14 +128,27 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
     /// @dev I:[MD-5]: increaseDebt reverts if there is a forbidden token on account
     function test_I_MD_05_increaseDebt_reverts_with_forbidden_tokens() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
-        vm.roll(block.number + 1);
 
         address link = tokenTestSuite.addressOf(Tokens.LINK);
+        uint256 linkMask = creditManager.getTokenMaskOrRevert(link);
+
+        vm.prank(USER);
+        creditFacade.multicall(
+            creditAccount,
+            MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (link, 10000, 0))
+                })
+            )
+        );
+
+        vm.roll(block.number + 1);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.forbidToken(link);
 
-        vm.expectRevert(ForbiddenTokenQuotaIncreasedException.selector);
+        vm.expectRevert(abi.encodeWithSelector(ForbiddenTokensException.selector, (linkMask)));
 
         vm.prank(USER);
         creditFacade.multicall(
@@ -144,10 +157,6 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (1))
-                }),
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (link, 10000, 0))
                 })
             )
         );

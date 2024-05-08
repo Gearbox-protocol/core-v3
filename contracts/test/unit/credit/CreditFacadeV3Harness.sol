@@ -31,8 +31,8 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
         _revertIfNoPermission(flags, permission);
     }
 
-    function revertIfOutOfBorrowingLimit(uint256 amount) external {
-        _revertIfOutOfBorrowingLimit(amount);
+    function revertIfOutOfDebtPerBlockLimit(uint256 amount) external {
+        _revertIfOutOfDebtPerBlockLimit(amount);
     }
 
     function setLastBlockBorrowed(uint64 _lastBlockBorrowed) external {

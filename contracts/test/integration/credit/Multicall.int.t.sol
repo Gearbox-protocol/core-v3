@@ -83,7 +83,7 @@ contract MultiCallIntegrationTest is
 
         bytes memory DUMB_CALLDATA = abi.encodeWithSignature("hello(string)", "world");
 
-        vm.expectRevert(UnknownMethodException.selector);
+        vm.expectRevert(abi.encodeWithSelector(UnknownMethodException.selector, (bytes4(DUMB_CALLDATA))));
 
         vm.prank(USER);
         creditFacade.multicall(
@@ -395,7 +395,9 @@ contract MultiCallIntegrationTest is
 
         for (uint256 i = 0; i < 2; i++) {
             vm.prank(USER);
-            vm.expectRevert(BalanceLessThanExpectedException.selector);
+            vm.expectRevert(
+                abi.encodeWithSelector(BalanceLessThanExpectedException.selector, (i == 0 ? underlying : tokenLINK))
+            );
 
             creditFacade.multicall(
                 creditAccount,

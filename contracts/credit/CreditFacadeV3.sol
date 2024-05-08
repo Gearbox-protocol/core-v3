@@ -4,41 +4,44 @@
 pragma solidity ^0.8.17;
 
 // THIRD-PARTY
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
-import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-// LIBS & TRAITS
-import {BalancesLogic, Balance, BalanceDelta, BalanceWithMask, Comparison} from "../libraries/BalancesLogic.sol";
-import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
-import {BitMask, UNDERLYING_TOKEN_MASK} from "../libraries/BitMask.sol";
-
-// INTERFACES
-import "../interfaces/ICreditFacadeV3.sol";
-import "../interfaces/IAddressProviderV3.sol";
-import {
-    ICreditManagerV3,
-    ManageDebtAction,
-    CollateralDebtData,
-    CollateralCalcTask,
-    BOT_PERMISSIONS_SET_FLAG,
-    INACTIVE_CREDIT_ACCOUNT_ADDRESS
-} from "../interfaces/ICreditManagerV3.sol";
-import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
-import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
-
+// FIRST-PARTY
 import {IDegenNFTV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFTV2.sol";
 import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
-import {IBotListV3} from "../interfaces/IBotListV3.sol";
-
-// CONSTANTS
+import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 
-// EXCEPTIONS
+// INTERFACES
+import {
+    AP_BOT_LIST, AP_WETH_TOKEN, IAddressProviderV3, NO_VERSION_CONTROL
+} from "../interfaces/IAddressProviderV3.sol";
+import {IBotListV3} from "../interfaces/IBotListV3.sol";
+import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
+import {CumulativeLossParams, DebtLimits, FullCheckParams, ICreditFacadeV3} from "../interfaces/ICreditFacadeV3.sol";
+import "../interfaces/ICreditFacadeV3Multicall.sol";
+import {
+    BOT_PERMISSIONS_SET_FLAG,
+    CollateralCalcTask,
+    CollateralDebtData,
+    ICreditManagerV3,
+    INACTIVE_CREDIT_ACCOUNT_ADDRESS,
+    ManageDebtAction
+} from "../interfaces/ICreditManagerV3.sol";
 import "../interfaces/IExceptions.sol";
+import {IPriceOracleV3, PriceUpdate} from "../interfaces/IPriceOracleV3.sol";
+
+// LIBRARIES
+import {BalanceDelta, BalanceWithMask, BalancesLogic, Comparison} from "../libraries/BalancesLogic.sol";
+import {BitMask, UNDERLYING_TOKEN_MASK} from "../libraries/BitMask.sol";
+
+// TRAITS
+import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 
 /// @title Credit facade V3
 /// @notice Provides a user interface to open, close and liquidate leveraged positions in the credit manager,
@@ -57,7 +60,6 @@ import "../interfaces/IExceptions.sol";
 contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     using Address for address;
     using BitMask for uint256;
-    using SafeCast for uint256;
     using SafeERC20 for IERC20;
 
     /// @notice Contract version
@@ -296,13 +298,13 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         _multicall(creditAccount, calls, collateralDebtData.enabledTokensMask, flags); // U:[FA-16]
 
-        bool success = BalancesLogic.compareBalances({
+        address failedToken = BalancesLogic.compareBalances({
             creditAccount: creditAccount,
             tokensMask: collateralDebtData.enabledTokensMask.disable(UNDERLYING_TOKEN_MASK),
             balances: initialBalances,
             comparison: Comparison.LESS
         });
-        if (!success) revert RemainingTokenBalanceIncreasedException(); // U:[FA-14]
+        if (failedToken != address(0)) revert RemainingTokenBalanceIncreasedException(failedToken); // U:[FA-14]
 
         collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(UNDERLYING_TOKEN_MASK); // U:[FA-16]
 
@@ -370,7 +372,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             IBotListV3(botList).getBotStatus({bot: msg.sender, creditAccount: creditAccount});
 
         if (forbidden || botPermissions == 0 || _flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG == 0) {
-            revert NotApprovedBotException(); // U:[FA-19]
+            revert NotApprovedBotException(msg.sender); // U:[FA-19]
         }
 
         _multicall(creditAccount, calls, _enabledTokensMaskOf(creditAccount), botPermissions); // U:[FA-19, 20]
@@ -392,8 +394,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     function _multicall(address creditAccount, MultiCall[] calldata calls, uint256 enabledTokensMask, uint256 flags)
         internal
     {
-        // impossible value of forbidden tokens mask to signal emptiness, see `_forbiddenTokensMaskRoE`
-        uint256 forbiddenTokensMask = UNDERLYING_TOKEN_MASK;
+        // impossible value of forbidden tokens mask to indicate emptiness, see `_forbiddenTokensMaskRoE`
+        uint256 forbiddenTokensMask = type(uint256).max;
 
         FullCheckParams memory fullCheckParams;
         BalanceWithMask[] memory forbiddenBalances;
@@ -421,9 +423,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
                     // onDemandPriceUpdates
                     if (method == ICreditFacadeV3Multicall.onDemandPriceUpdates.selector) {
-                        if (i != 0) revert UnknownMethodException(); // U:[FA-22]
-                        if (flags & SKIP_PRICE_UPDATES_CALL != 0) continue;
-                        _onDemandPriceUpdates(mcall.callData[4:]);
+                        if (i != 0) revert UnknownMethodException(method); // U:[FA-22]
+                        if (flags & SKIP_PRICE_UPDATES_CALL == 0) _onDemandPriceUpdates(mcall.callData[4:]); // U:[FA-25]
                     }
                     // storeExpectedBalances
                     else if (method == ICreditFacadeV3Multicall.storeExpectedBalances.selector) {
@@ -434,9 +435,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     // compareBalances
                     else if (method == ICreditFacadeV3Multicall.compareBalances.selector) {
                         if (expectedBalances.length == 0) revert ExpectedBalancesNotSetException(); // U:[FA-23]
-                        if (!BalancesLogic.compareBalances(creditAccount, expectedBalances, Comparison.GREATER)) {
-                            revert BalanceLessThanExpectedException(); // U:[FA-23]
-                        }
+                        address failedToken =
+                            BalancesLogic.compareBalances(creditAccount, expectedBalances, Comparison.GREATER);
+                        if (failedToken != address(0)) revert BalanceLessThanExpectedException(failedToken); // U:[FA-23]
                         expectedBalances = new Balance[](0); // U:[FA-23]
                     }
                     // addCollateral
@@ -483,12 +484,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     }
                     // setFullCheckParams
                     else if (method == ICreditFacadeV3Multicall.setFullCheckParams.selector) {
-                        if (flags & SKIP_COLLATERAL_CHECK != 0) revert UnknownMethodException(); // U:[FA-22]
+                        if (flags & SKIP_COLLATERAL_CHECK != 0) revert UnknownMethodException(method); // U:[FA-22]
                         _setFullCheckParams(fullCheckParams, mcall.callData[4:]); // U:[FA-24]
                     }
                     // unknown method
                     else {
-                        revert UnknownMethodException(); // U:[FA-22]
+                        revert UnknownMethodException(method); // U:[FA-22]
                     }
                 }
                 // adapter calls
@@ -508,9 +509,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             }
         }
         if (expectedBalances.length != 0) {
-            if (!BalancesLogic.compareBalances(creditAccount, expectedBalances, Comparison.GREATER)) {
-                revert BalanceLessThanExpectedException(); // U:[FA-23]
-            }
+            address failedToken = BalancesLogic.compareBalances(creditAccount, expectedBalances, Comparison.GREATER);
+            if (failedToken != address(0)) revert BalanceLessThanExpectedException(failedToken); // U:[FA-23]
         }
 
         if (flags & EXTERNAL_CONTRACT_WAS_CALLED != 0) _unsetActiveCreditAccount(); // U:[FA-38]
@@ -521,26 +521,26 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         // `forbiddenTokensMask` is non-empty at this point, so no need for `_forbiddenTokensMaskRoE`
         uint256 enabledForbiddenTokensMask = enabledTokensMask & forbiddenTokensMask;
         if (enabledForbiddenTokensMask != 0) {
-            if (flags & REVERT_ON_FORBIDDEN_TOKENS != 0) revert ForbiddenTokensException(); // U:[FA-45]
+            if (flags & REVERT_ON_FORBIDDEN_TOKENS != 0) revert ForbiddenTokensException(enabledForbiddenTokensMask); // U:[FA-45]
 
-            bool success = BalancesLogic.compareBalances({
+            address failedToken = BalancesLogic.compareBalances({
                 creditAccount: creditAccount,
                 tokensMask: enabledForbiddenTokensMask,
                 balances: forbiddenBalances,
                 comparison: Comparison.LESS
             });
-            if (!success) revert ForbiddenTokenBalanceIncreasedException(); // U:[FA-45]
+            if (failedToken != address(0)) revert ForbiddenTokenBalanceIncreasedException(failedToken); // U:[FA-45]
 
             flags |= USE_SAFE_PRICES; // U:[FA-45]
         }
 
-        ICreditManagerV3(creditManager).fullCollateralCheck(
-            creditAccount,
-            enabledTokensMask.enable(UNDERLYING_TOKEN_MASK),
-            fullCheckParams.collateralHints,
-            fullCheckParams.minHealthFactor,
-            flags & USE_SAFE_PRICES != 0
-        ); // U:[FA-24,34,45]
+        ICreditManagerV3(creditManager).fullCollateralCheck({
+            creditAccount: creditAccount,
+            enabledTokensMask: enabledTokensMask.enable(UNDERLYING_TOKEN_MASK),
+            collateralHints: fullCheckParams.collateralHints,
+            minHealthFactor: fullCheckParams.minHealthFactor,
+            useSafePrices: flags & USE_SAFE_PRICES != 0
+        }); // U:[FA-24,34,45]
     }
 
     /// @dev `ICreditFacadeV3Multicall.setFullCheckParams` implementation
@@ -556,7 +556,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             for (uint256 j; j < hintsLen; ++j) {
                 uint256 mask = fullCheckParams.collateralHints[j];
                 if (mask <= UNDERLYING_TOKEN_MASK || mask & mask - 1 != 0) {
-                    revert InvalidCollateralHintException(); // U:[FA-24]
+                    revert InvalidCollateralHintException(mask); // U:[FA-24]
                 }
             }
         }
@@ -602,7 +602,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         uint256 amount = abi.decode(callData, (uint256)); // U:[FA-27,31]
 
         if (action == ManageDebtAction.INCREASE_DEBT) {
-            _revertIfOutOfBorrowingLimit(amount); // U:[FA-28]
+            _revertIfOutOfDebtPerBlockLimit(amount); // U:[FA-28]
         }
 
         (uint256 newDebt,,) =
@@ -629,7 +629,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         if (quotaChange > 0) {
             forbiddenTokensMask = _forbiddenTokensMaskRoE(forbiddenTokensMask);
             if (forbiddenTokensMask != 0 && _getTokenMaskOrRevert(token) & forbiddenTokensMask != 0) {
-                revert ForbiddenTokenQuotaIncreasedException(); // U:[FA-45]
+                revert ForbiddenTokenQuotaIncreasedException(token); // U:[FA-45]
             }
         }
 
@@ -667,7 +667,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         (address bot, uint192 permissions) = abi.decode(callData, (address, uint192));
 
         uint192 allowedPermissions = ALL_PERMISSIONS & ~SET_BOT_PERMISSIONS_PERMISSION;
-        if (permissions & ~allowedPermissions != 0) revert UnexpectedPermissionsException(); // U:[FA-37]
+        uint192 unexpectedPermissions = permissions & ~allowedPermissions;
+        if (unexpectedPermissions != 0) revert UnexpectedPermissionsException(unexpectedPermissions); // U:[FA-37]
 
         uint256 remainingBots =
             IBotListV3(botList).setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: permissions}); // U:[FA-37]
@@ -778,7 +779,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
     /// @dev Ensures that amount borrowed by credit manager in the current block does not exceed the limit
     /// @dev Skipped when `maxDebtPerBlockMultiplier == type(uint8).max`
-    function _revertIfOutOfBorrowingLimit(uint256 amount) internal {
+    function _revertIfOutOfDebtPerBlockLimit(uint256 amount) internal {
         uint8 _maxDebtPerBlockMultiplier = maxDebtPerBlockMultiplier; // U:[FA-43]
         if (_maxDebtPerBlockMultiplier == type(uint8).max) return; // U:[FA-43]
 
@@ -800,6 +801,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
     /// @dev Ensures that account's debt principal is within allowed range or is zero
     function _revertIfOutOfDebtLimits(uint256 debt) internal view {
+        if (debt == 0) return;
         uint256 minDebt;
         uint256 maxDebt;
 
@@ -811,7 +813,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             minDebt := and(data, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
         }
 
-        if (debt != 0 && ((debt < minDebt) || (debt > maxDebt))) {
+        if (debt < minDebt || debt > maxDebt) {
             revert BorrowAmountOutOfLimitsException(); // U:[FA-44]
         }
     }
@@ -825,9 +827,10 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
     /// @dev Read-on-empty function to read forbidden tokens mask at most once if it's needed, returns its argument
     ///      if it's not empty or `forbiddenTokenMask` otherwise
-    /// @dev Non-empty forbidden tokens mask always has its LSB set to 0 since underlying can't be forbidden
+    /// @dev Non-empty forbidden tokens mask always has its LSB set to 0 since underlying can't be forbidden,
+    ///      so we can use `type(uint256).max` as indicator that value is not yet initialized
     function _forbiddenTokensMaskRoE(uint256 forbiddenTokensMaskOrEmpty) internal view returns (uint256) {
-        return forbiddenTokensMaskOrEmpty == UNDERLYING_TOKEN_MASK ? forbiddenTokenMask : forbiddenTokensMaskOrEmpty;
+        return forbiddenTokensMaskOrEmpty == type(uint256).max ? forbiddenTokenMask : forbiddenTokensMaskOrEmpty;
     }
 
     /// @dev Wraps any ETH sent in the function call and sends it back to `msg.sender`

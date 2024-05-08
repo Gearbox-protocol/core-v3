@@ -57,7 +57,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         vm.prank(address(creditFacade));
         botList.setBotPermissions(bot, creditAccount, ALL_PERMISSIONS & ~SET_BOT_PERMISSIONS_PERMISSION);
 
-        vm.expectRevert(NotApprovedBotException.selector);
+        vm.expectRevert(abi.encodeWithSelector(NotApprovedBotException.selector, (address(this))));
         creditFacade.botMulticall(
             creditAccount, MultiCallBuilder.build(MultiCall({target: address(adapterMock), callData: DUMB_CALLDATA}))
         );
@@ -102,7 +102,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         vm.prank(CONFIGURATOR);
         botList.setBotForbiddenStatus(bot, true);
 
-        vm.expectRevert(NotApprovedBotException.selector);
+        vm.expectRevert(abi.encodeWithSelector(NotApprovedBotException.selector, (bot)));
         vm.prank(bot);
         creditFacade.botMulticall(creditAccount, calls);
     }
