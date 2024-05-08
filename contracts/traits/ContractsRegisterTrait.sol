@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {IContractsRegister} from "@gearbox-protocol/core-v2/contracts/interfaces/IContractsRegister.sol";
+import {IRiskConfiguratorV3} from "../interfaces/IRiskConfiguratorV3.sol";
 
 import {AP_CONTRACTS_REGISTER, IAddressProviderV3, NO_VERSION_CONTROL} from "../interfaces/IAddressProviderV3.sol";
 import {RegisteredCreditManagerOnlyException, RegisteredPoolOnlyException} from "../interfaces/IExceptions.sol";
@@ -14,7 +14,7 @@ import {SanityCheckTrait} from "./SanityCheckTrait.sol";
 /// @notice Trait that simplifies validation of pools and credit managers
 abstract contract ContractsRegisterTrait is SanityCheckTrait {
     /// @notice Contracts register contract address
-    address public immutable contractsRegister;
+    address public immutable riskConfigurator;
 
     /// @dev Ensures that given address is a registered credit manager
     modifier registeredPoolOnly(address addr) {
@@ -29,10 +29,9 @@ abstract contract ContractsRegisterTrait is SanityCheckTrait {
     }
 
     /// @notice Constructor
-    /// @param addressProvider Address provider contract address
-    constructor(address addressProvider) nonZeroAddress(addressProvider) {
-        contractsRegister =
-            IAddressProviderV3(addressProvider).getAddressOrRevert(AP_CONTRACTS_REGISTER, NO_VERSION_CONTROL);
+    /// @param _riskConfigurator Address provider contract address
+    constructor(address _riskConfigurator) nonZeroAddress(_riskConfigurator) {
+        riskConfigurator = _riskConfigurator;
     }
 
     /// @dev Ensures that given address is a registered pool
@@ -47,11 +46,11 @@ abstract contract ContractsRegisterTrait is SanityCheckTrait {
 
     /// @dev Whether given address is a registered pool
     function _isRegisteredPool(address addr) internal view returns (bool) {
-        return IContractsRegister(contractsRegister).isPool(addr);
+        return IRiskConfiguratorV3(riskConfigurator).isPool(addr);
     }
 
     /// @dev Whether given address is a registered credit manager
     function _isRegisteredCreditManager(address addr) internal view returns (bool) {
-        return IContractsRegister(contractsRegister).isCreditManager(addr);
+        return IRiskConfiguratorV3(riskConfigurator).isCreditManager(addr);
     }
 }

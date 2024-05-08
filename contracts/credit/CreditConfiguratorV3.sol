@@ -185,7 +185,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function setLiquidationThreshold(address token, uint16 liquidationThreshold)
         external
         override
-        configuratorOnly // I:[CC-2]
+        controllerOnly // I:[CC-2]
     {
         _setLiquidationThreshold({token: token, liquidationThreshold: liquidationThreshold}); // I:[CC-5]
     }
@@ -294,7 +294,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         override
         nonZeroAddress(token)
         nonUnderlyingTokenOnly(token)
-        configuratorOnly // I:[CC-2]
+        controllerOnly // I:[CC-2]
     {
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
@@ -395,7 +395,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function setMaxEnabledTokens(uint8 newMaxEnabledTokens)
         external
         override
-        configuratorOnly // I:[CC-2]
+        controllerOnly // I:[CC-2]
     {
         CreditManagerV3 cm = CreditManagerV3(creditManager);
 
@@ -427,7 +427,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     )
         external
         override
-        configuratorOnly // I:[CC-2]
+        controllerOnly // I:[CC-2]
     {
         if (
             feeInterest >= PERCENTAGE_FACTOR || (liquidationPremium + feeLiquidation) >= PERCENTAGE_FACTOR
@@ -713,7 +713,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function setMaxCumulativeLoss(uint128 newMaxCumulativeLoss)
         external
         override
-        configuratorOnly // I:[CC-2]
+        controllerOnly // I:[CC-2]
     {
         _setMaxCumulativeLoss(creditFacade(), newMaxCumulativeLoss); // I:[CC-31]
     }
@@ -733,7 +733,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function resetCumulativeLoss()
         external
         override
-        configuratorOnly // I:[CC-2]
+        controllerOnly // I:[CC-2]
     {
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
         (, uint128 maxCumulativeLossCurrent) = cf.lossParams(); // I:[CC-32]

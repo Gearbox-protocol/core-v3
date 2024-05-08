@@ -10,13 +10,27 @@ import {RiskConfigurator} from "./RiskConfigurator.sol";
 contract RiskConfiguratorRegister is ACLTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
 
+    error CantRemoveRiskConfiguratorWithExistingPools();
+
+    event AddRiskCurator(address indexed newRiskConfigurator, string name, address _vetoAdmin);
+
     EnumerableSet.AddressSet internal _riskCurators;
 
     constructor(address acl) ACLTrait(acl) {}
 
-    function addRiskConfigurator(address newRiskConfigurator) external {
-        address rc = address(new RiskConfigurator(newRiskConfigurator));
+    function addRiskConfigurator(address newRiskConfigurator, string calldata name, address _vetoAdmin)
+        external
+        configuratorOnly
+    {
+        address rc = address(new RiskConfigurator(newRiskConfigurator, name, _vetoAdmin));
         _riskCurators.add(rc);
+        emit AddRiskCurator(newRiskConfigurator, name, _vetoAdmin);
+    }
+
+    function removeRiskConfigurator(address rc) external configuratorOnly {
+        if (RiskConfigurator(rc).pools().length != 0) revert CantRemoveRiskConfiguratorWithExistingPools();
+        _riskCurators.remove(rc);
+        (rc);
     }
 
     function riskCurators() external view returns (address[] memory) {
