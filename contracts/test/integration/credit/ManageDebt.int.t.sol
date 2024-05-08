@@ -10,6 +10,7 @@ import {
     BOT_PERMISSIONS_SET_FLAG
 } from "../../../interfaces/ICreditManagerV3.sol";
 import "../../../interfaces/ICreditFacadeV3.sol";
+import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // TESTS
@@ -21,7 +22,7 @@ import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
-contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
+contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events, IPoolV3Events {
     /// @dev I:[MD-1]: increaseDebt executes function as expected
     function test_I_MD_01_increaseDebt_executes_actions_as_expected() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
@@ -39,8 +40,8 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
             )
         );
 
-        vm.expectEmit(true, false, false, true);
-        emit IncreaseDebt(creditAccount, 512);
+        vm.expectEmit(true, true, true, true, address(pool));
+        emit Borrow(address(creditManager), creditAccount, 512);
 
         vm.prank(USER);
         creditFacade.multicall(
@@ -179,8 +180,8 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
             )
         );
 
-        vm.expectEmit(true, false, false, true);
-        emit DecreaseDebt(creditAccount, 512);
+        vm.expectEmit(true, true, true, true, address(pool));
+        emit Repay(address(creditManager), 512, 0, 0);
 
         vm.prank(USER);
         creditFacade.multicall(

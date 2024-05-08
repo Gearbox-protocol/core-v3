@@ -48,12 +48,6 @@ interface ICreditFacadeV3Events {
         address indexed creditAccount, address indexed liquidator, address to, uint256 remainingFunds
     );
 
-    /// @notice Emitted when account's debt is increased
-    event IncreaseDebt(address indexed creditAccount, uint256 amount);
-
-    /// @notice Emitted when account's debt is decreased
-    event DecreaseDebt(address indexed creditAccount, uint256 amount);
-
     /// @notice Emitted when collateral is added to account
     event AddCollateral(address indexed creditAccount, address indexed token, uint256 amount);
 

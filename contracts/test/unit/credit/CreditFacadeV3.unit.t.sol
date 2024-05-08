@@ -337,21 +337,9 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
     /// @dev U:[FA-10]: openCreditAccount wokrs as expected
     function test_U_FA_10_openCreditAccount_works_as_expected() public notExpirableCase {
-        vm.prank(CONFIGURATOR);
-        creditFacade.setDebtLimits(100, 200, 1);
-
-        uint256 debt = 200;
-
-        {
-            uint64 blockNow = 100;
-            creditFacade.setLastBlockBorrowed(blockNow);
-
-            vm.roll(blockNow);
-        }
-
-        uint256 debtInBlock = creditFacade.totalBorrowedInBlockInt();
-
+        address token = makeAddr("token");
         address expectedCreditAccount = DUMB_ADDRESS;
+
         creditManagerMock.setReturnOpenCreditAccount(expectedCreditAccount);
 
         vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.openCreditAccount, (FRIEND)));
@@ -361,16 +349,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.expectEmit(true, true, false, false);
         emit StartMultiCall({creditAccount: expectedCreditAccount, caller: USER});
-
-        vm.expectCall(
-            address(creditManagerMock),
-            abi.encodeCall(
-                ICreditManagerV3.manageDebt, (expectedCreditAccount, debt, 0, ManageDebtAction.INCREASE_DEBT)
-            )
-        );
-
-        vm.expectEmit(true, true, false, false);
-        emit IncreaseDebt({creditAccount: expectedCreditAccount, amount: debt});
 
         vm.expectEmit(true, false, false, false);
         emit FinishMultiCall();
@@ -389,14 +367,13 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             calls: MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (debt))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (token, 0))
                 })
             ),
             referralCode: REFERRAL_CODE
         });
 
         assertEq(creditAccount, expectedCreditAccount, "Incorrect credit account");
-        assertEq(creditFacade.totalBorrowedInBlockInt(), debtInBlock + debt, "Debt in block was updated incorrectly");
     }
 
     /// @dev U:[FA-11]: closeCreditAccount wokrs as expected
@@ -1211,9 +1188,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             abi.encodeCall(ICreditManagerV3.manageDebt, (creditAccount, amount, mask, ManageDebtAction.INCREASE_DEBT))
         );
 
-        vm.expectEmit(true, true, false, false);
-        emit IncreaseDebt(creditAccount, amount);
-
         creditFacade.multicallInt({
             creditAccount: creditAccount,
             calls: calls,
@@ -1283,9 +1257,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             address(creditManagerMock),
             abi.encodeCall(ICreditManagerV3.manageDebt, (creditAccount, amount, mask, ManageDebtAction.DECREASE_DEBT))
         );
-
-        vm.expectEmit(true, true, false, false);
-        emit DecreaseDebt(creditAccount, amount);
 
         creditFacade.multicallInt({
             creditAccount: creditAccount,

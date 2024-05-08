@@ -609,12 +609,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             ICreditManagerV3(creditManager).manageDebt(creditAccount, amount, enabledTokensMask, action); // U:[FA-27,31]
 
         _revertIfOutOfDebtLimits(newDebt); // U:[FA-28, 32, 33]
-
-        if (action == ManageDebtAction.INCREASE_DEBT) {
-            emit IncreaseDebt({creditAccount: creditAccount, amount: amount}); // U:[FA-27]
-        } else {
-            emit DecreaseDebt({creditAccount: creditAccount, amount: amount}); // U:[FA-31]
-        }
     }
 
     /// @dev `ICreditFacadeV3Multicall.updateQuota` implementation
