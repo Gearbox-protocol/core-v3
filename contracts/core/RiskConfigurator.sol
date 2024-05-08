@@ -5,6 +5,8 @@ pragma solidity ^0.8.17;
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {ACL} from "@gearbox-protocol/core-v2/contracts/core/ACL.sol";
+import {ControllerTimelockV3} from "../governance/ControllerTimelockV3.sol";
 
 import {PriceOracleFactoryV3} from "../factories/PriceOracleFactoryV3.sol";
 import {InterestModelFactory} from "../factories/InterestModelFactory.sol";
@@ -46,6 +48,12 @@ contract RiskConfigurator is Ownable2Step {
     address priceOracleFactory;
     address adapterFactory;
     address controller;
+
+    constructor(address _owner, address _vetoAdmin) {
+        _transferOwnership(_owner);
+        acl = address(new ACL());
+        // controller = new ControllerTimelockV3(_vetoAdmin);
+    }
 
     function createMarket(address underlying, uint256 totalLimit, address interestModel, uint8 rateKeeperType)
         external
@@ -105,7 +113,7 @@ contract RiskConfigurator is Ownable2Step {
         creditConfigurator.upgradeCreditConfigurator(newCreditConfigurator);
     }
 
-    function changePriceOracle(address pool, uint256 version, PriceUpdate[] calldata priceUpdates) external onlyOwner {
+    function changePriceOracle(address pool, uint256 version) external onlyOwner {
         // Check that prices for all tokens exists
 
         address oldOracle = priceOracles[pool];
@@ -113,8 +121,6 @@ contract RiskConfigurator is Ownable2Step {
         address[] memory collateralTokens = IPoolQuotaKeeperV3(IPoolV3(pool).poolQuotaKeeper()).quotedTokens();
         uint256 len = collateralTokens.length;
 
-        // Updates prices via old oracle to make it possible to set (validate price) in new one
-        IPriceOracleV3(oldOracle).updatePrices(priceUpdates);
         unchecked {
             for (uint256 i; i < len; ++i) {
                 address token = collateralTokens[i];
