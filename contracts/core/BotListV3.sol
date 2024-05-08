@@ -3,6 +3,8 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {IBotListV3, BotInfo} from "../interfaces/IBotListV3.sol";
@@ -16,12 +18,12 @@ import {
     InvalidBotException
 } from "../interfaces/IExceptions.sol";
 
-import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
+import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
 /// @title Bot list V3
 /// @notice Stores bot permissions (bit masks dictating which actions can be performed with credit accounts in multicall).
-contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
+contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice Contract version
@@ -37,11 +39,10 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
     mapping(address => mapping(address => EnumerableSet.AddressSet)) internal _activeBots;
 
     /// @notice Constructor
-    /// @param addressProvider Address provider contract address
-    constructor(address addressProvider)
-        ACLNonReentrantTrait(addressProvider)
-        ContractsRegisterTrait(addressProvider)
-    {}
+    /// @param riskConfiguratorRegister Address provider contract address
+    constructor(address riskConfiguratorRegister) {
+        _transferOwnership(riskConfiguratorRegister);
+    }
 
     // ----------- //
     // PERMISSIONS //
@@ -133,7 +134,7 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
     }
 
     /// @notice Sets `bot`'s status to `forbidden`
-    function setBotForbiddenStatus(address bot, bool forbidden) external override configuratorOnly {
+    function setBotForbiddenStatus(address bot, bool forbidden) external override onlyOwner {
         BotInfo storage info = _botInfo[bot];
         if (info.forbidden != forbidden) {
             info.forbidden = forbidden;
@@ -142,12 +143,7 @@ contract BotListV3 is ACLNonReentrantTrait, ContractsRegisterTrait, IBotListV3 {
     }
 
     /// @notice Sets `creditManager`'s status to `approved`
-    function setCreditManagerApprovedStatus(address creditManager, bool approved)
-        external
-        override
-        configuratorOnly
-        registeredCreditManagerOnly(creditManager)
-    {
+    function setCreditManagerApprovedStatus(address creditManager, bool approved) external override onlyOwner {
         if (approvedCreditManager[creditManager] != approved) {
             approvedCreditManager[creditManager] = approved;
             emit SetCreditManagerApprovedStatus(creditManager, approved);

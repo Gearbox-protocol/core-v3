@@ -17,9 +17,9 @@ abstract contract ACLTrait is SanityCheckTrait {
     address public immutable acl;
 
     /// @notice Constructor
-    /// @param _riskCurator Address provider contract address
-    constructor(address _riskCurator) nonZeroAddress(_riskCurator) {
-        acl = IRiskConfiguratorV3(_riskCurator).acl();
+    /// @param _riskConfigurator Address provider contract address
+    constructor(address _riskConfigurator) nonZeroAddress(_riskConfigurator) {
+        acl = IRiskConfiguratorV3(_riskConfigurator).acl();
     }
 
     /// @dev Ensures that function caller has configurator role

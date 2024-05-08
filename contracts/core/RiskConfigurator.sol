@@ -50,6 +50,7 @@ contract RiskConfigurator is Ownable2Step, IRiskConfiguratorV3 {
     // Mapping: market -> priceOracle
     mapping(address => address) public priceOracles;
 
+    address public immutable override riskConfiguratorRegister;
     address public override treasury;
     address public override acl;
     address public override interestModelFactory;
@@ -60,6 +61,7 @@ contract RiskConfigurator is Ownable2Step, IRiskConfiguratorV3 {
     address public override controller;
 
     constructor(address _owner, address _treasury, string memory _name, address _vetoAdmin) {
+        riskConfiguratorRegister = msg.sender;
         _transferOwnership(_owner);
         acl = address(new ACL());
         name = _name;

@@ -4,6 +4,8 @@
 pragma solidity ^0.8.17;
 
 interface IRiskConfiguratorV3 {
+    function riskConfiguratorRegister() external view returns (address);
+
     function acl() external view returns (address);
 
     function treasury() external view returns (address);

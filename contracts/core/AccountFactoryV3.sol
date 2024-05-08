@@ -4,6 +4,8 @@
 pragma solidity ^0.8.17;
 pragma abicoder v1;
 
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 
 import {CreditAccountV3} from "../credit/CreditAccountV3.sol";
@@ -41,7 +43,7 @@ struct QueuedAccount {
 ///         - When account is returned to the factory, it is only added to the queue after a certain delay, which
 ///           allows DAO to rescue funds that might have been accidentally left upon account closure, and serves
 ///           as protection against potential attacks involving reopening an account right after closing it
-contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait {
+contract AccountFactoryV3 is IAccountFactoryV3, Ownable {
     /// @notice Contract version
     uint256 public constant override version = 3_00;
 
@@ -55,8 +57,10 @@ contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait
     mapping(address => mapping(uint256 => QueuedAccount)) internal _queuedAccounts;
 
     /// @notice Constructor
-    /// @param addressProvider Address provider contract address
-    constructor(address addressProvider) ACLTrait(addressProvider) ContractsRegisterTrait(addressProvider) {}
+    /// @param riskConfiguratorRegister Address provider contract address
+    constructor(address riskConfiguratorRegister) {
+        _transferOwnership(riskConfiguratorRegister);
+    }
 
     /// @notice Provides a reusable credit account from the queue to the credit manager.
     ///         If there are no accounts that can be reused in the queue, deploys a new one.
@@ -114,8 +118,7 @@ contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait
     function addCreditManager(address creditManager)
         external
         override
-        configuratorOnly // U:[AF-1]
-        registeredCreditManagerOnly(creditManager) // U:[AF-4A]
+        onlyOwner // U:[AF-1]
     {
         if (_factoryParams[creditManager].masterCreditAccount != address(0)) {
             revert MasterCreditAccountAlreadyDeployedException(); // U:[AF-4B]
@@ -133,10 +136,10 @@ contract AccountFactoryV3 is IAccountFactoryV3, ACLTrait, ContractsRegisterTrait
     /// @param data Data to call the target contract with
     function rescue(address creditAccount, address target, bytes calldata data)
         external
-        configuratorOnly // U:[AF-1]
+        onlyOwner // U:[AF-1]
     {
         address creditManager = CreditAccountV3(creditAccount).creditManager();
-        _ensureRegisteredCreditManager(creditManager); // U:[AF-5A]
+        // _ensureRegisteredCreditManager(creditManager); // U:[AF-5A] // How to check?
 
         (,,,,,,, address borrower) = CreditManagerV3(creditManager).creditAccountInfo(creditAccount);
         if (borrower != address(0)) {
