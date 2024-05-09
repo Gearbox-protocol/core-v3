@@ -4,7 +4,13 @@
 pragma solidity ^0.8.17;
 
 import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
-import {ICreditManagerV3, ICreditManagerV3Events, ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
+import {
+    CollateralCalcTask,
+    ICreditManagerV3,
+    ICreditManagerV3Events,
+    ManageDebtAction
+} from "../../../interfaces/ICreditManagerV3.sol";
+import {IPriceOracleV3, PriceUpdate} from "../../../interfaces/IPriceOracleV3.sol";
 
 import "../../../interfaces/ICreditFacadeV3.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
@@ -45,9 +51,14 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
     {
         (address creditAccount,) = _openTestCreditAccount();
 
+        PriceUpdate[] memory priceUpdates;
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
 
         MultiCall[] memory calls = MultiCallBuilder.build(
+            MultiCall({
+                target: address(creditFacade),
+                callData: abi.encodeCall(ICreditFacadeV3Multicall.onDemandPriceUpdates, (priceUpdates))
+            }),
             MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
         );
 
@@ -55,46 +66,31 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
 
         // EXPECTED STACK TRACE & EVENTS
 
-        vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount)));
+        vm.expectCall(address(priceOracle), abi.encodeCall(IPriceOracleV3.updatePrices, (priceUpdates)));
+
+        vm.expectCall(
+            address(creditManager),
+            abi.encodeCall(ICreditManagerV3.calcDebtAndCollateral, (creditAccount, CollateralCalcTask.DEBT_COLLATERAL))
+        );
 
         vm.expectEmit(true, false, false, false);
         emit StartMultiCall({creditAccount: creditAccount, caller: LIQUIDATOR});
 
-        vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.execute, (DUMB_CALLDATA)));
+        vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount)));
 
-        vm.expectEmit(true, false, false, false);
-        emit Execute(creditAccount, address(targetMock));
+        vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.execute, (DUMB_CALLDATA)));
 
         vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountBase.execute, (address(targetMock), DUMB_CALLDATA)));
 
         vm.expectCall(address(targetMock), DUMB_CALLDATA);
 
-        vm.expectEmit(false, false, false, false);
-        emit FinishMultiCall();
+        vm.expectEmit(true, false, false, false);
+        emit Execute(creditAccount, address(targetMock));
 
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (address(1))));
 
-        // Total value = 2 * DAI_ACCOUNT_AMOUNT, cause we have x2 leverage
-        // uint256 totalValue = 2 * DAI_ACCOUNT_AMOUNT;
-        // uint256 debtWithInterest = DAI_ACCOUNT_AMOUNT;
-
-        // vm.expectCall(
-        //     address(creditManager),
-        //     abi.encodeCall(
-        //         ICreditManagerV3.closeCreditAccount,
-        //         (
-        //             creditAccount,
-        //             ClosureAction.LIQUIDATE_ACCOUNT,
-        //             totalValue,
-        //             LIQUIDATOR,
-        //             FRIEND,
-        //             1,
-        //             10,
-        //             debtWithInterest,
-        //             true
-        //         )
-        //     )
-        // );
+        vm.expectEmit(false, false, false, false);
+        emit FinishMultiCall();
 
         vm.expectEmit(true, true, true, true);
         emit LiquidateCreditAccount(creditAccount, LIQUIDATOR, FRIEND, 0);

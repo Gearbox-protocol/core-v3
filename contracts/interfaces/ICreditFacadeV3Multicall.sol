@@ -10,23 +10,45 @@ import {PriceUpdate} from "./IPriceOracleV3.sol";
 // PERMISSIONS //
 // ----------- //
 
+// NOTE: permissions 1 << 3, 1 << 4 and 1 << 7 were used by now deprecated methods, thus non-consecutive values
+
 uint192 constant ADD_COLLATERAL_PERMISSION = 1 << 0;
 uint192 constant INCREASE_DEBT_PERMISSION = 1 << 1;
 uint192 constant DECREASE_DEBT_PERMISSION = 1 << 2;
 uint192 constant WITHDRAW_COLLATERAL_PERMISSION = 1 << 5;
 uint192 constant UPDATE_QUOTA_PERMISSION = 1 << 6;
+uint192 constant SET_BOT_PERMISSIONS_PERMISSION = 1 << 8;
 uint192 constant EXTERNAL_CALLS_PERMISSION = 1 << 16;
 
-uint256 constant ALL_PERMISSIONS = ADD_COLLATERAL_PERMISSION | WITHDRAW_COLLATERAL_PERMISSION | INCREASE_DEBT_PERMISSION
-    | DECREASE_DEBT_PERMISSION | UPDATE_QUOTA_PERMISSION | EXTERNAL_CALLS_PERMISSION;
+uint192 constant ALL_PERMISSIONS = ADD_COLLATERAL_PERMISSION | WITHDRAW_COLLATERAL_PERMISSION | UPDATE_QUOTA_PERMISSION
+    | INCREASE_DEBT_PERMISSION | DECREASE_DEBT_PERMISSION | SET_BOT_PERMISSIONS_PERMISSION | EXTERNAL_CALLS_PERMISSION;
+uint192 constant OPEN_CREDIT_ACCOUNT_PERMISSIONS = ALL_PERMISSIONS & ~DECREASE_DEBT_PERMISSION;
+uint192 constant CLOSE_CREDIT_ACCOUNT_PERMISSIONS = ALL_PERMISSIONS & ~INCREASE_DEBT_PERMISSION;
+uint192 constant LIQUIDATE_CREDIT_ACCOUNT_PERMISSIONS =
+    EXTERNAL_CALLS_PERMISSION | ADD_COLLATERAL_PERMISSION | WITHDRAW_COLLATERAL_PERMISSION;
 
 // ----- //
 // FLAGS //
 // ----- //
 
+/// @dev Indicates that collateral check after the multicall can be skipped, set to true on account closure or liquidation
+uint256 constant SKIP_COLLATERAL_CHECK = 1 << 192;
+
 /// @dev Indicates that external calls from credit account to adapters were made during multicall,
 ///      set to true on the first call to the adapter
 uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 1 << 193;
+
+/// @dev Indicates that the price updates call should be skipped, set to true on liquidation when the first call
+///      of the multicall is `onDemandPriceUpdates`
+uint256 constant SKIP_PRICE_UPDATES_CALL = 1 << 194;
+
+/// @dev Indicates that collateral check must revert if any forbidden token is encountered on the account,
+///      set to true after risky operations, such as `increaseDebt` or `withdrawCollateral`
+uint256 constant REVERT_ON_FORBIDDEN_TOKENS = 1 << 195;
+
+/// @dev Indicates that collateral check must be performed using safe prices, set to true on `withdrawCollateral`
+///      or if account has enabled forbidden tokens
+uint256 constant USE_SAFE_PRICES = 1 << 196;
 
 /// @title Credit facade V3 multicall interface
 /// @dev Unless specified otherwise, all these methods are only available in `openCreditAccount`,
@@ -111,6 +133,15 @@ interface ICreditFacadeV3Multicall {
     ///        when known subset of account's collateral tokens covers all the debt. Underlying token is always
     ///        checked last so it's forbidden to pass its mask.
     /// @param minHealthFactor Min account's health factor in bps in order not to revert, must be at least 10000
-    /// @dev This method is available in all kinds of multicalls
+    /// @dev This method can't be called during closure or liquidation
     function setFullCheckParams(uint256[] calldata collateralHints, uint16 minHealthFactor) external;
+
+    /// @notice Sets `bot`'s permissions to manage account to `permissions`
+    /// @param bot Bot to set permissions for
+    /// @param permissions A bitmask encoding bot permissions
+    /// @dev Reverts if `permissions` has unexpected bits enabled (including `SET_BOT_PERMISSIONS_PERMISSION`,
+    ///      that would have been way too tricky) or some bits required by `bot` disabled
+    /// @dev Reverts if account has more active bots than allowed after changing permissions
+    /// @dev Changes account's `BOT_PERMISSIONS_SET_FLAG` in the credit manager if needed
+    function setBotPermissions(address bot, uint192 permissions) external;
 }

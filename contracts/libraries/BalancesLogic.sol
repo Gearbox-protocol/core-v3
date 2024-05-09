@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -72,21 +72,20 @@ library BalancesLogic {
     /// @param creditAccount Credit account to compare balances for
     /// @param balances Array of previously stored balances
     /// @param comparison Whether current balances must be greater/less than or equal to stored ones
-    /// @return success True if condition specified by `comparison` holds for all tokens, false otherwise
+    /// @return failedToken The first token for which the condition specified by `comparison` fails, if any
     function compareBalances(address creditAccount, Balance[] memory balances, Comparison comparison)
         internal
         view
-        returns (bool success)
+        returns (address failedToken)
     {
-        uint256 len = balances.length;
         unchecked {
-            for (uint256 i = 0; i < len; ++i) {
+            uint256 len = balances.length;
+            for (uint256 i; i < len; ++i) {
                 if (!BalancesLogic.checkBalance(creditAccount, balances[i].token, balances[i].balance, comparison)) {
-                    return false; // U:[BLL-3]
+                    return balances[i].token; // U:[BLL-3]
                 }
             }
         }
-        return true; // U:[BLL-3]
     }
 
     /// @dev Returns balances of specified tokens on the credit account
@@ -123,26 +122,24 @@ library BalancesLogic {
     /// @param tokensMask Bit mask of tokens to compare balances for
     /// @param balances Array of previously stored balances
     /// @param comparison Whether current balances must be greater/less than or equal to stored ones
-    /// @return success True if condition specified by `comparison` holds for all tokens, false otherwise
+    /// @return failedToken The first token for which the condition specified by `comparison` fails, if any
+    /// @dev This function assumes that `tokensMask` encodes a subset of tokens from `balances`
     function compareBalances(
         address creditAccount,
         uint256 tokensMask,
         BalanceWithMask[] memory balances,
         Comparison comparison
-    ) internal view returns (bool) {
-        if (tokensMask == 0) return true;
+    ) internal view returns (address failedToken) {
+        if (tokensMask == 0) return address(0);
 
         unchecked {
             uint256 len = balances.length;
             for (uint256 i; i < len; ++i) {
-                if (tokensMask & balances[i].tokenMask != 0) {
-                    if (!BalancesLogic.checkBalance(creditAccount, balances[i].token, balances[i].balance, comparison))
-                    {
-                        return false; // U:[BLL-5]
-                    }
+                if (tokensMask & balances[i].tokenMask == 0) continue;
+                if (!BalancesLogic.checkBalance(creditAccount, balances[i].token, balances[i].balance, comparison)) {
+                    return balances[i].token; // U:[BLL-5]
                 }
             }
         }
-        return true; // U:[BLL-5]
     }
 }
