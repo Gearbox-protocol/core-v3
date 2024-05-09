@@ -73,6 +73,7 @@ contract CreditManagerMock {
         addressProvider = _addressProvider;
         setPoolService(_pool);
         creditConfigurator = CONFIGURATOR;
+        underlying = IPoolV3(_pool).underlyingToken();
     }
 
     function setPriceOracle(address _priceOracle) external {

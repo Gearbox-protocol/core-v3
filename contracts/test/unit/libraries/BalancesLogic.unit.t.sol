@@ -87,25 +87,25 @@ contract BalancesLogicUnitTest is TestHelper {
 
         _setupTokenBalances(balances, length);
 
-        bool expectedResult = true;
-        for (uint256 i = 0; i < length; ++i) {
+        address expectedResult;
+        for (uint256 i; i < length; ++i) {
             if (greater && expectedBalances[i] > balances[i]) {
-                expectedResult = false;
+                expectedResult = tokens[i];
                 break;
             }
 
             if (!greater && expectedBalances[i] < balances[i]) {
-                expectedResult = false;
+                expectedResult = tokens[i];
                 break;
             }
         }
 
         Balance[] memory storedBalances = new Balance[](length);
-        for (uint256 i = 0; i < length; ++i) {
+        for (uint256 i; i < length; ++i) {
             storedBalances[i] = Balance({token: tokens[i], balance: expectedBalances[i]});
         }
 
-        bool result =
+        address result =
             BalancesLogic.compareBalances(creditAccount, storedBalances, greater ? Comparison.GREATER : Comparison.LESS);
         assertEq(result, expectedResult, "Incorrect result");
     }
@@ -153,23 +153,23 @@ contract BalancesLogicUnitTest is TestHelper {
 
         _setupTokenBalances(balancesAfter, 16);
 
-        bool expectedResult = true;
+        address expectedResult;
         for (uint256 i = 0; i < 16; ++i) {
             uint256 tokenMask = 1 << i;
             if (tokensMask & tokenMask > 0) {
                 if (greater && balancesAfter[i] < balancesBefore[i]) {
-                    expectedResult = false;
+                    expectedResult = tokens[i];
                     break;
                 }
 
                 if (!greater && balancesAfter[i] > balancesBefore[i]) {
-                    expectedResult = false;
+                    expectedResult = tokens[i];
                     break;
                 }
             }
         }
 
-        bool result = BalancesLogic.compareBalances(
+        address result = BalancesLogic.compareBalances(
             creditAccount, tokensMask, storedBalances, greater ? Comparison.GREATER : Comparison.LESS
         );
         assertEq(result, expectedResult, "Incorrect result");
