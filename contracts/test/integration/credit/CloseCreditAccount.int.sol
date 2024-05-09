@@ -17,7 +17,7 @@ import {
     BOT_PERMISSIONS_SET_FLAG
 } from "../../../interfaces/ICreditManagerV3.sol";
 
-import "../../../interfaces/ICreditFacadeV3.sol";
+import {ICreditFacadeV3} from "../../../interfaces/ICreditFacadeV3.sol";
 
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
@@ -99,7 +99,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT / 2)
-                )
+                    )
             })
         );
 
@@ -234,7 +234,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.withdrawCollateral, (daiToken, type(uint256).max, USER)
-                    )
+                        )
                 })
             )
         );

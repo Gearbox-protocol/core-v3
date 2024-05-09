@@ -50,7 +50,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-                )
+                    )
             })
         );
 
@@ -78,14 +78,14 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-                )
+                    )
             }),
             MultiCall({
                 target: address(adapterMock),
                 callData: abi.encodeCall(
                     AdapterMock.executeSwapSafeApprove,
                     (tokenTestSuite.addressOf(Tokens.DAI), tokenTestSuite.addressOf(Tokens.USDC), "", false)
-                )
+                    )
             })
         );
 
@@ -115,21 +115,21 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-                )
+                    )
             }),
             MultiCall({
                 target: address(adapterMock),
                 callData: abi.encodeCall(
                     AdapterMock.executeSwapSafeApprove,
                     (tokenTestSuite.addressOf(Tokens.DAI), tokenTestSuite.addressOf(Tokens.USDC), "", false)
-                )
+                    )
             }),
             MultiCall({
                 target: address(adapterMock),
                 callData: abi.encodeCall(
                     AdapterMock.executeSwapSafeApprove,
                     (tokenTestSuite.addressOf(Tokens.USDC), tokenTestSuite.addressOf(Tokens.LINK), "", false)
-                )
+                    )
             })
         );
 
@@ -164,28 +164,28 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
-                )
+                    )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
                     (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
-                )
+                    )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
                     (tokenTestSuite.addressOf(Tokens.WETH), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
-                )
+                    )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
                     (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
-                )
+                    )
             })
         );
 
@@ -218,21 +218,21 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
-                )
+                    )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
                     (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
-                )
+                    )
             }),
             MultiCall({
                 target: address(adapterMock),
                 callData: abi.encodeCall(
                     AdapterMock.executeSwapSafeApprove,
                     (tokenTestSuite.addressOf(Tokens.DAI), tokenTestSuite.addressOf(Tokens.LINK), "", false)
-                )
+                    )
             })
         );
 
@@ -262,7 +262,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-                )
+                    )
             })
         );
 
@@ -302,7 +302,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-                )
+                    )
             })
         );
 
@@ -347,14 +347,14 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
-                )
+                    )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
                     (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
-                )
+                    )
             })
         );
 
@@ -370,7 +370,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
                     (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
-                )
+                    )
             }),
             MultiCall({
                 target: address(creditFacade),
@@ -402,7 +402,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-                )
+                    )
             })
         );
 
@@ -415,7 +415,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 callData: abi.encodeCall(
                     AdapterMock.executeSwapSafeApprove,
                     (tokenTestSuite.addressOf(Tokens.DAI), tokenTestSuite.addressOf(Tokens.LINK), "", false)
-                )
+                    )
             })
         );
 
@@ -443,7 +443,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-                )
+                    )
             })
         );
 
@@ -456,14 +456,14 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 callData: abi.encodeCall(
                     AdapterMock.executeSwapSafeApprove,
                     (tokenTestSuite.addressOf(Tokens.DAI), tokenTestSuite.addressOf(Tokens.LINK), "", false)
-                )
+                    )
             }),
             MultiCall({
                 target: address(adapterMock),
                 callData: abi.encodeCall(
                     AdapterMock.executeSwapSafeApprove,
                     (tokenTestSuite.addressOf(Tokens.LINK), tokenTestSuite.addressOf(Tokens.USDC), "", true)
-                )
+                    )
             })
         );
 
@@ -495,7 +495,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-                )
+                    )
             })
         );
 
@@ -511,14 +511,14 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 callData: abi.encodeCall(
                     AdapterMock.executeSwapSafeApprove,
                     (tokenTestSuite.addressOf(Tokens.DAI), tokenTestSuite.addressOf(Tokens.LINK), "", true)
-                )
+                    )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
                     (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT * 3)), 0)
-                )
+                    )
             })
         );
 
@@ -548,7 +548,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-                )
+                    )
             })
         );
 
@@ -567,7 +567,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.withdrawCollateral, (underlying, type(uint256).max, USER)
-                    )
+                        )
                 })
             )
         );
@@ -591,7 +591,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-                )
+                    )
             })
         );
 
@@ -614,7 +614,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.withdrawCollateral, (underlying, type(uint256).max, USER)
-                    )
+                        )
                 })
             )
         );
@@ -640,13 +640,13 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-                )
+                    )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
-                )
+                    )
             })
         );
 
@@ -671,13 +671,13 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.withdrawCollateral, (underlying, type(uint256).max, USER)
-                    )
+                        )
                 }),
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.withdrawCollateral, (linkToken, type(uint256).max, USER)
-                    )
+                        )
                 })
             )
         );
@@ -701,7 +701,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-                )
+                    )
             })
         );
 
@@ -718,7 +718,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 callData: abi.encodeCall(
                     AdapterMock.executeSwapSafeApprove,
                     (tokenTestSuite.addressOf(Tokens.LINK), tokenTestSuite.addressOf(Tokens.DAI), "", true)
-                )
+                    )
             }),
             MultiCall({
                 target: address(creditFacade),
@@ -758,7 +758,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-                )
+                    )
             })
         );
 
@@ -798,13 +798,13 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
-                )
+                    )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
-                )
+                    )
             })
         );
 
@@ -847,14 +847,14 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.LINK), LINK_ACCOUNT_AMOUNT)
-                )
+                    )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
                     (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
-                )
+                    )
             })
         );
 

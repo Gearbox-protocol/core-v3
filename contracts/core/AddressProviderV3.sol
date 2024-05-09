@@ -3,111 +3,108 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {IACL} from "@gearbox-protocol/core-v2/contracts/interfaces/IACL.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 import "../interfaces/IAddressProviderV3.sol";
 import {AddressNotFoundException, CallerNotConfiguratorException} from "../interfaces/IExceptions.sol";
 
+import {IBotListV3} from "../interfaces/IBotListV3.sol";
+import {IAccountFactoryV3} from "../interfaces/IAccountFactoryV3.sol";
+
 /// @title Address provider V3
 /// @notice Stores addresses of important contracts
-contract AddressProviderV3 is IAddressProviderV3 {
+contract AddressProviderV3 is Ownable2Step, IAddressProviderV3 {
+    using EnumerableSet for EnumerableSet.AddressSet;
+
     /// @notice Contract version
-    uint256 public constant override version = 3_00;
+    uint256 public constant override version = 3_10;
+
+    error MarketConfiguratorsOnlyException();
+    error CantRemoveMarketConfiguratorWithExistingPoolsException();
+
+    /// @notice Market configurator factory
+    address public marketConfiguratorFactory;
+
+    /// @notice Keeps market confifgurators
+    EnumerableSet.AddressSet internal _marketConfigurators;
 
     /// @notice Mapping from (contract key, version) to contract addresses
-    mapping(bytes32 => mapping(uint256 => address)) public override addresses;
+    mapping(string => mapping(uint256 => address)) public override addresses;
 
-    /// @dev Ensures that function caller is configurator
-    modifier configuratorOnly() {
-        _revertIfNotConfigurator();
+    mapping(string => uint256) public latestVersions;
+
+    modifier marketConfiguratorFactoryOnly() {
+        if (msg.sender != marketConfiguratorFactory) revert("Market config");
         _;
     }
 
-    /// @dev Reverts if `msg.sender` is not configurator
-    function _revertIfNotConfigurator() internal view {
-        if (!IACL(getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL)).isConfigurator(msg.sender)) {
-            revert CallerNotConfiguratorException();
-        }
-    }
-
-    constructor(address _acl) {
+    constructor() {
         // The first event is emitted for the address provider itself to aid in contract discovery
         emit SetAddress("ADDRESS_PROVIDER", address(this), version);
-
-        _setAddress(AP_ACL, _acl, NO_VERSION_CONTROL);
     }
 
     /// @notice Returns the address of a contract with a given key and version
-    function getAddressOrRevert(bytes32 key, uint256 _version) public view virtual override returns (address result) {
+    function getAddressOrRevert(string memory key, uint256 _version)
+        public
+        view
+        virtual
+        override
+        returns (address result)
+    {
         result = addresses[key][_version];
         if (result == address(0)) revert AddressNotFoundException();
+    }
+
+    /// @notice Returns the address of a contract with a given key and version
+    function getLaterstAddressOrRevert(string memory key) public view virtual returns (address result) {
+        return getAddressOrRevert(key, latestVersions[key]);
     }
 
     /// @notice Sets the address for the passed contract key
     /// @param key Contract key
     /// @param value Contract address
     /// @param saveVersion Whether to save contract's version
-    function setAddress(bytes32 key, address value, bool saveVersion) external override configuratorOnly {
+    function setAddress(string memory key, address value, bool saveVersion) external override onlyOwner {
         _setAddress(key, value, saveVersion ? IVersion(value).version() : NO_VERSION_CONTROL);
     }
 
     /// @dev Implementation of `setAddress`
-    function _setAddress(bytes32 key, address value, uint256 _version) internal virtual {
+    function _setAddress(string memory key, address value, uint256 _version) internal virtual {
         addresses[key][_version] = value;
         emit SetAddress(key, value, _version);
     }
 
-    // ---------------------- //
-    // BACKWARD COMPATIBILITY //
-    // ---------------------- //
-
-    /// @notice ACL contract address
-    function getACL() external view returns (address) {
-        return getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL);
+    modifier marketConfiguratorsOnly() {
+        if (!_marketConfigurators.contains(msg.sender)) revert MarketConfiguratorsOnlyException();
+        _;
     }
 
-    /// @notice Contracts register contract address
-    function getContractsRegister() external view returns (address) {
-        return getAddressOrRevert(AP_CONTRACTS_REGISTER, NO_VERSION_CONTROL);
+    function addMarketConfigurator(address _marketConfigurator) external override marketConfiguratorFactoryOnly {
+        if (!_marketConfigurators.contains(_marketConfigurator)) {
+            _marketConfigurators.add(_marketConfigurator);
+            emit AddMarketConfigurator(_marketConfigurator);
+        }
     }
 
-    /// @notice Price oracle contract address
-    function getPriceOracle() external view returns (address) {
-        return getAddressOrRevert(AP_PRICE_ORACLE, 2);
+    function removeMarketConfigurator(address _marketConfigurator) external override marketConfiguratorFactoryOnly {
+        if (_marketConfigurators.contains(_marketConfigurator)) {
+            _marketConfigurators.add(_marketConfigurator);
+            emit RemoveMarketConfigurator(_marketConfigurator);
+        }
     }
 
-    /// @notice Account factory contract address
-    function getAccountFactory() external view returns (address) {
-        return getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL);
+    function marketConfigurators() external view override returns (address[] memory) {
+        return _marketConfigurators.values();
     }
 
-    /// @notice Data compressor contract address
-    function getDataCompressor() external view returns (address) {
-        return getAddressOrRevert(AP_DATA_COMPRESSOR, 2);
+    function isMarketConfigurator(address riskCurator) external view override returns (bool) {
+        return _marketConfigurators.contains(riskCurator);
     }
 
-    /// @notice Treasury contract address
-    function getTreasuryContract() external view returns (address) {
-        return getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL);
-    }
-
-    /// @notice GEAR token address
-    function getGearToken() external view returns (address) {
-        return getAddressOrRevert(AP_GEAR_TOKEN, NO_VERSION_CONTROL);
-    }
-
-    /// @notice WETH token address
-    function getWethToken() external view returns (address) {
-        return getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL);
-    }
-
-    /// @notice WETH gateway contract address
-    function getWETHGateway() external view returns (address) {
-        return getAddressOrRevert(AP_WETH_GATEWAY, 1);
-    }
-
-    /// @notice Router contract address
-    function getLeveragedActions() external view returns (address) {
-        return getAddressOrRevert(AP_ROUTER, 1);
+    function registerCreditManager(address creditManager) external override marketConfiguratorsOnly {
+        // TODO: make method names more consistent?
+        IBotListV3(getLaterstAddressOrRevert(AP_BOT_LIST)).approvedCreditManager(creditManager);
+        IAccountFactoryV3(getLaterstAddressOrRevert(AP_ACCOUNT_FACTORY)).addCreditManager(creditManager);
     }
 }

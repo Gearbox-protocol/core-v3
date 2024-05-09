@@ -3,9 +3,7 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {IRiskConfiguratorV3} from "../interfaces/IRiskConfiguratorV3.sol";
-
-import {AP_CONTRACTS_REGISTER, IAddressProviderV3, NO_VERSION_CONTROL} from "../interfaces/IAddressProviderV3.sol";
+import {IContractsRegister} from "../interfaces/IContractsRegister.sol";
 import {RegisteredCreditManagerOnlyException, RegisteredPoolOnlyException} from "../interfaces/IExceptions.sol";
 
 import {SanityCheckTrait} from "./SanityCheckTrait.sol";
@@ -14,7 +12,7 @@ import {SanityCheckTrait} from "./SanityCheckTrait.sol";
 /// @notice Trait that simplifies validation of pools and credit managers
 abstract contract ContractsRegisterTrait is SanityCheckTrait {
     /// @notice Contracts register contract address
-    address public immutable riskConfigurator;
+    address public immutable contractsRegister;
 
     /// @dev Ensures that given address is a registered credit manager
     modifier registeredPoolOnly(address addr) {
@@ -29,9 +27,9 @@ abstract contract ContractsRegisterTrait is SanityCheckTrait {
     }
 
     /// @notice Constructor
-    /// @param _riskConfigurator Address provider contract address
-    constructor(address _riskConfigurator) nonZeroAddress(_riskConfigurator) {
-        riskConfigurator = _riskConfigurator;
+    /// @param _contractsRegister Address provider contract address
+    constructor(address _contractsRegister) nonZeroAddress(_contractsRegister) {
+        contractsRegister = _contractsRegister;
     }
 
     /// @dev Ensures that given address is a registered pool
@@ -46,11 +44,11 @@ abstract contract ContractsRegisterTrait is SanityCheckTrait {
 
     /// @dev Whether given address is a registered pool
     function _isRegisteredPool(address addr) internal view returns (bool) {
-        return IRiskConfiguratorV3(riskConfigurator).isPool(addr);
+        return IContractsRegister(contractsRegister).isPool(addr);
     }
 
     /// @dev Whether given address is a registered credit manager
     function _isRegisteredCreditManager(address addr) internal view returns (bool) {
-        return IRiskConfiguratorV3(riskConfigurator).isCreditManager(addr);
+        return IContractsRegister(contractsRegister).isCreditManager(addr);
     }
 }

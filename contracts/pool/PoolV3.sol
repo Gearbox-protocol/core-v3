@@ -18,7 +18,6 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 // INTERFACES
-import {IRiskConfiguratorV3} from "../interfaces/IRiskConfiguratorV3.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {ILinearInterestRateModelV3} from "../interfaces/ILinearInterestRateModelV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
@@ -115,15 +114,17 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     /// @param name_ Name of the pool
     /// @param symbol_ Symbol of the pool's LP token
     constructor(
-        address riskConfigurator_,
+        address acl_,
+        address contractsRegister_,
+        address treasury_,
         address underlyingToken_,
         address interestRateModel_,
         uint256 totalDebtLimit_,
         string memory name_,
         string memory symbol_
     )
-        ACLNonReentrantTrait(riskConfigurator_) // U:[LP-1A]
-        ContractsRegisterTrait(riskConfigurator_)
+        ACLNonReentrantTrait(acl_) // U:[LP-1A]
+        ContractsRegisterTrait(contractsRegister_)
         ERC4626(IERC20(underlyingToken_)) // U:[LP-1B]
         ERC20(name_, symbol_) // U:[LP-1B]
         ERC20Permit(name_) // U:[LP-1B]
@@ -131,7 +132,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         nonZeroAddress(interestRateModel_) // U:[LP-1A]
     {
         underlyingToken = underlyingToken_; // U:[LP-1B]
-        treasury = IRiskConfiguratorV3(riskConfigurator_).treasury(); // U:[LP-1B]
+        treasury = treasury_; // U:[LP-1B]
 
         lastBaseInterestUpdate = uint40(block.timestamp); // U:[LP-1B]
         _baseInterestIndexLU = uint128(RAY); // U:[LP-1B]

@@ -89,7 +89,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.LINK), 100_000, 0)
-                )
+                    )
             })
         );
 
@@ -113,7 +113,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.LINK), -100_000, 0)
-                )
+                    )
             })
         );
 
@@ -155,13 +155,13 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.LINK), 100_000, 0)
-                )
+                    )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.USDT), 200_000, 0)
-                )
+                    )
             })
         );
 
@@ -216,13 +216,13 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.LINK), 100_000, 0)
-                )
+                    )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.USDT), 200_000, 0)
-                )
+                    )
             })
         );
 
@@ -270,14 +270,14 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
                     (tokenTestSuite.addressOf(Tokens.LINK), int96(uint96(100 * WAD)), 0)
-                )
+                    )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
                     (tokenTestSuite.addressOf(Tokens.USDT), int96(uint96(200 * WAD)), 0)
-                )
+                    )
             })
         );
 
@@ -309,13 +309,13 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.LINK), type(int96).min, 0)
-                    )
+                        )
                 }),
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.USDT), type(int96).min, 0)
-                    )
+                        )
                 }),
                 MultiCall({
                     target: address(creditFacade),
@@ -325,21 +325,21 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.withdrawCollateral, (underlying, type(uint256).max, USER)
-                    )
+                        )
                 }),
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.withdrawCollateral,
                         (tokenTestSuite.addressOf(Tokens.LINK), type(uint256).max, USER)
-                    )
+                        )
                 }),
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.withdrawCollateral,
                         (tokenTestSuite.addressOf(Tokens.USDT), type(uint256).max, USER)
-                    )
+                        )
                 })
             )
         );
@@ -383,13 +383,13 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.LINK), int96(quotaLink), 0)
-                )
+                    )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.USDT), int96(quotaUsdt), 0)
-                )
+                    )
             })
         );
 
@@ -428,14 +428,14 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
                     (tokenTestSuite.addressOf(Tokens.LINK), int96(uint96(100_000 * WAD)), 0)
-                )
+                    )
             }),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota,
                     (tokenTestSuite.addressOf(Tokens.USDT), int96(uint96(200 * WAD)), 0)
-                )
+                    )
             })
         );
 
@@ -471,7 +471,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.updateQuota, (tokenTestSuite.addressOf(Tokens.LINK), 100_000, 0)
-                )
+                    )
             })
         );
 

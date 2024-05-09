@@ -148,15 +148,21 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param _name Credit manager name
     /// @dev Adds pool's underlying as collateral token with LT = 0
     /// @dev Sets `msg.sender` as credit configurator
-    constructor(address _addressProvider, address _pool, string memory _name) {
+    constructor(
+        address _addressProvider,
+        address _accountFactory,
+        address _priceOracle,
+        address _pool,
+        string memory _name
+    ) {
         addressProvider = _addressProvider;
         pool = _pool; // U:[CM-1]
 
         underlying = IPoolV3(_pool).underlyingToken(); // U:[CM-1]
         _addToken(underlying); // U:[CM-1]
 
-        priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_PRICE_ORACLE, 3_10); // U:[CM-1]
-        accountFactory = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL); // U:[CM-1]
+        accountFactory = _accountFactory;
+        priceOracle = _priceOracle;
 
         creditConfigurator = msg.sender; // U:[CM-1]
 

@@ -16,7 +16,7 @@ import {AdapterFactoryV3} from "../factories/AdapterFactoryV3.sol";
 
 import {PoolV3} from "../pool/PoolV3.sol";
 
-import {IRiskConfiguratorV3} from "../interfaces/IRiskConfiguratorV3.sol";
+import {IMarketConfiguratorV3} from "../interfaces/IMarketConfiguratorV3.sol";
 
 import {IPriceOracleV3, PriceFeedParams, PriceUpdate} from "../interfaces/IPriceOracleV3.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
@@ -25,7 +25,7 @@ import {IContractsRegister} from "@gearbox-protocol/core-v2/contracts/interfaces
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 
-contract RiskConfigurator is Ownable2Step, IRiskConfiguratorV3 {
+contract MarketConfigurator is Ownable2Step, IMarketConfiguratorV3 {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     error InterestModelNotAllowedException(address);
@@ -50,9 +50,11 @@ contract RiskConfigurator is Ownable2Step, IRiskConfiguratorV3 {
     // Mapping: market -> priceOracle
     mapping(address => address) public priceOracles;
 
-    address public immutable override riskConfiguratorRegister;
+    address public immutable override addressProvider;
+
     address public override treasury;
     address public override acl;
+
     address public override interestModelFactory;
     address public override poolFactory;
     address public override creditFactory;
@@ -60,8 +62,8 @@ contract RiskConfigurator is Ownable2Step, IRiskConfiguratorV3 {
     address public override adapterFactory;
     address public override controller;
 
-    constructor(address _owner, address _treasury, string memory _name, address _vetoAdmin) {
-        riskConfiguratorRegister = msg.sender;
+    constructor(address _addressProvider, address _owner, address _treasury, string memory _name, address _vetoAdmin) {
+        addressProvider = _addressProvider;
         _transferOwnership(_owner);
         acl = address(new ACL());
         name = _name;

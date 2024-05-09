@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
 
-import {RiskConfigurator} from "../core/RiskConfigurator.sol";
+import {MarketConfigurator} from "./MarketConfigurator.sol";
 import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
 
 contract PoolFactoryV3 is IVersion {
@@ -34,7 +34,7 @@ contract PoolFactoryV3 is IVersion {
         string calldata symbol,
         bytes32 salt
     ) external returns (address pool) {
-        address acl = RiskConfigurator(msg.sender).acl();
+        address acl = MarketConfigurator(msg.sender).acl();
 
         bytes memory constructorParams = abi.encode(acl, underlying, interestRateModel, totalDebtLimit, name, symbol);
 

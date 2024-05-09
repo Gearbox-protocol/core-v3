@@ -4,8 +4,6 @@
 pragma solidity ^0.8.17;
 
 import {IACL} from "@gearbox-protocol/core-v2/contracts/interfaces/IACL.sol";
-
-import {IRiskConfiguratorV3} from "../interfaces/IRiskConfiguratorV3.sol";
 import {CallerNotConfiguratorException} from "../interfaces/IExceptions.sol";
 
 import {SanityCheckTrait} from "./SanityCheckTrait.sol";
@@ -17,9 +15,9 @@ abstract contract ACLTrait is SanityCheckTrait {
     address public immutable acl;
 
     /// @notice Constructor
-    /// @param _riskConfigurator Address provider contract address
-    constructor(address _riskConfigurator) nonZeroAddress(_riskConfigurator) {
-        acl = IRiskConfiguratorV3(_riskConfigurator).acl();
+    /// @param _aclAddress provider contract address
+    constructor(address _acl) nonZeroAddress(_acl) {
+        acl = _acl;
     }
 
     /// @dev Ensures that function caller has configurator role

@@ -17,7 +17,7 @@ import {
     CollateralDebtData
 } from "../../../interfaces/ICreditManagerV3.sol";
 
-import "../../../interfaces/ICreditFacadeV3.sol";
+import {ICreditFacadeV3} from "../../../interfaces/ICreditFacadeV3.sol";
 
 import {PERCENTAGE_FACTOR, SECONDS_PER_YEAR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
@@ -63,7 +63,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT / 2)
-                )
+                    )
             })
         );
 
@@ -298,7 +298,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.updateQuota, (collateral, int96(uint96(DAI_ACCOUNT_AMOUNT)), 0)
-                    )
+                        )
                 })
             ),
             REFERRAL_CODE

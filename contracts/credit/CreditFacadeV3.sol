@@ -18,7 +18,6 @@ import {BitMask, UNDERLYING_TOKEN_MASK} from "../libraries/BitMask.sol";
 
 // INTERFACES
 import "../interfaces/ICreditFacadeV3.sol";
-import "../interfaces/IAddressProviderV3.sol";
 import {
     ICreditManagerV3,
     ManageDebtAction,
@@ -153,8 +152,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         creditManager = _creditManager; // U:[FA-1]
 
         address addressProvider = ICreditManagerV3(_creditManager).addressProvider();
-        weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // U:[FA-1]
-        botList = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_BOT_LIST, 3_10); // U:[FA-1]
+        // weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // U:[FA-1]
+        // botList = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_BOT_LIST, 3_10); // U:[FA-1]
 
         degenNFT = _degenNFT; // U:[FA-1]
 
