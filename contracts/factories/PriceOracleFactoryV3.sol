@@ -3,6 +3,7 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
+import {AbstractFactory} from "./AbstractFactory.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -17,10 +18,10 @@ import {
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {PriceFeedValidationTrait} from "../traits/PriceFeedValidationTrait.sol";
 
-contract PriceOracleFactoryV3 is ACLNonReentrantTrait, PriceFeedValidationTrait {
+contract PriceOracleFactoryV3 is AbstractFactory, ACLNonReentrantTrait, PriceFeedValidationTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
-    /// @notice Contract version
 
+    /// @notice Contract version
     // uint256 public constant override version = 3_10;
 
     uint256 poLatestVersion;
@@ -32,15 +33,10 @@ contract PriceOracleFactoryV3 is ACLNonReentrantTrait, PriceFeedValidationTrait 
     /// @param addressProvider Address provider contract address
     constructor(address addressProvider) ACLNonReentrantTrait(addressProvider) {}
 
-    function deployPriceOracle() external returns (address) {
-        return _deployPriceOracle(poLatestVersion);
+    function deployPriceOracle(address _acl, uint256 _version, bytes32 _salt) external returns (address) {
+        bytes memory constructorParams = abi.encode(_acl);
+        return IBytecodeRepository(bytecodeRepository).deploy("PRICE_ORACLE", _version, constructorParams, _salt);
     }
-
-    function deployPriceOracle(uint256 version) external returns (address) {
-        return _deployPriceOracle(version);
-    }
-
-    function _deployPriceOracle(uint256 version) internal returns (address) {}
 
     function isRegisteredOracle(address token, address priceFeed) external view returns (bool) {}
 

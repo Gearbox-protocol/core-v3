@@ -1,27 +1,27 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IACL} from "@gearbox-protocol/core-v2/contracts/interfaces/IACL.sol";
+import {IAddressProviderV3} from "../interfaces/IAddressProviderV3.sol";
 import {CallerNotConfiguratorException} from "../interfaces/IExceptions.sol";
 
 import {SanityCheckTrait} from "./SanityCheckTrait.sol";
 
 /// @title ACL trait
 /// @notice Utility class for ACL (access-control list) consumers
-abstract contract ACLTrait is SanityCheckTrait {
+abstract contract APOwnerTrait is SanityCheckTrait {
     /// @notice ACL contract address
-    address public immutable acl;
+    address public immutable addressProvider;
 
     /// @notice Constructor
-    /// @param _acl Address provider contract address
-    constructor(address _acl) nonZeroAddress(_acl) {
-        acl = _acl;
+    /// @param _addressProvider AddressProvider contract address
+    constructor(address _addressProvider) nonZeroAddress(_addressProvider) {
+        addressProvider = _addressProvider;
     }
 
     /// @dev Ensures that function caller has configurator role
-    modifier configuratorOnly() {
+    modifier apOwnerOnly() {
         _ensureCallerIsConfigurator();
         _;
     }
@@ -29,13 +29,8 @@ abstract contract ACLTrait is SanityCheckTrait {
     /// @dev Reverts if the caller is not the configurator
     /// @dev Used to cut contract size on modifiers
     function _ensureCallerIsConfigurator() internal view {
-        if (!_isConfigurator({account: msg.sender})) {
+        if (IAddressProviderV3(addressProvider).owner() != msg.sender) {
             revert CallerNotConfiguratorException();
         }
-    }
-
-    /// @dev Checks whether given account has configurator role
-    function _isConfigurator(address account) internal view returns (bool) {
-        return IACL(acl).isConfigurator(account);
     }
 }

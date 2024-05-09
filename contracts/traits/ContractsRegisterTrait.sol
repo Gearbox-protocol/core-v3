@@ -43,12 +43,12 @@ abstract contract ContractsRegisterTrait is SanityCheckTrait {
     }
 
     /// @dev Whether given address is a registered pool
-    function _isRegisteredPool(address addr) internal view returns (bool) {
+    function _isRegisteredPool(address addr) internal view virtual returns (bool) {
         return IContractsRegister(contractsRegister).isPool(addr);
     }
 
     /// @dev Whether given address is a registered credit manager
-    function _isRegisteredCreditManager(address addr) internal view returns (bool) {
+    function _isRegisteredCreditManager(address addr) internal view virtual returns (bool) {
         return IContractsRegister(contractsRegister).isCreditManager(addr);
     }
 }

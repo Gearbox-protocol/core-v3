@@ -28,9 +28,7 @@ import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
 // TESTS
-
 import "../../lib/constants.sol";
-
 import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 
 // EXCEPTIONS

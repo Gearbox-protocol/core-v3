@@ -3,50 +3,64 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
-
+import {AbstractFactory} from "./AbstractFactory.sol";
 import {MarketConfigurator} from "./MarketConfigurator.sol";
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+import {IVersion} from "../interfaces/IVersion.sol";
+import {IBytecodeRepository} from "./IBytecodeRepository.sol";
+import {AP_POOL, AP_POOL_QUOTA_KEEPER, AP_POOL_RATE_KEEPER} from "./ContractLiterals.sol";
 
-contract PoolFactoryV3 is IVersion {
-    using EnumerableSet for EnumerableSet.AddressSet;
+contract PoolFactoryV3 is AbstractFactory, IVersion {
     /// @notice Contract version
-
     uint256 public constant override version = 3_10;
 
-    // bytecode by version
-    mapping(uint256 => bytes) public poolBytecode;
-
-    // bytecode for fee tokens
-    mapping(uint256 => mapping(address => bytes)) public poolBytecodeFeeTokens;
-
-    modifier registeredCuratorsOnly() {
-        _;
-    }
-
     function deploy(
-        uint256 _version,
         address underlying,
         address interestRateModel,
         uint256 totalDebtLimit,
         string calldata name,
         string calldata symbol,
-        bytes32 salt
-    ) external returns (address pool) {
+        uint256 _version,
+        bytes32 _salt
+    ) external marketConfiguratorOnly returns (address pool) {
         address acl = MarketConfigurator(msg.sender).acl();
 
         bytes memory constructorParams = abi.encode(acl, underlying, interestRateModel, totalDebtLimit, name, symbol);
 
-        bytes memory bytescode = poolBytecodeFeeTokens[version][underlying];
-        if (bytescode.length == 0) {
-            bytescode = poolBytecode[_version];
-        }
+        /// @notice tries to deploy version for specific (fee) token
+        try IBytecodeRepository(bytecodeRepository).deploy(
+            string.concat(AP_POOL, "_", underlying), _version, constructorParams, _salt
+        ) returns (address deployedContract) {
+            return deployedContract;
+        } catch {}
 
-        return Create2.deploy(0, salt, bytescode);
+        return IBytecodeRepository(bytecodeRepository).deploy(AP_POOL, _version, constructorParams, _salt);
     }
 
-    function deployPoolQuotaKeeper(address pool) external returns (address pqk) {}
+    function deployPoolQuotaKeeper(address pool, uint256 _version, bytes32 _salt) external returns (address pqk) {
+        bytes memory constructorParams = abi.encode(pool);
+        return IBytecodeRepository(bytecodeRepository).deploy(AP_POOL_QUOTA_KEEPER, _version, constructorParams, _salt);
+    }
 
-    function deployRateKeeper(address pool, uint8 rateKeeperType) external returns (address rateKeeper) {}
+    function deployRateKeeper(address pool, string memory rateKeeperType, uint256 _version, bytes32 _salt)
+        external
+        returns (address rateKeeper)
+    {
+        bytes memory constructorParams = abi.encode(pool);
+        return IBytecodeRepository(bytecodeRepository).deploy(
+            string.concat(AP_POOL_RATE_KEEPER, rateKeeperType), _version, constructorParams, _salt
+        );
+    }
+
+    function deployDegenNFT(
+        address acl,
+        address contractRegister,
+        string memory accessType,
+        uint256 _version,
+        bytes32 _salt
+    ) external returns (address rateKeeper) {
+        bytes memory constructorParams = abi.encode(acl, contractRegister);
+        return IBytecodeRepository(bytecodeRepository).deploy(
+            string.concat(AP_DEGEN_NFT, accessType), _version, constructorParams, _salt
+        );
+    }
 }
