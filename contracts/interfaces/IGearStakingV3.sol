@@ -3,11 +3,8 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
-
-uint256 constant EPOCH_LENGTH = 7 days;
-
-uint256 constant EPOCHS_TO_WITHDRAW = 4;
+import {EPOCHS_TO_WITHDRAW} from "../libraries/Constants.sol";
+import {IVersion} from "./IVersion.sol";
 
 /// @notice Voting contract status
 ///         * NOT_ALLOWED - cannot vote or unvote

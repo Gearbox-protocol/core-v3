@@ -3,19 +3,14 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {
-    ICreditManagerV3,
-    ICreditManagerV3Events,
-    ManageDebtAction,
-    BOT_PERMISSIONS_SET_FLAG
-} from "../../../interfaces/ICreditManagerV3.sol";
+import {ICreditManagerV3, ICreditManagerV3Events, ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
 import "../../../interfaces/ICreditFacadeV3.sol";
 import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // TESTS
 import "../../lib/constants.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {BOT_PERMISSIONS_SET_FLAG, PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
 import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 

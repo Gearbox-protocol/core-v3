@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {PoolV3} from "../../../pool/PoolV3.sol";
 import {ENTERED, NOT_ENTERED} from "../../../traits/ReentrancyGuardTrait.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
 
 contract PoolV3Harness is PoolV3 {
     uint16 _transferFee;

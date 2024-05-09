@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {IACL} from "@gearbox-protocol/core-v2/contracts/interfaces/IACL.sol";
+import {IACL} from "../interfaces/IACL.sol";
 import {CallerNotConfiguratorException} from "../interfaces/IExceptions.sol";
 
 import {SanityCheckTrait} from "./SanityCheckTrait.sol";

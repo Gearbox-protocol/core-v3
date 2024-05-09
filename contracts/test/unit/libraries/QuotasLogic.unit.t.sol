@@ -7,7 +7,7 @@ import {QuotasLogic} from "../../../libraries/QuotasLogic.sol";
 import {AccountQuota, TokenQuotaParams} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {TestHelper} from "../../lib/helper.sol";
 
-import {RAY, WAD} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {RAY, WAD} from "../../../libraries/Constants.sol";
 
 /// @title Quotas logic test
 /// @notice U:[BM]: Unit tests for QuotasLogic library

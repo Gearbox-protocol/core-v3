@@ -3,12 +3,7 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
-
-uint8 constant BOT_PERMISSIONS_SET_FLAG = 1;
-
-uint8 constant DEFAULT_MAX_ENABLED_TOKENS = 4;
-address constant INACTIVE_CREDIT_ACCOUNT_ADDRESS = address(1);
+import {IVersion} from "./IVersion.sol";
 
 /// @notice Debt management type
 ///         - `INCREASE_DEBT` borrows additional funds from the pool, updates account's debt and cumulative interest index

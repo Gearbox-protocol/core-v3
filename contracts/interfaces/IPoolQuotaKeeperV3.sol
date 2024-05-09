@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+import {IVersion} from "./IVersion.sol";
 
 struct TokenQuotaParams {
     uint16 rate;

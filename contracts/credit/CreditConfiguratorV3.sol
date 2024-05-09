@@ -9,6 +9,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 // LIBRARIES & CONSTANTS
+import {BitMask} from "../libraries/BitMask.sol";
 import {
     DEFAULT_FEE_INTEREST,
     DEFAULT_FEE_LIQUIDATION,
@@ -17,9 +18,9 @@ import {
     DEFAULT_LIQUIDATION_PREMIUM_EXPIRED,
     DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER,
     PERCENTAGE_FACTOR,
+    UNDERLYING_TOKEN_MASK,
     WAD
-} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-import {BitMask, UNDERLYING_TOKEN_MASK} from "../libraries/BitMask.sol";
+} from "../libraries/Constants.sol";
 
 // CONTRACTS
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
@@ -27,7 +28,7 @@ import {CreditFacadeV3} from "./CreditFacadeV3.sol";
 import {CreditManagerV3} from "./CreditManagerV3.sol";
 
 // INTERFACES
-import {IAdapter} from "@gearbox-protocol/core-v2/contracts/interfaces/IAdapter.sol";
+import {IAdapter} from "../interfaces/IAdapter.sol";
 import {ICreditConfiguratorV3, CreditManagerOpts, AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";

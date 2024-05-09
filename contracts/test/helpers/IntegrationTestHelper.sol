@@ -5,11 +5,13 @@ pragma solidity ^0.8.17;
 
 import "../interfaces/IAddressProviderV3.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
+import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
-import {IACL} from "@gearbox-protocol/core-v2/contracts/interfaces/IACL.sol";
+import {IACL} from "../../interfaces/IACL.sol";
+import {IContractsRegister} from "../../interfaces/IContractsRegister.sol";
+import {IDegenNFT} from "../../interfaces/IDegenNFT.sol";
 
-import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
+import {IWETH} from "../../interfaces/external/IWETH.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
@@ -18,8 +20,7 @@ import {MultiCall} from "../../interfaces/ICreditFacadeV3.sol";
 import {MultiCallBuilder} from "../lib/MultiCallBuilder.sol";
 import {PoolV3} from "../../pool/PoolV3.sol";
 import {PoolQuotaKeeperV3} from "../../pool/PoolQuotaKeeperV3.sol";
-import {GaugeV3} from "../../governance/GaugeV3.sol";
-import {DegenNFTV2} from "@gearbox-protocol/core-v2/contracts/tokens/DegenNFTV2.sol";
+import {GaugeV3} from "../../pool/GaugeV3.sol";
 import {CreditManagerFactory} from "../suites/CreditManagerFactory.sol";
 
 import {ICreditFacadeV3Multicall} from "../../interfaces/ICreditFacadeV3.sol";
@@ -36,6 +37,7 @@ import {IPoolV3DeployConfig, CreditManagerV3DeployParams, CollateralTokenHuman} 
 import {MockCreditConfig} from "../config/MockCreditConfig.sol";
 import {TestHelper} from "../lib/helper.sol";
 import {ERC20Mock} from "../mocks/token/ERC20Mock.sol";
+import {DegenNFTMock} from "../mocks/token/DegenNFTMock.sol";
 import "../lib/constants.sol";
 import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {PriceFeedMock} from "../mocks/oracles/PriceFeedMock.sol";
@@ -57,7 +59,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     // CORE
     IACL acl;
     IAddressProviderV3 addressProvider;
-    ContractsRegister cr;
+    IContractsRegister cr;
     AccountFactoryV3 accountFactory;
     IPriceOracleV3 priceOracle;
     BotListV3 botList;
@@ -67,7 +69,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     PoolQuotaKeeperV3 public poolQuotaKeeper;
     GaugeV3 public gauge;
 
-    DegenNFTV2 public degenNFT;
+    IDegenNFT public degenNFT;
 
     CreditManagerV3 public creditManager;
     CreditFacadeV3 public creditFacade;
@@ -234,7 +236,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
     function _initCoreContracts() internal {
         acl = IACL(addressProvider.getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL));
-        cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, NO_VERSION_CONTROL));
+        cr = IContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, NO_VERSION_CONTROL));
         accountFactory = AccountFactoryV3(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 3_00));
         priceOracle = IPriceOracleV3(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_10));
         botList = BotListV3(payable(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_10)));
@@ -311,10 +313,10 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         }
 
         if (_degenNFT != address(0)) {
-            address minter = DegenNFTV2(_degenNFT).minter();
+            address minter = IDegenNFT(_degenNFT).minter();
 
             vm.prank(minter);
-            DegenNFTV2(_degenNFT).mint(USER, 1000);
+            IDegenNFT(_degenNFT).mint(USER, 1000);
         }
 
         return true;
@@ -366,12 +368,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         configAccountAmount = creditAccountAmount;
         CreditManagerV3DeployParams[] memory allCms = config.creditManagers();
 
-        degenNFT = new DegenNFTV2(address(addressProvider), "DegenNFTV2", "Gear-Degen");
-
-        vm.prank(CONFIGURATOR);
-        degenNFT.setMinter(CONFIGURATOR);
-
-        vm.prank(CONFIGURATOR);
+        degenNFT = new DegenNFTMock("Degen NFT", "DNFT");
         degenNFT.mint(USER, 1000);
 
         uint256 len = allCms.length;
@@ -410,11 +407,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
             vm.prank(CONFIGURATOR);
             cr.addCreditManager(address(creditManager));
-
-            if (whitelisted) {
-                vm.prank(CONFIGURATOR);
-                degenNFT.addCreditFacade(address(creditFacade));
-            }
 
             if (expirable) {
                 vm.prank(CONFIGURATOR);

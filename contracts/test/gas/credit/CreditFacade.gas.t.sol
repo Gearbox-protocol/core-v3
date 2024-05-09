@@ -3,11 +3,8 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {ICreditFacadeV3Multicall} from "../../../interfaces/ICreditFacadeV3.sol";
+import {ICreditFacadeV3Multicall, MultiCall} from "../../../interfaces/ICreditFacadeV3.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
-
-// DATA
-import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 
 // TESTS
 import "../../lib/constants.sol";

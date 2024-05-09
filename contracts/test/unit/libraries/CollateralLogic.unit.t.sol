@@ -8,7 +8,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {CollateralLogic} from "../../../libraries/CollateralLogic.sol";
 import {TestHelper} from "../../lib/helper.sol";
 
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
 
 import "../../lib/constants.sol";
 import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";

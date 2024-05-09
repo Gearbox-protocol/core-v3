@@ -3,11 +3,17 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
-
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+import {IVersion} from "./IVersion.sol";
 import "./ICreditFacadeV3Multicall.sol";
 import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
+
+/// @notice Multicall element
+/// @param target Call target, which is either credit facade or adapter
+/// @param callData Call data
+struct MultiCall {
+    address target;
+    bytes callData;
+}
 
 /// @notice Debt limits packed into a single slot
 /// @param minDebt Minimum debt amount per credit account

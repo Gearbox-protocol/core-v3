@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 
-import {IACL} from "@gearbox-protocol/core-v2/contracts/interfaces/IACL.sol";
+import {IACL} from "../interfaces/IACL.sol";
 import {
     CallerNotControllerException,
     CallerNotPausableAdminException,

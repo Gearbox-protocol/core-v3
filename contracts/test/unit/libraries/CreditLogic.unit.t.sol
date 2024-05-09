@@ -8,8 +8,7 @@ import {CollateralDebtData} from "../../../interfaces/ICreditManagerV3.sol";
 import {TestHelper} from "../../lib/helper.sol";
 import {GeneralMock} from "../../mocks/GeneralMock.sol";
 
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-import {RAY, WAD} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {PERCENTAGE_FACTOR, RAY, WAD} from "../../../libraries/Constants.sol";
 
 /// @title Credit logic unit test
 /// @notice U:[CL]: Unit tests for `CreditLogic` library

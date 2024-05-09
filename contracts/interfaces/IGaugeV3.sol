@@ -3,9 +3,8 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
-
-import {IVotingContractV3} from "./IVotingContractV3.sol";
+import {IVersion} from "./IVersion.sol";
+import {IVotingContract} from "./IVotingContract.sol";
 
 struct QuotaRateParams {
     uint16 minRate;
@@ -40,7 +39,7 @@ interface IGaugeV3Events {
 }
 
 /// @title Gauge V3 interface
-interface IGaugeV3 is IGaugeV3Events, IVotingContractV3, IVersion {
+interface IGaugeV3 is IGaugeV3Events, IVotingContract, IVersion {
     function pool() external view returns (address);
 
     function voter() external view returns (address);

@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
+import {IVersion} from "./IVersion.sol";
 
 /// @notice Price feed params
 /// @param priceFeed Price feed address
@@ -37,10 +37,10 @@ interface IPriceOracleV3Events {
 }
 
 /// @title Price oracle V3 interface
-interface IPriceOracleV3 is IPriceOracleBase, IPriceOracleV3Events {
+interface IPriceOracleV3 is IVersion, IPriceOracleV3Events {
     function getTokens() external view returns (address[] memory);
 
-    function priceFeeds(address token) external view override returns (address priceFeed);
+    function priceFeeds(address token) external view returns (address priceFeed);
 
     function reservePriceFeeds(address token) external view returns (address);
 
@@ -52,17 +52,17 @@ interface IPriceOracleV3 is IPriceOracleBase, IPriceOracleV3Events {
     // CONVERSION //
     // ---------- //
 
-    function getPrice(address token) external view override returns (uint256);
+    function getPrice(address token) external view returns (uint256);
 
     function getSafePrice(address token) external view returns (uint256);
 
     function getReservePrice(address token) external view returns (uint256);
 
-    function convertToUSD(uint256 amount, address token) external view override returns (uint256);
+    function convertToUSD(uint256 amount, address token) external view returns (uint256);
 
-    function convertFromUSD(uint256 amount, address token) external view override returns (uint256);
+    function convertFromUSD(uint256 amount, address token) external view returns (uint256);
 
-    function convert(uint256 amount, address tokenFrom, address tokenTo) external view override returns (uint256);
+    function convert(uint256 amount, address tokenFrom, address tokenTo) external view returns (uint256);
 
     function safeConvertToUSD(uint256 amount, address token) external view returns (uint256);
 

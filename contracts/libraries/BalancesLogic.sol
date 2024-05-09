@@ -9,7 +9,10 @@ import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol
 
 import {BitMask} from "./BitMask.sol";
 
-import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
+struct Balance {
+    address token;
+    uint256 balance;
+}
 
 struct BalanceWithMask {
     address token;

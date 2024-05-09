@@ -6,8 +6,8 @@ pragma solidity ^0.8.17;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
+import {IBot} from "../interfaces/IBot.sol";
 import {IBotListV3, BotInfo} from "../interfaces/IBotListV3.sol";
-import {IBotV3} from "../interfaces/IBotV3.sol";
 import {ICreditAccountV3} from "../interfaces/ICreditAccountV3.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {
@@ -89,7 +89,7 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
         BotInfo storage info = _botInfo[bot];
         EnumerableSet.AddressSet storage accountBots = _activeBots[creditManager][creditAccount];
         if (permissions != 0) {
-            if (IBotV3(bot).requiredPermissions() & ~permissions != 0) revert InsufficientBotPermissionsException();
+            if (IBot(bot).requiredPermissions() & ~permissions != 0) revert InsufficientBotPermissionsException();
             if (info.forbidden) revert InvalidBotException();
             accountBots.add(bot);
         } else {

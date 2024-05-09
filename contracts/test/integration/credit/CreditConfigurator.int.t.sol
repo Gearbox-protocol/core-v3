@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+import {IVersion} from "../../../interfaces/IVersion.sol";
 
 import "../../interfaces/IAddressProviderV3.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -13,10 +13,10 @@ import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 import {CreditConfiguratorV3, CreditManagerOpts, AllowanceAction} from "../../../credit/CreditConfiguratorV3.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import {ICreditConfiguratorV3Events} from "../../../interfaces/ICreditConfiguratorV3.sol";
-import {IAdapter} from "@gearbox-protocol/core-v2/contracts/interfaces/IAdapter.sol";
+import {IAdapter} from "../../../interfaces/IAdapter.sol";
 
 //
-import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import "../../../libraries/Constants.sol";
 import {AddressList} from "../../lib/AddressList.sol";
 
 // EXCEPTIONS

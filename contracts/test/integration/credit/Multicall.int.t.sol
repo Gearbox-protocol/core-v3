@@ -5,12 +5,7 @@ pragma solidity ^0.8.17;
 
 import {ICreditAccountV3} from "../../../interfaces/ICreditAccountV3.sol";
 
-import {
-    ICreditManagerV3,
-    ICreditManagerV3Events,
-    ManageDebtAction,
-    BOT_PERMISSIONS_SET_FLAG
-} from "../../../interfaces/ICreditManagerV3.sol";
+import {ICreditManagerV3, ICreditManagerV3Events, ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import "../../../interfaces/ICreditFacadeV3.sol";
 import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
@@ -18,7 +13,7 @@ import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // CONSTANTS
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {BOT_PERMISSIONS_SET_FLAG, PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
 
 // TESTS
 import "../../lib/constants.sol";

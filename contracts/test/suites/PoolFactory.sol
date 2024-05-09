@@ -9,7 +9,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {PoolV3} from "../../pool/PoolV3.sol";
 import {LinearInterestRateModelV3} from "../../pool/LinearInterestRateModelV3.sol";
 
-import {GaugeV3} from "../../governance/GaugeV3.sol";
+import {GaugeV3} from "../../pool/GaugeV3.sol";
 import {PoolQuotaKeeperV3} from "../../pool/PoolQuotaKeeperV3.sol";
 import {
     IPoolV3DeployConfig, LinearIRMV3DeployParams, GaugeRate, PoolQuotaLimit

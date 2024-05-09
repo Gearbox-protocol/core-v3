@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
-import {RAY, SECONDS_PER_YEAR, PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {RAY, SECONDS_PER_YEAR, PERCENTAGE_FACTOR} from "../libraries/Constants.sol";
 
 uint192 constant RAY_DIVIDED_BY_PERCENTAGE = uint192(RAY / PERCENTAGE_FACTOR);
 

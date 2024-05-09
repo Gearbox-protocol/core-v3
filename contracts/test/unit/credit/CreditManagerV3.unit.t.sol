@@ -9,10 +9,10 @@ import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMoc
 import {AccountFactoryMock} from "../../mocks/core/AccountFactoryMock.sol";
 
 import {CreditManagerV3Harness} from "./CreditManagerV3Harness.sol";
-import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import "../../../libraries/Constants.sol";
 
 // LIBS & TRAITS
-import {UNDERLYING_TOKEN_MASK, BitMask} from "../../../libraries/BitMask.sol";
+import {BitMask} from "../../../libraries/BitMask.sol";
 import {CreditLogic} from "../../../libraries/CreditLogic.sol";
 import {CollateralLogic} from "../../../libraries/CollateralLogic.sol";
 import {USDTFees} from "../../../libraries/USDTFees.sol";
@@ -36,8 +36,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
-
-// EXCEPTIONS
 
 // MOCKS
 import {PriceOracleMock} from "../../mocks/oracles/PriceOracleMock.sol";

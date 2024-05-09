@@ -30,7 +30,7 @@ import {QuotasLogic} from "../../../libraries/QuotasLogic.sol";
 // TEST
 import "../../lib/constants.sol";
 
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
