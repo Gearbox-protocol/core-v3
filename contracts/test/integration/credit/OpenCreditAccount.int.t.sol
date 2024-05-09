@@ -63,7 +63,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
                 target: address(creditFacade),
                 callData: abi.encodeCall(
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT / 2)
-                    )
+                )
             })
         );
 
@@ -298,7 +298,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.updateQuota, (collateral, int96(uint96(DAI_ACCOUNT_AMOUNT)), 0)
-                        )
+                    )
                 })
             ),
             REFERRAL_CODE
