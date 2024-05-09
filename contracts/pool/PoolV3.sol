@@ -52,7 +52,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     using SafeERC20 for IERC20;
 
     /// @notice Contract version
-    uint256 public constant override version = 3_00;
+    uint256 public constant override version = 3_10;
 
     /// @notice Underlying token address
     address public immutable override underlyingToken;
@@ -102,8 +102,8 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     }
 
     /// @notice Constructor
-    /// @param acl ACL contract address
-    /// @param contractsRegister Contracts register address
+    /// @param acl_ ACL contract address
+    /// @param contractsRegister_ Contracts register address
     /// @param underlyingToken_ Pool underlying token address
     /// @param treasury_ Treasury address
     /// @param interestRateModel_ Interest rate model contract address
@@ -111,8 +111,8 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     /// @param name_ Name of the pool
     /// @param symbol_ Symbol of the pool's LP token
     constructor(
-        address acl,
-        address contractsRegister,
+        address acl_,
+        address contractsRegister_,
         address underlyingToken_,
         address treasury_,
         address interestRateModel_,
@@ -120,8 +120,8 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         string memory name_,
         string memory symbol_
     )
-        ACLNonReentrantTrait(acl) // U:[LP-1A]
-        ContractsRegisterTrait(contractsRegister)
+        ACLNonReentrantTrait(acl_) // U:[LP-1A]
+        ContractsRegisterTrait(contractsRegister_)
         ERC4626(IERC20(underlyingToken_)) // U:[LP-1B]
         ERC20(name_, symbol_) // U:[LP-1B]
         ERC20Permit(name_) // U:[LP-1B]

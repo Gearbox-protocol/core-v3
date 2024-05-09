@@ -31,7 +31,7 @@ import {
 ///         Rates are only updated once per epoch (1 week), to avoid manipulation and make strategies more predictable.
 contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     /// @notice Contract version
-    uint256 public constant override version = 3_00;
+    uint256 public constant override version = 3_10;
 
     /// @notice Address of the pool this gauge is connected to
     address public immutable override pool;
@@ -52,11 +52,11 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     bool public override epochFrozen;
 
     /// @notice Constructor
-    /// @param acl ACL contract address
+    /// @param _acl ACL contract address
     /// @param _pool Address of the lending pool
     /// @param _gearStaking Address of the GEAR staking contract
-    constructor(address acl, address _pool, address _gearStaking)
-        ACLNonReentrantTrait(acl)
+    constructor(address _acl, address _pool, address _gearStaking)
+        ACLNonReentrantTrait(_acl)
         nonZeroAddress(_gearStaking) // U:[GA-01]
     {
         pool = _pool; // U:[GA-01]

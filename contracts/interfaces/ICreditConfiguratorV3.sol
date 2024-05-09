@@ -199,8 +199,6 @@ interface ICreditConfiguratorV3 is IVersion, ICreditConfiguratorV3Events {
 
     function setExpirationDate(uint40 newExpirationDate) external;
 
-    function emergencyLiquidators() external view returns (address[] memory);
-
     function addEmergencyLiquidator(address liquidator) external;
 
     function removeEmergencyLiquidator(address liquidator) external;

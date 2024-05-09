@@ -10,8 +10,8 @@ import {USDT_Transfer} from "../traits/USDT_Transfer.sol";
 /// @notice Pool variation for USDT underlying with enabled transfer fees
 contract PoolV3_USDT is PoolV3, USDT_Transfer {
     constructor(
-        address acl,
-        address contractsRegister,
+        address acl_,
+        address contractsRegister_,
         address underlyingToken_,
         address treasury_,
         address interestRateModel_,
@@ -19,7 +19,7 @@ contract PoolV3_USDT is PoolV3, USDT_Transfer {
         string memory name_,
         string memory symbol_
     )
-        PoolV3(acl, contractsRegister, underlyingToken_, treasury_, interestRateModel_, totalDebtLimit_, name_, symbol_)
+        PoolV3(acl_, contractsRegister_, underlyingToken_, treasury_, interestRateModel_, totalDebtLimit_, name_, symbol_)
         USDT_Transfer(underlyingToken_)
     {}
 

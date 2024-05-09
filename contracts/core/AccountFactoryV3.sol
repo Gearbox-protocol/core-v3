@@ -44,7 +44,7 @@ struct QueuedAccount {
 ///           as protection against potential attacks involving reopening an account right after closing it
 contract AccountFactoryV3 is IAccountFactoryV3, Ownable {
     /// @notice Contract version
-    uint256 public constant override version = 3_00;
+    uint256 public constant override version = 3_10;
 
     /// @notice Delay after which returned credit accounts can be reused
     uint40 public constant override delay = 3 days;

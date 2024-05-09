@@ -11,11 +11,6 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 // LIBRARIES & CONSTANTS
 import {BitMask} from "../libraries/BitMask.sol";
 import {
-    DEFAULT_FEE_INTEREST,
-    DEFAULT_FEE_LIQUIDATION,
-    DEFAULT_LIQUIDATION_PREMIUM,
-    DEFAULT_FEE_LIQUIDATION_EXPIRED,
-    DEFAULT_LIQUIDATION_PREMIUM_EXPIRED,
     DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER,
     PERCENTAGE_FACTOR,
     UNDERLYING_TOKEN_MASK,
@@ -56,9 +51,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     /// @dev Set of allowed contracts
     EnumerableSet.AddressSet internal allowedAdaptersSet;
 
-    /// @dev Set of emergency liquidators
-    EnumerableSet.AddressSet internal emergencyLiquidatorsSet;
-
     /// @dev Ensures that function is not called for underlying token
     modifier nonUnderlyingTokenOnly(address token) {
         _revertIfUnderlyingToken(token);
@@ -71,21 +63,14 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     ///           * connects the credit facade and sets debt limits in it
     ///         - For an existing credit manager, simply copies lists of allowed adapters and emergency liquidators
     ///           from the currently connected credit configurator
-    /// @param acl ACL contract address
+    /// @param _acl ACL contract address
     /// @param _creditManager Credit manager to connect to
-    /// @param _creditFacade Facade to connect to the credit manager (ignored for existing credit managers)
-    /// @param opts Credit manager configuration paramaters, see `CreditManagerOpts` for details
     /// @dev When deploying a new credit suite, this contract must be deployed via `create2`. By the moment of deployment,
     ///      new credit manager must already have pre-computed address of this contract set as credit configurator.
-    constructor(
-        address acl,
-        CreditManagerV3 _creditManager,
-        CreditFacadeV3 _creditFacade,
-        CreditManagerOpts memory opts
-    ) ACLNonReentrantTrait(acl) {
-        creditManager = address(_creditManager); // I:[CC-1]
+    constructor(address _acl, address _creditManager) ACLNonReentrantTrait(_acl) {
+        creditManager = _creditManager; // I:[CC-1]
 
-        underlying = _creditManager.underlying(); // I:[CC-1]
+        underlying = CreditManagerV3(_creditManager).underlying(); // I:[CC-1]
 
         address currentConfigurator = CreditManagerV3(creditManager).creditConfigurator(); // I:[CC-41]
 
@@ -98,32 +83,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
                     allowedAdaptersSet.add(allowedAdaptersPrev[i]); // I:[CC-29]
                 }
             }
-
-            address[] memory emergencyLiquidatorsPrev = CreditConfiguratorV3(currentConfigurator).emergencyLiquidators(); // I:[CC-29]
-            len = emergencyLiquidatorsPrev.length;
-            unchecked {
-                for (uint256 i = 0; i < len; ++i) {
-                    emergencyLiquidatorsSet.add(emergencyLiquidatorsPrev[i]); // I:[CC-29]
-                }
-            }
-        }
-        // new credit manager
-        else {
-            _setFees({
-                feeInterest: DEFAULT_FEE_INTEREST,
-                feeLiquidation: DEFAULT_FEE_LIQUIDATION,
-                liquidationDiscount: PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM,
-                feeLiquidationExpired: DEFAULT_FEE_LIQUIDATION_EXPIRED,
-                liquidationDiscountExpired: PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM_EXPIRED
-            }); // I:[CC-1]
-
-            CreditManagerV3(creditManager).setCreditFacade(address(_creditFacade)); // I:[CC-1]
-
-            emit SetCreditFacade(address(_creditFacade)); // I:[CC-1A]
-            emit SetPriceOracle(CreditManagerV3(creditManager).priceOracle()); // I:[CC-1A]
-
-            _setMaxDebtPerBlockMultiplier(address(_creditFacade), uint8(DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER)); // I:[CC-1]
-            _setLimits({_creditFacade: address(_creditFacade), minDebt: opts.minDebt, maxDebt: opts.maxDebt}); // I:[CC-1]
         }
     }
 
@@ -270,12 +229,12 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         nonUnderlyingTokenOnly(token)
         pausableAdminsOnly // I:[CC-2A]
     {
-        _forbidToken({_creditFacade: creditFacade(), token: token});
+        _forbidToken(token);
     }
 
     /// @dev `forbidToken` implementation
-    function _forbidToken(address _creditFacade, address token) internal {
-        CreditFacadeV3 cf = CreditFacadeV3(_creditFacade);
+    function _forbidToken(address token) internal {
+        CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
         uint256 tokenMask = _getTokenMaskOrRevert({token: token}); // I:[CC-9]
         if (cf.forbiddenTokenMask() & tokenMask != 0) return; // I:[CC-9]
@@ -536,12 +495,12 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         override
         configuratorOnly // I:[CC-2]
     {
-        _setBotList(creditFacade(), newBotList); // I:[CC-33]
+        _setBotList(newBotList); // I:[CC-33]
     }
 
     /// @dev `setBotList` implementation
-    function _setBotList(address _creditFacade, address botList) internal {
-        CreditFacadeV3 cf = CreditFacadeV3(_creditFacade);
+    function _setBotList(address botList) internal {
+        CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
         if (botList == cf.botList()) return;
         cf.setBotList(botList); // I:[CC-33]
         emit SetBotList(botList); // I:[CC-33]
@@ -564,60 +523,48 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         CreditManagerV3(creditManager).setCreditFacade(newCreditFacade); // I:[CC-22]
 
         if (migrateParams) {
-            _setMaxDebtPerBlockMultiplier(newCreditFacade, prevCreditFacade.maxDebtPerBlockMultiplier()); // I:[CC-22]
+            _setMaxDebtPerBlockMultiplier(prevCreditFacade.maxDebtPerBlockMultiplier()); // I:[CC-22]
 
             (uint128 minDebt, uint128 maxDebt) = prevCreditFacade.debtLimits();
-            _setLimits({_creditFacade: newCreditFacade, minDebt: minDebt, maxDebt: maxDebt}); // I:[CC-22]
+            _setLimits({minDebt: minDebt, maxDebt: maxDebt}); // I:[CC-22]
 
             (, uint128 maxCumulativeLoss) = prevCreditFacade.lossParams();
             _setMaxCumulativeLoss(newCreditFacade, maxCumulativeLoss); // [CC-22]
 
-            _migrateEmergencyLiquidators(newCreditFacade); // I:[CC-22C]
+            _migrateEmergencyLiquidators(prevCreditFacade); // I:[CC-22C]
 
-            _migrateForbiddenTokens(newCreditFacade, prevCreditFacade.forbiddenTokenMask()); // I:[CC-22C]
+            _migrateForbiddenTokens(prevCreditFacade.forbiddenTokenMask()); // I:[CC-22C]
 
             if (prevCreditFacade.expirable() && CreditFacadeV3(newCreditFacade).expirable()) {
-                _setExpirationDate(newCreditFacade, prevCreditFacade.expirationDate()); // I:[CC-22]
+                _setExpirationDate(prevCreditFacade.expirationDate()); // I:[CC-22]
             }
 
             address botList = prevCreditFacade.botList();
-            if (botList != address(0)) _setBotList(newCreditFacade, botList); // I:[CC-22A]
-        } else {
-            // emergency liquidators set must be cleared to keep it consistent between facade and configurator
-            _clearEmergencyLiquidatorsSet(); // I:[CC-22C]
+            if (botList != address(0)) _setBotList(botList); // I:[CC-22A]
         }
 
         emit SetCreditFacade(newCreditFacade); // I:[CC-22]
     }
 
     /// @dev Migrate emergency liquidators to the new credit facade
-    function _migrateEmergencyLiquidators(address _creditFacade) internal {
-        uint256 len = emergencyLiquidatorsSet.length();
+    function _migrateEmergencyLiquidators(CreditFacadeV3 prevCreditFacade) internal {
+        address[] memory emergencyLiquidators = prevCreditFacade.emergencyLiquidators();
+        uint256 len = emergencyLiquidators.length;
         unchecked {
             for (uint256 i; i < len; ++i) {
-                _addEmergencyLiquidator(_creditFacade, emergencyLiquidatorsSet.at(i));
+                _addEmergencyLiquidator(emergencyLiquidators[i]);
             }
         }
     }
 
     /// @dev Migrates forbidden tokens to the new credit facade
-    function _migrateForbiddenTokens(address _creditFacade, uint256 forbiddenTokensMask) internal {
+    function _migrateForbiddenTokens(uint256 forbiddenTokensMask) internal {
         unchecked {
             while (forbiddenTokensMask != 0) {
                 uint256 mask = forbiddenTokensMask & uint256(-int256(forbiddenTokensMask));
                 address token = CreditManagerV3(creditManager).getTokenByMask(mask);
-                _forbidToken(_creditFacade, token);
+                _forbidToken(token);
                 forbiddenTokensMask ^= mask;
-            }
-        }
-    }
-
-    /// @dev Clears emergency liquidators set
-    function _clearEmergencyLiquidatorsSet() internal {
-        uint256 len = emergencyLiquidatorsSet.length();
-        unchecked {
-            for (uint256 i; i < len; ++i) {
-                emergencyLiquidatorsSet.remove(emergencyLiquidatorsSet.at(len - i - 1));
             }
         }
     }
@@ -651,7 +598,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     {
         address cf = creditFacade();
         (, uint128 currentMaxDebt) = CreditFacadeV3(cf).debtLimits();
-        _setLimits(cf, minDebt, currentMaxDebt);
+        _setLimits(minDebt, currentMaxDebt);
     }
 
     /// @notice Sets the new max debt limit in the credit facade
@@ -664,16 +611,16 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     {
         address cf = creditFacade();
         (uint128 currentMinDebt,) = CreditFacadeV3(cf).debtLimits();
-        _setLimits(cf, currentMinDebt, maxDebt);
+        _setLimits(currentMinDebt, maxDebt);
     }
 
     /// @dev `set{Min|Max}DebtLimit` implementation
-    function _setLimits(address _creditFacade, uint128 minDebt, uint128 maxDebt) internal {
+    function _setLimits(uint128 minDebt, uint128 maxDebt) internal {
         if (minDebt > maxDebt) {
             revert IncorrectLimitsException(); // I:[CC-15]
         }
 
-        CreditFacadeV3 cf = CreditFacadeV3(_creditFacade);
+        CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
         (uint128 currentMinDebt, uint128 currentMaxDebt) = cf.debtLimits();
         if (currentMinDebt == minDebt && currentMaxDebt == maxDebt) return;
@@ -689,7 +636,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         override
         controllerOnly // I:[CC-2B]
     {
-        _setMaxDebtPerBlockMultiplier(creditFacade(), newMaxDebtLimitPerBlockMultiplier); // I:[CC-24]
+        _setMaxDebtPerBlockMultiplier(newMaxDebtLimitPerBlockMultiplier); // I:[CC-24]
     }
 
     /// @notice Disables borrowing in the credit facade by setting max debt per block multiplier to zero
@@ -698,12 +645,12 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         override
         pausableAdminsOnly // I:[CC-2A]
     {
-        _setMaxDebtPerBlockMultiplier(creditFacade(), 0); // I:[CC-24]
+        _setMaxDebtPerBlockMultiplier(0); // I:[CC-24]
     }
 
     /// @dev `setMaxDebtPerBlockMultiplier` implementation
-    function _setMaxDebtPerBlockMultiplier(address _creditFacade, uint8 newMaxDebtLimitPerBlockMultiplier) internal {
-        CreditFacadeV3 cf = CreditFacadeV3(_creditFacade);
+    function _setMaxDebtPerBlockMultiplier(uint8 newMaxDebtLimitPerBlockMultiplier) internal {
+        CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
         if (newMaxDebtLimitPerBlockMultiplier == cf.maxDebtPerBlockMultiplier()) return;
 
@@ -755,12 +702,12 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         override
         controllerOnly // I:[CC-2B]
     {
-        _setExpirationDate(creditFacade(), newExpirationDate); // I:[CC-25]
+        _setExpirationDate(newExpirationDate); // I:[CC-25]
     }
 
     /// @dev `setExpirationDate` implementation
-    function _setExpirationDate(address _creditFacade, uint40 newExpirationDate) internal {
-        CreditFacadeV3 cf = CreditFacadeV3(_creditFacade);
+    function _setExpirationDate(uint40 newExpirationDate) internal {
+        CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
         if (block.timestamp > newExpirationDate || cf.expirationDate() >= newExpirationDate) {
             revert IncorrectExpirationDateException(); // I:[CC-25]
@@ -770,11 +717,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         emit SetExpirationDate(newExpirationDate); // I:[CC-25]
     }
 
-    /// @notice Returns all emergency liquidators
-    function emergencyLiquidators() external view override returns (address[] memory) {
-        return emergencyLiquidatorsSet.values();
-    }
-
     /// @notice Adds an address to the list of emergency liquidators
     /// @param liquidator Address to add to the list
     function addEmergencyLiquidator(address liquidator)
@@ -782,14 +724,12 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         override
         configuratorOnly // I:[CC-2]
     {
-        _addEmergencyLiquidator(creditFacade(), liquidator); // I:[CC-27]
+        _addEmergencyLiquidator(liquidator); // I:[CC-27]
     }
 
     /// @dev `addEmergencyLiquidator` implementation
-    function _addEmergencyLiquidator(address _creditFacade, address liquidator) internal {
-        CreditFacadeV3 cf = CreditFacadeV3(_creditFacade);
-
-        emergencyLiquidatorsSet.add(liquidator); // I:[CC-27]
+    function _addEmergencyLiquidator(address liquidator) internal {
+        CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
         if (cf.canLiquidateWhilePaused(liquidator)) return;
 
@@ -806,12 +746,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     {
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
-        emergencyLiquidatorsSet.remove(liquidator); // I:[CC-28]
-
-        if (!cf.canLiquidateWhilePaused(liquidator)) return;
-
-        cf.setEmergencyLiquidator(liquidator, AllowanceAction.FORBID); // I:[CC-28]
-        emit RemoveEmergencyLiquidator(liquidator); // I:[CC-28]
+        if (cf.canLiquidateWhilePaused(liquidator)) {
+            cf.setEmergencyLiquidator(liquidator, AllowanceAction.FORBID); // I:[CC-28]
+            emit RemoveEmergencyLiquidator(liquidator); // I:[CC-28]
+        }
     }
 
     // --------- //

@@ -38,7 +38,12 @@ import {
     DEFAULT_MAX_ENABLED_TOKENS,
     INACTIVE_CREDIT_ACCOUNT_ADDRESS,
     PERCENTAGE_FACTOR,
-    UNDERLYING_TOKEN_MASK
+    UNDERLYING_TOKEN_MASK,
+    DEFAULT_FEE_INTEREST,
+    DEFAULT_FEE_LIQUIDATION,
+    DEFAULT_LIQUIDATION_PREMIUM,
+    DEFAULT_FEE_LIQUIDATION_EXPIRED,
+    DEFAULT_LIQUIDATION_PREMIUM_EXPIRED
 } from "../libraries/Constants.sol";
 
 // EXCEPTIONS
@@ -85,22 +90,22 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     uint8 public override collateralTokensCount;
 
     /// @dev Liquidation threshold for the underlying token in bps
-    uint16 internal ltUnderlying;
+    uint16 internal ltUnderlying = PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM - DEFAULT_FEE_LIQUIDATION_EXPIRED;
 
     /// @dev Percentage of accrued interest in bps taken by the protocol as profit
-    uint16 internal feeInterest;
+    uint16 internal feeInterest = DEFAULT_FEE_INTEREST;
 
     /// @dev Percentage of liquidated account value in bps taken by the protocol as profit
-    uint16 internal feeLiquidation;
+    uint16 internal feeLiquidation = DEFAULT_FEE_LIQUIDATION;
 
     /// @dev Percentage of liquidated account value in bps that is used to repay debt
-    uint16 internal liquidationDiscount;
+    uint16 internal liquidationDiscount = PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM;
 
     /// @dev Percentage of liquidated expired account value in bps taken by the protocol as profit
-    uint16 internal feeLiquidationExpired;
+    uint16 internal feeLiquidationExpired = DEFAULT_FEE_LIQUIDATION_EXPIRED;
 
     /// @dev Percentage of liquidated expired account value in bps that is used to repay debt
-    uint16 internal liquidationDiscountExpired;
+    uint16 internal liquidationDiscountExpired = PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM_EXPIRED;
 
     /// @dev Active credit account which is an account adapters can interfact with
     address internal _activeCreditAccount = INACTIVE_CREDIT_ACCOUNT_ADDRESS;

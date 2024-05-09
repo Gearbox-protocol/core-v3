@@ -9,6 +9,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 // INTERFACES
 import {IBotListV3} from "../interfaces/IBotListV3.sol";
@@ -39,7 +40,8 @@ import {
     BOT_PERMISSIONS_SET_FLAG,
     INACTIVE_CREDIT_ACCOUNT_ADDRESS,
     PERCENTAGE_FACTOR,
-    UNDERLYING_TOKEN_MASK
+    UNDERLYING_TOKEN_MASK,
+    DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER
 } from "../libraries/Constants.sol";
 
 // TRAITS
@@ -63,6 +65,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     using Address for address;
     using BitMask for uint256;
     using SafeERC20 for IERC20;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice Contract version
     uint256 public constant override version = 3_10;
@@ -89,7 +92,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     uint40 public override expirationDate;
 
     /// @notice Maximum amount that can be borrowed by a credit manager in a single block, as a multiple of `maxDebt`
-    uint8 public override maxDebtPerBlockMultiplier;
+    uint8 public override maxDebtPerBlockMultiplier = DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER;
 
     /// @notice Last block when underlying was borrowed by a credit manager
     uint64 internal lastBlockBorrowed;
@@ -109,8 +112,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @notice Info on bad debt liquidation losses packed into a single slot
     CumulativeLossParams public override lossParams;
 
-    /// @notice Mapping account => emergency liquidator status
-    mapping(address => bool) public override canLiquidateWhilePaused;
+    /// @dev Set of emergency liquidators
+    EnumerableSet.AddressSet internal emergencyLiquidatorsSet;
 
     /// @dev Ensures that function caller is credit configurator
     modifier creditConfiguratorOnly() {
@@ -126,7 +129,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
     /// @dev Ensures that function can't be called when the contract is paused, unless caller is an emergency liquidator
     modifier whenNotPausedOrEmergency() {
-        require(!paused() || canLiquidateWhilePaused[msg.sender], "Pausable: paused");
+        require(!paused() || canLiquidateWhilePaused(msg.sender), "Pausable: paused");
         _;
     }
 
@@ -143,20 +146,20 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     }
 
     /// @notice Constructor
-    /// @param acl ACL contract address
+    /// @param _acl ACL contract address
     /// @param _creditManager Credit manager to connect this facade to
     /// @param _botList Bot list address
     /// @param _weth WETH token address
     /// @param _degenNFT Degen NFT address or `address(0)`
     /// @param _expirable Whether this facade should be expirable
     constructor(
-        address acl,
+        address _acl,
         address _creditManager,
         address _botList,
         address _weth,
         address _degenNFT,
         bool _expirable
-    ) ACLNonReentrantTrait(acl) {
+    ) ACLNonReentrantTrait(_acl) {
         creditManager = _creditManager; // U:[FA-1]
         botList = _botList; // U:[FA-1]
         weth = _weth; // U:[FA-1]
@@ -771,7 +774,21 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         override
         creditConfiguratorOnly // U:[FA-6]
     {
-        canLiquidateWhilePaused[liquidator] = allowance == AllowanceAction.ALLOW; // U:[FA-53]
+        if (allowance == AllowanceAction.ALLOW) {
+            emergencyLiquidatorsSet.add(liquidator);
+        } else {
+            emergencyLiquidatorsSet.remove(liquidator);
+        } // U:[FA-53]
+    }
+
+    /// @notice Mapping account => emergency liquidator status
+    function canLiquidateWhilePaused(address addr) public view returns (bool) {
+        return emergencyLiquidatorsSet.contains(addr);
+    }
+
+    /// @notice Return emergency liquidators
+    function emergencyLiquidators() external view returns (address[] memory) {
+        return emergencyLiquidatorsSet.values();
     }
 
     // --------- //
