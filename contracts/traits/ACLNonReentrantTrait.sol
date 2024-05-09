@@ -68,7 +68,7 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable, ReentrancyGuardTra
     }
 
     /// @notice Constructor
-    /// @param acl Address provider contract address
+    /// @param acl ACL contract address
     constructor(address acl) ACLTrait(acl) {
         controller = IACL(acl).owner();
     }

@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {IContractsRegister} from "../interfaces/IContractsRegister.sol";
+import {IContractsRegister} from "@gearbox-protocol/core-v2/contracts/interfaces/IContractsRegister.sol";
 import {RegisteredCreditManagerOnlyException, RegisteredPoolOnlyException} from "../interfaces/IExceptions.sol";
 
 import {SanityCheckTrait} from "./SanityCheckTrait.sol";
@@ -27,7 +27,7 @@ abstract contract ContractsRegisterTrait is SanityCheckTrait {
     }
 
     /// @notice Constructor
-    /// @param _contractsRegister Address provider contract address
+    /// @param _contractsRegister Contracts register address
     constructor(address _contractsRegister) nonZeroAddress(_contractsRegister) {
         contractsRegister = _contractsRegister;
     }

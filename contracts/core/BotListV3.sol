@@ -4,7 +4,6 @@
 pragma solidity ^0.8.17;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {IBotListV3, BotInfo} from "../interfaces/IBotListV3.sol";
@@ -38,10 +37,8 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
     /// @dev Mapping credit manager => credit account => set of bots with non-zero permissions
     mapping(address => mapping(address => EnumerableSet.AddressSet)) internal _activeBots;
 
-    /// @notice Constructor
-    /// @param riskConfiguratorRegister Address provider contract address
-    constructor(address riskConfiguratorRegister) {
-        _transferOwnership(riskConfiguratorRegister);
+    constructor(address owner) {
+        _transferOwnership(owner);
     }
 
     // ----------- //

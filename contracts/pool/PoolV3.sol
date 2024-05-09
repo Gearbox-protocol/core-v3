@@ -107,24 +107,26 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     }
 
     /// @notice Constructor
-    /// @param riskConfigurator_ Risk configurator contract address
+    /// @param acl ACL contract address
+    /// @param contractsRegister Contracts register address
     /// @param underlyingToken_ Pool underlying token address
+    /// @param treasury_ Treasury address
     /// @param interestRateModel_ Interest rate model contract address
     /// @param totalDebtLimit_ Initial total debt limit, `type(uint256).max` for no limit
     /// @param name_ Name of the pool
     /// @param symbol_ Symbol of the pool's LP token
     constructor(
-        address acl_,
-        address contractsRegister_,
-        address treasury_,
+        address acl,
+        address contractsRegister,
         address underlyingToken_,
+        address treasury_,
         address interestRateModel_,
         uint256 totalDebtLimit_,
         string memory name_,
         string memory symbol_
     )
-        ACLNonReentrantTrait(acl_) // U:[LP-1A]
-        ContractsRegisterTrait(contractsRegister_)
+        ACLNonReentrantTrait(acl) // U:[LP-1A]
+        ContractsRegisterTrait(contractsRegister)
         ERC4626(IERC20(underlyingToken_)) // U:[LP-1B]
         ERC20(name_, symbol_) // U:[LP-1B]
         ERC20Permit(name_) // U:[LP-1B]

@@ -18,9 +18,6 @@ import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/C
 import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
 
 // INTERFACES
-import {
-    AP_BOT_LIST, AP_WETH_TOKEN, IAddressProviderV3, NO_VERSION_CONTROL
-} from "../interfaces/IAddressProviderV3.sol";
 import {IBotListV3} from "../interfaces/IBotListV3.sol";
 import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
 import {CumulativeLossParams, DebtLimits, FullCheckParams, ICreditFacadeV3} from "../interfaces/ICreditFacadeV3.sol";
@@ -141,22 +138,27 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     }
 
     /// @notice Constructor
+    /// @param acl ACL contract address
     /// @param _creditManager Credit manager to connect this facade to
+    /// @param _botList Bot list address
+    /// @param _weth WETH token address
     /// @param _degenNFT Degen NFT address or `address(0)`
     /// @param _expirable Whether this facade should be expirable
-    constructor(address _creditManager, address _degenNFT, bool _expirable)
-        ACLNonReentrantTrait(ICreditManagerV3(_creditManager).addressProvider())
-    {
+    constructor(
+        address acl,
+        address _creditManager,
+        address _botList,
+        address _weth,
+        address _degenNFT,
+        bool _expirable
+    ) ACLNonReentrantTrait(acl) {
         creditManager = _creditManager; // U:[FA-1]
-        underlying = ICreditManagerV3(_creditManager).underlying(); // U:[FA-1]
-
-        address addressProvider = ICreditManagerV3(_creditManager).addressProvider();
-        // weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL); // U:[FA-1]
-        // botList = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_BOT_LIST, 3_10); // U:[FA-1]
-
+        botList = _botList; // U:[FA-1]
+        weth = _weth; // U:[FA-1]
         degenNFT = _degenNFT; // U:[FA-1]
-
         expirable = _expirable; // U:[FA-1]
+
+        underlying = ICreditManagerV3(_creditManager).underlying(); // U:[FA-1]
     }
 
     // ------------------ //

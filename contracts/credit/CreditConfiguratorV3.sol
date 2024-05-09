@@ -31,7 +31,6 @@ import {IAdapter} from "@gearbox-protocol/core-v2/contracts/interfaces/IAdapter.
 import {ICreditConfiguratorV3, CreditManagerOpts, AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
-import "../interfaces/IAddressProviderV3.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
@@ -46,9 +45,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
 
     /// @notice Contract version
     uint256 public constant override version = 3_10;
-
-    /// @notice Address provider contract address
-    address public immutable override addressProvider;
 
     /// @notice Credit manager address
     address public immutable override creditManager;
@@ -74,19 +70,21 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     ///           * connects the credit facade and sets debt limits in it
     ///         - For an existing credit manager, simply copies lists of allowed adapters and emergency liquidators
     ///           from the currently connected credit configurator
+    /// @param acl ACL contract address
     /// @param _creditManager Credit manager to connect to
     /// @param _creditFacade Facade to connect to the credit manager (ignored for existing credit managers)
     /// @param opts Credit manager configuration paramaters, see `CreditManagerOpts` for details
     /// @dev When deploying a new credit suite, this contract must be deployed via `create2`. By the moment of deployment,
     ///      new credit manager must already have pre-computed address of this contract set as credit configurator.
-    constructor(CreditManagerV3 _creditManager, CreditFacadeV3 _creditFacade, CreditManagerOpts memory opts)
-        ACLNonReentrantTrait(_creditManager.addressProvider())
-    {
+    constructor(
+        address acl,
+        CreditManagerV3 _creditManager,
+        CreditFacadeV3 _creditFacade,
+        CreditManagerOpts memory opts
+    ) ACLNonReentrantTrait(acl) {
         creditManager = address(_creditManager); // I:[CC-1]
 
         underlying = _creditManager.underlying(); // I:[CC-1]
-
-        addressProvider = _creditManager.addressProvider(); // I:[CC-1]
 
         address currentConfigurator = CreditManagerV3(creditManager).creditConfigurator(); // I:[CC-41]
 
@@ -518,29 +516,26 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     // -------- //
 
     /// @notice Sets the new price oracle contract in the credit manager
-    /// @param priceOracle Version of the new price oracle to take from the address provider
-    /// @dev Reverts if price oracle of given version is not found in the address provider
-    function setPriceOracle(address priceOracle)
+    /// @param newPriceOracle New price oracle
+    function setPriceOracle(address newPriceOracle)
         external
         override
         configuratorOnly // I:[CC-2]
     {
-        if (priceOracle == CreditManagerV3(creditManager).priceOracle()) return;
+        if (newPriceOracle == CreditManagerV3(creditManager).priceOracle()) return;
 
-        CreditManagerV3(creditManager).setPriceOracle(priceOracle); // I:[CC-21]
-        emit SetPriceOracle(priceOracle); // I:[CC-21]
+        CreditManagerV3(creditManager).setPriceOracle(newPriceOracle); // I:[CC-21]
+        emit SetPriceOracle(newPriceOracle); // I:[CC-21]
     }
 
     /// @notice Sets the new bot list contract in the credit facade
-    /// @param newVersion Version of the new bot list to take from the address provider
-    /// @dev Reverts if bot list of given version is not found in the address provider
-    function setBotList(uint256 newVersion)
+    /// @param newBotList New bot list
+    function setBotList(address newBotList)
         external
         override
         configuratorOnly // I:[CC-2]
     {
-        address botList = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_BOT_LIST, newVersion); // I:[CC-33]
-        _setBotList(creditFacade(), botList); // I:[CC-33]
+        _setBotList(creditFacade(), newBotList); // I:[CC-33]
     }
 
     /// @dev `setBotList` implementation

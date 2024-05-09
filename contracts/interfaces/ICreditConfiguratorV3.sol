@@ -120,8 +120,6 @@ interface ICreditConfiguratorV3Events {
 
 /// @title Credit configurator V3 interface
 interface ICreditConfiguratorV3 is IVersion, ICreditConfiguratorV3Events {
-    function addressProvider() external view returns (address);
-
     function creditManager() external view returns (address);
 
     function creditFacade() external view returns (address);
@@ -175,9 +173,9 @@ interface ICreditConfiguratorV3 is IVersion, ICreditConfiguratorV3Events {
     // UPGRADES //
     // -------- //
 
-    function setPriceOracle(address newOracle) external;
+    function setPriceOracle(address newPriceOracle) external;
 
-    function setBotList(uint256 newVersion) external;
+    function setBotList(address newBotList) external;
 
     function setCreditFacade(address newCreditFacade, bool migrateParams) external;
 

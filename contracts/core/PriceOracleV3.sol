@@ -46,8 +46,8 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     EnumerableSet.AddressSet internal _updatablePriceFeedsSet;
 
     /// @notice Constructor
-    /// @param addressProvider Address provider contract address
-    constructor(address addressProvider) ACLNonReentrantTrait(addressProvider) {}
+    /// @param acl ACL contract address
+    constructor(address acl) ACLNonReentrantTrait(acl) {}
 
     /// @notice Returns all tokens that have price feeds
     function getTokens() external view override returns (address[] memory) {

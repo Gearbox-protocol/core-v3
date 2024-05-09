@@ -15,7 +15,7 @@ abstract contract ACLTrait is SanityCheckTrait {
     address public immutable acl;
 
     /// @notice Constructor
-    /// @param _aclAddress provider contract address
+    /// @param _acl ACL contract address
     constructor(address _acl) nonZeroAddress(_acl) {
         acl = _acl;
     }

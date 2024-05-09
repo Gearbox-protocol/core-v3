@@ -78,7 +78,7 @@ abstract contract PolicyManagerV3 is ACLNonReentrantTrait {
     /// @notice Emitted when new policy group of the address is set
     event SetGroup(address indexed contractAddress, string indexed group);
 
-    constructor(address _addressProvider) ACLNonReentrantTrait(_addressProvider) {}
+    constructor(address acl) ACLNonReentrantTrait(acl) {}
 
     /// @notice Sets the params for a new or existing policy, using policy UID as key
     /// @param policyHash A unique identifier for a policy, generally, should be a hash of (GROUP_NAME, PARAMETER_NAME)

@@ -32,7 +32,6 @@ import {
     DEFAULT_MAX_ENABLED_TOKENS,
     INACTIVE_CREDIT_ACCOUNT_ADDRESS
 } from "../interfaces/ICreditManagerV3.sol";
-import "../interfaces/IAddressProviderV3.sol";
 import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 
@@ -57,9 +56,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     /// @notice Contract version
     uint256 public constant override version = 3_10;
-
-    /// @notice Address provider contract address
-    address public immutable override addressProvider;
 
     /// @notice Account factory contract address
     address public immutable override accountFactory;
@@ -143,30 +139,22 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     /// @notice Constructor
-    /// @param _addressProvider Address provider contract address
     /// @param _pool Address of the lending pool to connect this credit manager to
+    /// @param _accountFactory Account factory address
+    /// @param _priceOracle Price oracle address
     /// @param _name Credit manager name
     /// @dev Adds pool's underlying as collateral token with LT = 0
     /// @dev Sets `msg.sender` as credit configurator
-    constructor(
-        address _addressProvider,
-        address _accountFactory,
-        address _priceOracle,
-        address _pool,
-        string memory _name
-    ) {
-        addressProvider = _addressProvider;
+    constructor(address _pool, address _accountFactory, address _priceOracle, string memory _name) {
         pool = _pool; // U:[CM-1]
+        accountFactory = _accountFactory; // U:[CM-1]
+        priceOracle = _priceOracle; // U:[CM-1]
+        name = _name; // U:[CM-1]
 
         underlying = IPoolV3(_pool).underlyingToken(); // U:[CM-1]
         _addToken(underlying); // U:[CM-1]
 
-        accountFactory = _accountFactory;
-        priceOracle = _priceOracle;
-
         creditConfigurator = msg.sender; // U:[CM-1]
-
-        name = _name;
     }
 
     // ------------------ //

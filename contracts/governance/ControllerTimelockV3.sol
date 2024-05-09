@@ -38,9 +38,9 @@ contract ControllerTimelockV3 is PolicyManagerV3, IControllerTimelockV3 {
     mapping(bytes32 => QueuedTransactionData) public override queuedTransactions;
 
     /// @notice Constructor
-    /// @param _addressProvider Address of the address provider
+    /// @param acl ACL contract address
     /// @param _vetoAdmin Admin that can cancel transactions
-    constructor(address _addressProvider, address _vetoAdmin) PolicyManagerV3(_addressProvider) {
+    constructor(address acl, address _vetoAdmin) PolicyManagerV3(acl) {
         vetoAdmin = _vetoAdmin;
     }
 

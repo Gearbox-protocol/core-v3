@@ -5,7 +5,6 @@ pragma solidity ^0.8.17;
 pragma abicoder v1;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 
 import {CreditAccountV3} from "../credit/CreditAccountV3.sol";
@@ -56,10 +55,8 @@ contract AccountFactoryV3 is IAccountFactoryV3, Ownable {
     /// @dev Mapping (credit manager, index) => queued account
     mapping(address => mapping(uint256 => QueuedAccount)) internal _queuedAccounts;
 
-    /// @notice Constructor
-    /// @param riskConfiguratorRegister Address provider contract address
-    constructor(address riskConfiguratorRegister) {
-        _transferOwnership(riskConfiguratorRegister);
+    constructor(address owner) {
+        _transferOwnership(owner);
     }
 
     /// @notice Provides a reusable credit account from the queue to the credit manager.
@@ -136,10 +133,10 @@ contract AccountFactoryV3 is IAccountFactoryV3, Ownable {
     /// @param data Data to call the target contract with
     function rescue(address creditAccount, address target, bytes calldata data)
         external
+        override
         onlyOwner // U:[AF-1]
     {
         address creditManager = CreditAccountV3(creditAccount).creditManager();
-        // _ensureRegisteredCreditManager(creditManager); // U:[AF-5A] // How to check?
 
         (,,,,,,, address borrower) = CreditManagerV3(creditManager).creditAccountInfo(creditAccount);
         if (borrower != address(0)) {
