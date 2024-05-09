@@ -7,7 +7,7 @@ import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 
 import {BotListV3} from "../../../core/BotListV3.sol";
 
-import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
+import {ICreditAccountV3} from "../../../interfaces/ICreditAccountV3.sol";
 
 import {
     ICreditManagerV3,
@@ -80,7 +80,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         vm.expectEmit(true, false, false, true);
         emit Execute(creditAccount, address(targetMock));
 
-        vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountBase.execute, (address(targetMock), DUMB_CALLDATA)));
+        vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountV3.execute, (address(targetMock), DUMB_CALLDATA)));
 
         vm.expectCall(address(targetMock), DUMB_CALLDATA);
 

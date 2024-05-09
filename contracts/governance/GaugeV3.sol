@@ -52,10 +52,11 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     bool public override epochFrozen;
 
     /// @notice Constructor
+    /// @param acl ACL contract address
     /// @param _pool Address of the lending pool
     /// @param _gearStaking Address of the GEAR staking contract
-    constructor(address _pool, address _gearStaking)
-        ACLNonReentrantTrait(IPoolV3(_pool).addressProvider())
+    constructor(address acl, address _pool, address _gearStaking)
+        ACLNonReentrantTrait(acl)
         nonZeroAddress(_gearStaking) // U:[GA-01]
     {
         pool = _pool; // U:[GA-01]

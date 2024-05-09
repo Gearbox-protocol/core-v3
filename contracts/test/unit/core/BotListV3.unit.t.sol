@@ -10,7 +10,6 @@ import {IBotListV3Events} from "../../../interfaces/IBotListV3.sol";
 import "../../lib/constants.sol";
 
 // MOCKS
-import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 import {BotMock} from "../../mocks/core/BotMock.sol";
 
 // EXCEPTIONS
@@ -20,8 +19,6 @@ import "../../../interfaces/IExceptions.sol";
 /// @notice U:[BL]: Unit tests for bot list v3
 contract BotListV3UnitTest is Test, IBotListV3Events {
     BotListV3 botList;
-
-    AddressProviderV3ACLMock addressProvider;
 
     address bot;
     address otherBot;
@@ -43,12 +40,9 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
         vm.mockCall(invalidFacade, abi.encodeWithSignature("creditManager()"), abi.encode(creditManager));
         vm.mockCall(creditAccount, abi.encodeWithSignature("creditManager()"), abi.encode(creditManager));
 
-        vm.startPrank(CONFIGURATOR);
-        addressProvider = new AddressProviderV3ACLMock();
-        addressProvider.addCreditManager(creditManager);
-        botList = new BotListV3(address(addressProvider));
+        botList = new BotListV3(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         botList.setCreditManagerApprovedStatus(creditManager, true);
-        vm.stopPrank();
     }
 
     /// @notice U:[BL-1]: `setBotPermissions` works correctly

@@ -7,7 +7,7 @@ import {GearStakingV3, EPOCH_LENGTH} from "../../../governance/GearStakingV3.sol
 import {IGearStakingV3Events, MultiVote, VotingContractStatus} from "../../../interfaces/IGearStakingV3.sol";
 import {IVotingContractV3} from "../../../interfaces/IVotingContractV3.sol";
 
-import "../../../interfaces/IAddressProviderV3.sol";
+import "../../interfaces/IAddressProviderV3.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 
 // TEST
@@ -47,7 +47,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
         vm.prank(CONFIGURATOR);
         addressProvider.setAddress(AP_GEAR_TOKEN, gearToken, false);
 
-        gearStaking = new GearStakingV3(address(addressProvider), block.timestamp + 1);
+        gearStaking = new GearStakingV3(address(addressProvider), gearToken, block.timestamp + 1);
 
         votingContract = new TargetContractMock();
 
@@ -388,7 +388,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
 
     /// @dev U:[GS-07]: migrate and depositOnMigration perform operations in order and emits events
     function test_U_GS_07_migrate_and_depositOnMigration_work_correctly() public {
-        GearStakingV3 gearStakingSuccessor = new GearStakingV3(address(addressProvider), block.timestamp + 1);
+        GearStakingV3 gearStakingSuccessor = new GearStakingV3(address(addressProvider), gearToken, block.timestamp + 1);
 
         {
             MultiVote[] memory votes = new MultiVote[](1);

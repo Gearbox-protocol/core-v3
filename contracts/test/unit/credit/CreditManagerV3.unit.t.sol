@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 /// MOCKS
-import "../../../interfaces/IAddressProviderV3.sol";
+import "../../interfaces/IAddressProviderV3.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 import {AccountFactoryMock} from "../../mocks/core/AccountFactoryMock.sol";
 
@@ -21,7 +21,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 /// INTERFACE
 
 import {ENTERED} from "../../../traits/ReentrancyGuardTrait.sol";
-import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
+import {ICreditAccountV3} from "../../../interfaces/ICreditAccountV3.sol";
 import {
     ICreditManagerV3,
     CollateralTokenData,
@@ -114,7 +114,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         addressProvider = new AddressProviderV3ACLMock();
 
-        accountFactory = AccountFactoryMock(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL));
+        accountFactory = AccountFactoryMock(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 3_00));
 
         priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_10));
 
@@ -134,7 +134,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         poolQuotaKeeperMock = new PoolQuotaKeeperMock(address(poolMock), underlying);
         poolMock.setPoolQuotaKeeper(address(poolQuotaKeeperMock));
 
-        creditManager = new CreditManagerV3Harness(address(addressProvider), address(poolMock), name, isFeeToken);
+        creditManager = new CreditManagerV3Harness(
+            address(poolMock), address(accountFactory), address(priceOracleMock), name, isFeeToken
+        );
         creditManager.setCreditFacade(address(this));
 
         creditManager.setFees(
@@ -1231,7 +1233,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         vm.expectCall(
             creditAccount,
             abi.encodeCall(
-                ICreditAccountBase.execute, (underlying, abi.encodeCall(IERC20.approve, (DUMB_ADDRESS, 20000)))
+                ICreditAccountV3.execute, (underlying, abi.encodeCall(IERC20.approve, (DUMB_ADDRESS, 20000)))
             )
         );
 
@@ -1260,7 +1262,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         CreditAccountMock(creditAccount).setReturnExecuteResult(expectedReturnValue);
 
-        vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountBase.execute, (DUMB_ADDRESS, dumbCallData)));
+        vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountV3.execute, (DUMB_ADDRESS, dumbCallData)));
 
         vm.expectEmit(true, true, true, true);
         emit ExecuteCall(DUMB_ADDRESS, dumbCallData);

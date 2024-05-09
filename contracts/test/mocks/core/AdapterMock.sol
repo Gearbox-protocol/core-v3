@@ -14,12 +14,11 @@ contract AdapterMock is IAdapter {
     uint16 public constant override _gearboxAdapterVersion = 1;
 
     address public immutable override creditManager;
-    address public immutable override addressProvider;
+    address public override addressProvider;
     address public immutable override targetContract;
 
     constructor(address _creditManager, address _targetContract) {
         creditManager = _creditManager;
-        addressProvider = ICreditManagerV3(_creditManager).addressProvider();
         targetContract = _targetContract;
     }
 

@@ -89,8 +89,6 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
 
     function creditConfigurator() external view returns (address);
 
-    function addressProvider() external view returns (address);
-
     function accountFactory() external view returns (address);
 
     function name() external view returns (string memory);

@@ -42,8 +42,6 @@ interface IPoolV3Events {
 
 /// @title Pool V3 interface
 interface IPoolV3 is IVersion, IPoolV3Events, IERC4626, IERC20Permit {
-    function addressProvider() external view returns (address);
-
     function underlyingToken() external view returns (address);
 
     function treasury() external view returns (address);

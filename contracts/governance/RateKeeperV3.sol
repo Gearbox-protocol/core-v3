@@ -44,10 +44,11 @@ contract RateKeeperV3 is IRateKeeperV3, ACLNonReentrantTrait {
     mapping(address => uint16) internal _rates;
 
     /// @notice Constructor
+    /// @param acl ACL contract address
     /// @param pool_ Pool whose quota rates to set by this contract
     /// @param epochLength_ Epoch length in seconds
     /// @custom:tests U:[RK-1]
-    constructor(address pool_, uint256 epochLength_) ACLNonReentrantTrait(IPoolV3(pool_).addressProvider()) {
+    constructor(address acl, address pool_, uint256 epochLength_) ACLNonReentrantTrait(acl) {
         pool = pool_;
         underlying = IPoolV3(pool_).underlyingToken();
         poolQuotaKeeper = IPoolV3(pool_).poolQuotaKeeper();

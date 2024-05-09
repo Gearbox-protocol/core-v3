@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import "../../../interfaces/IAddressProviderV3.sol";
+import "../../interfaces/IAddressProviderV3.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
 import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
@@ -160,7 +160,14 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     }
 
     function _deploy() internal {
-        creditFacade = new CreditFacadeV3Harness(address(creditManagerMock), address(degenNFTMock), expirable);
+        creditFacade = new CreditFacadeV3Harness(
+            address(addressProvider),
+            address(creditManagerMock),
+            address(botListMock),
+            tokenTestSuite.addressOf(Tokens.WETH),
+            address(degenNFTMock),
+            expirable
+        );
 
         creditManagerMock.setCreditFacade(address(creditFacade));
     }

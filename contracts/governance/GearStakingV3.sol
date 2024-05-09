@@ -8,7 +8,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
-import {AP_GEAR_TOKEN, IAddressProviderV3, NO_VERSION_CONTROL} from "../interfaces/IAddressProviderV3.sol";
 import {IVotingContractV3} from "../interfaces/IVotingContractV3.sol";
 import {
     IGearStakingV3,
@@ -54,8 +53,12 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     /// @notice Address of the previous staking contract that is migrated from
     address public override migrator;
 
-    constructor(address _addressProvider, uint256 _firstEpochTimestamp) ACLNonReentrantTrait(_addressProvider) {
-        gear = IAddressProviderV3(_addressProvider).getAddressOrRevert(AP_GEAR_TOKEN, NO_VERSION_CONTROL); // U:[GS-01]
+    /// @notice Constructor
+    /// @param acl ACL contract address
+    /// @param _gear GEAR token address
+    /// @param _firstEpochTimestamp Timestamp at which the first epoch should start
+    constructor(address acl, address _gear, uint256 _firstEpochTimestamp) ACLNonReentrantTrait(acl) {
+        gear = _gear; // U:[GS-01]
         firstEpochTimestamp = _firstEpochTimestamp; // U:[GS-01]
     }
 

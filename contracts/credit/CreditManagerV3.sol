@@ -19,8 +19,8 @@ import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 
 // INTERFACES
-import {IAccountFactoryBase} from "../interfaces/IAccountFactoryV3.sol";
-import {ICreditAccountBase} from "../interfaces/ICreditAccountV3.sol";
+import {IAccountFactoryV3} from "../interfaces/IAccountFactoryV3.sol";
+import {ICreditAccountV3} from "../interfaces/ICreditAccountV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {
     ICreditManagerV3,
@@ -32,7 +32,6 @@ import {
     DEFAULT_MAX_ENABLED_TOKENS,
     INACTIVE_CREDIT_ACCOUNT_ADDRESS
 } from "../interfaces/ICreditManagerV3.sol";
-import "../interfaces/IAddressProviderV3.sol";
 import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 
@@ -53,13 +52,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     using Math for uint256;
     using CreditLogic for CollateralDebtData;
     using SafeERC20 for IERC20;
-    using CreditAccountHelper for ICreditAccountBase;
+    using CreditAccountHelper for ICreditAccountV3;
 
     /// @notice Contract version
     uint256 public constant override version = 3_10;
-
-    /// @notice Address provider contract address
-    address public immutable override addressProvider;
 
     /// @notice Account factory contract address
     address public immutable override accountFactory;
@@ -143,24 +139,22 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     /// @notice Constructor
-    /// @param _addressProvider Address provider contract address
     /// @param _pool Address of the lending pool to connect this credit manager to
+    /// @param _accountFactory Account factory address
+    /// @param _priceOracle Price oracle address
     /// @param _name Credit manager name
     /// @dev Adds pool's underlying as collateral token with LT = 0
     /// @dev Sets `msg.sender` as credit configurator
-    constructor(address _addressProvider, address _pool, string memory _name) {
-        addressProvider = _addressProvider;
+    constructor(address _pool, address _accountFactory, address _priceOracle, string memory _name) {
         pool = _pool; // U:[CM-1]
+        accountFactory = _accountFactory; // U:[CM-1]
+        priceOracle = _priceOracle; // U:[CM-1]
+        name = _name; // U:[CM-1]
 
         underlying = IPoolV3(_pool).underlyingToken(); // U:[CM-1]
         _addToken(underlying); // U:[CM-1]
 
-        priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_PRICE_ORACLE, 3_10); // U:[CM-1]
-        accountFactory = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL); // U:[CM-1]
-
         creditConfigurator = msg.sender; // U:[CM-1]
-
-        name = _name;
     }
 
     // ------------------ //
@@ -178,7 +172,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacadeOnly // U:[CM-2]
         returns (address creditAccount)
     {
-        creditAccount = IAccountFactoryBase(accountFactory).takeCreditAccount(0, 0); // U:[CM-6]
+        creditAccount = IAccountFactoryV3(accountFactory).takeCreditAccount(0, 0); // U:[CM-6]
 
         CreditAccountInfo storage newCreditAccountInfo = creditAccountInfo[creditAccount];
 
@@ -225,7 +219,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
         currentCreditAccountInfo.enabledTokensMask = 0; // U:[CM-7]
 
-        IAccountFactoryBase(accountFactory).returnCreditAccount({creditAccount: creditAccount}); // U:[CM-7]
+        IAccountFactoryV3(accountFactory).returnCreditAccount({creditAccount: creditAccount}); // U:[CM-7]
         creditAccountsSet.remove(creditAccount); // U:[CM-7]
     }
 
@@ -274,7 +268,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
 
         if (amountToPool != 0) {
-            ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amountToPool}); // U:[CM-8]
+            ICreditAccountV3(creditAccount).transfer({token: underlying, to: pool, amount: amountToPool}); // U:[CM-8]
         }
         _poolRepayCreditAccount(collateralDebtData.debt, profit, loss); // U:[CM-8]
 
@@ -290,7 +284,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             uint256 amountToLiquidator = Math.min(remainingFunds - minRemainingFunds, underlyingBalance);
 
             if (amountToLiquidator != 0) {
-                ICreditAccountBase(creditAccount).transfer({token: underlying, to: to, amount: amountToLiquidator}); // U:[CM-8]
+                ICreditAccountV3(creditAccount).transfer({token: underlying, to: to, amount: amountToLiquidator}); // U:[CM-8]
 
                 remainingFunds -= amountToLiquidator; // U:[CM-8]
             }
@@ -363,7 +357,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                 amount = maxRepayment; // U:[CM-11]
             }
 
-            ICreditAccountBase(creditAccount).transfer({token: underlying, to: pool, amount: amount}); // U:[CM-11]
+            ICreditAccountV3(creditAccount).transfer({token: underlying, to: pool, amount: amount}); // U:[CM-11]
 
             uint128 newCumulativeQuotaInterest;
             uint256 profit;
@@ -445,7 +439,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         returns (uint256)
     {
         getTokenMaskOrRevert({token: token}); // U:[CM-26]
-        ICreditAccountBase(creditAccount).transfer({token: token, to: to, amount: amount}); // U:[CM-27]
+        ICreditAccountV3(creditAccount).transfer({token: token, to: to, amount: amount}); // U:[CM-27]
         return 0;
     }
 
@@ -1261,7 +1255,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @dev Reverts if `token` is not recognized as collateral in the credit manager
     function _approveSpender(address creditAccount, address token, address spender, uint256 amount) internal {
         getTokenMaskOrRevert({token: token}); // U:[CM-15]
-        ICreditAccountBase(creditAccount).safeApprove({token: token, spender: spender, amount: amount}); // U:[CM-15]
+        ICreditAccountV3(creditAccount).safeApprove({token: token, spender: spender, amount: amount}); // U:[CM-15]
     }
 
     /// @dev Returns amount of token that should be transferred to receive `amount`
@@ -1278,7 +1272,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     /// @dev Internal wrapper for `creditAccount.execute` call to reduce contract size
     function _execute(address creditAccount, address target, bytes calldata callData) internal returns (bytes memory) {
-        return ICreditAccountBase(creditAccount).execute(target, callData);
+        return ICreditAccountV3(creditAccount).execute(target, callData);
     }
 
     /// @dev Internal wrapper for `pool.repayCreditAccount` call to reduce contract size

@@ -73,10 +73,12 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     }
 
     /// @notice Constructor
+    /// @param acl ACL contract address
+    /// @param contractsRegister Contracts register address
     /// @param _pool Pool address
-    constructor(address _pool)
-        ACLNonReentrantTrait(IPoolV3(_pool).addressProvider())
-        ContractsRegisterTrait(IPoolV3(_pool).addressProvider())
+    constructor(address acl, address contractsRegister, address _pool)
+        ACLNonReentrantTrait(acl)
+        ContractsRegisterTrait(contractsRegister)
     {
         pool = _pool; // U:[PQK-1]
         underlying = IPoolV3(_pool).asset(); // U:[PQK-1]

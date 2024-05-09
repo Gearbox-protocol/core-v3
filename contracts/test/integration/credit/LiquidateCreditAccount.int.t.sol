@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
+import {ICreditAccountV3} from "../../../interfaces/ICreditAccountV3.sol";
 import {
     CollateralCalcTask,
     ICreditManagerV3,
@@ -80,7 +80,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
 
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.execute, (DUMB_CALLDATA)));
 
-        vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountBase.execute, (address(targetMock), DUMB_CALLDATA)));
+        vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountV3.execute, (address(targetMock), DUMB_CALLDATA)));
 
         vm.expectCall(address(targetMock), DUMB_CALLDATA);
 
