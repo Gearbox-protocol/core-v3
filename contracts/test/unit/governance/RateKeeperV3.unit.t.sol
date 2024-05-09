@@ -40,7 +40,7 @@ contract RateKeeperV3UnitTest is Test, IRateKeeperV3Events {
         poolQuotaKeeper.set_lastQuotaRateUpdate(uint40(block.timestamp));
         pool.setPoolQuotaKeeper(address(poolQuotaKeeper));
 
-        rateKeeper = new RateKeeperV3Harness(address(pool), 1 days);
+        rateKeeper = new RateKeeperV3Harness(address(addressProvider), address(pool), 1 days);
     }
 
     /// @notice U:[RK-1]: Constructor works as expected

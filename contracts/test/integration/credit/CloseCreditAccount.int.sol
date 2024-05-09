@@ -3,12 +3,11 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import "../../../interfaces/IAddressProviderV3.sol";
+import "../../interfaces/IAddressProviderV3.sol";
 
 import {BotListV3} from "../../../core/BotListV3.sol";
-import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 
-import {ICreditAccountBase} from "../../../interfaces/ICreditAccountV3.sol";
+import {ICreditAccountV3} from "../../../interfaces/ICreditAccountV3.sol";
 import {SECONDS_PER_YEAR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 import {
     ICreditManagerV3,
@@ -17,7 +16,7 @@ import {
     BOT_PERMISSIONS_SET_FLAG
 } from "../../../interfaces/ICreditManagerV3.sol";
 
-import {ICreditFacadeV3} from "../../../interfaces/ICreditFacadeV3.sol";
+import "../../../interfaces/ICreditFacadeV3.sol";
 
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
@@ -176,7 +175,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         vm.expectEmit(true, false, false, true);
         emit Execute(creditAccount, address(targetMock));
 
-        vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountBase.execute, (address(targetMock), DUMB_CALLDATA)));
+        vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountV3.execute, (address(targetMock), DUMB_CALLDATA)));
 
         vm.expectCall(address(targetMock), DUMB_CALLDATA);
 
@@ -200,11 +199,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
     }
 
     /// @dev I:[CCA-5]: closeCreditAccount returns account to the factory and removes owner
-    function test_I_CCA_05_closeCreditAccount_returns_account_to_the_factory_and_removes_owner()
-        public
-        withAccountFactoryV1
-        creditTest
-    {
+    function test_I_CCA_05_closeCreditAccount_returns_account_to_the_factory_and_removes_owner() public creditTest {
         address daiToken = tokenTestSuite.addressOf(Tokens.DAI);
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
@@ -220,8 +215,6 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         // Existing address case
         vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
-
-        assertTrue(creditAccount != accountFactory.tail(), "credit account is already in tail!");
 
         // Increase block number cause it's forbidden to close credit account in the same block
         vm.roll(block.number + 1);
@@ -242,8 +235,6 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
                 })
             )
         );
-
-        assertEq(creditAccount, accountFactory.tail(), "credit account is not in accountFactory tail!");
 
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
         creditManager.getBorrowerOrRevert(creditAccount);

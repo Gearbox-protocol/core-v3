@@ -131,6 +131,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         ERC20(name_, symbol_) // U:[LP-1B]
         ERC20Permit(name_) // U:[LP-1B]
         nonZeroAddress(underlyingToken_) // U:[LP-1A]
+        nonZeroAddress(treasury_) // U:[LP-1A]
         nonZeroAddress(interestRateModel_) // U:[LP-1A]
     {
         underlyingToken = underlyingToken_; // U:[LP-1B]

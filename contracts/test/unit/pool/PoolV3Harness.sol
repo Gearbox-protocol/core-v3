@@ -11,13 +11,17 @@ contract PoolV3Harness is PoolV3 {
     uint16 _transferFee;
 
     constructor(
-        address addressProvider_,
+        address acl,
+        address contractsRegister,
         address underlyingToken_,
+        address treasury_,
         address interestRateModel_,
         uint256 totalDebtLimit_,
         string memory name_,
         string memory symbol_
-    ) PoolV3(addressProvider_, underlyingToken_, interestRateModel_, totalDebtLimit_, name_, symbol_) {}
+    )
+        PoolV3(acl, contractsRegister, underlyingToken_, treasury_, interestRateModel_, totalDebtLimit_, name_, symbol_)
+    {}
 
     // ------- //
     // GENERAL //

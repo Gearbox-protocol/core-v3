@@ -20,9 +20,6 @@ contract GaugeMock is ACLNonReentrantTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
 
-    /// @dev Address provider
-    address public immutable addressProvider;
-
     /// @dev Address of the pool
     PoolV3 public immutable pool;
 
@@ -35,8 +32,7 @@ contract GaugeMock is ACLNonReentrantTrait {
 
     /// @dev Constructor
 
-    constructor(address _pool) ACLNonReentrantTrait(address(PoolV3(_pool).addressProvider())) nonZeroAddress(_pool) {
-        addressProvider = address(PoolV3(_pool).addressProvider()); // F:[P4-01]
+    constructor(address acl, address _pool) ACLNonReentrantTrait(acl) nonZeroAddress(_pool) {
         pool = PoolV3(payable(_pool)); // F:[P4-01]
     }
 

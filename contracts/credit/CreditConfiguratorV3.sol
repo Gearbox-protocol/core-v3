@@ -183,7 +183,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function setLiquidationThreshold(address token, uint16 liquidationThreshold)
         external
         override
-        controllerOnly // I:[CC-2]
+        controllerOnly // I:[CC-2B]
     {
         _setLiquidationThreshold({token: token, liquidationThreshold: liquidationThreshold}); // I:[CC-5]
     }
@@ -292,7 +292,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         override
         nonZeroAddress(token)
         nonUnderlyingTokenOnly(token)
-        controllerOnly // I:[CC-2]
+        controllerOnly // I:[CC-2B]
     {
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
@@ -393,7 +393,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function setMaxEnabledTokens(uint8 newMaxEnabledTokens)
         external
         override
-        controllerOnly // I:[CC-2]
+        controllerOnly // I:[CC-2B]
     {
         CreditManagerV3 cm = CreditManagerV3(creditManager);
 
@@ -425,7 +425,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     )
         external
         override
-        controllerOnly // I:[CC-2]
+        controllerOnly // I:[CC-2B]
     {
         if (
             feeInterest >= PERCENTAGE_FACTOR || (liquidationPremium + feeLiquidation) >= PERCENTAGE_FACTOR
@@ -643,7 +643,11 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     /// @notice Sets the new min debt limit in the credit facade
     /// @param minDebt New minimum debt per credit account
     /// @dev Reverts if `minDebt` is greater than the current max debt
-    function setMinDebtLimit(uint128 minDebt) external override controllerOnly {
+    function setMinDebtLimit(uint128 minDebt)
+        external
+        override
+        controllerOnly // I:[CC-2B]
+    {
         address cf = creditFacade();
         (, uint128 currentMaxDebt) = CreditFacadeV3(cf).debtLimits();
         _setLimits(cf, minDebt, currentMaxDebt);
@@ -652,7 +656,11 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     /// @notice Sets the new max debt limit in the credit facade
     /// @param maxDebt New maximum debt per credit account
     /// @dev Reverts if `maxDebt` is less than the current min debt
-    function setMaxDebtLimit(uint128 maxDebt) external override controllerOnly {
+    function setMaxDebtLimit(uint128 maxDebt)
+        external
+        override
+        controllerOnly // I:[CC-2B]
+    {
         address cf = creditFacade();
         (uint128 currentMinDebt,) = CreditFacadeV3(cf).debtLimits();
         _setLimits(cf, currentMinDebt, maxDebt);
@@ -708,7 +716,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function setMaxCumulativeLoss(uint128 newMaxCumulativeLoss)
         external
         override
-        controllerOnly // I:[CC-2]
+        controllerOnly // I:[CC-2B]
     {
         _setMaxCumulativeLoss(creditFacade(), newMaxCumulativeLoss); // I:[CC-31]
     }
@@ -728,7 +736,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function resetCumulativeLoss()
         external
         override
-        controllerOnly // I:[CC-2]
+        controllerOnly // I:[CC-2B]
     {
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
         (, uint128 maxCumulativeLossCurrent) = cf.lossParams(); // I:[CC-32]

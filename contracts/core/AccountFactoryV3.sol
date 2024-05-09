@@ -118,11 +118,11 @@ contract AccountFactoryV3 is IAccountFactoryV3, Ownable {
         onlyOwner // U:[AF-1]
     {
         if (_factoryParams[creditManager].masterCreditAccount != address(0)) {
-            revert MasterCreditAccountAlreadyDeployedException(); // U:[AF-4B]
+            revert MasterCreditAccountAlreadyDeployedException(); // U:[AF-4A]
         }
-        address masterCreditAccount = address(new CreditAccountV3(creditManager)); // U:[AF-4C]
-        _factoryParams[creditManager].masterCreditAccount = masterCreditAccount; // U:[AF-4C]
-        emit AddCreditManager(creditManager, masterCreditAccount); // U:[AF-4C]
+        address masterCreditAccount = address(new CreditAccountV3(creditManager)); // U:[AF-4B]
+        _factoryParams[creditManager].masterCreditAccount = masterCreditAccount; // U:[AF-4B]
+        emit AddCreditManager(creditManager, masterCreditAccount); // U:[AF-4B]
     }
 
     /// @notice Executes function call from the account to the target contract with provided data,
@@ -140,11 +140,10 @@ contract AccountFactoryV3 is IAccountFactoryV3, Ownable {
 
         (,,,,,,, address borrower) = CreditManagerV3(creditManager).creditAccountInfo(creditAccount);
         if (borrower != address(0)) {
-            revert CreditAccountIsInUseException(); // U:[AF-5B]
+            revert CreditAccountIsInUseException(); // U:[AF-5A]
         }
 
-        CreditAccountV3(creditAccount).rescue(target, data); // U:[AF-5C]
-
-        emit Rescue(creditAccount, target, data);
+        CreditAccountV3(creditAccount).rescue(target, data); // U:[AF-5B]
+        emit Rescue(creditAccount, target, data); // U:[AF-5B]
     }
 }

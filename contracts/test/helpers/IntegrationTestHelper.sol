@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import "../../interfaces/IAddressProviderV3.sol";
+import "../interfaces/IAddressProviderV3.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
@@ -41,7 +41,6 @@ import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {PriceFeedMock} from "../mocks/oracles/PriceFeedMock.sol";
 import {BalanceHelper} from "./BalanceHelper.sol";
 import {BotListV3} from "../../core/BotListV3.sol";
-import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 // MOCKS
 import {AdapterMock} from "../mocks/core/AdapterMock.sol";
 import {TargetContractMock} from "../mocks/core/TargetContractMock.sol";
@@ -56,9 +55,10 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     uint256 chainId;
 
     // CORE
+    IACL acl;
     IAddressProviderV3 addressProvider;
     ContractsRegister cr;
-    AccountFactory accountFactory;
+    AccountFactoryV3 accountFactory;
     IPriceOracleV3 priceOracle;
     BotListV3 botList;
 
@@ -92,9 +92,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
     bool anyExpirable = true;
     bool expirable;
-
-    bool anyAccountFactory = true;
-    uint256 accountFactoryVersion = 1;
 
     bool installAdapterMock = false;
 
@@ -147,30 +144,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         vm.revertTo(snapshot);
 
         whitelisted = true;
-        _;
-    }
-
-    modifier withAccountFactoryV1() {
-        anyAccountFactory = false;
-        accountFactoryVersion = 1;
-        _;
-    }
-
-    modifier withAccountFactoryV3() {
-        anyAccountFactory = false;
-        accountFactoryVersion = 3_00;
-        _;
-    }
-
-    modifier withAllAccountFactories() {
-        anyAccountFactory = false;
-        uint256 snapshot = vm.snapshot();
-
-        accountFactoryVersion = 1;
-        _;
-        vm.revertTo(snapshot);
-
-        accountFactoryVersion = 3_00;
         _;
     }
 
@@ -239,15 +212,9 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         weth = tokenTestSuite.addressOf(Tokens.WETH);
 
         vm.startPrank(CONFIGURATOR);
-        GenesisFactory gp = new GenesisFactory(weth, DUMB_ADDRESS, accountFactoryVersion);
+        GenesisFactory gp = new GenesisFactory(weth, DUMB_ADDRESS);
         if (chainId == 1337 || chainId == 31337) gp.addPriceFeeds(tokenTestSuite.getPriceFeeds());
-        gp.acl().claimOwnership();
-
-        gp.acl().addPausableAdmin(CONFIGURATOR);
-        gp.acl().addUnpausableAdmin(CONFIGURATOR);
-
         addressProvider = gp.addressProvider();
-
         vm.stopPrank();
 
         _initCoreContracts();
@@ -266,8 +233,9 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     }
 
     function _initCoreContracts() internal {
+        acl = IACL(addressProvider.getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL));
         cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, NO_VERSION_CONTROL));
-        accountFactory = AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL));
+        accountFactory = AccountFactoryV3(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 3_00));
         priceOracle = IPriceOracleV3(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_10));
         botList = BotListV3(payable(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_10)));
     }
@@ -453,10 +421,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 creditConfigurator.setExpirationDate(uint40(block.timestamp + 1));
             }
 
-            if (accountFactoryVersion == 3_00) {
-                vm.prank(CONFIGURATOR);
-                AccountFactoryV3(address(accountFactory)).addCreditManager(address(creditManager));
-            }
+            vm.prank(CONFIGURATOR);
+            AccountFactoryV3(address(accountFactory)).addCreditManager(address(creditManager));
 
             vm.prank(CONFIGURATOR);
             poolQuotaKeeper.addCreditManager(address(creditManager));

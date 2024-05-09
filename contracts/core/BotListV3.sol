@@ -8,7 +8,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 
 import {IBotListV3, BotInfo} from "../interfaces/IBotListV3.sol";
 import {IBotV3} from "../interfaces/IBotV3.sol";
-import {ICreditAccountBase} from "../interfaces/ICreditAccountV3.sol";
+import {ICreditAccountV3} from "../interfaces/ICreditAccountV3.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {
     AddressIsNotContractException,
@@ -47,13 +47,13 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
 
     /// @notice Returns `bot`'s permissions for `creditAccount` in its credit manager
     function botPermissions(address bot, address creditAccount) external view override returns (uint192) {
-        address creditManager = ICreditAccountBase(creditAccount).creditManager();
+        address creditManager = ICreditAccountV3(creditAccount).creditManager();
         return _botInfo[bot].permissions[creditManager][creditAccount];
     }
 
     /// @notice Returns all bots with non-zero permissions for `creditAccount` in its credit manager
     function activeBots(address creditAccount) external view override returns (address[] memory) {
-        address creditManager = ICreditAccountBase(creditAccount).creditManager();
+        address creditManager = ICreditAccountV3(creditAccount).creditManager();
         return _activeBots[creditManager][creditAccount].values();
     }
 
@@ -67,7 +67,7 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
         BotInfo storage info = _botInfo[bot];
         if (info.forbidden) return (0, true);
 
-        address creditManager = ICreditAccountBase(creditAccount).creditManager();
+        address creditManager = ICreditAccountV3(creditAccount).creditManager();
         return (info.permissions[creditManager][creditAccount], false);
     }
 
@@ -83,7 +83,7 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
         nonZeroAddress(bot)
         returns (uint256 activeBotsRemaining)
     {
-        address creditManager = ICreditAccountBase(creditAccount).creditManager();
+        address creditManager = ICreditAccountV3(creditAccount).creditManager();
         _revertIfCallerNotValidCreditFacade(creditManager);
 
         BotInfo storage info = _botInfo[bot];
@@ -107,7 +107,7 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
     /// @dev Reverts if `creditAccount`'s credit manager is not approved or caller is not a facade connected to it
     /// @custom:tests U:[BL-2]
     function eraseAllBotPermissions(address creditAccount) external override {
-        address creditManager = ICreditAccountBase(creditAccount).creditManager();
+        address creditManager = ICreditAccountV3(creditAccount).creditManager();
         _revertIfCallerNotValidCreditFacade(creditManager);
 
         EnumerableSet.AddressSet storage accountBots = _activeBots[creditManager][creditAccount];

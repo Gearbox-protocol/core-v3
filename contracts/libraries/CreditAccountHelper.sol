@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 
-import {ICreditAccountBase} from "../interfaces/ICreditAccountV3.sol";
+import {ICreditAccountV3} from "../interfaces/ICreditAccountV3.sol";
 import {AllowanceFailedException} from "../interfaces/IExceptions.sol";
 
 /// @title Credit account helper library
@@ -22,7 +22,7 @@ library CreditAccountHelper {
     /// @param token Token to approve
     /// @param spender Address to approve to
     /// @param amount Amount to approve
-    function safeApprove(ICreditAccountBase creditAccount, address token, address spender, uint256 amount) internal {
+    function safeApprove(ICreditAccountV3 creditAccount, address token, address spender, uint256 amount) internal {
         if (!_approve(creditAccount, token, spender, amount, false)) {
             _approve(creditAccount, token, spender, 0, true); //U:[CAH-1,2]
             _approve(creditAccount, token, spender, amount, true); // U:[CAH-1,2]
@@ -38,7 +38,7 @@ library CreditAccountHelper {
     /// @param amount Amount to approve
     /// @param revertIfFailed Whether to revert or return `false` on receiving `false` or an error from `approve`
     function _approve(
-        ICreditAccountBase creditAccount,
+        ICreditAccountV3 creditAccount,
         address token,
         address spender,
         uint256 amount,
@@ -63,7 +63,7 @@ library CreditAccountHelper {
     /// @param token Token to send
     /// @param to Address to send to
     /// @param amount Amount to send
-    function transfer(ICreditAccountBase creditAccount, address token, address to, uint256 amount) internal {
+    function transfer(ICreditAccountV3 creditAccount, address token, address to, uint256 amount) internal {
         creditAccount.safeTransfer(token, to, amount);
     }
 
@@ -75,12 +75,10 @@ library CreditAccountHelper {
     /// @param to Address to send to
     /// @param amount Amount to send
     /// @return delivered The actual amount that the `to` address received
-    function transferDeliveredBalanceControl(
-        ICreditAccountBase creditAccount,
-        address token,
-        address to,
-        uint256 amount
-    ) internal returns (uint256 delivered) {
+    function transferDeliveredBalanceControl(ICreditAccountV3 creditAccount, address token, address to, uint256 amount)
+        internal
+        returns (uint256 delivered)
+    {
         uint256 balanceBefore = IERC20(token).safeBalanceOf({account: to});
         transfer(creditAccount, token, to, amount);
         delivered = IERC20(token).safeBalanceOf({account: to}) - balanceBefore;

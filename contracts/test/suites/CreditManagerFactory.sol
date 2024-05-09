@@ -5,6 +5,8 @@ pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/utils/Create2.sol";
 
+import "../interfaces/IAddressProviderV3.sol";
+
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
 import {CreditConfiguratorV3, CreditManagerOpts} from "../../credit/CreditConfiguratorV3.sol";
@@ -18,11 +20,18 @@ contract CreditManagerFactory {
     CreditConfiguratorV3 public creditConfigurator;
 
     constructor(address _ap, address _pool, CreditManagerOpts memory opts, bytes32 salt) {
-        creditManager = new CreditManagerV3(_ap, _pool, opts.name);
-        creditFacade = new CreditFacadeV3(address(creditManager), opts.degenNFT, opts.expirable);
+        address acl = IAddressProviderV3(_ap).getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL);
+        address weth = IAddressProviderV3(_ap).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL);
+        address accountFactory = IAddressProviderV3(_ap).getAddressOrRevert(AP_ACCOUNT_FACTORY, 3_00);
+        address priceOracle = IAddressProviderV3(_ap).getAddressOrRevert(AP_PRICE_ORACLE, 3_10);
+        address botList = IAddressProviderV3(_ap).getAddressOrRevert(AP_BOT_LIST, 3_10);
 
-        bytes memory configuratorByteCode =
-            abi.encodePacked(type(CreditConfiguratorV3).creationCode, abi.encode(creditManager, creditFacade, opts));
+        creditManager = new CreditManagerV3(_pool, accountFactory, priceOracle, opts.name);
+        creditFacade = new CreditFacadeV3(acl, address(creditManager), botList, weth, opts.degenNFT, opts.expirable);
+
+        bytes memory configuratorByteCode = abi.encodePacked(
+            type(CreditConfiguratorV3).creationCode, abi.encode(acl, creditManager, creditFacade, opts)
+        );
 
         creditConfigurator = CreditConfiguratorV3(Create2.computeAddress(salt, keccak256(configuratorByteCode)));
 

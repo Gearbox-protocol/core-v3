@@ -17,7 +17,9 @@ import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {TestHelper} from "../../lib/helper.sol";
-import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
+import {
+    AddressProviderV3ACLMock, AP_TREASURY, NO_VERSION_CONTROL
+} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
 import {ERC20FeeMock} from "../../mocks/token/ERC20FeeMock.sol";
 
@@ -74,7 +76,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         addressProvider = new AddressProviderV3ACLMock();
         addressProvider.addPausableAdmin(configurator);
         addressProvider.addCreditManager(creditManager);
-        treasury = addressProvider.getTreasuryContract();
+        treasury = addressProvider.getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL);
         vm.stopPrank();
 
         _setupPool();
@@ -82,8 +84,10 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
     function _setupPool() internal {
         pool = new PoolV3Harness({
+            acl: address(addressProvider),
+            contractsRegister: address(addressProvider),
             underlyingToken_: address(underlying),
-            addressProvider_: address(addressProvider),
+            treasury_: address(treasury),
             interestRateModel_: interestRateModel,
             totalDebtLimit_: 2000,
             name_: string(abi.encodePacked("diesel ", IERC20Metadata(underlying).name())),
@@ -121,8 +125,10 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
     function test_U_LP_01A_constructor_reverts_on_zero_addresses() public {
         vm.expectRevert(ZeroAddressException.selector);
         new PoolV3Harness({
+            acl: address(addressProvider),
+            contractsRegister: address(addressProvider),
             underlyingToken_: address(0),
-            addressProvider_: address(addressProvider),
+            treasury_: treasury,
             interestRateModel_: interestRateModel,
             totalDebtLimit_: type(uint256).max,
             name_: "",
@@ -131,8 +137,10 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
         vm.expectRevert(ZeroAddressException.selector);
         new PoolV3Harness({
+            acl: address(addressProvider),
+            contractsRegister: address(addressProvider),
             underlyingToken_: address(underlying),
-            addressProvider_: address(0),
+            treasury_: address(0),
             interestRateModel_: interestRateModel,
             totalDebtLimit_: type(uint256).max,
             name_: "",
@@ -141,8 +149,10 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
         vm.expectRevert(ZeroAddressException.selector);
         new PoolV3Harness({
+            acl: address(addressProvider),
+            contractsRegister: address(addressProvider),
             underlyingToken_: address(underlying),
-            addressProvider_: address(addressProvider),
+            treasury_: treasury,
             interestRateModel_: address(0),
             totalDebtLimit_: type(uint256).max,
             name_: "",
@@ -159,8 +169,10 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         emit SetTotalDebtLimit({limit: 2000});
 
         pool = new PoolV3Harness({
+            acl: address(addressProvider),
+            contractsRegister: address(addressProvider),
             underlyingToken_: address(underlying),
-            addressProvider_: address(addressProvider),
+            treasury_: treasury,
             interestRateModel_: interestRateModel,
             totalDebtLimit_: 2000,
             name_: string(abi.encodePacked("diesel ", IERC20Metadata(underlying).name())),
@@ -170,7 +182,6 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         assertEq(pool.asset(), address(underlying), "Incorrect asset");
         assertEq(pool.symbol(), "dTEST", "Incorrect symbol");
         assertEq(pool.name(), "diesel Test Token", "Incorrect name");
-        assertEq(pool.addressProvider(), address(addressProvider), "Incorrect addressProvider");
         assertEq(pool.underlyingToken(), address(underlying), "Incorrect underlyingToken");
         assertEq(pool.treasury(), treasury, "Incorrect treasury");
         assertEq(pool.lastBaseInterestUpdate(), block.timestamp, "Incorrect lastBaseInterestUpdate");

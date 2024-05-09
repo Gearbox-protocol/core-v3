@@ -3,12 +3,12 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import "../../../interfaces/IAddressProviderV3.sol";
+import "../../interfaces/IAddressProviderV3.sol";
 
 import {IDegenNFTV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFTV2.sol";
 
-import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
-import {ICreditAccount} from "@gearbox-protocol/core-v2/contracts/interfaces/ICreditAccount.sol";
+import {IAccountFactoryV3} from "../../../interfaces/IAccountFactoryV3.sol";
+import {ICreditAccountV3} from "../../../interfaces/ICreditAccountV3.sol";
 import {
     ICreditManagerV3,
     ICreditManagerV3Events,
@@ -17,7 +17,7 @@ import {
     CollateralDebtData
 } from "../../../interfaces/ICreditManagerV3.sol";
 
-import {ICreditFacadeV3} from "../../../interfaces/ICreditFacadeV3.sol";
+import "../../../interfaces/ICreditFacadeV3.sol";
 
 import {PERCENTAGE_FACTOR, SECONDS_PER_YEAR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
 
@@ -44,10 +44,6 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
     /// @dev I:[OCA-1]: openCreditAccount transfers_tokens_from_pool
     function test_I_OCA_01_openCreditAccount_transfers_tokens_from_pool() public creditTest {
-        address expectedCreditAccount =
-            AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL)).head();
-
-        uint256 blockAtOpen = block.number;
         uint256 cumulativeAtOpen = pool.baseInterestIndex();
         // pool.setCumulativeIndexNow(cumulativeAtOpen);
 
@@ -71,14 +67,10 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
 
-        assertEq(creditAccount, expectedCreditAccount, "Incorrecct credit account address");
-
         (uint256 debt, uint256 cumulativeIndexLastUpdate,,,,,,) = creditManager.creditAccountInfo(creditAccount);
 
         assertEq(debt, DAI_ACCOUNT_AMOUNT, "Incorrect borrowed amount set in CA");
         assertEq(cumulativeIndexLastUpdate, cumulativeAtOpen, "Incorrect cumulativeIndexLastUpdate set in CA");
-
-        assertEq(ICreditAccount(creditAccount).since(), blockAtOpen, "Incorrect since set in CA");
 
         expectBalance(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT + DAI_ACCOUNT_AMOUNT / 2);
         // assertEq(pool.lendAmount(), DAI_ACCOUNT_AMOUNT, "Incorrect DAI_ACCOUNT_AMOUNT in Pool call");
@@ -133,7 +125,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
     //     uint16 LEVERAGE = 300; // x3
 
     //     address expectedCreditAccount =
-    //         AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL)).head();
+    //         AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 3_00)).head();
 
     //     vm.prank(FRIEND);
     //     creditFacade.approveAccountTransfer(USER, true);
@@ -196,7 +188,10 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         tokenTestSuite.mint(Tokens.DAI, USER, WAD);
         tokenTestSuite.approve(Tokens.DAI, USER, address(creditManager));
 
-        address expectedCreditAccountAddress = accountFactory.head();
+        uint256 snapshot = vm.snapshot();
+        vm.prank(address(creditManager));
+        address expectedCreditAccountAddress = accountFactory.takeCreditAccount(0, 0);
+        vm.revertTo(snapshot);
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
@@ -354,10 +349,6 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
     /// @dev I:[OCA-13]: openCreditAccount with zero debt works correctly
     function test_I_OCA_14_openCreditAccount_sets_zero_debt_flag() public creditTest {
-        address expectedCreditAccount =
-            AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL)).head();
-
-        uint256 blockAtOpen = block.number;
         // pool.setCumulativeIndexNow(cumulativeAtOpen);
 
         MultiCall[] memory calls = MultiCallBuilder.build();
@@ -366,13 +357,9 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
 
-        assertEq(creditAccount, expectedCreditAccount, "Incorrecct credit account address");
-
         (uint256 debt,,,,,,,) = creditManager.creditAccountInfo(creditAccount);
 
         assertEq(debt, 0, "Incorrect borrowed amount set in CA");
-
-        assertEq(ICreditAccount(creditAccount).since(), blockAtOpen, "Incorrect since set in CA");
 
         expectBalance(Tokens.DAI, creditAccount, 0);
 
