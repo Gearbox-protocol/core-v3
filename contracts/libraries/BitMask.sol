@@ -5,8 +5,6 @@ pragma solidity ^0.8.17;
 
 import {IncorrectParameterException} from "../interfaces/IExceptions.sol";
 
-uint256 constant UNDERLYING_TOKEN_MASK = 1;
-
 /// @title Bit mask library
 /// @notice Implements functions that manipulate bit masks
 ///         Bit masks are utilized extensively by Gearbox to efficiently store token sets (enabled tokens on accounts

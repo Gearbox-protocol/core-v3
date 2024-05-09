@@ -10,7 +10,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 // LIBS & TRAITS
-import {UNDERLYING_TOKEN_MASK, BitMask} from "../libraries/BitMask.sol";
+import {BitMask} from "../libraries/BitMask.sol";
 import {CreditLogic} from "../libraries/CreditLogic.sol";
 import {CollateralLogic} from "../libraries/CollateralLogic.sol";
 import {CreditAccountHelper} from "../libraries/CreditAccountHelper.sol";
@@ -28,15 +28,18 @@ import {
     ManageDebtAction,
     CreditAccountInfo,
     CollateralDebtData,
-    CollateralCalcTask,
-    DEFAULT_MAX_ENABLED_TOKENS,
-    INACTIVE_CREDIT_ACCOUNT_ADDRESS
+    CollateralCalcTask
 } from "../interfaces/ICreditManagerV3.sol";
 import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 
-// CONSTANTS
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+// LIBRARIES
+import {
+    DEFAULT_MAX_ENABLED_TOKENS,
+    INACTIVE_CREDIT_ACCOUNT_ADDRESS,
+    PERCENTAGE_FACTOR,
+    UNDERLYING_TOKEN_MASK
+} from "../libraries/Constants.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";

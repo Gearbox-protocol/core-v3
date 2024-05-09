@@ -8,7 +8,7 @@ import {console} from "forge-std/console.sol";
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+import {IVersion} from "../../../interfaces/IVersion.sol";
 
 import "../../interfaces/IAddressProviderV3.sol";
 

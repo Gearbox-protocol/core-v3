@@ -5,8 +5,8 @@ pragma solidity ^0.8.17;
 
 import {Test} from "forge-std/Test.sol";
 
-import {GaugeV3} from "../../../governance/GaugeV3.sol";
-import {EPOCH_LENGTH, GearStakingV3, MultiVote, VotingContractStatus} from "../../../governance/GearStakingV3.sol";
+import {EPOCH_LENGTH, GearStakingV3, MultiVote, VotingContractStatus} from "../../../core/GearStakingV3.sol";
+import {GaugeV3} from "../../../pool/GaugeV3.sol";
 import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
 
 import {CallerNotGaugeException} from "../../../interfaces/IExceptions.sol";

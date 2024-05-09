@@ -10,32 +10,37 @@ import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC2
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-// FIRST-PARTY
-import {IDegenNFTV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFTV2.sol";
-import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
-import {Balance} from "@gearbox-protocol/core-v2/contracts/libraries/Balances.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
-import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
-
 // INTERFACES
 import {IBotListV3} from "../interfaces/IBotListV3.sol";
 import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
-import {CumulativeLossParams, DebtLimits, FullCheckParams, ICreditFacadeV3} from "../interfaces/ICreditFacadeV3.sol";
+import {
+    CumulativeLossParams,
+    DebtLimits,
+    FullCheckParams,
+    ICreditFacadeV3,
+    MultiCall
+} from "../interfaces/ICreditFacadeV3.sol";
 import "../interfaces/ICreditFacadeV3Multicall.sol";
 import {
-    BOT_PERMISSIONS_SET_FLAG,
     CollateralCalcTask,
     CollateralDebtData,
     ICreditManagerV3,
-    INACTIVE_CREDIT_ACCOUNT_ADDRESS,
     ManageDebtAction
 } from "../interfaces/ICreditManagerV3.sol";
+import {IDegenNFT} from "../interfaces/IDegenNFT.sol";
 import "../interfaces/IExceptions.sol";
 import {IPriceOracleV3, PriceUpdate} from "../interfaces/IPriceOracleV3.sol";
+import {IWETH} from "../interfaces/external/IWETH.sol";
 
 // LIBRARIES
-import {BalanceDelta, BalanceWithMask, BalancesLogic, Comparison} from "../libraries/BalancesLogic.sol";
-import {BitMask, UNDERLYING_TOKEN_MASK} from "../libraries/BitMask.sol";
+import {Balance, BalanceDelta, BalanceWithMask, BalancesLogic, Comparison} from "../libraries/BalancesLogic.sol";
+import {BitMask} from "../libraries/BitMask.sol";
+import {
+    BOT_PERMISSIONS_SET_FLAG,
+    INACTIVE_CREDIT_ACCOUNT_ADDRESS,
+    PERCENTAGE_FACTOR,
+    UNDERLYING_TOKEN_MASK
+} from "../libraries/Constants.sol";
 
 // TRAITS
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
@@ -191,7 +196,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             if (msg.sender != onBehalfOf) {
                 revert ForbiddenInWhitelistedModeException(); // U:[FA-9]
             }
-            IDegenNFTV2(degenNFT).burn(onBehalfOf, 1); // U:[FA-9]
+            IDegenNFT(degenNFT).burn(onBehalfOf, 1); // U:[FA-9]
         }
 
         creditAccount = ICreditManagerV3(creditManager).openCreditAccount({onBehalfOf: onBehalfOf}); // U:[FA-10]

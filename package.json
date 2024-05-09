@@ -30,7 +30,6 @@
     "@chainlink/contracts": "^0.6.1",
     "@commitlint/cli": "^17.6.3",
     "@commitlint/config-conventional": "17.6.0",
-    "@gearbox-protocol/core-v2": "1.19.0-base.16",
     "@gearbox-protocol/prettier-config": "^1.5.0",
     "@gearbox-protocol/sdk-gov": "^1.4.6",
     "@openzeppelin/contracts": "^4.9.3",

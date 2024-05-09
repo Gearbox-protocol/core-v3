@@ -3,9 +3,9 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IBotV3} from "../../../interfaces/IBotV3.sol";
+import {IBot} from "../../../interfaces/IBot.sol";
 
-contract BotMock is IBotV3 {
+contract BotMock is IBot {
     uint192 public override requiredPermissions;
 
     function setRequiredPermissions(uint192 permissions) external {

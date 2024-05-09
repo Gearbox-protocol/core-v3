@@ -15,10 +15,9 @@ import {
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {IPoolQuotaKeeperV3, AccountQuota} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 
-import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
-import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
+import {MultiCall, MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
 import {CreditLogic} from "../../../libraries/CreditLogic.sol";
 
 // TESTS

@@ -23,7 +23,7 @@ import {
 import {ITokenTestSuite} from "../interfaces/ITokenTestSuite.sol";
 
 import "../lib/constants.sol";
-import "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import "../../libraries/Constants.sol";
 
 contract MockCreditConfig is Test, IPoolV3DeployConfig {
     string public id = "mock-test-DAI";

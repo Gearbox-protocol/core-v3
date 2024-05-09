@@ -16,7 +16,7 @@ import {IPoolQuotaKeeperV3, TokenQuotaParams, AccountQuota} from "../interfaces/
 import {IGaugeV3} from "../interfaces/IGaugeV3.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 
-import {PERCENTAGE_FACTOR, RAY} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {PERCENTAGE_FACTOR, RAY} from "../libraries/Constants.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";

@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {RateKeeperV3} from "../../../governance/RateKeeperV3.sol";
+import {RateKeeperV3} from "../../../pool/RateKeeperV3.sol";
 
 contract RateKeeperV3Harness is RateKeeperV3 {
     constructor(address acl, address pool_, uint256 epochLength_) RateKeeperV3(acl, pool_, epochLength_) {}

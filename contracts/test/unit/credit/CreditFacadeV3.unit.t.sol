@@ -9,7 +9,6 @@ import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMoc
 import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
 import {ERC20PermitMock} from "../../mocks/token/ERC20PermitMock.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
-import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
 
 /// LIBS
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -32,21 +31,18 @@ import {
     ICreditManagerV3,
     CollateralCalcTask,
     CollateralDebtData,
-    ManageDebtAction,
-    BOT_PERMISSIONS_SET_FLAG
+    ManageDebtAction
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {IBotListV3} from "../../../interfaces/IBotListV3.sol";
 import {IPriceOracleV3, PriceUpdate} from "../../../interfaces/IPriceOracleV3.sol";
 
-import {BitMask, UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
+import {BitMask} from "../../../libraries/BitMask.sol";
 import {BalanceWithMask} from "../../../libraries/BalancesLogic.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
-// DATA
-
 // CONSTANTS
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {BOT_PERMISSIONS_SET_FLAG, PERCENTAGE_FACTOR, UNDERLYING_TOKEN_MASK} from "../../../libraries/Constants.sol";
 
 // TESTS
 
@@ -146,7 +142,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
     function _withDegenNFT() internal {
         whitelisted = true;
-        degenNFTMock = new DegenNFTMock();
+        degenNFTMock = new DegenNFTMock("DegenNFT", "DNFT");
     }
 
     function _notExpirable() internal {
@@ -330,15 +326,12 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(1, 2, 2);
 
-        vm.prank(USER);
-
         vm.expectRevert(ForbiddenInWhitelistedModeException.selector);
+        vm.prank(USER);
         creditFacade.openCreditAccount({onBehalfOf: FRIEND, calls: new MultiCall[](0), referralCode: 0});
 
-        degenNFTMock.setRevertOnBurn(true);
-
-        vm.prank(USER);
         vm.expectRevert(InsufficientBalanceException.selector);
+        vm.prank(USER);
         creditFacade.openCreditAccount({onBehalfOf: USER, calls: new MultiCall[](0), referralCode: 0});
     }
 

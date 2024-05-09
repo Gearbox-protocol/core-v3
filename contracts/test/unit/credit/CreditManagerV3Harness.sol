@@ -9,7 +9,7 @@ import {USDT_Transfer} from "../../../traits/USDT_Transfer.sol";
 import {CollateralDebtData, CollateralCalcTask, CollateralTokenData} from "../../../interfaces/ICreditManagerV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
 
 contract CreditManagerV3Harness is CreditManagerV3, USDT_Transfer {
     using EnumerableSet for EnumerableSet.AddressSet;

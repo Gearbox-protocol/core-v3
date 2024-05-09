@@ -29,12 +29,7 @@ import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
 // CONSTANTS
-import {
-    RAY,
-    MAX_WITHDRAW_FEE,
-    SECONDS_PER_YEAR,
-    PERCENTAGE_FACTOR
-} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {RAY, MAX_WITHDRAW_FEE, SECONDS_PER_YEAR, PERCENTAGE_FACTOR} from "../libraries/Constants.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";

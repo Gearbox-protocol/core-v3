@@ -5,8 +5,7 @@ pragma solidity ^0.8.17;
 
 import "../../interfaces/IAddressProviderV3.sol";
 
-import {IDegenNFTV2} from "@gearbox-protocol/core-v2/contracts/interfaces/IDegenNFTV2.sol";
-
+import {IDegenNFT} from "../../../interfaces/IDegenNFT.sol";
 import {IAccountFactoryV3} from "../../../interfaces/IAccountFactoryV3.sol";
 import {ICreditAccountV3} from "../../../interfaces/ICreditAccountV3.sol";
 import {
@@ -19,10 +18,10 @@ import {
 
 import "../../../interfaces/ICreditFacadeV3.sol";
 
-import {PERCENTAGE_FACTOR, SECONDS_PER_YEAR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {PERCENTAGE_FACTOR, SECONDS_PER_YEAR, UNDERLYING_TOKEN_MASK} from "../../../libraries/Constants.sol";
 
 // LIBS & TRAITS
-import {BitMask, UNDERLYING_TOKEN_MASK} from "../../../libraries/BitMask.sol";
+import {BitMask} from "../../../libraries/BitMask.sol";
 
 // TESTS
 import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
@@ -106,7 +105,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
     /// @dev I:[OCA-3]: openCreditAccount opens account and burns token
     function test_I_OCA_03_openCreditAccount_burns_token_in_whitelisted_mode() public withDegenNFT creditTest {
-        IDegenNFTV2 degenNFT = IDegenNFTV2(creditFacade.degenNFT());
+        IDegenNFT degenNFT = IDegenNFT(creditFacade.degenNFT());
 
         uint256 startingBalance = degenNFT.balanceOf(USER);
 

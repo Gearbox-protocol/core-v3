@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {Test} from "forge-std/Test.sol";
 
-import {RateKeeperV3, TokenRate} from "../../../governance/RateKeeperV3.sol";
+import {RateKeeperV3, TokenRate} from "../../../pool/RateKeeperV3.sol";
 import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
 
 import {PoolMock} from "../../mocks/pool/PoolMock.sol";

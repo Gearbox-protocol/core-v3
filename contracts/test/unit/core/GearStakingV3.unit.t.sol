@@ -3,9 +3,9 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {GearStakingV3, EPOCH_LENGTH} from "../../../governance/GearStakingV3.sol";
+import {GearStakingV3, EPOCH_LENGTH} from "../../../core/GearStakingV3.sol";
 import {IGearStakingV3Events, MultiVote, VotingContractStatus} from "../../../interfaces/IGearStakingV3.sol";
-import {IVotingContractV3} from "../../../interfaces/IVotingContractV3.sol";
+import {IVotingContract} from "../../../interfaces/IVotingContract.sol";
 
 import "../../interfaces/IAddressProviderV3.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
@@ -99,7 +99,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
                 );
             }
 
-            vm.expectCall(address(votingContract), abi.encodeCall(IVotingContractV3.vote, (USER, uint96(WAD / 2), "")));
+            vm.expectCall(address(votingContract), abi.encodeCall(IVotingContract.vote, (USER, uint96(WAD / 2), "")));
 
             vm.prank(USER);
             if (withPermit) {
@@ -140,7 +140,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
             extraData: ""
         });
 
-        vm.expectCall(address(votingContract), abi.encodeCall(IVotingContractV3.unvote, (USER, uint96(WAD / 2), "")));
+        vm.expectCall(address(votingContract), abi.encodeCall(IVotingContract.unvote, (USER, uint96(WAD / 2), "")));
 
         vm.expectEmit(true, false, false, true);
         emit ScheduleGearWithdrawal(USER, WAD);
@@ -196,12 +196,12 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
             extraData: "foobar"
         });
 
-        vm.expectCall(address(votingContract), abi.encodeCall(IVotingContractV3.vote, (USER, uint96(WAD / 2), "foo")));
+        vm.expectCall(address(votingContract), abi.encodeCall(IVotingContract.vote, (USER, uint96(WAD / 2), "foo")));
 
-        vm.expectCall(address(votingContract2), abi.encodeCall(IVotingContractV3.vote, (USER, uint96(WAD / 3), "bar")));
+        vm.expectCall(address(votingContract2), abi.encodeCall(IVotingContract.vote, (USER, uint96(WAD / 3), "bar")));
 
         vm.expectCall(
-            address(votingContract2), abi.encodeCall(IVotingContractV3.unvote, (USER, uint96(WAD / 4), "foobar"))
+            address(votingContract2), abi.encodeCall(IVotingContract.unvote, (USER, uint96(WAD / 4), "foobar"))
         );
 
         vm.prank(USER);
@@ -436,14 +436,14 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
         votesAfter[0] =
             MultiVote({votingContract: newVotingContract, voteAmount: uint96(WAD / 2), isIncrease: true, extraData: ""});
 
-        vm.expectCall(address(votingContract), abi.encodeCall(IVotingContractV3.unvote, (USER, uint96(WAD / 2), "")));
+        vm.expectCall(address(votingContract), abi.encodeCall(IVotingContract.unvote, (USER, uint96(WAD / 2), "")));
 
         vm.expectCall(
             address(gearStakingSuccessor),
             abi.encodeCall(GearStakingV3.depositOnMigration, (uint96(WAD / 2), USER, votesAfter))
         );
 
-        vm.expectCall(newVotingContract, abi.encodeCall(IVotingContractV3.vote, (USER, uint96(WAD / 2), "")));
+        vm.expectCall(newVotingContract, abi.encodeCall(IVotingContract.vote, (USER, uint96(WAD / 2), "")));
 
         vm.expectEmit(true, true, true, true);
         emit MigrateGear(USER, address(gearStakingSuccessor), uint96(WAD / 2));

@@ -6,10 +6,9 @@ pragma solidity ^0.8.17;
 import {Test} from "forge-std/Test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-import {IPriceFeed, IUpdatablePriceFeed} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceFeed.sol";
-
-import {IPriceOracleV3Events, PriceFeedParams, PriceUpdate} from "../../../interfaces/IPriceOracleV3.sol";
 import "../../../interfaces/IExceptions.sol";
+import {IPriceFeed, IUpdatablePriceFeed} from "../../../interfaces/IPriceFeed.sol";
+import {IPriceOracleV3Events, PriceFeedParams, PriceUpdate} from "../../../interfaces/IPriceOracleV3.sol";
 
 import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
 import {PriceFeedMock} from "../../mocks/oracles/PriceFeedMock.sol";

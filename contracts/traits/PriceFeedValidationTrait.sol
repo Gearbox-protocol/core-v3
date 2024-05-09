@@ -13,7 +13,7 @@ import {
     PriceFeedDoesNotExistException,
     StalePriceException
 } from "../interfaces/IExceptions.sol";
-import {IPriceFeed, IUpdatablePriceFeed} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceFeed.sol";
+import {IPriceFeed, IUpdatablePriceFeed} from "../interfaces/IPriceFeed.sol";
 
 /// @title Price feed validation trait
 abstract contract PriceFeedValidationTrait {

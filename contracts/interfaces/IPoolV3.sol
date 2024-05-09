@@ -6,7 +6,7 @@ pragma abicoder v1;
 
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+import {IVersion} from "./IVersion.sol";
 
 interface IPoolV3Events {
     /// @notice Emitted when depositing liquidity with referral code

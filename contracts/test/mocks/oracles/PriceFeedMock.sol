@@ -4,7 +4,7 @@
 pragma solidity ^0.8.10;
 
 import {PriceFeedType} from "@gearbox-protocol/sdk-gov/contracts/PriceFeedType.sol";
-import {IPriceFeed} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceFeed.sol";
+import {IPriceFeed} from "../../../interfaces/IPriceFeed.sol";
 
 enum FlagState {
     FALSE,

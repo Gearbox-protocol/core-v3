@@ -8,17 +8,15 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
-import {IVotingContractV3} from "../interfaces/IVotingContractV3.sol";
+import {IVotingContract} from "../interfaces/IVotingContract.sol";
 import {
     IGearStakingV3,
     UserVoteLockData,
     WithdrawalData,
     MultiVote,
-    VotingContractStatus,
-    EPOCHS_TO_WITHDRAW,
-    EPOCH_LENGTH
+    VotingContractStatus
 } from "../interfaces/IGearStakingV3.sol";
-
+import {EPOCHS_TO_WITHDRAW, EPOCH_LENGTH} from "../libraries/Constants.sol";
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 
 // EXCEPTIONS
@@ -239,15 +237,13 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
                     vld.available -= currentVote.voteAmount;
                 }
 
-                IVotingContractV3(currentVote.votingContract).vote(user, currentVote.voteAmount, currentVote.extraData);
+                IVotingContract(currentVote.votingContract).vote(user, currentVote.voteAmount, currentVote.extraData);
             } else {
                 if (allowedVotingContract[currentVote.votingContract] == VotingContractStatus.NOT_ALLOWED) {
                     revert VotingContractNotAllowedException(); // U: [GS-04A]
                 }
 
-                IVotingContractV3(currentVote.votingContract).unvote(
-                    user, currentVote.voteAmount, currentVote.extraData
-                );
+                IVotingContract(currentVote.votingContract).unvote(user, currentVote.voteAmount, currentVote.extraData);
                 vld.available += currentVote.voteAmount;
             }
 

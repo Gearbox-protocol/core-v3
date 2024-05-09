@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 pragma abicoder v1;
 
 // INTERFACES
-import {GaugeV3, QuotaRateParams, UserVotes} from "../../../governance/GaugeV3.sol";
+import {GaugeV3, QuotaRateParams, UserVotes} from "../../../pool/GaugeV3.sol";
 
 contract GaugeV3Harness is GaugeV3 {
     constructor(address acl, address _pool, address _gearStaking) GaugeV3(acl, _pool, _gearStaking) {}
