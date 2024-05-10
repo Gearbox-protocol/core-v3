@@ -45,6 +45,7 @@ import {BotListV3} from "../../core/BotListV3.sol";
 // MOCKS
 import {AdapterMock} from "../mocks/core/AdapterMock.sol";
 import {TargetContractMock} from "../mocks/core/TargetContractMock.sol";
+import {AddressProviderV3ACLMock} from "../mocks/core/AddressProviderV3ACLMock.sol";
 
 import {GenesisFactory} from "../suites/GenesisFactory.sol";
 
@@ -343,8 +344,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         vm.prank(INITIAL_LP);
         pool.deposit(initialBalance, INITIAL_LP);
 
-        vm.prank(CONFIGURATOR);
-        cr.addPool(address(pool));
+        AddressProviderV3ACLMock(address(addressProvider)).addPool(address(pool));
 
         vm.label(address(pool), "Pool");
     }
@@ -405,8 +405,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
             _addCollateralTokens(cmParams.collateralTokens);
 
-            vm.prank(CONFIGURATOR);
-            cr.addCreditManager(address(creditManager));
+            AddressProviderV3ACLMock(address(addressProvider)).addCreditManager(address(creditManager));
 
             if (expirable) {
                 vm.prank(CONFIGURATOR);
