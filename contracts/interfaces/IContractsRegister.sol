@@ -7,9 +7,6 @@ import {IVersion} from "./IVersion.sol";
 
 /// @title Contracts register interface
 interface IContractsRegister is IVersion {
-    function addPool(address) external;
     function isPool(address) external view returns (bool);
-
-    function addCreditManager(address) external;
     function isCreditManager(address) external view returns (bool);
 }
