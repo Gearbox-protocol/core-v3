@@ -105,8 +105,6 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
     /// @dev I:[OCA-3]: openCreditAccount opens account and burns token
     function test_I_OCA_03_openCreditAccount_burns_token_in_whitelisted_mode() public withDegenNFT creditTest {
-        IDegenNFT degenNFT = IDegenNFT(creditFacade.degenNFT());
-
         uint256 startingBalance = degenNFT.balanceOf(USER);
 
         vm.prank(CONFIGURATOR);

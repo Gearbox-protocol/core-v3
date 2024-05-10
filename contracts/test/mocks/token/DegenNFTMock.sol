@@ -8,21 +8,21 @@ import {IDegenNFT} from "../../../interfaces/IDegenNFT.sol";
 import {InsufficientBalanceException} from "../../../interfaces/IExceptions.sol";
 
 contract DegenNFTMock is ERC721, IDegenNFT {
-    uint256 public constant override version = 3_00;
-    uint256 public override totalSupply;
+    address public minter;
 
-    constructor(string memory name, string memory symbol) ERC721(name, symbol) {}
+    constructor(string memory name, string memory symbol) ERC721(name, symbol) {
+        minter = msg.sender;
+    }
 
-    function mint(address to, uint256 amount) external override {
+    function mint(address to, uint256 amount) external {
         uint256 balanceBefore = balanceOf(to);
         for (uint256 i; i < amount; ++i) {
             uint256 tokenId = (uint256(uint160(to)) << 40) + balanceBefore + i;
             _mint(to, tokenId);
         }
-        totalSupply += amount;
     }
 
-    function burn(address from, uint256 amount) external override {
+    function burn(address from, uint256 amount) external {
         uint256 balance = balanceOf(from);
         if (balance < amount) {
             revert InsufficientBalanceException();
@@ -31,12 +31,5 @@ contract DegenNFTMock is ERC721, IDegenNFT {
             uint256 tokenId = (uint256(uint160(from)) << 40) + balance - i - 1;
             _burn(tokenId);
         }
-        totalSupply -= amount;
     }
-
-    function minter() external view override returns (address) {}
-
-    function setMinter(address) external override {}
-
-    function addCreditFacade(address) external override {}
 }

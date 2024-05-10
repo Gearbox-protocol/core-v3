@@ -9,7 +9,6 @@ import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
 import {IACL} from "../../interfaces/IACL.sol";
 import {IContractsRegister} from "../../interfaces/IContractsRegister.sol";
-import {IDegenNFT} from "../../interfaces/IDegenNFT.sol";
 
 import {IWETH} from "../../interfaces/external/IWETH.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -69,7 +68,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     PoolQuotaKeeperV3 public poolQuotaKeeper;
     GaugeV3 public gauge;
 
-    IDegenNFT public degenNFT;
+    DegenNFTMock public degenNFT;
 
     CreditManagerV3 public creditManager;
     CreditFacadeV3 public creditFacade;
@@ -313,10 +312,10 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         }
 
         if (_degenNFT != address(0)) {
-            address minter = IDegenNFT(_degenNFT).minter();
+            address minter = DegenNFTMock(_degenNFT).minter();
 
             vm.prank(minter);
-            IDegenNFT(_degenNFT).mint(USER, 1000);
+            DegenNFTMock(_degenNFT).mint(USER, 1000);
         }
 
         return true;
