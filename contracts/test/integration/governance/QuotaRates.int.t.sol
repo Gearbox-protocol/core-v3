@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {Test} from "forge-std/Test.sol";
 
-import {TumblerV3, TokenRate} from "../../../pool/TumblerV3.sol";
+import {TumblerV3} from "../../../pool/TumblerV3.sol";
 import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
 
 import {PoolMock} from "../../mocks/pool/PoolMock.sol";
@@ -40,9 +40,8 @@ contract QuotaRatesIntegrationTest is Test {
 
     /// @notice I:[QR-1]: `TumblerV3` allows to change rates in `PoolQuotaKeeperV3`
     function test_I_QR_01_tumbler_allows_to_change_rates_in_poolQuotaKeeper() public {
-        TokenRate[] memory rates = new TokenRate[](2);
-        rates[0] = TokenRate(address(token1), 4200);
-        rates[1] = TokenRate(address(token2), 12000);
+        tumbler.addToken(address(token1), 4200);
+        tumbler.addToken(address(token2), 12000);
 
         address[] memory tokens = new address[](2);
         tokens[0] = address(token1);
@@ -51,7 +50,7 @@ contract QuotaRatesIntegrationTest is Test {
         vm.expectCall(address(quotaKeeper), abi.encodeCall(quotaKeeper.updateRates, ()));
         vm.expectCall(address(tumbler), abi.encodeCall(tumbler.getRates, (tokens)));
 
-        tumbler.setRates(rates);
+        tumbler.updateRates();
         assertEq(quotaKeeper.getQuotaRate(address(token1)), 4200, "Incorrect token1 rate");
         assertEq(quotaKeeper.getQuotaRate(address(token2)), 12000, "Incorrect token2 rate");
     }

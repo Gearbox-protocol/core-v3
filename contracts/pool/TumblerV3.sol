@@ -13,7 +13,7 @@ import {
 } from "../interfaces/IExceptions.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
-import {ITumblerV3, TokenRate} from "../interfaces/ITumblerV3.sol";
+import {ITumblerV3} from "../interfaces/ITumblerV3.sol";
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 
 /// @title Tumbler V3
@@ -62,51 +62,50 @@ contract TumblerV3 is ITumblerV3, ACLNonReentrantTrait {
     }
 
     /// @notice Returns rates for a given list of tokens
-    /// @custom:tests U:[TU-3]
+    /// @custom:tests U:[TU-2], U:[TU-3]
     function getRates(address[] calldata tokens) external view override returns (uint16[] memory rates) {
         uint256 len = tokens.length;
         rates = new uint16[](len);
         unchecked {
             for (uint256 i; i < len; ++i) {
+                if (!_tokensSet.contains(tokens[i])) revert TokenIsNotQuotedException();
                 rates[i] = _rates[tokens[i]];
-                if (rates[i] == 0) revert TokenIsNotQuotedException();
             }
         }
     }
 
-    /// @notice Sets rates for a given list of tokens and, if time passed since the last update
-    ///         is greater than epoch length, updates them in the quota keeper
-    /// @custom:tests U:[TU-4], I:[QR-1]
-    function setRates(TokenRate[] calldata rates) external override controllerOnly {
-        uint256 len = rates.length;
-        unchecked {
-            for (uint256 i; i < len; ++i) {
-                _addToken(rates[i].token);
-                _setRate(rates[i].token, rates[i].rate);
-            }
-        }
-        if (block.timestamp < IPoolQuotaKeeperV3(poolQuotaKeeper).lastQuotaRateUpdate() + epochLength) return;
-        IPoolQuotaKeeperV3(poolQuotaKeeper).updateRates();
-    }
-
-    /// @dev Adds `token` to the set of supported tokens and to the quota keeper unless it's already there
-    /// @dev Reverts if `token` is zero address or pool's underlying
+    /// @notice Adds `token` to the set of supported tokens and to the quota keeper unless it's already there,
+    ///         sets its rate to `rate`
+    /// @dev Reverts if `token` is zero address, pool's underlying or is already added
     /// @custom:tests U:[TU-2]
-    function _addToken(address token) internal {
-        if (!_tokensSet.add(token)) return;
-        if (token == address(0)) revert ZeroAddressException();
-        if (token == underlying) revert TokenNotAllowedException();
+    function addToken(address token, uint16 rate) external override configuratorOnly nonZeroAddress(token) {
+        if (token == underlying || !_tokensSet.add(token)) revert TokenNotAllowedException();
         if (!IPoolQuotaKeeperV3(poolQuotaKeeper).isQuotedToken(token)) {
             IPoolQuotaKeeperV3(poolQuotaKeeper).addQuotaToken(token);
         }
         emit AddToken(token);
+
+        _setRate(token, rate);
     }
 
     /// @dev Sets `token`'s rate to `rate`
-    /// @dev Reverts if `rate` is zero
+    /// @dev Reverts if `token` is not added or `rate` is zero
     /// @custom:tests U:[TU-3]
-    function _setRate(address token, uint16 rate) internal {
+    function setRate(address token, uint16 rate) external override controllerOnly {
+        if (!_tokensSet.contains(token)) revert TokenIsNotQuotedException();
         if (rate == 0) revert IncorrectParameterException();
+        _setRate(token, rate);
+    }
+
+    /// @notice Updates rates in the quota keeper if time passed since the last update is greater than epoch length
+    /// @custom:tests U:[TU-4], I:[QR-1]
+    function updateRates() external override controllerOnly {
+        if (block.timestamp < IPoolQuotaKeeperV3(poolQuotaKeeper).lastQuotaRateUpdate() + epochLength) return;
+        IPoolQuotaKeeperV3(poolQuotaKeeper).updateRates();
+    }
+
+    /// @dev `setRate` implementation
+    function _setRate(address token, uint16 rate) internal {
         if (_rates[token] == rate) return;
         _rates[token] = rate;
         emit SetRate(token, rate);

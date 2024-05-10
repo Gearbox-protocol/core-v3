@@ -5,11 +5,6 @@ pragma solidity ^0.8.17;
 
 import {IRateKeeper} from "./base/IRateKeeper.sol";
 
-struct TokenRate {
-    address token;
-    uint16 rate;
-}
-
 interface ITumblerV3Events {
     /// @notice Emitted when new token is added
     event AddToken(address indexed token);
@@ -32,5 +27,9 @@ interface ITumblerV3 is IRateKeeper, ITumblerV3Events {
 
     function getRates(address[] calldata tokens) external view returns (uint16[] memory);
 
-    function setRates(TokenRate[] calldata rates) external;
+    function addToken(address token, uint16 rate) external;
+
+    function setRate(address token, uint16 rate) external;
+
+    function updateRates() external;
 }
