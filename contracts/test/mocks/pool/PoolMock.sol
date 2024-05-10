@@ -62,7 +62,7 @@ contract PoolMock {
     uint256 public _cumulativeIndex_RAY;
 
     // Contract version
-    uint256 public version = 3_00;
+    uint256 public version = 3_10;
 
     uint96 public quotaRevenue;
 

@@ -3,14 +3,9 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IVersion} from "./IVersion.sol";
+import {IRateKeeper} from "./base/IRateKeeper.sol";
 
-struct TokenRate {
-    address token;
-    uint16 rate;
-}
-
-interface IRateKeeperV3Events {
+interface ITumblerV3Events {
     /// @notice Emitted when new token is added
     event AddToken(address indexed token);
 
@@ -18,8 +13,8 @@ interface IRateKeeperV3Events {
     event SetRate(address indexed token, uint16 rate);
 }
 
-/// @title Rate keeper V3 interface
-interface IRateKeeperV3 is IVersion, IRateKeeperV3Events {
+/// @title Tumbler V3 interface
+interface ITumblerV3 is IRateKeeper, ITumblerV3Events {
     function pool() external view returns (address);
 
     function underlying() external view returns (address);
@@ -32,5 +27,9 @@ interface IRateKeeperV3 is IVersion, IRateKeeperV3Events {
 
     function getRates(address[] calldata tokens) external view returns (uint16[] memory);
 
-    function setRates(TokenRate[] calldata rates) external;
+    function addToken(address token, uint16 rate) external;
+
+    function setRate(address token, uint16 rate) external;
+
+    function updateRates() external;
 }

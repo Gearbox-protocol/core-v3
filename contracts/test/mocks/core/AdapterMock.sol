@@ -4,8 +4,8 @@
 pragma solidity ^0.8.17;
 
 import {AdapterType} from "@gearbox-protocol/sdk-gov/contracts/AdapterType.sol";
-import {IAdapter} from "../../../interfaces/IAdapter.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
+import {IAdapter} from "../../../interfaces/base/IAdapter.sol";
 
 /// @title Adapter Mock
 contract AdapterMock is IAdapter {

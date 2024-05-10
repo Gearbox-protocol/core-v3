@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 pragma abicoder v1;
 
@@ -31,7 +31,7 @@ import {
 ///         Rates are only updated once per epoch (1 week), to avoid manipulation and make strategies more predictable.
 contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     /// @notice Contract version
-    uint256 public constant override version = 3_00;
+    uint256 public constant override version = 3_10;
 
     /// @notice Address of the pool this gauge is connected to
     address public immutable override pool;
@@ -52,23 +52,23 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     bool public override epochFrozen;
 
     /// @notice Constructor
-    /// @param acl ACL contract address
+    /// @param _acl ACL contract address
     /// @param _pool Address of the lending pool
     /// @param _gearStaking Address of the GEAR staking contract
-    constructor(address acl, address _pool, address _gearStaking)
-        ACLNonReentrantTrait(acl)
-        nonZeroAddress(_gearStaking) // U:[GA-01]
+    constructor(address _acl, address _pool, address _gearStaking)
+        ACLNonReentrantTrait(_acl)
+        nonZeroAddress(_gearStaking) // U:[GA-1]
     {
-        pool = _pool; // U:[GA-01]
-        voter = _gearStaking; // U:[GA-01]
-        epochLastUpdate = IGearStakingV3(_gearStaking).getCurrentEpoch(); // U:[GA-01]
-        epochFrozen = true; // U:[GA-01]
-        emit SetFrozenEpoch(true); // U:[GA-01]
+        pool = _pool; // U:[GA-1]
+        voter = _gearStaking; // U:[GA-1]
+        epochLastUpdate = IGearStakingV3(_gearStaking).getCurrentEpoch(); // U:[GA-1]
+        epochFrozen = true; // U:[GA-1]
+        emit SetFrozenEpoch(true); // U:[GA-1]
     }
 
     /// @dev Ensures that function caller is voter
     modifier onlyVoter() {
-        _revertIfCallerNotVoter(); // U:[GA-02]
+        _revertIfCallerNotVoter(); // U:[GA-2]
         _;
     }
 
@@ -129,7 +129,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     function vote(address user, uint96 votes, bytes calldata extraData)
         external
         override
-        onlyVoter // U:[GA-02]
+        onlyVoter // U:[GA-2]
     {
         (address token, bool lpSide) = abi.decode(extraData, (address, bool)); // U:[GA-10,11,12]
         _vote({user: user, token: token, votes: votes, lpSide: lpSide}); // U:[GA-10,11,12]
@@ -168,7 +168,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     function unvote(address user, uint96 votes, bytes calldata extraData)
         external
         override
-        onlyVoter // U:[GA-02]
+        onlyVoter // U:[GA-2]
     {
         (address token, bool lpSide) = abi.decode(extraData, (address, bool)); // U:[GA-10,11,13]
         _unvote({user: user, token: token, votes: votes, lpSide: lpSide}); // U:[GA-10,11,13]
@@ -227,23 +227,23 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     function addQuotaToken(address token, uint16 minRate, uint16 maxRate)
         external
         override
-        nonZeroAddress(token) // U:[GA-04]
-        configuratorOnly // U:[GA-03]
+        nonZeroAddress(token) // U:[GA-4]
+        configuratorOnly // U:[GA-3]
     {
         if (isTokenAdded(token) || token == IPoolV3(pool).underlyingToken()) {
-            revert TokenNotAllowedException(); // U:[GA-04]
+            revert TokenNotAllowedException(); // U:[GA-4]
         }
-        _checkParams({minRate: minRate, maxRate: maxRate}); // U:[GA-04]
+        _checkParams({minRate: minRate, maxRate: maxRate}); // U:[GA-4]
 
         quotaRateParams[token] =
-            QuotaRateParams({minRate: minRate, maxRate: maxRate, totalVotesLpSide: 0, totalVotesCaSide: 0}); // U:[GA-05]
+            QuotaRateParams({minRate: minRate, maxRate: maxRate, totalVotesLpSide: 0, totalVotesCaSide: 0}); // U:[GA-5]
 
         IPoolQuotaKeeperV3 quotaKeeper = _poolQuotaKeeper();
         if (!quotaKeeper.isQuotedToken(token)) {
-            quotaKeeper.addQuotaToken({token: token}); // U:[GA-05]
+            quotaKeeper.addQuotaToken({token: token}); // U:[GA-5]
         }
 
-        emit AddQuotaToken({token: token, minRate: minRate, maxRate: maxRate}); // U:[GA-05]
+        emit AddQuotaToken({token: token, minRate: minRate, maxRate: maxRate}); // U:[GA-5]
     }
 
     /// @dev Changes the min rate for a quoted token
@@ -251,8 +251,8 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     function changeQuotaMinRate(address token, uint16 minRate)
         external
         override
-        nonZeroAddress(token) // U: [GA-04]
-        controllerOnly // U: [GA-03]
+        nonZeroAddress(token) // U:[GA-4]
+        controllerOnly // U:[GA-3]
     {
         _changeQuotaTokenRateParams(token, minRate, quotaRateParams[token].maxRate);
     }
@@ -262,36 +262,36 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     function changeQuotaMaxRate(address token, uint16 maxRate)
         external
         override
-        nonZeroAddress(token) // U: [GA-04]
-        controllerOnly // U: [GA-03]
+        nonZeroAddress(token) // U:[GA-4]
+        controllerOnly // U:[GA-3]
     {
         _changeQuotaTokenRateParams(token, quotaRateParams[token].minRate, maxRate);
     }
 
     /// @dev Implementation of `changeQuotaTokenRateParams`
     function _changeQuotaTokenRateParams(address token, uint16 minRate, uint16 maxRate) internal {
-        if (!isTokenAdded(token)) revert TokenNotAllowedException(); // U:[GA-06A, GA-06B]
+        if (!isTokenAdded(token)) revert TokenNotAllowedException(); // U:[GA-6A, GA-6B]
 
-        _checkParams(minRate, maxRate); // U:[GA-04]
+        _checkParams(minRate, maxRate); // U:[GA-4]
 
-        QuotaRateParams storage qrp = quotaRateParams[token]; // U:[GA-06A, GA-06B]
+        QuotaRateParams storage qrp = quotaRateParams[token]; // U:[GA-6A, GA-6B]
         if (minRate == qrp.minRate && maxRate == qrp.maxRate) return;
-        qrp.minRate = minRate; // U:[GA-06A, GA-06B]
-        qrp.maxRate = maxRate; // U:[GA-06A, GA-06B]
+        qrp.minRate = minRate; // U:[GA-6A, GA-6B]
+        qrp.maxRate = maxRate; // U:[GA-6A, GA-6B]
 
-        emit SetQuotaTokenParams({token: token, minRate: minRate, maxRate: maxRate}); // U:[GA-06A, GA-06B]
+        emit SetQuotaTokenParams({token: token, minRate: minRate, maxRate: maxRate}); // U:[GA-6A, GA-6B]
     }
 
     /// @dev Checks that given min and max rate are correct (`0 < minRate <= maxRate`)
     function _checkParams(uint16 minRate, uint16 maxRate) internal pure {
         if (minRate == 0 || minRate > maxRate) {
-            revert IncorrectParameterException(); // U:[GA-04]
+            revert IncorrectParameterException(); // U:[GA-4]
         }
     }
 
     /// @notice Whether token is added to the gauge as quoted
     function isTokenAdded(address token) public view override returns (bool) {
-        return quotaRateParams[token].maxRate != 0; // U:[GA-08]
+        return quotaRateParams[token].maxRate != 0; // U:[GA-8]
     }
 
     /// @dev Returns quota keeper connected to the pool
@@ -302,7 +302,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     /// @dev Reverts if `msg.sender` is not voter
     function _revertIfCallerNotVoter() internal view {
         if (msg.sender != voter) {
-            revert CallerNotVoterException(); // U:[GA-02]
+            revert CallerNotVoterException(); // U:[GA-2]
         }
     }
 }

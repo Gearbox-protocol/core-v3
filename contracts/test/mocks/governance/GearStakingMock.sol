@@ -7,7 +7,7 @@ import {IGearStakingV3, MultiVote, VotingContractStatus} from "../../../interfac
 import {EPOCHS_TO_WITHDRAW} from "../../../libraries/Constants.sol";
 
 contract GearStakingMock is IGearStakingV3 {
-    uint256 public constant version = 3_00;
+    uint256 public constant version = 3_10;
 
     uint16 public getCurrentEpoch;
 

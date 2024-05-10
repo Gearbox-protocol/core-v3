@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 pragma abicoder v1;
 
@@ -19,9 +19,9 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 
 // INTERFACES
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
-import {ILinearInterestRateModelV3} from "../interfaces/ILinearInterestRateModelV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
+import {IInterestRateModel} from "../interfaces/base/IInterestRateModel.sol";
 
 // LIBS & TRAITS
 import {CreditLogic} from "../libraries/CreditLogic.sol";
@@ -52,7 +52,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     using SafeERC20 for IERC20;
 
     /// @notice Contract version
-    uint256 public constant override version = 3_00;
+    uint256 public constant override version = 3_10;
 
     /// @notice Underlying token address
     address public immutable override underlyingToken;
@@ -102,8 +102,8 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     }
 
     /// @notice Constructor
-    /// @param acl ACL contract address
-    /// @param contractsRegister Contracts register address
+    /// @param acl_ ACL contract address
+    /// @param contractsRegister_ Contracts register address
     /// @param underlyingToken_ Pool underlying token address
     /// @param treasury_ Treasury address
     /// @param interestRateModel_ Interest rate model contract address
@@ -111,8 +111,8 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     /// @param name_ Name of the pool
     /// @param symbol_ Symbol of the pool's LP token
     constructor(
-        address acl,
-        address contractsRegister,
+        address acl_,
+        address contractsRegister_,
         address underlyingToken_,
         address treasury_,
         address interestRateModel_,
@@ -120,8 +120,8 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         string memory name_,
         string memory symbol_
     )
-        ACLNonReentrantTrait(acl) // U:[LP-1A]
-        ContractsRegisterTrait(contractsRegister)
+        ACLNonReentrantTrait(acl_) // U:[LP-1A]
+        ContractsRegisterTrait(contractsRegister_)
         ERC4626(IERC20(underlyingToken_)) // U:[LP-1B]
         ERC20(name_, symbol_) // U:[LP-1B]
         ERC20Permit(name_) // U:[LP-1B]
@@ -408,7 +408,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         borrowable = Math.min(borrowable, _borrowable(_creditManagerDebt[creditManager])); // U:[LP-12]
         if (borrowable == 0) return 0; // U:[LP-12]
 
-        uint256 available = ILinearInterestRateModelV3(interestRateModel).availableToBorrow({
+        uint256 available = IInterestRateModel(interestRateModel).availableToBorrow({
             expectedLiquidity: expectedLiquidity(),
             availableLiquidity: availableLiquidity()
         }); // U:[LP-12]
@@ -580,7 +580,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         }
 
         _expectedLiquidityLU = expectedLiquidity_.toUint128(); // U:[LP-18]
-        _baseInterestRate = ILinearInterestRateModelV3(interestRateModel).calcBorrowRate({
+        _baseInterestRate = IInterestRateModel(interestRateModel).calcBorrowRate({
             expectedLiquidity: expectedLiquidity_,
             availableLiquidity: availableLiquidity_,
             checkOptimalBorrowing: checkOptimalBorrowing

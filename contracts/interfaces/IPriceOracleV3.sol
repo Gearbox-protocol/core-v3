@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IVersion} from "./IVersion.sol";
+import {IVersion} from "./base/IVersion.sol";
 
 /// @notice Price feed params
 /// @param priceFeed Price feed address

@@ -14,8 +14,8 @@ import {
     PriceFeedDoesNotExistException,
     PriceFeedIsNotUpdatableException
 } from "../interfaces/IExceptions.sol";
-import {IUpdatablePriceFeed} from "../interfaces/IPriceFeed.sol";
 import {IPriceOracleV3, PriceFeedParams, PriceUpdate} from "../interfaces/IPriceOracleV3.sol";
+import {IUpdatablePriceFeed} from "../interfaces/base/IPriceFeed.sol";
 
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {PriceFeedValidationTrait} from "../traits/PriceFeedValidationTrait.sol";

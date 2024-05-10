@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IVersion} from "./IVersion.sol";
+import {IVersion} from "./base/IVersion.sol";
 
 /// @notice Debt management type
 ///         - `INCREASE_DEBT` borrows additional funds from the pool, updates account's debt and cumulative interest index

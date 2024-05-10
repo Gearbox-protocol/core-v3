@@ -46,8 +46,8 @@ contract PoolFactory is Test {
             IAddressProviderV3(addressProvider).getAddressOrRevert(AP_CONTRACTS_REGISTER, NO_VERSION_CONTROL);
 
         pool = new PoolV3({
-            acl: acl,
-            contractsRegister: contractsRegister,
+            acl_: acl,
+            contractsRegister_: contractsRegister,
             underlyingToken_: underlying,
             treasury_: IAddressProviderV3(addressProvider).getAddressOrRevert(AP_TREASURY, NO_VERSION_CONTROL),
             interestRateModel_: address(irm),
@@ -56,7 +56,7 @@ contract PoolFactory is Test {
             symbol_: config.symbol()
         });
 
-        address gearStaking = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_GEAR_STAKING, 3_00);
+        address gearStaking = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_GEAR_STAKING, 3_10);
         gauge = new GaugeV3(acl, address(pool), gearStaking);
         vm.prank(CONFIGURATOR);
         gauge.setFrozenEpoch(false);

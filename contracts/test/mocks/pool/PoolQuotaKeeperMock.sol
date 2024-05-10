@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 import {IPoolQuotaKeeperV3, TokenQuotaParams, AccountQuota} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 
 contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
-    uint256 public constant override version = 3_00;
+    uint256 public constant override version = 3_10;
 
     /// @dev Address provider
     address public immutable underlying;

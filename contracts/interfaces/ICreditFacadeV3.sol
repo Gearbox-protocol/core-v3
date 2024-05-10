@@ -3,9 +3,9 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IVersion} from "./IVersion.sol";
+import {AllowanceAction} from "./ICreditConfiguratorV3.sol";
 import "./ICreditFacadeV3Multicall.sol";
-import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
+import {IVersion} from "./base/IVersion.sol";
 
 /// @notice Multicall element
 /// @param target Call target, which is either credit facade or adapter

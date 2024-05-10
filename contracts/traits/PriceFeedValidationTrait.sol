@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
@@ -13,7 +13,7 @@ import {
     PriceFeedDoesNotExistException,
     StalePriceException
 } from "../interfaces/IExceptions.sol";
-import {IPriceFeed, IUpdatablePriceFeed} from "../interfaces/IPriceFeed.sol";
+import {IPriceFeed, IUpdatablePriceFeed} from "../interfaces/base/IPriceFeed.sol";
 
 /// @title Price feed validation trait
 abstract contract PriceFeedValidationTrait {

@@ -9,7 +9,6 @@ import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
 import {IACL} from "../../interfaces/IACL.sol";
 import {IContractsRegister} from "../../interfaces/IContractsRegister.sol";
-import {IDegenNFT} from "../../interfaces/IDegenNFT.sol";
 
 import {IWETH} from "../../interfaces/external/IWETH.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -27,7 +26,6 @@ import {ICreditFacadeV3Multicall} from "../../interfaces/ICreditFacadeV3.sol";
 
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {IPriceOracleV3} from "../../interfaces/IPriceOracleV3.sol";
-import {CreditManagerOpts} from "../../credit/CreditConfiguratorV3.sol";
 import {PoolFactory} from "../suites/PoolFactory.sol";
 
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
@@ -46,6 +44,7 @@ import {BotListV3} from "../../core/BotListV3.sol";
 // MOCKS
 import {AdapterMock} from "../mocks/core/AdapterMock.sol";
 import {TargetContractMock} from "../mocks/core/TargetContractMock.sol";
+import {AddressProviderV3ACLMock} from "../mocks/core/AddressProviderV3ACLMock.sol";
 
 import {GenesisFactory} from "../suites/GenesisFactory.sol";
 
@@ -69,7 +68,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     PoolQuotaKeeperV3 public poolQuotaKeeper;
     GaugeV3 public gauge;
 
-    IDegenNFT public degenNFT;
+    DegenNFTMock public degenNFT;
 
     CreditManagerV3 public creditManager;
     CreditFacadeV3 public creditFacade;
@@ -237,7 +236,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     function _initCoreContracts() internal {
         acl = IACL(addressProvider.getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL));
         cr = IContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, NO_VERSION_CONTROL));
-        accountFactory = AccountFactoryV3(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 3_00));
+        accountFactory = AccountFactoryV3(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 3_10));
         priceOracle = IPriceOracleV3(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_10));
         botList = BotListV3(payable(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_10)));
     }
@@ -313,10 +312,10 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         }
 
         if (_degenNFT != address(0)) {
-            address minter = IDegenNFT(_degenNFT).minter();
+            address minter = DegenNFTMock(_degenNFT).minter();
 
             vm.prank(minter);
-            IDegenNFT(_degenNFT).mint(USER, 1000);
+            DegenNFTMock(_degenNFT).mint(USER, 1000);
         }
 
         return true;
@@ -344,8 +343,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         vm.prank(INITIAL_LP);
         pool.deposit(initialBalance, INITIAL_LP);
 
-        vm.prank(CONFIGURATOR);
-        cr.addPool(address(pool));
+        AddressProviderV3ACLMock(address(addressProvider)).addPool(address(pool));
 
         vm.label(address(pool), "Pool");
     }
@@ -380,21 +378,21 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 whitelisted = cmParams.whitelisted;
             }
 
-            CreditManagerOpts memory cmOpts = CreditManagerOpts({
-                minDebt: cmParams.minDebt,
-                maxDebt: cmParams.maxDebt,
+            CreditManagerFactory cmf = new CreditManagerFactory({
+                addressProvider: address(addressProvider),
+                pool: address(pool),
                 degenNFT: (whitelisted) ? address(degenNFT) : address(0),
                 expirable: (anyExpirable) ? cmParams.expirable : expirable,
                 name: cmParams.name
             });
 
-            CreditManagerFactory cmf = new CreditManagerFactory(address(addressProvider), address(pool), cmOpts, 0);
-
             creditManager = cmf.creditManager();
             creditFacade = cmf.creditFacade();
             creditConfigurator = cmf.creditConfigurator();
 
-            vm.prank(CONFIGURATOR);
+            vm.startPrank(CONFIGURATOR);
+            creditConfigurator.setMaxDebtLimit(cmParams.maxDebt);
+            creditConfigurator.setMinDebtLimit(cmParams.minDebt);
             creditConfigurator.setFees(
                 cmParams.feeInterest,
                 cmParams.feeLiquidation,
@@ -402,11 +400,11 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 cmParams.feeLiquidationExpired,
                 cmParams.liquidationPremiumExpired
             );
+            vm.stopPrank();
 
             _addCollateralTokens(cmParams.collateralTokens);
 
-            vm.prank(CONFIGURATOR);
-            cr.addCreditManager(address(creditManager));
+            AddressProviderV3ACLMock(address(addressProvider)).addCreditManager(address(creditManager));
 
             if (expirable) {
                 vm.prank(CONFIGURATOR);

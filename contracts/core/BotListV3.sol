@@ -6,7 +6,6 @@ pragma solidity ^0.8.17;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import {IBot} from "../interfaces/IBot.sol";
 import {IBotListV3, BotInfo} from "../interfaces/IBotListV3.sol";
 import {ICreditAccountV3} from "../interfaces/ICreditAccountV3.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
@@ -16,6 +15,7 @@ import {
     InsufficientBotPermissionsException,
     InvalidBotException
 } from "../interfaces/IExceptions.sol";
+import {IBot} from "../interfaces/base/IBot.sol";
 
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";

@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {Test} from "forge-std/Test.sol";
 
-import {RateKeeperV3, TokenRate} from "../../../pool/RateKeeperV3.sol";
+import {TumblerV3} from "../../../pool/TumblerV3.sol";
 import {PoolQuotaKeeperV3} from "../../../pool/PoolQuotaKeeperV3.sol";
 
 import {PoolMock} from "../../mocks/pool/PoolMock.sol";
@@ -13,9 +13,9 @@ import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
 /// @title Quota rates integration test
-/// @notice I:[QR]: Tests that ensure that rate and quota keeper contracts interact correctly
+/// @notice I:[QR]: Tests that ensure that tumbler and quota keeper contracts interact correctly
 contract QuotaRatesIntegrationTest is Test {
-    RateKeeperV3 rateKeeper;
+    TumblerV3 tumbler;
     PoolQuotaKeeperV3 quotaKeeper;
 
     PoolMock pool;
@@ -34,24 +34,23 @@ contract QuotaRatesIntegrationTest is Test {
         quotaKeeper = new PoolQuotaKeeperV3(address(addressProvider), address(addressProvider), address(pool));
         pool.setPoolQuotaKeeper(address(quotaKeeper));
 
-        rateKeeper = new RateKeeperV3(address(addressProvider), address(pool), 1 days);
-        quotaKeeper.setGauge(address(rateKeeper));
+        tumbler = new TumblerV3(address(addressProvider), address(pool), 1 days);
+        quotaKeeper.setGauge(address(tumbler));
     }
 
-    /// @notice I:[QR-1]: `RateKeeperV3` allows to change rates in `PoolQuotaKeeperV3`
-    function test_I_QR_01_rateKeeper_allows_to_change_rates_in_poolQuotaKeeper() public {
-        TokenRate[] memory rates = new TokenRate[](2);
-        rates[0] = TokenRate(address(token1), 4200);
-        rates[1] = TokenRate(address(token2), 12000);
+    /// @notice I:[QR-1]: `TumblerV3` allows to change rates in `PoolQuotaKeeperV3`
+    function test_I_QR_01_tumbler_allows_to_change_rates_in_poolQuotaKeeper() public {
+        tumbler.addToken(address(token1), 4200);
+        tumbler.addToken(address(token2), 12000);
 
         address[] memory tokens = new address[](2);
         tokens[0] = address(token1);
         tokens[1] = address(token2);
 
         vm.expectCall(address(quotaKeeper), abi.encodeCall(quotaKeeper.updateRates, ()));
-        vm.expectCall(address(rateKeeper), abi.encodeCall(rateKeeper.getRates, (tokens)));
+        vm.expectCall(address(tumbler), abi.encodeCall(tumbler.getRates, (tokens)));
 
-        rateKeeper.setRates(rates);
+        tumbler.updateRates();
         assertEq(quotaKeeper.getQuotaRate(address(token1)), 4200, "Incorrect token1 rate");
         assertEq(quotaKeeper.getQuotaRate(address(token2)), 12000, "Incorrect token2 rate");
     }

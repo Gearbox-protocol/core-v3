@@ -8,7 +8,7 @@ import {console} from "forge-std/console.sol";
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-import {IVersion} from "../../../interfaces/IVersion.sol";
+import {IVersion} from "../../../interfaces/base/IVersion.sol";
 
 import "../../interfaces/IAddressProviderV3.sol";
 
@@ -33,8 +33,8 @@ contract AddressProviderV3ACLMock is Test, IAddressProviderV3, Ownable {
         PriceOracleMock priceOracleMock = new PriceOracleMock();
         _setAddress(AP_PRICE_ORACLE, address(priceOracleMock), priceOracleMock.version());
 
-        AccountFactoryMock accountFactoryMock = new AccountFactoryMock(3_00);
-        _setAddress(AP_ACCOUNT_FACTORY, address(accountFactoryMock), 3_00);
+        AccountFactoryMock accountFactoryMock = new AccountFactoryMock(3_10);
+        _setAddress(AP_ACCOUNT_FACTORY, address(accountFactoryMock), 3_10);
 
         BotListMock botListMock = new BotListMock();
         _setAddress(AP_BOT_LIST, address(botListMock), 3_10);

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 pragma abicoder v1;
 
@@ -13,8 +13,8 @@ import {QuotasLogic} from "../libraries/QuotasLogic.sol";
 
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IPoolQuotaKeeperV3, TokenQuotaParams, AccountQuota} from "../interfaces/IPoolQuotaKeeperV3.sol";
-import {IGaugeV3} from "../interfaces/IGaugeV3.sol";
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
+import {IRateKeeper} from "../interfaces/base/IRateKeeper.sol";
 
 import {PERCENTAGE_FACTOR, RAY} from "../libraries/Constants.sol";
 
@@ -34,7 +34,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     using QuotasLogic for TokenQuotaParams;
 
     /// @notice Contract version
-    uint256 public constant override version = 3_00;
+    uint256 public constant override version = 3_10;
 
     /// @notice Address of the underlying token
     address public immutable override underlying;
@@ -385,7 +385,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         gaugeOnly // U:[PQK-3]
     {
         address[] memory tokens = quotaTokensSet.values();
-        uint16[] memory rates = IGaugeV3(gauge).getRates(tokens); // U:[PQK-7]
+        uint16[] memory rates = IRateKeeper(gauge).getRates(tokens); // U:[PQK-7]
 
         uint256 quotaRevenue;
         uint256 timestampLU = lastQuotaRateUpdate;
