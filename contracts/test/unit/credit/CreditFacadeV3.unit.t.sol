@@ -42,7 +42,12 @@ import {BalanceWithMask} from "../../../libraries/BalancesLogic.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // CONSTANTS
-import {BOT_PERMISSIONS_SET_FLAG, PERCENTAGE_FACTOR, UNDERLYING_TOKEN_MASK} from "../../../libraries/Constants.sol";
+import {
+    BOT_PERMISSIONS_SET_FLAG,
+    DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER,
+    PERCENTAGE_FACTOR,
+    UNDERLYING_TOKEN_MASK
+} from "../../../libraries/Constants.sol";
 
 // TESTS
 
@@ -1672,7 +1677,9 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         uint8 maxDebtPerBlockMultiplier = creditFacade.maxDebtPerBlockMultiplier();
         (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
 
-        assertEq(maxDebtPerBlockMultiplier, 0, "SETUP: incorrect maxDebtPerBlockMultiplier");
+        assertEq(
+            maxDebtPerBlockMultiplier, DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER, "SETUP: incorrect maxDebtPerBlockMultiplier"
+        );
         assertEq(minDebt, 0, "SETUP: incorrect minDebt");
         assertEq(maxDebt, 0, "SETUP: incorrect maxDebt");
 

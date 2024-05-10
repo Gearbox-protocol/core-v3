@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 pragma abicoder v1;
 
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
-import {IVersion} from "./IVersion.sol";
+import {IVersion} from "./base/IVersion.sol";
 
 interface IPoolV3Events {
     /// @notice Emitted when depositing liquidity with referral code

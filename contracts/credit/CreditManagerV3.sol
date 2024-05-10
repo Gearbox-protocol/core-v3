@@ -1196,7 +1196,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     function setMaxEnabledTokens(uint8 _maxEnabledTokens)
         external
         override
-        creditConfiguratorOnly // U: [CM-4]
+        creditConfiguratorOnly // U:[CM-4]
     {
         maxEnabledTokens = _maxEnabledTokens; // U:[CM-44]
     }
@@ -1210,11 +1210,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     function setContractAllowance(address adapter, address targetContract)
         external
         override
-        creditConfiguratorOnly // U: [CM-4]
+        creditConfiguratorOnly // U:[CM-4]
     {
         if (targetContract == address(this) || adapter == address(this)) {
-            revert TargetContractNotAllowedException();
-        } // U:[CM-45]
+            revert TargetContractNotAllowedException(); // U:[CM-45]
+        }
 
         if (adapter != address(0)) {
             adapterToContract[adapter] = targetContract; // U:[CM-45]
@@ -1229,7 +1229,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     function setCreditFacade(address _creditFacade)
         external
         override
-        creditConfiguratorOnly // U: [CM-4]
+        creditConfiguratorOnly // U:[CM-4]
     {
         creditFacade = _creditFacade; // U:[CM-46]
     }
@@ -1239,7 +1239,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     function setPriceOracle(address _priceOracle)
         external
         override
-        creditConfiguratorOnly // U: [CM-4]
+        creditConfiguratorOnly // U:[CM-4]
     {
         priceOracle = _priceOracle; // U:[CM-46]
     }
@@ -1249,7 +1249,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     function setCreditConfigurator(address _creditConfigurator)
         external
         override
-        creditConfiguratorOnly // U: [CM-4]
+        creditConfiguratorOnly // U:[CM-4]
     {
         creditConfigurator = _creditConfigurator; // U:[CM-46]
         emit SetCreditConfigurator(_creditConfigurator); // U:[CM-46]

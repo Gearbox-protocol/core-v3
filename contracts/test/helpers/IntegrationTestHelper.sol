@@ -27,7 +27,6 @@ import {ICreditFacadeV3Multicall} from "../../interfaces/ICreditFacadeV3.sol";
 
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {IPriceOracleV3} from "../../interfaces/IPriceOracleV3.sol";
-import {CreditManagerOpts} from "../../credit/CreditConfiguratorV3.sol";
 import {PoolFactory} from "../suites/PoolFactory.sol";
 
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
@@ -237,7 +236,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     function _initCoreContracts() internal {
         acl = IACL(addressProvider.getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL));
         cr = IContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, NO_VERSION_CONTROL));
-        accountFactory = AccountFactoryV3(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 3_00));
+        accountFactory = AccountFactoryV3(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 3_10));
         priceOracle = IPriceOracleV3(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_10));
         botList = BotListV3(payable(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_10)));
     }
@@ -380,21 +379,21 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 whitelisted = cmParams.whitelisted;
             }
 
-            CreditManagerOpts memory cmOpts = CreditManagerOpts({
-                minDebt: cmParams.minDebt,
-                maxDebt: cmParams.maxDebt,
+            CreditManagerFactory cmf = new CreditManagerFactory({
+                addressProvider: address(addressProvider),
+                pool: address(pool),
                 degenNFT: (whitelisted) ? address(degenNFT) : address(0),
                 expirable: (anyExpirable) ? cmParams.expirable : expirable,
                 name: cmParams.name
             });
 
-            CreditManagerFactory cmf = new CreditManagerFactory(address(addressProvider), address(pool), cmOpts, 0);
-
             creditManager = cmf.creditManager();
             creditFacade = cmf.creditFacade();
             creditConfigurator = cmf.creditConfigurator();
 
-            vm.prank(CONFIGURATOR);
+            vm.startPrank(CONFIGURATOR);
+            creditConfigurator.setMaxDebtLimit(cmParams.maxDebt);
+            creditConfigurator.setMinDebtLimit(cmParams.minDebt);
             creditConfigurator.setFees(
                 cmParams.feeInterest,
                 cmParams.feeLiquidation,
@@ -402,6 +401,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 cmParams.feeLiquidationExpired,
                 cmParams.liquidationPremiumExpired
             );
+            vm.stopPrank();
 
             _addCollateralTokens(cmParams.collateralTokens);
 

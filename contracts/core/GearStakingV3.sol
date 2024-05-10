@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
@@ -8,7 +8,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
-import {IVotingContract} from "../interfaces/IVotingContract.sol";
 import {
     IGearStakingV3,
     UserVoteLockData,
@@ -16,6 +15,7 @@ import {
     MultiVote,
     VotingContractStatus
 } from "../interfaces/IGearStakingV3.sol";
+import {IVotingContract} from "../interfaces/base/IVotingContract.sol";
 import {EPOCHS_TO_WITHDRAW, EPOCH_LENGTH} from "../libraries/Constants.sol";
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 
@@ -28,7 +28,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     using SafeCast for uint256;
 
     /// @notice Contract version
-    uint256 public constant override version = 3_00;
+    uint256 public constant override version = 3_10;
 
     /// @notice Address of the GEAR token
     address public immutable override gear;
@@ -56,8 +56,8 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     /// @param _gear GEAR token address
     /// @param _firstEpochTimestamp Timestamp at which the first epoch should start
     constructor(address acl, address _gear, uint256 _firstEpochTimestamp) ACLNonReentrantTrait(acl) {
-        gear = _gear; // U:[GS-01]
-        firstEpochTimestamp = _firstEpochTimestamp; // U:[GS-01]
+        gear = _gear; // U:[GS-1]
+        firstEpochTimestamp = _firstEpochTimestamp; // U:[GS-1]
     }
 
     /// @dev Ensures that function is called by migrator
@@ -71,7 +71,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     /// @param votes Sequence of votes to perform, see `MultiVote`
     /// @dev Requires approval from `msg.sender` for GEAR to this contract
     function deposit(uint96 amount, MultiVote[] calldata votes) external override nonReentrant {
-        _deposit(amount, msg.sender, votes); // U: [GS-02]
+        _deposit(amount, msg.sender, votes); // U:[GS-2]
     }
 
     /// @notice Same as `deposit` but uses signed EIP-2612 permit message
@@ -87,8 +87,8 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
         bytes32 r,
         bytes32 s
     ) external override nonReentrant {
-        try IERC20Permit(gear).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {} // U:[GS-02]
-        _deposit(amount, msg.sender, votes); // U:[GS-02]
+        try IERC20Permit(gear).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {} // U:[GS-2]
+        _deposit(amount, msg.sender, votes); // U:[GS-2]
     }
 
     /// @dev Implementation of `deposit`
@@ -108,7 +108,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     /// @notice Performs a sequence of votes
     /// @param votes Sequence of votes to perform, see `MultiVote`
     function multivote(MultiVote[] calldata votes) external override nonReentrant {
-        _multivote(msg.sender, votes); // U: [GS-04]
+        _multivote(msg.sender, votes); // U:[GS-4]
     }
 
     /// @notice Unstakes GEAR and schedules withdrawal which can be claimed in 4 epochs, claims available withdrawals,
@@ -117,7 +117,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     /// @param to Address to send claimable GEAR, if any
     /// @param votes Sequence of votes to perform, see `MultiVote`
     function withdraw(uint96 amount, address to, MultiVote[] calldata votes) external override nonReentrant {
-        _multivote(msg.sender, votes); // U: [GS-03]
+        _multivote(msg.sender, votes); // U:[GS-3]
 
         _processPendingWithdrawals(msg.sender, to);
 
@@ -125,18 +125,18 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
 
         if (vld.available < amount) revert InsufficientBalanceException();
         unchecked {
-            vld.available -= amount; // U: [GS-03]
+            vld.available -= amount; // U:[GS-3]
         }
 
-        withdrawalData[msg.sender].withdrawalsPerEpoch[EPOCHS_TO_WITHDRAW - 1] += amount; // U: [GS-03]
+        withdrawalData[msg.sender].withdrawalsPerEpoch[EPOCHS_TO_WITHDRAW - 1] += amount; // U:[GS-3]
 
-        emit ScheduleGearWithdrawal(msg.sender, amount); // U: [GS-03]
+        emit ScheduleGearWithdrawal(msg.sender, amount); // U:[GS-3]
     }
 
     /// @notice Claims all caller's mature withdrawals
     /// @param to Address to send claimable GEAR, if any
     function claimWithdrawals(address to) external override nonReentrant {
-        _processPendingWithdrawals(msg.sender, to); // U: [GS-05]
+        _processPendingWithdrawals(msg.sender, to); // U:[GS-5]
     }
 
     /// @notice Migrates the user's staked GEAR to a successor staking contract, bypassing the withdrawal delay
@@ -148,22 +148,22 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
         external
         override
         nonReentrant
-        nonZeroAddress(successor) // U: [GS-07]
+        nonZeroAddress(successor) // U:[GS-7]
     {
-        _multivote(msg.sender, votesBefore); // U: [GS-07]
+        _multivote(msg.sender, votesBefore); // U:[GS-7]
 
         UserVoteLockData storage vld = voteLockData[msg.sender];
 
         if (vld.available < amount) revert InsufficientBalanceException();
         unchecked {
-            vld.available -= amount; // U: [GS-07]
-            vld.totalStaked -= amount; // U: [GS-07]
+            vld.available -= amount; // U:[GS-7]
+            vld.totalStaked -= amount; // U:[GS-7]
         }
 
         IERC20(gear).approve(successor, uint256(amount));
-        IGearStakingV3(successor).depositOnMigration(amount, msg.sender, votesAfter); // U: [GS-07]
+        IGearStakingV3(successor).depositOnMigration(amount, msg.sender, votesAfter); // U:[GS-7]
 
-        emit MigrateGear(msg.sender, successor, amount); // U: [GS-07]
+        emit MigrateGear(msg.sender, successor, amount); // U:[GS-7]
     }
 
     /// @notice Performs a deposit on user's behalf from the migrator (usually the previous staking contract)
@@ -174,9 +174,9 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
         external
         override
         nonReentrant
-        migratorOnly // U: [GS-07]
+        migratorOnly // U:[GS-7]
     {
-        _deposit(amount, onBehalfOf, votes); // U: [GS-07]
+        _deposit(amount, onBehalfOf, votes); // U:[GS-7]
     }
 
     /// @dev Refreshes the user's withdrawal struct, shifting the withdrawal amounts based on the number of epochs
@@ -229,7 +229,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
 
             if (currentVote.isIncrease) {
                 if (allowedVotingContract[currentVote.votingContract] != VotingContractStatus.ALLOWED) {
-                    revert VotingContractNotAllowedException(); // U: [GS-04A]
+                    revert VotingContractNotAllowedException(); // U:[GS-4A]
                 }
 
                 if (vld.available < currentVote.voteAmount) revert InsufficientBalanceException();
@@ -240,7 +240,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
                 IVotingContract(currentVote.votingContract).vote(user, currentVote.voteAmount, currentVote.extraData);
             } else {
                 if (allowedVotingContract[currentVote.votingContract] == VotingContractStatus.NOT_ALLOWED) {
-                    revert VotingContractNotAllowedException(); // U: [GS-04A]
+                    revert VotingContractNotAllowedException(); // U:[GS-4A]
                 }
 
                 IVotingContract(currentVote.votingContract).unvote(user, currentVote.voteAmount, currentVote.extraData);
@@ -255,9 +255,9 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
 
     /// @notice Returns the current global voting epoch
     function getCurrentEpoch() public view override returns (uint16) {
-        if (block.timestamp < firstEpochTimestamp) return 0; // U:[GS-01]
+        if (block.timestamp < firstEpochTimestamp) return 0; // U:[GS-1]
         unchecked {
-            return uint16((block.timestamp - firstEpochTimestamp) / EPOCH_LENGTH) + 1; // U:[GS-01]
+            return uint16((block.timestamp - firstEpochTimestamp) / EPOCH_LENGTH) + 1; // U:[GS-1]
         }
     }
 
@@ -306,9 +306,9 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
         configuratorOnly
     {
         if (status == allowedVotingContract[votingContract]) return;
-        allowedVotingContract[votingContract] = status; // U: [GS-06]
+        allowedVotingContract[votingContract] = status; // U:[GS-6]
 
-        emit SetVotingContractStatus(votingContract, status); // U: [GS-06]
+        emit SetVotingContractStatus(votingContract, status); // U:[GS-6]
     }
 
     /// @notice Sets a new successor contract
@@ -319,11 +319,11 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     function setSuccessor(address newSuccessor) external override configuratorOnly {
         if (successor != newSuccessor) {
             if (IGearStakingV3(newSuccessor).migrator() != address(this)) {
-                revert IncompatibleSuccessorException(); // U: [GS-08]
+                revert IncompatibleSuccessorException(); // U:[GS-8]
             }
-            successor = newSuccessor; // U: [GS-08]
+            successor = newSuccessor; // U:[GS-8]
 
-            emit SetSuccessor(newSuccessor); // U: [GS-08]
+            emit SetSuccessor(newSuccessor); // U:[GS-8]
         }
     }
 
@@ -333,9 +333,9 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     /// @param newMigrator Address of the new migrator contract
     function setMigrator(address newMigrator) external override configuratorOnly {
         if (migrator != newMigrator) {
-            migrator = newMigrator; // U: [GS-09]
+            migrator = newMigrator; // U:[GS-9]
 
-            emit SetMigrator(newMigrator); // U: [GS-09]
+            emit SetMigrator(newMigrator); // U:[GS-9]
         }
     }
 }

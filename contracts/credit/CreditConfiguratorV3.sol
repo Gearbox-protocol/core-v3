@@ -10,12 +10,7 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 // LIBRARIES & CONSTANTS
 import {BitMask} from "../libraries/BitMask.sol";
-import {
-    DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER,
-    PERCENTAGE_FACTOR,
-    UNDERLYING_TOKEN_MASK,
-    WAD
-} from "../libraries/Constants.sol";
+import {PERCENTAGE_FACTOR, UNDERLYING_TOKEN_MASK, WAD} from "../libraries/Constants.sol";
 
 // CONTRACTS
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
@@ -23,10 +18,10 @@ import {CreditFacadeV3} from "./CreditFacadeV3.sol";
 import {CreditManagerV3} from "./CreditManagerV3.sol";
 
 // INTERFACES
-import {IAdapter} from "../interfaces/IAdapter.sol";
-import {ICreditConfiguratorV3, CreditManagerOpts, AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
+import {ICreditConfiguratorV3, AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
+import {IAdapter} from "../interfaces/base/IAdapter.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
@@ -58,30 +53,20 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     }
 
     /// @notice Constructor
-    ///         - For a newly deployed credit manager, performs initial configuration:
-    ///           * sets its fee parameters to default values
-    ///           * connects the credit facade and sets debt limits in it
-    ///         - For an existing credit manager, simply copies lists of allowed adapters and emergency liquidators
-    ///           from the currently connected credit configurator
     /// @param _acl ACL contract address
     /// @param _creditManager Credit manager to connect to
-    /// @dev When deploying a new credit suite, this contract must be deployed via `create2`. By the moment of deployment,
-    ///      new credit manager must already have pre-computed address of this contract set as credit configurator.
-    constructor(address _acl, address _creditManager) ACLNonReentrantTrait(_acl) {
+    /// @param _migrateAdapters Whether to copy allowed adaprters from the currently connected configurator
+    constructor(address _acl, address _creditManager, bool _migrateAdapters) ACLNonReentrantTrait(_acl) {
         creditManager = _creditManager; // I:[CC-1]
-
         underlying = CreditManagerV3(_creditManager).underlying(); // I:[CC-1]
 
-        address currentConfigurator = CreditManagerV3(creditManager).creditConfigurator(); // I:[CC-41]
-
-        // existing credit manager
-        if (currentConfigurator != address(this)) {
-            address[] memory allowedAdaptersPrev = CreditConfiguratorV3(currentConfigurator).allowedAdapters(); // I:[CC-29]
-            uint256 len = allowedAdaptersPrev.length;
-            unchecked {
-                for (uint256 i = 0; i < len; ++i) {
-                    allowedAdaptersSet.add(allowedAdaptersPrev[i]); // I:[CC-29]
-                }
+        if (!_migrateAdapters) return;
+        address currentConfigurator = CreditManagerV3(_creditManager).creditConfigurator();
+        address[] memory adapters = CreditConfiguratorV3(currentConfigurator).allowedAdapters();
+        uint256 len = adapters.length;
+        unchecked {
+            for (uint256 i; i < len; ++i) {
+                allowedAdaptersSet.add(adapters[i]); // I:[CC-29]
             }
         }
     }
@@ -529,7 +514,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             _setLimits({minDebt: minDebt, maxDebt: maxDebt}); // I:[CC-22]
 
             (, uint128 maxCumulativeLoss) = prevCreditFacade.lossParams();
-            _setMaxCumulativeLoss(newCreditFacade, maxCumulativeLoss); // [CC-22]
+            _setMaxCumulativeLoss(maxCumulativeLoss); // [CC-22]
 
             _migrateEmergencyLiquidators(prevCreditFacade); // I:[CC-22C]
 
@@ -540,7 +525,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             }
 
             address botList = prevCreditFacade.botList();
-            if (botList != address(0)) _setBotList(botList); // I:[CC-22A]
+            if (botList != address(0)) _setBotList(botList); // I:[CC-22]
         }
 
         emit SetCreditFacade(newCreditFacade); // I:[CC-22]
@@ -666,12 +651,12 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         override
         controllerOnly // I:[CC-2B]
     {
-        _setMaxCumulativeLoss(creditFacade(), newMaxCumulativeLoss); // I:[CC-31]
+        _setMaxCumulativeLoss(newMaxCumulativeLoss); // I:[CC-31]
     }
 
     /// @dev `setMaxCumulativeLoss` implementation
-    function _setMaxCumulativeLoss(address _creditFacade, uint128 _maxCumulativeLoss) internal {
-        CreditFacadeV3 cf = CreditFacadeV3(_creditFacade);
+    function _setMaxCumulativeLoss(uint128 _maxCumulativeLoss) internal {
+        CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
         (, uint128 maxCumulativeLossCurrent) = cf.lossParams(); // I:[CC-31]
         if (_maxCumulativeLoss == maxCumulativeLossCurrent) return;

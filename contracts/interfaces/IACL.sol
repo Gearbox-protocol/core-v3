@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IVersion} from "./IVersion.sol";
+import {IVersion} from "./base/IVersion.sol";
 
 /// @title ACL interface
 interface IACL is IVersion {

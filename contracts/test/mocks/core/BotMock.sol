@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IBot} from "../../../interfaces/IBot.sol";
+import {IBot} from "../../../interfaces/base/IBot.sol";
 
 contract BotMock is IBot {
     uint192 public override requiredPermissions;

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 pragma abicoder v1;
 
@@ -19,9 +19,9 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 
 // INTERFACES
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
-import {ILinearInterestRateModelV3} from "../interfaces/ILinearInterestRateModelV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
+import {IInterestRateModel} from "../interfaces/base/IInterestRateModel.sol";
 
 // LIBS & TRAITS
 import {CreditLogic} from "../libraries/CreditLogic.sol";
@@ -408,7 +408,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         borrowable = Math.min(borrowable, _borrowable(_creditManagerDebt[creditManager])); // U:[LP-12]
         if (borrowable == 0) return 0; // U:[LP-12]
 
-        uint256 available = ILinearInterestRateModelV3(interestRateModel).availableToBorrow({
+        uint256 available = IInterestRateModel(interestRateModel).availableToBorrow({
             expectedLiquidity: expectedLiquidity(),
             availableLiquidity: availableLiquidity()
         }); // U:[LP-12]
@@ -580,7 +580,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         }
 
         _expectedLiquidityLU = expectedLiquidity_.toUint128(); // U:[LP-18]
-        _baseInterestRate = ILinearInterestRateModelV3(interestRateModel).calcBorrowRate({
+        _baseInterestRate = IInterestRateModel(interestRateModel).calcBorrowRate({
             expectedLiquidity: expectedLiquidity_,
             availableLiquidity: availableLiquidity_,
             checkOptimalBorrowing: checkOptimalBorrowing

@@ -3,17 +3,15 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {IVersion} from "../../../interfaces/IVersion.sol";
-
 import "../../interfaces/IAddressProviderV3.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
 
-import {CreditConfiguratorV3, CreditManagerOpts, AllowanceAction} from "../../../credit/CreditConfiguratorV3.sol";
+import {CreditConfiguratorV3, AllowanceAction} from "../../../credit/CreditConfiguratorV3.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import {ICreditConfiguratorV3Events} from "../../../interfaces/ICreditConfiguratorV3.sol";
-import {IAdapter} from "../../../interfaces/IAdapter.sol";
+import {IAdapter} from "../../../interfaces/base/IAdapter.sol";
 
 //
 import "../../../libraries/Constants.sol";
@@ -193,66 +191,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         assertEq(maxDebtPerBlock, DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER, "Incorrect  maxDebtPerBlock");
 
         assertEq(expirationDate, 0, "Incorrect expiration date");
-    }
-
-    /// @dev I:[CC-1A]: constructor emits all events
-    function test_I_CC_01A_constructor_emits_all_events() public creditTest {
-        CreditManagerOpts memory creditOpts = CreditManagerOpts({
-            minDebt: uint128(50 * WAD),
-            maxDebt: uint128(150000 * WAD),
-            degenNFT: address(0),
-            expirable: false,
-            name: "Test Credit Manager"
-        });
-
-        address priceOracle = addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_10);
-        address accountFactory = addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 3_00);
-        address botList = addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_10);
-
-        creditManager = new CreditManagerV3(address(pool), accountFactory, priceOracle, "Test Credit Manager");
-        creditFacade = new CreditFacadeV3(
-            address(acl),
-            address(creditManager),
-            botList,
-            tokenTestSuite.addressOf(Tokens.WETH),
-            creditOpts.degenNFT,
-            creditOpts.expirable
-        );
-
-        bytes memory configuratorByteCode = abi.encodePacked(
-            type(CreditConfiguratorV3).creationCode, abi.encode(acl, creditManager, creditFacade, creditOpts)
-        );
-
-        address creditConfiguratorAddr = _getAddress(configuratorByteCode, 0);
-
-        creditManager.setCreditConfigurator(creditConfiguratorAddr);
-
-        vm.expectEmit(true, false, false, true);
-        emit SetTokenLiquidationThreshold(underlying, DEFAULT_UNDERLYING_LT);
-
-        vm.expectEmit(false, false, false, false);
-        emit UpdateFees(
-            DEFAULT_FEE_INTEREST,
-            DEFAULT_FEE_LIQUIDATION,
-            DEFAULT_LIQUIDATION_PREMIUM,
-            DEFAULT_FEE_LIQUIDATION_EXPIRED,
-            DEFAULT_LIQUIDATION_PREMIUM_EXPIRED
-        );
-
-        vm.expectEmit(true, false, false, false);
-        emit SetCreditFacade(address(creditFacade));
-
-        vm.expectEmit(true, false, false, false);
-        emit SetPriceOracle(priceOracle);
-
-        /// todo: change
-        // vm.expectEmit(false, false, false, true);
-        // emit SetMaxDebtPerBlockMultiplier(uint128(150000 * WAD * DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER));
-
-        vm.expectEmit(false, false, false, true);
-        emit SetBorrowingLimits(uint128(50 * WAD), uint128(150000 * WAD));
-
-        _deploy(configuratorByteCode, 0);
     }
 
     /// @dev I:[CC-2]: configuratorOnly functions revert on non-configurator
@@ -871,6 +809,12 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             vm.prank(CONFIGURATOR);
             creditConfigurator.setMaxCumulativeLoss(1e18);
 
+            vm.prank(CONFIGURATOR);
+            creditConfigurator.setBotList(DUMB_ADDRESS);
+
+            vm.prank(CONFIGURATOR);
+            creditConfigurator.setMaxDebtPerBlockMultiplier(DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER + 1);
+
             CreditFacadeV3 cf =
                 new CreditFacadeV3(address(acl), address(creditManager), address(0), address(0), address(0), expirable);
 
@@ -901,7 +845,9 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             (, uint128 maxCumulativeLoss2) = cf.lossParams();
 
             assertEq(
-                maxDebtPerBlockMultiplier2, migrateSettings ? maxDebtPerBlockMultiplier : 0, "Incorrwect limitPerBlock"
+                maxDebtPerBlockMultiplier2,
+                migrateSettings ? maxDebtPerBlockMultiplier : DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER,
+                "Incorrwect limitPerBlock"
             );
             assertEq(minDebt2, migrateSettings ? minDebt : 0, "Incorrwect minDebt");
             assertEq(maxDebt2, migrateSettings ? maxDebt : 0, "Incorrwect maxDebt");
@@ -910,29 +856,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
             assertEq(maxCumulativeLoss2, migrateSettings ? maxCumulativeLoss : 0, "Incorrect maxCumulativeLoss");
 
-            vm.revertTo(snapshot);
-        }
-    }
-
-    /// @dev I:[CC-22A]: setCreditFacade migrates bot list
-    function test_I_CC_22A_botList_is_transferred_on_CreditFacade_upgrade() public creditTest {
-        for (uint256 ms = 0; ms < 2; ms++) {
-            uint256 snapshot = vm.snapshot();
-
-            bool migrateSettings = ms != 0;
-
-            vm.prank(CONFIGURATOR);
-            creditConfigurator.setBotList(DUMB_ADDRESS);
-
-            address botList = creditFacade.botList();
-
-            CreditFacadeV3 cf =
-                new CreditFacadeV3(address(acl), address(creditManager), address(0), address(0), address(0), false);
-
-            vm.prank(CONFIGURATOR);
-            creditConfigurator.setCreditFacade(address(cf), migrateSettings);
-
-            assertEq(cf.botList(), migrateSettings ? botList : address(0), "Bot list was not transferred");
+            assertEq(cf.botList(), migrateSettings ? DUMB_ADDRESS : address(0), "Bot list was not transferred");
 
             vm.revertTo(snapshot);
         }
@@ -983,7 +907,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             );
 
             if (!migrateSettings) {
-                address[] memory el = creditConfigurator.emergencyLiquidators();
+                address[] memory el = cf.emergencyLiquidators();
 
                 assertEq(el.length, 0, "Emergency liquidator array was not deleted");
 
@@ -1082,7 +1006,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             creditFacade.canLiquidateWhilePaused(DUMB_ADDRESS), "Credit manager emergency liquidator status incorrect"
         );
 
-        address[] memory el = creditConfigurator.emergencyLiquidators();
+        address[] memory el = creditFacade.emergencyLiquidators();
 
         assertEq(el.length, 1, "Emergency liquidator was not added to array");
 
@@ -1107,68 +1031,22 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             !creditFacade.canLiquidateWhilePaused(DUMB_ADDRESS), "Credit manager emergency liquidator status incorrect"
         );
 
-        address[] memory el = creditConfigurator.emergencyLiquidators();
+        address[] memory el = creditFacade.emergencyLiquidators();
 
         assertEq(el.length, 0, "Emergency liquidator was not removed from array");
     }
 
     /// @dev I:[CC-29]: Array-based parameters are migrated correctly to new CC
     function test_I_CC_29_arrays_are_migrated_correctly_for_new_CC() public withAdapterMock creditTest {
-        vm.startPrank(CONFIGURATOR);
+        vm.prank(CONFIGURATOR);
         creditConfigurator.allowAdapter(address(adapterMock));
-        creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS);
-        creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS2);
-        vm.stopPrank();
 
-        CreditManagerOpts memory creditOpts = CreditManagerOpts({
-            minDebt: uint128(50 * WAD),
-            maxDebt: uint128(150000 * WAD),
-            degenNFT: address(0),
-            expirable: false,
-            name: "Test Credit Manager"
-        });
+        CreditConfiguratorV3 newConfigurator = new CreditConfiguratorV3(address(acl), address(creditManager), true);
 
-        CreditConfiguratorV3 newCC = new CreditConfiguratorV3(address(acl), creditManager, creditFacade, creditOpts);
+        address[] memory newAllowedAdapters = newConfigurator.allowedAdapters();
 
-        assertEq(
-            creditConfigurator.allowedAdapters().length,
-            newCC.allowedAdapters().length,
-            "Incorrect new allowed contracts array"
-        );
-
-        assertEq(
-            creditConfigurator.emergencyLiquidators().length,
-            newCC.emergencyLiquidators().length,
-            "Incorrect new emergency liquidators array"
-        );
-
-        uint256 len = newCC.allowedAdapters().length;
-
-        for (uint256 i = 0; i < len;) {
-            assertEq(
-                creditConfigurator.allowedAdapters()[i],
-                newCC.allowedAdapters()[i],
-                "Allowed contracts migrated incorrectly"
-            );
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        len = newCC.emergencyLiquidators().length;
-
-        for (uint256 i = 0; i < len;) {
-            assertEq(
-                creditConfigurator.emergencyLiquidators()[i],
-                newCC.emergencyLiquidators()[i],
-                "Emergency liquidators migrated incorrectly"
-            );
-
-            unchecked {
-                ++i;
-            }
-        }
+        assertEq(newAllowedAdapters.length, 1, "Incorrect new allowedAdapters array length");
+        assertEq(newAllowedAdapters[0], address(adapterMock), "Incorrect new allowedAdapters array");
     }
 
     /// @dev I:[CC-30] rampLiquidationThreshold works correctly

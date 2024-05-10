@@ -4,7 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {IERC721Metadata} from "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
-import {IVersion} from "./IVersion.sol";
+import {IVersion} from "./base/IVersion.sol";
 
 interface IDegenNFT is IVersion, IERC721Metadata {
     function totalSupply() external view returns (uint256);

@@ -3,25 +3,11 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IVersion} from "./IVersion.sol";
+import {IVersion} from "./base/IVersion.sol";
 
 enum AllowanceAction {
     FORBID,
     ALLOW
-}
-
-/// @notice Struct with credit manager configuration parameters
-/// @param minDebt Minimum debt amount per account
-/// @param maxDebt Maximum debt amount per account
-/// @param degenNFT Whether to apply Degen NFT whitelist logic
-/// @param expirable Whether facade must be expirable
-/// @param name Credit manager name
-struct CreditManagerOpts {
-    uint128 minDebt;
-    uint128 maxDebt;
-    address degenNFT;
-    bool expirable;
-    string name;
 }
 
 interface ICreditConfiguratorV3Events {

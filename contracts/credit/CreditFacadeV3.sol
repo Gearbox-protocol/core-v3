@@ -113,7 +113,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     CumulativeLossParams public override lossParams;
 
     /// @dev Set of emergency liquidators
-    EnumerableSet.AddressSet internal emergencyLiquidatorsSet;
+    EnumerableSet.AddressSet internal _emergencyLiquidatorsSet;
 
     /// @dev Ensures that function caller is credit configurator
     modifier creditConfiguratorOnly() {
@@ -775,20 +775,20 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         creditConfiguratorOnly // U:[FA-6]
     {
         if (allowance == AllowanceAction.ALLOW) {
-            emergencyLiquidatorsSet.add(liquidator);
+            _emergencyLiquidatorsSet.add(liquidator);
         } else {
-            emergencyLiquidatorsSet.remove(liquidator);
+            _emergencyLiquidatorsSet.remove(liquidator);
         } // U:[FA-53]
     }
 
     /// @notice Mapping account => emergency liquidator status
     function canLiquidateWhilePaused(address addr) public view returns (bool) {
-        return emergencyLiquidatorsSet.contains(addr);
+        return _emergencyLiquidatorsSet.contains(addr);
     }
 
     /// @notice Return emergency liquidators
     function emergencyLiquidators() external view returns (address[] memory) {
-        return emergencyLiquidatorsSet.values();
+        return _emergencyLiquidatorsSet.values();
     }
 
     // --------- //

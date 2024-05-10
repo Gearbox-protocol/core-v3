@@ -124,7 +124,7 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
     //     uint16 LEVERAGE = 300; // x3
 
     //     address expectedCreditAccount =
-    //         AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 3_00)).head();
+    //         AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 3_10)).head();
 
     //     vm.prank(FRIEND);
     //     creditFacade.approveAccountTransfer(USER, true);

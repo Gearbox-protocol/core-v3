@@ -9,7 +9,9 @@ import "../interfaces/IAddressProviderV3.sol";
 
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
-import {CreditConfiguratorV3, CreditManagerOpts} from "../../credit/CreditConfiguratorV3.sol";
+import {CreditConfiguratorV3} from "../../credit/CreditConfiguratorV3.sol";
+
+import {DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER} from "../../libraries/Constants.sol";
 
 /// @title CreditManagerFactory
 /// @notice Deploys 3 core interdependent contracts: CreditManage, CreditFacadeV3 and CredigConfigurator
@@ -19,26 +21,19 @@ contract CreditManagerFactory {
     CreditFacadeV3 public creditFacade;
     CreditConfiguratorV3 public creditConfigurator;
 
-    constructor(address _ap, address _pool, CreditManagerOpts memory opts, bytes32 salt) {
-        address acl = IAddressProviderV3(_ap).getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL);
-        address weth = IAddressProviderV3(_ap).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL);
-        address accountFactory = IAddressProviderV3(_ap).getAddressOrRevert(AP_ACCOUNT_FACTORY, 3_00);
-        address priceOracle = IAddressProviderV3(_ap).getAddressOrRevert(AP_PRICE_ORACLE, 3_10);
-        address botList = IAddressProviderV3(_ap).getAddressOrRevert(AP_BOT_LIST, 3_10);
+    constructor(address addressProvider, address pool, address degenNFT, bool expirable, string memory name) {
+        address acl = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL);
+        address weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL);
+        address accountFactory = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_ACCOUNT_FACTORY, 3_10);
+        address priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_PRICE_ORACLE, 3_10);
+        address botList = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_BOT_LIST, 3_10);
 
-        creditManager = new CreditManagerV3(_pool, accountFactory, priceOracle, opts.name);
-        creditFacade = new CreditFacadeV3(acl, address(creditManager), botList, weth, opts.degenNFT, opts.expirable);
+        creditManager = new CreditManagerV3(pool, accountFactory, priceOracle, name);
 
-        bytes memory configuratorByteCode = abi.encodePacked(
-            type(CreditConfiguratorV3).creationCode, abi.encode(acl, creditManager, creditFacade, opts)
-        );
+        creditFacade = new CreditFacadeV3(acl, address(creditManager), botList, weth, degenNFT, expirable);
+        creditManager.setCreditFacade(address(creditFacade));
 
-        creditConfigurator = CreditConfiguratorV3(Create2.computeAddress(salt, keccak256(configuratorByteCode)));
-
+        creditConfigurator = new CreditConfiguratorV3(acl, address(creditManager), false);
         creditManager.setCreditConfigurator(address(creditConfigurator));
-
-        Create2.deploy(0, salt, configuratorByteCode);
-
-        require(address(creditConfigurator.creditManager()) == address(creditManager), "Incorrect CM");
     }
 }
