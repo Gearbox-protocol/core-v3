@@ -9,9 +9,7 @@ import {IVersion} from "./IVersion.sol";
 interface IContractsRegister is IVersion {
     function addPool(address) external;
     function isPool(address) external view returns (bool);
-    function getPools() external view returns (address[] memory);
 
     function addCreditManager(address) external;
     function isCreditManager(address) external view returns (bool);
-    function getCreditManagers() external view returns (address[] memory);
 }
