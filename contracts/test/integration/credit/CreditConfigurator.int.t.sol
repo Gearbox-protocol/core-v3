@@ -56,21 +56,19 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     // HELPERS
     //
     function _compareParams(
-        uint16 feeInterest,
         uint16 feeLiquidation,
         uint16 liquidationDiscount,
         uint16 feeLiquidationExpired,
         uint16 liquidationDiscountExpired
     ) internal {
         (
-            uint16 feeInterest2,
+            ,
             uint16 feeLiquidation2,
             uint16 liquidationDiscount2,
             uint16 feeLiquidationExpired2,
             uint16 liquidationDiscountExpired2
         ) = creditManager.fees();
 
-        assertEq(feeInterest2, feeInterest, "Incorrect feeInterest");
         assertEq(feeLiquidation2, feeLiquidation, "Incorrect feeLiquidation");
         assertEq(liquidationDiscount2, liquidationDiscount, "Incorrect liquidationDiscount");
         assertEq(feeLiquidationExpired2, feeLiquidationExpired, "Incorrect feeLiquidationExpired");
@@ -251,7 +249,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.setMaxEnabledTokens(1);
 
         vm.expectRevert(CallerNotControllerException.selector);
-        creditConfigurator.setFees(0, 0, 0, 0, 0);
+        creditConfigurator.setFees(0, 0, 0, 0);
 
         vm.expectRevert(CallerNotControllerException.selector);
         creditConfigurator.setMinDebtLimit(0);
@@ -641,18 +639,12 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.expectRevert(IncorrectParameterException.selector);
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.setFees(PERCENTAGE_FACTOR, feeLiquidation, 0, 0, 0);
-
-        vm.expectRevert(IncorrectParameterException.selector);
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setFees(PERCENTAGE_FACTOR - 1, feeLiquidation, PERCENTAGE_FACTOR - feeLiquidation, 0, 0);
+        creditConfigurator.setFees(feeLiquidation, PERCENTAGE_FACTOR - feeLiquidation, 0, 0);
 
         vm.expectRevert(IncorrectParameterException.selector);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.setFees(
-            PERCENTAGE_FACTOR - 1,
             feeLiquidation,
             PERCENTAGE_FACTOR - feeLiquidation - 1,
             feeLiquidationExpired,
@@ -663,8 +655,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     /// @dev I:[CC-18]: setFees updates LT for underlying and for all tokens which have LTs larger than new LT
     function test_I_CC_18_setFees_updates_LT_for_underlying_and_align_LTs_for_other_tokens() public creditTest {
         vm.startPrank(CONFIGURATOR);
-
-        (uint16 feeInterest,,,,) = creditManager.fees();
 
         address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
         address wethToken = tokenTestSuite.addressOf(Tokens.WETH);
@@ -681,7 +671,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         emit SetTokenLiquidationThreshold(underlying, uint16(expectedLT));
 
         creditConfigurator.setFees(
-            feeInterest,
             2 * DEFAULT_FEE_LIQUIDATION,
             DEFAULT_LIQUIDATION_PREMIUM,
             DEFAULT_FEE_LIQUIDATION_EXPIRED,
@@ -698,14 +687,13 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     /// @dev I:[CC-19]: setFees sets fees and doesn't change others
     function test_I_CC_19_setFees_sets_fees_and_doesnt_change_others() public creditTest {
         (
-            uint16 feeInterest,
+            ,
             uint16 feeLiquidation,
             uint16 liquidationDiscount,
             uint16 feeLiquidationExpired,
             uint16 liquidationDiscountExpired
         ) = creditManager.fees();
 
-        uint16 newFeeInterest = (feeInterest * 3) / 2;
         uint16 newFeeLiquidation = feeLiquidation * 2;
         uint16 newLiquidationPremium = (PERCENTAGE_FACTOR - liquidationDiscount) * 2;
         uint16 newFeeLiquidationExpired = feeLiquidationExpired * 2;
@@ -713,24 +701,15 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
         vm.expectEmit(false, false, false, true);
         emit UpdateFees(
-            newFeeInterest,
-            newFeeLiquidation,
-            newLiquidationPremium,
-            newFeeLiquidationExpired,
-            newLiquidationPremiumExpired
+            newFeeLiquidation, newLiquidationPremium, newFeeLiquidationExpired, newLiquidationPremiumExpired
         );
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.setFees(
-            newFeeInterest,
-            newFeeLiquidation,
-            newLiquidationPremium,
-            newFeeLiquidationExpired,
-            newLiquidationPremiumExpired
+            newFeeLiquidation, newLiquidationPremium, newFeeLiquidationExpired, newLiquidationPremiumExpired
         );
 
         _compareParams(
-            newFeeInterest,
             newFeeLiquidation,
             PERCENTAGE_FACTOR - newLiquidationPremium,
             newFeeLiquidationExpired,

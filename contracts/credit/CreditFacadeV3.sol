@@ -387,9 +387,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         if (token == underlying) revert UnderlyingIsNotLiquidatableException();
         (CollateralDebtData memory cdd, bool isUnhealthy) = _revertIfNotLiquidatable(creditAccount);
 
-        uint256 balanceBefore = IERC20(token).safeBalanceOf(creditAccount);
+        uint256 balanceBefore = IERC20(underlying).safeBalanceOf(creditAccount);
         _addCollateral(creditAccount, underlying, repaidAmount);
-        repaidAmount = IERC20(token).safeBalanceOf(creditAccount) - balanceBefore;
+        repaidAmount = IERC20(underlying).safeBalanceOf(creditAccount) - balanceBefore;
 
         uint256 feeAmount;
         (repaidAmount, feeAmount, seizedAmount) =

@@ -383,6 +383,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 pool: address(pool),
                 degenNFT: (whitelisted) ? address(degenNFT) : address(0),
                 expirable: (anyExpirable) ? cmParams.expirable : expirable,
+                feeInterest: cmParams.feeInterest,
                 name: cmParams.name
             });
 
@@ -394,7 +395,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             creditConfigurator.setMaxDebtLimit(cmParams.maxDebt);
             creditConfigurator.setMinDebtLimit(cmParams.minDebt);
             creditConfigurator.setFees(
-                cmParams.feeInterest,
                 cmParams.feeLiquidation,
                 cmParams.liquidationPremium,
                 cmParams.feeLiquidationExpired,
@@ -548,7 +548,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
     function _makeAccountsLiquitable() internal {
         vm.prank(CONFIGURATOR);
-        creditConfigurator.setFees(1000, 200, 9000, 100, 9500);
+        creditConfigurator.setFees(200, 9000, 100, 9500);
 
         // switch to new block to be able to close account
         vm.roll(block.number + 1);

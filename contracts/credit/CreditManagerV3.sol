@@ -39,7 +39,6 @@ import {
     INACTIVE_CREDIT_ACCOUNT_ADDRESS,
     PERCENTAGE_FACTOR,
     UNDERLYING_TOKEN_MASK,
-    DEFAULT_FEE_INTEREST,
     DEFAULT_FEE_LIQUIDATION,
     DEFAULT_LIQUIDATION_PREMIUM,
     DEFAULT_FEE_LIQUIDATION_EXPIRED,
@@ -93,7 +92,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     uint16 internal ltUnderlying = PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM - DEFAULT_FEE_LIQUIDATION_EXPIRED;
 
     /// @dev Percentage of accrued interest in bps taken by the protocol as profit
-    uint16 internal feeInterest = DEFAULT_FEE_INTEREST;
+    uint16 internal immutable feeInterest;
 
     /// @dev Percentage of liquidated account value in bps taken by the protocol as profit
     uint16 internal feeLiquidation = DEFAULT_FEE_LIQUIDATION;
@@ -150,13 +149,21 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param _pool Address of the lending pool to connect this credit manager to
     /// @param _accountFactory Account factory address
     /// @param _priceOracle Price oracle address
+    /// @param _feeInterest Percentage of accrued interest in bps to take by the protocol as profit
     /// @param _name Credit manager name
     /// @dev Adds pool's underlying as collateral token with LT = 0
     /// @dev Sets `msg.sender` as credit configurator
-    constructor(address _pool, address _accountFactory, address _priceOracle, string memory _name) {
+    constructor(
+        address _pool,
+        address _accountFactory,
+        address _priceOracle,
+        uint16 _feeInterest,
+        string memory _name
+    ) {
         pool = _pool; // U:[CM-1]
         accountFactory = _accountFactory; // U:[CM-1]
         priceOracle = _priceOracle; // U:[CM-1]
+        feeInterest = _feeInterest; // U:[CM-1]
         name = _name; // U:[CM-1]
 
         underlying = IPoolV3(_pool).underlyingToken(); // U:[CM-1]
@@ -1136,13 +1143,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     /// @notice Sets credit manager's fee parameters (all fields in bps)
-    /// @param _feeInterest Percentage of accrued interest taken by the protocol as profit
     /// @param _feeLiquidation Percentage of liquidated account value taken by the protocol as profit
     /// @param _liquidationDiscount Percentage of liquidated account value that is used to repay debt
     /// @param _feeLiquidationExpired Percentage of liquidated expired account value taken by the protocol as profit
     /// @param _liquidationDiscountExpired Percentage of liquidated expired account value that is used to repay debt
+    /// @dev First parameter exists for backward compatibility and is ignored
     function setFees(
-        uint16 _feeInterest,
+        uint16,
         uint16 _feeLiquidation,
         uint16 _liquidationDiscount,
         uint16 _feeLiquidationExpired,
@@ -1152,7 +1159,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         override
         creditConfiguratorOnly // U:[CM-4]
     {
-        feeInterest = _feeInterest; // U:[CM-40]
         feeLiquidation = _feeLiquidation; // U:[CM-40]
         liquidationDiscount = _liquidationDiscount; // U:[CM-40]
         feeLiquidationExpired = _feeLiquidationExpired; // U:[CM-40]

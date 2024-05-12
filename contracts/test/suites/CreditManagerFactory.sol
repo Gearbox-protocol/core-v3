@@ -21,14 +21,21 @@ contract CreditManagerFactory {
     CreditFacadeV3 public creditFacade;
     CreditConfiguratorV3 public creditConfigurator;
 
-    constructor(address addressProvider, address pool, address degenNFT, bool expirable, string memory name) {
+    constructor(
+        address addressProvider,
+        address pool,
+        address degenNFT,
+        bool expirable,
+        uint16 feeInterest,
+        string memory name
+    ) {
         address acl = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL);
         address weth = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_WETH_TOKEN, NO_VERSION_CONTROL);
         address accountFactory = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_ACCOUNT_FACTORY, 3_10);
         address priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_PRICE_ORACLE, 3_10);
         address botList = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_BOT_LIST, 3_10);
 
-        creditManager = new CreditManagerV3(pool, accountFactory, priceOracle, name);
+        creditManager = new CreditManagerV3(pool, accountFactory, priceOracle, feeInterest, name);
 
         creditFacade = new CreditFacadeV3(acl, address(creditManager), botList, weth, degenNFT, expirable);
         creditManager.setCreditFacade(address(creditFacade));

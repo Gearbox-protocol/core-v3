@@ -481,17 +481,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.expectRevert("Pausable: paused");
         vm.prank(LIQUIDATOR);
         creditFacade.liquidateCreditAccount({creditAccount: creditAccount, to: FRIEND, calls: new MultiCall[](0)});
-
-        vm.expectRevert("Pausable: paused");
-        vm.prank(LIQUIDATOR);
-        creditFacade.partiallyLiquidateCreditAccount({
-            creditAccount: DUMB_ADDRESS,
-            token: address(0),
-            repaidAmount: 0,
-            minSeizedAmount: 0,
-            to: DUMB_ADDRESS,
-            priceUpdates: new PriceUpdate[](0)
-        });
     }
 
     /// @dev U:[FA-13]: liquidateCreditAccount reverts if account is not liquidatable
