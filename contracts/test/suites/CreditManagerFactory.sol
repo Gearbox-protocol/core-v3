@@ -33,7 +33,7 @@ contract CreditManagerFactory {
         creditFacade = new CreditFacadeV3(acl, address(creditManager), botList, weth, degenNFT, expirable);
         creditManager.setCreditFacade(address(creditFacade));
 
-        creditConfigurator = new CreditConfiguratorV3(acl, address(creditManager), false);
+        creditConfigurator = new CreditConfiguratorV3(acl, address(creditManager));
         creditManager.setCreditConfigurator(address(creditConfigurator));
     }
 }

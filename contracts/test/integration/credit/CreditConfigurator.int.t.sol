@@ -1041,7 +1041,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.prank(CONFIGURATOR);
         creditConfigurator.allowAdapter(address(adapterMock));
 
-        CreditConfiguratorV3 newConfigurator = new CreditConfiguratorV3(address(acl), address(creditManager), true);
+        CreditConfiguratorV3 newConfigurator = new CreditConfiguratorV3(address(acl), address(creditManager));
 
         address[] memory newAllowedAdapters = newConfigurator.allowedAdapters();
 

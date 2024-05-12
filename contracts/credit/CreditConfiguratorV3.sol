@@ -55,20 +55,21 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     /// @notice Constructor
     /// @param _acl ACL contract address
     /// @param _creditManager Credit manager to connect to
-    /// @param _migrateAdapters Whether to copy allowed adaprters from the currently connected configurator
-    constructor(address _acl, address _creditManager, bool _migrateAdapters) ACLNonReentrantTrait(_acl) {
+    /// @dev Copies allowed adaprters from the currently connected configurator
+    constructor(address _acl, address _creditManager) ACLNonReentrantTrait(_acl) {
         creditManager = _creditManager; // I:[CC-1]
         underlying = CreditManagerV3(_creditManager).underlying(); // I:[CC-1]
 
-        if (!_migrateAdapters) return;
         address currentConfigurator = CreditManagerV3(_creditManager).creditConfigurator();
-        address[] memory adapters = CreditConfiguratorV3(currentConfigurator).allowedAdapters();
-        uint256 len = adapters.length;
-        unchecked {
-            for (uint256 i; i < len; ++i) {
-                allowedAdaptersSet.add(adapters[i]); // I:[CC-29]
+        if (!currentConfigurator.isContract()) return;
+        try CreditConfiguratorV3(currentConfigurator).allowedAdapters() returns (address[] memory adapters) {
+            uint256 len = adapters.length;
+            unchecked {
+                for (uint256 i; i < len; ++i) {
+                    allowedAdaptersSet.add(adapters[i]); // I:[CC-29]
+                }
             }
-        }
+        } catch {}
     }
 
     /// @notice Returns the facade currently connected to the credit manager

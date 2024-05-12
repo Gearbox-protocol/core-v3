@@ -5,6 +5,7 @@ pragma solidity ^0.8.17;
 
 import {AllowanceAction} from "./ICreditConfiguratorV3.sol";
 import "./ICreditFacadeV3Multicall.sol";
+import {PriceUpdate} from "./IPriceOracleV3.sol";
 import {IVersion} from "./base/IVersion.sol";
 
 /// @notice Multicall element
@@ -54,6 +55,16 @@ interface ICreditFacadeV3Events {
         address indexed creditAccount, address indexed liquidator, address to, uint256 remainingFunds
     );
 
+    /// @notice Emitted when account is partially liquidated
+    event PartiallyLiquidateCreditAccount(
+        address indexed creditAccount,
+        address indexed token,
+        address indexed liquidator,
+        uint256 repaidDebt,
+        uint256 seizedCollateral,
+        uint256 fee
+    );
+
     /// @notice Emitted when collateral is added to account
     event AddCollateral(address indexed creditAccount, address indexed token, uint256 amount);
 
@@ -76,6 +87,8 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
 
     function underlying() external view returns (address);
 
+    function treasury() external view returns (address);
+
     function degenNFT() external view returns (address);
 
     function weth() external view returns (address);
@@ -96,6 +109,8 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
 
     function forbiddenTokenMask() external view returns (uint256);
 
+    function emergencyLiquidators() external view returns (address[] memory);
+
     function canLiquidateWhilePaused(address) external view returns (bool);
 
     // ------------------ //
@@ -110,6 +125,15 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
     function closeCreditAccount(address creditAccount, MultiCall[] calldata calls) external payable;
 
     function liquidateCreditAccount(address creditAccount, address to, MultiCall[] calldata calls) external;
+
+    function partiallyLiquidateCreditAccount(
+        address creditAccount,
+        address token,
+        uint256 repaidAmount,
+        uint256 minSeizedAmount,
+        address to,
+        PriceUpdate[] calldata priceUpdates
+    ) external returns (uint256 seizedAmount);
 
     function multicall(address creditAccount, MultiCall[] calldata calls) external payable;
 

@@ -211,6 +211,12 @@ error CustomHealthFactorTooLowException();
 /// @notice Thrown when submitted collateral hint is not a valid token mask
 error InvalidCollateralHintException(uint256 mask);
 
+/// @notice Thrown when trying to seize underlying token during partial liquidation
+error UnderlyingIsNotLiquidatableException();
+
+/// @notice Thrown when amount of collateral seized during partial liquidation is less than required
+error SeizedLessThanRequiredException(uint256 seizedAmount);
+
 // ------ //
 // ACCESS //
 // ------ //

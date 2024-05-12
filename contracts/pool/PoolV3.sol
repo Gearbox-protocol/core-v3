@@ -29,7 +29,7 @@ import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
 // CONSTANTS
-import {RAY, MAX_WITHDRAW_FEE, SECONDS_PER_YEAR, PERCENTAGE_FACTOR} from "../libraries/Constants.sol";
+import {RAY, MAX_WITHDRAW_FEE, PERCENTAGE_FACTOR} from "../libraries/Constants.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
@@ -153,7 +153,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
 
     /// @notice Available liquidity in the pool
     function availableLiquidity() public view override returns (uint256) {
-        return IERC20(underlyingToken).balanceOf(address(this)); // U:[LP-3]
+        return IERC20(underlyingToken).safeBalanceOf(address(this)); // U:[LP-3]
     }
 
     /// @notice Amount of underlying that would be in the pool if debt principal, base interest

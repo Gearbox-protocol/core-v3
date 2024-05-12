@@ -32,23 +32,23 @@ uint192 constant LIQUIDATE_CREDIT_ACCOUNT_PERMISSIONS =
 // ----- //
 
 /// @dev Indicates that collateral check after the multicall can be skipped, set to true on account closure or liquidation
-uint256 constant SKIP_COLLATERAL_CHECK = 1 << 192;
+uint256 constant SKIP_COLLATERAL_CHECK_FLAG = 1 << 192;
 
 /// @dev Indicates that external calls from credit account to adapters were made during multicall,
 ///      set to true on the first call to the adapter
-uint256 constant EXTERNAL_CONTRACT_WAS_CALLED = 1 << 193;
+uint256 constant EXTERNAL_CONTRACT_WAS_CALLED_FLAG = 1 << 193;
 
 /// @dev Indicates that the price updates call should be skipped, set to true on liquidation when the first call
 ///      of the multicall is `onDemandPriceUpdates`
-uint256 constant SKIP_PRICE_UPDATES_CALL = 1 << 194;
+uint256 constant SKIP_PRICE_UPDATES_CALL_FLAG = 1 << 194;
 
 /// @dev Indicates that collateral check must revert if any forbidden token is encountered on the account,
 ///      set to true after risky operations, such as `increaseDebt` or `withdrawCollateral`
-uint256 constant REVERT_ON_FORBIDDEN_TOKENS = 1 << 195;
+uint256 constant REVERT_ON_FORBIDDEN_TOKENS_FLAG = 1 << 195;
 
 /// @dev Indicates that collateral check must be performed using safe prices, set to true on `withdrawCollateral`
 ///      or if account has enabled forbidden tokens
-uint256 constant USE_SAFE_PRICES = 1 << 196;
+uint256 constant USE_SAFE_PRICES_FLAG = 1 << 196;
 
 /// @title Credit facade V3 multicall interface
 /// @dev Unless specified otherwise, all these methods are only available in `openCreditAccount`,
