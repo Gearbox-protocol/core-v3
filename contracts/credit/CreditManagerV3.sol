@@ -93,7 +93,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     uint16 internal ltUnderlying = PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM - DEFAULT_FEE_LIQUIDATION_EXPIRED;
 
     /// @dev Percentage of accrued interest in bps taken by the protocol as profit
-    uint16 internal feeInterest = DEFAULT_FEE_INTEREST;
+    uint16 internal immutable feeInterest;
 
     /// @dev Percentage of liquidated account value in bps taken by the protocol as profit
     uint16 internal feeLiquidation = DEFAULT_FEE_LIQUIDATION;
@@ -153,10 +153,17 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param _name Credit manager name
     /// @dev Adds pool's underlying as collateral token with LT = 0
     /// @dev Sets `msg.sender` as credit configurator
-    constructor(address _pool, address _accountFactory, address _priceOracle, string memory _name) {
+    constructor(
+        address _pool,
+        address _accountFactory,
+        address _priceOracle,
+        uint16 _feeInterest,
+        string memory _name
+    ) {
         pool = _pool; // U:[CM-1]
         accountFactory = _accountFactory; // U:[CM-1]
         priceOracle = _priceOracle; // U:[CM-1]
+        feeInterest = _feeInterest;
         name = _name; // U:[CM-1]
 
         underlying = IPoolV3(_pool).underlyingToken(); // U:[CM-1]

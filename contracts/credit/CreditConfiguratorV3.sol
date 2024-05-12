@@ -378,7 +378,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         ) revert IncorrectParameterException(); // I:[CC-17]
 
         _setFees({
-            feeInterest: feeInterest,
             feeLiquidation: feeLiquidation,
             liquidationDiscount: PERCENTAGE_FACTOR - liquidationPremium,
             feeLiquidationExpired: feeLiquidationExpired,
@@ -388,7 +387,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
 
     /// @dev `setFees` implementation
     function _setFees(
-        uint16 feeInterest,
         uint16 feeLiquidation,
         uint16 liquidationDiscount,
         uint16 feeLiquidationExpired,
@@ -412,14 +410,13 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         ) = CreditManagerV3(creditManager).fees();
 
         if (
-            (feeInterest == _feeInterestCurrent) && (feeLiquidation == _feeLiquidationCurrent)
-                && (liquidationDiscount == _liquidationDiscountCurrent)
+            (feeLiquidation == _feeLiquidationCurrent) && (liquidationDiscount == _liquidationDiscountCurrent)
                 && (feeLiquidationExpired == _feeLiquidationExpiredCurrent)
                 && (liquidationDiscountExpired == _liquidationDiscountExpiredCurrent)
         ) return;
 
         CreditManagerV3(creditManager).setFees({
-            _feeInterest: feeInterest,
+            _feeInterest: _feeInterestCurrent,
             _feeLiquidation: feeLiquidation,
             _liquidationDiscount: liquidationDiscount,
             _feeLiquidationExpired: feeLiquidationExpired,
@@ -427,7 +424,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         }); // I:[CC-19]
 
         emit UpdateFees({
-            feeInterest: feeInterest,
+            feeInterest: _feeInterestCurrent,
             feeLiquidation: feeLiquidation,
             liquidationPremium: PERCENTAGE_FACTOR - liquidationDiscount,
             feeLiquidationExpired: feeLiquidationExpired,
@@ -716,10 +713,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function _addEmergencyLiquidator(address liquidator) internal {
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
-        if (cf.canLiquidateWhilePaused(liquidator)) return;
-
-        cf.setEmergencyLiquidator(liquidator, AllowanceAction.ALLOW); // I:[CC-27]
-        emit AddEmergencyLiquidator(liquidator); // I:[CC-27]
+        if (!cf.canLiquidateWhilePaused(liquidator)) {
+            cf.setEmergencyLiquidator(liquidator, AllowanceAction.ALLOW); // I:[CC-27]
+            emit AddEmergencyLiquidator(liquidator); // I:[CC-27]
+        }
     }
 
     /// @notice Removes an address from the list of emergency liquidators
