@@ -52,7 +52,6 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
         botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: type(uint192).max});
 
         BotMock(bot).setRequiredPermissions(1);
-        BotMock(bot).requiredPermissions();
 
         vm.expectRevert(InsufficientBotPermissionsException.selector);
         vm.prank(creditFacade);

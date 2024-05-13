@@ -48,7 +48,7 @@ contract GaugeMigrationIntegrationTest is Test {
         vm.startPrank(configurator);
         // deploy address provider, staking and pool
         addressProvider = new AddressProviderV3ACLMock();
-        staking = new GearStakingV3(address(addressProvider), address(gear), block.timestamp);
+        staking = new GearStakingV3(configurator, address(gear), block.timestamp);
         pool = new PoolMock(address(addressProvider), address(underlying));
 
         // deploy quota keeper and connect it to the pool
@@ -166,7 +166,7 @@ contract GaugeMigrationIntegrationTest is Test {
     function test_I_GAM_02_gaude_and_staking_migration_works_as_expected() public {
         // prepare new staking and gauge contracts
         vm.startPrank(configurator);
-        GearStakingV3 newStaking = new GearStakingV3(address(addressProvider), address(gear), block.timestamp);
+        GearStakingV3 newStaking = new GearStakingV3(configurator, address(gear), block.timestamp);
         GaugeV3 newGauge = new GaugeV3(address(addressProvider), address(pool), address(newStaking));
 
         newStaking.setMigrator(address(staking));

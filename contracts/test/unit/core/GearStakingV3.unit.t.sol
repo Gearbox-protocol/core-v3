@@ -47,7 +47,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
         vm.prank(CONFIGURATOR);
         addressProvider.setAddress(AP_GEAR_TOKEN, gearToken, false);
 
-        gearStaking = new GearStakingV3(address(addressProvider), gearToken, block.timestamp + 1);
+        gearStaking = new GearStakingV3(CONFIGURATOR, gearToken, block.timestamp + 1);
 
         votingContract = new TargetContractMock();
 
@@ -376,7 +376,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
 
     /// @dev U:[GS-6]: setVotingContractStatus respects access control and emits event
     function test_U_GS_06_setVotingContractStatus_works_correctly() public {
-        vm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.expectRevert("Ownable: caller is not the owner");
         gearStaking.setVotingContractStatus(DUMB_ADDRESS, VotingContractStatus.ALLOWED);
 
         vm.expectEmit(true, false, false, true);
@@ -388,7 +388,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
 
     /// @dev U:[GS-7]: migrate and depositOnMigration perform operations in order and emits events
     function test_U_GS_07_migrate_and_depositOnMigration_work_correctly() public {
-        GearStakingV3 gearStakingSuccessor = new GearStakingV3(address(addressProvider), gearToken, block.timestamp + 1);
+        GearStakingV3 gearStakingSuccessor = new GearStakingV3(CONFIGURATOR, gearToken, block.timestamp + 1);
 
         {
             MultiVote[] memory votes = new MultiVote[](1);
@@ -462,7 +462,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
 
     /// @dev U:[GS-8]: setSuccessor respects access control and emits event
     function test_U_GS_08_setSuccessor_works_correctly() public {
-        vm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.expectRevert("Ownable: caller is not the owner");
         gearStaking.setSuccessor(DUMB_ADDRESS);
 
         vm.mockCall(DUMB_ADDRESS, abi.encodeWithSignature("migrator()"), abi.encode(address(0)));
@@ -484,7 +484,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
 
     /// @dev U:[GS-9]: setMigrator respects access control and emits event
     function test_U_GS_09_setMigrator_works_correctly() public {
-        vm.expectRevert(CallerNotConfiguratorException.selector);
+        vm.expectRevert("Ownable: caller is not the owner");
         gearStaking.setMigrator(DUMB_ADDRESS);
 
         vm.expectEmit(true, false, false, false);

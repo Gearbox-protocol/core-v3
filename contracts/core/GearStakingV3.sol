@@ -4,6 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
@@ -15,15 +16,16 @@ import {
     MultiVote,
     VotingContractStatus
 } from "../interfaces/IGearStakingV3.sol";
-import {IVotingContract} from "../interfaces/base/IVotingContract.sol";
-import {EPOCHS_TO_WITHDRAW, EPOCH_LENGTH} from "../libraries/Constants.sol";
-import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
-
-// EXCEPTIONS
 import "../interfaces/IExceptions.sol";
+import {IVotingContract} from "../interfaces/base/IVotingContract.sol";
+
+import {EPOCHS_TO_WITHDRAW, EPOCH_LENGTH} from "../libraries/Constants.sol";
+
+import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
+import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 
 /// @title Gear staking V3
-contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
+contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityCheckTrait {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;
 
@@ -52,12 +54,13 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     address public override migrator;
 
     /// @notice Constructor
-    /// @param _acl ACL contract address
-    /// @param _gear GEAR token address
-    /// @param _firstEpochTimestamp Timestamp at which the first epoch should start
-    constructor(address _acl, address _gear, uint256 _firstEpochTimestamp) ACLNonReentrantTrait(_acl) {
-        gear = _gear; // U:[GS-1]
-        firstEpochTimestamp = _firstEpochTimestamp; // U:[GS-1]
+    /// @param owner_ Contract owner
+    /// @param gear_ GEAR token address
+    /// @param firstEpochTimestamp_ Timestamp at which the first epoch should start
+    constructor(address owner_, address gear_, uint256 firstEpochTimestamp_) {
+        gear = gear_; // U:[GS-1]
+        firstEpochTimestamp = firstEpochTimestamp_; // U:[GS-1]
+        _transferOwnership(owner_); // U:[GS-1]
     }
 
     /// @dev Ensures that function is called by migrator
@@ -300,11 +303,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     /// @notice Sets the status of contract as an allowed voting contract
     /// @param votingContract Address to set the status for
     /// @param status The new status of the contract, see `VotingContractStatus`
-    function setVotingContractStatus(address votingContract, VotingContractStatus status)
-        external
-        override
-        configuratorOnly
-    {
+    function setVotingContractStatus(address votingContract, VotingContractStatus status) external override onlyOwner {
         if (status == allowedVotingContract[votingContract]) return;
         allowedVotingContract[votingContract] = status; // U:[GS-6]
 
@@ -316,7 +315,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     ///      This is used to upgrade staking contracts when new functionality is added.
     ///      It must already have this contract set as migrator.
     /// @param newSuccessor Address of the new successor contract
-    function setSuccessor(address newSuccessor) external override configuratorOnly {
+    function setSuccessor(address newSuccessor) external override onlyOwner {
         if (successor != newSuccessor) {
             if (IGearStakingV3(newSuccessor).migrator() != address(this)) {
                 revert IncompatibleSuccessorException(); // U:[GS-8]
@@ -331,7 +330,7 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     /// @dev Migrator is a contract (usually the previous staking contract) that can deposit GEAR on behalf of users
     ///      during migration in order for them to move their staked GEAR, bypassing the withdrawal delay.
     /// @param newMigrator Address of the new migrator contract
-    function setMigrator(address newMigrator) external override configuratorOnly {
+    function setMigrator(address newMigrator) external override onlyOwner {
         if (migrator != newMigrator) {
             migrator = newMigrator; // U:[GS-9]
 

@@ -15,8 +15,6 @@ import {
     CreditAccountIsInUseException,
     MasterCreditAccountAlreadyDeployedException
 } from "../interfaces/IExceptions.sol";
-import {ACLTrait} from "../traits/ACLTrait.sol";
-import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
 /// @dev Struct holding factory and queue params for a credit manager
 /// @param masterCreditAccount Address of the contract to clone to create new accounts for the credit manager
@@ -55,8 +53,10 @@ contract AccountFactoryV3 is IAccountFactoryV3, Ownable {
     /// @dev Mapping (credit manager, index) => queued account
     mapping(address => mapping(uint256 => QueuedAccount)) internal _queuedAccounts;
 
-    constructor(address owner) {
-        _transferOwnership(owner);
+    /// @notice Constructor
+    /// @param owner_ Contract owner
+    constructor(address owner_) {
+        _transferOwnership(owner_);
     }
 
     /// @notice Provides a reusable credit account from the queue to the credit manager.

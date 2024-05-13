@@ -18,7 +18,6 @@ import {
 import {IBot} from "../interfaces/base/IBot.sol";
 
 import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
-import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
 /// @title Bot list V3
 /// @notice Stores bot permissions (bit masks dictating which actions can be performed with credit accounts in multicall).
@@ -37,8 +36,10 @@ contract BotListV3 is IBotListV3, SanityCheckTrait, Ownable {
     /// @dev Mapping credit manager => credit account => set of bots with non-zero permissions
     mapping(address => mapping(address => EnumerableSet.AddressSet)) internal _activeBots;
 
-    constructor(address owner) {
-        _transferOwnership(owner);
+    /// @notice Constructor
+    /// @param owner_ Contract owner
+    constructor(address owner_) {
+        _transferOwnership(owner_);
     }
 
     // ----------- //

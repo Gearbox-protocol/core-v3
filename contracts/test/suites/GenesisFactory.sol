@@ -38,7 +38,7 @@ contract GenesisFactory is Ownable {
         ERC20 gearToken = new ERC20("Gearbox", "GEAR");
         addressProvider.setAddress(AP_GEAR_TOKEN, address(gearToken), false);
 
-        GearStakingV3 gearStaking = new GearStakingV3(address(addressProvider), address(gearToken), 1);
+        GearStakingV3 gearStaking = new GearStakingV3(msg.sender, address(gearToken), 1);
         addressProvider.setAddress(AP_GEAR_STAKING, address(gearStaking), true);
 
         addressProvider.addPausableAdmin(msg.sender);
