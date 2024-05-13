@@ -225,7 +225,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             _multicall({
                 creditAccount: creditAccount,
                 calls: calls,
-                enabledTokensMask: 0,
+                enabledTokensMask: UNDERLYING_TOKEN_MASK,
                 flags: OPEN_CREDIT_ACCOUNT_PERMISSIONS
             }); // U:[FA-10]
         }
