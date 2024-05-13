@@ -75,6 +75,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     BotListMock botListMock;
 
     DegenNFTMock degenNFTMock;
+    address treasury;
     bool whitelisted;
 
     bool expirable;
@@ -136,6 +137,8 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         AddressProviderV3ACLMock(address(addressProvider)).addPausableAdmin(CONFIGURATOR);
 
         PoolMock poolMock = new PoolMock(address(addressProvider), tokenTestSuite.addressOf(Tokens.DAI));
+        treasury = makeAddr("TREASURY");
+        poolMock.setTreasury(treasury);
 
         creditManagerMock =
             new CreditManagerMock({_addressProvider: address(addressProvider), _pool: address(poolMock)});
@@ -177,6 +180,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     function test_U_FA_01_constructor_sets_correct_values() public allDegenNftCases allExpirableCases {
         assertEq(creditFacade.creditManager(), address(creditManagerMock), "Incorrect creditManager");
         assertEq(creditFacade.underlying(), tokenTestSuite.addressOf(Tokens.DAI), "Incorrect underlying");
+        assertEq(creditFacade.treasury(), treasury, "Incorrect treasury");
 
         assertEq(creditFacade.weth(), tokenTestSuite.addressOf(Tokens.WETH), "Incorrect weth token");
 
@@ -199,6 +203,16 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         /// @notice We'll check that it works for emergency liquidatior as exceptions in another test
         vm.expectRevert("Pausable: paused");
         creditFacade.liquidateCreditAccount({creditAccount: DUMB_ADDRESS, to: DUMB_ADDRESS, calls: new MultiCall[](0)});
+
+        vm.expectRevert("Pausable: paused");
+        creditFacade.partiallyLiquidateCreditAccount({
+            creditAccount: DUMB_ADDRESS,
+            token: address(0),
+            repaidAmount: 0,
+            minSeizedAmount: 0,
+            to: DUMB_ADDRESS,
+            priceUpdates: new PriceUpdate[](0)
+        });
 
         vm.expectRevert("Pausable: paused");
         creditFacade.multicall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
@@ -238,6 +252,16 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditFacade.liquidateCreditAccount({creditAccount: DUMB_ADDRESS, to: DUMB_ADDRESS, calls: new MultiCall[](0)});
+
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        creditFacade.partiallyLiquidateCreditAccount({
+            creditAccount: DUMB_ADDRESS,
+            token: address(0),
+            repaidAmount: 0,
+            minSeizedAmount: 0,
+            to: DUMB_ADDRESS,
+            priceUpdates: new PriceUpdate[](0)
+        });
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         creditFacade.multicall({creditAccount: DUMB_ADDRESS, calls: new MultiCall[](0)});
@@ -844,7 +868,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
                 })
             ),
             enabledTokensMask: 0,
-            flags: SKIP_COLLATERAL_CHECK
+            flags: SKIP_COLLATERAL_CHECK_FLAG
         });
 
         vm.expectRevert(

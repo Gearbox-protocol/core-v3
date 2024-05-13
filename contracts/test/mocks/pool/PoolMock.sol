@@ -29,6 +29,8 @@ contract PoolMock {
     address public underlyingToken;
     address public asset;
 
+    address public treasury;
+
     // Credit Managers
     address[] public creditManagers;
 
@@ -86,6 +88,10 @@ contract PoolMock {
 
     function setVersion(uint256 ver) external {
         version = ver;
+    }
+
+    function setTreasury(address _treasury) external {
+        treasury = _treasury;
     }
 
     function setPoolQuotaKeeper(address _poolQuotaKeeper) external {

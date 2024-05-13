@@ -20,9 +20,13 @@ contract CreditManagerV3Harness is CreditManagerV3, USDT_Transfer {
         address _pool,
         address _accountFactory,
         address _priceOracle,
+        uint16 _feeInterest,
         string memory _name,
         bool enableTransferFee
-    ) CreditManagerV3(_pool, _accountFactory, _priceOracle, _name) USDT_Transfer(IPoolV3(_pool).underlyingToken()) {
+    )
+        CreditManagerV3(_pool, _accountFactory, _priceOracle, _feeInterest, _name)
+        USDT_Transfer(IPoolV3(_pool).underlyingToken())
+    {
         _enableTransferFee = enableTransferFee;
     }
 

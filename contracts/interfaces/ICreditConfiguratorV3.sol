@@ -55,11 +55,7 @@ interface ICreditConfiguratorV3Events {
 
     /// @notice Emitted when new fee parameters are set in the credit manager
     event UpdateFees(
-        uint16 feeInterest,
-        uint16 feeLiquidation,
-        uint16 liquidationPremium,
-        uint16 feeLiquidationExpired,
-        uint16 liquidationPremiumExpired
+        uint16 feeLiquidation, uint16 liquidationPremium, uint16 feeLiquidationExpired, uint16 liquidationPremiumExpired
     );
 
     // -------- //
@@ -146,7 +142,6 @@ interface ICreditConfiguratorV3 is IVersion, ICreditConfiguratorV3Events {
     // -------------- //
 
     function setFees(
-        uint16 feeInterest,
         uint16 feeLiquidation,
         uint16 liquidationPremium,
         uint16 feeLiquidationExpired,

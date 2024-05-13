@@ -66,21 +66,4 @@ library CreditAccountHelper {
     function transfer(ICreditAccountV3 creditAccount, address token, address to, uint256 amount) internal {
         creditAccount.safeTransfer(token, to, amount);
     }
-
-    /// @dev Performs a token transfer from a Credit account and returns the actual amount of token transferred
-    /// @dev For some tokens, such as stETH or USDT (with fee enabled), the amount that arrives to the recipient can
-    ///      differ from the sent amount. This ensures that calculations are correct in such cases.
-    /// @param creditAccount Credit account to send tokens from
-    /// @param token Token to send
-    /// @param to Address to send to
-    /// @param amount Amount to send
-    /// @return delivered The actual amount that the `to` address received
-    function transferDeliveredBalanceControl(ICreditAccountV3 creditAccount, address token, address to, uint256 amount)
-        internal
-        returns (uint256 delivered)
-    {
-        uint256 balanceBefore = IERC20(token).safeBalanceOf({account: to});
-        transfer(creditAccount, token, to, amount);
-        delivered = IERC20(token).safeBalanceOf({account: to}) - balanceBefore;
-    }
 }

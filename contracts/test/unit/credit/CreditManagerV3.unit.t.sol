@@ -133,12 +133,12 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         poolMock.setPoolQuotaKeeper(address(poolQuotaKeeperMock));
 
         creditManager = new CreditManagerV3Harness(
-            address(poolMock), address(accountFactory), address(priceOracleMock), name, isFeeToken
+            address(poolMock), address(accountFactory), address(priceOracleMock), DEFAULT_FEE_INTEREST, name, isFeeToken
         );
         creditManager.setCreditFacade(address(this));
 
         creditManager.setFees(
-            DEFAULT_FEE_INTEREST,
+            0,
             DEFAULT_FEE_LIQUIDATION,
             PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM,
             DEFAULT_FEE_LIQUIDATION_EXPIRED,
@@ -2097,7 +2097,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
     /// @dev U:[CM-40]: setFees sets configuration properly
     function test_U_CM_40_setFees_sets_configuration_properly() public creditManagerTest {
-        uint16 s_feeInterest = 8733;
         uint16 s_feeLiquidation = 1233;
         uint16 s_liquidationPremium = 1220;
         uint16 s_feeLiquidationExpired = 1221;
@@ -2105,17 +2104,16 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         vm.prank(CONFIGURATOR);
         creditManager.setFees(
-            s_feeInterest, s_feeLiquidation, s_liquidationPremium, s_feeLiquidationExpired, s_liquidationPremiumExpired
+            0, s_feeLiquidation, s_liquidationPremium, s_feeLiquidationExpired, s_liquidationPremiumExpired
         );
         (
-            uint16 feeInterest,
+            ,
             uint16 feeLiquidation,
             uint16 liquidationDiscount,
             uint16 feeLiquidationExpired,
             uint16 liquidationPremiumExpired
         ) = creditManager.fees();
 
-        assertEq(feeInterest, s_feeInterest, "Incorrect feeInterest");
         assertEq(feeLiquidation, s_feeLiquidation, "Incorrect feeLiquidation");
         assertEq(liquidationDiscount, s_liquidationPremium, "Incorrect liquidationDiscount");
         assertEq(feeLiquidationExpired, s_feeLiquidationExpired, "Incorrect feeLiquidationExpired");

@@ -10,8 +10,8 @@ import {IPoolV3} from "../interfaces/IPoolV3.sol";
 /// @title Credit manager V3 USDT
 /// @notice Credit manager variation for USDT underlying with enabled transfer fees
 contract CreditManagerV3_USDT is CreditManagerV3, USDT_Transfer {
-    constructor(address _pool, address _accountFactory, address _priceOracle, string memory _name)
-        CreditManagerV3(_pool, _accountFactory, _priceOracle, _name)
+    constructor(address _pool, address _accountFactory, address _priceOracle, uint16 _feeInterest, string memory _name)
+        CreditManagerV3(_pool, _accountFactory, _priceOracle, _feeInterest, _name)
         USDT_Transfer(IPoolV3(_pool).asset())
     {}
 

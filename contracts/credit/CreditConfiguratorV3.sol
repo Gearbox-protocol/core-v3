@@ -55,20 +55,21 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     /// @notice Constructor
     /// @param _acl ACL contract address
     /// @param _creditManager Credit manager to connect to
-    /// @param _migrateAdapters Whether to copy allowed adaprters from the currently connected configurator
-    constructor(address _acl, address _creditManager, bool _migrateAdapters) ACLNonReentrantTrait(_acl) {
+    /// @dev Copies allowed adaprters from the currently connected configurator
+    constructor(address _acl, address _creditManager) ACLNonReentrantTrait(_acl) {
         creditManager = _creditManager; // I:[CC-1]
         underlying = CreditManagerV3(_creditManager).underlying(); // I:[CC-1]
 
-        if (!_migrateAdapters) return;
         address currentConfigurator = CreditManagerV3(_creditManager).creditConfigurator();
-        address[] memory adapters = CreditConfiguratorV3(currentConfigurator).allowedAdapters();
-        uint256 len = adapters.length;
-        unchecked {
-            for (uint256 i; i < len; ++i) {
-                allowedAdaptersSet.add(adapters[i]); // I:[CC-29]
+        if (!currentConfigurator.isContract()) return;
+        try CreditConfiguratorV3(currentConfigurator).allowedAdapters() returns (address[] memory adapters) {
+            uint256 len = adapters.length;
+            unchecked {
+                for (uint256 i; i < len; ++i) {
+                    allowedAdaptersSet.add(adapters[i]); // I:[CC-29]
+                }
             }
-        }
+        } catch {}
     }
 
     /// @notice Returns the facade currently connected to the credit manager
@@ -353,7 +354,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     /// @notice Sets new fees params in the credit manager (all fields in bps)
     /// @notice Sets underlying token's liquidation threshold to 1 - liquidation fee - liquidation premium and
     ///         upper-bounds all other tokens' LTs with this number, which interrupts ongoing LT rampings
-    /// @param feeInterest Percentage of accrued interest taken by the protocol as profit
     /// @param feeLiquidation Percentage of liquidated account value taken by the protocol as profit
     /// @param liquidationPremium Percentage of liquidated account value that can be taken by liquidator
     /// @param feeLiquidationExpired Percentage of liquidated expired account value taken by the protocol as profit
@@ -362,7 +362,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     /// @dev Reverts if `liquidationPremium + feeLiquidation` is above 100%
     /// @dev Reverts if `liquidationPremiumExpired + feeLiquidationExpired` is above 100%
     function setFees(
-        uint16 feeInterest,
         uint16 feeLiquidation,
         uint16 liquidationPremium,
         uint16 feeLiquidationExpired,
@@ -373,12 +372,11 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         controllerOnly // I:[CC-2B]
     {
         if (
-            feeInterest >= PERCENTAGE_FACTOR || (liquidationPremium + feeLiquidation) >= PERCENTAGE_FACTOR
+            (liquidationPremium + feeLiquidation) >= PERCENTAGE_FACTOR
                 || (liquidationPremiumExpired + feeLiquidationExpired) >= PERCENTAGE_FACTOR
         ) revert IncorrectParameterException(); // I:[CC-17]
 
         _setFees({
-            feeInterest: feeInterest,
             feeLiquidation: feeLiquidation,
             liquidationDiscount: PERCENTAGE_FACTOR - liquidationPremium,
             feeLiquidationExpired: feeLiquidationExpired,
@@ -388,7 +386,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
 
     /// @dev `setFees` implementation
     function _setFees(
-        uint16 feeInterest,
         uint16 feeLiquidation,
         uint16 liquidationDiscount,
         uint16 feeLiquidationExpired,
@@ -412,22 +409,16 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         ) = CreditManagerV3(creditManager).fees();
 
         if (
-            (feeInterest == _feeInterestCurrent) && (feeLiquidation == _feeLiquidationCurrent)
-                && (liquidationDiscount == _liquidationDiscountCurrent)
+            (feeLiquidation == _feeLiquidationCurrent) && (liquidationDiscount == _liquidationDiscountCurrent)
                 && (feeLiquidationExpired == _feeLiquidationExpiredCurrent)
                 && (liquidationDiscountExpired == _liquidationDiscountExpiredCurrent)
         ) return;
 
-        CreditManagerV3(creditManager).setFees({
-            _feeInterest: feeInterest,
-            _feeLiquidation: feeLiquidation,
-            _liquidationDiscount: liquidationDiscount,
-            _feeLiquidationExpired: feeLiquidationExpired,
-            _liquidationDiscountExpired: liquidationDiscountExpired
-        }); // I:[CC-19]
+        CreditManagerV3(creditManager).setFees(
+            _feeInterestCurrent, feeLiquidation, liquidationDiscount, feeLiquidationExpired, liquidationDiscountExpired
+        ); // I:[CC-19]
 
         emit UpdateFees({
-            feeInterest: feeInterest,
             feeLiquidation: feeLiquidation,
             liquidationPremium: PERCENTAGE_FACTOR - liquidationDiscount,
             feeLiquidationExpired: feeLiquidationExpired,

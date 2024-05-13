@@ -70,43 +70,4 @@ library BitMask {
     {
         return (enabledTokensMask | bitsToEnable) & (~bitsToDisable); // U:[BM-5]
     }
-
-    /// @dev Enables bits from the second mask in the first mask, skipping specified bits
-    /// @param enabledTokenMask The initial mask
-    /// @param bitsToEnable Mask with bits to enable
-    /// @param invertedSkipMask An inversion of mask of immutable bits
-    function enable(uint256 enabledTokenMask, uint256 bitsToEnable, uint256 invertedSkipMask)
-        internal
-        pure
-        returns (uint256)
-    {
-        return enabledTokenMask | (bitsToEnable & invertedSkipMask); // U:[BM-6]
-    }
-
-    /// @dev Disables bits from the second mask in the first mask, skipping specified bits
-    /// @param enabledTokenMask The initial mask
-    /// @param bitsToDisable Mask with bits to disable
-    /// @param invertedSkipMask An inversion of mask of immutable bits
-    function disable(uint256 enabledTokenMask, uint256 bitsToDisable, uint256 invertedSkipMask)
-        internal
-        pure
-        returns (uint256)
-    {
-        return enabledTokenMask & (~(bitsToDisable & invertedSkipMask)); // U:[BM-6]
-    }
-
-    /// @dev Computes a new mask with sets of new enabled and disabled bits, skipping some bits
-    /// @dev bitsToEnable and bitsToDisable are applied sequentially to original mask. Skipmask is applied in both cases.
-    /// @param enabledTokensMask The initial mask
-    /// @param bitsToEnable Mask with bits to enable
-    /// @param bitsToDisable Mask with bits to disable
-    /// @param invertedSkipMask An inversion of mask of immutable bits
-    function enableDisable(
-        uint256 enabledTokensMask,
-        uint256 bitsToEnable,
-        uint256 bitsToDisable,
-        uint256 invertedSkipMask
-    ) internal pure returns (uint256) {
-        return (enabledTokensMask | (bitsToEnable & invertedSkipMask)) & (~(bitsToDisable & invertedSkipMask)); // U:[BM-7]
-    }
 }
