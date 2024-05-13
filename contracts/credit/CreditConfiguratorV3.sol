@@ -93,6 +93,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         external
         override
         nonZeroAddress(token)
+        nonUnderlyingTokenOnly(token)
         configuratorOnly // I:[CC-2]
     {
         _addCollateralToken({token: token}); // I:[CC-3,4]
@@ -129,16 +130,14 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function setLiquidationThreshold(address token, uint16 liquidationThreshold)
         external
         override
+        nonUnderlyingTokenOnly(token)
         controllerOnly // I:[CC-2B]
     {
         _setLiquidationThreshold({token: token, liquidationThreshold: liquidationThreshold}); // I:[CC-5]
     }
 
     /// @dev `setLiquidationThreshold` implementation
-    function _setLiquidationThreshold(address token, uint16 liquidationThreshold)
-        internal
-        nonUnderlyingTokenOnly(token)
-    {
+    function _setLiquidationThreshold(address token, uint16 liquidationThreshold) internal {
         (, uint16 ltUnderlying) =
             CreditManagerV3(creditManager).collateralTokenByMask({tokenMask: UNDERLYING_TOKEN_MASK});
 
@@ -339,7 +338,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function setMaxEnabledTokens(uint8 newMaxEnabledTokens)
         external
         override
-        controllerOnly // I:[CC-2B]
+        configuratorOnly // I:[CC-2]
     {
         CreditManagerV3 cm = CreditManagerV3(creditManager);
 
@@ -358,7 +357,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     /// @param liquidationPremium Percentage of liquidated account value that can be taken by liquidator
     /// @param feeLiquidationExpired Percentage of liquidated expired account value taken by the protocol as profit
     /// @param liquidationPremiumExpired Percentage of liquidated expired account value that can be taken by liquidator
-    /// @dev Reverts if `feeInterest` is above 100%
     /// @dev Reverts if `liquidationPremium + feeLiquidation` is above 100%
     /// @dev Reverts if `liquidationPremiumExpired + feeLiquidationExpired` is above 100%
     function setFees(
@@ -369,7 +367,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     )
         external
         override
-        controllerOnly // I:[CC-2B]
+        configuratorOnly // I:[CC-2]
     {
         if (
             (liquidationPremium + feeLiquidation) >= PERCENTAGE_FACTOR
@@ -572,8 +570,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         override
         controllerOnly // I:[CC-2B]
     {
-        address cf = creditFacade();
-        (, uint128 currentMaxDebt) = CreditFacadeV3(cf).debtLimits();
+        (, uint128 currentMaxDebt) = CreditFacadeV3(creditFacade()).debtLimits();
         _setLimits(minDebt, currentMaxDebt);
     }
 
@@ -585,8 +582,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         override
         controllerOnly // I:[CC-2B]
     {
-        address cf = creditFacade();
-        (uint128 currentMinDebt,) = CreditFacadeV3(cf).debtLimits();
+        (uint128 currentMinDebt,) = CreditFacadeV3(creditFacade()).debtLimits();
         _setLimits(currentMinDebt, maxDebt);
     }
 
@@ -676,7 +672,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function setExpirationDate(uint40 newExpirationDate)
         external
         override
-        controllerOnly // I:[CC-2B]
+        configuratorOnly // I:[CC-2]
     {
         _setExpirationDate(newExpirationDate); // I:[CC-25]
     }

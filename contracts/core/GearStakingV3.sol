@@ -52,10 +52,10 @@ contract GearStakingV3 is ACLNonReentrantTrait, IGearStakingV3 {
     address public override migrator;
 
     /// @notice Constructor
-    /// @param acl ACL contract address
+    /// @param _acl ACL contract address
     /// @param _gear GEAR token address
     /// @param _firstEpochTimestamp Timestamp at which the first epoch should start
-    constructor(address acl, address _gear, uint256 _firstEpochTimestamp) ACLNonReentrantTrait(acl) {
+    constructor(address _acl, address _gear, uint256 _firstEpochTimestamp) ACLNonReentrantTrait(_acl) {
         gear = _gear; // U:[GS-1]
         firstEpochTimestamp = _firstEpochTimestamp; // U:[GS-1]
     }

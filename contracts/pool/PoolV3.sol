@@ -721,12 +721,12 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         emit SetCreditManagerDebtLimit(creditManager, newLimit); // U:[LP-25D]
     }
 
-    /// @notice Sets new withdrawal fee, can only be called by controller
+    /// @notice Sets new withdrawal fee, can only be called by configurator
     /// @param newWithdrawFee New withdrawal fee in bps
     function setWithdrawFee(uint256 newWithdrawFee)
         external
         override
-        controllerOnly // U:[LP-2C]
+        configuratorOnly // U:[LP-2C]
     {
         if (newWithdrawFee > MAX_WITHDRAW_FEE) {
             revert IncorrectParameterException(); // U:[LP-26A]
