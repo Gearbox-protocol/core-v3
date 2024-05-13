@@ -202,6 +202,12 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.allowAdapter(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditConfigurator.setMaxEnabledTokens(1);
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditConfigurator.setFees(0, 0, 0, 0);
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.setPriceOracle(address(1));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
@@ -218,6 +224,9 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.removeEmergencyLiquidator(address(0));
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditConfigurator.setExpirationDate(0);
 
         vm.stopPrank();
     }
@@ -246,12 +255,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.forbidAdapter(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotControllerException.selector);
-        creditConfigurator.setMaxEnabledTokens(1);
-
-        vm.expectRevert(CallerNotControllerException.selector);
-        creditConfigurator.setFees(0, 0, 0, 0);
-
-        vm.expectRevert(CallerNotControllerException.selector);
         creditConfigurator.setMinDebtLimit(0);
 
         vm.expectRevert(CallerNotControllerException.selector);
@@ -265,9 +268,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
         vm.expectRevert(CallerNotControllerException.selector);
         creditConfigurator.resetCumulativeLoss();
-
-        vm.expectRevert(CallerNotControllerException.selector);
-        creditConfigurator.setExpirationDate(0);
     }
 
     //
@@ -280,6 +280,9 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
         vm.expectRevert(ZeroAddressException.selector);
         creditConfigurator.addCollateralToken(address(0), 9300);
+
+        vm.expectRevert(TokenNotAllowedException.selector);
+        creditConfigurator.addCollateralToken(underlying, 9300);
 
         vm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, DUMB_ADDRESS));
         creditConfigurator.addCollateralToken(DUMB_ADDRESS, 9300);

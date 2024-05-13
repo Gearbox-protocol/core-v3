@@ -93,6 +93,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         external
         override
         nonZeroAddress(token)
+        nonUnderlyingTokenOnly(token)
         configuratorOnly // I:[CC-2]
     {
         _addCollateralToken({token: token}); // I:[CC-3,4]
@@ -337,7 +338,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function setMaxEnabledTokens(uint8 newMaxEnabledTokens)
         external
         override
-        controllerOnly // I:[CC-2B]
+        configuratorOnly // I:[CC-2]
     {
         CreditManagerV3 cm = CreditManagerV3(creditManager);
 
@@ -366,7 +367,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     )
         external
         override
-        controllerOnly // I:[CC-2B]
+        configuratorOnly // I:[CC-2]
     {
         if (
             (liquidationPremium + feeLiquidation) >= PERCENTAGE_FACTOR
@@ -671,7 +672,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function setExpirationDate(uint40 newExpirationDate)
         external
         override
-        controllerOnly // I:[CC-2B]
+        configuratorOnly // I:[CC-2]
     {
         _setExpirationDate(newExpirationDate); // I:[CC-25]
     }
