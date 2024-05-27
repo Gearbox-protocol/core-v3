@@ -18,7 +18,7 @@ import {BotListMock} from "../core/BotListMock.sol";
 import {WETHMock} from "../token/WETHMock.sol";
 
 contract AddressProviderV3ACLMock is Test, IAddressProviderV3, Ownable {
-    mapping(string => mapping(uint256 => address)) addresses;
+    mapping(bytes32 => mapping(uint256 => address)) addresses;
 
     mapping(address => bool) public isPool;
     mapping(address => bool) public isCreditManager;
@@ -56,24 +56,21 @@ contract AddressProviderV3ACLMock is Test, IAddressProviderV3, Ownable {
         return address(this);
     }
 
-    function getAddressOrRevert(string calldata key, uint256 _version)
-        public
-        view
-        virtual
-        override
-        returns (address result)
-    {
+    function getAddressOrRevert(bytes32 key, uint256 _version) public view virtual override returns (address result) {
         result = addresses[key][_version];
         require(
-            result != address(0), string.concat("Address not found, key: ", key, ", version: ", vm.toString(_version))
+            result != address(0),
+            string.concat(
+                "Address not found, key: ", string(abi.encodePacked(key)), ", version: ", vm.toString(_version)
+            )
         );
     }
 
-    function setAddress(string calldata key, address value, bool saveVersion) external override {
+    function setAddress(bytes32 key, address value, bool saveVersion) external override {
         _setAddress(key, value, saveVersion ? IVersion(value).version() : NO_VERSION_CONTROL);
     }
 
-    function _setAddress(string memory key, address value, uint256 _version) internal virtual {
+    function _setAddress(bytes32 key, address value, uint256 _version) internal virtual {
         addresses[key][_version] = value;
     }
 
