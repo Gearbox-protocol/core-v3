@@ -24,8 +24,6 @@ contract AccountFactoryMock is Test, IAccountFactoryV3 {
         usedAccount = address(new CreditAccountMock());
 
         version = _version;
-
-        vm.label(usedAccount, "CREDIT_ACCOUNT");
     }
 
     /// @dev Provides a new credit account to a Credit Manager
