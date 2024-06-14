@@ -8,6 +8,7 @@ import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMoc
 
 import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
 import {ERC20PermitMock} from "../../mocks/token/ERC20PermitMock.sol";
+import {PhantomTokenMock} from "../../mocks/token/PhantomTokenMock.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 
 /// LIBS
@@ -19,6 +20,7 @@ import {GeneralMock} from "../../mocks/GeneralMock.sol";
 import {CreditManagerMock} from "../../mocks/credit/CreditManagerMock.sol";
 import {DegenNFTMock} from "../../mocks/token/DegenNFTMock.sol";
 import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
+import {PhantomTokenAdapterMock} from "../../mocks/core/PhantomTokenAdapterMock.sol";
 import {BotListMock} from "../../mocks/core/BotListMock.sol";
 import {PriceOracleMock} from "../../mocks/oracles/PriceOracleMock.sol";
 import {UpdatablePriceFeedMock} from "../../mocks/oracles/UpdatablePriceFeedMock.sol";
@@ -1412,6 +1414,43 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper {
                 MultiCall({
                     target: address(creditFacade),
                     callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (link, amount, USER))
+                })
+            ),
+            enabledTokensMask: 0,
+            flags: WITHDRAW_COLLATERAL_PERMISSION
+        });
+    }
+
+    /// @dev U:[FA-36A]: multicall `withdrawCollateral` with phantom tokens works properly
+    function test_U_FA_36A_multicall_withdrawCollateral_with_phantom_token_works_correctly() public notExpirableCase {
+        address creditAccount = DUMB_ADDRESS;
+
+        address ptUnderlying = makeAddr("PTU");
+
+        PhantomTokenMock ptMock = new PhantomTokenMock(ptUnderlying);
+
+        address adapter = address(new PhantomTokenAdapterMock(address(creditManagerMock), address(ptMock)));
+
+        creditManagerMock.setContractAllowance(address(adapter), address(ptMock));
+
+        uint256 amount = 100;
+
+        vm.expectCall(address(adapter), abi.encodeCall(PhantomTokenMock.withdrawalCall, (DUMB_ADDRESS, 100)));
+
+        vm.expectCall(
+            address(creditManagerMock),
+            abi.encodeCall(ICreditManagerV3.withdrawCollateral, (creditAccount, ptUnderlying, amount, USER))
+        );
+
+        vm.expectEmit(true, true, false, true);
+        emit WithdrawCollateral(creditAccount, ptUnderlying, amount, USER);
+
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.withdrawCollateral, (address(ptMock), amount, USER))
                 })
             ),
             enabledTokensMask: 0,

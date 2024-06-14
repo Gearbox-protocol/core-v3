@@ -19,9 +19,7 @@ contract PriceOracleMock is Test {
     mapping(address => bool) revertsOnGetPrice;
     mapping(address => mapping(bool => address)) priceFeedsInt;
 
-    constructor() {
-        vm.label(address(this), "PRICE_ORACLE");
-    }
+    constructor() {}
 
     function updatePrices(PriceUpdate[] calldata) external pure {}
 

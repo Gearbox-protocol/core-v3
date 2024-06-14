@@ -224,6 +224,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
             chainId == 1337 || chainId == 31337 ? tokenTestSuite.getPriceFeeds() : new PriceFeedConfig[](0)
         );
         addressProvider = gp.addressProvider();
+        vm.allowCheatcodes(address(addressProvider));
         vm.stopPrank();
 
         _initCoreContracts();
@@ -341,9 +342,8 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         gauge = pf.gauge();
         poolQuotaKeeper = pf.poolQuotaKeeper();
 
-        vm.warp(block.timestamp + 7 days);
-        vm.prank(CONFIGURATOR);
-        gauge.updateEpoch();
+        vm.prank(address(gauge));
+        poolQuotaKeeper.updateRates();
 
         tokenTestSuite.mint(underlying, INITIAL_LP, initialBalance);
         tokenTestSuite.approve(underlying, INITIAL_LP, address(pool));

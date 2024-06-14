@@ -23,6 +23,7 @@ import {
     ICreditManagerV3,
     ManageDebtAction
 } from "../interfaces/ICreditManagerV3.sol";
+import {IPhantomToken} from "../interfaces/base/IPhantomToken.sol";
 import "../interfaces/IExceptions.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IPriceOracleV3, PriceUpdate} from "../interfaces/IPriceOracleV3.sol";
@@ -404,8 +405,11 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
         if (seizedAmount < minSeizedAmount) revert SeizedLessThanRequiredException(seizedAmount);
 
         _manageDebt(creditAccount, repaidAmount, cdd.enabledTokensMask, ManageDebtAction.DECREASE_DEBT);
-        _withdrawCollateral(creditAccount, underlying, feeAmount, treasury);
-        _withdrawCollateral(creditAccount, token, seizedAmount, to);
+        _withdrawCollateral(creditAccount, underlying, feeAmount, treasury, 0);
+        uint256 flags = _withdrawCollateral(creditAccount, token, seizedAmount, to, 0);
+
+        if (flags & EXTERNAL_CONTRACT_WAS_CALLED_FLAG != 0) _unsetActiveCreditAccount();
+
         _fullCollateralCheck({
             creditAccount: creditAccount,
             enabledTokensMask: cdd.enabledTokensMask,
@@ -731,18 +735,48 @@ contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardT
     }
 
     /// @dev `ICreditFacadeV3Multicall.withdrawCollateral` implementation
-    function _withdrawCollateral(address creditAccount, address token, uint256 amount, address to) internal {
-        if (amount == 0) return;
+    function _withdrawCollateral(address creditAccount, address token, uint256 amount, address to, uint256 flags)
+        internal
+        returns (uint256)
+    {
+        if (amount == 0) return flags;
         if (amount == type(uint256).max) {
             amount = IERC20(token).safeBalanceOf(creditAccount);
-            if (amount <= 1) return;
+            if (amount <= 1) return flags;
             unchecked {
                 --amount;
             }
         }
+
+        /// Phantom tokens often represent non-transferable positions, and hence require
+        /// a position to be closed before the actual withdrawal is performed on the underlying. Closing
+        /// a position is usually a pre-determined simple action, so it is safe to prepend before withdrawal
+
+        try IPhantomToken(token).getWithdrawalMultiCall(creditAccount, amount) returns (
+            address tokenOut, uint256 amountOut, address targetContract, bytes memory callData
+        ) {
+            if (flags & EXTERNAL_CONTRACT_WAS_CALLED_FLAG == 0) {
+                flags |= EXTERNAL_CONTRACT_WAS_CALLED_FLAG;
+                _setActiveCreditAccount(creditAccount);
+            }
+
+            address adapter = ICreditManagerV3(creditManager).contractToAdapter(targetContract);
+
+            if (adapter == address(0)) {
+                revert TargetContractNotAllowedException();
+            }
+
+            adapter.functionCall(callData);
+            token = tokenOut;
+            amount = amountOut;
+            emit Execute({creditAccount: creditAccount, targetContract: targetContract});
+        } catch {}
+
         ICreditManagerV3(creditManager).withdrawCollateral(creditAccount, token, amount, to); // U:[FA-36]
 
         emit WithdrawCollateral(creditAccount, token, amount, to); // U:[FA-36]
+
+        return flags;
     }
 
     /// @dev `ICreditFacadeV3Multicall.setBotPermissions` implementation
