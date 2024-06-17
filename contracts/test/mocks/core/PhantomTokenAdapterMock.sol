@@ -6,6 +6,7 @@ pragma solidity ^0.8.17;
 import {AdapterType} from "@gearbox-protocol/sdk-gov/contracts/AdapterType.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import {IAdapter} from "../../../interfaces/base/IAdapter.sol";
+import {ERC20Mock} from "../token/ERC20Mock.sol";
 
 /// @title Adapter Mock
 contract PhantomTokenAdapterMock is IAdapter {
@@ -15,16 +16,21 @@ contract PhantomTokenAdapterMock is IAdapter {
     address public immutable override creditManager;
     address public immutable override targetContract;
 
-    constructor(address _creditManager, address _targetContract) {
+    address public immutable phantomTokenUnderlying;
+
+    constructor(address _creditManager, address _targetContract, address _phantomTokenUnderlying) {
         creditManager = _creditManager;
         targetContract = _targetContract;
+        phantomTokenUnderlying = _phantomTokenUnderlying;
     }
 
-    function withdrawalCall(address creditAccount, address amount)
+    function withdrawalCall(address creditAccount, uint256 amount)
         external
         returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
         _execute(msg.data);
+        ERC20Mock(targetContract).burn(creditAccount, amount);
+        ERC20Mock(phantomTokenUnderlying).mint(creditAccount, amount);
     }
 
     fallback() external {
