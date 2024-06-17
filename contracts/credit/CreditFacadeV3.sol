@@ -587,12 +587,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     if (targetContract == address(0)) {
                         revert TargetContractNotAllowedException();
                     }
-                    if (flags & EXTERNAL_CONTRACT_WAS_CALLED_FLAG == 0) {
-                        flags |= EXTERNAL_CONTRACT_WAS_CALLED_FLAG;
-                        _setActiveCreditAccount(creditAccount); // U:[FA-38]
-                    }
-                    mcall.target.functionCall(mcall.callData); // U:[FA-38]
-                    emit Execute({creditAccount: creditAccount, targetContract: targetContract});
+                    flags = _externalCall(creditAccount, targetContract, mcall.target, mcall.callData, flags);
                 }
             }
         }
@@ -746,21 +741,18 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         try IPhantomToken(token).getWithdrawalMultiCall(creditAccount, amount) returns (
             address tokenOut, uint256 amountOut, address targetContract, bytes memory callData
         ) {
-            if (flags & EXTERNAL_CONTRACT_WAS_CALLED_FLAG == 0) {
-                flags |= EXTERNAL_CONTRACT_WAS_CALLED_FLAG;
-                _setActiveCreditAccount(creditAccount);
-            }
-
             address adapter = ICreditManagerV3(creditManager).contractToAdapter(targetContract);
 
             if (adapter == address(0)) {
                 revert TargetContractNotAllowedException();
             }
 
-            adapter.functionCall(callData);
+            uint256 balanceBefore = IERC20(tokenOut).balanceOf(creditAccount);
+
+            flags = _externalCall(creditAccount, targetContract, adapter, callData, flags);
+
+            amount = IERC20(tokenOut).balanceOf(creditAccount) - balanceBefore;
             token = tokenOut;
-            amount = amountOut;
-            emit Execute({creditAccount: creditAccount, targetContract: targetContract});
         } catch {}
 
         ICreditManagerV3(creditManager).withdrawCollateral(creditAccount, token, amount, to); // U:[FA-36]
@@ -1050,6 +1042,20 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @dev Same as above but unsets active credit account
     function _unsetActiveCreditAccount() internal {
         _setActiveCreditAccount(INACTIVE_CREDIT_ACCOUNT_ADDRESS);
+    }
+
+    function _externalCall(address creditAccount, address target, address adapter, bytes memory callData, uint256 flags)
+        internal
+        returns (uint256)
+    {
+        if (flags & EXTERNAL_CONTRACT_WAS_CALLED_FLAG == 0) {
+            flags |= EXTERNAL_CONTRACT_WAS_CALLED_FLAG;
+            _setActiveCreditAccount(creditAccount); // U:[FA-38]
+        }
+        adapter.functionCall(callData); // U:[FA-38]
+        emit Execute({creditAccount: creditAccount, targetContract: target});
+
+        return flags;
     }
 
     /// @dev Internal wrapper for `creditManager.enabledTokensMaskOf` call to reduce contract size
