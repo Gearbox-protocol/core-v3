@@ -20,9 +20,16 @@ contract PhantomTokenMock is IPhantomToken {
         _decimals = 18;
     }
 
-    function mint(address account, uint256 amount) external {
+    function mint(address account, uint256 amount) external returns (bool) {
         balances[account] += amount;
         totalSupply += amount;
+        return true;
+    }
+
+    function burn(address account, uint256 amount) external returns (bool) {
+        balances[account] -= amount;
+        totalSupply -= amount;
+        return true;
     }
 
     function balanceOf(address account) external view returns (uint256) {
