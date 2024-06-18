@@ -655,20 +655,33 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         );
     }
 
-    /// @dev I:[CC-18]: setFees updates LT for underlying and for all tokens which have LTs larger than new LT
-    function test_I_CC_18_setFees_updates_LT_for_underlying_and_align_LTs_for_other_tokens() public creditTest {
+    /// @dev I:[CC-18]: setFees updates LT for underlying or reverts
+    function test_I_CC_18_setFees_updates_LT_for_underlying_or_reverts() public creditTest {
+        address usdc = tokenTestSuite.addressOf(Tokens.USDC);
+
+        uint16 expectedLT = PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM - 2 * DEFAULT_FEE_LIQUIDATION;
+
         vm.startPrank(CONFIGURATOR);
 
-        address usdcToken = tokenTestSuite.addressOf(Tokens.USDC);
-        address wethToken = tokenTestSuite.addressOf(Tokens.WETH);
-        creditConfigurator.setLiquidationThreshold(usdcToken, creditManager.liquidationThresholds(underlying));
+        creditConfigurator.setLiquidationThreshold(usdc, expectedLT + 1);
+        vm.expectRevert(IncorrectLiquidationThresholdException.selector);
+        creditConfigurator.setFees(
+            2 * DEFAULT_FEE_LIQUIDATION,
+            DEFAULT_LIQUIDATION_PREMIUM,
+            DEFAULT_FEE_LIQUIDATION_EXPIRED,
+            DEFAULT_LIQUIDATION_PREMIUM_EXPIRED
+        );
+        creditConfigurator.setLiquidationThreshold(usdc, expectedLT - 1);
 
-        uint256 expectedLT = PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM - 2 * DEFAULT_FEE_LIQUIDATION;
-
-        uint256 wethLTBefore = creditManager.liquidationThresholds(wethToken);
-
-        vm.expectEmit(true, false, false, true);
-        emit SetTokenLiquidationThreshold(usdcToken, uint16(expectedLT));
+        creditConfigurator.rampLiquidationThreshold(usdc, expectedLT + 1, uint40(block.timestamp + 1), 1);
+        vm.expectRevert(IncorrectLiquidationThresholdException.selector);
+        creditConfigurator.setFees(
+            2 * DEFAULT_FEE_LIQUIDATION,
+            DEFAULT_LIQUIDATION_PREMIUM,
+            DEFAULT_FEE_LIQUIDATION_EXPIRED,
+            DEFAULT_LIQUIDATION_PREMIUM_EXPIRED
+        );
+        creditConfigurator.setLiquidationThreshold(usdc, expectedLT - 1);
 
         vm.expectEmit(true, false, false, true);
         emit SetTokenLiquidationThreshold(underlying, uint16(expectedLT));
@@ -681,10 +694,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         );
 
         assertEq(creditManager.liquidationThresholds(underlying), expectedLT, "Incorrect LT for underlying token");
-
-        assertEq(creditManager.liquidationThresholds(usdcToken), expectedLT, "Incorrect USDC for underlying token");
-
-        assertEq(creditManager.liquidationThresholds(wethToken), wethLTBefore, "Incorrect WETH for underlying token");
     }
 
     /// @dev I:[CC-19]: setFees sets fees and doesn't change others
@@ -697,10 +706,10 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             uint16 liquidationDiscountExpired
         ) = creditManager.fees();
 
-        uint16 newFeeLiquidation = feeLiquidation * 2;
-        uint16 newLiquidationPremium = (PERCENTAGE_FACTOR - liquidationDiscount) * 2;
-        uint16 newFeeLiquidationExpired = feeLiquidationExpired * 2;
-        uint16 newLiquidationPremiumExpired = (PERCENTAGE_FACTOR - liquidationDiscountExpired) * 2;
+        uint16 newFeeLiquidation = feeLiquidation * 3 / 2;
+        uint16 newLiquidationPremium = (PERCENTAGE_FACTOR - liquidationDiscount) * 3 / 2;
+        uint16 newFeeLiquidationExpired = feeLiquidationExpired * 3 / 2;
+        uint16 newLiquidationPremiumExpired = (PERCENTAGE_FACTOR - liquidationDiscountExpired) * 3 / 2;
 
         vm.expectEmit(false, false, false, true);
         emit UpdateFees(
