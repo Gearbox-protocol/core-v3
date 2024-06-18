@@ -59,4 +59,8 @@ contract AdapterMock is IAdapter {
     function _approveToken(address token, uint256 amount) internal {
         ICreditManagerV3(creditManager).approveCreditAccount(token, amount);
     }
+
+    function serialize() external view returns (AdapterType, uint16, bytes[] memory) {
+        return (AdapterType.ABSTRACT, 0, new bytes[](0));
+    }
 }
