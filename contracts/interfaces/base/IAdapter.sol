@@ -20,4 +20,8 @@ interface IAdapter {
 
     /// @notice Target contract adapter helps to interact with
     function targetContract() external view returns (address);
+
+    /// @notice Returns all adapter parameters serialized into a bytes array,
+    ///         as well as adapter type and version, to properly deserialize
+    function serialize() external view returns (AdapterType, uint16, bytes[] memory serializedData);
 }

@@ -40,4 +40,8 @@ contract PhantomTokenAdapterMock is IAdapter {
     function _execute(bytes memory data) internal returns (bytes memory result) {
         result = ICreditManagerV3(creditManager).execute(data);
     }
+
+    function serialize() external view returns (AdapterType, uint16, bytes[] memory) {
+        return (AdapterType.ABSTRACT, 0, new bytes[](0));
+    }
 }
