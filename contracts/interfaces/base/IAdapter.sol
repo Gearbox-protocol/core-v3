@@ -16,8 +16,10 @@ interface IAdapter {
     function _gearboxAdapterVersion() external view returns (uint16);
 
     /// @notice Credit manager this adapter is connected to
+    /// @dev Assumed to be an immutable state variable
     function creditManager() external view returns (address);
 
     /// @notice Target contract adapter helps to interact with
+    /// @dev Assumed to be an immutable state variable
     function targetContract() external view returns (address);
 }

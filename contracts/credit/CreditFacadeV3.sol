@@ -156,7 +156,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param _botList Bot list address
     /// @param _weth WETH token address
     /// @param _degenNFT Degen NFT address or `address(0)`
-    /// @param _expirable Whether this facade should be expirable
+    /// @param _expirable Whether this facade should be expirable. If `true`, the expiration date remains unset,
+    ///        and facade never expires, unless the date is set via `setExpirationDate` in the configurator.
     constructor(
         address _acl,
         address _creditManager,
