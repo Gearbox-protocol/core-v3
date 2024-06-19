@@ -152,7 +152,10 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param _feeInterest Percentage of accrued interest in bps to take by the protocol as profit
     /// @param _name Credit manager name
     /// @dev Adds pool's underlying as collateral token with LT = 0
-    /// @dev Sets `msg.sender` as credit configurator
+    /// @dev Reverts if `_priceOracle` does not have a price feed for underlying
+    /// @dev Sets `msg.sender` as credit configurator, which MUST then pass the role to `CreditConfiguratorV3` contract
+    ///      once it's deployed via `setCreditConfigurator`. The latter performs crucial sanity checks, and configuring
+    ///      the credit manager without them might have dramatic consequences.
     /// @dev Reverts if `_maxEnabledTokens` is zero
     constructor(
         address _pool,
@@ -172,6 +175,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         name = _name; // U:[CM-1]
 
         underlying = IPoolV3(_pool).underlyingToken(); // U:[CM-1]
+        if (IPriceOracleV3(_priceOracle).priceFeeds(underlying) == address(0)) revert PriceFeedDoesNotExistException(); // U:[CM-1]
         _addToken(underlying); // U:[CM-1]
 
         creditConfigurator = msg.sender; // U:[CM-1]
