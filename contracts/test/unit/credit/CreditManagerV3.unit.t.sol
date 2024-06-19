@@ -132,6 +132,8 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         poolQuotaKeeperMock = new PoolQuotaKeeperMock(address(poolMock), underlying);
         poolMock.setPoolQuotaKeeper(address(poolQuotaKeeperMock));
 
+        priceOracleMock.addPriceFeed(underlying, makeAddr("UNDERLYING_PRICE_FEED"));
+
         creditManager = new CreditManagerV3Harness(
             address(poolMock),
             address(accountFactory),
@@ -305,6 +307,18 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             address(accountFactory),
             address(priceOracleMock),
             0,
+            DEFAULT_FEE_INTEREST,
+            name,
+            isFeeToken
+        );
+
+        PriceOracleMock priceOracleMock2 = new PriceOracleMock();
+        vm.expectRevert(PriceFeedDoesNotExistException.selector);
+        new CreditManagerV3Harness(
+            address(poolMock),
+            address(accountFactory),
+            address(priceOracleMock2),
+            DEFAULT_MAX_ENABLED_TOKENS,
             DEFAULT_FEE_INTEREST,
             name,
             isFeeToken

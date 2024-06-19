@@ -7,6 +7,7 @@ import "../../interfaces/IAddressProviderV3.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
+import {PriceOracleV3} from "../../../core/PriceOracleV3.sol";
 
 import {CreditConfiguratorV3, AllowanceAction} from "../../../credit/CreditConfiguratorV3.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
@@ -759,14 +760,25 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
     /// @dev I:[CC-21]: setPriceOracle upgrades priceOracle correctly
     function test_I_CC_21_setPriceOracle_upgrades_priceOracle_correctly() public creditTest {
+        PriceOracleV3 newPriceOracle = new PriceOracleV3(address(acl));
+
         vm.startPrank(CONFIGURATOR);
 
-        vm.expectEmit(true, false, false, false);
-        emit SetPriceOracle(DUMB_ADDRESS);
+        vm.expectRevert(PriceFeedDoesNotExistException.selector);
+        creditConfigurator.setPriceOracle(address(newPriceOracle));
 
-        creditConfigurator.setPriceOracle(DUMB_ADDRESS);
+        uint256 num = creditManager.collateralTokensCount();
+        for (uint256 i; i < num; ++i) {
+            address token = creditManager.getTokenByMask(1 << i);
+            newPriceOracle.setPriceFeed(token, priceOracle.priceFeeds(token), 1);
+        }
 
-        assertEq(address(creditManager.priceOracle()), DUMB_ADDRESS);
+        vm.expectEmit(true, true, true, true);
+        emit SetPriceOracle(address(newPriceOracle));
+
+        creditConfigurator.setPriceOracle(address(newPriceOracle));
+
+        assertEq(address(creditManager.priceOracle()), address(newPriceOracle));
         vm.stopPrank();
     }
 
@@ -850,6 +862,30 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         }
     }
 
+    /// @dev I:[CC-22B]: setCreditFacade reverts if new facade is adapter or target contract
+    function test_I_CC_22B_setCreditFacade_reverts_if_new_facade_is_adapter() public creditTest {
+        vm.startPrank(CONFIGURATOR);
+
+        CreditFacadeV3 cf =
+            new CreditFacadeV3(address(acl), address(creditManager), address(0), address(0), address(0), false);
+        AdapterMock adapter = new AdapterMock(address(creditManager), address(cf));
+        TargetContractMock target = new TargetContractMock();
+
+        vm.mockCall(address(cf), abi.encodeCall(IAdapter.targetContract, ()), abi.encode(address(target)));
+        creditConfigurator.allowAdapter(address(cf));
+
+        vm.expectRevert(TargetContractNotAllowedException.selector);
+        creditConfigurator.setCreditFacade(address(cf), false);
+
+        creditConfigurator.forbidAdapter(address(cf));
+        creditConfigurator.allowAdapter(address(adapter));
+
+        vm.expectRevert(TargetContractNotAllowedException.selector);
+        creditConfigurator.setCreditFacade(address(cf), false);
+
+        vm.stopPrank();
+    }
+
     /// @dev I:[CC-22C]: setCreditFacade correctly migrates array parameters
     function test_I_CC_22C_setCreditFacade_correctly_migrates_array_parameters() public creditTest {
         for (uint256 ms = 0; ms < 2; ms++) {
@@ -907,14 +943,33 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     }
 
     /// @dev I:[CC-23]: uupgradeCreditConfigurator upgrades creditConfigurator
-    function test_I_CC_23_upgradeCreditConfigurator_upgrades_creditConfigurator() public withAdapterMock creditTest {
-        vm.expectEmit(true, false, false, false);
-        emit CreditConfiguratorUpgraded(address(adapterMock));
+    function test_I_CC_23_upgradeCreditConfigurator_upgrades_creditConfigurator() public creditTest {
+        TargetContractMock target1 = new TargetContractMock();
+        TargetContractMock target2 = new TargetContractMock();
+        AdapterMock adapter1 = new AdapterMock(address(creditManager), address(target1));
+        AdapterMock adapter2 = new AdapterMock(address(creditManager), address(target2));
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.upgradeCreditConfigurator(address(adapterMock));
+        creditConfigurator.allowAdapter(address(adapter1));
 
-        assertEq(address(creditManager.creditConfigurator()), address(adapterMock));
+        CreditConfiguratorV3 cc1 = new CreditConfiguratorV3(address(acl), address(creditManager));
+
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.allowAdapter(address(adapter2));
+
+        CreditConfiguratorV3 cc2 = new CreditConfiguratorV3(address(acl), address(creditManager));
+
+        vm.expectRevert(IncorrectAdaptersSetException.selector);
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.upgradeCreditConfigurator(address(cc1));
+
+        vm.expectEmit(true, true, true, true);
+        emit CreditConfiguratorUpgraded(address(cc2));
+
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.upgradeCreditConfigurator(address(cc2));
+
+        assertEq(address(creditManager.creditConfigurator()), address(cc2));
     }
 
     /// @dev I:[CC-24]: setMaxDebtPerBlockMultiplier and forbidBorrowing work correctly

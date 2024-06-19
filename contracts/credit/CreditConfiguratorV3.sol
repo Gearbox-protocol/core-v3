@@ -256,7 +256,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     /// @param adapter Adapter to allow
     /// @dev Reverts if `adapter` is incompatible with the credit manager
     /// @dev Reverts if `adapter`'s target contract is not a contract
-    /// @dev Reverts if `adapter` or its target contract is credit manager or credit facade
+    /// @dev Reverts if `adapter` or its target contract is credit facade
     function allowAdapter(address adapter)
         external
         override
@@ -268,10 +268,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             revert AddressIsNotContractException(targetContract); // I:[CC-10A]
         }
 
-        if (
-            targetContract == creditManager || targetContract == creditFacade() || adapter == creditManager
-                || adapter == creditFacade()
-        ) revert TargetContractNotAllowedException(); // I:[CC-10C]
+        address cf = creditFacade();
+        if (targetContract == cf || adapter == cf) {
+            revert TargetContractNotAllowedException(); // I:[CC-10C]
+        }
 
         address currentAdapter = CreditManagerV3(creditManager).contractToAdapter(targetContract);
         if (currentAdapter != address(0)) {
@@ -420,12 +420,23 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
 
     /// @notice Sets the new price oracle contract in the credit manager
     /// @param newPriceOracle New price oracle
+    /// @dev Reverts if `newPriceOracle` does not have price feeds for all collateral tokens
     function setPriceOracle(address newPriceOracle)
         external
         override
         configuratorOnly // I:[CC-2]
     {
         if (newPriceOracle == CreditManagerV3(creditManager).priceOracle()) return;
+
+        uint256 num = CreditManagerV3(creditManager).collateralTokensCount();
+        unchecked {
+            for (uint256 i; i < num; ++i) {
+                address token = CreditManagerV3(creditManager).getTokenByMask(1 << i);
+                if (IPriceOracleV3(newPriceOracle).priceFeeds(token) == address(0)) {
+                    revert PriceFeedDoesNotExistException(); // I:[CC-21]
+                }
+            }
+        }
 
         CreditManagerV3(creditManager).setPriceOracle(newPriceOracle); // I:[CC-21]
         emit SetPriceOracle(newPriceOracle); // I:[CC-21]
@@ -453,6 +464,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     /// @param newCreditFacade New credit facade
     /// @param migrateParams Whether to migrate old credit facade params
     /// @dev Reverts if `newCreditFacade` is incompatible with credit manager
+    /// @dev Reverts if `newCreditFacade` is one of allowed adapters or their target contracts
     function setCreditFacade(address newCreditFacade, bool migrateParams)
         external
         override
@@ -462,6 +474,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         if (newCreditFacade == address(prevCreditFacade)) return;
 
         _revertIfContractIncompatible(newCreditFacade); // I:[CC-20]
+        if (
+            CreditManagerV3(creditManager).adapterToContract(newCreditFacade) != address(0)
+                || CreditManagerV3(creditManager).contractToAdapter(newCreditFacade) != address(0)
+        ) revert TargetContractNotAllowedException(); // I:[CC-22B]
 
         CreditManagerV3(creditManager).setCreditFacade(newCreditFacade); // I:[CC-22]
 
@@ -472,7 +488,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             _setLimits({minDebt: minDebt, maxDebt: maxDebt}); // I:[CC-22]
 
             (, uint128 maxCumulativeLoss) = prevCreditFacade.lossParams();
-            _setMaxCumulativeLoss(maxCumulativeLoss); // [CC-22]
+            _setMaxCumulativeLoss(maxCumulativeLoss); // I:[CC-22]
 
             _migrateEmergencyLiquidators(prevCreditFacade); // I:[CC-22C]
 
@@ -515,6 +531,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     /// @notice Upgrades credit manager's configurator contract
     /// @param newCreditConfigurator New credit configurator
     /// @dev Reverts if `newCreditConfigurator` is incompatible with credit manager
+    /// @dev Reverts if sets of allowed adapters of this contract and new configurator are inconsistent
     function upgradeCreditConfigurator(address newCreditConfigurator)
         external
         override
@@ -523,6 +540,16 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         if (newCreditConfigurator == address(this)) return;
 
         _revertIfContractIncompatible(newCreditConfigurator); // I:[CC-20]
+
+        address[] memory newAllowedAdapters = CreditConfiguratorV3(newCreditConfigurator).allowedAdapters();
+        uint256 num = newAllowedAdapters.length;
+        if (num != allowedAdaptersSet.length()) revert IncorrectAdaptersSetException(); // I:[CC-23]
+        unchecked {
+            for (uint256 i; i < num; ++i) {
+                if (!allowedAdaptersSet.contains(newAllowedAdapters[i])) revert IncorrectAdaptersSetException(); // I:[CC-23]
+            }
+        }
+
         CreditManagerV3(creditManager).setCreditConfigurator(newCreditConfigurator); // I:[CC-23]
         emit CreditConfiguratorUpgraded(newCreditConfigurator); // I:[CC-23]
     }
