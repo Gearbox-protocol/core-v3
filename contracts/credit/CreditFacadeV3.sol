@@ -293,6 +293,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @dev Reverts if `creditAccount` is not opened in connected credit manager
     /// @dev Reverts if account has no debt or is neither unhealthy nor expired
     /// @dev Reverts if remaining token balances increase during the multicall
+    /// @dev Liquidator can fully seize non-enabled tokens so it's highly recommended to avoid holding them.
+    ///      Since adapter calls are allowed, unclaimed rewards from integrated protocols are also at risk;
+    ///      bots can be used to claim and withdraw them.
     function liquidateCreditAccount(address creditAccount, address to, MultiCall[] calldata calls)
         external
         override
@@ -368,6 +371,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @dev Reverts if `creditAccount` is not opened in connected credit manager
     /// @dev Reverts if account has no debt or is neither unhealthy nor expired
     /// @dev Reverts if `token` is underlying
+    /// @dev Like in full liquidations, liquidator can seize non-enabled tokens from the credit account, altough
+    ///      here they are actually used to repay debt; unclaimed rewards are also safe in this case
     function partiallyLiquidateCreditAccount(
         address creditAccount,
         address token,
@@ -1000,6 +1005,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         uint16 minHealthFactor,
         bool useSafePrices
     ) internal {
+        // older credit managers do not enable underlying token upon opening an account so it is done here
         ICreditManagerV3(creditManager).fullCollateralCheck({
             creditAccount: creditAccount,
             enabledTokensMask: enabledTokensMask.enable(UNDERLYING_TOKEN_MASK),
