@@ -7,6 +7,7 @@ import "../../interfaces/IAddressProviderV3.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
 import {CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
+import {PriceOracleV3} from "../../../core/PriceOracleV3.sol";
 
 import {CreditConfiguratorV3, AllowanceAction} from "../../../credit/CreditConfiguratorV3.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
@@ -759,14 +760,25 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
     /// @dev I:[CC-21]: setPriceOracle upgrades priceOracle correctly
     function test_I_CC_21_setPriceOracle_upgrades_priceOracle_correctly() public creditTest {
+        PriceOracleV3 newPriceOracle = new PriceOracleV3(address(acl));
+
         vm.startPrank(CONFIGURATOR);
 
-        vm.expectEmit(true, false, false, false);
-        emit SetPriceOracle(DUMB_ADDRESS);
+        vm.expectRevert(PriceFeedDoesNotExistException.selector);
+        creditConfigurator.setPriceOracle(address(newPriceOracle));
 
-        creditConfigurator.setPriceOracle(DUMB_ADDRESS);
+        uint256 num = creditManager.collateralTokensCount();
+        for (uint256 i; i < num; ++i) {
+            address token = creditManager.getTokenByMask(1 << i);
+            newPriceOracle.setPriceFeed(token, priceOracle.priceFeeds(token), 1);
+        }
 
-        assertEq(address(creditManager.priceOracle()), DUMB_ADDRESS);
+        vm.expectEmit(true, true, true, true);
+        emit SetPriceOracle(address(newPriceOracle));
+
+        creditConfigurator.setPriceOracle(address(newPriceOracle));
+
+        assertEq(address(creditManager.priceOracle()), address(newPriceOracle));
         vm.stopPrank();
     }
 

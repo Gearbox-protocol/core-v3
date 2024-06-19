@@ -420,12 +420,23 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
 
     /// @notice Sets the new price oracle contract in the credit manager
     /// @param newPriceOracle New price oracle
+    /// @dev Reverts if `newPriceOracle` does not have price feeds for all collateral tokens
     function setPriceOracle(address newPriceOracle)
         external
         override
         configuratorOnly // I:[CC-2]
     {
         if (newPriceOracle == CreditManagerV3(creditManager).priceOracle()) return;
+
+        uint256 num = CreditManagerV3(creditManager).collateralTokensCount();
+        unchecked {
+            for (uint256 i; i < num; ++i) {
+                address token = CreditManagerV3(creditManager).getTokenByMask(1 << i);
+                if (IPriceOracleV3(newPriceOracle).priceFeeds(token) == address(0)) {
+                    revert PriceFeedDoesNotExistException(); // I:[CC-21]
+                }
+            }
+        }
 
         CreditManagerV3(creditManager).setPriceOracle(newPriceOracle); // I:[CC-21]
         emit SetPriceOracle(newPriceOracle); // I:[CC-21]
@@ -472,7 +483,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             _setLimits({minDebt: minDebt, maxDebt: maxDebt}); // I:[CC-22]
 
             (, uint128 maxCumulativeLoss) = prevCreditFacade.lossParams();
-            _setMaxCumulativeLoss(maxCumulativeLoss); // [CC-22]
+            _setMaxCumulativeLoss(maxCumulativeLoss); // I:[CC-22]
 
             _migrateEmergencyLiquidators(prevCreditFacade); // I:[CC-22C]
 
