@@ -62,6 +62,8 @@ struct CreditManagerV3DeployParams {
     uint128 minDebt;
     /// @dev The maximal debt principal amount
     uint128 maxDebt;
+    /// @dev Max enabled tokens
+    uint8 maxEnabledTokens;
     /// @dev Percentage DAO fee on interest
     uint16 feeInterest;
     /// @dev Percentage DAO fee on liquidation amount for normal liquidations

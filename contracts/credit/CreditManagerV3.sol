@@ -35,7 +35,6 @@ import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 
 // LIBRARIES
 import {
-    DEFAULT_MAX_ENABLED_TOKENS,
     INACTIVE_CREDIT_ACCOUNT_ADDRESS,
     PERCENTAGE_FACTOR,
     UNDERLYING_TOKEN_MASK,
@@ -83,7 +82,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     address public override priceOracle;
 
     /// @notice Maximum number of tokens that a credit account can have enabled as collateral
-    uint8 public override maxEnabledTokens = DEFAULT_MAX_ENABLED_TOKENS;
+    uint8 public immutable override maxEnabledTokens;
 
     /// @notice Number of known collateral tokens
     uint8 public override collateralTokensCount;
@@ -149,20 +148,26 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param _pool Address of the lending pool to connect this credit manager to
     /// @param _accountFactory Account factory address
     /// @param _priceOracle Price oracle address
+    /// @param _maxEnabledTokens Maximum number of tokens that a credit account can have enabled as collateral
     /// @param _feeInterest Percentage of accrued interest in bps to take by the protocol as profit
     /// @param _name Credit manager name
     /// @dev Adds pool's underlying as collateral token with LT = 0
     /// @dev Sets `msg.sender` as credit configurator
+    /// @dev Reverts if `_maxEnabledTokens` is zero
     constructor(
         address _pool,
         address _accountFactory,
         address _priceOracle,
+        uint8 _maxEnabledTokens,
         uint16 _feeInterest,
         string memory _name
     ) {
+        if (_maxEnabledTokens == 0) revert IncorrectParameterException(); // U:[CM-1]
+
         pool = _pool; // U:[CM-1]
         accountFactory = _accountFactory; // U:[CM-1]
         priceOracle = _priceOracle; // U:[CM-1]
+        maxEnabledTokens = _maxEnabledTokens; // U:[CM-1]
         feeInterest = _feeInterest; // U:[CM-1]
         name = _name; // U:[CM-1]
 
@@ -207,6 +212,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             sstore(slot, 1)
         } // U:[CM-6]
 
+        newCreditAccountInfo.enabledTokensMask = UNDERLYING_TOKEN_MASK; // U:[CM-6]
+
         creditAccountsSet.add(creditAccount); // U:[CM-6]
     }
 
@@ -232,7 +239,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             sstore(slot, 0)
         } // U:[CM-7]
 
-        currentCreditAccountInfo.enabledTokensMask = 0; // U:[CM-7]
+        // this statement is redundant since at this point only the underlying is enabled (otherwise, debt
+        // couldn't be zero because of quotas on the account), but it's kept for the sake of completeness
+        currentCreditAccountInfo.enabledTokensMask = UNDERLYING_TOKEN_MASK; // U:[CM-7]
 
         IAccountFactoryV3(accountFactory).returnCreditAccount({creditAccount: creditAccount}); // U:[CM-7]
         creditAccountsSet.remove(creditAccount); // U:[CM-7]
@@ -1195,16 +1204,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             tokenData.timestampRampStart = timestampRampStart; // U:[CM-42]
             tokenData.rampDuration = rampDuration; // U:[CM-42]
         }
-    }
-
-    /// @notice Sets a new max number of enabled tokens
-    /// @param _maxEnabledTokens The new max number of enabled tokens
-    function setMaxEnabledTokens(uint8 _maxEnabledTokens)
-        external
-        override
-        creditConfiguratorOnly // U:[CM-4]
-    {
-        maxEnabledTokens = _maxEnabledTokens; // U:[CM-44]
     }
 
     /// @notice Sets the link between the adapter and the target contract
