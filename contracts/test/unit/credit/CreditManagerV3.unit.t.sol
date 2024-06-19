@@ -312,11 +312,12 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             isFeeToken
         );
 
+        PriceOracleMock priceOracleMock2 = new PriceOracleMock();
         vm.expectRevert(PriceFeedDoesNotExistException.selector);
         new CreditManagerV3Harness(
             address(poolMock),
             address(accountFactory),
-            address(new PriceOracleMock()),
+            address(priceOracleMock2),
             DEFAULT_MAX_ENABLED_TOKENS,
             DEFAULT_FEE_INTEREST,
             name,
