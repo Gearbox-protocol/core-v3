@@ -259,8 +259,6 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
         uint16 liquidationDiscountExpired
     ) external;
 
-    function setMaxEnabledTokens(uint8 maxEnabledTokens) external;
-
     function setContractAllowance(address adapter, address targetContract) external;
 
     function setCreditFacade(address creditFacade) external;

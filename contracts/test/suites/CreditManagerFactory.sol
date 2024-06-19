@@ -26,6 +26,7 @@ contract CreditManagerFactory {
         address pool,
         address degenNFT,
         bool expirable,
+        uint8 maxEnabledTokens,
         uint16 feeInterest,
         string memory name
     ) {
@@ -35,7 +36,7 @@ contract CreditManagerFactory {
         address priceOracle = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_PRICE_ORACLE, 3_10);
         address botList = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_BOT_LIST, 3_10);
 
-        creditManager = new CreditManagerV3(pool, accountFactory, priceOracle, feeInterest, name);
+        creditManager = new CreditManagerV3(pool, accountFactory, priceOracle, maxEnabledTokens, feeInterest, name);
 
         creditFacade = new CreditFacadeV3(acl, address(creditManager), botList, weth, degenNFT, expirable);
         creditManager.setCreditFacade(address(creditFacade));

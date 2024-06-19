@@ -74,6 +74,7 @@ contract MockCreditConfig is Test, IPoolV3DeployConfig {
 
         cp.minDebt = uint128(getAccountAmount / 2);
         cp.maxDebt = uint128(10 * getAccountAmount);
+        cp.maxEnabledTokens = DEFAULT_MAX_ENABLED_TOKENS;
         cp.feeInterest = DEFAULT_FEE_INTEREST;
         cp.feeLiquidation = DEFAULT_FEE_LIQUIDATION;
         cp.liquidationPremium = DEFAULT_LIQUIDATION_PREMIUM;

@@ -360,6 +360,8 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
         expectBalance(Tokens.DAI, creditAccount, 0);
 
-        assertEq(creditManager.enabledTokensMaskOf(creditAccount), 0, "Incorrect enabled token mask");
+        assertEq(
+            creditManager.enabledTokensMaskOf(creditAccount), UNDERLYING_TOKEN_MASK, "Incorrect enabled token mask"
+        );
     }
 }
