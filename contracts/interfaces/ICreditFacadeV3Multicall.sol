@@ -74,14 +74,22 @@ interface ICreditFacadeV3Multicall {
     /// @dev This method is available in all kinds of multicalls
     function compareBalances() external;
 
-    /// @notice Adds collateral to account
+    /// @notice Adds collateral to account.
+    ///         Only the underlying token counts towards account's collateral value by default, while all other tokens
+    ///         must be enabled as collateral by "purchasing" quota for it. Holding non-enabled token on account with
+    ///         non-zero debt poses a risk of losing it entirely to the liquidator. Adding non-enabled tokens is still
+    ///         supported to allow users to later swap them into enabled ones in the same multicall.
     /// @param token Token to add
     /// @param amount Amount to add
     /// @dev Requires token approval from caller to the credit manager
     /// @dev This method can also be called during liquidation
     function addCollateral(address token, uint256 amount) external;
 
-    /// @notice Adds collateral to account using signed EIP-2612 permit message
+    /// @notice Adds collateral to account using signed EIP-2612 permit message.
+    ///         Only the underlying token counts towards account's collateral value by default, while all other tokens
+    ///         must be enabled as collateral by "purchasing" quota for it. Holding non-enabled token on account with
+    ///         non-zero debt poses a risk of losing it entirely to the liquidator. Adding non-enabled tokens is still
+    ///         supported to allow users to later swap them into enabled ones in the same multicall.
     /// @param token Token to add
     /// @param amount Amount to add
     /// @param deadline Permit deadline

@@ -50,9 +50,6 @@ interface ICreditConfiguratorV3Events {
     // CREDIT MANAGER //
     // -------------- //
 
-    /// @notice Emitted when a new maximum number of enabled tokens is set in the credit manager
-    event SetMaxEnabledTokens(uint8 maxEnabledTokens);
-
     /// @notice Emitted when new fee parameters are set in the credit manager
     event UpdateFees(
         uint16 feeLiquidation, uint16 liquidationPremium, uint16 feeLiquidationExpired, uint16 liquidationPremiumExpired
@@ -147,8 +144,6 @@ interface ICreditConfiguratorV3 is IVersion, ICreditConfiguratorV3Events {
         uint16 feeLiquidationExpired,
         uint16 liquidationPremiumExpired
     ) external;
-
-    function setMaxEnabledTokens(uint8 newMaxEnabledTokens) external;
 
     // -------- //
     // UPGRADES //

@@ -202,9 +202,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.allowAdapter(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.setMaxEnabledTokens(1);
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.setFees(0, 0, 0, 0);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
@@ -968,21 +965,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         expirationDate = creditFacade.expirationDate();
 
         assertEq(expirationDate, newExpirationDate, "Incorrect new expirationDate");
-    }
-
-    /// @dev I:[CC-26]: setMaxEnabledTokens works correctly and emits event
-    function test_I_CC_26_setMaxEnabledTokens_works_correctly() public creditTest {
-        vm.expectEmit(false, false, false, true);
-        emit SetMaxEnabledTokens(255);
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setMaxEnabledTokens(255);
-
-        assertEq(creditManager.maxEnabledTokens(), 255, "Credit manager max enabled tokens incorrect");
-
-        vm.expectRevert(IncorrectParameterException.selector);
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setMaxEnabledTokens(0);
     }
 
     /// @dev I:[CC-27]: addEmergencyLiquidator works correctly and emits event
