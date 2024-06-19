@@ -56,8 +56,8 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
         return totalBorrowedInBlock;
     }
 
-    function revertIfOutOfDebtLimits(uint256 debt) external view {
-        _revertIfOutOfDebtLimits(debt);
+    function revertIfOutOfDebtLimits(uint256 debt, ManageDebtAction action) external view {
+        _revertIfOutOfDebtLimits(debt, action);
     }
 
     function isExpired() external view returns (bool) {
