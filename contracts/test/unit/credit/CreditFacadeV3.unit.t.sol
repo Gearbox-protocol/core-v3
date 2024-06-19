@@ -306,6 +306,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     /// @dev U:[FA-7]: payable functions wraps eth to msg.sender
     function test_U_FA_07_payable_functions_wraps_eth_to_msg_sender() public notExpirableCase {
         vm.deal(USER, 3 ether);
+        creditManagerMock.setManageDebt(1 ether);
 
         vm.prank(CONFIGURATOR);
         creditFacade.setDebtLimits(1 ether, 9 ether, 9);
@@ -1580,10 +1581,20 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.setDebtLimits(minDebt, maxDebt, 1);
 
         vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
-        creditFacade.revertIfOutOfDebtLimits(minDebt - 1);
+        creditFacade.revertIfOutOfDebtLimits(0, ManageDebtAction.INCREASE_DEBT);
+
+        creditFacade.revertIfOutOfDebtLimits(0, ManageDebtAction.DECREASE_DEBT);
 
         vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
-        creditFacade.revertIfOutOfDebtLimits(maxDebt + 1);
+        creditFacade.revertIfOutOfDebtLimits(minDebt - 1, ManageDebtAction.INCREASE_DEBT);
+
+        vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
+        creditFacade.revertIfOutOfDebtLimits(minDebt - 1, ManageDebtAction.DECREASE_DEBT);
+
+        vm.expectRevert(BorrowAmountOutOfLimitsException.selector);
+        creditFacade.revertIfOutOfDebtLimits(maxDebt + 1, ManageDebtAction.INCREASE_DEBT);
+
+        creditFacade.revertIfOutOfDebtLimits(maxDebt + 1, ManageDebtAction.DECREASE_DEBT);
     }
 
     /// @dev U:[FA-45]: multicall handles forbidden tokens properly

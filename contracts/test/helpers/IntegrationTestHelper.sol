@@ -495,16 +495,23 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
         return creditFacade.openCreditAccount(
             onBehalfOf,
-            MultiCallBuilder.build(
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (debt))
-                }),
-                MultiCall({
-                    target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, amount))
-                })
-            ),
+            debt == 0
+                ? MultiCallBuilder.build(
+                    MultiCall({
+                        target: address(creditFacade),
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, amount))
+                    })
+                )
+                : MultiCallBuilder.build(
+                    MultiCall({
+                        target: address(creditFacade),
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (debt))
+                    }),
+                    MultiCall({
+                        target: address(creditFacade),
+                        callData: abi.encodeCall(ICreditFacadeV3Multicall.addCollateral, (underlying, amount))
+                    })
+                ),
             referralCode
         );
     }
