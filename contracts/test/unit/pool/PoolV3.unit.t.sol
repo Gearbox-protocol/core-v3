@@ -10,7 +10,7 @@ import {MAX_WITHDRAW_FEE, RAY} from "../../../libraries/Constants.sol";
 
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import "../../../interfaces/IExceptions.sol";
-import {ILinearInterestRateModelV3} from "../../../interfaces/ILinearInterestRateModelV3.sol";
+import {LinearInterestRateModelV3} from "../../../pool/LinearInterestRateModelV3.sol";
 import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
 
@@ -54,7 +54,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
     ERC20FeeMock underlying;
     AddressProviderV3ACLMock addressProvider;
 
-    bytes4 constant calcBorrowRateSelector = bytes4(keccak256("calcBorrowRate(uint256,uint256,bool)"));
+    bytes4 constant calcBorrowRateSelector = LinearInterestRateModelV3.calcBorrowRate.selector;
 
     // ----- //
     // SETUP //
@@ -796,7 +796,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
     function test_U_LP_12_creditManagerBorrowable_works_as_expected() public {
         // for the next two cases, `irm.availableToBorrow` should not be called
         vm.mockCallRevert(
-            interestRateModel, abi.encode(ILinearInterestRateModelV3.availableToBorrow.selector), "should not be called"
+            interestRateModel, abi.encode(LinearInterestRateModelV3.availableToBorrow.selector), "should not be called"
         );
 
         // case: total debt limit is fully used
@@ -810,7 +810,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
         // for the next three cases, let `irm.availableToBorrow` always return 500
         vm.mockCall(
-            interestRateModel, abi.encode(ILinearInterestRateModelV3.availableToBorrow.selector), abi.encode(500)
+            interestRateModel, abi.encode(LinearInterestRateModelV3.availableToBorrow.selector), abi.encode(500)
         );
 
         // case: `irm.availableToBorrow` is the smallest
