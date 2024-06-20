@@ -4,9 +4,7 @@
 pragma solidity ^0.8.17;
 
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
-import {RAY, SECONDS_PER_YEAR, PERCENTAGE_FACTOR} from "../libraries/Constants.sol";
-
-uint192 constant RAY_DIVIDED_BY_PERCENTAGE = uint192(RAY / PERCENTAGE_FACTOR);
+import {RAY, RAY_OVER_PERCENTAGE, SECONDS_PER_YEAR, PERCENTAGE_FACTOR} from "../libraries/Constants.sol";
 
 /// @title Quotas logic library
 library QuotasLogic {
@@ -21,7 +19,7 @@ library QuotasLogic {
     {
         return uint192(
             uint256(cumulativeIndexLU)
-                + RAY_DIVIDED_BY_PERCENTAGE * (block.timestamp - lastQuotaRateUpdate) * rate / SECONDS_PER_YEAR
+                + uint192(RAY_OVER_PERCENTAGE) * (block.timestamp - lastQuotaRateUpdate) * rate / SECONDS_PER_YEAR
         ); // U:[QL-1]
     }
 
