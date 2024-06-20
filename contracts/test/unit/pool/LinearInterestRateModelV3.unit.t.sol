@@ -10,7 +10,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 // TEST
 import "../../lib/constants.sol";
 
-import {PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
+import {PERCENTAGE_FACTOR, RAY_OVER_PERCENTAGE} from "../../../libraries/Constants.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
@@ -30,7 +30,7 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
     // TESTS
     //
 
-    // U:[LIM-1]: start parameters are correct
+    /// @notice U:[LIM-1]: start parameters are correct
     function test_U_LIM_01_start_parameters_correct() public {
         (uint16 U_1, uint16 U_2, uint16 R_base, uint16 R_slope1, uint16 R_slope2, uint16 R_slope3) =
             irm.getModelParameters();
@@ -55,7 +55,7 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
         uint16 R_slope3;
     }
 
-    // U:[LIM-2]: linear model constructor reverts for incorrect params
+    /// @notice U:[LIM-2]: linear model constructor reverts for incorrect params
     function test_U_LIM_02_linear_model_constructor_reverts_for_incorrect_params() public {
         // adds liqudity to mint initial diesel tokens to change 1:1 rate
 
@@ -177,7 +177,7 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
         bool expectedRevert;
     }
 
-    // U:[LIM-3]: linear model computes available to borrow and borrow rate correctly
+    /// @notice U:[LIM-3]: linear model computes available to borrow and borrow rate correctly
     function test_U_LIM_03_linear_model_computes_available_to_borrow_and_borrow_rate_correctly() public {
         // adds liqudity to mint initial diesel tokens to change 1:1 rate
 
@@ -198,7 +198,7 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
                 availableLiquidity: 100,
                 /// EXPECTED VALUES
                 // R_base only
-                expectedBorrowRate: 15_00 * RAY / PERCENTAGE_FACTOR,
+                expectedBorrowRate: 15_00 * RAY_OVER_PERCENTAGE,
                 expectedAvailableToBorrow: 100,
                 expectedRevert: false
             }),
@@ -218,7 +218,7 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
                 availableLiquidity: 100,
                 /// EXPECTED VALUES
                 // R_base only
-                expectedBorrowRate: 15_00 * RAY / PERCENTAGE_FACTOR,
+                expectedBorrowRate: 15_00 * RAY_OVER_PERCENTAGE,
                 expectedAvailableToBorrow: 95,
                 expectedRevert: false
             }),
@@ -238,7 +238,7 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
                 availableLiquidity: 100,
                 /// EXPECTED VALUES
                 // R_base only
-                expectedBorrowRate: 15_00 * RAY / PERCENTAGE_FACTOR,
+                expectedBorrowRate: 15_00 * RAY_OVER_PERCENTAGE,
                 expectedAvailableToBorrow: 100,
                 expectedRevert: false
             }),
@@ -258,8 +258,9 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
                 availableLiquidity: 100,
                 /// EXPECTED VALUES
                 // R_base only
-                expectedBorrowRate: 15_00 * RAY / PERCENTAGE_FACTOR,
-                expectedAvailableToBorrow: 100,
+                expectedBorrowRate: 15_00 * RAY_OVER_PERCENTAGE,
+                // borrowing all 100 brings utilization to 100%, while borrowing 99 leaves it at 90%
+                expectedAvailableToBorrow: 99,
                 expectedRevert: false
             }),
             LinearCalculationsCase({
@@ -278,7 +279,7 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
                 availableLiquidity: 60,
                 /// EXPECTED VALUES
                 // 15% + 5% (r1) * 40% (utilisation) / 80% (u1)
-                expectedBorrowRate: (15_00 + 5_00 * 40 / 80) * RAY / PERCENTAGE_FACTOR,
+                expectedBorrowRate: (15_00 + 5_00 * 40 / 80) * RAY_OVER_PERCENTAGE,
                 expectedAvailableToBorrow: 60,
                 expectedRevert: false
             }),
@@ -298,7 +299,7 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
                 availableLiquidity: 60,
                 /// EXPECTED VALUES
                 // 15% (rBase) + 5% (r1) * 40% (utilisation) / 80% (u1)
-                expectedBorrowRate: (15_00 + 5_00 * 40 / 80) * RAY / PERCENTAGE_FACTOR,
+                expectedBorrowRate: (15_00 + 5_00 * 40 / 80) * RAY_OVER_PERCENTAGE,
                 expectedAvailableToBorrow: 55,
                 expectedRevert: false
             }),
@@ -319,7 +320,7 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
                 // EXPECTED VALUES
                 // utilisation: 90%
                 // 12% (rBase) + 5% (r1) + 15%(r2) * 10% / 15% (u2 - u1)
-                expectedBorrowRate: (12_00 + 5_00 + 15_00 * 10 / 15) * RAY / PERCENTAGE_FACTOR,
+                expectedBorrowRate: (12_00 + 5_00 + 15_00 * 10 / 15) * RAY_OVER_PERCENTAGE,
                 expectedAvailableToBorrow: 10,
                 expectedRevert: false
             }),
@@ -339,7 +340,7 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
                 availableLiquidity: 10,
                 /// EXPECTED VALUES
                 // 12% (rBase) + 5% (r1) + 15%(r2) * 10% / 15% (u2 - u1)
-                expectedBorrowRate: (12_00 + 5_00 + 15_00 * 10 / 15) * RAY / PERCENTAGE_FACTOR,
+                expectedBorrowRate: (12_00 + 5_00 + 15_00 * 10 / 15) * RAY_OVER_PERCENTAGE,
                 expectedAvailableToBorrow: 5,
                 expectedRevert: false
             }),
@@ -360,7 +361,7 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
                 // EXPECTED VALUES
                 // utilisation: 90%
                 // 12% (rBase) + 5% (r1) + 15% + 90% (r3) * 3% / 5%(1 - u2)
-                expectedBorrowRate: (12_00 + 5_00 + 15_00 + 90_00 * 3 / 5) * RAY / PERCENTAGE_FACTOR,
+                expectedBorrowRate: (12_00 + 5_00 + 15_00 + 90_00 * 3 / 5) * RAY_OVER_PERCENTAGE,
                 expectedAvailableToBorrow: 2,
                 expectedRevert: false
             }),
@@ -380,7 +381,7 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
                 availableLiquidity: 2,
                 /// EXPECTED VALUES
                 // 12% (rBase) + 5% (r1) + 15% + 90% (r3) * 3% / 5%(1 - u2)
-                expectedBorrowRate: (12_00 + 5_00 + 15_00 + 90_00 * 3 / 5) * RAY / PERCENTAGE_FACTOR,
+                expectedBorrowRate: (12_00 + 5_00 + 15_00 + 90_00 * 3 / 5) * RAY_OVER_PERCENTAGE,
                 expectedAvailableToBorrow: 0,
                 expectedRevert: true
             }),
@@ -401,7 +402,7 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
                 // EXPECTED VALUES
                 // utilisation: 90%
                 // 12% (rBase) + 5% (r1) + 15% + 90% (r3) * 3% / 5%(1 - u2)
-                expectedBorrowRate: (12_00 + 5_00 + 15_00 + 90_00) * RAY / PERCENTAGE_FACTOR,
+                expectedBorrowRate: (12_00 + 5_00 + 15_00 + 90_00) * RAY_OVER_PERCENTAGE,
                 expectedAvailableToBorrow: 0,
                 expectedRevert: false
             }),
@@ -421,7 +422,7 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
                 availableLiquidity: 0,
                 /// EXPECTED VALUES
                 // 12% (rBase) + 5% (r1) + 15% + 90% (r3) * 3% / 5%(1 - u2)
-                expectedBorrowRate: (12_00 + 5_00 + 15_00 + 90_00) * RAY / PERCENTAGE_FACTOR,
+                expectedBorrowRate: (12_00 + 5_00 + 15_00 + 90_00) * RAY_OVER_PERCENTAGE,
                 expectedAvailableToBorrow: 0,
                 expectedRevert: true
             })
@@ -457,6 +458,26 @@ contract LinearInterestRateModelV3UnitTest is TestHelper {
                 testCase.expectedAvailableToBorrow,
                 _testCaseErr(testCase.name, "availableToBorrow isn't computed correcty")
             );
+        }
+    }
+
+    /// @notice U:[LIM-4]: `calcBorrowRate` allows to borrow `availableToBorrow`
+    function test_U_LIM_04_calcBorrowRate_allows_to_borrow_availableToBorrow(
+        uint256 expectedLiquidity,
+        uint256 availableLiquidity
+    ) public {
+        expectedLiquidity = bound(expectedLiquidity, 0, 1e36);
+        availableLiquidity = bound(availableLiquidity, 0, expectedLiquidity);
+        uint256 amount = irm.availableToBorrow(expectedLiquidity, availableLiquidity);
+
+        if (amount != 0) {
+            // it allows to borrow `availableToBorrow`
+            irm.calcBorrowRate(expectedLiquidity, availableLiquidity - amount, true);
+
+            // it doesn't allow to borrow more
+            uint256 amountWithBuffer = amount > 100 ? amount * 101 / 100 : amount + 1;
+            vm.expectRevert(BorrowingMoreThanU2ForbiddenException.selector);
+            irm.calcBorrowRate(expectedLiquidity, availableLiquidity - amountWithBuffer, true);
         }
     }
 }

@@ -6,6 +6,8 @@ pragma solidity ^0.8.17;
 uint256 constant WAD = 1e18;
 uint256 constant RAY = 1e27;
 uint16 constant PERCENTAGE_FACTOR = 1e4;
+uint256 constant WAD_OVER_PERCENTAGE = WAD / PERCENTAGE_FACTOR;
+uint256 constant RAY_OVER_PERCENTAGE = RAY / PERCENTAGE_FACTOR;
 
 uint256 constant SECONDS_PER_YEAR = 365 days;
 uint256 constant EPOCH_LENGTH = 7 days;
