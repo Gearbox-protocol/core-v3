@@ -22,7 +22,7 @@ library CreditAccountHelper {
     /// @param token Token to approve
     /// @param spender Address to approve to
     /// @param amount Amount to approve
-    function safeApprove(ICreditAccountV3 creditAccount, address token, address spender, uint256 amount) internal {
+    function safeApprove(address creditAccount, address token, address spender, uint256 amount) internal {
         if (!_approve(creditAccount, token, spender, amount, false)) {
             _approve(creditAccount, token, spender, 0, true); //U:[CAH-1,2]
             _approve(creditAccount, token, spender, amount, true); // U:[CAH-1,2]
@@ -30,23 +30,20 @@ library CreditAccountHelper {
     }
 
     /// @dev Internal function used to approve tokens from a credit account to a third-party contrat.
-    ///      Uses credit account's `execute` to properly handle both ERC20-compliant and on-compliant
+    ///      Uses credit account's `execute` to properly handle both ERC20-compliant and non-compliant
     ///      (no returned value from "approve") tokens
     /// @param creditAccount Credit account to approve tokens from
     /// @param token Token to approve
     /// @param spender Address to approve to
     /// @param amount Amount to approve
     /// @param revertIfFailed Whether to revert or return `false` on receiving `false` or an error from `approve`
-    function _approve(
-        ICreditAccountV3 creditAccount,
-        address token,
-        address spender,
-        uint256 amount,
-        bool revertIfFailed
-    ) private returns (bool) {
+    function _approve(address creditAccount, address token, address spender, uint256 amount, bool revertIfFailed)
+        private
+        returns (bool)
+    {
         // Makes a low-level call to approve from the credit account and parses the value.
         // If nothing or true was returned, assumes that the call succeeded.
-        try creditAccount.execute(token, abi.encodeCall(IERC20.approve, (spender, amount))) returns (
+        try ICreditAccountV3(creditAccount).execute(token, abi.encodeCall(IERC20.approve, (spender, amount))) returns (
             bytes memory result
         ) {
             if (result.length == 0 || abi.decode(result, (bool))) return true;
@@ -56,14 +53,5 @@ library CreditAccountHelper {
         // After that, failure results in a revert.
         if (revertIfFailed) revert AllowanceFailedException();
         return false;
-    }
-
-    /// @dev Performs a token transfer from a credit account, accounting for non-ERC20 tokens
-    /// @param creditAccount Credit account to send tokens from
-    /// @param token Token to send
-    /// @param to Address to send to
-    /// @param amount Amount to send
-    function transfer(ICreditAccountV3 creditAccount, address token, address to, uint256 amount) internal {
-        creditAccount.safeTransfer(token, to, amount);
     }
 }
