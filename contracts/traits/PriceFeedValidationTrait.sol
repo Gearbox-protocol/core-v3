@@ -50,7 +50,7 @@ abstract contract PriceFeedValidationTrait {
                 if (stalenessPeriod != 0) revert IncorrectParameterException();
             } else {
                 if (stalenessPeriod == 0) revert IncorrectParameterException();
-                if (!_isUpdatable(priceFeed)) _checkAnswer(answer, updatedAt, stalenessPeriod);
+                _checkAnswer(answer, updatedAt, stalenessPeriod);
             }
         } catch {
             revert IncorrectPriceFeedException();
