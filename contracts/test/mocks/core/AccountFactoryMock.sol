@@ -2,7 +2,6 @@
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
-//pragma abicoder v1;
 
 import {IAccountFactoryV3} from "../../../interfaces/IAccountFactoryV3.sol";
 import {CreditAccountMock} from "../credit/CreditAccountMock.sol";

@@ -2,7 +2,6 @@
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
-pragma abicoder v1;
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
