@@ -31,26 +31,10 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable, ReentrancyGuardTra
         _;
     }
 
-    /// @dev Reverts if the caller is not controller or configurator
-    /// @dev Used to cut contract size on modifiers
-    function _ensureCallerIsControllerOrConfigurator() internal view {
-        if (msg.sender != controller && !_isConfigurator({account: msg.sender})) {
-            revert CallerNotControllerException();
-        }
-    }
-
     /// @dev Ensures that function caller has pausable admin role
     modifier pausableAdminsOnly() {
         _ensureCallerIsPausableAdmin();
         _;
-    }
-
-    /// @dev Reverts if the caller is not pausable admin
-    /// @dev Used to cut contract size on modifiers
-    function _ensureCallerIsPausableAdmin() internal view {
-        if (!_isPausableAdmin({account: msg.sender})) {
-            revert CallerNotPausableAdminException();
-        }
     }
 
     /// @dev Ensures that function caller has unpausable admin role
@@ -59,26 +43,20 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable, ReentrancyGuardTra
         _;
     }
 
-    /// @dev Reverts if the caller is not unpausable admin
-    /// @dev Used to cut contract size on modifiers
-    function _ensureCallerIsUnpausableAdmin() internal view {
-        if (!_isUnpausableAdmin({account: msg.sender})) {
-            revert CallerNotUnpausableAdminException();
-        }
-    }
-
     /// @notice Constructor
-    /// @param acl ACL contract address
-    constructor(address acl) ACLTrait(acl) {
-        controller = IACL(acl).owner();
+    /// @param _acl ACL contract address
+    constructor(address _acl) ACLTrait(_acl) {
+        controller = IACL(_acl).owner();
     }
 
     /// @notice Pauses contract, can only be called by an account with pausable admin role
+    /// @dev Reverts if contract is already paused
     function pause() external virtual pausableAdminsOnly {
         _pause();
     }
 
     /// @notice Unpauses contract, can only be called by an account with unpausable admin role
+    /// @dev Reverts if contract is already unpaused
     function unpause() external virtual unpausableAdminsOnly {
         _unpause();
     }
@@ -90,13 +68,23 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable, ReentrancyGuardTra
         emit NewController(newController);
     }
 
-    /// @dev Checks whether given account has pausable admin role
-    function _isPausableAdmin(address account) internal view returns (bool) {
-        return IACL(acl).isPausableAdmin(account);
+    /// @dev Reverts if the caller is not controller or configurator
+    /// @dev Used to cut contract size on modifiers
+    function _ensureCallerIsControllerOrConfigurator() internal view {
+        if (msg.sender != controller && !_isConfigurator(msg.sender)) {
+            revert CallerNotControllerException();
+        }
     }
 
-    /// @dev Checks whether given account has unpausable admin role
-    function _isUnpausableAdmin(address account) internal view returns (bool) {
-        return IACL(acl).isUnpausableAdmin(account);
+    /// @dev Reverts if the caller is not pausable admin
+    /// @dev Used to cut contract size on modifiers
+    function _ensureCallerIsPausableAdmin() internal view {
+        if (!IACL(acl).isPausableAdmin(msg.sender)) revert CallerNotPausableAdminException();
+    }
+
+    /// @dev Reverts if the caller is not unpausable admin
+    /// @dev Used to cut contract size on modifiers
+    function _ensureCallerIsUnpausableAdmin() internal view {
+        if (!IACL(acl).isUnpausableAdmin(msg.sender)) revert CallerNotUnpausableAdminException();
     }
 }
