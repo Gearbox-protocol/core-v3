@@ -26,7 +26,7 @@ import {PriceFeedValidationTrait} from "../traits/PriceFeedValidationTrait.sol";
 ///         `latestRoundData` and always return answers with 8 decimals. They may also implement their own price
 ///         checks, in which case they may incidcate it by returning `skipPriceCheck = true`.
 ///         Price oracle also provides "safe" pricing, which uses minimum of main and reserve feed answers. These
-///         two feeds are allowed to be the same, which effectively makes it trusted, but to reduce changes of
+///         two feeds are allowed to be the same, which effectively makes it trusted, but to reduce chances of
 ///         this happening accidentally, reserve price feed must be explicitly set after the main one.
 ///         Finally, this contract serves as register for updatable price feeds and can be used to apply batched
 ///         on-demand price updates while ensuring that those are not calls to arbitrary contracts.
@@ -203,10 +203,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     /// @custom:tests U:[PO-5]
     function addUpdatablePriceFeed(address priceFeed) external override nonZeroAddress(priceFeed) configuratorOnly {
         if (!_isUpdatable(priceFeed)) revert PriceFeedIsNotUpdatableException();
-        if (!_updatablePriceFeedsSet.contains(priceFeed)) {
-            _updatablePriceFeedsSet.add(priceFeed);
-            emit AddUpdatablePriceFeed(priceFeed);
-        }
+        if (_updatablePriceFeedsSet.add(priceFeed)) emit AddUpdatablePriceFeed(priceFeed);
     }
 
     // --------- //

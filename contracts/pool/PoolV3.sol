@@ -232,7 +232,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         emit Refer(receiver, referralCode, assets); // U:[LP-7]
     }
 
-    /// @notice Withdraws pool shares for given amount of underlying tokens
+    /// @notice Burns pool shares in exchange for given amount of underlying tokens
     /// @param assets Amount of underlying to withdraw
     /// @param receiver Account to send underlying to
     /// @param owner Account to burn pool shares from
@@ -251,7 +251,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         _withdraw(receiver, owner, assetsSent, assets, assetsToUser, shares); // U:[LP-8]
     }
 
-    /// @notice Redeems given number of pool shares for underlying tokens
+    /// @notice Redeems given number of pool shares in exchange for underlying tokens
     /// @param shares Number of pool shares to redeem
     /// @param receiver Account to send underlying to
     /// @param owner Account to burn pool shares from
@@ -271,8 +271,8 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     }
 
     /// @notice Number of pool shares that would be minted on depositing `assets`
-    function previewDeposit(uint256 assets) public view override(ERC4626, IERC4626) returns (uint256 shares) {
-        shares = _convertToShares(_amountMinusFee(assets), Math.Rounding.Down); // U:[LP-10]
+    function previewDeposit(uint256 assets) public view override(ERC4626, IERC4626) returns (uint256) {
+        return _convertToShares(_amountMinusFee(assets), Math.Rounding.Down); // U:[LP-10]
     }
 
     /// @notice Amount of underlying that would be spent to mint `shares`

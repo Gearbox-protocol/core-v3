@@ -194,7 +194,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     ///         - Wraps any ETH sent in the function call and sends it back to the caller
     ///         - If Degen NFT is enabled, burns one from the caller
     ///         - Opens an account in the credit manager
-    ///         - Performs a multicall (all calls allowed except debt decrease and withdrawals)
+    ///         - Performs a multicall (all calls allowed except debt decrease)
     ///         - Runs the collateral check
     /// @param onBehalfOf Address on whose behalf to open the account
     /// @param calls List of calls to perform after opening the account
@@ -308,7 +308,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             calls.length != 0 && calls[0].target == address(this)
                 && bytes4(calls[0].callData) == ICreditFacadeV3Multicall.onDemandPriceUpdates.selector
         ) {
-            _onDemandPriceUpdates(calls[0].callData[4:]);
+            _updatePrices(_priceOracle(), abi.decode(calls[0].callData[4:], (PriceUpdate[])));
             flags |= SKIP_PRICE_UPDATES_CALL_FLAG;
         }
 
@@ -380,7 +380,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         uint256 repaidAmount,
         uint256 minSeizedAmount,
         address to,
-        PriceUpdate[] calldata priceUpdates
+        PriceUpdate[] memory priceUpdates
     )
         external
         override
@@ -389,7 +389,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         returns (uint256 seizedAmount)
     {
         address priceOracle = _priceOracle();
-        IPriceOracleV3(priceOracle).updatePrices(priceUpdates);
+        if (priceUpdates.length != 0) _updatePrices(priceOracle, priceUpdates);
 
         if (token == underlying) revert UnderlyingIsNotLiquidatableException();
         (CollateralDebtData memory cdd, bool isUnhealthy) = _revertIfNotLiquidatable(creditAccount);
@@ -514,7 +514,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                     // onDemandPriceUpdates
                     if (method == ICreditFacadeV3Multicall.onDemandPriceUpdates.selector) {
                         if (i != 0) revert UnknownMethodException(method); // U:[FA-22]
-                        if (flags & SKIP_PRICE_UPDATES_CALL_FLAG == 0) _onDemandPriceUpdates(mcall.callData[4:]); // U:[FA-25]
+                        if (flags & SKIP_PRICE_UPDATES_CALL_FLAG == 0) {
+                            _updatePrices(_priceOracle(), abi.decode(mcall.callData[4:], (PriceUpdate[]))); // U:[FA-25]
+                        }
                     }
                     // storeExpectedBalances
                     else if (method == ICreditFacadeV3Multicall.storeExpectedBalances.selector) {
@@ -652,13 +654,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
                 }
             }
         }
-    }
-
-    /// @dev `ICreditFacadeV3Multicall.onDemandPriceUpdates` implementation
-    function _onDemandPriceUpdates(bytes calldata callData) internal {
-        PriceUpdate[] memory updates = abi.decode(callData, (PriceUpdate[])); // U:[FA-25]
-
-        IPriceOracleV3(_priceOracle()).updatePrices(updates); // U:[FA-25]
     }
 
     /// @dev `ICreditFacadeV3Multicall.addCollateral` implementation
@@ -999,6 +994,11 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @dev Internal wrapper for `creditManager.priceOracle` call to reduce contract size
     function _priceOracle() internal view returns (address) {
         return ICreditManagerV3(creditManager).priceOracle();
+    }
+
+    /// @dev Internal wrapper for `priceOracle.updatePrices` call to reduce contract size
+    function _updatePrices(address priceOracle, PriceUpdate[] memory updates) internal {
+        IPriceOracleV3(priceOracle).updatePrices(updates);
     }
 
     /// @dev Internal wrapper for `creditManager.fullCollateralCheck` call to reduce contract size
