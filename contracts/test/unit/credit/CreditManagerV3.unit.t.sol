@@ -2058,7 +2058,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             borrower: address(0)
         });
 
-        if (mask.disable(UNDERLYING_TOKEN_MASK).calcEnabledTokens() > DEFAULT_MAX_ENABLED_TOKENS) {
+        if (mask.disable(UNDERLYING_TOKEN_MASK).calcEnabledBits() > DEFAULT_MAX_ENABLED_TOKENS) {
             vm.expectRevert(TooManyEnabledTokensException.selector);
             creditManager.saveEnabledTokensMask(creditAccount, mask);
         } else {

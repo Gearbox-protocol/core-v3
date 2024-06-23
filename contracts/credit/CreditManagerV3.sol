@@ -769,7 +769,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
 
         uint256 tokensIdx;
-        uint256 tokensLen = tokensToCheckMask.calcEnabledTokens(); // U:[CM-24]
+        uint256 tokensLen = tokensToCheckMask.calcEnabledBits(); // U:[CM-24]
         quotedTokens = new address[](tokensLen); // U:[CM-24]
         quotasPacked = new uint256[](tokensLen); // U:[CM-24]
 
@@ -786,8 +786,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     tokenMask = collateralHints[hintsIdx++];
                     if (tokensToCheckMask & tokenMask == 0) continue;
                 } else {
-                    // mask with only the LSB of `tokensToCheckMask` enabled
-                    tokenMask = tokensToCheckMask & uint256(-int256(tokensToCheckMask));
+                    tokenMask = tokensToCheckMask.lsbMask();
                 }
 
                 (address token, uint16 lt) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
@@ -828,7 +827,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         address _priceOracle = priceOracle;
         uint256 totalValueUSD;
         while (remainingTokensMask != 0) {
-            uint256 tokenMask = remainingTokensMask & uint256(-int256(remainingTokensMask));
+            uint256 tokenMask = remainingTokensMask.lsbMask();
             remainingTokensMask ^= tokenMask;
 
             address token = getTokenByMask(tokenMask);
@@ -1087,7 +1086,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @dev Saves `creditAccount`'s `enabledTokensMask` in the storage
     /// @dev Ensures that the number of enabled tokens excluding underlying does not exceed `maxEnabledTokens`
     function _saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) internal {
-        if (enabledTokensMask.disable(UNDERLYING_TOKEN_MASK).calcEnabledTokens() > maxEnabledTokens) {
+        if (enabledTokensMask.disable(UNDERLYING_TOKEN_MASK).calcEnabledBits() > maxEnabledTokens) {
             revert TooManyEnabledTokensException(); // U:[CM-37]
         }
 

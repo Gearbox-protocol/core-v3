@@ -518,13 +518,11 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
 
     /// @dev Migrates forbidden tokens to the new credit facade
     function _migrateForbiddenTokens(uint256 forbiddenTokensMask) internal {
-        unchecked {
-            while (forbiddenTokensMask != 0) {
-                uint256 mask = forbiddenTokensMask & uint256(-int256(forbiddenTokensMask));
-                address token = CreditManagerV3(creditManager).getTokenByMask(mask);
-                _forbidToken(token);
-                forbiddenTokensMask ^= mask;
-            }
+        while (forbiddenTokensMask != 0) {
+            uint256 mask = forbiddenTokensMask.lsbMask();
+            address token = CreditManagerV3(creditManager).getTokenByMask(mask);
+            _forbidToken(token);
+            forbiddenTokensMask ^= mask;
         }
     }
 

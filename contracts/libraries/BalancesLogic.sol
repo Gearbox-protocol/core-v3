@@ -102,19 +102,19 @@ library BalancesLogic {
     ) internal view returns (BalanceWithMask[] memory balances) {
         if (tokensMask == 0) return balances;
 
-        balances = new BalanceWithMask[](tokensMask.calcEnabledTokens()); // U:[BLL-4]
-        unchecked {
-            uint256 i;
-            while (tokensMask != 0) {
-                uint256 tokenMask = tokensMask & uint256(-int256(tokensMask));
-                tokensMask ^= tokenMask;
+        balances = new BalanceWithMask[](tokensMask.calcEnabledBits()); // U:[BLL-4]
+        uint256 i;
+        while (tokensMask != 0) {
+            uint256 tokenMask = tokensMask.lsbMask();
+            tokensMask ^= tokenMask;
 
-                address token = getTokenByMaskFn(tokenMask);
-                balances[i] = BalanceWithMask({
-                    token: token,
-                    tokenMask: tokenMask,
-                    balance: IERC20(token).safeBalanceOf(creditAccount)
-                }); // U:[BLL-4]
+            address token = getTokenByMaskFn(tokenMask);
+            balances[i] = BalanceWithMask({
+                token: token,
+                tokenMask: tokenMask,
+                balance: IERC20(token).safeBalanceOf(creditAccount)
+            }); // U:[BLL-4]
+            unchecked {
                 ++i;
             }
         }
