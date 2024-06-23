@@ -12,34 +12,14 @@ import {IncorrectParameterException} from "../interfaces/IExceptions.sol";
 ///         1 if i-th item is included into the set. For example, each token has a mask equal to 2**i, so set inclusion
 ///         can be checked by checking tokenMask & setMask != 0.
 library BitMask {
-    /// @dev Calculates an index of an item based on its mask (using a binary search)
-    /// @dev The input should always have only 1 bit set, otherwise the result may be unpredictable
-    function calcIndex(uint256 mask) internal pure returns (uint8 index) {
-        if (mask == 0) revert IncorrectParameterException(); // U:[BM-1]
-        uint16 lb = 0; // U:[BM-2]
-        uint16 ub = 256; // U:[BM-2]
-        uint16 mid = 128; // U:[BM-2]
-
-        unchecked {
-            while (true) {
-                uint256 newMask = 1 << mid;
-                if (newMask & mask != 0) return uint8(mid); // U:[BM-2]
-
-                if (newMask > mask) ub = mid; // U:[BM-2]
-
-                else lb = mid; // U:[BM-2]
-                mid = (lb + ub) >> 1; // U:[BM-2]
-            }
-        }
-    }
-
     /// @dev Calculates the number of `1` bits
     /// @param enabledTokensMask Bit mask to compute the number of `1` bits in
+    /// @custom:tests U:[BM-1]
     function calcEnabledTokens(uint256 enabledTokensMask) internal pure returns (uint256 totalTokensEnabled) {
         unchecked {
             while (enabledTokensMask > 0) {
-                enabledTokensMask &= enabledTokensMask - 1; // U:[BM-3]
-                ++totalTokensEnabled; // U:[BM-3]
+                enabledTokensMask &= enabledTokensMask - 1;
+                ++totalTokensEnabled;
             }
         }
     }
@@ -47,15 +27,17 @@ library BitMask {
     /// @dev Enables bits from the second mask in the first mask
     /// @param enabledTokenMask The initial mask
     /// @param bitsToEnable Mask of bits to enable
+    /// @custom:tests U:[BM-2]
     function enable(uint256 enabledTokenMask, uint256 bitsToEnable) internal pure returns (uint256) {
-        return enabledTokenMask | bitsToEnable; // U:[BM-4]
+        return enabledTokenMask | bitsToEnable;
     }
 
     /// @dev Disables bits from the second mask in the first mask
     /// @param enabledTokenMask The initial mask
     /// @param bitsToDisable Mask of bits to disable
+    /// @custom:tests U:[BM-2]
     function disable(uint256 enabledTokenMask, uint256 bitsToDisable) internal pure returns (uint256) {
-        return enabledTokenMask & ~bitsToDisable; // U:[BM-4]
+        return enabledTokenMask & ~bitsToDisable;
     }
 
     /// @dev Computes a new mask with sets of new enabled and disabled bits
@@ -63,11 +45,12 @@ library BitMask {
     /// @param enabledTokensMask The initial mask
     /// @param bitsToEnable Mask with bits to enable
     /// @param bitsToDisable Mask with bits to disable
+    /// @custom:tests U:[BM-3]
     function enableDisable(uint256 enabledTokensMask, uint256 bitsToEnable, uint256 bitsToDisable)
         internal
         pure
         returns (uint256)
     {
-        return (enabledTokensMask | bitsToEnable) & (~bitsToDisable); // U:[BM-5]
+        return (enabledTokensMask | bitsToEnable) & (~bitsToDisable);
     }
 }

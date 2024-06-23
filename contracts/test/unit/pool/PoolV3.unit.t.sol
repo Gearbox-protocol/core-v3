@@ -199,6 +199,12 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         pool.pause();
 
         vm.expectRevert("Pausable: paused");
+        pool.transfer({to: user, amount: 0});
+
+        vm.expectRevert("Pausable: paused");
+        pool.transferFrom({from: user, to: user, amount: 0});
+
+        vm.expectRevert("Pausable: paused");
         pool.deposit({assets: 1, receiver: user});
 
         vm.expectRevert("Pausable: paused");

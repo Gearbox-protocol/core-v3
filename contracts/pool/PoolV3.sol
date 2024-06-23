@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
-pragma solidity ^0.8.17;
-pragma abicoder v1;
+pragma solidity 0.8.23;
 
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 
@@ -53,9 +52,6 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
 
     /// @notice Contract version
     uint256 public constant override version = 3_10;
-
-    /// @notice Underlying token address
-    address public immutable override underlyingToken;
 
     /// @notice Protocol treasury address
     address public immutable override treasury;
@@ -129,7 +125,6 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         nonZeroAddress(treasury_) // U:[LP-1A]
         nonZeroAddress(interestRateModel_) // U:[LP-1A]
     {
-        underlyingToken = underlyingToken_; // U:[LP-1B]
         treasury = treasury_; // U:[LP-1B]
 
         lastBaseInterestUpdate = uint40(block.timestamp); // U:[LP-1B]
@@ -139,6 +134,12 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         emit SetInterestRateModel(interestRateModel_); // U:[LP-1B]
 
         _setTotalDebtLimit(totalDebtLimit_); // U:[LP-1B]
+    }
+
+    /// @notice Pool's underlying token, same as `asset()`
+    /// @dev Exists for backward compatibility
+    function underlyingToken() external view override returns (address) {
+        return asset(); // U:[LP-1B]
     }
 
     /// @notice Pool shares decimals, matches underlying token decimals
@@ -153,7 +154,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
 
     /// @notice Available liquidity in the pool
     function availableLiquidity() public view override returns (uint256) {
-        return IERC20(underlyingToken).safeBalanceOf(address(this)); // U:[LP-3]
+        return IERC20(asset()).safeBalanceOf(address(this)); // U:[LP-3]
     }
 
     /// @notice Amount of underlying that would be in the pool if debt principal, base interest
@@ -231,7 +232,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         emit Refer(receiver, referralCode, assets); // U:[LP-7]
     }
 
-    /// @notice Withdraws pool shares for given amount of underlying tokens
+    /// @notice Burns pool shares in exchange for given amount of underlying tokens
     /// @param assets Amount of underlying to withdraw
     /// @param receiver Account to send underlying to
     /// @param owner Account to burn pool shares from
@@ -250,7 +251,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         _withdraw(receiver, owner, assetsSent, assets, assetsToUser, shares); // U:[LP-8]
     }
 
-    /// @notice Redeems given number of pool shares for underlying tokens
+    /// @notice Redeems given number of pool shares in exchange for underlying tokens
     /// @param shares Number of pool shares to redeem
     /// @param receiver Account to send underlying to
     /// @param owner Account to burn pool shares from
@@ -270,8 +271,8 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     }
 
     /// @notice Number of pool shares that would be minted on depositing `assets`
-    function previewDeposit(uint256 assets) public view override(ERC4626, IERC4626) returns (uint256 shares) {
-        shares = _convertToShares(_amountMinusFee(assets), Math.Rounding.Down); // U:[LP-10]
+    function previewDeposit(uint256 assets) public view override(ERC4626, IERC4626) returns (uint256) {
+        return _convertToShares(_amountMinusFee(assets), Math.Rounding.Down); // U:[LP-10]
     }
 
     /// @notice Amount of underlying that would be spent to mint `shares`
@@ -320,7 +321,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     ///      - updates base interest rate and index
     ///      - mints pool shares to `receiver`
     function _deposit(address receiver, uint256 assetsSent, uint256 assetsReceived, uint256 shares) internal {
-        IERC20(underlyingToken).safeTransferFrom({from: msg.sender, to: address(this), amount: assetsSent}); // U:[LP-6,7]
+        IERC20(asset()).safeTransferFrom({from: msg.sender, to: address(this), amount: assetsSent}); // U:[LP-6,7]
 
         _updateBaseInterest({
             expectedLiquidityDelta: assetsReceived.toInt256(),
@@ -353,10 +354,10 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
             checkOptimalBorrowing: false
         }); // U:[LP-8,9]
 
-        IERC20(underlyingToken).safeTransfer({to: receiver, value: amountToUser}); // U:[LP-8,9]
+        IERC20(asset()).safeTransfer({to: receiver, value: amountToUser}); // U:[LP-8,9]
         if (assetsSent > amountToUser) {
             unchecked {
-                IERC20(underlyingToken).safeTransfer({to: treasury, value: assetsSent - amountToUser}); // U:[LP-8,9]
+                IERC20(asset()).safeTransfer({to: treasury, value: assetsSent - amountToUser}); // U:[LP-8,9]
             }
         }
         emit Withdraw(msg.sender, receiver, owner, assetsReceived, shares); // U:[LP-8,9]
@@ -443,7 +444,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         cmDebt.borrowed = cmBorrowed_; // U:[LP-13B]
         _totalDebt.borrowed = totalBorrowed_; // U:[LP-13B]
 
-        IERC20(underlyingToken).safeTransfer({to: creditAccount, value: borrowedAmount}); // U:[LP-13B]
+        IERC20(asset()).safeTransfer({to: creditAccount, value: borrowedAmount}); // U:[LP-13B]
         emit Borrow(msg.sender, creditAccount, borrowedAmount); // U:[LP-13B]
     }
 
@@ -749,6 +750,15 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     // --------- //
     // INTERNALS //
     // --------- //
+
+    /// @dev Same as `ERC20._transfer` but reverts if contract is paused
+    function _transfer(address from, address to, uint256 amount)
+        internal
+        override
+        whenNotPaused // U:[LP-2A]
+    {
+        super._transfer(from, to, amount);
+    }
 
     /// @dev Returns amount of token that should be transferred to receive `amount`
     ///      Pools with fee-on-transfer underlying should override this method
