@@ -242,11 +242,25 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             sstore(slot, 0)
         } // U:[CM-7]
 
-        // this statement is redundant since at this point only the underlying is enabled (otherwise, debt
-        // couldn't be zero because of quotas on the account), but it's kept for the sake of completeness
+        // the three following statements are redundant and kept for the sake of completeness:
+
+        // quota interest and fees are already unset after opening an account, fully liquidating it or
+        // fully repaying its debt, which are the only situations after which an account can be closed
+        // currentCreditAccountInfo.cumulativeQuotaInterest = 1;
+        // currentCreditAccountInfo.quotaFees = 0;
+        assembly {
+            let slot := add(currentCreditAccountInfo.slot, 2)
+            sstore(slot, 1)
+        } // U:[CM-7]
+
+        // underlying is already the only enabled token since there is no quotas after opening an account,
+        // full liquidation automatically removes them and full debt repayment requires to remove them
         currentCreditAccountInfo.enabledTokensMask = UNDERLYING_TOKEN_MASK; // U:[CM-7]
 
-        IAccountFactoryV3(accountFactory).returnCreditAccount({creditAccount: creditAccount}); // U:[CM-7]
+        // even without this line, interest index should never be used for calculations when account has no debt
+        currentCreditAccountInfo.cumulativeIndexLastUpdate = 0; // U:[CM-7]
+
+        IAccountFactoryV3(accountFactory).returnCreditAccount(creditAccount); // U:[CM-7]
         creditAccountsSet.remove(creditAccount); // U:[CM-7]
     }
 
@@ -677,7 +691,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
 
         cdd.debt = currentCreditAccountInfo.debt; // U:[CM-20]
-        cdd.cumulativeIndexLastUpdate = currentCreditAccountInfo.cumulativeIndexLastUpdate; // U:[CM-20]
+        // interest index is meaningless when account has no debt
+        cdd.cumulativeIndexLastUpdate = cdd.debt == 0 ? 0 : currentCreditAccountInfo.cumulativeIndexLastUpdate; // U:[CM-20]
         cdd.cumulativeIndexNow = IPoolV3(pool).baseInterestIndex(); // U:[CM-20]
 
         if (task == CollateralCalcTask.GENERIC_PARAMS) {
@@ -769,7 +784,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
 
         uint256 tokensIdx;
-        uint256 tokensLen = tokensToCheckMask.calcEnabledTokens(); // U:[CM-24]
+        uint256 tokensLen = tokensToCheckMask.calcEnabledBits(); // U:[CM-24]
         quotedTokens = new address[](tokensLen); // U:[CM-24]
         quotasPacked = new uint256[](tokensLen); // U:[CM-24]
 
@@ -786,8 +801,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
                     tokenMask = collateralHints[hintsIdx++];
                     if (tokensToCheckMask & tokenMask == 0) continue;
                 } else {
-                    // mask with only the LSB of `tokensToCheckMask` enabled
-                    tokenMask = tokensToCheckMask & uint256(-int256(tokensToCheckMask));
+                    tokenMask = tokensToCheckMask.lsbMask();
                 }
 
                 (address token, uint16 lt) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
@@ -828,7 +842,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         address _priceOracle = priceOracle;
         uint256 totalValueUSD;
         while (remainingTokensMask != 0) {
-            uint256 tokenMask = remainingTokensMask & uint256(-int256(remainingTokensMask));
+            uint256 tokenMask = remainingTokensMask.lsbMask();
             remainingTokensMask ^= tokenMask;
 
             address token = getTokenByMask(tokenMask);
@@ -1087,7 +1101,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @dev Saves `creditAccount`'s `enabledTokensMask` in the storage
     /// @dev Ensures that the number of enabled tokens excluding underlying does not exceed `maxEnabledTokens`
     function _saveEnabledTokensMask(address creditAccount, uint256 enabledTokensMask) internal {
-        if (enabledTokensMask.disable(UNDERLYING_TOKEN_MASK).calcEnabledTokens() > maxEnabledTokens) {
+        if (enabledTokensMask.disable(UNDERLYING_TOKEN_MASK).calcEnabledBits() > maxEnabledTokens) {
             revert TooManyEnabledTokensException(); // U:[CM-37]
         }
 

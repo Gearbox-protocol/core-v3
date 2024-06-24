@@ -12,9 +12,9 @@ import {TestHelper} from "../../lib/helper.sol";
 /// @notice U:[BM]: Unit tests for bit mask library
 contract BitMaskUnitTest is TestHelper {
     using BitMask for uint256;
-    /// @notice U:[BM-1]: `calcEnabledTokens` works correctly
+    /// @notice U:[BM-1]: `calcEnabledBits` works correctly
 
-    function test_U_BM_01_calcEnabledTokens_works_correctly(uint8 bitsToEnable, uint256 randomValue) public {
+    function test_U_BM_01_calcEnabledBits_works_correctly(uint8 bitsToEnable, uint256 randomValue) public {
         uint256 bitMask;
 
         for (uint256 i; i < bitsToEnable;) {
@@ -26,7 +26,7 @@ contract BitMaskUnitTest is TestHelper {
             }
         }
 
-        assertEq(bitMask.calcEnabledTokens(), bitsToEnable, "Incorrect bits computation");
+        assertEq(bitMask.calcEnabledBits(), bitsToEnable, "Incorrect bits computation");
     }
 
     /// @notice U:[BM-2]: `enable` & `disable` works correctly
@@ -48,5 +48,17 @@ contract BitMaskUnitTest is TestHelper {
 
         mask = mask.enableDisable(0, 1 << bit);
         assertEq(mask, 0, "Disable doesn't work");
+    }
+
+    /// @notice U:[BM-4]: `lsbMask` works correctly
+    function test_U_BM_04_lsbMask_works_correctly(uint256 mask) public {
+        uint256 lsbMask = mask.lsbMask();
+        if (lsbMask == 0) {
+            assertEq(mask, 0, "Zero LSB for non-zero mask");
+            return;
+        }
+        assertEq(lsbMask.calcEnabledBits(), 1, "LSB mask has more than one enabled bit");
+        assertEq(mask & lsbMask, lsbMask, "LSB is not enabled");
+        assertEq(mask & (lsbMask - 1), 0, "LSB is not least");
     }
 }

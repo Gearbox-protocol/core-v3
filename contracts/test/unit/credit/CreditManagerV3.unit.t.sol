@@ -579,9 +579,9 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         creditManager.setCreditAccountInfoMap({
             creditAccount: creditAccount,
             debt: 0,
-            cumulativeIndexLastUpdate: 0,
-            cumulativeQuotaInterest: 0,
-            quotaFees: 0,
+            cumulativeIndexLastUpdate: 123,
+            cumulativeQuotaInterest: 123,
+            quotaFees: 123,
             enabledTokensMask: 0,
             flags: 123,
             borrower: address(0)
@@ -590,11 +590,22 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         vm.expectCall(address(accountFactory), abi.encodeCall(accountFactory.returnCreditAccount, (creditAccount)));
         creditManager.closeCreditAccount(creditAccount);
 
-        (,,,, uint256 enabledTokensMask, uint16 flags, uint64 lastDebtUpdate, address borrower) =
-            creditManager.creditAccountInfo(creditAccount);
+        (
+            ,
+            uint256 cumulativeIndexLastUpdate,
+            uint128 cumulativeQuotaInterest,
+            uint128 quotaFees,
+            uint256 enabledTokensMask,
+            uint16 flags,
+            uint64 lastDebtUpdate,
+            address borrower
+        ) = creditManager.creditAccountInfo(creditAccount);
+        assertEq(cumulativeIndexLastUpdate, 0, "cumulativeIndexLastUpdate not cleaned");
+        assertEq(cumulativeQuotaInterest, 1, "cumulativeQuotaInterest not cleaned");
+        assertEq(quotaFees, 0, "quotaFees not cleaned");
         assertEq(enabledTokensMask, UNDERLYING_TOKEN_MASK, "enabledTokensMask not cleared");
         assertEq(borrower, address(0), "borrower not cleared");
-        assertEq(lastDebtUpdate, 0, "lastDebtUpadte not cleared");
+        assertEq(lastDebtUpdate, 0, "lastDebtUpdate not cleared");
         assertEq(flags, 0, "flags not cleared");
 
         assertEq(creditManager.creditAccountsLen(), 0, _testCaseErr("incorrect creditAccounts length"));
@@ -1670,14 +1681,14 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 enabledTokensMask: UNDERLYING_TOKEN_MASK,
                 underlyingBalance: debt,
                 linkBalance: 0,
-                expectedTotalValueUSD: vars.get("UNDERLYING_PRICE") * (debt - 1),
-                expectedTwvUSD: vars.get("UNDERLYING_PRICE") * (debt - 1) * LT_UNDERLYING / PERCENTAGE_FACTOR
+                expectedTotalValueUSD: vars.get("UNDERLYING_PRICE") * debt,
+                expectedTwvUSD: vars.get("UNDERLYING_PRICE") * debt * LT_UNDERLYING / PERCENTAGE_FACTOR
             }),
             CollateralCalcTestCase({
                 name: "One quoted token with balance < quota",
                 enabledTokensMask: LINK_TOKEN_MASK,
                 underlyingBalance: 0,
-                linkBalance: vars.get("LINK_QUOTA") / 2 / vars.get("LINK_PRICE") + 1,
+                linkBalance: vars.get("LINK_QUOTA") / 2 / vars.get("LINK_PRICE"),
                 expectedTotalValueUSD: vars.get("LINK_QUOTA") / 2,
                 expectedTwvUSD: vars.get("LINK_QUOTA") / 2 * vars.get("LINK_LT") / PERCENTAGE_FACTOR
             }),
@@ -1685,7 +1696,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 name: "One quoted token with balance > quota",
                 enabledTokensMask: LINK_TOKEN_MASK,
                 underlyingBalance: 0,
-                linkBalance: 2 * vars.get("LINK_QUOTA") * vars.get("UNDERLYING_PRICE") / vars.get("LINK_PRICE") + 1,
+                linkBalance: 2 * vars.get("LINK_QUOTA") * vars.get("UNDERLYING_PRICE") / vars.get("LINK_PRICE"),
                 expectedTotalValueUSD: 2 * vars.get("LINK_QUOTA_IN_USD"),
                 expectedTwvUSD: vars.get("LINK_QUOTA_IN_USD")
             })
@@ -2058,7 +2069,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             borrower: address(0)
         });
 
-        if (mask.disable(UNDERLYING_TOKEN_MASK).calcEnabledTokens() > DEFAULT_MAX_ENABLED_TOKENS) {
+        if (mask.disable(UNDERLYING_TOKEN_MASK).calcEnabledBits() > DEFAULT_MAX_ENABLED_TOKENS) {
             vm.expectRevert(TooManyEnabledTokensException.selector);
             creditManager.saveEnabledTokensMask(creditAccount, mask);
         } else {

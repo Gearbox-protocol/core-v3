@@ -353,7 +353,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         uint16 liquidationDiscount = PERCENTAGE_FACTOR - liquidationPremium;
         uint16 liquidationDiscountExpired = PERCENTAGE_FACTOR - liquidationPremiumExpired;
 
-        uint16 newLTUnderlying = uint16(liquidationDiscount - feeLiquidation); // I:[CC-18]
+        uint16 newLTUnderlying = liquidationDiscount - feeLiquidation; // I:[CC-18]
         (, uint16 ltUnderlying) = CreditManagerV3(creditManager).collateralTokenByMask(UNDERLYING_TOKEN_MASK);
 
         if (newLTUnderlying != ltUnderlying) {
@@ -518,13 +518,11 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
 
     /// @dev Migrates forbidden tokens to the new credit facade
     function _migrateForbiddenTokens(uint256 forbiddenTokensMask) internal {
-        unchecked {
-            while (forbiddenTokensMask != 0) {
-                uint256 mask = forbiddenTokensMask & uint256(-int256(forbiddenTokensMask));
-                address token = CreditManagerV3(creditManager).getTokenByMask(mask);
-                _forbidToken(token);
-                forbiddenTokensMask ^= mask;
-            }
+        while (forbiddenTokensMask != 0) {
+            uint256 mask = forbiddenTokensMask.lsbMask();
+            address token = CreditManagerV3(creditManager).getTokenByMask(mask);
+            _forbidToken(token);
+            forbiddenTokensMask ^= mask;
         }
     }
 
