@@ -6,7 +6,7 @@ evm_version = 'shanghai'
 src = 'contracts'
 optimizer_runs = 12000
 
-# See more config   options https://github.com/gakonst/foundry/tree/master/config
+# See more config options https://github.com/gakonst/foundry/tree/master/config
 block_number = 120000 
 block_timestamp = 16400000 
 gas_limit = 9223372036854775807 # the gas limit in tests
