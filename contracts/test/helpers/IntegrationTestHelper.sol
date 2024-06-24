@@ -216,7 +216,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         GenesisFactory gp = new GenesisFactory(weth, DUMB_ADDRESS);
         if (chainId == 1337 || chainId == 31337) gp.addPriceFeeds(tokenTestSuite.getPriceFeeds());
         addressProvider = gp.addressProvider();
-        vm.allowCheatcodes(address(addressProvider));
         vm.stopPrank();
 
         _initCoreContracts();
@@ -334,8 +333,9 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         gauge = pf.gauge();
         poolQuotaKeeper = pf.poolQuotaKeeper();
 
-        vm.prank(address(gauge));
-        poolQuotaKeeper.updateRates();
+        vm.warp(block.timestamp + 7 days);
+        vm.prank(CONFIGURATOR);
+        gauge.updateEpoch();
 
         tokenTestSuite.mint(underlying, INITIAL_LP, initialBalance);
         tokenTestSuite.approve(underlying, INITIAL_LP, address(pool));

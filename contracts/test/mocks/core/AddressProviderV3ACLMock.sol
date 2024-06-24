@@ -39,7 +39,7 @@ contract AddressProviderV3ACLMock is Test, IAddressProviderV3, Ownable {
         BotListMock botListMock = new BotListMock();
         _setAddress(AP_BOT_LIST, address(botListMock), 3_10);
 
-        _setAddress(AP_TREASURY, address(123456), 0);
+        _setAddress(AP_TREASURY, makeAddr("TREASURY"), 0);
 
         _setAddress(AP_WETH_TOKEN, address(new WETHMock()), 0);
     }
