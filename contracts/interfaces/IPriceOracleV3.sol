@@ -5,14 +5,6 @@ pragma solidity ^0.8.17;
 
 import {IPriceOracleBase} from "@gearbox-protocol/core-v2/contracts/interfaces/IPriceOracleBase.sol";
 
-/// @notice On-demand price update params
-/// @param priceFeed Price feed to update, must be in the set of updatable feeds in the price oracle
-/// @param data Update data
-struct PriceUpdate {
-    address priceFeed;
-    bytes data;
-}
-
 struct PriceFeedParams {
     address priceFeed;
     uint32 stalenessPeriod;
