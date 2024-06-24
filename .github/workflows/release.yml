@@ -5,6 +5,7 @@ on:
     branches:
       - "main"
       - "next"
+      - "3_0_migration"
 
 env:
   HUSKY: 0
