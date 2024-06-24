@@ -3,13 +3,14 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import "../../interfaces/IAddressProviderV3.sol";
+import "../interfaces/IAddressProviderV3.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {ContractsRegister} from "@gearbox-protocol/core-v2/contracts/core/ContractsRegister.sol";
+import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {AccountFactoryV3} from "../../core/AccountFactoryV3.sol";
-import {IACL} from "@gearbox-protocol/core-v2/contracts/interfaces/IACL.sol";
+import {IACL} from "../../interfaces/IACL.sol";
+import {IContractsRegister} from "../../interfaces/IContractsRegister.sol";
 
-import {IWETH} from "@gearbox-protocol/core-v2/contracts/interfaces/external/IWETH.sol";
+import {IWETH} from "../../interfaces/external/IWETH.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {CreditFacadeV3} from "../../credit/CreditFacadeV3.sol";
@@ -18,15 +19,13 @@ import {MultiCall} from "../../interfaces/ICreditFacadeV3.sol";
 import {MultiCallBuilder} from "../lib/MultiCallBuilder.sol";
 import {PoolV3} from "../../pool/PoolV3.sol";
 import {PoolQuotaKeeperV3} from "../../pool/PoolQuotaKeeperV3.sol";
-import {GaugeV3} from "../../governance/GaugeV3.sol";
-import {DegenNFTV2} from "@gearbox-protocol/core-v2/contracts/tokens/DegenNFTV2.sol";
+import {GaugeV3} from "../../pool/GaugeV3.sol";
 import {CreditManagerFactory} from "../suites/CreditManagerFactory.sol";
 
 import {ICreditFacadeV3Multicall} from "../../interfaces/ICreditFacadeV3.sol";
 
 import {CreditManagerV3} from "../../credit/CreditManagerV3.sol";
 import {IPriceOracleV3} from "../../interfaces/IPriceOracleV3.sol";
-import {CreditManagerOpts} from "../../credit/CreditConfiguratorV3.sol";
 import {PoolFactory} from "../suites/PoolFactory.sol";
 
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
@@ -36,15 +35,16 @@ import {IPoolV3DeployConfig, CreditManagerV3DeployParams, CollateralTokenHuman} 
 import {MockCreditConfig} from "../config/MockCreditConfig.sol";
 import {TestHelper} from "../lib/helper.sol";
 import {ERC20Mock} from "../mocks/token/ERC20Mock.sol";
+import {DegenNFTMock} from "../mocks/token/DegenNFTMock.sol";
 import "../lib/constants.sol";
 import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {PriceFeedMock} from "../mocks/oracles/PriceFeedMock.sol";
 import {BalanceHelper} from "./BalanceHelper.sol";
 import {BotListV3} from "../../core/BotListV3.sol";
-import {AccountFactory} from "@gearbox-protocol/core-v2/contracts/core/AccountFactory.sol";
 // MOCKS
 import {AdapterMock} from "../mocks/core/AdapterMock.sol";
 import {TargetContractMock} from "../mocks/core/TargetContractMock.sol";
+import {AddressProviderV3ACLMock} from "../mocks/core/AddressProviderV3ACLMock.sol";
 
 import {GenesisFactory} from "../suites/GenesisFactory.sol";
 
@@ -56,9 +56,10 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     uint256 chainId;
 
     // CORE
+    IACL acl;
     IAddressProviderV3 addressProvider;
-    ContractsRegister cr;
-    AccountFactory accountFactory;
+    IContractsRegister cr;
+    AccountFactoryV3 accountFactory;
     IPriceOracleV3 priceOracle;
     BotListV3 botList;
 
@@ -67,7 +68,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     PoolQuotaKeeperV3 public poolQuotaKeeper;
     GaugeV3 public gauge;
 
-    DegenNFTV2 public degenNFT;
+    DegenNFTMock public degenNFT;
 
     CreditManagerV3 public creditManager;
     CreditFacadeV3 public creditFacade;
@@ -92,12 +93,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
     bool anyExpirable = true;
     bool expirable;
-
-    bool anySupportsQuotas = true;
-    bool supportsQuotas;
-
-    bool anyAccountFactory = true;
-    uint256 accountFactoryVersion = 1;
 
     bool installAdapterMock = false;
 
@@ -153,30 +148,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         _;
     }
 
-    modifier withAccountFactoryV1() {
-        anyAccountFactory = false;
-        accountFactoryVersion = 1;
-        _;
-    }
-
-    modifier withAccountFactoryV3() {
-        anyAccountFactory = false;
-        accountFactoryVersion = 3_00;
-        _;
-    }
-
-    modifier withAllAccountFactories() {
-        anyAccountFactory = false;
-        uint256 snapshot = vm.snapshot();
-
-        accountFactoryVersion = 1;
-        _;
-        vm.revertTo(snapshot);
-
-        accountFactoryVersion = 3_00;
-        _;
-    }
-
     modifier withUnderlying(Tokens t) {
         anyUnderlying = false;
         underlyingT = t;
@@ -227,28 +198,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         }
     }
 
-    modifier attachAllV3CMTest() {
-        _attachCore();
-
-        address creditManagerAddr;
-        bool skipTest = false;
-
-        // address[] memory cms = cr.getCreditManagers();
-        // uint256 len = cms.length;
-        // unchecked {
-        //     for (uint256 i = 0; i < len; i++) {
-        //         address poolAddr = cr.poolByIndex(i);
-        //         if (!_attachPool(poolAddr)) {
-        //             console.log("Skipped");
-        //             skipTest = true;
-        //             break;
-        //         } else {}
-        //     }
-        // }
-
-        _;
-    }
-
     constructor() {
         new Roles();
         NetworkDetector nd = new NetworkDetector();
@@ -264,15 +213,9 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         weth = tokenTestSuite.addressOf(Tokens.WETH);
 
         vm.startPrank(CONFIGURATOR);
-        GenesisFactory gp = new GenesisFactory(weth, DUMB_ADDRESS, accountFactoryVersion);
+        GenesisFactory gp = new GenesisFactory(weth, DUMB_ADDRESS);
         if (chainId == 1337 || chainId == 31337) gp.addPriceFeeds(tokenTestSuite.getPriceFeeds());
-        gp.acl().claimOwnership();
-
-        gp.acl().addPausableAdmin(CONFIGURATOR);
-        gp.acl().addUnpausableAdmin(CONFIGURATOR);
-
         addressProvider = gp.addressProvider();
-
         vm.stopPrank();
 
         _initCoreContracts();
@@ -291,13 +234,14 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     }
 
     function _initCoreContracts() internal {
-        cr = ContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, NO_VERSION_CONTROL));
-        accountFactory = AccountFactory(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, NO_VERSION_CONTROL));
-        priceOracle = IPriceOracleV3(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_00));
-        botList = BotListV3(payable(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_00)));
+        acl = IACL(addressProvider.getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL));
+        cr = IContractsRegister(addressProvider.getAddressOrRevert(AP_CONTRACTS_REGISTER, NO_VERSION_CONTROL));
+        accountFactory = AccountFactoryV3(addressProvider.getAddressOrRevert(AP_ACCOUNT_FACTORY, 3_10));
+        priceOracle = IPriceOracleV3(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_10));
+        botList = BotListV3(payable(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_10)));
     }
 
-    function _attachPool(address _pool) internal returns (bool isCompartible) {
+    function _attachPool(address _pool) internal returns (bool isCompatible) {
         pool = PoolV3(_pool);
 
         poolQuotaKeeper = PoolQuotaKeeperV3(pool.poolQuotaKeeper());
@@ -312,7 +256,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         return true;
     }
 
-    function _attachCreditManager(address _creditManager) internal returns (bool isCompartible) {
+    function _attachCreditManager(address _creditManager) internal returns (bool isCompatible) {
         creditManager = CreditManagerV3(_creditManager);
         creditFacade = CreditFacadeV3(creditManager.creditFacade());
         creditConfigurator = CreditConfiguratorV3(creditManager.creditConfigurator());
@@ -368,10 +312,10 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         }
 
         if (_degenNFT != address(0)) {
-            address minter = DegenNFTV2(_degenNFT).minter();
+            address minter = DegenNFTMock(_degenNFT).minter();
 
             vm.prank(minter);
-            DegenNFTV2(_degenNFT).mint(USER, 1000);
+            DegenNFTMock(_degenNFT).mint(USER, 1000);
         }
 
         return true;
@@ -383,13 +327,15 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
         underlying = tokenTestSuite.addressOf(underlyingT);
 
-        supportsQuotas = anySupportsQuotas ? config.supportsQuotas() : supportsQuotas;
-
-        PoolFactory pf = new PoolFactory(address(addressProvider), config, underlying, supportsQuotas, tokenTestSuite);
+        PoolFactory pf = new PoolFactory(address(addressProvider), config, underlying, true, tokenTestSuite);
 
         pool = pf.pool();
         gauge = pf.gauge();
         poolQuotaKeeper = pf.poolQuotaKeeper();
+
+        vm.warp(block.timestamp + 7 days);
+        vm.prank(CONFIGURATOR);
+        gauge.updateEpoch();
 
         tokenTestSuite.mint(underlying, INITIAL_LP, initialBalance);
         tokenTestSuite.approve(underlying, INITIAL_LP, address(pool));
@@ -397,15 +343,14 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         vm.prank(INITIAL_LP);
         pool.deposit(initialBalance, INITIAL_LP);
 
-        vm.prank(CONFIGURATOR);
-        cr.addPool(address(pool));
+        AddressProviderV3ACLMock(address(addressProvider)).addPool(address(pool));
 
         vm.label(address(pool), "Pool");
     }
 
     function _deployMockCreditAndPool() internal {
-        IPoolV3DeployConfig creditConfig = new MockCreditConfig(tokenTestSuite, underlyingT);
-
+        require(underlyingT == Tokens.DAI, "IntegrationTestHelper: Only DAI mock config is supported");
+        IPoolV3DeployConfig creditConfig = new MockCreditConfig();
         _deployCreditAndPool(creditConfig);
     }
 
@@ -421,12 +366,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         configAccountAmount = creditAccountAmount;
         CreditManagerV3DeployParams[] memory allCms = config.creditManagers();
 
-        degenNFT = new DegenNFTV2(address(addressProvider), "DegenNFTV2", "Gear-Degen");
-
-        vm.prank(CONFIGURATOR);
-        degenNFT.setMinter(CONFIGURATOR);
-
-        vm.prank(CONFIGURATOR);
+        degenNFT = new DegenNFTMock("Degen NFT", "DNFT");
         degenNFT.mint(USER, 1000);
 
         uint256 len = allCms.length;
@@ -438,53 +378,44 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
                 whitelisted = cmParams.whitelisted;
             }
 
-            CreditManagerOpts memory cmOpts = CreditManagerOpts({
-                minDebt: cmParams.minDebt,
-                maxDebt: cmParams.maxDebt,
+            CreditManagerFactory cmf = new CreditManagerFactory({
+                addressProvider: address(addressProvider),
+                pool: address(pool),
                 degenNFT: (whitelisted) ? address(degenNFT) : address(0),
                 expirable: (anyExpirable) ? cmParams.expirable : expirable,
+                feeInterest: cmParams.feeInterest,
                 name: cmParams.name
             });
-
-            CreditManagerFactory cmf = new CreditManagerFactory(address(addressProvider), address(pool), cmOpts, 0);
 
             creditManager = cmf.creditManager();
             creditFacade = cmf.creditFacade();
             creditConfigurator = cmf.creditConfigurator();
 
-            vm.prank(CONFIGURATOR);
+            vm.startPrank(CONFIGURATOR);
+            creditConfigurator.setMaxDebtLimit(cmParams.maxDebt);
+            creditConfigurator.setMinDebtLimit(cmParams.minDebt);
             creditConfigurator.setFees(
-                cmParams.feeInterest,
                 cmParams.feeLiquidation,
                 cmParams.liquidationPremium,
                 cmParams.feeLiquidationExpired,
                 cmParams.liquidationPremiumExpired
             );
+            vm.stopPrank();
 
             _addCollateralTokens(cmParams.collateralTokens);
 
-            vm.prank(CONFIGURATOR);
-            cr.addCreditManager(address(creditManager));
-
-            if (whitelisted) {
-                vm.prank(CONFIGURATOR);
-                degenNFT.addCreditFacade(address(creditFacade));
-            }
+            AddressProviderV3ACLMock(address(addressProvider)).addCreditManager(address(creditManager));
 
             if (expirable) {
                 vm.prank(CONFIGURATOR);
                 creditConfigurator.setExpirationDate(uint40(block.timestamp + 1));
             }
 
-            if (accountFactoryVersion == 3_00) {
-                vm.prank(CONFIGURATOR);
-                AccountFactoryV3(address(accountFactory)).addCreditManager(address(creditManager));
-            }
+            vm.prank(CONFIGURATOR);
+            AccountFactoryV3(address(accountFactory)).addCreditManager(address(creditManager));
 
-            if (supportsQuotas) {
-                vm.prank(CONFIGURATOR);
-                poolQuotaKeeper.addCreditManager(address(creditManager));
-            }
+            vm.prank(CONFIGURATOR);
+            poolQuotaKeeper.addCreditManager(address(creditManager));
 
             vm.prank(CONFIGURATOR);
             pool.setCreditManagerDebtLimit(address(creditManager), cmParams.poolLimit);
@@ -543,7 +474,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
             vm.startPrank(CONFIGURATOR);
             creditManager.addToken(address(t));
-            IPriceOracleV3(address(priceOracle)).setPriceFeed(address(t), address(pf), 1 hours, false);
+            IPriceOracleV3(address(priceOracle)).setPriceFeed(address(t), address(pf), 1 hours);
             creditManager.setCollateralTokenData(address(t), 8000, 8000, type(uint40).max, 0);
             vm.stopPrank();
 
@@ -617,7 +548,7 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
     function _makeAccountsLiquitable() internal {
         vm.prank(CONFIGURATOR);
-        creditConfigurator.setFees(1000, 200, 9000, 100, 9500);
+        creditConfigurator.setFees(200, 9000, 100, 9500);
 
         // switch to new block to be able to close account
         vm.roll(block.number + 1);
@@ -678,8 +609,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
     }
 
     function makeTokenQuoted(address token, uint16 rate, uint96 limit) internal {
-        require(supportsQuotas, "Test suite does not support quotas");
-
         vm.startPrank(CONFIGURATOR);
         gauge.addQuotaToken(token, rate, rate);
         poolQuotaKeeper.setTokenLimit(token, limit);
@@ -689,8 +618,6 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
         // uint256 tokenMask = creditManager.getTokenMaskOrRevert(token);
         // uint256 limitedMask = creditManager.quotedTokensMask();
-
-        creditConfigurator.makeTokenQuoted(token);
 
         vm.stopPrank();
     }

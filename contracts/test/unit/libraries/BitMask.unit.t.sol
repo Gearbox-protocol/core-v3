@@ -63,37 +63,4 @@ contract BitMaskUnitTest is TestHelper {
         mask = mask.enableDisable(0, 1 << bit);
         assertEq(mask, 0, "Disable doesn't work");
     }
-
-    /// @notice U:[BM-6]: `enable` & `disable` works correctly
-    function test_U_BM_06_enable_and_disable_works_correctly(uint8 bit) public {
-        uint256 mask;
-        mask = mask.enable(1 << bit, 0);
-        assertEq(mask, 0, "Enable doesn't work");
-
-        mask = mask.enable(1 << bit, 1 << bit);
-        assertEq(mask, 1 << bit, "Enable doesn't work");
-
-        mask = mask.disable(1 << bit, 0);
-        assertEq(mask, 1 << bit, "Disable doesn't work");
-
-        mask = mask.disable(1 << bit, 1 << bit);
-        assertEq(mask, 0, "Disable doesn't work");
-    }
-
-    /// @notice U:[BM-7]: `enableWithSkip` works correctly
-    function test_U_BM_07_enableWithSkip_works_correctly(uint8 bit) public {
-        uint256 mask;
-
-        mask = mask.enableDisable(1 << bit, 0, 0);
-        assertEq(mask, 0, "Enable doesn't work");
-
-        mask = mask.enableDisable(1 << bit, 0, 1 << bit);
-        assertEq(mask, 1 << bit, "Enable doesn't work");
-
-        mask = mask.enableDisable(0, 1 << bit, 0);
-        assertEq(mask, 1 << bit, "Disable doesn't work");
-
-        mask = mask.enableDisable(0, 1 << bit, 1 << bit);
-        assertEq(mask, 0, "Disable doesn't work");
-    }
 }

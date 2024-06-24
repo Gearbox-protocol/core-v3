@@ -187,14 +187,6 @@ contract CollateralLogicHelper is TestHelper {
         }
     }
 
-    function getHints(Tokens[] memory tokens) internal view returns (uint256[] memory collateralHints) {
-        uint256 len = tokens.length;
-        collateralHints = new uint256[](len);
-        for (uint256 i; i < len; ++i) {
-            collateralHints[i] = tokenMask[tokens[i]];
-        }
-    }
-
     function setBalances(B[] memory balances) internal {
         uint256 len = balances.length;
         for (uint256 i; i < len; ++i) {

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 
-import {IACL} from "@gearbox-protocol/core-v2/contracts/interfaces/IACL.sol";
+import {IACL} from "../interfaces/IACL.sol";
 import {
     CallerNotControllerException,
     CallerNotPausableAdminException,
@@ -68,8 +68,8 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable, ReentrancyGuardTra
     }
 
     /// @notice Constructor
-    /// @param addressProvider Address provider contract address
-    constructor(address addressProvider) ACLTrait(addressProvider) {
+    /// @param acl ACL contract address
+    constructor(address acl) ACLTrait(acl) {
         controller = IACL(acl).owner();
     }
 

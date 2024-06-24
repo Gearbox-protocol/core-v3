@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IACL} from "@gearbox-protocol/core-v2/contracts/interfaces/IACL.sol";
-
-import {AP_ACL, IAddressProviderV3, NO_VERSION_CONTROL} from "../interfaces/IAddressProviderV3.sol";
+import {IACL} from "../interfaces/IACL.sol";
 import {CallerNotConfiguratorException} from "../interfaces/IExceptions.sol";
 
 import {SanityCheckTrait} from "./SanityCheckTrait.sol";
@@ -17,9 +15,9 @@ abstract contract ACLTrait is SanityCheckTrait {
     address public immutable acl;
 
     /// @notice Constructor
-    /// @param addressProvider Address provider contract address
-    constructor(address addressProvider) nonZeroAddress(addressProvider) {
-        acl = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_ACL, NO_VERSION_CONTROL);
+    /// @param _acl ACL contract address
+    constructor(address _acl) nonZeroAddress(_acl) {
+        acl = _acl;
     }
 
     /// @dev Ensures that function caller has configurator role

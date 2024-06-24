@@ -4,9 +4,8 @@
 pragma solidity ^0.8.17;
 
 import {AdapterType} from "@gearbox-protocol/sdk-gov/contracts/AdapterType.sol";
-import {IAdapter} from "@gearbox-protocol/core-v2/contracts/interfaces/IAdapter.sol";
-
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
+import {IAdapter} from "../../../interfaces/base/IAdapter.sol";
 
 /// @title Adapter Mock
 contract AdapterMock is IAdapter {
@@ -14,12 +13,10 @@ contract AdapterMock is IAdapter {
     uint16 public constant override _gearboxAdapterVersion = 1;
 
     address public immutable override creditManager;
-    address public immutable override addressProvider;
     address public immutable override targetContract;
 
     constructor(address _creditManager, address _targetContract) {
         creditManager = _creditManager;
-        addressProvider = ICreditManagerV3(_creditManager).addressProvider();
         targetContract = _targetContract;
     }
 

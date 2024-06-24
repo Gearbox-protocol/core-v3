@@ -1,13 +1,20 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {MultiCall} from "@gearbox-protocol/core-v2/contracts/libraries/MultiCall.sol";
-
-import {IVersion} from "@gearbox-protocol/core-v2/contracts/interfaces/IVersion.sol";
+import {AllowanceAction} from "./ICreditConfiguratorV3.sol";
 import "./ICreditFacadeV3Multicall.sol";
-import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
+import {PriceUpdate} from "./IPriceOracleV3.sol";
+import {IVersion} from "./base/IVersion.sol";
+
+/// @notice Multicall element
+/// @param target Call target, which is either credit facade or adapter
+/// @param callData Call data
+struct MultiCall {
+    address target;
+    bytes callData;
+}
 
 /// @notice Debt limits packed into a single slot
 /// @param minDebt Minimum debt amount per credit account
@@ -29,15 +36,9 @@ struct CumulativeLossParams {
 /// @param collateralHints Optional array of token masks to check first to reduce the amount of computation
 ///        when known subset of account's collateral tokens covers all the debt
 /// @param minHealthFactor Min account's health factor in bps in order not to revert
-/// @param enabledTokensMaskAfter Bitmask of account's enabled collateral tokens after the multicall
-/// @param revertOnForbiddenTokens Whether to revert on enabled forbidden tokens after the multicall
-/// @param useSafePrices Whether to use safe pricing (min of main and reserve feeds) when evaluating collateral
 struct FullCheckParams {
     uint256[] collateralHints;
     uint16 minHealthFactor;
-    uint256 enabledTokensMaskAfter;
-    bool revertOnForbiddenTokens;
-    bool useSafePrices;
 }
 
 interface ICreditFacadeV3Events {
@@ -54,11 +55,15 @@ interface ICreditFacadeV3Events {
         address indexed creditAccount, address indexed liquidator, address to, uint256 remainingFunds
     );
 
-    /// @notice Emitted when account's debt is increased
-    event IncreaseDebt(address indexed creditAccount, uint256 amount);
-
-    /// @notice Emitted when account's debt is decreased
-    event DecreaseDebt(address indexed creditAccount, uint256 amount);
+    /// @notice Emitted when account is partially liquidated
+    event PartiallyLiquidateCreditAccount(
+        address indexed creditAccount,
+        address indexed token,
+        address indexed liquidator,
+        uint256 repaidDebt,
+        uint256 seizedCollateral,
+        uint256 fee
+    );
 
     /// @notice Emitted when collateral is added to account
     event AddCollateral(address indexed creditAccount, address indexed token, uint256 amount);
@@ -80,6 +85,10 @@ interface ICreditFacadeV3Events {
 interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
     function creditManager() external view returns (address);
 
+    function underlying() external view returns (address);
+
+    function treasury() external view returns (address);
+
     function degenNFT() external view returns (address);
 
     function weth() external view returns (address);
@@ -100,6 +109,8 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
 
     function forbiddenTokenMask() external view returns (uint256);
 
+    function emergencyLiquidators() external view returns (address[] memory);
+
     function canLiquidateWhilePaused(address) external view returns (bool);
 
     // ------------------ //
@@ -115,11 +126,18 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
 
     function liquidateCreditAccount(address creditAccount, address to, MultiCall[] calldata calls) external;
 
+    function partiallyLiquidateCreditAccount(
+        address creditAccount,
+        address token,
+        uint256 repaidAmount,
+        uint256 minSeizedAmount,
+        address to,
+        PriceUpdate[] calldata priceUpdates
+    ) external returns (uint256 seizedAmount);
+
     function multicall(address creditAccount, MultiCall[] calldata calls) external payable;
 
     function botMulticall(address creditAccount, MultiCall[] calldata calls) external;
-
-    function setBotPermissions(address creditAccount, address bot, uint192 permissions) external;
 
     // ------------- //
     // CONFIGURATION //

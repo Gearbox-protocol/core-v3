@@ -9,9 +9,14 @@ import {ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
 import {BalanceWithMask} from "../../../libraries/BalancesLogic.sol";
 
 contract CreditFacadeV3Harness is CreditFacadeV3 {
-    constructor(address _creditManager, address _degenNFT, bool _expirable)
-        CreditFacadeV3(_creditManager, _degenNFT, _expirable)
-    {}
+    constructor(
+        address acl,
+        address _creditManager,
+        address _botList,
+        address _weth,
+        address _degenNFT,
+        bool _expirable
+    ) CreditFacadeV3(acl, _creditManager, _botList, _weth, _degenNFT, _expirable) {}
 
     function setReentrancy(uint8 _status) external {
         _reentrancyStatus = _status;
@@ -23,33 +28,16 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
 
     function multicallInt(address creditAccount, MultiCall[] calldata calls, uint256 enabledTokensMask, uint256 flags)
         external
-        returns (FullCheckParams memory fullCheckParams)
     {
-        return _multicall(creditAccount, calls, enabledTokensMask, flags, 0);
-    }
-
-    function applyPriceOnDemandInt(MultiCall[] calldata calls) external returns (uint256 remainingCalls) {
-        return _applyOnDemandPriceUpdates(calls);
-    }
-
-    function fullCollateralCheckInt(
-        address creditAccount,
-        uint256 enabledTokensMaskBefore,
-        FullCheckParams memory fullCheckParams,
-        BalanceWithMask[] memory forbiddenBalances,
-        uint256 forbiddenTokensMask
-    ) external {
-        _fullCollateralCheck(
-            creditAccount, enabledTokensMaskBefore, fullCheckParams, forbiddenBalances, forbiddenTokensMask
-        );
+        _multicall(creditAccount, calls, enabledTokensMask, flags);
     }
 
     function revertIfNoPermission(uint256 flags, uint256 permission) external pure {
         _revertIfNoPermission(flags, permission);
     }
 
-    function revertIfOutOfBorrowingLimit(uint256 amount) external {
-        _revertIfOutOfBorrowingLimit(amount);
+    function revertIfOutOfDebtPerBlockLimit(uint256 amount) external {
+        _revertIfOutOfDebtPerBlockLimit(amount);
     }
 
     function setLastBlockBorrowed(uint64 _lastBlockBorrowed) external {

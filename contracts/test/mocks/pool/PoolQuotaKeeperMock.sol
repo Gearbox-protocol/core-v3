@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 import {IPoolQuotaKeeperV3, TokenQuotaParams, AccountQuota} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 
 contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
-    uint256 public constant override version = 3_00;
+    uint256 public constant override version = 3_10;
 
     /// @dev Address provider
     address public immutable underlying;
@@ -123,6 +123,14 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     /// @dev Returns whether a token is quoted
     function isQuotedToken(address) external view override returns (bool) {
         return return_isQuotedToken;
+    }
+
+    function set_isQuotedToken(bool value) external {
+        return_isQuotedToken = value;
+    }
+
+    function set_lastQuotaRateUpdate(uint40 value) external {
+        lastQuotaRateUpdate = value;
     }
 
     /// @dev Returns quota parameters for a single (account, token) pair

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 import {CollateralDebtData, CollateralTokenData} from "../interfaces/ICreditManagerV3.sol";
-import {SECONDS_PER_YEAR, PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {SECONDS_PER_YEAR, PERCENTAGE_FACTOR} from "../libraries/Constants.sol";
 
 import {BitMask} from "./BitMask.sol";
 

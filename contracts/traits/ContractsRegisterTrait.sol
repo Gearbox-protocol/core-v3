@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
-// (c) Gearbox Foundation, 2023.
+// (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IContractsRegister} from "@gearbox-protocol/core-v2/contracts/interfaces/IContractsRegister.sol";
-
-import {AP_CONTRACTS_REGISTER, IAddressProviderV3, NO_VERSION_CONTROL} from "../interfaces/IAddressProviderV3.sol";
+import {IContractsRegister} from "../interfaces/IContractsRegister.sol";
 import {RegisteredCreditManagerOnlyException, RegisteredPoolOnlyException} from "../interfaces/IExceptions.sol";
 
 import {SanityCheckTrait} from "./SanityCheckTrait.sol";
@@ -29,10 +27,9 @@ abstract contract ContractsRegisterTrait is SanityCheckTrait {
     }
 
     /// @notice Constructor
-    /// @param addressProvider Address provider contract address
-    constructor(address addressProvider) nonZeroAddress(addressProvider) {
-        contractsRegister =
-            IAddressProviderV3(addressProvider).getAddressOrRevert(AP_CONTRACTS_REGISTER, NO_VERSION_CONTROL);
+    /// @param _contractsRegister Contracts register address
+    constructor(address _contractsRegister) nonZeroAddress(_contractsRegister) {
+        contractsRegister = _contractsRegister;
     }
 
     /// @dev Ensures that given address is a registered pool

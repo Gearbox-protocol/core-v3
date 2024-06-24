@@ -3,25 +3,21 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.17;
 
-import {
-    ICreditManagerV3,
-    ICreditManagerV3Events,
-    ManageDebtAction,
-    BOT_PERMISSIONS_SET_FLAG
-} from "../../../interfaces/ICreditManagerV3.sol";
+import {ICreditManagerV3, ICreditManagerV3Events, ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
 import "../../../interfaces/ICreditFacadeV3.sol";
+import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // TESTS
 import "../../lib/constants.sol";
-import {PERCENTAGE_FACTOR} from "@gearbox-protocol/core-v2/contracts/libraries/Constants.sol";
+import {BOT_PERMISSIONS_SET_FLAG, PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
 import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
-contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
+contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events, IPoolV3Events {
     /// @dev I:[MD-1]: increaseDebt executes function as expected
     function test_I_MD_01_increaseDebt_executes_actions_as_expected() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
@@ -39,8 +35,8 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
             )
         );
 
-        vm.expectEmit(true, false, false, true);
-        emit IncreaseDebt(creditAccount, 512);
+        vm.expectEmit(true, true, true, true, address(pool));
+        emit Borrow(address(creditManager), creditAccount, 512);
 
         vm.prank(USER);
         creditFacade.multicall(
@@ -72,7 +68,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
                     target: address(creditFacade),
                     callData: abi.encodeCall(
                         ICreditFacadeV3Multicall.increaseDebt, (maxDebt * maxDebtPerBlockMultiplier + 1)
-                        )
+                    )
                 })
             )
         );
@@ -128,9 +124,9 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
     /// @dev I:[MD-5]: increaseDebt reverts if there is a forbidden token on account
     function test_I_MD_05_increaseDebt_reverts_with_forbidden_tokens() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
-        vm.roll(block.number + 1);
 
         address link = tokenTestSuite.addressOf(Tokens.LINK);
+        uint256 linkMask = creditManager.getTokenMaskOrRevert(link);
 
         vm.prank(USER);
         creditFacade.multicall(
@@ -138,15 +134,17 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
             MultiCallBuilder.build(
                 MultiCall({
                     target: address(creditFacade),
-                    callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (link))
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (link, 10000, 0))
                 })
             )
         );
 
+        vm.roll(block.number + 1);
+
         vm.prank(CONFIGURATOR);
         creditConfigurator.forbidToken(link);
 
-        vm.expectRevert(ForbiddenTokensException.selector);
+        vm.expectRevert(abi.encodeWithSelector(ForbiddenTokensException.selector, (linkMask)));
 
         vm.prank(USER);
         creditFacade.multicall(
@@ -177,8 +175,8 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
             )
         );
 
-        vm.expectEmit(true, false, false, true);
-        emit DecreaseDebt(creditAccount, 512);
+        vm.expectEmit(true, true, true, true, address(pool));
+        emit Repay(address(creditManager), 512, 0, 0);
 
         vm.prank(USER);
         creditFacade.multicall(
