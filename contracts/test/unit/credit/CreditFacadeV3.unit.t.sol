@@ -10,7 +10,6 @@ import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
 import {ERC20PermitMock} from "../../mocks/token/ERC20PermitMock.sol";
 import {PhantomTokenMock} from "../../mocks/token/PhantomTokenMock.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// LIBS
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -1442,15 +1441,11 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     function test_U_FA_36A_multicall_withdrawCollateral_with_phantom_token_works_correctly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
-        address ptUnderlying = address(new ERC20Mock("PT Underlying", "PTU", 18));
+        address ptUnderlying = makeAddr("PTU");
 
         PhantomTokenMock ptMock = new PhantomTokenMock(ptUnderlying);
 
-        address adapter =
-            address(new PhantomTokenAdapterMock(address(creditManagerMock), address(ptMock), ptUnderlying));
-
-        ERC20Mock(ptUnderlying).set_minter(adapter);
-        ptMock.mint(creditAccount, 100);
+        address adapter = address(new PhantomTokenAdapterMock(address(creditManagerMock), address(ptMock)));
 
         creditManagerMock.setContractAllowance(address(adapter), address(ptMock));
 
