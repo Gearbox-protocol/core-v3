@@ -7,6 +7,11 @@
       "name": "next",
       "channel": "next",
       "prerelease": "next"
+    },
+    {
+      "name": "3_0_migration",
+      "channel": "migration",
+      "prerelease": "migration"
     }
   ],
   "plugins": [
