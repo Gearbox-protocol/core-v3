@@ -141,28 +141,26 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         quotaChange = requestedChange;
         if (quotaChange > 0) {
             (uint96 totalQuoted, uint96 limit) = _getTokenQuotaTotalAndLimit(tokenQuotaParams);
-            quotaChange = (rate == 0) ? int96(0) : QuotasLogic.calcActualQuotaChange(totalQuoted, limit, quotaChange); // U:[PQK-15]
+            // with correct configuration, quota increase can't reach `type(int96).max`, so cast is safe
+            quotaChange =
+                rate == 0 ? int96(0) : int96(QuotasLogic.calcQuotaIncrease(totalQuoted, limit, uint96(quotaChange))); // U:[PQK-15]
+            uint96 absoluteChange = uint96(quotaChange);
 
-            fees = uint128(uint256(uint96(quotaChange)) * quotaIncreaseFee / PERCENTAGE_FACTOR); // U:[PQK-15]
+            newQuoted = quoted + absoluteChange;
+            tokenQuotaParams.totalQuoted = totalQuoted + absoluteChange; // U:[PQK-15]
 
-            newQuoted = quoted + uint96(quotaChange);
-            if (quoted == 0 && newQuoted != 0) {
-                enableToken = true; // U:[PQK-15]
-            }
+            if (quoted == 0 && newQuoted != 0) enableToken = true; // U:[PQK-15]
 
-            tokenQuotaParams.totalQuoted = totalQuoted + uint96(quotaChange); // U:[PQK-15]
+            fees = uint128(uint256(absoluteChange) * quotaIncreaseFee / PERCENTAGE_FACTOR); // U:[PQK-15]
         } else {
-            if (quotaChange == type(int96).min) {
-                quotaChange = -int96(quoted);
-            }
-
+            // with correct configuration, `quoted` can't reach `2**95`, so negation would never underflow
+            quotaChange = quotaChange == type(int96).min ? -int96(quoted) : quotaChange;
             uint96 absoluteChange = uint96(-quotaChange);
+
             newQuoted = quoted - absoluteChange;
             tokenQuotaParams.totalQuoted -= absoluteChange; // U:[PQK-15]
 
-            if (quoted != 0 && newQuoted == 0) {
-                disableToken = true; // U:[PQK-15]
-            }
+            if (quoted != 0 && newQuoted == 0) disableToken = true; // U:[PQK-15]
         }
 
         if (newQuoted < minQuota || newQuoted > maxQuota) revert QuotaIsOutOfBoundsException(); // U:[PQK-15]
@@ -205,6 +203,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
                 quotaRevenueChange += QuotasLogic.calcQuotaRevenueChange(rate, -int256(uint256(quoted))); // U:[PQK-16]
                 tokenQuotaParams.totalQuoted -= quoted; // U:[PQK-16]
                 accountQuota.quota = 0; // U:[PQK-16]
+                // with correct configuration, `quoted` can't reach `2**95`, so negation would never underflow
                 emit UpdateQuota({creditAccount: creditAccount, token: token, quotaChange: -int96(quoted)});
             }
 

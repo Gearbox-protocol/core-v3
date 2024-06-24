@@ -59,8 +59,8 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
                 price: 2,
                 liquidationThreshold: 80_00,
                 quotaUSD: 10_001,
-                expectedValueUSD: (5_000 - 1) * 2,
-                expectedWeightedValueUSD: (5_000 - 1) * 2 * 80_00 / PERCENTAGE_FACTOR,
+                expectedValueUSD: 5_000 * 2,
+                expectedWeightedValueUSD: 5_000 * 2 * 80_00 / PERCENTAGE_FACTOR,
                 priceOracleCalled: true
             }),
             CalcOneTokenCollateralTestCase({
@@ -69,7 +69,7 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
                 price: 2,
                 liquidationThreshold: 80_00,
                 quotaUSD: 40_00,
-                expectedValueUSD: (5_000 - 1) * 2,
+                expectedValueUSD: 5_000 * 2,
                 expectedWeightedValueUSD: 40_00,
                 priceOracleCalled: true
             })
@@ -126,9 +126,9 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
                 balances: arrayOf(B({t: Tokens.USDT, balance: 10_000}), B({t: Tokens.DAI, balance: 5_000})),
                 quotas: arrayOf(Q({t: Tokens.USDT, quota: 10_000})),
                 target: type(uint256).max,
-                expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.USDT] + (5_000 - 1) * prices[Tokens.DAI],
-                expectedTwvUSD: (10_000 - 1) * prices[Tokens.USDT] * lts[Tokens.USDT] / PERCENTAGE_FACTOR
-                    + (5_000 - 1) * prices[Tokens.DAI] * lts[Tokens.DAI] / PERCENTAGE_FACTOR,
+                expectedTotalValueUSD: 10_000 * prices[Tokens.USDT] + 5_000 * prices[Tokens.DAI],
+                expectedTwvUSD: 10_000 * prices[Tokens.USDT] * lts[Tokens.USDT] / PERCENTAGE_FACTOR
+                    + 5_000 * prices[Tokens.DAI] * lts[Tokens.DAI] / PERCENTAGE_FACTOR,
                 expectedOrder: arrayOf(Tokens.USDT, Tokens.DAI)
             }),
             CalcCollateralTestCase({
@@ -136,9 +136,9 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
                 balances: arrayOf(B({t: Tokens.USDT, balance: 10_000}), B({t: Tokens.LINK, balance: 1_000})),
                 quotas: arrayOf(Q({t: Tokens.USDT, quota: 10_000}), Q({t: Tokens.LINK, quota: 20_000})),
                 target: type(uint256).max,
-                expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.USDT] + (1_000 - 1) * prices[Tokens.LINK],
-                expectedTwvUSD: (10_000 - 1) * prices[Tokens.USDT] * lts[Tokens.USDT] / PERCENTAGE_FACTOR
-                    + (1_000 - 1) * prices[Tokens.LINK] * lts[Tokens.LINK] / PERCENTAGE_FACTOR,
+                expectedTotalValueUSD: 10_000 * prices[Tokens.USDT] + 1_000 * prices[Tokens.LINK],
+                expectedTwvUSD: 10_000 * prices[Tokens.USDT] * lts[Tokens.USDT] / PERCENTAGE_FACTOR
+                    + 1_000 * prices[Tokens.LINK] * lts[Tokens.LINK] / PERCENTAGE_FACTOR,
                 expectedOrder: arrayOf(Tokens.USDT, Tokens.LINK, Tokens.DAI)
             }),
             CalcCollateralTestCase({
@@ -146,8 +146,8 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
                 balances: arrayOf(B({t: Tokens.USDT, balance: 10_000}), B({t: Tokens.DAI, balance: 5_000})),
                 quotas: arrayOf(Q({t: Tokens.USDT, quota: 10_000})),
                 target: 8_000 * prices[Tokens.DAI],
-                expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.USDT],
-                expectedTwvUSD: (10_000 - 1) * prices[Tokens.USDT] * lts[Tokens.USDT] / PERCENTAGE_FACTOR,
+                expectedTotalValueUSD: 10_000 * prices[Tokens.USDT],
+                expectedTwvUSD: 10_000 * prices[Tokens.USDT] * lts[Tokens.USDT] / PERCENTAGE_FACTOR,
                 expectedOrder: arrayOf(Tokens.USDT)
             }),
             CalcCollateralTestCase({
@@ -155,8 +155,8 @@ contract CollateralLogicUnitTest is TestHelper, CollateralLogicHelper {
                 balances: arrayOf(B({t: Tokens.USDT, balance: 10_000}), B({t: Tokens.LINK, balance: 1_000})),
                 quotas: arrayOf(Q({t: Tokens.USDT, quota: 10_000}), Q({t: Tokens.LINK, quota: 20_000})),
                 target: 8_000 * prices[Tokens.DAI],
-                expectedTotalValueUSD: (10_000 - 1) * prices[Tokens.USDT],
-                expectedTwvUSD: (10_000 - 1) * prices[Tokens.USDT] * lts[Tokens.USDT] / PERCENTAGE_FACTOR,
+                expectedTotalValueUSD: 10_000 * prices[Tokens.USDT],
+                expectedTwvUSD: 10_000 * prices[Tokens.USDT] * lts[Tokens.USDT] / PERCENTAGE_FACTOR,
                 expectedOrder: arrayOf(Tokens.USDT)
             })
         ];

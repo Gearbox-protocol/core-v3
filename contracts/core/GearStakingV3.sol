@@ -260,6 +260,7 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
     function getCurrentEpoch() public view override returns (uint16) {
         if (block.timestamp < firstEpochTimestamp) return 0; // U:[GS-1]
         unchecked {
+            // cast is safe for the next millenium
             return uint16((block.timestamp - firstEpochTimestamp) / EPOCH_LENGTH) + 1; // U:[GS-1]
         }
     }
