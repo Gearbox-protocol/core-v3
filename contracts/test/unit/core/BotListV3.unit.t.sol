@@ -39,10 +39,15 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
         vm.mockCall(creditFacade, abi.encodeWithSignature("creditManager()"), abi.encode(creditManager));
         vm.mockCall(invalidFacade, abi.encodeWithSignature("creditManager()"), abi.encode(creditManager));
         vm.mockCall(creditAccount, abi.encodeWithSignature("creditManager()"), abi.encode(creditManager));
+        vm.mockCall(
+            creditManager,
+            abi.encodeWithSignature("getBorrowerOrRevert(address)", creditAccount),
+            abi.encode(address(0))
+        );
 
         botList = new BotListV3(CONFIGURATOR);
         vm.prank(CONFIGURATOR);
-        botList.setCreditManagerApprovedStatus(creditManager, true);
+        botList.addCreditManager(creditManager);
     }
 
     /// @notice U:[BL-1]: `setBotPermissions` works correctly
@@ -53,75 +58,50 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
 
         BotMock(bot).setRequiredPermissions(1);
 
-        vm.expectRevert(InsufficientBotPermissionsException.selector);
+        vm.expectRevert(IncorrectBotPermissionsException.selector);
         vm.prank(creditFacade);
         botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: 2});
-        BotMock(bot).setRequiredPermissions(0);
 
-        vm.prank(CONFIGURATOR);
-        botList.setBotForbiddenStatus(bot, true);
-
-        vm.expectRevert(InvalidBotException.selector);
-        vm.prank(creditFacade);
-        botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: type(uint192).max});
-
-        vm.prank(CONFIGURATOR);
-        botList.setBotForbiddenStatus(bot, false);
+        vm.expectCall(creditManager, abi.encodeWithSignature("getBorrowerOrRevert(address)", creditAccount));
 
         vm.expectEmit(true, true, true, true);
         emit SetBotPermissions(bot, creditManager, creditAccount, 1);
 
         vm.prank(creditFacade);
-        uint256 activeBotsRemaining =
-            botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: 1});
+        botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: 1});
 
-        assertEq(activeBotsRemaining, 1, "Incorrect number of bots returned");
-        assertEq(botList.botPermissions(bot, creditAccount), 1, "Bot permissions were not set");
+        assertEq(botList.getBotPermissions(bot, creditAccount), 1, "Bot permissions were not set");
 
-        address[] memory bots = botList.activeBots(creditAccount);
-        assertEq(bots.length, 1, "Incorrect active bots array length");
-        assertEq(bots[0], bot, "Incorrect address added to active bots list");
-
-        vm.prank(creditFacade);
-        activeBotsRemaining = botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: 2});
-
-        assertEq(activeBotsRemaining, 1, "Incorrect number of bots returned");
-        assertEq(botList.botPermissions(bot, creditAccount), 2, "Bot permissions were not set");
-
-        bots = botList.activeBots(creditAccount);
+        address[] memory bots = botList.getActiveBots(creditAccount);
         assertEq(bots.length, 1, "Incorrect active bots array length");
         assertEq(bots[0], bot, "Incorrect address added to active bots list");
 
         vm.prank(CONFIGURATOR);
-        botList.setBotForbiddenStatus(bot, true);
+        botList.forbidBot(bot);
 
-        vm.expectEmit(true, true, true, true);
-        emit SetBotPermissions(bot, creditManager, creditAccount, 0);
-
+        vm.expectRevert(ForbiddenBotException.selector);
         vm.prank(creditFacade);
-        activeBotsRemaining = botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: 0});
+        botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: 1});
 
-        assertEq(activeBotsRemaining, 0, "Incorrect number of bots returned");
-        assertEq(botList.botPermissions(bot, creditAccount), 0, "Bot permissions were not set");
-
-        bots = botList.activeBots(creditAccount);
-        assertEq(bots.length, 0, "Incorrect active bots array length");
+        assertEq(botList.getBotPermissions(bot, creditAccount), 0, "Bot permissions were not cleared after forbidding");
+        assertEq(botList.getActiveBots(creditAccount).length, 0, "Bot was not removed from active after forbidding");
     }
 
     /// @dev U:[BL-2]: `eraseAllBotPermissions` works correctly
     function test_U_BL_02_eraseAllBotPermissions_works_correctly() public {
+        BotMock(bot).setRequiredPermissions(1);
         vm.prank(creditFacade);
         botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: 1});
 
+        BotMock(otherBot).setRequiredPermissions(2);
         vm.prank(creditFacade);
-        uint256 activeBotsRemaining =
-            botList.setBotPermissions({bot: otherBot, creditAccount: creditAccount, permissions: 2});
-
-        assertEq(activeBotsRemaining, 2, "Incorrect number of active bots");
+        botList.setBotPermissions({bot: otherBot, creditAccount: creditAccount, permissions: 2});
 
         vm.expectRevert(CallerNotCreditFacadeException.selector);
         vm.prank(invalidFacade);
         botList.eraseAllBotPermissions(creditAccount);
+
+        vm.expectCall(creditManager, abi.encodeWithSignature("getBorrowerOrRevert(address)", creditAccount));
 
         vm.expectEmit(true, true, true, true);
         emit SetBotPermissions(otherBot, creditManager, creditAccount, 0);
@@ -132,10 +112,10 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
         vm.prank(creditFacade);
         botList.eraseAllBotPermissions(creditAccount);
 
-        assertEq(botList.botPermissions(bot, creditAccount), 0, "Permissions not erased for bot 1");
-        assertEq(botList.botPermissions(otherBot, creditAccount), 0, "Permissions not erased for bot 2");
+        assertEq(botList.getBotPermissions(bot, creditAccount), 0, "Permissions not erased for bot 1");
+        assertEq(botList.getBotPermissions(otherBot, creditAccount), 0, "Permissions not erased for bot 2");
 
-        address[] memory activeBots = botList.activeBots(creditAccount);
+        address[] memory activeBots = botList.getActiveBots(creditAccount);
         assertEq(activeBots.length, 0, "Not all active bots were disabled");
     }
 }

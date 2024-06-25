@@ -148,9 +148,6 @@ interface ICreditFacadeV3Multicall {
     /// @notice Sets `bot`'s permissions to manage account to `permissions`
     /// @param bot Bot to set permissions for
     /// @param permissions A bitmask encoding bot permissions
-    /// @dev Reverts if `permissions` has unexpected bits enabled (including `SET_BOT_PERMISSIONS_PERMISSION`,
-    ///      that would have been way too tricky) or some bits required by `bot` disabled
-    /// @dev Reverts if account has more active bots than allowed after changing permissions
-    /// @dev Changes account's `BOT_PERMISSIONS_SET_FLAG` in the credit manager if needed
+    /// @dev Reverts if `permissions` has unexpected bits enabled or doesn't match permissions required by `bot`
     function setBotPermissions(address bot, uint192 permissions) external;
 }

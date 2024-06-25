@@ -442,30 +442,12 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         emit SetPriceOracle(newPriceOracle); // I:[CC-21]
     }
 
-    /// @notice Sets the new bot list contract in the credit facade
-    /// @param newBotList New bot list
-    function setBotList(address newBotList)
-        external
-        override
-        configuratorOnly // I:[CC-2]
-    {
-        _setBotList(newBotList); // I:[CC-33]
-    }
-
-    /// @dev `setBotList` implementation
-    function _setBotList(address botList) internal {
-        CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
-        if (botList == cf.botList()) return;
-        cf.setBotList(botList); // I:[CC-33]
-        emit SetBotList(botList); // I:[CC-33]
-    }
-
-    /// @notice Upgrades a facade connected to the credit manager
+    /// @notice Connects a facade to the credit manager, migrates state of the previous facade if it is set
     /// @param newCreditFacade New credit facade
-    /// @param migrateParams Whether to migrate old credit facade params
     /// @dev Reverts if `newCreditFacade` is incompatible with credit manager
     /// @dev Reverts if `newCreditFacade` is one of allowed adapters or their target contracts
-    function setCreditFacade(address newCreditFacade, bool migrateParams)
+    /// @dev Reverts if `newCreditFacade`'s bot list is different from the one already in use
+    function setCreditFacade(address newCreditFacade)
         external
         override
         configuratorOnly // I:[CC-2]
@@ -481,7 +463,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
 
         CreditManagerV3(creditManager).setCreditFacade(newCreditFacade); // I:[CC-22]
 
-        if (migrateParams) {
+        if (address(prevCreditFacade) != address(0)) {
             _setMaxDebtPerBlockMultiplier(prevCreditFacade.maxDebtPerBlockMultiplier()); // I:[CC-22]
 
             (uint128 minDebt, uint128 maxDebt) = prevCreditFacade.debtLimits();
@@ -498,8 +480,9 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
                 _setExpirationDate(prevCreditFacade.expirationDate()); // I:[CC-22]
             }
 
-            address botList = prevCreditFacade.botList();
-            if (botList != address(0)) _setBotList(botList); // I:[CC-22]
+            if (CreditFacadeV3(newCreditFacade).botList() != prevCreditFacade.botList()) {
+                revert IncorrectBotListException(); // U:[CC-22D]
+            }
         }
 
         emit SetCreditFacade(newCreditFacade); // I:[CC-22]

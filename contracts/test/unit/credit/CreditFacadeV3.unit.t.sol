@@ -43,7 +43,6 @@ import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // CONSTANTS
 import {
-    BOT_PERMISSIONS_SET_FLAG,
     DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER,
     PERCENTAGE_FACTOR,
     UNDERLYING_TOKEN_MASK
@@ -131,6 +130,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         addressProvider.setAddress(AP_WETH_TOKEN, tokenTestSuite.addressOf(Tokens.WETH), false);
 
         botListMock = BotListMock(addressProvider.getAddressOrRevert(AP_BOT_LIST, 3_10));
+        botListMock.setCreditManagerAddedReturns(true);
 
         priceOracleMock = PriceOracleMock(addressProvider.getAddressOrRevert(AP_PRICE_ORACLE, 3_10));
 
@@ -291,9 +291,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         creditFacade.setDebtLimits(0, 0, 0);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditFacade.setBotList(address(1));
-
-        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditFacade.setCumulativeLossParams(0, false);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
@@ -423,9 +420,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         MultiCall[] memory calls;
 
         creditManagerMock.setBorrower(USER);
-        creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, hasBotPermissions);
         if (!hasCalls) creditManagerMock.setRevertOnActiveAccount(true);
-        if (!hasBotPermissions) botListMock.setRevertOnErase(true);
 
         if (hasCalls) {
             vm.expectCall(
@@ -714,11 +709,10 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         uint256 enabledTokensMask = 123123123;
 
-        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false);
+        botListMock.setBotPermissionsReturns(ALL_PERMISSIONS);
 
         creditManagerMock.setEnabledTokensMask(enabledTokensMask);
         creditManagerMock.setBorrower(USER);
-        creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, true);
 
         for (uint256 testCase = 0; testCase < 2; ++testCase) {
             bool botMulticallCase = testCase == 1;
@@ -746,28 +740,13 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         }
     }
 
-    /// @dev U:[FA-19]: botMulticall reverts if 1. bot permissions flag is false 2. no permissions are set 3. bot is forbidden
-    function test_U_FA_19_botMulticall_reverts_for_invalid_bots() public notExpirableCase {
+    /// @dev U:[FA-19]: botMulticall reverts for not approved bots
+    function test_U_FA_19_botMulticall_reverts_for_not_approved_bots() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
         creditManagerMock.setBorrower(USER);
         MultiCall[] memory calls;
 
-        creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, true);
-
-        botListMock.setBotStatusReturns(ALL_PERMISSIONS, true);
-
-        vm.expectRevert(abi.encodeWithSelector(NotApprovedBotException.selector, (address(this))));
-        creditFacade.botMulticall(creditAccount, calls);
-
-        botListMock.setBotStatusReturns(0, false);
-
-        vm.expectRevert(abi.encodeWithSelector(NotApprovedBotException.selector, (address(this))));
-        creditFacade.botMulticall(creditAccount, calls);
-
-        creditManagerMock.setFlagFor(creditAccount, BOT_PERMISSIONS_SET_FLAG, false);
-
-        botListMock.setBotStatusReturns(ALL_PERMISSIONS, false);
-
+        botListMock.setBotPermissionsReturns(0);
         vm.expectRevert(abi.encodeWithSelector(NotApprovedBotException.selector, (address(this))));
         creditFacade.botMulticall(creditAccount, calls);
     }
@@ -1443,49 +1422,20 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
 
         creditManagerMock.setBorrower(USER);
 
-        // It reverts if passed unexpected permissions, e.g. `SET_BOT_PERMISSIONS_PEMISSION`
-        vm.expectRevert(
-            abi.encodeWithSelector(UnexpectedPermissionsException.selector, (SET_BOT_PERMISSIONS_PERMISSION))
-        );
+        // It reverts if passed unexpected permissions, e.g. `1 << 3`
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedPermissionsException.selector, (1 << 3)));
         vm.prank(USER);
         creditFacade.multicall(
             creditAccount,
             MultiCallBuilder.build(
                 MultiCall(
-                    address(creditFacade),
-                    abi.encodeCall(ICreditFacadeV3Multicall.setBotPermissions, (bot, SET_BOT_PERMISSIONS_PERMISSION))
+                    address(creditFacade), abi.encodeCall(ICreditFacadeV3Multicall.setBotPermissions, (bot, 1 << 3))
                 )
             )
         );
 
-        creditManagerMock.setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: false});
-
-        botListMock.setBotPermissionsReturn(1);
-
-        // It sets `BOT_PERMISSIONS_SET_FLAG` flag in the credit manager to `true` if it was `false` before
-        vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.flagsOf, (creditAccount)));
-        vm.expectCall(
-            address(creditManagerMock),
-            abi.encodeCall(ICreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, true))
-        );
+        // It calls `botList.setBotPermissions` otherwise
         vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.setBotPermissions, (bot, creditAccount, 1)));
-
-        vm.prank(USER);
-        creditFacade.multicall(
-            creditAccount,
-            MultiCallBuilder.build(
-                MultiCall(address(creditFacade), abi.encodeCall(ICreditFacadeV3Multicall.setBotPermissions, (bot, 1)))
-            )
-        );
-
-        // It resets flag to `false` if there are no active bots left on the account
-        botListMock.setBotPermissionsReturn(0);
-        vm.expectCall(address(botListMock), abi.encodeCall(IBotListV3.setBotPermissions, (bot, creditAccount, 1)));
-
-        vm.expectCall(
-            address(creditManagerMock),
-            abi.encodeCall(ICreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, false))
-        );
         vm.prank(USER);
         creditFacade.multicall(
             creditAccount,
@@ -1734,16 +1684,6 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         assertEq(maxDebtPerBlockMultiplier, 3, " incorrect maxDebtPerBlockMultiplier");
         assertEq(minDebt, 1, " incorrect minDebt");
         assertEq(maxDebt, 2, " incorrect maxDebt");
-    }
-
-    /// @dev U:[FA-50]: setBotList works properly
-    function test_U_FA_50_setBotList_works_properly() public notExpirableCase {
-        assertEq(creditFacade.botList(), address(botListMock), "SETUP: incorrect botList");
-
-        vm.prank(CONFIGURATOR);
-        creditFacade.setBotList(DUMB_ADDRESS);
-
-        assertEq(creditFacade.botList(), DUMB_ADDRESS, "incorrect botList");
     }
 
     /// @dev U:[FA-51]: setCumulativeLossParams works properly

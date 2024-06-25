@@ -153,6 +153,9 @@ error AdapterIsNotRegisteredException();
 /// @notice Thrown if new credit configurator's set of allowed adapters differs from the current one
 error IncorrectAdaptersSetException();
 
+/// @notice Thrown if new credit facade's bot list differs from the one currently in use
+error IncorrectBotListException();
+
 // ------------- //
 // CREDIT FACADE //
 // ------------- //
@@ -293,10 +296,13 @@ error ParameterChangedAfterQueuedTxException();
 // -------- //
 
 /// @notice Thrown when attempting to set non-zero permissions for a forbidden bot
-error InvalidBotException();
+error ForbiddenBotException();
 
 /// @notice Thrown when attempting to set permissions for a bot that don't meet its requirements
-error InsufficientBotPermissionsException();
+error IncorrectBotPermissionsException();
+
+/// @notice Thrown when attempting to interact with a bot list from a credit manager that is not added
+error CreditManagerNotAddedException();
 
 // --------------- //
 // ACCOUNT FACTORY //
