@@ -4,38 +4,26 @@
 pragma solidity ^0.8.17;
 
 contract BotListMock {
-    bool revertOnErase;
-
     uint256 return_botPermissions;
-    bool return_forbidden;
+    bool return_isCreditManagerAdded;
 
-    uint256 return_activeBotsRemaining;
-
-    function setBotStatusReturns(uint256 botPermissions, bool forbidden) external {
+    function setBotPermissionsReturns(uint256 botPermissions) external {
         return_botPermissions = botPermissions;
-        return_forbidden = forbidden;
     }
 
-    function getBotStatus(address, address) external view returns (uint256 botPermissions, bool forbidden) {
+    function setCreditManagerAddedReturns(bool added) external {
+        return_isCreditManagerAdded = added;
+    }
+
+    function getBotPermissions(address, address) external view returns (uint256 botPermissions) {
         botPermissions = return_botPermissions;
-        forbidden = return_forbidden;
     }
 
-    function eraseAllBotPermissions(address) external view {
-        if (revertOnErase) {
-            revert("Unexpected call to eraseAllBotPermissions");
-        }
+    function isCreditManagerAdded(address) external view returns (bool) {
+        return return_isCreditManagerAdded;
     }
 
-    function setRevertOnErase(bool _value) external {
-        revertOnErase = _value;
-    }
+    function eraseAllBotPermissions(address) external view {}
 
-    function setBotPermissionsReturn(uint256 activeBotsRemaining) external {
-        return_activeBotsRemaining = activeBotsRemaining;
-    }
-
-    function setBotPermissions(address, address, uint192) external view returns (uint256 activeBotsRemaining) {
-        activeBotsRemaining = return_activeBotsRemaining;
-    }
+    function setBotPermissions(address, address, uint192) external view {}
 }

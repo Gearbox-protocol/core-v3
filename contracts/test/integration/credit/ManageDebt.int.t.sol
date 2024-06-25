@@ -10,7 +10,7 @@ import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // TESTS
 import "../../lib/constants.sol";
-import {BOT_PERMISSIONS_SET_FLAG, PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
+import {PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
 import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 

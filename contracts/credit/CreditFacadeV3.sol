@@ -38,7 +38,6 @@ import {IWETH} from "../interfaces/external/IWETH.sol";
 import {Balance, BalanceDelta, BalanceWithMask, BalancesLogic, Comparison} from "../libraries/BalancesLogic.sol";
 import {BitMask} from "../libraries/BitMask.sol";
 import {
-    BOT_PERMISSIONS_SET_FLAG,
     INACTIVE_CREDIT_ACCOUNT_ADDRESS,
     PERCENTAGE_FACTOR,
     UNDERLYING_TOKEN_MASK,
@@ -105,7 +104,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     uint128 internal totalBorrowedInBlock;
 
     /// @notice Bot list address
-    address public override botList;
+    address public immutable override botList;
 
     /// @notice Credit account debt limits packed into a single slot
     DebtLimits public override debtLimits;
@@ -157,6 +156,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param _degenNFT Degen NFT address or `address(0)`
     /// @param _expirable Whether this facade should be expirable. If `true`, the expiration date remains unset,
     ///        and facade never expires, unless the date is set via `setExpirationDate` in the configurator.
+    /// @dev Reverts if `_creditManager` is not added to the `_botList`
     constructor(
         address _acl,
         address _creditManager,
@@ -173,6 +173,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
 
         underlying = ICreditManagerV3(_creditManager).underlying(); // U:[FA-1]
         treasury = IPoolV3(ICreditManagerV3(_creditManager).pool()).treasury(); // U:[FA-1]
+
+        if (!IBotListV3(_botList).isCreditManagerAdded(_creditManager)) revert CreditManagerNotAddedException(); // U:[FA-1]
     }
 
     /// @notice Whether `addr` is an approved emergency liquidator
@@ -260,9 +262,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
             }); // U:[FA-11]
         }
 
-        if (_flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG != 0) {
-            IBotListV3(botList).eraseAllBotPermissions(creditAccount); // U:[FA-11]
-        }
+        IBotListV3(botList).eraseAllBotPermissions(creditAccount); // U:[FA-11]
 
         ICreditManagerV3(creditManager).closeCreditAccount(creditAccount); // U:[FA-11]
 
@@ -444,7 +444,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @param calls List of calls to perform
     /// @dev Reverts if credit facade is paused or expired
     /// @dev Reverts if `creditAccount` is not opened in connected credit manager
-    /// @dev Reverts if calling bot is forbidden or has no permissions to manage `creditAccount`
+    /// @dev Reverts if calling bot has no permissions to manage `creditAccount`
+    /// @dev Setting bots permissions is prohibited inside `botMulticall` regardless of given permissions
     function botMulticall(address creditAccount, MultiCall[] calldata calls)
         external
         override
@@ -454,14 +455,12 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     {
         _getBorrowerOrRevert(creditAccount); // U:[FA-5]
 
-        (uint256 botPermissions, bool forbidden) =
-            IBotListV3(botList).getBotStatus({bot: msg.sender, creditAccount: creditAccount});
+        uint256 botPermissions = IBotListV3(botList).getBotPermissions({bot: msg.sender, creditAccount: creditAccount});
+        if (botPermissions == 0) revert NotApprovedBotException({bot: msg.sender}); // U:[FA-19]
 
-        if (forbidden || botPermissions == 0 || _flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG == 0) {
-            revert NotApprovedBotException(msg.sender); // U:[FA-19]
-        }
-
-        _multicall(creditAccount, calls, _enabledTokensMaskOf(creditAccount), botPermissions); // U:[FA-19, 20]
+        _multicall(
+            creditAccount, calls, _enabledTokensMaskOf(creditAccount), botPermissions & ~SET_BOT_PERMISSIONS_PERMISSION
+        ); // U:[FA-19, 20]
     }
 
     // --------- //
@@ -741,18 +740,10 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     function _setBotPermissions(address creditAccount, bytes calldata callData) internal {
         (address bot, uint192 permissions) = abi.decode(callData, (address, uint192));
 
-        uint192 allowedPermissions = ALL_PERMISSIONS & ~SET_BOT_PERMISSIONS_PERMISSION;
-        uint192 unexpectedPermissions = permissions & ~allowedPermissions;
+        uint192 unexpectedPermissions = permissions & ~ALL_PERMISSIONS;
         if (unexpectedPermissions != 0) revert UnexpectedPermissionsException(unexpectedPermissions); // U:[FA-37]
 
-        uint256 remainingBots =
-            IBotListV3(botList).setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: permissions}); // U:[FA-37]
-
-        if (remainingBots == 0) {
-            _setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: false}); // U:[FA-37]
-        } else if (_flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG == 0) {
-            _setFlagFor({creditAccount: creditAccount, flag: BOT_PERMISSIONS_SET_FLAG, value: true}); // U:[FA-37]
-        }
+        IBotListV3(botList).setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: permissions}); // U:[FA-37]
     }
 
     // ------------- //
@@ -792,17 +783,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         debtLimits.minDebt = newMinDebt; // U:[FA-49]
         debtLimits.maxDebt = newMaxDebt; // U:[FA-49]
         maxDebtPerBlockMultiplier = newMaxDebtPerBlockMultiplier; // U:[FA-49]
-    }
-
-    /// @notice Sets the new bot list
-    /// @param newBotList New bot list address
-    /// @dev Reverts if caller is not credit configurator
-    function setBotList(address newBotList)
-        external
-        override
-        creditConfiguratorOnly // U:[FA-6]
-    {
-        botList = newBotList; // U:[FA-50]
     }
 
     /// @notice Sets the new max cumulative loss
@@ -1005,16 +985,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     /// @dev Internal wrapper for `creditManager.getTokenByMask` call to reduce contract size
     function _getTokenByMask(uint256 mask) internal view returns (address) {
         return ICreditManagerV3(creditManager).getTokenByMask(mask);
-    }
-
-    /// @dev Internal wrapper for `creditManager.flagsOf` call to reduce contract size
-    function _flagsOf(address creditAccount) internal view returns (uint16) {
-        return ICreditManagerV3(creditManager).flagsOf(creditAccount);
-    }
-
-    /// @dev Internal wrapper for `creditManager.setFlagFor` call to reduce contract size
-    function _setFlagFor(address creditAccount, uint16 flag, bool value) internal {
-        ICreditManagerV3(creditManager).setFlagFor(creditAccount, flag, value);
     }
 
     /// @dev Internal wrapper for `creditManager.setActiveCreditAccount` call to reduce contract size

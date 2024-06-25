@@ -5,14 +5,6 @@ pragma solidity ^0.8.17;
 
 import {IVersion} from "./base/IVersion.sol";
 
-/// @notice Bot info
-/// @param forbidden Whether bot is forbidden
-/// @param permissions Mapping credit manager => credit account => bot's permissions
-struct BotInfo {
-    bool forbidden;
-    mapping(address => mapping(address => uint192)) permissions;
-}
-
 interface IBotListV3Events {
     // ----------- //
     // PERMISSIONS //
@@ -27,11 +19,11 @@ interface IBotListV3Events {
     // CONFIGURATION //
     // ------------- //
 
-    /// @notice Emitted when `bot`'s forbidden status is set
-    event SetBotForbiddenStatus(address indexed bot, bool forbidden);
+    /// @notice Emitted when `bot` is forbidden
+    event ForbidBot(address indexed bot);
 
-    /// @notice Emitted when `creditManager`'s approved status is set
-    event SetCreditManagerApprovedStatus(address indexed creditManager, bool approved);
+    /// @notice Emitted when `creditManager` is added
+    event AddCreditManager(address indexed creditManager);
 }
 
 /// @title Bot list V3 interface
@@ -40,18 +32,11 @@ interface IBotListV3 is IBotListV3Events, IVersion {
     // PERMISSIONS //
     // ----------- //
 
-    function botPermissions(address bot, address creditAccount) external view returns (uint192);
+    function getActiveBots(address creditAccount) external view returns (address[] memory);
 
-    function activeBots(address creditAccount) external view returns (address[] memory);
+    function getBotPermissions(address bot, address creditAccount) external view returns (uint192);
 
-    function getBotStatus(address bot, address creditAccount)
-        external
-        view
-        returns (uint192 permissions, bool forbidden);
-
-    function setBotPermissions(address bot, address creditAccount, uint192 permissions)
-        external
-        returns (uint256 activeBotsRemaining);
+    function setBotPermissions(address bot, address creditAccount, uint192 permissions) external;
 
     function eraseAllBotPermissions(address creditAccount) external;
 
@@ -59,11 +44,15 @@ interface IBotListV3 is IBotListV3Events, IVersion {
     // CONFIGURATION //
     // ------------- //
 
-    function botForbiddenStatus(address bot) external view returns (bool);
+    function isCreditManagerAdded(address creditManager) external view returns (bool);
 
-    function approvedCreditManager(address creditManager) external view returns (bool);
+    function creditManagers() external view returns (address[] memory);
 
-    function setBotForbiddenStatus(address bot, bool forbidden) external;
+    function addCreditManager(address creditManager) external;
 
-    function setCreditManagerApprovedStatus(address creditManager, bool approved) external;
+    function isBotForbidden(address bot) external view returns (bool);
+
+    function forbiddenBots() external view returns (address[] memory);
+
+    function forbidBot(address bot) external;
 }

@@ -8,7 +8,7 @@ import "../../interfaces/IAddressProviderV3.sol";
 import {BotListV3} from "../../../core/BotListV3.sol";
 
 import {ICreditAccountV3} from "../../../interfaces/ICreditAccountV3.sol";
-import {BOT_PERMISSIONS_SET_FLAG, SECONDS_PER_YEAR} from "../../../libraries/Constants.sol";
+import {SECONDS_PER_YEAR} from "../../../libraries/Constants.sol";
 import {ICreditManagerV3, ICreditManagerV3Events, ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
 
 import "../../../interfaces/ICreditFacadeV3.sol";
@@ -146,6 +146,7 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         );
 
         address bot = address(new BotMock());
+        BotMock(bot).setRequiredPermissions(ADD_COLLATERAL_PERMISSION);
 
         vm.prank(USER);
         creditFacade.multicall(
