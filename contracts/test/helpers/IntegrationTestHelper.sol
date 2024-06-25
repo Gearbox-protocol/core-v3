@@ -20,7 +20,6 @@ import {MultiCallBuilder} from "../lib/MultiCallBuilder.sol";
 import {PoolV3} from "../../pool/PoolV3.sol";
 import {PoolQuotaKeeperV3} from "../../pool/PoolQuotaKeeperV3.sol";
 import {GaugeV3} from "../../pool/GaugeV3.sol";
-import {CreditManagerFactory} from "../suites/CreditManagerFactory.sol";
 
 import {ICreditFacadeV3Multicall} from "../../interfaces/ICreditFacadeV3.sol";
 
@@ -374,23 +373,38 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         for (uint256 i; i < len; ++i) {
             CreditManagerV3DeployParams memory cmParams = allCms[i];
 
-            if (anyDegenNFT) {
-                whitelisted = cmParams.whitelisted;
-            }
+            if (anyDegenNFT) whitelisted = cmParams.whitelisted;
 
-            CreditManagerFactory cmf = new CreditManagerFactory({
-                addressProvider: address(addressProvider),
-                pool: address(pool),
-                degenNFT: (whitelisted) ? address(degenNFT) : address(0),
-                expirable: (anyExpirable) ? cmParams.expirable : expirable,
-                maxEnabledTokens: cmParams.maxEnabledTokens,
-                feeInterest: cmParams.feeInterest,
-                name: cmParams.name
-            });
+            creditManager = new CreditManagerV3(
+                address(pool),
+                address(accountFactory),
+                address(priceOracle),
+                cmParams.maxEnabledTokens,
+                cmParams.feeInterest,
+                cmParams.name
+            );
 
-            creditManager = cmf.creditManager();
-            creditFacade = cmf.creditFacade();
-            creditConfigurator = cmf.creditConfigurator();
+            creditConfigurator = new CreditConfiguratorV3(address(acl), address(creditManager));
+            creditManager.setCreditConfigurator(address(creditConfigurator));
+
+            vm.startPrank(CONFIGURATOR);
+            AddressProviderV3ACLMock(address(addressProvider)).addCreditManager(address(creditManager));
+            accountFactory.addCreditManager(address(creditManager));
+            botList.addCreditManager(address(creditManager));
+            poolQuotaKeeper.addCreditManager(address(creditManager));
+            pool.setCreditManagerDebtLimit(address(creditManager), cmParams.poolLimit);
+            vm.stopPrank();
+
+            creditFacade = new CreditFacadeV3(
+                address(acl),
+                address(creditManager),
+                address(botList),
+                weth,
+                whitelisted ? address(degenNFT) : address(0),
+                anyExpirable ? cmParams.expirable : expirable
+            );
+            vm.prank(CONFIGURATOR);
+            creditConfigurator.setCreditFacade(address(creditFacade));
 
             vm.startPrank(CONFIGURATOR);
             creditConfigurator.setMaxDebtLimit(cmParams.maxDebt);
@@ -405,24 +419,10 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
 
             _addCollateralTokens(cmParams.collateralTokens);
 
-            AddressProviderV3ACLMock(address(addressProvider)).addCreditManager(address(creditManager));
-
             if (expirable) {
                 vm.prank(CONFIGURATOR);
                 creditConfigurator.setExpirationDate(uint40(block.timestamp + 1));
             }
-
-            vm.prank(CONFIGURATOR);
-            AccountFactoryV3(address(accountFactory)).addCreditManager(address(creditManager));
-
-            vm.prank(CONFIGURATOR);
-            poolQuotaKeeper.addCreditManager(address(creditManager));
-
-            vm.prank(CONFIGURATOR);
-            pool.setCreditManagerDebtLimit(address(creditManager), cmParams.poolLimit);
-
-            vm.prank(CONFIGURATOR);
-            botList.setCreditManagerApprovedStatus(address(creditManager), true);
 
             vm.label(address(creditFacade), "CreditFacadeV3");
             vm.label(address(creditManager), "CreditManagerV3");

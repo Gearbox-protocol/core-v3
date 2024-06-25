@@ -19,7 +19,7 @@ import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // CONSTANTS
 
-import {BOT_PERMISSIONS_SET_FLAG, PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
+import {PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
 
 // TESTS
 
@@ -46,6 +46,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         (address creditAccount,) = _openTestCreditAccount();
 
         address bot = address(new BotMock());
+        BotMock(bot).setRequiredPermissions(ALL_PERMISSIONS & ~SET_BOT_PERMISSIONS_PERMISSION);
 
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
 
@@ -63,7 +64,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
 
         _setBotPermissions(USER, creditAccount, bot, ALL_PERMISSIONS & ~SET_BOT_PERMISSIONS_PERMISSION);
 
-        botList.getBotStatus({creditAccount: creditAccount, bot: bot});
+        botList.getBotPermissions({creditAccount: creditAccount, bot: bot});
 
         vm.expectEmit(true, true, false, true);
         emit StartMultiCall({creditAccount: creditAccount, caller: bot});
@@ -95,36 +96,11 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         creditFacade.botMulticall(creditAccount, calls);
 
         vm.prank(CONFIGURATOR);
-        botList.setBotForbiddenStatus(bot, true);
+        botList.forbidBot(bot);
 
         vm.expectRevert(abi.encodeWithSelector(NotApprovedBotException.selector, (bot)));
         vm.prank(bot);
         creditFacade.botMulticall(creditAccount, calls);
-    }
-
-    /// @dev I:[BOT-02]: setBotPermissions works correctly in CF
-    function test_I_BOT_02_setBotPermissions_works_correctly() public creditTest {
-        (address creditAccount,) = _openTestCreditAccount();
-
-        address bot = address(new BotMock());
-
-        vm.expectCall(
-            address(creditManager),
-            abi.encodeCall(CreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, true))
-        );
-
-        _setBotPermissions(USER, creditAccount, bot, ALL_PERMISSIONS & ~SET_BOT_PERMISSIONS_PERMISSION);
-
-        assertTrue(creditManager.flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG > 0, "Flag was not set");
-
-        vm.expectCall(
-            address(creditManager),
-            abi.encodeCall(CreditManagerV3.setFlagFor, (creditAccount, BOT_PERMISSIONS_SET_FLAG, false))
-        );
-
-        _setBotPermissions(USER, creditAccount, bot, 0);
-
-        assertTrue(creditManager.flagsOf(creditAccount) & BOT_PERMISSIONS_SET_FLAG == 0, "Flag was not set");
     }
 
     function _setBotPermissions(address user, address creditAccount, address bot, uint192 permissions) internal {
