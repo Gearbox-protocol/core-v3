@@ -82,11 +82,20 @@ error BorrowingMoreThanU2ForbiddenException();
 /// @notice Thrown when a credit manager attempts to borrow more than its limit in the current block, or in general
 error CreditManagerCantBorrowException();
 
-/// @notice Thrown when attempting to connect a quota keeper to an incompatible pool
-error IncompatiblePoolQuotaKeeperException();
+/// @notice Thrown when attempting to set an incompatible quota keeper contract
+error IncompatibleQuotaKeeperException();
+
+/// @notice Thrown when attempting to set an incompatible rate keeper contract
+error IncompatibleRateKeeperException();
 
 /// @notice Thrown when the quota is outside of min/max bounds
 error QuotaIsOutOfBoundsException();
+
+/// @notice Thrown when attempting to use an uninitialized quota keeper
+error QuotaKeeperNotInitializedException();
+
+/// @notice Thrown when attempting to initialize an already initialized quota keeper
+error QuotaKeeperAlreadyInitializedException();
 
 // -------------- //
 // CREDIT MANAGER //

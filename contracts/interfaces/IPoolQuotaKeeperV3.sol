@@ -87,8 +87,6 @@ interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion {
         view
         returns (uint96 quoted, uint128 outstandingInterest);
 
-    function poolQuotaRevenue() external view returns (uint256);
-
     function lastQuotaRateUpdate() external view returns (uint40);
 
     // ------------- //

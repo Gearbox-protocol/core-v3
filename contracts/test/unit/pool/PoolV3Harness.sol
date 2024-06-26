@@ -76,6 +76,10 @@ contract PoolV3Harness is PoolV3 {
     // QUOTAS //
     // ------ //
 
+    function hackQuotaKeeper(address quotaKeeper) external {
+        _quotaKeeper = quotaKeeper;
+    }
+
     function hackQuotaRevenue(uint256 value) external {
         _quotaRevenue = uint96(value);
         lastQuotaRevenueUpdate = uint40(block.timestamp);

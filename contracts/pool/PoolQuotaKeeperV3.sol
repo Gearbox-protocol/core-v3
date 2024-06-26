@@ -325,27 +325,6 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         isActive = rate != 0;
     }
 
-    /// @notice Returns the pool's quota revenue (in units of underlying per year)
-    function poolQuotaRevenue() external view virtual override returns (uint256 quotaRevenue) {
-        address[] memory tokens = quotaTokensSet.values();
-
-        uint256 len = tokens.length;
-
-        for (uint256 i; i < len;) {
-            address token = tokens[i];
-
-            TokenQuotaParams storage tokenQuotaParams = totalQuotaParams[token];
-            (uint16 rate,,) = _getTokenQuotaParamsOrRevert(tokenQuotaParams);
-            (uint256 totalQuoted,) = _getTokenQuotaTotalAndLimit(tokenQuotaParams);
-
-            quotaRevenue += totalQuoted * rate / PERCENTAGE_FACTOR;
-
-            unchecked {
-                ++i;
-            }
-        }
-    }
-
     /// @notice Returns the list of allowed credit managers
     function creditManagers() external view override returns (address[] memory) {
         return creditManagerSet.values(); // U:[PQK-10]

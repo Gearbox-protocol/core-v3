@@ -98,7 +98,6 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         vm.mockCall(interestRateModel, abi.encode(calcBorrowRateSelector), abi.encode(RAY / 20)); // 5%
         vm.mockCall(creditManager, abi.encodeCall(ICreditManagerV3.pool, ()), abi.encode(pool));
         vm.mockCall(quotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.pool, ()), abi.encode(pool));
-        vm.mockCall(quotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.poolQuotaRevenue, ()), abi.encode(0));
 
         // connect contracts
         vm.startPrank(configurator);
@@ -284,7 +283,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         pool.setInterestRateModel({newInterestRateModel: address(0)});
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        pool.setPoolQuotaKeeper({newPoolQuotaKeeper: address(0)});
+        pool.setPoolQuotaKeeper({quotaKeeper: address(0)});
 
         vm.expectRevert(CallerNotControllerException.selector);
         pool.setTotalDebtLimit({newLimit: 0});
@@ -1084,33 +1083,52 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         pool.setPoolQuotaKeeper(address(0));
     }
 
+    /// @notice U:[LP-23B]: quota keeper initialization works as expected
+    function test_U_LP_23B_quotaKeeper_initialization_works_as_expected() public {
+        pool.hackQuotaKeeper(address(0));
+
+        vm.expectRevert(QuotaKeeperNotInitializedException.selector);
+        pool.poolQuotaKeeper();
+
+        vm.expectRevert(QuotaKeeperNotInitializedException.selector);
+        pool.updateQuotaRevenue(0);
+
+        vm.expectRevert(QuotaKeeperNotInitializedException.selector);
+        pool.setQuotaRevenue(0);
+
+        pool.hackQuotaKeeper(quotaKeeper);
+
+        vm.expectRevert(QuotaKeeperAlreadyInitializedException.selector);
+        vm.prank(configurator);
+        pool.setPoolQuotaKeeper(quotaKeeper);
+    }
+
     /// @notice U:[LP-23C]: `setPoolQuotaKeeper` reverts on incompatible quota keeper
     function test_U_LP_23C_setPoolQuotaKeeper_reverts_on_incompatible_quota_keeper() public {
+        pool.hackQuotaKeeper(address(0));
+
         address newQuotaKeeper = makeAddr("NEW_QUOTA_KEEPER");
         vm.mockCall(newQuotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.pool, ()), abi.encode(makeAddr("WRONG_POOL")));
 
-        vm.expectRevert(IncompatiblePoolQuotaKeeperException.selector);
+        vm.expectRevert(IncompatibleQuotaKeeperException.selector);
         vm.prank(configurator);
         pool.setPoolQuotaKeeper(newQuotaKeeper);
     }
 
     /// @notice U:[LP-23D]: `setPoolQuotaKeeper` works as expected
     function test_U_LP_23D_setPoolQuotaKeeper_works_as_expected() public {
+        pool.hackQuotaKeeper(address(0));
+
         address newQuotaKeeper = makeAddr("NEW_QUOTA_KEEPER");
         vm.mockCall(newQuotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.pool, ()), abi.encode(address(pool)));
-        vm.mockCall(newQuotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.poolQuotaRevenue, ()), abi.encode(100));
 
-        vm.expectEmit(true, false, false, false);
+        vm.expectEmit(true, true, true, true);
         emit SetPoolQuotaKeeper(newQuotaKeeper);
-
-        vm.expectCall(newQuotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.poolQuotaRevenue, ()));
 
         vm.prank(configurator);
         pool.setPoolQuotaKeeper(newQuotaKeeper);
 
         assertEq(pool.poolQuotaKeeper(), newQuotaKeeper, "Incorrect poolQuotaKeeper");
-        // implicitly test that `_setQuotaRevenue` is called with correct parameters
-        assertEq(pool.quotaRevenue(), 100, "Incorrect quotaRevenue");
     }
 
     /// @notice U:[LP-24]: `setTotalDebtLimit` works as expected
