@@ -40,8 +40,6 @@ interface IGaugeV3Events {
 
 /// @title Gauge V3 interface
 interface IGaugeV3 is IVotingContract, IRateKeeper, IGaugeV3Events {
-    function pool() external view returns (address);
-
     function voter() external view returns (address);
 
     function updateEpoch() external;

@@ -85,8 +85,8 @@ error CreditManagerCantBorrowException();
 /// @notice Thrown when attempting to set an incompatible quota keeper contract
 error IncompatibleQuotaKeeperException();
 
-/// @notice Thrown when attempting to set an incompatible rate keeper contract
-error IncompatibleRateKeeperException();
+/// @notice Thrown when attempting to set an incompatible gauge contract
+error IncompatibleGaugeException();
 
 /// @notice Thrown when the quota is outside of min/max bounds
 error QuotaIsOutOfBoundsException();

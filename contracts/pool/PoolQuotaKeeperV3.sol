@@ -5,7 +5,7 @@ pragma solidity 0.8.23;
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-/// LIBS & TRAITS
+// LIBS & TRAITS
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 import {QuotasLogic} from "../libraries/QuotasLogic.sol";
@@ -15,7 +15,7 @@ import {IPoolQuotaKeeperV3, TokenQuotaParams, AccountQuota} from "../interfaces/
 import {ICreditManagerV3} from "../interfaces/ICreditManagerV3.sol";
 import {IRateKeeper} from "../interfaces/base/IRateKeeper.sol";
 
-import {PERCENTAGE_FACTOR, RAY} from "../libraries/Constants.sol";
+import {PERCENTAGE_FACTOR} from "../libraries/Constants.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
@@ -28,6 +28,7 @@ import "../interfaces/IExceptions.sol";
 ///         * increase fee that is charged when additional quota is purchased (more suited to leveraged trading).
 ///         Quota keeper stores information about quotas of accounts in all credit managers connected to the pool, and
 ///         performs calculations that help to keep pool's expected liquidity and credit managers' debt consistent.
+/// @dev Any contract that implements the `IRateKeeper` interface can be used everywhere where the term "gauge" is used
 contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, ContractsRegisterTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using QuotasLogic for TokenQuotaParams;
@@ -47,7 +48,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @dev The list of all quoted tokens
     EnumerableSet.AddressSet internal quotaTokensSet;
 
-    /// @notice Mapping from token to global token quota params
+    /// @dev Mapping from token to global token quota params
     mapping(address => TokenQuotaParams) internal totalQuotaParams;
 
     /// @dev Mapping from (creditAccount, token) to account's token quota params
@@ -341,6 +342,8 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
         override
         gaugeOnly // U:[PQK-3]
     {
+        if (token == underlying) revert TokenNotAllowedException(); // U:[PQK-6]
+
         if (quotaTokensSet.contains(token)) {
             revert TokenAlreadyAddedException(); // U:[PQK-6]
         }
@@ -394,16 +397,16 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     }
 
     /// @notice Sets a new gauge contract to compute quota rates
-    /// @param _gauge Address of the new gauge contract
-    function setGauge(address _gauge)
+    /// @param newGauge Address of the new gauge contract
+    function setGauge(address newGauge)
         external
         override
         configuratorOnly // U:[PQK-2]
     {
-        if (gauge != _gauge) {
-            gauge = _gauge; // U:[PQK-8]
-            emit SetGauge(_gauge); // U:[PQK-8]
-        }
+        if (newGauge == gauge) return;
+        if (IRateKeeper(newGauge).quotaKeeper() != address(this)) revert IncompatibleGaugeException(); // U:[PQK-8]
+        gauge = newGauge; // U:[PQK-8]
+        emit SetGauge(newGauge); // U:[PQK-8]
     }
 
     /// @notice Adds an address to the set of allowed credit managers
@@ -419,10 +422,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
             revert IncompatibleCreditManagerException(); // U:[PQK-9]
         }
 
-        if (!creditManagerSet.contains(_creditManager)) {
-            creditManagerSet.add(_creditManager); // U:[PQK-10]
-            emit AddCreditManager(_creditManager); // U:[PQK-10]
-        }
+        if (creditManagerSet.add(_creditManager)) emit AddCreditManager(_creditManager); // U:[PQK-10]
     }
 
     /// @notice Sets the total quota limit for a token

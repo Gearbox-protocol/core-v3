@@ -32,8 +32,8 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     /// @notice Contract version
     uint256 public constant override version = 3_10;
 
-    /// @notice Address of the pool this gauge is connected to
-    address public immutable override pool;
+    /// @notice Quota keeper rates are provided for
+    address public immutable override quotaKeeper;
 
     /// @notice Mapping from token address to its rate parameters
     mapping(address => QuotaRateParams) public override quotaRateParams;
@@ -52,13 +52,14 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
 
     /// @notice Constructor
     /// @param _acl ACL contract address
-    /// @param _pool Address of the lending pool
+    /// @param _quotaKeeper Address of the quota keeper to provide rates for
     /// @param _gearStaking Address of the GEAR staking contract
-    constructor(address _acl, address _pool, address _gearStaking)
+    constructor(address _acl, address _quotaKeeper, address _gearStaking)
         ACLNonReentrantTrait(_acl)
+        nonZeroAddress(_quotaKeeper) // U:[GA-1]
         nonZeroAddress(_gearStaking) // U:[GA-1]
     {
-        pool = _pool; // U:[GA-1]
+        quotaKeeper = _quotaKeeper; // U:[GA-1]
         voter = _gearStaking; // U:[GA-1]
         epochLastUpdate = IGearStakingV3(_gearStaking).getCurrentEpoch(); // U:[GA-1]
         epochFrozen = true; // U:[GA-1]
@@ -85,7 +86,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
 
             if (!epochFrozen) {
                 // The quota keeper should call back to retrieve quota rates for needed tokens
-                _poolQuotaKeeper().updateRates(); // U:[GA-14]
+                IPoolQuotaKeeperV3(quotaKeeper).updateRates(); // U:[GA-14]
             }
 
             emit UpdateEpoch(epochNow); // U:[GA-14]
@@ -219,7 +220,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
         }
     }
 
-    /// @notice Adds a new quoted token to the gauge and sets the initial rate params
+    /// @notice Adds a new quoted token to the gauge and sets the initial rate params.
     ///         If token is not added to the quota keeper, adds it there as well
     /// @param token Address of the token to add
     /// @param minRate The minimal interest rate paid on token's quotas
@@ -230,7 +231,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
         nonZeroAddress(token) // U:[GA-4]
         configuratorOnly // U:[GA-3]
     {
-        if (isTokenAdded(token) || token == IPoolV3(pool).underlyingToken()) {
+        if (isTokenAdded(token)) {
             revert TokenNotAllowedException(); // U:[GA-4]
         }
         _checkParams({minRate: minRate, maxRate: maxRate}); // U:[GA-4]
@@ -238,9 +239,8 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
         quotaRateParams[token] =
             QuotaRateParams({minRate: minRate, maxRate: maxRate, totalVotesLpSide: 0, totalVotesCaSide: 0}); // U:[GA-5]
 
-        IPoolQuotaKeeperV3 quotaKeeper = _poolQuotaKeeper();
-        if (!quotaKeeper.isQuotedToken(token)) {
-            quotaKeeper.addQuotaToken({token: token}); // U:[GA-5]
+        if (!IPoolQuotaKeeperV3(quotaKeeper).isQuotedToken(token)) {
+            IPoolQuotaKeeperV3(quotaKeeper).addQuotaToken(token); // U:[GA-5]
         }
 
         emit AddQuotaToken({token: token, minRate: minRate, maxRate: maxRate}); // U:[GA-5]
@@ -292,11 +292,6 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     /// @notice Whether token is added to the gauge as quoted
     function isTokenAdded(address token) public view override returns (bool) {
         return quotaRateParams[token].maxRate != 0; // U:[GA-8]
-    }
-
-    /// @dev Returns quota keeper connected to the pool
-    function _poolQuotaKeeper() internal view returns (IPoolQuotaKeeperV3) {
-        return IPoolQuotaKeeperV3(IPoolV3(pool).poolQuotaKeeper());
     }
 
     /// @dev Reverts if `msg.sender` is not voter

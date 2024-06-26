@@ -95,11 +95,11 @@ interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion {
 
     function gauge() external view returns (address);
 
-    function setGauge(address _gauge) external;
+    function setGauge(address newGauge) external;
 
     function creditManagers() external view returns (address[] memory);
 
-    function addCreditManager(address _creditManager) external;
+    function addCreditManager(address creditManager) external;
 
     function quotedTokens() external view returns (address[] memory);
 

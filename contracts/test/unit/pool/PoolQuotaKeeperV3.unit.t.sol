@@ -70,7 +70,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
 
         poolMock.setPoolQuotaKeeper(address(pqk));
 
-        gaugeMock = new GaugeMock(address(addressProvider), address(poolMock));
+        gaugeMock = new GaugeMock(address(addressProvider), address(pqk));
 
         pqk.setGauge(address(gaugeMock));
 
@@ -171,8 +171,8 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         assertEq(cumulativeIndexLU_RAY, 1, "Cumulative index !=1");
     }
 
-    /// @notice U:[PQK-6]: addQuotaToken reverts on adding the same token twice
-    function test_U_PQK_06_addQuotaToken_reverts_on_adding_the_same_token_twice() public {
+    /// @notice U:[PQK-6]: addQuotaToken reverts on adding quoted token or underlying
+    function test_U_PQK_06_addQuotaToken_reverts_on_adding_quoted_token_or_underlying() public {
         address gauge = pqk.gauge();
         vm.prank(gauge);
         pqk.addQuotaToken(DUMB_ADDRESS);
@@ -180,6 +180,10 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         vm.prank(gauge);
         vm.expectRevert(TokenAlreadyAddedException.selector);
         pqk.addQuotaToken(DUMB_ADDRESS);
+
+        vm.prank(gauge);
+        vm.expectRevert(TokenNotAllowedException.selector);
+        pqk.addQuotaToken(underlying);
     }
 
     /// @notice U:[PQK-7]: updateRates works as expected
@@ -284,6 +288,12 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         pqk = new PoolQuotaKeeperV3(address(addressProvider), address(addressProvider), address(poolMock));
 
         assertEq(pqk.gauge(), address(0), "SETUP: incorrect address at start");
+
+        gaugeMock = new GaugeMock(address(addressProvider), makeAddr("DUMMY"));
+        vm.expectRevert(IncompatibleGaugeException.selector);
+        pqk.setGauge(address(gaugeMock));
+
+        gaugeMock = new GaugeMock(address(addressProvider), address(pqk));
 
         vm.expectEmit(true, true, false, false);
         emit SetGauge(address(gaugeMock));

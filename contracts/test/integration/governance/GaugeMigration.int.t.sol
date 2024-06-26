@@ -56,7 +56,7 @@ contract GaugeMigrationIntegrationTest is Test {
         pool.setPoolQuotaKeeper(address(quotaKeeper));
 
         // deploy gauge and connect it to the quota keeper and staking
-        gauge = new GaugeV3(address(addressProvider), address(pool), address(staking));
+        gauge = new GaugeV3(address(addressProvider), address(quotaKeeper), address(staking));
         staking.setVotingContractStatus(address(gauge), VotingContractStatus.ALLOWED);
         quotaKeeper.setGauge(address(gauge));
 
@@ -102,7 +102,7 @@ contract GaugeMigrationIntegrationTest is Test {
     function test_I_GAM_01_gauge_migration_works_as_expected() public {
         // prepare a new gauge and disable an old one
         vm.startPrank(configurator);
-        GaugeV3 newGauge = new GaugeV3(address(addressProvider), address(pool), address(staking));
+        GaugeV3 newGauge = new GaugeV3(address(addressProvider), address(quotaKeeper), address(staking));
 
         staking.setVotingContractStatus(address(newGauge), VotingContractStatus.ALLOWED);
         staking.setVotingContractStatus(address(gauge), VotingContractStatus.UNVOTE_ONLY);
@@ -167,7 +167,7 @@ contract GaugeMigrationIntegrationTest is Test {
         // prepare new staking and gauge contracts
         vm.startPrank(configurator);
         GearStakingV3 newStaking = new GearStakingV3(configurator, address(gear), block.timestamp);
-        GaugeV3 newGauge = new GaugeV3(address(addressProvider), address(pool), address(newStaking));
+        GaugeV3 newGauge = new GaugeV3(address(addressProvider), address(quotaKeeper), address(newStaking));
 
         newStaking.setMigrator(address(staking));
         staking.setSuccessor(address(newStaking));
