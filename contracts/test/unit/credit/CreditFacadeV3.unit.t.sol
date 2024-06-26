@@ -1337,6 +1337,20 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
     function test_U_FA_34_multicall_updateQuota_works_properly() public notExpirableCase {
         address creditAccount = DUMB_ADDRESS;
 
+        address underlying = tokenTestSuite.addressOf(Tokens.DAI);
+        vm.expectRevert(TokenIsNotQuotedException.selector);
+        creditFacade.multicallInt({
+            creditAccount: creditAccount,
+            calls: MultiCallBuilder.build(
+                MultiCall({
+                    target: address(creditFacade),
+                    callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (underlying, 0, 0))
+                })
+            ),
+            enabledTokensMask: 0,
+            flags: UPDATE_QUOTA_PERMISSION
+        });
+
         uint96 maxDebt = 443330;
 
         vm.prank(CONFIGURATOR);

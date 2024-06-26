@@ -702,6 +702,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
     ) internal returns (uint256, uint256) {
         (address token, int96 quotaChange, uint96 minQuota) = abi.decode(callData, (address, int96, uint96)); // U:[FA-34]
 
+        if (token == underlying) revert TokenIsNotQuotedException(); // U:[FA-34]
+
         if (quotaChange > 0) {
             forbiddenTokensMask = _forbiddenTokensMaskRoE(forbiddenTokensMask);
             if (forbiddenTokensMask != 0 && _getTokenMaskOrRevert(token) & forbiddenTokensMask != 0) {
