@@ -94,8 +94,8 @@ contract GaugeMigrationIntegrationTest is Test {
         gauge.updateEpoch();
 
         // validate correctness
-        assertEq(quotaKeeper.getQuotaRate(address(token1)), 2200, "Incorrect token1 rate");
-        assertEq(quotaKeeper.getQuotaRate(address(token2)), 400, "Incorrect token2 rate");
+        assertEq(quotaKeeper.tokenQuotaParams(address(token1)).rate, 2200, "Incorrect token1 rate");
+        assertEq(quotaKeeper.tokenQuotaParams(address(token2)).rate, 400, "Incorrect token2 rate");
     }
 
     /// @notice I:[GAM-1]: Gauge migration works as expected
@@ -154,8 +154,8 @@ contract GaugeMigrationIntegrationTest is Test {
         newGauge.updateEpoch();
 
         // validate correctness
-        assertEq(quotaKeeper.getQuotaRate(address(token1)), 2200, "Incorrect token1 rate");
-        assertEq(quotaKeeper.getQuotaRate(address(token2)), 1200, "Incorrect token2 rate");
+        assertEq(quotaKeeper.tokenQuotaParams(address(token1)).rate, 2200, "Incorrect token1 rate");
+        assertEq(quotaKeeper.tokenQuotaParams(address(token2)).rate, 1200, "Incorrect token2 rate");
 
         // check that new gauge can be used to add tokens to quota keeper
         vm.prank(configurator);
@@ -226,8 +226,8 @@ contract GaugeMigrationIntegrationTest is Test {
         newGauge.updateEpoch();
 
         // validate correctness
-        assertEq(quotaKeeper.getQuotaRate(address(token1)), 2200, "Incorrect token1 rate");
-        assertEq(quotaKeeper.getQuotaRate(address(token2)), 1200, "Incorrect token2 rate");
+        assertEq(quotaKeeper.tokenQuotaParams(address(token1)).rate, 2200, "Incorrect token1 rate");
+        assertEq(quotaKeeper.tokenQuotaParams(address(token2)).rate, 1200, "Incorrect token2 rate");
 
         // check that new gauge can be used to add tokens to quota keeper
         vm.prank(configurator);

@@ -51,7 +51,7 @@ contract QuotaRatesIntegrationTest is Test {
         vm.expectCall(address(tumbler), abi.encodeCall(tumbler.getRates, (tokens)));
 
         tumbler.updateRates();
-        assertEq(quotaKeeper.getQuotaRate(address(token1)), 4200, "Incorrect token1 rate");
-        assertEq(quotaKeeper.getQuotaRate(address(token2)), 12000, "Incorrect token2 rate");
+        assertEq(quotaKeeper.tokenQuotaParams(address(token1)).rate, 4200, "Incorrect token1 rate");
+        assertEq(quotaKeeper.tokenQuotaParams(address(token2)).rate, 12000, "Incorrect token2 rate");
     }
 }

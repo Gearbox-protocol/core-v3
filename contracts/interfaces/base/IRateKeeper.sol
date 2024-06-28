@@ -11,6 +11,10 @@ interface IRateKeeper is IVersion {
     /// @notice Quota keeper rates are provided for
     function quotaKeeper() external view returns (address);
 
-    /// @notice Returns quota rates for a list of tokens, must revert for unrecognized tokens
+    /// @notice Whether token is added to the rate keeper
+    function isTokenAdded(address token) external view returns (bool);
+
+    /// @notice Returns quota rates for a list of tokens, must return non-zero rates for added tokens
+    ///         and revert if some tokens are not recognized
     function getRates(address[] calldata tokens) external view returns (uint16[] memory);
 }

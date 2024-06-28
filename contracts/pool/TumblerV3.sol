@@ -38,9 +38,9 @@ contract TumblerV3 is ITumblerV3, ACLNonReentrantTrait {
     mapping(address => uint16) internal _rates;
 
     /// @notice Constructor
-    /// @param acl_ ACL contract address
-    /// @param quotaKeeper_ Address of the quota keeper to provide rates for
-    /// @param epochLength_ Epoch length in seconds
+    /// @param  acl_ ACL contract address
+    /// @param  quotaKeeper_ Address of the quota keeper to provide rates for
+    /// @param  epochLength_ Epoch length in seconds
     /// @custom:tests U:[TU-1]
     constructor(address acl_, address quotaKeeper_, uint256 epochLength_)
         ACLNonReentrantTrait(acl_)
@@ -48,6 +48,12 @@ contract TumblerV3 is ITumblerV3, ACLNonReentrantTrait {
     {
         quotaKeeper = quotaKeeper_;
         epochLength = epochLength_;
+    }
+
+    /// @notice Whether `token` is added to the tumbler
+    /// @custom:tests U:[TU-2]
+    function isTokenAdded(address token) public view override returns (bool) {
+        return _tokensSet.contains(token);
     }
 
     /// @notice Returns all supported tokens
@@ -63,7 +69,7 @@ contract TumblerV3 is ITumblerV3, ACLNonReentrantTrait {
         rates = new uint16[](len);
         unchecked {
             for (uint256 i; i < len; ++i) {
-                if (!_tokensSet.contains(tokens[i])) revert TokenIsNotQuotedException();
+                if (!isTokenAdded(tokens[i])) revert TokenIsNotQuotedException();
                 rates[i] = _rates[tokens[i]];
             }
         }
@@ -71,7 +77,7 @@ contract TumblerV3 is ITumblerV3, ACLNonReentrantTrait {
 
     /// @notice Adds `token` to the set of supported tokens and to the quota keeper unless it's already there,
     ///         sets its rate to `rate`
-    /// @dev Reverts if `token` is zero address, is already added, or `rate` is zero
+    /// @dev    Reverts if `token` is zero address, is already added, or `rate` is zero
     /// @custom:tests U:[TU-2]
     function addToken(address token, uint16 rate) external override configuratorOnly nonZeroAddress(token) {
         if (!_tokensSet.add(token)) revert TokenNotAllowedException();
@@ -83,11 +89,11 @@ contract TumblerV3 is ITumblerV3, ACLNonReentrantTrait {
         _setRate(token, rate);
     }
 
-    /// @dev Sets `token`'s rate to `rate`
-    /// @dev Reverts if `token` is not added or `rate` is zero
+    /// @notice Sets `token`'s rate to `rate`
+    /// @dev    Reverts if `token` is not added or `rate` is zero
     /// @custom:tests U:[TU-3]
     function setRate(address token, uint16 rate) external override controllerOnly {
-        if (!_tokensSet.contains(token)) revert TokenIsNotQuotedException();
+        if (!isTokenAdded(token)) revert TokenIsNotQuotedException();
         _setRate(token, rate);
     }
 

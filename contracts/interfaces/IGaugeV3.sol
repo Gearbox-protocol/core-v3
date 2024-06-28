@@ -70,8 +70,6 @@ interface IGaugeV3 is IVotingContract, IRateKeeper, IGaugeV3Events {
 
     function setFrozenEpoch(bool status) external;
 
-    function isTokenAdded(address token) external view returns (bool);
-
     function addQuotaToken(address token, uint16 minRate, uint16 maxRate) external;
 
     function changeQuotaMinRate(address token, uint16 minRate) external;

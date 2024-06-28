@@ -112,13 +112,12 @@ contract CreditManagerV3Harness is CreditManagerV3, USDT_Transfer {
         _saveEnabledTokensMask(creditAccount, enabledTokensMask);
     }
 
-    function getQuotedTokensData(
-        address creditAccount,
-        uint256 enabledTokensMask,
-        uint256[] memory collateralHints,
-        address _poolQuotaKeeper
-    ) external view returns (address[] memory quotaTokens, uint256 outstandingQuotaInterest, uint256[] memory quotas) {
-        return _getQuotedTokensData(creditAccount, enabledTokensMask, collateralHints, _poolQuotaKeeper);
+    function getQuotedTokensData(address creditAccount, uint256 enabledTokensMask, uint256[] memory collateralHints)
+        external
+        view
+        returns (address[] memory quotaTokens, uint256 outstandingQuotaInterest, uint256[] memory quotas)
+    {
+        return _getQuotedTokensData(creditAccount, enabledTokensMask, collateralHints);
     }
 
     function getCollateralTokensData(uint256 tokenMask) external view returns (CollateralTokenData memory) {

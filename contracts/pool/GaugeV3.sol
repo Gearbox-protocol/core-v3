@@ -50,6 +50,12 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     /// @notice Whether gauge is frozen and rates cannot be updated
     bool public override epochFrozen;
 
+    /// @dev Ensures that function caller is voter
+    modifier onlyVoter() {
+        _revertIfCallerNotVoter(); // U:[GA-2]
+        _;
+    }
+
     /// @notice Constructor
     /// @param _acl ACL contract address
     /// @param _quotaKeeper Address of the quota keeper to provide rates for
@@ -64,12 +70,6 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
         epochLastUpdate = IGearStakingV3(_gearStaking).getCurrentEpoch(); // U:[GA-1]
         epochFrozen = true; // U:[GA-1]
         emit SetFrozenEpoch(true); // U:[GA-1]
-    }
-
-    /// @dev Ensures that function caller is voter
-    modifier onlyVoter() {
-        _revertIfCallerNotVoter(); // U:[GA-2]
-        _;
     }
 
     /// @notice Updates the epoch and, unless frozen, rates in the quota keeper
@@ -246,7 +246,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
         emit AddQuotaToken({token: token, minRate: minRate, maxRate: maxRate}); // U:[GA-5]
     }
 
-    /// @dev Changes the min rate for a quoted token
+    /// @notice Changes the min rate for a quoted token
     /// @param minRate The minimal interest rate paid on token's quotas
     function changeQuotaMinRate(address token, uint16 minRate)
         external
@@ -257,7 +257,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
         _changeQuotaTokenRateParams(token, minRate, quotaRateParams[token].maxRate);
     }
 
-    /// @dev Changes the max rate for a quoted token
+    /// @notice Changes the max rate for a quoted token
     /// @param maxRate The maximal interest rate paid on token's quotas
     function changeQuotaMaxRate(address token, uint16 maxRate)
         external
