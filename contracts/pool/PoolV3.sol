@@ -65,8 +65,8 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     /// @notice Withdrawal fee in bps
     uint16 public override withdrawFee;
 
-    /// @notice Pool quota keeper contract address
-    address public override poolQuotaKeeper;
+    /// @dev Quota keeper contract address
+    address internal _quotaKeeper;
     /// @dev Current quota revenue
     uint96 internal _quotaRevenue;
 
@@ -91,10 +91,6 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     modifier poolQuotaKeeperOnly() {
         _revertIfCallerIsNotPoolQuotaKeeper();
         _;
-    }
-
-    function _revertIfCallerIsNotPoolQuotaKeeper() internal view {
-        if (msg.sender != poolQuotaKeeper) revert CallerNotPoolQuotaKeeperException(); // U:[LP-2C]
     }
 
     /// @notice Constructor
@@ -602,6 +598,12 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     // QUOTAS //
     // ------ //
 
+    /// @notice Returns the quota keeper address or reverts if it is not initialized
+    function poolQuotaKeeper() public view override returns (address quotaKeeper) {
+        quotaKeeper = _quotaKeeper;
+        if (quotaKeeper == address(0)) revert QuotaKeeperNotInitializedException(); // U:[LP-23B]
+    }
+
     /// @notice Current annual quota revenue in underlying tokens
     function quotaRevenue() public view override returns (uint256) {
         return _quotaRevenue;
@@ -670,24 +672,18 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         emit SetInterestRateModel(newInterestRateModel); // U:[LP-22B]
     }
 
-    /// @notice Sets new pool quota keeper, can only be called by configurator
-    /// @param newPoolQuotaKeeper Address of the new pool quota keeper contract
-    function setPoolQuotaKeeper(address newPoolQuotaKeeper)
+    /// @notice Initializes the quota keeper, can only be called by configurator
+    /// @param quotaKeeper Address of the quota keeper contract
+    function setPoolQuotaKeeper(address quotaKeeper)
         external
         override
         configuratorOnly // U:[LP-2C]
-        nonZeroAddress(newPoolQuotaKeeper) // U:[LP-23A]
+        nonZeroAddress(quotaKeeper) // U:[LP-23A]
     {
-        if (IPoolQuotaKeeperV3(newPoolQuotaKeeper).pool() != address(this)) {
-            revert IncompatiblePoolQuotaKeeperException(); // U:[LP-23C]
-        }
-
-        poolQuotaKeeper = newPoolQuotaKeeper; // U:[LP-23D]
-
-        uint256 newQuotaRevenue = IPoolQuotaKeeperV3(poolQuotaKeeper).poolQuotaRevenue();
-        _setQuotaRevenue(newQuotaRevenue); // U:[LP-23D]
-
-        emit SetPoolQuotaKeeper(newPoolQuotaKeeper); // U:[LP-23D]
+        if (_quotaKeeper != address(0)) revert QuotaKeeperAlreadyInitializedException(); // U:[LP-23B]
+        if (IPoolQuotaKeeperV3(quotaKeeper).pool() != address(this)) revert IncompatibleQuotaKeeperException(); // U:[LP-23C]
+        _quotaKeeper = quotaKeeper; // U:[LP-23D]
+        emit SetPoolQuotaKeeper(quotaKeeper); // U:[LP-23D]
     }
 
     /// @notice Sets new total debt limit, can only be called by controller
@@ -750,6 +746,11 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     // --------- //
     // INTERNALS //
     // --------- //
+
+    /// @dev Ensures that function caller is quota keeper, which must be initialized
+    function _revertIfCallerIsNotPoolQuotaKeeper() internal view {
+        if (msg.sender != poolQuotaKeeper()) revert CallerNotPoolQuotaKeeperException(); // U:[LP-2C]
+    }
 
     /// @dev Same as `ERC20._transfer` but reverts if contract is paused
     function _transfer(address from, address to, uint256 amount)

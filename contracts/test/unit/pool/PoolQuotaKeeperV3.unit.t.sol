@@ -70,7 +70,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
 
         poolMock.setPoolQuotaKeeper(address(pqk));
 
-        gaugeMock = new GaugeMock(address(addressProvider), address(poolMock));
+        gaugeMock = new GaugeMock(address(addressProvider), address(pqk));
 
         pqk.setGauge(address(gaugeMock));
 
@@ -90,14 +90,14 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
     // TESTS
     //
 
-    /// @notice U:[PQK-1]: constructor sets parameters correctly
-    function test_U_PQK_01_constructor_sets_parameters_correctly() public {
+    /// @notice U:[QK-1]: constructor sets parameters correctly
+    function test_U_QK_01_constructor_sets_parameters_correctly() public {
         assertEq(address(poolMock), pqk.pool(), "Incorrect poolMock address");
         assertEq(underlying, pqk.underlying(), "Incorrect poolMock address");
     }
 
-    /// @notice U:[PQK-2]: configuration functions revert if called nonConfigurator(nonController)
-    function test_U_PQK_02_configuration_functions_reverts_if_call_nonConfigurator() public {
+    /// @notice U:[QK-2]: configuration functions revert if called nonConfigurator(nonController)
+    function test_U_QK_02_configuration_functions_reverts_if_call_nonConfigurator() public {
         vm.startPrank(USER);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
@@ -115,8 +115,8 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         vm.stopPrank();
     }
 
-    /// @notice U:[PQK-3]: gaugeOnly funcitons revert if called by non-gauge contract
-    function test_U_PQK_03_gaugeOnly_funcitons_reverts_if_called_by_non_gauge() public {
+    /// @notice U:[QK-3]: gaugeOnly funcitons revert if called by non-gauge contract
+    function test_U_QK_03_gaugeOnly_funcitons_reverts_if_called_by_non_gauge() public {
         vm.startPrank(USER);
 
         vm.expectRevert(CallerNotGaugeException.selector);
@@ -128,8 +128,8 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         vm.stopPrank();
     }
 
-    /// @notice U:[PQK-4]: creditManagerOnly funcitons revert if called by non registered creditManager
-    function test_U_PQK_04_creditManagerOnly_funcitons_reverts_if_called_by_non_gauge() public {
+    /// @notice U:[QK-4]: creditManagerOnly funcitons revert if called by non registered creditManager
+    function test_U_QK_04_creditManagerOnly_funcitons_reverts_if_called_by_non_creditManager() public {
         vm.startPrank(USER);
 
         vm.expectRevert(CallerNotCreditManagerException.selector);
@@ -144,8 +144,14 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         vm.stopPrank();
     }
 
-    /// @notice U:[PQK-5]: addQuotaToken adds token and set parameters correctly
-    function test_U_PQK_05_addQuotaToken_adds_token_and_set_parameters_correctly() public {
+    /// @notice U:[QK-5]: addQuotaToken adds token and set parameters correctly
+    function test_U_QK_05_addQuotaToken_adds_token_and_set_parameters_correctly() public {
+        address gauge = pqk.gauge();
+
+        vm.prank(gauge);
+        vm.expectRevert(TokenNotAllowedException.selector);
+        pqk.addQuotaToken(underlying);
+
         address[] memory tokens = pqk.quotedTokens();
 
         assertEq(tokens.length, 0, "SETUP: tokens set unexpectedly has tokens");
@@ -153,7 +159,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         vm.expectEmit(true, true, false, false);
         emit AddQuotaToken(DUMB_ADDRESS);
 
-        vm.prank(pqk.gauge());
+        vm.prank(gauge);
         pqk.addQuotaToken(DUMB_ADDRESS);
 
         tokens = pqk.quotedTokens();
@@ -162,28 +168,20 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         assertEq(tokens[0], DUMB_ADDRESS, "Incorrect address was added to quotaTokenSet");
         assertEq(tokens.length, 1, "token wasn't added to quotaTokenSet");
 
-        (uint16 rate, uint192 cumulativeIndexLU_RAY,, uint96 totalQuoted, uint96 limit,) =
-            pqk.getTokenQuotaParams(DUMB_ADDRESS);
+        TokenQuotaParams memory tqp = pqk.tokenQuotaParams(DUMB_ADDRESS);
 
-        assertEq(totalQuoted, 0, "totalQuoted !=0");
-        assertEq(limit, 0, "limit !=0");
-        assertEq(rate, 0, "rate !=0");
-        assertEq(cumulativeIndexLU_RAY, 1, "Cumulative index !=1");
-    }
-
-    /// @notice U:[PQK-6]: addQuotaToken reverts on adding the same token twice
-    function test_U_PQK_06_addQuotaToken_reverts_on_adding_the_same_token_twice() public {
-        address gauge = pqk.gauge();
-        vm.prank(gauge);
-        pqk.addQuotaToken(DUMB_ADDRESS);
+        assertEq(tqp.totalQuoted, 0, "totalQuoted !=0");
+        assertEq(tqp.limit, 0, "limit !=0");
+        assertEq(tqp.rate, 0, "rate !=0");
+        assertEq(tqp.cumulativeIndexLU, 0, "Cumulative index !=1");
 
         vm.prank(gauge);
         vm.expectRevert(TokenAlreadyAddedException.selector);
         pqk.addQuotaToken(DUMB_ADDRESS);
     }
 
-    /// @notice U:[PQK-7]: updateRates works as expected
-    function test_U_PQK_07_updateRates_works_as_expected() public {
+    /// @notice U:[QK-6]: updateRates works as expected
+    function test_U_QK_06_updateRates_works_as_expected() public {
         address DAI = tokenTestSuite.addressOf(Tokens.DAI);
         address USDC = tokenTestSuite.addressOf(Tokens.USDC);
 
@@ -217,7 +215,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
                 pqk.updateQuota({
                     creditAccount: DUMB_ADDRESS,
                     token: DAI,
-                    requestedChange: daiQuota,
+                    quotaChange: daiQuota,
                     minQuota: 0,
                     maxQuota: type(uint96).max
                 });
@@ -226,7 +224,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
                 pqk.updateQuota({
                     creditAccount: DUMB_ADDRESS,
                     token: USDC,
-                    requestedChange: usdcQuota,
+                    quotaChange: usdcQuota,
                     minQuota: 0,
                     maxQuota: type(uint96).max
                 });
@@ -254,22 +252,21 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
             vm.prank(address(gaugeMock));
             pqk.updateRates();
 
-            (uint16 rate, uint192 cumulativeIndexLU_RAY,, uint96 totalQuoted, uint96 limit,) =
-                pqk.getTokenQuotaParams(DAI);
+            TokenQuotaParams memory tqp = pqk.tokenQuotaParams(DAI);
 
-            assertEq(rate, DAI_QUOTA_RATE, _testCaseErr("Incorrect DAI rate"));
+            assertEq(tqp.rate, DAI_QUOTA_RATE, _testCaseErr("Incorrect DAI rate"));
             assertEq(
-                cumulativeIndexLU_RAY,
-                1 + RAY * DAI_QUOTA_RATE / PERCENTAGE_FACTOR,
+                tqp.cumulativeIndexLU,
+                RAY * DAI_QUOTA_RATE / PERCENTAGE_FACTOR,
                 _testCaseErr("Incorrect DAI cumulativeIndexLU")
             );
 
-            (rate, cumulativeIndexLU_RAY,, totalQuoted, limit,) = pqk.getTokenQuotaParams(USDC);
+            tqp = pqk.tokenQuotaParams(USDC);
 
-            assertEq(rate, USDC_QUOTA_RATE, _testCaseErr("Incorrect USDC rate"));
+            assertEq(tqp.rate, USDC_QUOTA_RATE, _testCaseErr("Incorrect USDC rate"));
             assertEq(
-                cumulativeIndexLU_RAY,
-                1 + RAY * USDC_QUOTA_RATE / PERCENTAGE_FACTOR,
+                tqp.cumulativeIndexLU,
+                RAY * USDC_QUOTA_RATE / PERCENTAGE_FACTOR,
                 _testCaseErr("Incorrect USDC cumulativeIndexLU")
             );
 
@@ -279,38 +276,41 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         }
     }
 
-    /// @notice U:[PQK-8]: setGauge works as expected
-    function test_U_PQK_08_setGauge_works_as_expected() public {
+    /// @notice U:[QK-7]: setGauge works as expected
+    function test_U_QK_07_setGauge_works_as_expected() public {
         pqk = new PoolQuotaKeeperV3(address(addressProvider), address(addressProvider), address(poolMock));
 
         assertEq(pqk.gauge(), address(0), "SETUP: incorrect address at start");
+
+        gaugeMock = new GaugeMock(address(addressProvider), makeAddr("DUMMY"));
+        vm.expectRevert(IncompatibleGaugeException.selector);
+        pqk.setGauge(address(gaugeMock));
+
+        gaugeMock = new GaugeMock(address(addressProvider), address(pqk));
 
         vm.expectEmit(true, true, false, false);
         emit SetGauge(address(gaugeMock));
 
         pqk.setGauge(address(gaugeMock));
         assertEq(pqk.gauge(), address(gaugeMock), "gauge address wasnt updated");
+
+        vm.prank(address(gaugeMock));
+        pqk.addQuotaToken(makeAddr("TOKEN"));
+
+        vm.expectRevert(TokenIsNotQuotedException.selector);
+        pqk.setGauge(address(gaugeMock));
     }
 
-    /// @notice U:[PQK-9]: addCreditManager works as expected
-    function test_U_PQK_09_addCreditManager_reverts_for_non_cm_contract() public {
-        // Case: non registered credit manager
-        vm.expectRevert(RegisteredCreditManagerOnlyException.selector);
-        pqk.addCreditManager(DUMB_ADDRESS);
-
-        // Case: credit manager with different poolMock address
-        creditManagerMock.setPoolService(DUMB_ADDRESS);
-        vm.expectRevert(IncompatibleCreditManagerException.selector);
-        pqk.addCreditManager(address(creditManagerMock));
-    }
-
-    /// @notice U:[PQK-10]: addCreditManager works as expected
-    function test_U_PQK_10_addCreditManager_works_as_expected() public {
+    /// @notice U:[QK-8]: addCreditManager works as expected
+    function test_U_QK_08_addCreditManager_works_as_expected() public {
         pqk = new PoolQuotaKeeperV3(address(addressProvider), address(addressProvider), address(poolMock));
 
         address[] memory managers = pqk.creditManagers();
-
         assertEq(managers.length, 0, "SETUP: at least one creditmanager is unexpectedly connected");
+
+        // Case: non registered credit manager
+        vm.expectRevert(RegisteredCreditManagerOnlyException.selector);
+        pqk.addCreditManager(DUMB_ADDRESS);
 
         vm.expectEmit(true, true, false, false);
         emit AddCreditManager(address(creditManagerMock));
@@ -327,16 +327,21 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         managers = pqk.creditManagers();
         assertEq(managers.length, 1, "Incorrect length of connected managers");
         assertEq(managers[0], address(creditManagerMock), "Incorrect address was added to creditManagerSet");
+
+        // Case: credit manager with different poolMock address
+        creditManagerMock.setPoolService(DUMB_ADDRESS);
+        vm.expectRevert(IncompatibleCreditManagerException.selector);
+        pqk.addCreditManager(address(creditManagerMock));
     }
 
-    /// @notice U:[PQK-11]: setTokenLimit reverts for unregistered token
-    function test_U_PQK_11_reverts_for_unregistered_token() public {
+    /// @notice U:[QK-9]: setTokenLimit works as expected
+    function test_U_QK_09_setTokenLimit_works_as_expected() public {
+        vm.expectRevert(IncorrectParameterException.selector);
+        pqk.setTokenLimit(DUMB_ADDRESS, type(uint96).max);
+
         vm.expectRevert(TokenIsNotQuotedException.selector);
         pqk.setTokenLimit(DUMB_ADDRESS, 1);
-    }
 
-    /// @notice U:[PQK-12]: setTokenLimit works as expected
-    function test_U_PQK_12_setTokenLimit_works_as_expected() public {
         uint96 limit = 435_223_999;
 
         gaugeMock.addQuotaToken(DUMB_ADDRESS, 11);
@@ -346,22 +351,22 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
 
         pqk.setTokenLimit(DUMB_ADDRESS, limit);
 
-        (,,,, uint96 limitSet, bool isActive) = pqk.getTokenQuotaParams(DUMB_ADDRESS);
+        TokenQuotaParams memory tqp = pqk.tokenQuotaParams(DUMB_ADDRESS);
 
-        assertEq(limitSet, limit, "Incorrect limit was set");
-        assertTrue(!isActive, "Incorrect isActive was set");
+        assertEq(tqp.limit, limit, "Incorrect limit was set");
+        assertEq(tqp.rate, 0, "Rate is incorrectly non-zero");
 
         vm.warp(block.timestamp + 7 days);
         gaugeMock.updateEpoch();
 
-        (,,,, limitSet, isActive) = pqk.getTokenQuotaParams(DUMB_ADDRESS);
+        tqp = pqk.tokenQuotaParams(DUMB_ADDRESS);
 
-        assertEq(limitSet, limit, "Incorrect limit was set");
-        assertTrue(isActive, "Incorrect isActive was set");
+        assertEq(tqp.limit, limit, "Incorrect limit was set");
+        assertNotEq(tqp.rate, 0, "Rate is incorrectly zero");
     }
 
-    /// @notice U:[PQK-13]: setTokenQuotaIncreaseFee works as expected
-    function test_U_PQK_13_setTokenQuotaIncreaseFee_works_as_expected() public {
+    /// @notice U:[QK-10]: setTokenQuotaIncreaseFee works as expected
+    function test_U_QK_10_setTokenQuotaIncreaseFee_works_as_expected() public {
         uint16 fee = 39_99;
 
         gaugeMock.addQuotaToken(DUMB_ADDRESS, 11);
@@ -371,23 +376,35 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
 
         pqk.setTokenQuotaIncreaseFee(DUMB_ADDRESS, fee);
 
-        (,, uint16 feeSet,,,) = pqk.getTokenQuotaParams(DUMB_ADDRESS);
+        TokenQuotaParams memory tqp = pqk.tokenQuotaParams(DUMB_ADDRESS);
 
-        assertEq(feeSet, fee, "Incorrect fee was set");
+        assertEq(tqp.quotaIncreaseFee, fee, "Incorrect fee was set");
     }
 
-    /// @notice U:[PQK-14]: updateQuota reverts for unregistered token
-    function test_U_PQK_14_updateQuotas_reverts_for_unregistered_token() public {
+    /// @notice U:[QK-11]: updateQuota reverts for unregistered token
+    function test_U_QK_11_updateQuotas_reverts_for_unregistered_token() public {
         pqk.addCreditManager(address(creditManagerMock));
-
         address link = tokenTestSuite.addressOf(Tokens.LINK);
-        vm.expectRevert(TokenIsNotQuotedException.selector);
 
+        vm.expectRevert(TokenIsNotQuotedException.selector);
         vm.prank(address(creditManagerMock));
         pqk.updateQuota({
             creditAccount: DUMB_ADDRESS,
             token: link,
-            requestedChange: -int96(uint96(100 * WAD)),
+            quotaChange: -int96(uint96(100 * WAD)),
+            minQuota: 0,
+            maxQuota: 1
+        });
+
+        vm.prank(address(gaugeMock));
+        pqk.addQuotaToken(link);
+
+        vm.expectRevert(TokenIsNotQuotedException.selector);
+        vm.prank(address(creditManagerMock));
+        pqk.updateQuota({
+            creditAccount: DUMB_ADDRESS,
+            token: link,
+            quotaChange: -int96(uint96(100 * WAD)),
             minQuota: 0,
             maxQuota: 1
         });
@@ -410,9 +427,9 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         int256 expectedQuotaRevenueChange;
     }
 
-    /// @notice U:[PQK-15]: updateQuotas works as expected
-    function test_U_PQK_15_updateQuotas_works_as_expected() public {
-        UpdateQuotaTestCase[7] memory cases = [
+    /// @notice U:[QK-12]: updateQuotas works as expected
+    function test_U_QK_12_updateQuotas_works_as_expected() public {
+        UpdateQuotaTestCase[6] memory cases = [
             UpdateQuotaTestCase({
                 name: "Open new quota < limit",
                 /// SETUP
@@ -428,22 +445,6 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
                 expectedDisableToken: false,
                 expectRevert: false,
                 expectedQuotaRevenueChange: 10_000 * 10 / 100 // 10% additional rate
-            }),
-            UpdateQuotaTestCase({
-                name: "Quota in a year",
-                /// SETUP
-                period: 365 days,
-                change: 0,
-                minQuota: 0,
-                maxQuota: 100_000_000,
-                /// 10_000 * 10% quota
-                expectedCaQuotaInterestChange: 1_000,
-                expectedFees: 0,
-                expectedRealQuotaChange: 0,
-                expectedEnableToken: false,
-                expectedDisableToken: false,
-                expectRevert: false,
-                expectedQuotaRevenueChange: 0
             }),
             UpdateQuotaTestCase({
                 name: "Quota < minQuota",
@@ -601,8 +602,8 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         int256 expectedRevenueChange;
     }
 
-    /// @notice U:[PQK-16]: removeQuotas works correctly
-    function test_U_PQK_16_removeQuotas_works_correctly() public {
+    /// @notice U:[QK-13]: removeQuotas works correctly
+    function test_U_QK_13_removeQuotas_works_correctly() public {
         RemoveQuotasCase[4] memory cases = [
             RemoveQuotasCase({
                 token1Quota: 1,
@@ -664,7 +665,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
             pqk.updateQuota({
                 creditAccount: creditAccount,
                 token: token1,
-                requestedChange: int96(cases[i].token1Quota),
+                quotaChange: int96(cases[i].token1Quota),
                 minQuota: 0,
                 maxQuota: type(uint96).max
             });
@@ -673,7 +674,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
             pqk.updateQuota({
                 creditAccount: creditAccount,
                 token: token2,
-                requestedChange: int96(cases[i].token2Quota),
+                quotaChange: int96(cases[i].token2Quota),
                 minQuota: 0,
                 maxQuota: type(uint96).max
             });
@@ -682,7 +683,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
             pqk.updateQuota({
                 creditAccount: DUMB_ADDRESS,
                 token: token1,
-                requestedChange: int96(cases[i].token1TotalQuoted - cases[i].token1Quota),
+                quotaChange: int96(cases[i].token1TotalQuoted - cases[i].token1Quota),
                 minQuota: 0,
                 maxQuota: type(uint96).max
             });
@@ -691,7 +692,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
             pqk.updateQuota({
                 creditAccount: DUMB_ADDRESS,
                 token: token2,
-                requestedChange: int96(cases[i].token2TotalQuoted - cases[i].token2Quota),
+                quotaChange: int96(cases[i].token2TotalQuoted - cases[i].token2Quota),
                 minQuota: 0,
                 maxQuota: type(uint96).max
             });
@@ -724,25 +725,29 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
                 assertEq(quota2, 0, "Quota 2 was not removed");
             }
 
-            (,,, uint96 totalQuoted1, uint96 limit1,) = pqk.getTokenQuotaParams(token1);
-            (,,, uint96 totalQuoted2, uint96 limit2,) = pqk.getTokenQuotaParams(token2);
+            TokenQuotaParams memory tqp1 = pqk.tokenQuotaParams(token1);
+            TokenQuotaParams memory tqp2 = pqk.tokenQuotaParams(token2);
 
-            assertEq(totalQuoted1, cases[i].token1TotalQuoted - cases[i].token1Quota, "Incorrect new total quoted 1");
+            assertEq(
+                tqp1.totalQuoted, cases[i].token1TotalQuoted - cases[i].token1Quota, "Incorrect new total quoted 1"
+            );
 
-            assertEq(totalQuoted2, cases[i].token2TotalQuoted - cases[i].token2Quota, "Incorrect new total quoted 2");
+            assertEq(
+                tqp2.totalQuoted, cases[i].token2TotalQuoted - cases[i].token2Quota, "Incorrect new total quoted 2"
+            );
 
             if (cases[i].setLimitsToZero) {
-                assertEq(limit1, 0, "Limit 1 was not set to zero");
+                assertEq(tqp1.limit, 0, "Limit 1 was not set to zero");
 
-                assertEq(limit2, 0, "Limit 2 was not set to zero");
+                assertEq(tqp2.limit, 0, "Limit 2 was not set to zero");
             }
 
             vm.revertTo(snapshot);
         }
     }
 
-    /// @notice U:[PQK-17]: accrueQuotaInterest works correctly
-    function test_U_PQK_17_accrueQuotaInterest_works_correctly() external {
+    /// @notice U:[QK-14]: accrueQuotaInterest works correctly
+    function test_U_QK_14_accrueQuotaInterest_works_correctly() external {
         pqk.addCreditManager(address(creditManagerMock));
 
         address creditAccount = makeAddr("CREDIT_ACCOUNT");
@@ -773,7 +778,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         pqk.updateQuota({
             creditAccount: creditAccount,
             token: token1,
-            requestedChange: int96(uint96(WAD)),
+            quotaChange: int96(uint96(WAD)),
             minQuota: 0,
             maxQuota: type(uint96).max
         });
@@ -782,7 +787,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         pqk.updateQuota({
             creditAccount: creditAccount,
             token: token2,
-            requestedChange: int96(uint96(WAD)),
+            quotaChange: int96(uint96(WAD)),
             minQuota: 0,
             maxQuota: type(uint96).max
         });
@@ -790,17 +795,14 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         uint256 timestampLU = block.timestamp;
         vm.warp(block.timestamp + 365 days);
 
-        uint192 expectedIndex1 = QuotasLogic.cumulativeIndexSince(1, 1000, timestampLU);
+        uint192 expectedIndex1 = QuotasLogic.cumulativeIndexSince(0, 1000, timestampLU);
         // uint192 expectedIndex2 = QuotasLogic.cumulativeIndexSince(uint192(RAY), 2000, timestampLU);
 
         vm.prank(address(creditManagerMock));
         pqk.accrueQuotaInterest(creditAccount, tokens);
 
-        (, uint192 actualIndex1) = pqk.getQuota(creditAccount, token1);
-        // (, uint192 actualIndex2) = pqk.getQuota(creditAccount, token2);
+        assertEq(pqk.accountQuotas(creditAccount, token1).cumulativeIndexLU, expectedIndex1, "Incorrect token 1 index");
 
-        assertEq(expectedIndex1, actualIndex1, "Incorrect token 1 index");
-
-        assertEq(expectedIndex1, actualIndex1, "Incorrect token 2 index");
+        // assertEq(pqk.accountQuotas(creditAccount, token2).cumulativeIndexLU, expectedIndex2, "Incorrect token 2 index");
     }
 }

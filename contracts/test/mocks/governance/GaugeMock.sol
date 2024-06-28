@@ -20,8 +20,7 @@ contract GaugeMock is ACLNonReentrantTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
 
-    /// @dev Address of the pool
-    PoolV3 public immutable pool;
+    address public quotaKeeper;
 
     /// @dev Mapping from token address to its rate parameters
     mapping(address => uint16) public rates;
@@ -31,35 +30,22 @@ contract GaugeMock is ACLNonReentrantTrait {
     //
 
     /// @dev Constructor
-
-    constructor(address acl, address _pool) ACLNonReentrantTrait(acl) nonZeroAddress(_pool) {
-        pool = PoolV3(payable(_pool)); // F:[P4-01]
+    constructor(address acl, address quotaKeeper_) ACLNonReentrantTrait(acl) nonZeroAddress(quotaKeeper_) {
+        quotaKeeper = quotaKeeper_;
     }
 
     /// @dev Rolls the new epoch and updates all quota rates
     function updateEpoch() external {
-        /// compute all compounded rates
-        IPoolQuotaKeeperV3 keeper = IPoolQuotaKeeperV3(pool.poolQuotaKeeper());
-
-        // /// update rates & cumulative indexes
-        // address[] memory tokens = keeper.quotedTokens();
-        // uint256 len = tokens.length;
-        // uint16[] memory rateUpdates = new uint16[](len);
-
-        // unchecked {
-        //     for (uint256 i; i < len; ++i) {
-        //         address token = tokens[i];
-        //         rateUpdates[i] = rates[token];
-        //     }
-        // }
-
-        keeper.updateRates();
+        IPoolQuotaKeeperV3(quotaKeeper).updateRates();
     }
 
     function addQuotaToken(address token, uint16 rate) external configuratorOnly {
         rates[token] = rate;
-        IPoolQuotaKeeperV3 keeper = IPoolQuotaKeeperV3(pool.poolQuotaKeeper());
-        keeper.addQuotaToken(token);
+        IPoolQuotaKeeperV3(quotaKeeper).addQuotaToken(token);
+    }
+
+    function isTokenAdded(address token) external view returns (bool) {
+        return rates[token] != 0;
     }
 
     function changeQuotaTokenRateParams(address token, uint16 rate) external configuratorOnly {

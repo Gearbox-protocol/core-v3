@@ -44,66 +44,43 @@ interface IPoolQuotaKeeperV3Events {
 /// @title Pool quota keeper V3 interface
 interface IPoolQuotaKeeperV3 is IPoolQuotaKeeperV3Events, IVersion {
     function pool() external view returns (address);
-
     function underlying() external view returns (address);
+    function gauge() external view returns (address);
+
+    function isCreditManagerAdded(address creditManager) external view returns (bool);
+    function creditManagers() external view returns (address[] memory);
+
+    function isQuotedToken(address token) external view returns (bool);
+    function quotedTokens() external view returns (address[] memory);
+
+    function tokenQuotaParams(address token) external view returns (TokenQuotaParams memory);
+    function accountQuotas(address creditAccount, address token) external view returns (AccountQuota memory);
+    function lastQuotaRateUpdate() external view returns (uint40);
 
     // ----------------- //
     // QUOTAS MANAGEMENT //
     // ----------------- //
 
-    function updateQuota(address creditAccount, address token, int96 requestedChange, uint96 minQuota, uint96 maxQuota)
+    function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota, uint96 maxQuota)
         external
-        returns (uint128 caQuotaInterestChange, uint128 fees, bool enableToken, bool disableToken);
+        returns (uint128 outstandingInterest, uint128 fees, bool enableToken, bool disableToken);
 
     function removeQuotas(address creditAccount, address[] calldata tokens, bool setLimitsToZero) external;
 
     function accrueQuotaInterest(address creditAccount, address[] calldata tokens) external;
-
-    function getQuotaRate(address) external view returns (uint16);
-
-    function cumulativeIndex(address token) external view returns (uint192);
-
-    function isQuotedToken(address token) external view returns (bool);
-
-    function getQuota(address creditAccount, address token)
-        external
-        view
-        returns (uint96 quota, uint192 cumulativeIndexLU);
-
-    function getTokenQuotaParams(address token)
-        external
-        view
-        returns (
-            uint16 rate,
-            uint192 cumulativeIndexLU,
-            uint16 quotaIncreaseFee,
-            uint96 totalQuoted,
-            uint96 limit,
-            bool isActive
-        );
 
     function getQuotaAndOutstandingInterest(address creditAccount, address token)
         external
         view
         returns (uint96 quoted, uint128 outstandingInterest);
 
-    function poolQuotaRevenue() external view returns (uint256);
-
-    function lastQuotaRateUpdate() external view returns (uint40);
-
     // ------------- //
     // CONFIGURATION //
     // ------------- //
 
-    function gauge() external view returns (address);
+    function setGauge(address newGauge) external;
 
-    function setGauge(address _gauge) external;
-
-    function creditManagers() external view returns (address[] memory);
-
-    function addCreditManager(address _creditManager) external;
-
-    function quotedTokens() external view returns (address[] memory);
+    function addCreditManager(address creditManager) external;
 
     function addQuotaToken(address token) external;
 

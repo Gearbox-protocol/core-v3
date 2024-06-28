@@ -71,6 +71,9 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Address of the pool credit manager is connected to
     address public immutable override pool;
 
+    /// @notice Address of the quota keeper connected to the pool
+    address public immutable override poolQuotaKeeper;
+
     /// @notice Address of the connected credit facade
     address public override creditFacade;
 
@@ -176,6 +179,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         underlying = IPoolV3(_pool).underlyingToken(); // U:[CM-1]
         if (IPriceOracleV3(_priceOracle).priceFeeds(underlying) == address(0)) revert PriceFeedDoesNotExistException(); // U:[CM-1]
         _addToken(underlying); // U:[CM-1]
+        poolQuotaKeeper = IPoolV3(_pool).poolQuotaKeeper(); // U:[CM-1]
 
         creditConfigurator = msg.sender; // U:[CM-1]
     }
@@ -302,7 +306,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }); // U:[CM-8]
 
         if (collateralDebtData.quotedTokens.length != 0) {
-            IPoolQuotaKeeperV3(collateralDebtData._poolQuotaKeeper).removeQuotas({
+            IPoolQuotaKeeperV3(poolQuotaKeeper).removeQuotas({
                 creditAccount: creditAccount,
                 tokens: collateralDebtData.quotedTokens,
                 setLimitsToZero: loss > 0
@@ -429,7 +433,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
                 // quota interest is accrued in credit manager regardless of whether anything has been repaid,
                 // so they are also accrued in the quota keeper to keep the contracts in sync
-                IPoolQuotaKeeperV3(collateralDebtData._poolQuotaKeeper).accrueQuotaInterest({
+                IPoolQuotaKeeperV3(poolQuotaKeeper).accrueQuotaInterest({
                     creditAccount: creditAccount,
                     tokens: collateralDebtData.quotedTokens
                 }); // U:[CM-11A]
@@ -700,16 +704,16 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         }
 
         cdd.enabledTokensMask = enabledTokensMask; // U:[CM-21]
-        cdd._poolQuotaKeeper = poolQuotaKeeper(); // U:[CM-21]
-
         uint256[] memory quotasPacked;
         (cdd.quotedTokens, cdd.cumulativeQuotaInterest, quotasPacked) = _getQuotedTokensData({
             creditAccount: creditAccount,
             enabledTokensMask: enabledTokensMask,
-            collateralHints: collateralHints,
-            _poolQuotaKeeper: cdd._poolQuotaKeeper
+            collateralHints: collateralHints
         }); // U:[CM-21]
         cdd.cumulativeQuotaInterest += currentCreditAccountInfo.cumulativeQuotaInterest - 1; // U:[CM-21]
+
+        // artifacts from the previous version
+        cdd._poolQuotaKeeper = poolQuotaKeeper; // U:[CM-21]
         cdd.quotedTokensMask = quotedTokensMask; // U:[CM-21]
 
         cdd.accruedInterest = CreditLogic.calcAccruedInterest({
@@ -763,17 +767,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @param creditAccount Credit account to return quotas data for
     /// @param enabledTokensMask Bitmask of account's enabled collateral tokens
     /// @param collateralHints Optional array of token masks specifying tokens order
-    /// @param _poolQuotaKeeper Cached quota keeper address
     /// @return quotedTokens Array of quoted tokens enabled as collateral on the account,
     ///         sorted according to `collateralHints` if specified
     /// @return outstandingQuotaInterest Account's quota interest that has not yet been accounted for
     /// @return quotasPacked Array of quotas packed with tokens' LTs
-    function _getQuotedTokensData(
-        address creditAccount,
-        uint256 enabledTokensMask,
-        uint256[] memory collateralHints,
-        address _poolQuotaKeeper
-    )
+    function _getQuotedTokensData(address creditAccount, uint256 enabledTokensMask, uint256[] memory collateralHints)
         internal
         view
         returns (address[] memory quotedTokens, uint128 outstandingQuotaInterest, uint256[] memory quotasPacked)
@@ -806,8 +804,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
                 (address token, uint16 lt) = _collateralTokenByMask({tokenMask: tokenMask, calcLT: true}); // U:[CM-24]
 
-                (uint256 quota, uint128 outstandingInterestDelta) =
-                    IPoolQuotaKeeperV3(_poolQuotaKeeper).getQuotaAndOutstandingInterest(_creditAccount, token); // U:[CM-24]
+                (uint256 quota, uint128 outstandingInterestDelta) = IPoolQuotaKeeperV3(poolQuotaKeeper)
+                    .getQuotaAndOutstandingInterest({creditAccount: _creditAccount, token: token}); // U:[CM-24]
 
                 quotedTokens[tokensIdx] = token; // U:[CM-24]
                 quotasPacked[tokensIdx] = CollateralLogic.packQuota(uint96(quota), lt);
@@ -861,11 +859,6 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     // QUOTAS //
     // ------ //
 
-    /// @notice Returns address of the quota keeper connected to the pool
-    function poolQuotaKeeper() public view override returns (address) {
-        return IPoolV3(pool).poolQuotaKeeper(); // U:[CM-47]
-    }
-
     /// @notice Requests quota keeper to update credit account's quota for a given token
     /// @param creditAccount Account to update the quota for
     /// @param token Token to update the quota for
@@ -891,11 +884,11 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             revert UpdateQuotaOnZeroDebtAccountException();
         }
 
-        (uint128 caInterestChange, uint128 quotaFees, bool enable, bool disable) = IPoolQuotaKeeperV3(poolQuotaKeeper())
+        (uint128 caInterestChange, uint128 quotaFees, bool enable, bool disable) = IPoolQuotaKeeperV3(poolQuotaKeeper)
             .updateQuota({
             creditAccount: creditAccount,
             token: token,
-            requestedChange: quotaChange,
+            quotaChange: quotaChange,
             minQuota: minQuota,
             maxQuota: maxQuota
         }); // U:[CM-25]

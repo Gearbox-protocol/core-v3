@@ -40,8 +40,6 @@ interface IGaugeV3Events {
 
 /// @title Gauge V3 interface
 interface IGaugeV3 is IVotingContract, IRateKeeper, IGaugeV3Events {
-    function pool() external view returns (address);
-
     function voter() external view returns (address);
 
     function updateEpoch() external;
@@ -71,8 +69,6 @@ interface IGaugeV3 is IVotingContract, IRateKeeper, IGaugeV3Events {
     function epochFrozen() external view returns (bool);
 
     function setFrozenEpoch(bool status) external;
-
-    function isTokenAdded(address token) external view returns (bool);
 
     function addQuotaToken(address token, uint16 minRate, uint16 maxRate) external;
 
