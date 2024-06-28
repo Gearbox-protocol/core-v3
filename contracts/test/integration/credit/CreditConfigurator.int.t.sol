@@ -303,7 +303,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         uint256 tokensCountBefore = creditManager.collateralTokensCount();
 
         address newToken = tokenTestSuite.addressOf(Tokens.wstETH);
-        makeTokenQuoted(newToken, 1, type(uint96).max);
+        makeTokenQuoted(newToken, 1, uint96(type(int96).max));
 
         vm.expectEmit(true, false, false, false);
         emit AddCollateralToken(newToken);

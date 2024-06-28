@@ -352,13 +352,17 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
             "Incorrect pool balance"
         );
 
-        (uint96 quota, uint192 cumulativeIndexLU) =
-            poolQuotaKeeper.getQuota(creditAccount, tokenTestSuite.addressOf(Tokens.LINK));
+        assertEq(
+            poolQuotaKeeper.accountQuotas(creditAccount, tokenTestSuite.addressOf(Tokens.LINK)).quota,
+            0,
+            "Quota was not set to 0"
+        );
 
-        assertEq(uint256(quota), 0, "Quota was not set to 0");
-
-        (quota, cumulativeIndexLU) = poolQuotaKeeper.getQuota(creditAccount, tokenTestSuite.addressOf(Tokens.USDT));
-        assertEq(uint256(quota), 0, "Quota was not set to 0");
+        assertEq(
+            poolQuotaKeeper.accountQuotas(creditAccount, tokenTestSuite.addressOf(Tokens.USDT)).quota,
+            0,
+            "Quota was not set to 0"
+        );
     }
 
     /// @dev I:[CMQ-07]: calcDebtAndCollateral correctly counts quota interest
@@ -450,9 +454,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
         creditFacade.liquidateCreditAccount(creditAccount, FRIEND, new MultiCall[](0));
 
         for (uint256 i = 0; i < quotedTokens.length; ++i) {
-            (,,, uint96 limit,,) = poolQuotaKeeper.getTokenQuotaParams(quotedTokens[i]);
-
-            assertEq(limit, 0, "Limit was not zeroed");
+            assertEq(poolQuotaKeeper.tokenQuotaParams(quotedTokens[i]).limit, 0, "Limit was not zeroed");
         }
     }
 

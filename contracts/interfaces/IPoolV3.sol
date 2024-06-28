@@ -23,8 +23,8 @@ interface IPoolV3Events {
     /// @notice Emitted when new interest rate model contract is set
     event SetInterestRateModel(address indexed newInterestRateModel);
 
-    /// @notice Emitted when new pool quota keeper contract is set
-    event SetPoolQuotaKeeper(address indexed newPoolQuotaKeeper);
+    /// @notice Emitted when the quota keeper contract is initialized
+    event SetPoolQuotaKeeper(address indexed quotaKeeper);
 
     /// @notice Emitted when new total debt limit is set
     event SetTotalDebtLimit(uint256 limit);
@@ -121,7 +121,7 @@ interface IPoolV3 is IVersion, IPoolV3Events, IERC4626, IERC20Permit {
 
     function setInterestRateModel(address newInterestRateModel) external;
 
-    function setPoolQuotaKeeper(address newPoolQuotaKeeper) external;
+    function setPoolQuotaKeeper(address quotaKeeper) external;
 
     function setTotalDebtLimit(uint256 newLimit) external;
 

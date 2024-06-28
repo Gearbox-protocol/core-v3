@@ -30,7 +30,7 @@ contract GaugeGasTest is IntegrationTestHelper {
 
                 vm.startPrank(CONFIGURATOR);
                 gauge.addQuotaToken(address(token), 500, 500);
-                poolQuotaKeeper.setTokenLimit(address(token), type(uint96).max);
+                poolQuotaKeeper.setTokenLimit(address(token), uint96(type(int96).max));
                 vm.stopPrank();
 
                 vm.warp(block.timestamp + 7 days);

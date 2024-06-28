@@ -325,6 +325,11 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         );
 
         assertEq(address(creditManager.pool()), address(poolMock), _testCaseErr("Incorrect pool"));
+        assertEq(
+            address(creditManager.poolQuotaKeeper()),
+            address(poolQuotaKeeperMock),
+            _testCaseErr("Incorrect poolQuotaKeeper")
+        );
 
         assertEq(creditManager.underlying(), tokenTestSuite.addressOf(Tokens.DAI), _testCaseErr("Incorrect underlying"));
 
@@ -1829,8 +1834,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
             (address[] memory quotaTokens, uint256 outstandingQuotaInterest,) = creditManager.getQuotedTokensData({
                 creditAccount: DUMB_ADDRESS,
                 enabledTokensMask: _case.enabledTokensMask,
-                collateralHints: new uint256[](0),
-                _poolQuotaKeeper: address(poolQuotaKeeperMock)
+                collateralHints: new uint256[](0)
             });
 
             assertEq(quotaTokens, _case.expectedQuotaTokens, _testCaseErr("Incorrect quotedTokens"));
@@ -2293,12 +2297,5 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         assertEq(creditManager.creditConfigurator(), DUMB_ADDRESS, "creditConfigurator is not set correctly");
         vm.stopPrank();
-    }
-
-    /// @dev U:[CM-47]: poolQuotaKeeper works correctly
-    function test_U_CM_47_poolQuotaKeeper_works_correctly() public creditManagerTest {
-        poolMock.setPoolQuotaKeeper(DUMB_ADDRESS);
-
-        assertEq(creditManager.poolQuotaKeeper(), DUMB_ADDRESS, "Incorrect poolQuotaKeeper");
     }
 }

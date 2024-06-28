@@ -56,7 +56,7 @@ contract GaugeMigrationIntegrationTest is Test {
         pool.setPoolQuotaKeeper(address(quotaKeeper));
 
         // deploy gauge and connect it to the quota keeper and staking
-        gauge = new GaugeV3(address(addressProvider), address(pool), address(staking));
+        gauge = new GaugeV3(address(addressProvider), address(quotaKeeper), address(staking));
         staking.setVotingContractStatus(address(gauge), VotingContractStatus.ALLOWED);
         quotaKeeper.setGauge(address(gauge));
 
@@ -94,15 +94,15 @@ contract GaugeMigrationIntegrationTest is Test {
         gauge.updateEpoch();
 
         // validate correctness
-        assertEq(quotaKeeper.getQuotaRate(address(token1)), 2200, "Incorrect token1 rate");
-        assertEq(quotaKeeper.getQuotaRate(address(token2)), 400, "Incorrect token2 rate");
+        assertEq(quotaKeeper.tokenQuotaParams(address(token1)).rate, 2200, "Incorrect token1 rate");
+        assertEq(quotaKeeper.tokenQuotaParams(address(token2)).rate, 400, "Incorrect token2 rate");
     }
 
     /// @notice I:[GAM-1]: Gauge migration works as expected
     function test_I_GAM_01_gauge_migration_works_as_expected() public {
         // prepare a new gauge and disable an old one
         vm.startPrank(configurator);
-        GaugeV3 newGauge = new GaugeV3(address(addressProvider), address(pool), address(staking));
+        GaugeV3 newGauge = new GaugeV3(address(addressProvider), address(quotaKeeper), address(staking));
 
         staking.setVotingContractStatus(address(newGauge), VotingContractStatus.ALLOWED);
         staking.setVotingContractStatus(address(gauge), VotingContractStatus.UNVOTE_ONLY);
@@ -154,8 +154,8 @@ contract GaugeMigrationIntegrationTest is Test {
         newGauge.updateEpoch();
 
         // validate correctness
-        assertEq(quotaKeeper.getQuotaRate(address(token1)), 2200, "Incorrect token1 rate");
-        assertEq(quotaKeeper.getQuotaRate(address(token2)), 1200, "Incorrect token2 rate");
+        assertEq(quotaKeeper.tokenQuotaParams(address(token1)).rate, 2200, "Incorrect token1 rate");
+        assertEq(quotaKeeper.tokenQuotaParams(address(token2)).rate, 1200, "Incorrect token2 rate");
 
         // check that new gauge can be used to add tokens to quota keeper
         vm.prank(configurator);
@@ -167,7 +167,7 @@ contract GaugeMigrationIntegrationTest is Test {
         // prepare new staking and gauge contracts
         vm.startPrank(configurator);
         GearStakingV3 newStaking = new GearStakingV3(configurator, address(gear), block.timestamp);
-        GaugeV3 newGauge = new GaugeV3(address(addressProvider), address(pool), address(newStaking));
+        GaugeV3 newGauge = new GaugeV3(address(addressProvider), address(quotaKeeper), address(newStaking));
 
         newStaking.setMigrator(address(staking));
         staking.setSuccessor(address(newStaking));
@@ -226,8 +226,8 @@ contract GaugeMigrationIntegrationTest is Test {
         newGauge.updateEpoch();
 
         // validate correctness
-        assertEq(quotaKeeper.getQuotaRate(address(token1)), 2200, "Incorrect token1 rate");
-        assertEq(quotaKeeper.getQuotaRate(address(token2)), 1200, "Incorrect token2 rate");
+        assertEq(quotaKeeper.tokenQuotaParams(address(token1)).rate, 2200, "Incorrect token1 rate");
+        assertEq(quotaKeeper.tokenQuotaParams(address(token2)).rate, 1200, "Incorrect token2 rate");
 
         // check that new gauge can be used to add tokens to quota keeper
         vm.prank(configurator);
