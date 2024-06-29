@@ -24,7 +24,7 @@ import {IInterestRateModel} from "../interfaces/base/IInterestRateModel.sol";
 
 // LIBS & TRAITS
 import {CreditLogic} from "../libraries/CreditLogic.sol";
-import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
+import {ACLTrait} from "../traits/ACLTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
 // CONSTANTS
@@ -42,7 +42,7 @@ struct DebtParams {
 /// @title Pool V3
 /// @notice Pool contract that implements lending and borrowing logic, compatible with ERC-4626 standard
 /// @notice Pool shares implement EIP-2612 permits
-contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV3 {
+contract PoolV3 is ERC4626, ERC20Permit, ACLTrait, ContractsRegisterTrait, IPoolV3 {
     using Math for uint256;
     using SafeCast for int256;
     using SafeCast for uint256;
@@ -112,7 +112,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         string memory name_,
         string memory symbol_
     )
-        ACLNonReentrantTrait(acl_) // U:[LP-1A]
+        ACLTrait(acl_) // U:[LP-1A]
         ContractsRegisterTrait(contractsRegister_)
         ERC4626(IERC20(underlyingToken_)) // U:[LP-1B]
         ERC20(name_, symbol_) // U:[LP-1B]

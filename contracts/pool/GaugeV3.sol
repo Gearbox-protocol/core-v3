@@ -10,7 +10,7 @@ import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 
 // TRAITS
-import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
+import {ACLTrait} from "../traits/ACLTrait.sol";
 
 // EXCEPTIONS
 import {
@@ -28,7 +28,7 @@ import {
 ///         determined by the Gearbox DAO. GEAR holders then vote either for CA side, which moves the rate towards min,
 ///         or for LP side, which moves it towards max.
 ///         Rates are only updated once per epoch (1 week), to avoid manipulation and make strategies more predictable.
-contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
+contract GaugeV3 is IGaugeV3, ACLTrait {
     /// @notice Contract version
     uint256 public constant override version = 3_10;
 
@@ -61,7 +61,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
     /// @param _quotaKeeper Address of the quota keeper to provide rates for
     /// @param _gearStaking Address of the GEAR staking contract
     constructor(address _acl, address _quotaKeeper, address _gearStaking)
-        ACLNonReentrantTrait(_acl)
+        ACLTrait(_acl)
         nonZeroAddress(_quotaKeeper) // U:[GA-1]
         nonZeroAddress(_gearStaking) // U:[GA-1]
     {

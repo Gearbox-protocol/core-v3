@@ -5,14 +5,15 @@ pragma solidity ^0.8.17;
 
 import {IContractsRegister} from "../interfaces/IContractsRegister.sol";
 import {RegisteredCreditManagerOnlyException, RegisteredPoolOnlyException} from "../interfaces/IExceptions.sol";
+import {IContractsRegisterTrait} from "../interfaces/base/IContractsRegisterTrait.sol";
 
 import {SanityCheckTrait} from "./SanityCheckTrait.sol";
 
 /// @title Contracts register trait
 /// @notice Trait that simplifies validation of pools and credit managers
-abstract contract ContractsRegisterTrait is SanityCheckTrait {
+abstract contract ContractsRegisterTrait is IContractsRegisterTrait, SanityCheckTrait {
     /// @notice Contracts register contract address
-    address public immutable contractsRegister;
+    address public immutable override contractsRegister;
 
     /// @dev Ensures that given address is a registered pool
     modifier registeredPoolOnly(address addr) {

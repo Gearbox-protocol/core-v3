@@ -3,6 +3,7 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
+import {IACLTrait} from "./base/IACLTrait.sol";
 import {IRateKeeper} from "./base/IRateKeeper.sol";
 
 interface ITumblerV3Events {
@@ -14,7 +15,7 @@ interface ITumblerV3Events {
 }
 
 /// @title Tumbler V3 interface
-interface ITumblerV3 is IRateKeeper, ITumblerV3Events {
+interface ITumblerV3 is IACLTrait, IRateKeeper, ITumblerV3Events {
     function epochLength() external view returns (uint256);
 
     function getTokens() external view returns (address[] memory);

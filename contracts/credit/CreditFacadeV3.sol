@@ -45,7 +45,7 @@ import {
 } from "../libraries/Constants.sol";
 
 // TRAITS
-import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
+import {ACLTrait} from "../traits/ACLTrait.sol";
 
 /// @title Credit facade V3
 /// @notice Provides a user interface to open, close and liquidate leveraged positions in the credit manager,
@@ -61,7 +61,7 @@ import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 ///         quota size validation, pausing on large protocol losses, Degen NFT whitelist mode, and forbidden tokens
 ///         (they count towards account value, but having them enabled as collateral restricts available actions and
 ///         activates a safer version of collateral check).
-contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
+contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
     using Address for address;
     using BitMask for uint256;
     using SafeERC20 for IERC20;
@@ -164,7 +164,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLNonReentrantTrait {
         address _weth,
         address _degenNFT,
         bool _expirable
-    ) ACLNonReentrantTrait(_acl) {
+    ) ACLTrait(_acl) {
         creditManager = _creditManager; // U:[FA-1]
         botList = _botList; // U:[FA-1]
         weth = _weth; // U:[FA-1]

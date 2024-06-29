@@ -14,12 +14,12 @@ import {
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {ITumblerV3} from "../interfaces/ITumblerV3.sol";
-import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
+import {ACLTrait} from "../traits/ACLTrait.sol";
 
 /// @title Tumbler V3
 /// @notice Extremely simplified version of `GaugeV3` contract for quota rates management, which,
 ///         instead of voting, allows controller to set rates directly with custom epoch length
-contract TumblerV3 is ITumblerV3, ACLNonReentrantTrait {
+contract TumblerV3 is ITumblerV3, ACLTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice Contract version
@@ -42,10 +42,7 @@ contract TumblerV3 is ITumblerV3, ACLNonReentrantTrait {
     /// @param  quotaKeeper_ Address of the quota keeper to provide rates for
     /// @param  epochLength_ Epoch length in seconds
     /// @custom:tests U:[TU-1]
-    constructor(address acl_, address quotaKeeper_, uint256 epochLength_)
-        ACLNonReentrantTrait(acl_)
-        nonZeroAddress(quotaKeeper_)
-    {
+    constructor(address acl_, address quotaKeeper_, uint256 epochLength_) ACLTrait(acl_) nonZeroAddress(quotaKeeper_) {
         quotaKeeper = quotaKeeper_;
         epochLength = epochLength_;
     }

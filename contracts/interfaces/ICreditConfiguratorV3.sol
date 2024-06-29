@@ -3,6 +3,7 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
+import {IACLTrait} from "./base/IACLTrait.sol";
 import {IVersion} from "./base/IVersion.sol";
 
 enum AllowanceAction {
@@ -95,7 +96,7 @@ interface ICreditConfiguratorV3Events {
 }
 
 /// @title Credit configurator V3 interface
-interface ICreditConfiguratorV3 is IVersion, ICreditConfiguratorV3Events {
+interface ICreditConfiguratorV3 is IACLTrait, IVersion, ICreditConfiguratorV3Events {
     function creditManager() external view returns (address);
 
     function creditFacade() external view returns (address);
