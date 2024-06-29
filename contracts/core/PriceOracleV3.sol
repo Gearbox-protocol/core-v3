@@ -20,15 +20,18 @@ import {IUpdatablePriceFeed} from "../interfaces/base/IPriceFeed.sol";
 import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
 import {PriceFeedValidationTrait} from "../traits/PriceFeedValidationTrait.sol";
 
-/// @title Price oracle V3
+/// @title  Price oracle V3
 /// @notice Acts as router that dispatches calls to corresponding price feeds.
-///         Underlying price feeds can be arbitrary, but they must adhere to Chainlink interface, i.e., implement
+///         - Underlying price feeds can be arbitrary, but they must adhere to Chainlink interface, i.e., implement
 ///         `latestRoundData` and always return answers with 8 decimals. They may also implement their own price
 ///         checks, in which case they may incidcate it by returning `skipPriceCheck = true`.
-///         Price oracle also provides "safe" pricing, which uses minimum of main and reserve feed answers. These
+///         - Price oracle also provides "safe" pricing, which uses minimum of main and reserve feed answers. These
 ///         two feeds are allowed to be the same, which effectively makes it trusted, but to reduce chances of
 ///         this happening accidentally, reserve price feed must be explicitly set after the main one.
-///         Finally, this contract serves as register for updatable price feeds and can be used to apply batched
+///         The primary purpose of reserve price feeds is to upper-bound main ones during the collateral check after
+///         operations that allow users to offload mispriced tokens on Gearbox and withdraw underlying; they should
+///         not be used for general collateral evaluation, including decisions on whether accounts are liquidatable.
+///         - Finally, this contract serves as register for updatable price feeds and can be used to apply batched
 ///         on-demand price updates while ensuring that those are not calls to arbitrary contracts.
 contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPriceOracleV3 {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -46,8 +49,8 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     EnumerableSet.AddressSet internal _updatablePriceFeedsSet;
 
     /// @notice Constructor
-    /// @param _acl ACL contract address
-    constructor(address _acl) ACLNonReentrantTrait(_acl) {}
+    /// @param  acl_ ACL contract address
+    constructor(address acl_) ACLNonReentrantTrait(acl_) {}
 
     /// @notice Returns all tokens that have price feeds
     function getTokens() external view override returns (address[] memory) {
@@ -79,33 +82,39 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     // ---------- //
 
     /// @notice Returns `token`'s price in USD (with 8 decimals)
+    /// @dev    Reverts if `token`'s price feed is not set
     function getPrice(address token) external view override returns (uint256 price) {
         (price,) = _getPrice(token);
     }
 
     /// @notice Returns `token`'s safe price in USD (with 8 decimals)
+    /// @dev    Reverts if `token`'s price feed is not set
     function getSafePrice(address token) external view override returns (uint256 price) {
         (price,) = _getSafePrice(token);
     }
 
     /// @notice Returns `token`'s price in USD (with 8 decimals) from its reserve price feed
+    /// @dev    Reverts if `token`'s reserve price feed is not set
     function getReservePrice(address token) external view override returns (uint256 price) {
         (price,) = _getReservePrice(token);
     }
 
     /// @notice Converts `amount` of `token` into USD amount (with 8 decimals)
+    /// @dev    Reverts if `token`'s price feed is not set
     function convertToUSD(uint256 amount, address token) external view override returns (uint256) {
         (uint256 price, uint256 scale) = _getPrice(token);
         return amount * price / scale;
     }
 
     /// @notice Converts `amount` of USD (with 8 decimals) into `token` amount
+    /// @dev    Reverts if `token`'s price feed is not set
     function convertFromUSD(uint256 amount, address token) external view override returns (uint256) {
         (uint256 price, uint256 scale) = _getPrice(token);
         return amount * scale / price;
     }
 
     /// @notice Converts `amount` of `tokenFrom` into `tokenTo` amount
+    /// @dev    Reverts if at least one of `tokenFrom` or `tokenTo`'s price feeds is not set
     function convert(uint256 amount, address tokenFrom, address tokenTo) external view override returns (uint256) {
         (uint256 priceFrom, uint256 scaleFrom) = _getPrice(tokenFrom);
         (uint256 priceTo, uint256 scaleTo) = _getPrice(tokenTo);
@@ -113,6 +122,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     }
 
     /// @notice Converts `amount` of `token` into USD amount (with 8 decimals) using safe price
+    /// @dev    Reverts if `token`'s price feed is not set
     function safeConvertToUSD(uint256 amount, address token) external view override returns (uint256) {
         (uint256 price, uint256 scale) = _getSafePrice(token);
         return amount * price / scale;
@@ -128,6 +138,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     }
 
     /// @notice Applies on-demand price feed updates, see `PriceUpdate` for details
+    /// @dev    Reverts if `updates` contains unrecognized price feeds
     /// @custom:tests U:[PO-5]
     function updatePrices(PriceUpdate[] calldata updates) external {
         unchecked {
@@ -143,8 +154,11 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     // CONFIGURATION //
     // ------------- //
 
-    /// @notice Sets `priceFeed` as `token`'s main price feed
-    /// @dev If new main price feed coincides with reserve one, unsets the latter
+    /// @notice Sets `priceFeed` as `token`'s main price feed.
+    ///         If new main price feed coincides with reserve one, unsets the latter.
+    /// @dev    Reverts if caller is not controller or configurator
+    /// @dev    `token` must satisfy validity conditions, see `_validateToken`
+    /// @dev    `priceFeed` must satisfy validity conditions, see `PriceFeedValidationTrait`
     /// @custom:tests U:[PO-3]
     function setPriceFeed(address token, address priceFeed, uint32 stalenessPeriod)
         external
@@ -166,7 +180,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
             skipCheck: skipCheck,
             tokenDecimals: params.tokenDecimals
         });
-        emit SetPriceFeed(token, priceFeed, stalenessPeriod, skipCheck);
+        emit SetPriceFeed({token: token, priceFeed: priceFeed, stalenessPeriod: stalenessPeriod, skipCheck: skipCheck});
 
         if (priceFeed == reservePriceFeedParams(token).priceFeed) {
             delete _priceFeedsParams[_getTokenReserveKey(token)];
@@ -174,8 +188,10 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
         }
     }
 
-    /// @notice Sets `priceFeed` as `token`'s reserve price feed
-    /// @dev Main price feed for the token must already be set
+    /// @notice Sets `priceFeed` as `token`'s reserve price feed.
+    ///         Main price feed for the token must already be set.
+    /// @dev    Reverts if caller is not configurator
+    /// @dev    `priceFeed` must satisfy common validity conditions, see `PriceFeedValidationTrait`
     /// @custom:tests U:[PO-4]
     function setReservePriceFeed(address token, address priceFeed, uint32 stalenessPeriod)
         external
@@ -194,12 +210,18 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
             skipCheck: skipCheck,
             tokenDecimals: params.tokenDecimals
         });
-        emit SetReservePriceFeed(token, priceFeed, stalenessPeriod, skipCheck);
+        emit SetReservePriceFeed({
+            token: token,
+            priceFeed: priceFeed,
+            stalenessPeriod: stalenessPeriod,
+            skipCheck: skipCheck
+        });
     }
 
     /// @notice Adds `priceFeed` to the set of updatable price feeds
-    /// @dev Price feed must be updatable but is not required to satisfy all validity conditions,
-    ///      e.g., decimals need not to be equal to 8
+    /// @dev    Reverts if caller is not configurator
+    /// @dev    Reverts if `priceFeed` is not updatable
+    /// @dev    `priceFeed` is not required to satisfy all validity conditions, e.g. decimals need not to be 8
     /// @custom:tests U:[PO-5]
     function addUpdatablePriceFeed(address priceFeed) external override nonZeroAddress(priceFeed) configuratorOnly {
         if (!_isUpdatable(priceFeed)) revert PriceFeedIsNotUpdatableException();
@@ -210,7 +232,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
     // INTERNALS //
     // --------- //
 
-    /// @dev Returns `token`'s price and scale from its main price feed
+    /// @dev    Returns `token`'s price and scale from its main price feed
     /// @custom:tests U:[PO-1]
     function _getPrice(address token) internal view returns (uint256 price, uint256 scale) {
         PriceFeedParams memory params = priceFeedParams(token);
@@ -218,7 +240,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
         return (_getPrice(params), _getScale(params));
     }
 
-    /// @dev Returns `token`'s safe price and scale computed as minimum between main and reserve feed prices
+    /// @dev    Returns `token`'s safe price and scale computed as minimum between main and reserve feed prices
     /// @custom:tests U:[PO-2]
     function _getSafePrice(address token) internal view returns (uint256 price, uint256 scale) {
         PriceFeedParams memory params = priceFeedParams(token);
@@ -229,7 +251,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
         return (Math.min(_getPrice(params), _getPrice(reserveParams)), _getScale(params));
     }
 
-    /// @dev Returns `token`'s price and scale from its reserve price feed
+    /// @dev    Returns `token`'s price and scale from its reserve price feed
     /// @custom:tests U:[PO-2]
     function _getReservePrice(address token) internal view returns (uint256 price, uint256 scale) {
         PriceFeedParams memory params = reservePriceFeedParams(token);
@@ -251,7 +273,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
         }
     }
 
-    /// @dev Returns key that is used to store `token`'s reserve feed in `_priceFeedsParams`
+    /// @dev    Returns key that is used to store `token`'s reserve feed in `_priceFeedsParams`
     /// @custom:tests U:[PO-6]
     function _getTokenReserveKey(address token) internal pure returns (address key) {
         // address(uint160(uint256(keccak256(abi.encodePacked("RESERVE", token)))))
@@ -261,7 +283,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
         }
     }
 
-    /// @dev Validates that `token` is a contract that returns `decimals` within allowed range
+    /// @dev    Validates that `token` is a contract that returns `decimals` within allowed range
     /// @custom:tests U:[PO-7]
     function _validateToken(address token) internal view returns (uint8 decimals) {
         if (!Address.isContract(token)) revert AddressIsNotContractException(token);

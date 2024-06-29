@@ -6,10 +6,10 @@ pragma solidity ^0.8.17;
 import {IVersion} from "./base/IVersion.sol";
 
 /// @notice Price feed params
-/// @param priceFeed Price feed address
-/// @param stalenessPeriod Period (in seconds) after which price feed's answer should be considered stale
-/// @param skipCheck Whether price feed implements its own safety and staleness checks
-/// @param tokenDecimals Token decimals
+/// @param  priceFeed Price feed address
+/// @param  stalenessPeriod Period (in seconds) after which price feed's answer should be considered stale
+/// @param  skipCheck Whether price feed implements its own safety and staleness checks
+/// @param  tokenDecimals Token decimals
 struct PriceFeedParams {
     address priceFeed;
     uint32 stalenessPeriod;
@@ -18,8 +18,8 @@ struct PriceFeedParams {
 }
 
 /// @notice On-demand price update params
-/// @param priceFeed Price feed to update, must be in the set of updatable feeds in the price oracle
-/// @param data Update data
+/// @param  priceFeed Price feed to update, must be in the set of updatable feeds in the price oracle
+/// @param  data Update data
 struct PriceUpdate {
     address priceFeed;
     bytes data;

@@ -7,30 +7,20 @@ import {EPOCHS_TO_WITHDRAW} from "../libraries/Constants.sol";
 import {IVersion} from "./base/IVersion.sol";
 
 /// @notice Voting contract status
-///         * NOT_ALLOWED - cannot vote or unvote
-///         * ALLOWED - can both vote and unvote
-///         * UNVOTE_ONLY - can only unvote
+///         * `NOT_ALLOWED` - can neither vote or unvote
+///         * `ALLOWED` - can both vote and unvote
+///         * `UNVOTE_ONLY` - can only unvote
 enum VotingContractStatus {
     NOT_ALLOWED,
     ALLOWED,
     UNVOTE_ONLY
 }
 
-struct UserVoteLockData {
-    uint96 totalStaked;
-    uint96 available;
-}
-
-struct WithdrawalData {
-    uint96[EPOCHS_TO_WITHDRAW] withdrawalsPerEpoch;
-    uint16 epochLastUpdate;
-}
-
 /// @notice Multi vote
-/// @param votingContract Contract to submit a vote to
-/// @param voteAmount Amount of staked GEAR to vote with
-/// @param isIncrease Whether to add or remove votes
-/// @param extraData Data to pass to the voting contract
+/// @param  votingContract Contract to submit a vote to
+/// @param  voteAmount Amount of staked GEAR to vote with
+/// @param  isIncrease Whether to add or remove votes
+/// @param  extraData Data to pass to the voting contract
 struct MultiVote {
     address votingContract;
     uint96 voteAmount;
@@ -39,25 +29,25 @@ struct MultiVote {
 }
 
 interface IGearStakingV3Events {
-    /// @notice Emitted when the user deposits GEAR into staked GEAR
+    /// @notice Emitted when the user deposits GEAR into staking contract
     event DepositGear(address indexed user, uint256 amount);
 
-    /// @notice Emitted Emits when the user migrates GEAR into a successor contract
+    /// @notice Emitted when the user migrates GEAR into a successor contract
     event MigrateGear(address indexed user, address indexed successor, uint256 amount);
 
-    /// @notice Emitted Emits when the user starts a withdrawal from staked GEAR
+    /// @notice Emitted when the user starts a withdrawal from staked contract
     event ScheduleGearWithdrawal(address indexed user, uint256 amount);
 
-    /// @notice Emitted Emits when the user claims a mature withdrawal from staked GEAR
+    /// @notice Emitted when the user claims a mature withdrawal from staked contract
     event ClaimGearWithdrawal(address indexed user, address to, uint256 amount);
 
-    /// @notice Emitted Emits when the configurator adds or removes a voting contract
+    /// @notice Emitted when the configurator adds or removes a voting contract
     event SetVotingContractStatus(address indexed votingContract, VotingContractStatus status);
 
-    /// @notice Emitted Emits when the new successor contract is set
+    /// @notice Emitted when the new successor contract is set
     event SetSuccessor(address indexed successor);
 
-    /// @notice Emitted Emits when the new migrator contract is set
+    /// @notice Emitted when the new migrator contract is set
     event SetMigrator(address indexed migrator);
 }
 

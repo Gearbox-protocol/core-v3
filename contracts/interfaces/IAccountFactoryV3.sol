@@ -26,6 +26,10 @@ interface IAccountFactoryV3Events {
 interface IAccountFactoryV3 is IVersion, IAccountFactoryV3Events {
     function delay() external view returns (uint40);
 
+    function isCreditManagerAdded(address creditManager) external view returns (bool);
+
+    function creditManagers() external view returns (address[] memory);
+
     function takeCreditAccount(uint256, uint256) external returns (address creditAccount);
 
     function returnCreditAccount(address creditAccount) external;

@@ -39,6 +39,10 @@ contract AccountFactoryMock is Test, IAccountFactoryV3 {
 
     function delay() external pure override returns (uint40) {}
 
+    function creditManagers() external pure override returns (address[] memory) {}
+
+    function isCreditManagerAdded(address) external pure override returns (bool) {}
+
     function addCreditManager(address) external pure override {}
 
     function rescue(address, address, bytes calldata) external pure override {}
