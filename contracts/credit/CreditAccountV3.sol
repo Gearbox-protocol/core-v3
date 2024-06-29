@@ -38,13 +38,6 @@ contract CreditAccountV3 is ICreditAccountV3 {
         _;
     }
 
-    /// @dev Reverts if `msg.sender` is not credit manager
-    function _revertIfNotCreditManager() internal view {
-        if (msg.sender != creditManager) {
-            revert CallerNotCreditManagerException();
-        }
-    }
-
     /// @notice Constructor
     /// @param _creditManager Credit manager to connect this account to
     constructor(address _creditManager) {
@@ -89,5 +82,12 @@ contract CreditAccountV3 is ICreditAccountV3 {
         factoryOnly // U:[CA-2]
     {
         target.functionCall(data); // U:[CA-5]
+    }
+
+    /// @dev Reverts if `msg.sender` is not credit manager
+    function _revertIfNotCreditManager() internal view {
+        if (msg.sender != creditManager) {
+            revert CallerNotCreditManagerException();
+        }
     }
 }

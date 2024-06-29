@@ -92,14 +92,14 @@ contract TumblerV3 is ITumblerV3, ACLNonReentrantTrait {
     /// @notice Sets `token`'s rate to `rate`
     /// @dev    Reverts if `token` is not added or `rate` is zero
     /// @custom:tests U:[TU-3]
-    function setRate(address token, uint16 rate) external override controllerOnly {
+    function setRate(address token, uint16 rate) external override controllerOrConfiguratorOnly {
         if (!isTokenAdded(token)) revert TokenIsNotQuotedException();
         _setRate(token, rate);
     }
 
     /// @notice Updates rates in the quota keeper if time passed since the last update is greater than epoch length
     /// @custom:tests U:[TU-4], I:[QR-1]
-    function updateRates() external override controllerOnly {
+    function updateRates() external override controllerOrConfiguratorOnly {
         if (block.timestamp < IPoolQuotaKeeperV3(quotaKeeper).lastQuotaRateUpdate() + epochLength) return;
         IPoolQuotaKeeperV3(quotaKeeper).updateRates();
     }

@@ -151,7 +151,7 @@ contract PriceOracleV3 is ACLNonReentrantTrait, PriceFeedValidationTrait, IPrice
         override
         nonZeroAddress(token)
         nonZeroAddress(priceFeed)
-        controllerOnly
+        controllerOrConfiguratorOnly
     {
         PriceFeedParams memory params = priceFeedParams(token);
         if (params.priceFeed == address(0)) {

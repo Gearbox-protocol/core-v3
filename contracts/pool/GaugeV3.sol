@@ -252,7 +252,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
         external
         override
         nonZeroAddress(token) // U:[GA-4]
-        controllerOnly // U:[GA-3]
+        controllerOrConfiguratorOnly // U:[GA-3]
     {
         _changeQuotaTokenRateParams(token, minRate, quotaRateParams[token].maxRate);
     }
@@ -263,7 +263,7 @@ contract GaugeV3 is IGaugeV3, ACLNonReentrantTrait {
         external
         override
         nonZeroAddress(token) // U:[GA-4]
-        controllerOnly // U:[GA-3]
+        controllerOrConfiguratorOnly // U:[GA-3]
     {
         _changeQuotaTokenRateParams(token, quotaRateParams[token].minRate, maxRate);
     }

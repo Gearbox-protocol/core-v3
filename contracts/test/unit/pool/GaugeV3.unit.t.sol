@@ -93,10 +93,10 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         gauge.addQuotaToken(DUMB_ADDRESS, 0, 0);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         gauge.changeQuotaMinRate(DUMB_ADDRESS, 0);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         gauge.changeQuotaMaxRate(DUMB_ADDRESS, 0);
     }
 

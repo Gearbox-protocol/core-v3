@@ -349,7 +349,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @dev    Reverts if `limit` is above `type(int96).max`
     /// @dev    Reverts if `token` is not added
     /// @custom:tests U:[QK-2], U:[QK-9]
-    function setTokenLimit(address token, uint96 limit) external override controllerOnly {
+    function setTokenLimit(address token, uint96 limit) external override controllerOrConfiguratorOnly {
         if (limit > uint96(type(int96).max)) revert IncorrectParameterException();
         if (!_quotedTokensSet.contains(token)) revert TokenIsNotQuotedException();
 
@@ -361,7 +361,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @dev    Reverts if `fee` is above 100%
     /// @dev    Reverts if `token` is not added
     /// @custom:tests U:[QK-2], U:[QK-10]
-    function setTokenQuotaIncreaseFee(address token, uint16 fee) external override controllerOnly {
+    function setTokenQuotaIncreaseFee(address token, uint16 fee) external override controllerOrConfiguratorOnly {
         if (fee > PERCENTAGE_FACTOR) revert IncorrectParameterException();
         if (!_quotedTokensSet.contains(token)) revert TokenIsNotQuotedException();
 

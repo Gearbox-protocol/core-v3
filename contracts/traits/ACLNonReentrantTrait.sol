@@ -7,7 +7,7 @@ import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 
 import {IACL} from "../interfaces/IACL.sol";
 import {
-    CallerNotControllerException,
+    CallerNotControllerOrConfiguratorException,
     CallerNotPausableAdminException,
     CallerNotUnpausableAdminException
 } from "../interfaces/IExceptions.sol";
@@ -26,7 +26,7 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable, ReentrancyGuardTra
     address public controller;
 
     /// @dev Ensures that function caller is external controller or configurator
-    modifier controllerOnly() {
+    modifier controllerOrConfiguratorOnly() {
         _ensureCallerIsControllerOrConfigurator();
         _;
     }
@@ -72,7 +72,7 @@ abstract contract ACLNonReentrantTrait is ACLTrait, Pausable, ReentrancyGuardTra
     /// @dev Used to cut contract size on modifiers
     function _ensureCallerIsControllerOrConfigurator() internal view {
         if (msg.sender != controller && !_isConfigurator(msg.sender)) {
-            revert CallerNotControllerException();
+            revert CallerNotControllerOrConfiguratorException();
         }
     }
 

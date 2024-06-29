@@ -213,7 +213,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.setCreditFacade(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        creditConfigurator.upgradeCreditConfigurator(DUMB_ADDRESS);
+        creditConfigurator.setCreditConfigurator(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.addEmergencyLiquidator(address(0));
@@ -236,33 +236,33 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.forbidToken(DUMB_ADDRESS);
     }
 
-    /// @dev I:[CC-2B]: controllerOnly functions revert on non-pausable admin
-    function test_I_CC_02B_controllerOnly_functions_revert_on_non_controller() public creditTest {
-        vm.expectRevert(CallerNotControllerException.selector);
+    /// @dev I:[CC-2B]: controllerOrConfiguratorOnly functions revert on non-pausable admin
+    function test_I_CC_02B_controllerOrConfiguratorOnly_functions_revert_on_non_controller() public creditTest {
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         creditConfigurator.setLiquidationThreshold(DUMB_ADDRESS, uint16(0));
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         creditConfigurator.rampLiquidationThreshold(DUMB_ADDRESS, 0, 0, 0);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         creditConfigurator.allowToken(DUMB_ADDRESS);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         creditConfigurator.forbidAdapter(DUMB_ADDRESS);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         creditConfigurator.setMinDebtLimit(0);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         creditConfigurator.setMaxDebtLimit(0);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         creditConfigurator.setMaxDebtPerBlockMultiplier(0);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         creditConfigurator.setMaxCumulativeLoss(0);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         creditConfigurator.resetCumulativeLoss();
     }
 
@@ -708,9 +708,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         uint16 newLiquidationPremiumExpired = (PERCENTAGE_FACTOR - liquidationDiscountExpired) * 3 / 2;
 
         vm.expectEmit(false, false, false, true);
-        emit UpdateFees(
-            newFeeLiquidation, newLiquidationPremium, newFeeLiquidationExpired, newLiquidationPremiumExpired
-        );
+        emit SetFees(newFeeLiquidation, newLiquidationPremium, newFeeLiquidationExpired, newLiquidationPremiumExpired);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.setFees(
@@ -733,19 +731,19 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.setCreditFacade(address(0));
 
         vm.expectRevert(ZeroAddressException.selector);
-        creditConfigurator.upgradeCreditConfigurator(address(0));
+        creditConfigurator.setCreditConfigurator(address(0));
 
         vm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, DUMB_ADDRESS));
         creditConfigurator.setCreditFacade(DUMB_ADDRESS);
 
         vm.expectRevert(abi.encodeWithSelector(AddressIsNotContractException.selector, DUMB_ADDRESS));
-        creditConfigurator.upgradeCreditConfigurator(DUMB_ADDRESS);
+        creditConfigurator.setCreditConfigurator(DUMB_ADDRESS);
 
         vm.expectRevert(IncompatibleContractException.selector);
         creditConfigurator.setCreditFacade(underlying);
 
         vm.expectRevert(IncompatibleContractException.selector);
-        creditConfigurator.upgradeCreditConfigurator(underlying);
+        creditConfigurator.setCreditConfigurator(underlying);
 
         AdapterMock adapterDifferentCM = getAdapterDifferentCM();
 
@@ -753,7 +751,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.setCreditFacade(address(adapterDifferentCM));
 
         vm.expectRevert(IncompatibleContractException.selector);
-        creditConfigurator.upgradeCreditConfigurator(address(adapterDifferentCM));
+        creditConfigurator.setCreditConfigurator(address(adapterDifferentCM));
     }
 
     /// @dev I:[CC-21]: setPriceOracle upgrades priceOracle correctly
@@ -929,13 +927,13 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
         vm.expectRevert(IncorrectAdaptersSetException.selector);
         vm.prank(CONFIGURATOR);
-        creditConfigurator.upgradeCreditConfigurator(address(cc1));
+        creditConfigurator.setCreditConfigurator(address(cc1));
 
         vm.expectEmit(true, true, true, true);
-        emit CreditConfiguratorUpgraded(address(cc2));
+        emit SetCreditConfigurator(address(cc2));
 
         vm.prank(CONFIGURATOR);
-        creditConfigurator.upgradeCreditConfigurator(address(cc2));
+        creditConfigurator.setCreditConfigurator(address(cc2));
 
         assertEq(address(creditManager.creditConfigurator()), address(cc2));
     }

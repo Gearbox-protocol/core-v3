@@ -106,10 +106,10 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         vm.expectRevert(CallerNotConfiguratorException.selector);
         pqk.addCreditManager(DUMB_ADDRESS);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         pqk.setTokenLimit(DUMB_ADDRESS, 1);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         pqk.setTokenQuotaIncreaseFee(DUMB_ADDRESS, 1);
 
         vm.stopPrank();

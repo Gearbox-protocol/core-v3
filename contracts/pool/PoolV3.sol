@@ -534,7 +534,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     }
 
     /// @notice Current cumulative base interest index in ray
-    function baseInterestIndex() public view override returns (uint256) {
+    function baseInterestIndex() external view override returns (uint256) {
         uint256 timestampLU = lastBaseInterestUpdate;
         if (block.timestamp == timestampLU) return _baseInterestIndexLU; // U:[LP-16]
         return _calcBaseInterestIndex(timestampLU); // U:[LP-16]
@@ -686,24 +686,24 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         emit SetPoolQuotaKeeper(quotaKeeper); // U:[LP-23D]
     }
 
-    /// @notice Sets new total debt limit, can only be called by controller
+    /// @notice Sets new total debt limit, can only be called by controller or configurator
     /// @param newLimit New debt limit, `type(uint256).max` for no limit
     function setTotalDebtLimit(uint256 newLimit)
         external
         override
-        controllerOnly // U:[LP-2C]
+        controllerOrConfiguratorOnly // U:[LP-2C]
     {
         _setTotalDebtLimit(newLimit); // U:[LP-24]
     }
 
-    /// @notice Sets new debt limit for a given credit manager, can only be called by controller
+    /// @notice Sets new debt limit for a given credit manager, can only be called by controller or configurator
     ///         Adds credit manager to the list of connected managers when called for the first time
     /// @param creditManager Credit manager to set the limit for
     /// @param newLimit New debt limit, `type(uint256).max` for no limit (has smaller priority than total debt limit)
     function setCreditManagerDebtLimit(address creditManager, uint256 newLimit)
         external
         override
-        controllerOnly // U:[LP-2C]
+        controllerOrConfiguratorOnly // U:[LP-2C]
         nonZeroAddress(creditManager) // U:[LP-25A]
         registeredCreditManagerOnly(creditManager) // U:[LP-25B]
     {
@@ -762,13 +762,13 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     }
 
     /// @dev Returns amount of token that should be transferred to receive `amount`
-    ///      Pools with fee-on-transfer underlying should override this method
+    /// @dev Pools with fee-on-transfer underlying should override this method
     function _amountWithFee(uint256 amount) internal view virtual returns (uint256) {
         return amount;
     }
 
     /// @dev Returns amount of token that will be received if `amount` is transferred
-    ///      Pools with fee-on-transfer underlying should override this method
+    /// @dev Pools with fee-on-transfer underlying should override this method
     function _amountMinusFee(uint256 amount) internal view virtual returns (uint256) {
         return amount;
     }

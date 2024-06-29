@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 import {Test} from "forge-std/Test.sol";
 
 import {
-    CallerNotControllerException,
+    CallerNotControllerOrConfiguratorException,
     IncorrectParameterException,
     TokenIsNotQuotedException,
     TokenNotAllowedException,
@@ -139,7 +139,7 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
     /// @notice U:[TU-4]: `updateRates` works as expected
     function test_U_TU_04_updateRates_works_as_expected() public {
         // reverts on unauthorized caller
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         vm.prank(makeAddr("dude"));
         tumbler.updateRates();
 
