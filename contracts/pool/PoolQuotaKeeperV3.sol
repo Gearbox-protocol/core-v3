@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
-pragma solidity 0.8.23;
+pragma solidity ^0.8.23;
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
@@ -13,7 +13,7 @@ import {IRateKeeper} from "../interfaces/base/IRateKeeper.sol";
 import {PERCENTAGE_FACTOR} from "../libraries/Constants.sol";
 import {QuotasLogic} from "../libraries/QuotasLogic.sol";
 
-import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
+import {ACLTrait} from "../traits/ACLTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
 import "../interfaces/IExceptions.sol";
@@ -27,7 +27,7 @@ import "../interfaces/IExceptions.sol";
 ///         Quota keeper stores information about quotas of accounts in all credit managers connected to the pool, and
 ///         performs calculations that help to keep pool's expected liquidity and credit managers' debt consistent.
 /// @dev Any contract that implements the `IRateKeeper` interface can be used everywhere where the term "gauge" is used
-contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, ContractsRegisterTrait {
+contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLTrait, ContractsRegisterTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice Contract version
@@ -75,7 +75,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @param pool_ Pool address
     /// @custom:tests U:[QK-1]
     constructor(address acl_, address contractsRegister_, address pool_)
-        ACLNonReentrantTrait(acl_)
+        ACLTrait(acl_)
         ContractsRegisterTrait(contractsRegister_)
     {
         pool = pool_;
@@ -349,7 +349,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @dev    Reverts if `limit` is above `type(int96).max`
     /// @dev    Reverts if `token` is not added
     /// @custom:tests U:[QK-2], U:[QK-9]
-    function setTokenLimit(address token, uint96 limit) external override controllerOnly {
+    function setTokenLimit(address token, uint96 limit) external override controllerOrConfiguratorOnly {
         if (limit > uint96(type(int96).max)) revert IncorrectParameterException();
         if (!_quotedTokensSet.contains(token)) revert TokenIsNotQuotedException();
 
@@ -361,7 +361,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLNonReentrantTrait, Contract
     /// @dev    Reverts if `fee` is above 100%
     /// @dev    Reverts if `token` is not added
     /// @custom:tests U:[QK-2], U:[QK-10]
-    function setTokenQuotaIncreaseFee(address token, uint16 fee) external override controllerOnly {
+    function setTokenQuotaIncreaseFee(address token, uint16 fee) external override controllerOrConfiguratorOnly {
         if (fee > PERCENTAGE_FACTOR) revert IncorrectParameterException();
         if (!_quotedTokensSet.contains(token)) revert TokenIsNotQuotedException();
 

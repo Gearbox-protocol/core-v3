@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
-pragma solidity 0.8.23;
+pragma solidity ^0.8.23;
 
 // THIRD-PARTY
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -53,10 +53,9 @@ import "../interfaces/IExceptions.sol";
 ///         to open accounts and perform interactions with external protocols, while the DAO can configure manager
 ///         params using `CreditConfiguratorV3`. Both mentioned contracts perform some important safety checks.
 contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardTrait {
-    using EnumerableSet for EnumerableSet.AddressSet;
     using BitMask for uint256;
-    using Math for uint256;
     using CreditLogic for CollateralDebtData;
+    using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
 
     /// @notice Contract version
@@ -962,7 +961,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @return liquidationThreshold Token's liquidation threshold in bps
     /// @dev Reverts if `tokenMask` doesn't correspond to any known collateral token
     function collateralTokenByMask(uint256 tokenMask)
-        public
+        external
         view
         override
         returns (address token, uint16 liquidationThreshold)
@@ -1053,7 +1052,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     /// @notice Returns `creditAccount`'s flags as a bit mask
     /// @dev Does not revert if `creditAccount` is not opened in this credit manager
-    function flagsOf(address creditAccount) public view override returns (uint16) {
+    function flagsOf(address creditAccount) external view override returns (uint16) {
         return creditAccountInfo[creditAccount].flags; // U:[CM-35]
     }
 
@@ -1112,10 +1111,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         uint256 resultLen = offset + limit > len ? (offset > len ? 0 : len - offset) : limit;
 
         result = new address[](resultLen);
-        unchecked {
-            for (uint256 i = 0; i < resultLen; ++i) {
-                result[i] = creditAccountsSet.at(offset + i);
-            }
+        for (uint256 i; i < resultLen; ++i) {
+            result[i] = creditAccountsSet.at(offset + i);
         }
     }
 
@@ -1283,13 +1280,13 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     }
 
     /// @dev Returns amount of token that should be transferred to receive `amount`
-    ///      Pools with fee-on-transfer underlying should override this method
+    /// @dev Credit managers with fee-on-transfer underlying should override this method
     function _amountWithFee(uint256 amount) internal view virtual returns (uint256) {
         return amount;
     }
 
     /// @dev Returns amount of token that will be received if `amount` is transferred
-    ///      Pools with fee-on-transfer underlying should override this method
+    /// @dev Credit managers with fee-on-transfer underlying should override this method
     function _amountMinusFee(uint256 amount) internal view virtual returns (uint256) {
         return amount;
     }

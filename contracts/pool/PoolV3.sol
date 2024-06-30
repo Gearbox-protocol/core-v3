@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
-pragma solidity 0.8.23;
+pragma solidity ^0.8.23;
 
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 
@@ -24,7 +24,7 @@ import {IInterestRateModel} from "../interfaces/base/IInterestRateModel.sol";
 
 // LIBS & TRAITS
 import {CreditLogic} from "../libraries/CreditLogic.sol";
-import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
+import {ACLTrait} from "../traits/ACLTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
 // CONSTANTS
@@ -40,9 +40,15 @@ struct DebtParams {
 }
 
 /// @title Pool V3
-/// @notice Pool contract that implements lending and borrowing logic, compatible with ERC-4626 standard
-/// @notice Pool shares implement EIP-2612 permits
-contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegisterTrait, IPoolV3 {
+/// @notice Pool contract that implements lending and borrowing logic, compatible with ERC-4626 standard and
+///         supporting EIP-2612 permits. Pool's underlying is expected to be your normal ERC-20 token:
+///         - no rebasing or any calculations that can affect transfers accuracy (fee-on-transfer tokens can
+///         be supported though by overriding `_amountWithFee` and `_amountMinusFee` functions)
+///         - such scale that amounts fit into `uint96` and are not sensitive to ~4 digits precision loss
+///         (nearly all tokens with decimals between 6 and 18 work)
+/// @dev To prevent the first depositor front-running attack, small amount of shares must be minted to some
+///      dead address before allowing borrowing
+contract PoolV3 is ERC4626, ERC20Permit, ACLTrait, ContractsRegisterTrait, IPoolV3 {
     using Math for uint256;
     using SafeCast for int256;
     using SafeCast for uint256;
@@ -87,6 +93,12 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     /// @dev List of all connected credit managers
     EnumerableSet.AddressSet internal _creditManagerSet;
 
+    /// @dev Ensures that function can only be called by connected credit managers
+    modifier creditManagerOnly() {
+        _revertIfCallerIsNotCreditManager();
+        _;
+    }
+
     /// @dev Ensures that function can only be called by the pool quota keeper
     modifier poolQuotaKeeperOnly() {
         _revertIfCallerIsNotPoolQuotaKeeper();
@@ -112,7 +124,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         string memory name_,
         string memory symbol_
     )
-        ACLNonReentrantTrait(acl_) // U:[LP-1A]
+        ACLTrait(acl_) // U:[LP-1A]
         ContractsRegisterTrait(contractsRegister_)
         ERC4626(IERC20(underlyingToken_)) // U:[LP-1B]
         ERC20(name_, symbol_) // U:[LP-1B]
@@ -169,7 +181,6 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     // ---------------- //
 
     /// @notice Total amount of underlying tokens managed by the pool, same as `expectedLiquidity`
-    /// @dev Since `totalAssets` doesn't depend on underlying balance, pool is not vulnerable to the inflation attack
     function totalAssets() public view override(ERC4626, IERC4626) returns (uint256 assets) {
         return expectedLiquidity();
     }
@@ -360,14 +371,12 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     }
 
     /// @dev Internal conversion function (from assets to shares) with support for rounding direction
-    /// @dev Pool is not vulnerable to the inflation attack, so the simplified implementation w/o virtual shares is used
     function _convertToShares(uint256 assets, Math.Rounding rounding) internal view override returns (uint256 shares) {
         uint256 supply = totalSupply();
         return (assets == 0 || supply == 0) ? assets : assets.mulDiv(supply, totalAssets(), rounding);
     }
 
     /// @dev Internal conversion function (from shares to assets) with support for rounding direction
-    /// @dev Pool is not vulnerable to the inflation attack, so the simplified implementation w/o virtual shares is used
     function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view override returns (uint256 assets) {
         uint256 supply = totalSupply();
         return (supply == 0) ? shares : shares.mulDiv(totalAssets(), supply, rounding);
@@ -421,14 +430,15 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         override
         whenNotPaused // U:[LP-2A]
         nonReentrant // U:[LP-2B]
+        creditManagerOnly // U:[LP-2C]
     {
         uint128 borrowedAmountU128 = borrowedAmount.toUint128();
 
         DebtParams storage cmDebt = _creditManagerDebt[msg.sender];
         uint128 totalBorrowed_ = _totalDebt.borrowed + borrowedAmountU128;
         uint128 cmBorrowed_ = cmDebt.borrowed + borrowedAmountU128;
-        if (borrowedAmount == 0 || cmBorrowed_ > cmDebt.limit || totalBorrowed_ > _totalDebt.limit) {
-            revert CreditManagerCantBorrowException(); // U:[LP-2C,13A]
+        if (cmBorrowed_ > cmDebt.limit || totalBorrowed_ > _totalDebt.limit) {
+            revert CreditManagerCantBorrowException(); // U:[LP-13A]
         }
 
         _updateBaseInterest({
@@ -462,15 +472,8 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         override
         whenNotPaused // U:[LP-2A]
         nonReentrant // U:[LP-2B]
+        creditManagerOnly // U:[LP-2C]
     {
-        uint128 repaidAmountU128 = repaidAmount.toUint128();
-
-        DebtParams storage cmDebt = _creditManagerDebt[msg.sender];
-        uint128 cmBorrowed = cmDebt.borrowed;
-        if (cmBorrowed == 0) {
-            revert CallerNotCreditManagerException(); // U:[LP-2C,14A]
-        }
-
         if (profit > 0) {
             _mint(treasury, convertToShares(profit)); // U:[LP-14B]
         } else if (loss > 0) {
@@ -495,8 +498,9 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
             checkOptimalBorrowing: false
         }); // U:[LP-14B,14C,14D]
 
+        uint128 repaidAmountU128 = repaidAmount.toUint128();
         _totalDebt.borrowed -= repaidAmountU128; // U:[LP-14B,14C,14D]
-        cmDebt.borrowed = cmBorrowed - repaidAmountU128; // U:[LP-14B,14C,14D]
+        _creditManagerDebt[msg.sender].borrowed -= repaidAmountU128; // U:[LP-14B,14C,14D]
 
         emit Repay(msg.sender, repaidAmount, profit, loss); // U:[LP-14B,14C,14D]
     }
@@ -534,7 +538,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     }
 
     /// @notice Current cumulative base interest index in ray
-    function baseInterestIndex() public view override returns (uint256) {
+    function baseInterestIndex() external view override returns (uint256) {
         uint256 timestampLU = lastBaseInterestUpdate;
         if (block.timestamp == timestampLU) return _baseInterestIndexLU; // U:[LP-16]
         return _calcBaseInterestIndex(timestampLU); // U:[LP-16]
@@ -686,24 +690,24 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
         emit SetPoolQuotaKeeper(quotaKeeper); // U:[LP-23D]
     }
 
-    /// @notice Sets new total debt limit, can only be called by controller
+    /// @notice Sets new total debt limit, can only be called by controller or configurator
     /// @param newLimit New debt limit, `type(uint256).max` for no limit
     function setTotalDebtLimit(uint256 newLimit)
         external
         override
-        controllerOnly // U:[LP-2C]
+        controllerOrConfiguratorOnly // U:[LP-2C]
     {
         _setTotalDebtLimit(newLimit); // U:[LP-24]
     }
 
-    /// @notice Sets new debt limit for a given credit manager, can only be called by controller
+    /// @notice Sets new debt limit for a given credit manager, can only be called by controller or configurator
     ///         Adds credit manager to the list of connected managers when called for the first time
     /// @param creditManager Credit manager to set the limit for
     /// @param newLimit New debt limit, `type(uint256).max` for no limit (has smaller priority than total debt limit)
     function setCreditManagerDebtLimit(address creditManager, uint256 newLimit)
         external
         override
-        controllerOnly // U:[LP-2C]
+        controllerOrConfiguratorOnly // U:[LP-2C]
         nonZeroAddress(creditManager) // U:[LP-25A]
         registeredCreditManagerOnly(creditManager) // U:[LP-25B]
     {
@@ -747,6 +751,11 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     // INTERNALS //
     // --------- //
 
+    /// @dev Ensures that function caller is a connected credit manager
+    function _revertIfCallerIsNotCreditManager() internal view {
+        if (!_creditManagerSet.contains(msg.sender)) revert CallerNotCreditManagerException(); // U:[LP-2C]
+    }
+
     /// @dev Ensures that function caller is quota keeper, which must be initialized
     function _revertIfCallerIsNotPoolQuotaKeeper() internal view {
         if (msg.sender != poolQuotaKeeper()) revert CallerNotPoolQuotaKeeperException(); // U:[LP-2C]
@@ -762,13 +771,13 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLNonReentrantTrait, ContractsRegister
     }
 
     /// @dev Returns amount of token that should be transferred to receive `amount`
-    ///      Pools with fee-on-transfer underlying should override this method
+    /// @dev Pools with fee-on-transfer underlying should override this method
     function _amountWithFee(uint256 amount) internal view virtual returns (uint256) {
         return amount;
     }
 
     /// @dev Returns amount of token that will be received if `amount` is transferred
-    ///      Pools with fee-on-transfer underlying should override this method
+    /// @dev Pools with fee-on-transfer underlying should override this method
     function _amountMinusFee(uint256 amount) internal view virtual returns (uint256) {
         return amount;
     }

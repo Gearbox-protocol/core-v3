@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
-pragma solidity 0.8.23;
+pragma solidity ^0.8.23;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
@@ -36,13 +36,6 @@ contract CreditAccountV3 is ICreditAccountV3 {
     modifier creditManagerOnly() {
         _revertIfNotCreditManager();
         _;
-    }
-
-    /// @dev Reverts if `msg.sender` is not credit manager
-    function _revertIfNotCreditManager() internal view {
-        if (msg.sender != creditManager) {
-            revert CallerNotCreditManagerException();
-        }
     }
 
     /// @notice Constructor
@@ -89,5 +82,12 @@ contract CreditAccountV3 is ICreditAccountV3 {
         factoryOnly // U:[CA-2]
     {
         target.functionCall(data); // U:[CA-5]
+    }
+
+    /// @dev Reverts if `msg.sender` is not credit manager
+    function _revertIfNotCreditManager() internal view {
+        if (msg.sender != creditManager) {
+            revert CallerNotCreditManagerException();
+        }
     }
 }

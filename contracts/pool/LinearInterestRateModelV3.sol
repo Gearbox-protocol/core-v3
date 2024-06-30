@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {ILinearInterestRateModelV3} from "../interfaces/ILinearInterestRateModelV3.sol";
 import {IncorrectParameterException, BorrowingMoreThanU2ForbiddenException} from "../interfaces/IExceptions.sol";
@@ -81,7 +81,7 @@ contract LinearInterestRateModelV3 is ILinearInterestRateModelV3 {
     /// @param checkOptimalBorrowing Whether to check if borrowing over `U_2` utilization should be prevented
     /// @custom:tests U:[LIM-3], U:[LIM-4]
     function calcBorrowRate(uint256 expectedLiquidity, uint256 availableLiquidity, bool checkOptimalBorrowing)
-        public
+        external
         view
         override
         returns (uint256)

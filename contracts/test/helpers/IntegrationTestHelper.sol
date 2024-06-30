@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import "../interfaces/IAddressProviderV3.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -30,7 +30,12 @@ import {PoolFactory} from "../suites/PoolFactory.sol";
 import {TokensTestSuite} from "../suites/TokensTestSuite.sol";
 import {NetworkDetector} from "@gearbox-protocol/sdk-gov/contracts/NetworkDetector.sol";
 
-import {IPoolV3DeployConfig, CreditManagerV3DeployParams, CollateralTokenHuman} from "../interfaces/ICreditConfig.sol";
+import {
+    IPoolV3DeployConfig,
+    CreditManagerV3DeployParams,
+    CollateralTokenHuman,
+    PriceFeedConfig
+} from "../interfaces/ICreditConfig.sol";
 import {MockCreditConfig} from "../config/MockCreditConfig.sol";
 import {TestHelper} from "../lib/helper.sol";
 import {ERC20Mock} from "../mocks/token/ERC20Mock.sol";
@@ -212,8 +217,11 @@ contract IntegrationTestHelper is TestHelper, BalanceHelper, ConfigManager {
         weth = tokenTestSuite.addressOf(Tokens.WETH);
 
         vm.startPrank(CONFIGURATOR);
-        GenesisFactory gp = new GenesisFactory(weth, DUMB_ADDRESS);
-        if (chainId == 1337 || chainId == 31337) gp.addPriceFeeds(tokenTestSuite.getPriceFeeds());
+        GenesisFactory gp = new GenesisFactory(
+            weth,
+            DUMB_ADDRESS,
+            chainId == 1337 || chainId == 31337 ? tokenTestSuite.getPriceFeeds() : new PriceFeedConfig[](0)
+        );
         addressProvider = gp.addressProvider();
         vm.stopPrank();
 

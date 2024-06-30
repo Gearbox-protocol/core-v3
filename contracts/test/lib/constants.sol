@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {WAD, RAY, DEFAULT_FEE_LIQUIDATION, DEFAULT_LIQUIDATION_PREMIUM} from "../../libraries/Constants.sol";
 import {Test} from "forge-std/Test.sol";

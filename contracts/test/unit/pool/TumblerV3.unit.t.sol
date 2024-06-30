@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {Test} from "forge-std/Test.sol";
 
 import {
-    CallerNotControllerException,
+    CallerNotControllerOrConfiguratorException,
     IncorrectParameterException,
     TokenIsNotQuotedException,
     TokenNotAllowedException,
@@ -47,7 +47,6 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
     function test_U_TU_01_constructor_works_as_expected() public {
         assertEq(tumbler.quotaKeeper(), address(poolQuotaKeeper), "Incorrect quotaKeeper");
         assertEq(tumbler.epochLength(), 1 days, "Incorrect epochLength");
-        assertEq(tumbler.getTokens().length, 0, "Non-empty quoted tokens set");
 
         vm.expectRevert(ZeroAddressException.selector);
         new TumblerV3(address(addressProvider), address(0), 1 days);
@@ -80,10 +79,6 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
 
         assertTrue(tumbler.isTokenAdded(token1), "token1 is not added");
 
-        address[] memory quotedTokens = tumbler.getTokens();
-        assertEq(quotedTokens.length, 1, "Incorrect getTokens.length");
-        assertEq(quotedTokens[0], token1, "Incorrect getTokens[0]");
-
         // addToken reverts if token is already added
         vm.expectRevert(TokenNotAllowedException.selector);
         tumbler.addToken(token1, 1);
@@ -102,11 +97,6 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
         tumbler.addToken(token2, 1);
 
         assertTrue(tumbler.isTokenAdded(token2), "token2 is not added");
-
-        quotedTokens = tumbler.getTokens();
-        assertEq(quotedTokens.length, 2, "Incorrect getTokens.length");
-        assertEq(quotedTokens[0], token1, "Incorrect getTokens[0]");
-        assertEq(quotedTokens[1], token2, "Incorrect getTokens[1]");
     }
 
     /// @notice U:[TU-3]: `setRate` works as expected
@@ -139,7 +129,7 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
     /// @notice U:[TU-4]: `updateRates` works as expected
     function test_U_TU_04_updateRates_works_as_expected() public {
         // reverts on unauthorized caller
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         vm.prank(makeAddr("dude"));
         tumbler.updateRates();
 

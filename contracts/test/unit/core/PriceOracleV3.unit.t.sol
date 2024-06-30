@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {Test} from "forge-std/Test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -115,7 +115,7 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         vm.expectRevert(ZeroAddressException.selector);
         priceOracle.setPriceFeed(token, address(0), 0);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         priceOracle.setPriceFeed(token, priceFeed, 0);
 
         // setting the price feed

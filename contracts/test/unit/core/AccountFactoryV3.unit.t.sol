@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {CreditAccountV3} from "../../../credit/CreditAccountV3.sol";
 import {CreditAccountInfo, CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
@@ -9,6 +9,7 @@ import {IAccountFactoryV3Events} from "../../../interfaces/IAccountFactoryV3.sol
 import {
     CallerNotCreditManagerException,
     CreditAccountIsInUseException,
+    CreditManagerNotAddedException,
     MasterCreditAccountAlreadyDeployedException,
     RegisteredCreditManagerOnlyException
 } from "../../../interfaces/IExceptions.sol";
@@ -143,6 +144,9 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
     function test_U_AF_04B_addCreditManager_works_correctly(address manager) public {
         vm.assume(manager != creditManager);
 
+        assertFalse(accountFactory.isCreditManagerAdded(manager), "[before] Credit manager already added");
+        assertEq(accountFactory.creditManagers().length, 1, "[before] Incorrect number of added credit managers");
+
         vm.expectEmit(true, false, false, false);
         emit AddCreditManager(manager, address(0));
 
@@ -153,6 +157,9 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
         assertNotEq(account, address(0), "Incorrect master account");
         assertEq(CreditAccountV3(account).factory(), address(accountFactory), "Incorrect master account's factory");
         assertEq(CreditAccountV3(account).creditManager(), manager, "Incorrect master account's creditManager");
+
+        assertTrue(accountFactory.isCreditManagerAdded(manager), "[after] Credit manager not added");
+        assertEq(accountFactory.creditManagers().length, 2, "[before] Incorrect number of added credit managers");
     }
 
     /// @notice U:[AF-5A]: `rescue` reverts when credit account is in use
@@ -181,10 +188,19 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
     function test_U_AF_05B_rescue_works_correctly(address creditAccount, address target, bytes calldata data) public {
         vm.assume(creditAccount != address(vm) && creditAccount != CONSOLE);
 
-        CreditAccountInfo memory info;
+        vm.mockCall(
+            creditAccount,
+            abi.encodeCall(CreditAccountV3(creditAccount).creditManager, ()),
+            abi.encode(makeAddr("WRONG"))
+        );
+        vm.expectRevert(CreditManagerNotAddedException.selector);
+        vm.prank(configurator);
+        accountFactory.rescue(creditAccount, target, data);
+
         vm.mockCall(
             creditAccount, abi.encodeCall(CreditAccountV3(creditAccount).creditManager, ()), abi.encode(creditManager)
         );
+        CreditAccountInfo memory info;
         vm.mockCall(
             creditManager,
             abi.encodeCall(CreditManagerV3(creditManager).creditAccountInfo, (creditAccount)),

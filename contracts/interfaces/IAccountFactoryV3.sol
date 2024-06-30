@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {IVersion} from "./base/IVersion.sol";
 
@@ -25,6 +25,10 @@ interface IAccountFactoryV3Events {
 /// @title Account factory V3 interface
 interface IAccountFactoryV3 is IVersion, IAccountFactoryV3Events {
     function delay() external view returns (uint40);
+
+    function isCreditManagerAdded(address creditManager) external view returns (bool);
+
+    function creditManagers() external view returns (address[] memory);
 
     function takeCreditAccount(uint256, uint256) external returns (address creditAccount);
 
