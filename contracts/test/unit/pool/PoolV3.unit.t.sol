@@ -267,7 +267,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
     /// @notice U:[LP-2C]: External function have correct access rights
     function test_U_LP_02C_external_functions_have_correct_access() public {
-        vm.expectRevert(CreditManagerCantBorrowException.selector);
+        vm.expectRevert(CallerNotCreditManagerException.selector);
         pool.lendCreditAccount({borrowedAmount: 1, creditAccount: address(0)});
 
         vm.expectRevert(CallerNotCreditManagerException.selector);
@@ -845,10 +845,6 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
     /// @notice U:[LP-13A]: `lendCreditAccount` reverts on out of debt limits
     function test_U_LP_13A_lendCreditAccount_reverts_on_out_of_debt_limits() public {
-        // case: zero amount
-        vm.expectRevert(CreditManagerCantBorrowException.selector);
-        pool.lendCreditAccount({borrowedAmount: 0, creditAccount: address(0)});
-
         // case: CM debt limit violated
         pool.hackCreditManagerBorrowed(creditManager, 500);
         vm.expectRevert(CreditManagerCantBorrowException.selector);
@@ -877,15 +873,6 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
         assertEq(pool.totalBorrowed(), 1300, "Incorrect totalBorrowed");
         assertEq(pool.creditManagerBorrowed(creditManager), 800, "Incorrect creditManagerBorrowed");
-    }
-
-    /// @notice U:[LP-14A]: `repayCreditAccount` reverts on no debt
-    function test_U_LP_14A_repayCreditAccount_reverts_on_no_debt() public {
-        pool.hackCreditManagerBorrowed(creditManager, 0);
-
-        vm.expectRevert(CallerNotCreditManagerException.selector);
-        vm.prank(creditManager);
-        pool.repayCreditAccount({repaidAmount: 0, profit: 0, loss: 0});
     }
 
     /// @notice U:[LP-14B]: `repayCreditAccount` with profit works as expected

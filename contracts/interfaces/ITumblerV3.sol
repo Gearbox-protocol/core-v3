@@ -18,8 +18,6 @@ interface ITumblerV3Events {
 interface ITumblerV3 is IACLTrait, IRateKeeper, ITumblerV3Events {
     function epochLength() external view returns (uint256);
 
-    function getTokens() external view returns (address[] memory);
-
     function getRates(address[] calldata tokens) external view returns (uint16[] memory);
 
     function addToken(address token, uint16 rate) external;

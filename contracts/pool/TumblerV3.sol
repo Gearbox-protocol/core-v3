@@ -3,25 +3,18 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity 0.8.23;
 
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-
-import {
-    IncorrectParameterException,
-    TokenIsNotQuotedException,
-    TokenNotAllowedException,
-    ZeroAddressException
-} from "../interfaces/IExceptions.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {ITumblerV3} from "../interfaces/ITumblerV3.sol";
+
 import {ACLTrait} from "../traits/ACLTrait.sol";
+
+import "../interfaces/IExceptions.sol";
 
 /// @title Tumbler V3
 /// @notice Extremely simplified version of `GaugeV3` contract for quota rates management, which,
 ///         instead of voting, allows controller to set rates directly with custom epoch length
 contract TumblerV3 is ITumblerV3, ACLTrait {
-    using EnumerableSet for EnumerableSet.AddressSet;
-
     /// @notice Contract version
     uint256 public constant override version = 3_10;
 
@@ -30,9 +23,6 @@ contract TumblerV3 is ITumblerV3, ACLTrait {
 
     /// @notice Epoch length in seconds
     uint256 public immutable override epochLength;
-
-    /// @dev Set of all supported tokens
-    EnumerableSet.AddressSet internal _tokensSet;
 
     /// @dev Mapping from token to its quota rate
     mapping(address => uint16) internal _rates;
@@ -50,13 +40,7 @@ contract TumblerV3 is ITumblerV3, ACLTrait {
     /// @notice Whether `token` is added to the tumbler
     /// @custom:tests U:[TU-2]
     function isTokenAdded(address token) public view override returns (bool) {
-        return _tokensSet.contains(token);
-    }
-
-    /// @notice Returns all supported tokens
-    /// @custom:tests U:[TU-2]
-    function getTokens() external view override returns (address[] memory) {
-        return _tokensSet.values();
+        return _rates[token] != 0;
     }
 
     /// @notice Returns rates for a given list of tokens
@@ -74,10 +58,11 @@ contract TumblerV3 is ITumblerV3, ACLTrait {
 
     /// @notice Adds `token` to the set of supported tokens and to the quota keeper unless it's already there,
     ///         sets its rate to `rate`
+    /// @dev    Reverts if caller is not configurator
     /// @dev    Reverts if `token` is zero address, is already added, or `rate` is zero
     /// @custom:tests U:[TU-2]
     function addToken(address token, uint16 rate) external override configuratorOnly nonZeroAddress(token) {
-        if (!_tokensSet.add(token)) revert TokenNotAllowedException();
+        if (isTokenAdded(token)) revert TokenNotAllowedException();
         if (!IPoolQuotaKeeperV3(quotaKeeper).isQuotedToken(token)) {
             IPoolQuotaKeeperV3(quotaKeeper).addQuotaToken(token);
         }
@@ -87,6 +72,7 @@ contract TumblerV3 is ITumblerV3, ACLTrait {
     }
 
     /// @notice Sets `token`'s rate to `rate`
+    /// @dev    Reverts if caller is not controller or configurator
     /// @dev    Reverts if `token` is not added or `rate` is zero
     /// @custom:tests U:[TU-3]
     function setRate(address token, uint16 rate) external override controllerOrConfiguratorOnly {
@@ -95,6 +81,7 @@ contract TumblerV3 is ITumblerV3, ACLTrait {
     }
 
     /// @notice Updates rates in the quota keeper if time passed since the last update is greater than epoch length
+    /// @dev    Reverts if caller is not controller or configurator
     /// @custom:tests U:[TU-4], I:[QR-1]
     function updateRates() external override controllerOrConfiguratorOnly {
         if (block.timestamp < IPoolQuotaKeeperV3(quotaKeeper).lastQuotaRateUpdate() + epochLength) return;

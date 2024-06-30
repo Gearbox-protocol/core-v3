@@ -72,7 +72,7 @@ error InsufficientVotesException();
 /// @notice Thrown when attempting to borrow more than the second point on a two-point curve
 error BorrowingMoreThanU2ForbiddenException();
 
-/// @notice Thrown when a credit manager attempts to borrow more than its limit in the current block, or in general
+/// @notice Thrown when a credit manager attempts to borrow more beyond its own or total debt limit
 error CreditManagerCantBorrowException();
 
 /// @notice Thrown when attempting to set an incompatible quota keeper contract

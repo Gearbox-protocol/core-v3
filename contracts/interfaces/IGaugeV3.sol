@@ -7,18 +7,6 @@ import {IACLTrait} from "./base/IACLTrait.sol";
 import {IRateKeeper} from "./base/IRateKeeper.sol";
 import {IVotingContract} from "./base/IVotingContract.sol";
 
-struct QuotaRateParams {
-    uint16 minRate;
-    uint16 maxRate;
-    uint96 totalVotesLpSide;
-    uint96 totalVotesCaSide;
-}
-
-struct UserVotes {
-    uint96 votesLpSide;
-    uint96 votesCaSide;
-}
-
 interface IGaugeV3Events {
     /// @notice Emitted when epoch is updated
     event UpdateEpoch(uint16 epochNow);
@@ -29,7 +17,7 @@ interface IGaugeV3Events {
     /// @notice Emitted when a user removes a vote
     event Unvote(address indexed user, address indexed token, uint96 votes, bool lpSide);
 
-    /// @notice Emitted when a new quota token is added in the PoolQuotaKeeper
+    /// @notice Emitted when a new quota token is added to the gauge
     event AddQuotaToken(address indexed token, uint16 minRate, uint16 maxRate);
 
     /// @notice Emitted when quota interest rate parameters are changed
