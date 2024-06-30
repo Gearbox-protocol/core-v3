@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {GaugeV3Harness, QuotaRateParams, UserVotes} from "./GaugeV3Harness.sol";
 import {IGaugeV3Events, IGaugeV3} from "../../../interfaces/IGaugeV3.sol";
