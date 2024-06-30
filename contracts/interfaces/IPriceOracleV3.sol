@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
+import {IACLTrait} from "./base/IACLTrait.sol";
 import {IVersion} from "./base/IVersion.sol";
 
 /// @notice Price feed params
-/// @param priceFeed Price feed address
-/// @param stalenessPeriod Period (in seconds) after which price feed's answer should be considered stale
-/// @param skipCheck Whether price feed implements its own safety and staleness checks
-/// @param tokenDecimals Token decimals
+/// @param  priceFeed Price feed address
+/// @param  stalenessPeriod Period (in seconds) after which price feed's answer should be considered stale
+/// @param  skipCheck Whether price feed implements its own safety and staleness checks
+/// @param  tokenDecimals Token decimals
 struct PriceFeedParams {
     address priceFeed;
     uint32 stalenessPeriod;
@@ -18,8 +19,8 @@ struct PriceFeedParams {
 }
 
 /// @notice On-demand price update params
-/// @param priceFeed Price feed to update, must be in the set of updatable feeds in the price oracle
-/// @param data Update data
+/// @param  priceFeed Price feed to update, must be in the set of updatable feeds in the price oracle
+/// @param  data Update data
 struct PriceUpdate {
     address priceFeed;
     bytes data;
@@ -37,7 +38,7 @@ interface IPriceOracleV3Events {
 }
 
 /// @title Price oracle V3 interface
-interface IPriceOracleV3 is IVersion, IPriceOracleV3Events {
+interface IPriceOracleV3 is IACLTrait, IVersion, IPriceOracleV3Events {
     function getTokens() external view returns (address[] memory);
 
     function priceFeeds(address token) external view returns (address priceFeed);

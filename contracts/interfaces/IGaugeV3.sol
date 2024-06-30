@@ -1,22 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
+import {IACLTrait} from "./base/IACLTrait.sol";
 import {IRateKeeper} from "./base/IRateKeeper.sol";
 import {IVotingContract} from "./base/IVotingContract.sol";
-
-struct QuotaRateParams {
-    uint16 minRate;
-    uint16 maxRate;
-    uint96 totalVotesLpSide;
-    uint96 totalVotesCaSide;
-}
-
-struct UserVotes {
-    uint96 votesLpSide;
-    uint96 votesCaSide;
-}
 
 interface IGaugeV3Events {
     /// @notice Emitted when epoch is updated
@@ -28,7 +17,7 @@ interface IGaugeV3Events {
     /// @notice Emitted when a user removes a vote
     event Unvote(address indexed user, address indexed token, uint96 votes, bool lpSide);
 
-    /// @notice Emitted when a new quota token is added in the PoolQuotaKeeper
+    /// @notice Emitted when a new quota token is added to the gauge
     event AddQuotaToken(address indexed token, uint16 minRate, uint16 maxRate);
 
     /// @notice Emitted when quota interest rate parameters are changed
@@ -39,7 +28,7 @@ interface IGaugeV3Events {
 }
 
 /// @title Gauge V3 interface
-interface IGaugeV3 is IVotingContract, IRateKeeper, IGaugeV3Events {
+interface IGaugeV3 is IACLTrait, IVotingContract, IRateKeeper, IGaugeV3Events {
     function voter() external view returns (address);
 
     function updateEpoch() external;

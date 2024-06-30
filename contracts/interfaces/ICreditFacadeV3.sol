@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {AllowanceAction} from "./ICreditConfiguratorV3.sol";
 import "./ICreditFacadeV3Multicall.sol";
 import {PriceUpdate} from "./IPriceOracleV3.sol";
+import {IACLTrait} from "./base/IACLTrait.sol";
 import {IVersion} from "./base/IVersion.sol";
 
 /// @notice Multicall element
@@ -82,7 +83,7 @@ interface ICreditFacadeV3Events {
 }
 
 /// @title Credit facade V3 interface
-interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
+interface ICreditFacadeV3 is IACLTrait, IVersion, ICreditFacadeV3Events {
     function creditManager() external view returns (address);
 
     function underlying() external view returns (address);

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {ACLNonReentrantTrait} from "../../../traits/ACLNonReentrantTrait.sol";
+import {ACLTrait} from "../../../traits/ACLTrait.sol";
 
 // interfaces
 
@@ -16,7 +16,7 @@ import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {PoolV3} from "../../../pool/PoolV3.sol";
 
 /// @title Gauge fore new 4626 pools
-contract GaugeMock is ACLNonReentrantTrait {
+contract GaugeMock is ACLTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
 
@@ -30,7 +30,7 @@ contract GaugeMock is ACLNonReentrantTrait {
     //
 
     /// @dev Constructor
-    constructor(address acl, address quotaKeeper_) ACLNonReentrantTrait(acl) nonZeroAddress(quotaKeeper_) {
+    constructor(address acl, address quotaKeeper_) ACLTrait(acl) nonZeroAddress(quotaKeeper_) {
         quotaKeeper = quotaKeeper_;
     }
 

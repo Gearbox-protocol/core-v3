@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
+import {IACLTrait} from "./base/IACLTrait.sol";
 import {IVersion} from "./base/IVersion.sol";
 
 enum AllowanceAction {
@@ -51,7 +52,7 @@ interface ICreditConfiguratorV3Events {
     // -------------- //
 
     /// @notice Emitted when new fee parameters are set in the credit manager
-    event UpdateFees(
+    event SetFees(
         uint16 feeLiquidation, uint16 liquidationPremium, uint16 feeLiquidationExpired, uint16 liquidationPremiumExpired
     );
 
@@ -65,8 +66,8 @@ interface ICreditConfiguratorV3Events {
     /// @notice Emitted when a new facade is connected to the credit manager
     event SetCreditFacade(address indexed creditFacade);
 
-    /// @notice Emitted when credit manager's configurator contract is upgraded
-    event CreditConfiguratorUpgraded(address indexed creditConfigurator);
+    /// @notice Emitted when a new configurator is connected to the credit manager
+    event SetCreditConfigurator(address indexed creditConfigurator);
 
     // ------------- //
     // CREDIT FACADE //
@@ -95,7 +96,7 @@ interface ICreditConfiguratorV3Events {
 }
 
 /// @title Credit configurator V3 interface
-interface ICreditConfiguratorV3 is IVersion, ICreditConfiguratorV3Events {
+interface ICreditConfiguratorV3 is IACLTrait, IVersion, ICreditConfiguratorV3Events {
     function creditManager() external view returns (address);
 
     function creditFacade() external view returns (address);
@@ -150,7 +151,7 @@ interface ICreditConfiguratorV3 is IVersion, ICreditConfiguratorV3Events {
 
     function setCreditFacade(address newCreditFacade) external;
 
-    function upgradeCreditConfigurator(address newCreditConfigurator) external;
+    function setCreditConfigurator(address newCreditConfigurator) external;
 
     // ------------- //
     // CREDIT FACADE //

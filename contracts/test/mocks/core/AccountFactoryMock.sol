@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {IAccountFactoryV3} from "../../../interfaces/IAccountFactoryV3.sol";
 import {CreditAccountMock} from "../credit/CreditAccountMock.sol";
@@ -38,6 +38,10 @@ contract AccountFactoryMock is Test, IAccountFactoryV3 {
     }
 
     function delay() external pure override returns (uint40) {}
+
+    function creditManagers() external pure override returns (address[] memory) {}
+
+    function isCreditManagerAdded(address) external pure override returns (bool) {}
 
     function addCreditManager(address) external pure override {}
 

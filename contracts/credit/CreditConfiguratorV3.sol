@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
-pragma solidity 0.8.23;
+pragma solidity ^0.8.23;
 
 // THIRD-PARTY
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -14,7 +14,7 @@ import {CreditLogic} from "../libraries/CreditLogic.sol";
 import {PERCENTAGE_FACTOR, UNDERLYING_TOKEN_MASK, WAD} from "../libraries/Constants.sol";
 
 // CONTRACTS
-import {ACLNonReentrantTrait} from "../traits/ACLNonReentrantTrait.sol";
+import {ACLTrait} from "../traits/ACLTrait.sol";
 import {CreditFacadeV3} from "./CreditFacadeV3.sol";
 import {CreditManagerV3} from "./CreditManagerV3.sol";
 
@@ -30,7 +30,7 @@ import "../interfaces/IExceptions.sol";
 /// @title Credit configurator V3
 /// @notice Provides funcionality to configure various aspects of credit manager and facade's behavior
 /// @dev Most of the functions can only be accessed by configurator or timelock controller
-contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
+contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using Address for address;
     using BitMask for uint256;
@@ -57,7 +57,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     /// @param _acl ACL contract address
     /// @param _creditManager Credit manager to connect to
     /// @dev Copies allowed adaprters from the currently connected configurator
-    constructor(address _acl, address _creditManager) ACLNonReentrantTrait(_acl) {
+    constructor(address _acl, address _creditManager) ACLTrait(_acl) {
         creditManager = _creditManager; // I:[CC-1]
         underlying = CreditManagerV3(_creditManager).underlying(); // I:[CC-1]
 
@@ -65,10 +65,8 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         if (!currentConfigurator.isContract()) return;
         try CreditConfiguratorV3(currentConfigurator).allowedAdapters() returns (address[] memory adapters) {
             uint256 len = adapters.length;
-            unchecked {
-                for (uint256 i; i < len; ++i) {
-                    allowedAdaptersSet.add(adapters[i]); // I:[CC-29]
-                }
+            for (uint256 i; i < len; ++i) {
+                allowedAdaptersSet.add(adapters[i]); // I:[CC-29]
             }
         } catch {}
     }
@@ -134,7 +132,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         external
         override
         nonUnderlyingTokenOnly(token)
-        controllerOnly // I:[CC-2B]
+        controllerOrConfiguratorOnly // I:[CC-2B]
     {
         _setLiquidationThreshold({token: token, liquidationThreshold: liquidationThreshold}); // I:[CC-5]
     }
@@ -172,7 +170,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         external
         override
         nonUnderlyingTokenOnly(token)
-        controllerOnly // I:[CC-2B]
+        controllerOrConfiguratorOnly // I:[CC-2B]
     {
         (, uint16 ltUnderlying) = CreditManagerV3(creditManager).collateralTokenByMask(UNDERLYING_TOKEN_MASK);
         if (liquidationThresholdFinal > ltUnderlying) revert IncorrectLiquidationThresholdException(); // I:[CC-30]
@@ -231,7 +229,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         override
         nonZeroAddress(token)
         nonUnderlyingTokenOnly(token)
-        controllerOnly // I:[CC-2B]
+        controllerOrConfiguratorOnly // I:[CC-2B]
     {
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
@@ -294,7 +292,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         external
         override
         nonZeroAddress(adapter)
-        controllerOnly // I:[CC-2B]
+        controllerOrConfiguratorOnly // I:[CC-2B]
     {
         address targetContract = _getTargetContractOrRevert({adapter: adapter});
         if (CreditManagerV3(creditManager).adapterToContract(adapter) == address(0)) {
@@ -379,7 +377,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
             _feeInterestCurrent, feeLiquidation, liquidationDiscount, feeLiquidationExpired, liquidationDiscountExpired
         ); // I:[CC-19]
 
-        emit UpdateFees({
+        emit SetFees({
             feeLiquidation: feeLiquidation,
             liquidationPremium: liquidationPremium,
             feeLiquidationExpired: feeLiquidationExpired,
@@ -398,19 +396,17 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         }); // I:[CC-18]
 
         uint256 len = CreditManagerV3(creditManager).collateralTokensCount();
-        unchecked {
-            for (uint256 i = 1; i < len; ++i) {
-                address token = CreditManagerV3(creditManager).getTokenByMask(1 << i);
-                (uint16 ltInitial, uint16 ltFinal, uint40 timestampRampStart, uint24 rampDuration) =
-                    CreditManagerV3(creditManager).ltParams(token);
-                uint16 lt = CreditLogic.getLiquidationThreshold({
-                    ltInitial: ltInitial,
-                    ltFinal: ltFinal,
-                    timestampRampStart: timestampRampStart,
-                    rampDuration: rampDuration
-                });
-                if (lt > ltUnderlying || ltFinal > ltUnderlying) revert IncorrectLiquidationThresholdException(); // I:[CC-18]
-            }
+        for (uint256 i = 1; i < len; ++i) {
+            address token = CreditManagerV3(creditManager).getTokenByMask(1 << i);
+            (uint16 ltInitial, uint16 ltFinal, uint40 timestampRampStart, uint24 rampDuration) =
+                CreditManagerV3(creditManager).ltParams(token);
+            uint16 lt = CreditLogic.getLiquidationThreshold({
+                ltInitial: ltInitial,
+                ltFinal: ltFinal,
+                timestampRampStart: timestampRampStart,
+                rampDuration: rampDuration
+            });
+            if (lt > ltUnderlying || ltFinal > ltUnderlying) revert IncorrectLiquidationThresholdException(); // I:[CC-18]
         }
     }
 
@@ -429,12 +425,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         if (newPriceOracle == CreditManagerV3(creditManager).priceOracle()) return;
 
         uint256 num = CreditManagerV3(creditManager).collateralTokensCount();
-        unchecked {
-            for (uint256 i; i < num; ++i) {
-                address token = CreditManagerV3(creditManager).getTokenByMask(1 << i);
-                if (IPriceOracleV3(newPriceOracle).priceFeeds(token) == address(0)) {
-                    revert PriceFeedDoesNotExistException(); // I:[CC-21]
-                }
+        for (uint256 i; i < num; ++i) {
+            address token = CreditManagerV3(creditManager).getTokenByMask(1 << i);
+            if (IPriceOracleV3(newPriceOracle).priceFeeds(token) == address(0)) {
+                revert PriceFeedDoesNotExistException(); // I:[CC-21]
             }
         }
 
@@ -492,10 +486,8 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function _migrateEmergencyLiquidators(CreditFacadeV3 prevCreditFacade) internal {
         address[] memory emergencyLiquidators = prevCreditFacade.emergencyLiquidators();
         uint256 len = emergencyLiquidators.length;
-        unchecked {
-            for (uint256 i; i < len; ++i) {
-                _addEmergencyLiquidator(emergencyLiquidators[i]);
-            }
+        for (uint256 i; i < len; ++i) {
+            _addEmergencyLiquidator(emergencyLiquidators[i]);
         }
     }
 
@@ -513,7 +505,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     /// @param newCreditConfigurator New credit configurator
     /// @dev Reverts if `newCreditConfigurator` is incompatible with credit manager
     /// @dev Reverts if sets of allowed adapters of this contract and new configurator are inconsistent
-    function upgradeCreditConfigurator(address newCreditConfigurator)
+    function setCreditConfigurator(address newCreditConfigurator)
         external
         override
         configuratorOnly // I:[CC-2]
@@ -525,14 +517,12 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
         address[] memory newAllowedAdapters = CreditConfiguratorV3(newCreditConfigurator).allowedAdapters();
         uint256 num = newAllowedAdapters.length;
         if (num != allowedAdaptersSet.length()) revert IncorrectAdaptersSetException(); // I:[CC-23]
-        unchecked {
-            for (uint256 i; i < num; ++i) {
-                if (!allowedAdaptersSet.contains(newAllowedAdapters[i])) revert IncorrectAdaptersSetException(); // I:[CC-23]
-            }
+        for (uint256 i; i < num; ++i) {
+            if (!allowedAdaptersSet.contains(newAllowedAdapters[i])) revert IncorrectAdaptersSetException(); // I:[CC-23]
         }
 
         CreditManagerV3(creditManager).setCreditConfigurator(newCreditConfigurator); // I:[CC-23]
-        emit CreditConfiguratorUpgraded(newCreditConfigurator); // I:[CC-23]
+        emit SetCreditConfigurator(newCreditConfigurator); // I:[CC-23]
     }
 
     // ------------- //
@@ -545,7 +535,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function setMinDebtLimit(uint128 minDebt)
         external
         override
-        controllerOnly // I:[CC-2B]
+        controllerOrConfiguratorOnly // I:[CC-2B]
     {
         (, uint128 currentMaxDebt) = CreditFacadeV3(creditFacade()).debtLimits();
         _setLimits(minDebt, currentMaxDebt);
@@ -557,7 +547,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function setMaxDebtLimit(uint128 maxDebt)
         external
         override
-        controllerOnly // I:[CC-2B]
+        controllerOrConfiguratorOnly // I:[CC-2B]
     {
         (uint128 currentMinDebt,) = CreditFacadeV3(creditFacade()).debtLimits();
         _setLimits(currentMinDebt, maxDebt);
@@ -583,7 +573,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function setMaxDebtPerBlockMultiplier(uint8 newMaxDebtLimitPerBlockMultiplier)
         external
         override
-        controllerOnly // I:[CC-2B]
+        controllerOrConfiguratorOnly // I:[CC-2B]
     {
         _setMaxDebtPerBlockMultiplier(newMaxDebtLimitPerBlockMultiplier); // I:[CC-24]
     }
@@ -613,7 +603,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function setMaxCumulativeLoss(uint128 newMaxCumulativeLoss)
         external
         override
-        controllerOnly // I:[CC-2B]
+        controllerOrConfiguratorOnly // I:[CC-2B]
     {
         _setMaxCumulativeLoss(newMaxCumulativeLoss); // I:[CC-31]
     }
@@ -633,7 +623,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLNonReentrantTrait {
     function resetCumulativeLoss()
         external
         override
-        controllerOnly // I:[CC-2B]
+        controllerOrConfiguratorOnly // I:[CC-2B]
     {
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
         (, uint128 maxCumulativeLossCurrent) = cf.lossParams(); // I:[CC-32]

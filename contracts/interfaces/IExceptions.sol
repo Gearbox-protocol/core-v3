@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 // ------- //
 // GENERAL //
@@ -53,13 +53,6 @@ error RegisteredCreditManagerOnlyException();
 /// @notice Thrown when an address is expected to be a registered pool, but is not
 error RegisteredPoolOnlyException();
 
-// ---------------- //
-// ADDRESS PROVIDER //
-// ---------------- //
-
-/// @notice Reverts if address key isn't found in address provider
-error AddressNotFoundException();
-
 // ----------------- //
 // POOL, PQK, GAUGES //
 // ----------------- //
@@ -79,7 +72,7 @@ error InsufficientVotesException();
 /// @notice Thrown when attempting to borrow more than the second point on a two-point curve
 error BorrowingMoreThanU2ForbiddenException();
 
-/// @notice Thrown when a credit manager attempts to borrow more than its limit in the current block, or in general
+/// @notice Thrown when a credit manager attempts to borrow more beyond its own or total debt limit
 error CreditManagerCantBorrowException();
 
 /// @notice Thrown when attempting to set an incompatible quota keeper contract
@@ -252,7 +245,7 @@ error CallerNotCreditManagerException();
 error CallerNotCreditFacadeException();
 
 /// @notice Thrown on attempting to call an access restricted function not as controller or configurator
-error CallerNotControllerException();
+error CallerNotControllerOrConfiguratorException();
 
 /// @notice Thrown on attempting to pause a contract without pausable admin rights
 error CallerNotPausableAdminException();
@@ -280,25 +273,6 @@ error CallerNotExecutorException();
 
 /// @notice Thrown on attempting to call an access restricted function not as veto admin
 error CallerNotVetoAdminException();
-
-// ------------------- //
-// CONTROLLER TIMELOCK //
-// ------------------- //
-
-/// @notice Thrown when the new parameter values do not satisfy required conditions
-error ParameterChecksFailedException();
-
-/// @notice Thrown when attempting to execute a non-queued transaction
-error TxNotQueuedException();
-
-/// @notice Thrown when attempting to execute a transaction that is either immature or stale
-error TxExecutedOutsideTimeWindowException();
-
-/// @notice Thrown when execution of a transaction fails
-error TxExecutionRevertedException();
-
-/// @notice Thrown when the value of a parameter on execution is different from the value on queue
-error ParameterChangedAfterQueuedTxException();
 
 // -------- //
 // BOT LIST //

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
-import {GaugeV3Harness} from "./GaugeV3Harness.sol";
-import {IGaugeV3Events, IGaugeV3, QuotaRateParams, UserVotes} from "../../../interfaces/IGaugeV3.sol";
+import {GaugeV3Harness, QuotaRateParams, UserVotes} from "./GaugeV3Harness.sol";
+import {IGaugeV3Events, IGaugeV3} from "../../../interfaces/IGaugeV3.sol";
 
 import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {IGearStakingV3} from "../../../interfaces/IGearStakingV3.sol";
@@ -93,10 +93,10 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         vm.expectRevert(CallerNotConfiguratorException.selector);
         gauge.addQuotaToken(DUMB_ADDRESS, 0, 0);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         gauge.changeQuotaMinRate(DUMB_ADDRESS, 0);
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         gauge.changeQuotaMaxRate(DUMB_ADDRESS, 0);
     }
 
@@ -118,12 +118,6 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
 
         vm.expectRevert(TokenNotAllowedException.selector);
         gauge.addQuotaToken(token, 0, 0);
-
-        vm.expectRevert(ZeroAddressException.selector);
-        gauge.changeQuotaMinRate(address(0), 0);
-
-        vm.expectRevert(ZeroAddressException.selector);
-        gauge.changeQuotaMaxRate(address(0), 0);
 
         vm.expectRevert(IncorrectParameterException.selector);
         gauge.changeQuotaMinRate(token, 0);
@@ -179,7 +173,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         uint16 minRate = 100;
 
         // Case: it reverts if token is not added before
-        vm.expectRevert(TokenNotAllowedException.selector);
+        vm.expectRevert(TokenIsNotQuotedException.selector);
         vm.prank(CONFIGURATOR);
         gauge.changeQuotaMinRate(token, minRate);
 
@@ -213,7 +207,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         uint16 maxRate = 3000;
 
         // Case: it reverts if token is not added before
-        vm.expectRevert(TokenNotAllowedException.selector);
+        vm.expectRevert(TokenIsNotQuotedException.selector);
         vm.prank(CONFIGURATOR);
         gauge.changeQuotaMaxRate(token, maxRate);
 
@@ -261,10 +255,10 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
     /// @dev U:[GA-10]: vote and unvote reverts in token isn't added
     function test_U_GA_10_vote_and_unvote_reverts_in_token_isnt_added() public {
         vm.startPrank(address(gearStakingMock));
-        vm.expectRevert(TokenNotAllowedException.selector);
+        vm.expectRevert(TokenIsNotQuotedException.selector);
         gauge.vote(USER, 122, abi.encode(DUMB_ADDRESS, true));
 
-        vm.expectRevert(TokenNotAllowedException.selector);
+        vm.expectRevert(TokenIsNotQuotedException.selector);
         gauge.unvote(USER, 122, abi.encode(DUMB_ADDRESS, true));
 
         vm.stopPrank();
@@ -448,7 +442,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
             "Incorrect rates for [inch, pepe, link]"
         );
 
-        vm.expectRevert(TokenNotAllowedException.selector);
+        vm.expectRevert(TokenIsNotQuotedException.selector);
         gauge.getRates(arrayOf(inch, pepe, link, DUMB_ADDRESS));
     }
 
