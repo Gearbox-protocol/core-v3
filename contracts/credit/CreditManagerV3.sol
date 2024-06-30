@@ -1111,10 +1111,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         uint256 resultLen = offset + limit > len ? (offset > len ? 0 : len - offset) : limit;
 
         result = new address[](resultLen);
-        unchecked {
-            for (uint256 i = 0; i < resultLen; ++i) {
-                result[i] = creditAccountsSet.at(offset + i);
-            }
+        for (uint256 i; i < resultLen; ++i) {
+            result[i] = creditAccountsSet.at(offset + i);
         }
     }
 

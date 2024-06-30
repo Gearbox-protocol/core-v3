@@ -497,107 +497,107 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
         emit StartMultiCall({creditAccount: creditAccount, caller: msg.sender}); // U:[FA-18]
 
         Balance[] memory expectedBalances;
-        unchecked {
-            uint256 len = calls.length;
-            for (uint256 i; i < len; ++i) {
-                MultiCall calldata mcall = calls[i];
 
-                // credit facade calls
-                if (mcall.target == address(this)) {
-                    bytes4 method = bytes4(mcall.callData);
+        uint256 len = calls.length;
+        for (uint256 i; i < len; ++i) {
+            MultiCall calldata mcall = calls[i];
 
-                    // onDemandPriceUpdates
-                    if (method == ICreditFacadeV3Multicall.onDemandPriceUpdates.selector) {
-                        if (i != 0) revert UnknownMethodException(method); // U:[FA-22]
-                        if (flags & SKIP_PRICE_UPDATES_CALL_FLAG == 0) {
-                            _updatePrices(_priceOracle(), abi.decode(mcall.callData[4:], (PriceUpdate[]))); // U:[FA-25]
-                        }
-                    }
-                    // storeExpectedBalances
-                    else if (method == ICreditFacadeV3Multicall.storeExpectedBalances.selector) {
-                        if (expectedBalances.length != 0) revert ExpectedBalancesAlreadySetException(); // U:[FA-23]
-                        BalanceDelta[] memory balanceDeltas = abi.decode(mcall.callData[4:], (BalanceDelta[])); // U:[FA-23]
-                        expectedBalances = BalancesLogic.storeBalances(creditAccount, balanceDeltas); // U:[FA-23]
-                    }
-                    // compareBalances
-                    else if (method == ICreditFacadeV3Multicall.compareBalances.selector) {
-                        if (expectedBalances.length == 0) revert ExpectedBalancesNotSetException(); // U:[FA-23]
-                        address failedToken =
-                            BalancesLogic.compareBalances(creditAccount, expectedBalances, Comparison.GREATER_OR_EQUAL);
-                        if (failedToken != address(0)) revert BalanceLessThanExpectedException(failedToken); // U:[FA-23]
-                        expectedBalances = new Balance[](0); // U:[FA-23]
-                    }
-                    // addCollateral
-                    else if (method == ICreditFacadeV3Multicall.addCollateral.selector) {
-                        _revertIfNoPermission(flags, ADD_COLLATERAL_PERMISSION); // U:[FA-21]
-                        (address token, uint256 amount) = abi.decode(mcall.callData[4:], (address, uint256)); // U:[FA-26A]
-                        _addCollateral(creditAccount, token, amount); // U:[FA-26A]
-                    }
-                    // addCollateralWithPermit
-                    else if (method == ICreditFacadeV3Multicall.addCollateralWithPermit.selector) {
-                        _revertIfNoPermission(flags, ADD_COLLATERAL_PERMISSION); // U:[FA-21]
-                        _addCollateralWithPermit(creditAccount, mcall.callData[4:]); // U:[FA-26B]
-                    }
-                    // updateQuota
-                    else if (method == ICreditFacadeV3Multicall.updateQuota.selector) {
-                        _revertIfNoPermission(flags, UPDATE_QUOTA_PERMISSION); // U:[FA-21]
-                        (enabledTokensMask, forbiddenTokensMask) =
-                            _updateQuota(creditAccount, mcall.callData[4:], enabledTokensMask, forbiddenTokensMask); // U:[FA-34]
-                    }
-                    // withdrawCollateral
-                    else if (method == ICreditFacadeV3Multicall.withdrawCollateral.selector) {
-                        _revertIfNoPermission(flags, WITHDRAW_COLLATERAL_PERMISSION); // U:[FA-21]
-                        // pulls credit account on top of the stack
-                        address creditAccount_ = creditAccount;
-                        (address token, uint256 amount, address to) =
-                            abi.decode(mcall.callData[4:], (address, uint256, address)); // U:[FA-36]
-                        _withdrawCollateral(creditAccount_, token, amount, to); // U:[FA-36]
-                        flags |= REVERT_ON_FORBIDDEN_TOKENS_FLAG | USE_SAFE_PRICES_FLAG; // U:[FA-36,45]
-                    }
-                    // increaseDebt
-                    else if (method == ICreditFacadeV3Multicall.increaseDebt.selector) {
-                        _revertIfNoPermission(flags, INCREASE_DEBT_PERMISSION); // U:[FA-21]
-                        uint256 amount = abi.decode(mcall.callData[4:], (uint256)); // U:[FA-27]
-                        _manageDebt(creditAccount, amount, enabledTokensMask, ManageDebtAction.INCREASE_DEBT); // U:[FA-27]
-                        flags |= REVERT_ON_FORBIDDEN_TOKENS_FLAG; // U:[FA-45]
-                    }
-                    // decreaseDebt
-                    else if (method == ICreditFacadeV3Multicall.decreaseDebt.selector) {
-                        _revertIfNoPermission(flags, DECREASE_DEBT_PERMISSION); // U:[FA-21]
-                        uint256 amount = abi.decode(mcall.callData[4:], (uint256)); // U:[FA-31]
-                        _manageDebt(creditAccount, amount, enabledTokensMask, ManageDebtAction.DECREASE_DEBT); // U:[FA-31]
-                    }
-                    // setBotPermissions
-                    else if (method == ICreditFacadeV3Multicall.setBotPermissions.selector) {
-                        _revertIfNoPermission(flags, SET_BOT_PERMISSIONS_PERMISSION); // U:[FA-21]
-                        _setBotPermissions(creditAccount, mcall.callData[4:]); // U:[FA-37]
-                    }
-                    // setFullCheckParams
-                    else if (method == ICreditFacadeV3Multicall.setFullCheckParams.selector) {
-                        if (flags & SKIP_COLLATERAL_CHECK_FLAG != 0) revert UnknownMethodException(method); // U:[FA-22]
-                        _setFullCheckParams(fullCheckParams, mcall.callData[4:]); // U:[FA-24]
-                    }
-                    // unknown method
-                    else {
-                        revert UnknownMethodException(method); // U:[FA-22]
+            // credit facade calls
+            if (mcall.target == address(this)) {
+                bytes4 method = bytes4(mcall.callData);
+
+                // onDemandPriceUpdates
+                if (method == ICreditFacadeV3Multicall.onDemandPriceUpdates.selector) {
+                    if (i != 0) revert UnknownMethodException(method); // U:[FA-22]
+                    if (flags & SKIP_PRICE_UPDATES_CALL_FLAG == 0) {
+                        _updatePrices(_priceOracle(), abi.decode(mcall.callData[4:], (PriceUpdate[]))); // U:[FA-25]
                     }
                 }
-                // adapter calls
+                // storeExpectedBalances
+                else if (method == ICreditFacadeV3Multicall.storeExpectedBalances.selector) {
+                    if (expectedBalances.length != 0) revert ExpectedBalancesAlreadySetException(); // U:[FA-23]
+                    BalanceDelta[] memory balanceDeltas = abi.decode(mcall.callData[4:], (BalanceDelta[])); // U:[FA-23]
+                    expectedBalances = BalancesLogic.storeBalances(creditAccount, balanceDeltas); // U:[FA-23]
+                }
+                // compareBalances
+                else if (method == ICreditFacadeV3Multicall.compareBalances.selector) {
+                    if (expectedBalances.length == 0) revert ExpectedBalancesNotSetException(); // U:[FA-23]
+                    address failedToken =
+                        BalancesLogic.compareBalances(creditAccount, expectedBalances, Comparison.GREATER_OR_EQUAL);
+                    if (failedToken != address(0)) revert BalanceLessThanExpectedException(failedToken); // U:[FA-23]
+                    expectedBalances = new Balance[](0); // U:[FA-23]
+                }
+                // addCollateral
+                else if (method == ICreditFacadeV3Multicall.addCollateral.selector) {
+                    _revertIfNoPermission(flags, ADD_COLLATERAL_PERMISSION); // U:[FA-21]
+                    (address token, uint256 amount) = abi.decode(mcall.callData[4:], (address, uint256)); // U:[FA-26A]
+                    _addCollateral(creditAccount, token, amount); // U:[FA-26A]
+                }
+                // addCollateralWithPermit
+                else if (method == ICreditFacadeV3Multicall.addCollateralWithPermit.selector) {
+                    _revertIfNoPermission(flags, ADD_COLLATERAL_PERMISSION); // U:[FA-21]
+                    _addCollateralWithPermit(creditAccount, mcall.callData[4:]); // U:[FA-26B]
+                }
+                // updateQuota
+                else if (method == ICreditFacadeV3Multicall.updateQuota.selector) {
+                    _revertIfNoPermission(flags, UPDATE_QUOTA_PERMISSION); // U:[FA-21]
+                    (enabledTokensMask, forbiddenTokensMask) =
+                        _updateQuota(creditAccount, mcall.callData[4:], enabledTokensMask, forbiddenTokensMask); // U:[FA-34]
+                }
+                // withdrawCollateral
+                else if (method == ICreditFacadeV3Multicall.withdrawCollateral.selector) {
+                    _revertIfNoPermission(flags, WITHDRAW_COLLATERAL_PERMISSION); // U:[FA-21]
+                    // pulls credit account on top of the stack
+                    address creditAccount_ = creditAccount;
+                    (address token, uint256 amount, address to) =
+                        abi.decode(mcall.callData[4:], (address, uint256, address)); // U:[FA-36]
+                    _withdrawCollateral(creditAccount_, token, amount, to); // U:[FA-36]
+                    flags |= REVERT_ON_FORBIDDEN_TOKENS_FLAG | USE_SAFE_PRICES_FLAG; // U:[FA-36,45]
+                }
+                // increaseDebt
+                else if (method == ICreditFacadeV3Multicall.increaseDebt.selector) {
+                    _revertIfNoPermission(flags, INCREASE_DEBT_PERMISSION); // U:[FA-21]
+                    uint256 amount = abi.decode(mcall.callData[4:], (uint256)); // U:[FA-27]
+                    _manageDebt(creditAccount, amount, enabledTokensMask, ManageDebtAction.INCREASE_DEBT); // U:[FA-27]
+                    flags |= REVERT_ON_FORBIDDEN_TOKENS_FLAG; // U:[FA-45]
+                }
+                // decreaseDebt
+                else if (method == ICreditFacadeV3Multicall.decreaseDebt.selector) {
+                    _revertIfNoPermission(flags, DECREASE_DEBT_PERMISSION); // U:[FA-21]
+                    uint256 amount = abi.decode(mcall.callData[4:], (uint256)); // U:[FA-31]
+                    _manageDebt(creditAccount, amount, enabledTokensMask, ManageDebtAction.DECREASE_DEBT); // U:[FA-31]
+                }
+                // setBotPermissions
+                else if (method == ICreditFacadeV3Multicall.setBotPermissions.selector) {
+                    _revertIfNoPermission(flags, SET_BOT_PERMISSIONS_PERMISSION); // U:[FA-21]
+                    _setBotPermissions(creditAccount, mcall.callData[4:]); // U:[FA-37]
+                }
+                // setFullCheckParams
+                else if (method == ICreditFacadeV3Multicall.setFullCheckParams.selector) {
+                    if (flags & SKIP_COLLATERAL_CHECK_FLAG != 0) revert UnknownMethodException(method); // U:[FA-22]
+                    _setFullCheckParams(fullCheckParams, mcall.callData[4:]); // U:[FA-24]
+                }
+                // unknown method
                 else {
-                    _revertIfNoPermission(flags, EXTERNAL_CALLS_PERMISSION); // U:[FA-21]
-                    address targetContract = ICreditManagerV3(creditManager).adapterToContract(mcall.target);
-                    if (targetContract == address(0)) {
-                        revert TargetContractNotAllowedException();
-                    }
-                    if (flags & EXTERNAL_CONTRACT_WAS_CALLED_FLAG == 0) {
-                        flags |= EXTERNAL_CONTRACT_WAS_CALLED_FLAG;
-                        _setActiveCreditAccount(creditAccount); // U:[FA-38]
-                    }
-                    mcall.target.functionCall(mcall.callData); // U:[FA-38]
-                    emit Execute({creditAccount: creditAccount, targetContract: targetContract});
+                    revert UnknownMethodException(method); // U:[FA-22]
                 }
             }
+            // adapter calls
+            else {
+                _revertIfNoPermission(flags, EXTERNAL_CALLS_PERMISSION); // U:[FA-21]
+                address targetContract = ICreditManagerV3(creditManager).adapterToContract(mcall.target);
+                if (targetContract == address(0)) {
+                    revert TargetContractNotAllowedException();
+                }
+                if (flags & EXTERNAL_CONTRACT_WAS_CALLED_FLAG == 0) {
+                    flags |= EXTERNAL_CONTRACT_WAS_CALLED_FLAG;
+                    _setActiveCreditAccount(creditAccount); // U:[FA-38]
+                }
+                mcall.target.functionCall(mcall.callData); // U:[FA-38]
+                emit Execute({creditAccount: creditAccount, targetContract: targetContract});
+            }
         }
+
         if (expectedBalances.length != 0) {
             address failedToken =
                 BalancesLogic.compareBalances(creditAccount, expectedBalances, Comparison.GREATER_OR_EQUAL);

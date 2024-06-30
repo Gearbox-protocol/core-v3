@@ -65,10 +65,8 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait {
         if (!currentConfigurator.isContract()) return;
         try CreditConfiguratorV3(currentConfigurator).allowedAdapters() returns (address[] memory adapters) {
             uint256 len = adapters.length;
-            unchecked {
-                for (uint256 i; i < len; ++i) {
-                    allowedAdaptersSet.add(adapters[i]); // I:[CC-29]
-                }
+            for (uint256 i; i < len; ++i) {
+                allowedAdaptersSet.add(adapters[i]); // I:[CC-29]
             }
         } catch {}
     }
@@ -398,19 +396,17 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait {
         }); // I:[CC-18]
 
         uint256 len = CreditManagerV3(creditManager).collateralTokensCount();
-        unchecked {
-            for (uint256 i = 1; i < len; ++i) {
-                address token = CreditManagerV3(creditManager).getTokenByMask(1 << i);
-                (uint16 ltInitial, uint16 ltFinal, uint40 timestampRampStart, uint24 rampDuration) =
-                    CreditManagerV3(creditManager).ltParams(token);
-                uint16 lt = CreditLogic.getLiquidationThreshold({
-                    ltInitial: ltInitial,
-                    ltFinal: ltFinal,
-                    timestampRampStart: timestampRampStart,
-                    rampDuration: rampDuration
-                });
-                if (lt > ltUnderlying || ltFinal > ltUnderlying) revert IncorrectLiquidationThresholdException(); // I:[CC-18]
-            }
+        for (uint256 i = 1; i < len; ++i) {
+            address token = CreditManagerV3(creditManager).getTokenByMask(1 << i);
+            (uint16 ltInitial, uint16 ltFinal, uint40 timestampRampStart, uint24 rampDuration) =
+                CreditManagerV3(creditManager).ltParams(token);
+            uint16 lt = CreditLogic.getLiquidationThreshold({
+                ltInitial: ltInitial,
+                ltFinal: ltFinal,
+                timestampRampStart: timestampRampStart,
+                rampDuration: rampDuration
+            });
+            if (lt > ltUnderlying || ltFinal > ltUnderlying) revert IncorrectLiquidationThresholdException(); // I:[CC-18]
         }
     }
 
@@ -429,12 +425,10 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait {
         if (newPriceOracle == CreditManagerV3(creditManager).priceOracle()) return;
 
         uint256 num = CreditManagerV3(creditManager).collateralTokensCount();
-        unchecked {
-            for (uint256 i; i < num; ++i) {
-                address token = CreditManagerV3(creditManager).getTokenByMask(1 << i);
-                if (IPriceOracleV3(newPriceOracle).priceFeeds(token) == address(0)) {
-                    revert PriceFeedDoesNotExistException(); // I:[CC-21]
-                }
+        for (uint256 i; i < num; ++i) {
+            address token = CreditManagerV3(creditManager).getTokenByMask(1 << i);
+            if (IPriceOracleV3(newPriceOracle).priceFeeds(token) == address(0)) {
+                revert PriceFeedDoesNotExistException(); // I:[CC-21]
             }
         }
 
@@ -492,10 +486,8 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait {
     function _migrateEmergencyLiquidators(CreditFacadeV3 prevCreditFacade) internal {
         address[] memory emergencyLiquidators = prevCreditFacade.emergencyLiquidators();
         uint256 len = emergencyLiquidators.length;
-        unchecked {
-            for (uint256 i; i < len; ++i) {
-                _addEmergencyLiquidator(emergencyLiquidators[i]);
-            }
+        for (uint256 i; i < len; ++i) {
+            _addEmergencyLiquidator(emergencyLiquidators[i]);
         }
     }
 
@@ -525,10 +517,8 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait {
         address[] memory newAllowedAdapters = CreditConfiguratorV3(newCreditConfigurator).allowedAdapters();
         uint256 num = newAllowedAdapters.length;
         if (num != allowedAdaptersSet.length()) revert IncorrectAdaptersSetException(); // I:[CC-23]
-        unchecked {
-            for (uint256 i; i < num; ++i) {
-                if (!allowedAdaptersSet.contains(newAllowedAdapters[i])) revert IncorrectAdaptersSetException(); // I:[CC-23]
-            }
+        for (uint256 i; i < num; ++i) {
+            if (!allowedAdaptersSet.contains(newAllowedAdapters[i])) revert IncorrectAdaptersSetException(); // I:[CC-23]
         }
 
         CreditManagerV3(creditManager).setCreditConfigurator(newCreditConfigurator); // I:[CC-23]

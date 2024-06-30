@@ -141,12 +141,10 @@ contract PriceOracleV3 is ACLTrait, PriceFeedValidationTrait, IPriceOracleV3 {
     /// @dev    Reverts if `updates` contains unrecognized price feeds
     /// @custom:tests U:[PO-5]
     function updatePrices(PriceUpdate[] calldata updates) external {
-        unchecked {
-            uint256 len = updates.length;
-            for (uint256 i; i < len; ++i) {
-                if (!_updatablePriceFeedsSet.contains(updates[i].priceFeed)) revert PriceFeedIsNotUpdatableException();
-                IUpdatablePriceFeed(updates[i].priceFeed).updatePrice(updates[i].data);
-            }
+        uint256 len = updates.length;
+        for (uint256 i; i < len; ++i) {
+            if (!_updatablePriceFeedsSet.contains(updates[i].priceFeed)) revert PriceFeedIsNotUpdatableException();
+            IUpdatablePriceFeed(updates[i].priceFeed).updatePrice(updates[i].data);
         }
     }
 
