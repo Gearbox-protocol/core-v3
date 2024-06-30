@@ -19,17 +19,19 @@ contract USDT_Transfer {
     }
 
     /// @dev Computes amount of USDT that should be sent to receive `amount`
+    /// @custom:tests U:[UTT-1]
     function _amountUSDTWithFee(uint256 amount) internal view virtual returns (uint256) {
-        uint256 basisPointsRate = _basisPointsRate(); // U:[UTT_01]
+        uint256 basisPointsRate = _basisPointsRate();
         if (basisPointsRate == 0) return amount;
-        return amount.amountUSDTWithFee({basisPointsRate: basisPointsRate, maximumFee: _maximumFee()}); // U:[UTT_01]
+        return amount.amountUSDTWithFee({basisPointsRate: basisPointsRate, maximumFee: _maximumFee()});
     }
 
     /// @dev Computes amount of USDT that would be received if `amount` is sent
+    /// @custom:tests U:[UTT-1]
     function _amountUSDTMinusFee(uint256 amount) internal view virtual returns (uint256) {
-        uint256 basisPointsRate = _basisPointsRate(); // U:[UTT_01]
+        uint256 basisPointsRate = _basisPointsRate();
         if (basisPointsRate == 0) return amount;
-        return amount.amountUSDTMinusFee({basisPointsRate: basisPointsRate, maximumFee: _maximumFee()}); // U:[UTT_01]
+        return amount.amountUSDTMinusFee({basisPointsRate: basisPointsRate, maximumFee: _maximumFee()});
     }
 
     /// @dev Returns fee rate in bps

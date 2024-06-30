@@ -9,34 +9,28 @@ import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol
 import {ICreditAccountV3} from "../interfaces/ICreditAccountV3.sol";
 import {AllowanceFailedException} from "../interfaces/IExceptions.sol";
 
-/// @title Credit account helper library
+/// @title  Credit account helper library
 /// @notice Implements functions that help manage assets on a credit account
 library CreditAccountHelper {
     using SafeERC20 for IERC20;
 
-    /// @dev Requests a credit account to do an approval with support for various kinds of tokens
-    /// @dev Supports up-to-spec ERC20 tokens, ERC20 tokens that revert on transfer failure,
-    ///      tokens that require 0 allowance before changing to non-zero value, and non-ERC20 tokens
-    ///      that do not return a `success` value
-    /// @param creditAccount Credit account to approve tokens from
-    /// @param token Token to approve
-    /// @param spender Address to approve to
-    /// @param amount Amount to approve
+    /// @notice Requests a credit account to do an approval with support for various kinds of tokens
+    ///         Supports up-to-spec ERC20 tokens, ERC20 tokens that revert on transfer failure,
+    ///         tokens that require 0 allowance before changing to non-zero value, and non-ERC20 tokens
+    ///         that do not return a `success` value
+    /// @param  creditAccount Credit account to approve tokens from
+    /// @param  token Token to approve
+    /// @param  spender Address to approve to
+    /// @param  amount Amount to approve
+    /// @custom:tests U:[CAH-1], U:[CAH-2]
     function safeApprove(address creditAccount, address token, address spender, uint256 amount) internal {
         if (!_approve(creditAccount, token, spender, amount, false)) {
-            _approve(creditAccount, token, spender, 0, true); //U:[CAH-1,2]
-            _approve(creditAccount, token, spender, amount, true); // U:[CAH-1,2]
+            _approve(creditAccount, token, spender, 0, true);
+            _approve(creditAccount, token, spender, amount, true);
         }
     }
 
-    /// @dev Internal function used to approve tokens from a credit account to a third-party contrat.
-    ///      Uses credit account's `execute` to properly handle both ERC20-compliant and non-compliant
-    ///      (no returned value from "approve") tokens
-    /// @param creditAccount Credit account to approve tokens from
-    /// @param token Token to approve
-    /// @param spender Address to approve to
-    /// @param amount Amount to approve
-    /// @param revertIfFailed Whether to revert or return `false` on receiving `false` or an error from `approve`
+    /// @dev Internal function used to approve tokens from a credit account to a third-party address
     function _approve(address creditAccount, address token, address spender, uint256 amount, bool revertIfFailed)
         private
         returns (bool)

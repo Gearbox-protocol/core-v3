@@ -3,33 +3,32 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.17;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {PERCENTAGE_FACTOR, RAY} from "../libraries/Constants.sol";
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-
-/// @title Collateral logic Library
+/// @title  Collateral logic library
 /// @notice Implements functions that compute value of collateral on a credit account
 library CollateralLogic {
     using SafeERC20 for IERC20;
 
-    /// @dev Computes USD-denominated total value and TWV of a credit account.
-    ///      If finite TWV target is specified, the function will stop processing tokens after cumulative TWV reaches
-    ///      the target, in which case the returned values might be smaller than actual collateral.
-    ///      This is useful to check whether account is sufficiently collateralized.
-    /// @param quotedTokens Array of quoted tokens on the credit account
-    /// @param quotasPacked Array of packed values (quota, LT), in the same order as `quotedTokens`
-    /// @param creditAccount Credit account to compute collateral for
-    /// @param underlying The underlying token of the corresponding credit manager
-    /// @param ltUnderlying The underlying token's LT
-    /// @param twvUSDTarget Target twvUSD value to stop calculation after
-    /// @param convertToUSDFn A function that returns token value in USD and accepts the following inputs:
-    ///        * `priceOracle` - price oracle to convert assets in
-    ///        * `amount` - amount of token to convert
-    ///        * `token` - token to convert
-    /// @param priceOracle Price oracle to convert assets, passed to `convertToUSDFn`
+    /// @notice Computes USD-denominated total value and TWV of a credit account.
+    ///         If finite TWV target is specified, the function will stop processing tokens after cumulative TWV
+    ///         reaches the target, in which case the returned values might be smaller than actual collateral.
+    ///         This is useful to check whether account is sufficiently collateralized.
+    /// @param  quotedTokens Array of quoted tokens on the credit account
+    /// @param  quotasPacked Array of packed values (quota, LT), in the same order as `quotedTokens`
+    /// @param  creditAccount Credit account to compute collateral for
+    /// @param  underlying The underlying token of the corresponding credit manager
+    /// @param  ltUnderlying The underlying token's LT
+    /// @param  twvUSDTarget Target twvUSD value to stop calculation after
+    /// @param  convertToUSDFn A function that returns token value in USD and accepts the following inputs:
+    ///         * `priceOracle` - price oracle to convert assets in
+    ///         * `amount` - amount of token to convert
+    ///         * `token` - token to convert
+    /// @param  priceOracle Price oracle to convert assets, passed to `convertToUSDFn`
     /// @return totalValueUSD Total value of credit account's assets
     /// @return twvUSD Total LT-weighted value of credit account's assets
     /// @custom:tests U:[CLL-2]
@@ -46,7 +45,7 @@ library CollateralLogic {
         uint256 underlyingPriceRAY = convertToUSDFn(priceOracle, RAY, underlying);
 
         uint256 len = quotedTokens.length;
-        for (uint256 i; i < len;) {
+        for (uint256 i; i < len; ++i) {
             (uint256 quota, uint16 liquidationThreshold) = unpackQuota(quotasPacked[i]);
 
             // puts variables on top of the stack to avoid the "stack too deep" error
@@ -65,9 +64,6 @@ library CollateralLogic {
             twvUSD += weightedValueUSD;
 
             if (twvUSD >= twvUSDTarget) return (totalValueUSD, twvUSD);
-            unchecked {
-                ++i;
-            }
         }
 
         (uint256 underlyingValueUSD, uint256 underlyingWeightedValueUSD) = calcOneTokenCollateral({
@@ -82,13 +78,13 @@ library CollateralLogic {
         twvUSD += underlyingWeightedValueUSD;
     }
 
-    /// @dev Computes USD value of a single asset on a credit account
-    /// @param creditAccount Address of the credit account
-    /// @param convertToUSDFn Function to convert asset amounts to USD
-    /// @param priceOracle Address of the price oracle
-    /// @param token Address of the token
-    /// @param liquidationThreshold LT of the token
-    /// @param quotaUSD Quota of the token converted to USD
+    /// @notice Computes USD value of a single asset on a credit account
+    /// @param  creditAccount Address of the credit account
+    /// @param  convertToUSDFn Function to convert asset amounts to USD
+    /// @param  priceOracle Address of the price oracle
+    /// @param  token Address of the token
+    /// @param  liquidationThreshold LT of the token
+    /// @param  quotaUSD Quota of the token converted to USD
     /// @return valueUSD Value of the token
     /// @return weightedValueUSD LT-weighted value of the token
     /// @custom:tests U:[CLL-1]
@@ -108,12 +104,12 @@ library CollateralLogic {
         }
     }
 
-    /// @dev Packs quota and LT into one word
+    /// @notice Packs quota and LT into one word
     function packQuota(uint96 quota, uint16 lt) internal pure returns (uint256) {
         return (uint256(lt) << 96) | quota;
     }
 
-    /// @dev Unpacks one word into quota and LT
+    /// @notice Unpacks one word into quota and LT
     function unpackQuota(uint256 packedQuota) internal pure returns (uint256 quota, uint16 lt) {
         lt = uint16(packedQuota >> 96);
         quota = uint96(packedQuota);
