@@ -202,8 +202,8 @@ contract CreditManagerMock {
     }
 
     function setContractAllowance(address adapter, address targetContract) external {
-        adapterToContract[adapter] = targetContract; // U:[CM-45]
-        contractToAdapter[targetContract] = adapter; // U:[CM-45]
+        adapterToContract[adapter] = targetContract;
+        contractToAdapter[targetContract] = adapter;
     }
 
     function execute(bytes calldata data) external returns (bytes memory) {}
@@ -214,7 +214,7 @@ contract CreditManagerMock {
     /// @dev Currently, the following flags are supported:
     ///      * 1 - BOT_PERMISSIONS_FLAG - whether the account has non-zero permissions for at least one bot
     function flagsOf(address) external view returns (uint16) {
-        return flags; // U:[CM-35]
+        return flags;
     }
 
     /// @notice Sets a flag for a Credit Account
@@ -223,20 +223,20 @@ contract CreditManagerMock {
     /// @param value The new flag value
     function setFlagFor(address creditAccount, uint16 flag, bool value) external {
         if (value) {
-            _enableFlag(creditAccount, flag); // U:[CM-36]
+            _enableFlag(creditAccount, flag);
         } else {
-            _disableFlag(creditAccount, flag); // U:[CM-36]
+            _disableFlag(creditAccount, flag);
         }
     }
 
     /// @notice Sets the flag in the CA's flag mask to 1
     function _enableFlag(address, uint16 flag) internal {
-        flags |= flag; // U:[CM-36]
+        flags |= flag;
     }
 
     /// @notice Sets the flag in the CA's flag mask to 0
     function _disableFlag(address, uint16 flag) internal {
-        flags &= ~flag; // U:[CM-36]
+        flags &= ~flag;
     }
 
     function addCollateral(address, address, address, uint256) external pure returns (uint256) {

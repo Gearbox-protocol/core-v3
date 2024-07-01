@@ -15,48 +15,33 @@ contract AdapterMock is IAdapter {
     address public immutable override creditManager;
     address public immutable override targetContract;
 
+    bool internal _return_useSafePrices;
+
     constructor(address _creditManager, address _targetContract) {
         creditManager = _creditManager;
         targetContract = _targetContract;
-    }
-
-    function executeSwapSafeApprove(address tokenIn, address tokenOut, bytes memory callData, bool disableTokenIn)
-        external
-        returns (uint256 tokensToEnable, uint256 tokensToDisable, bytes memory result)
-    {
-        tokensToEnable = _getMaskOrRevert(tokenOut);
-        if (disableTokenIn) tokensToDisable = _getMaskOrRevert(tokenIn);
-        _approveToken(tokenIn, type(uint256).max);
-        result = _execute(callData);
-        _approveToken(tokenIn, 1);
-    }
-
-    function dumbCall(uint256 _tokensToEnable, uint256 _tokensToDisable)
-        external
-        returns (uint256 tokensToEnable, uint256 tokensToDisable)
-    {
-        _execute(dumbCallData());
-        tokensToEnable = _tokensToEnable;
-        tokensToDisable = _tokensToDisable;
     }
 
     function dumbCallData() public pure returns (bytes memory) {
         return abi.encodeWithSignature("hello(string)", "world");
     }
 
-    fallback() external {
-        _execute(msg.data);
+    function dumbCall() external returns (bool) {
+        _execute(dumbCallData());
+        return _return_useSafePrices;
     }
 
-    function _getMaskOrRevert(address token) internal view returns (uint256 tokenMask) {
-        tokenMask = ICreditManagerV3(creditManager).getTokenMaskOrRevert(token);
+    fallback(bytes calldata) external returns (bytes memory) {
+        (bool success,) = targetContract.call(msg.data);
+        require(success);
+        return abi.encode(_return_useSafePrices);
+    }
+
+    function setReturn_useSafePrices(bool value) external {
+        _return_useSafePrices = value;
     }
 
     function _execute(bytes memory data) internal returns (bytes memory result) {
         result = ICreditManagerV3(creditManager).execute(data);
-    }
-
-    function _approveToken(address token, uint256 amount) internal {
-        ICreditManagerV3(creditManager).approveCreditAccount(token, amount);
     }
 }
