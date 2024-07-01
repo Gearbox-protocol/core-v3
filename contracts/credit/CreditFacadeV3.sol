@@ -593,7 +593,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
                     flags |= EXTERNAL_CONTRACT_WAS_CALLED_FLAG;
                     _setActiveCreditAccount(creditAccount); // U:[FA-38]
                 }
-                mcall.target.functionCall(mcall.callData); // U:[FA-38]
+                bool useSafePrices = abi.decode(mcall.target.functionCall(mcall.callData), (bool)); // U:[FA-38]
+                if (useSafePrices) flags |= REVERT_ON_FORBIDDEN_TOKENS_FLAG | USE_SAFE_PRICES_FLAG; // U:[FA-38,45]
                 emit Execute({creditAccount: creditAccount, targetContract: targetContract});
             }
         }
