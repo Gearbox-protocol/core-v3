@@ -77,13 +77,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
                 )
             }),
-            MultiCall({
-                target: address(adapterMock),
-                callData: abi.encodeCall(
-                    AdapterMock.executeSwapSafeApprove,
-                    (tokenTestSuite.addressOf(Tokens.DAI), tokenTestSuite.addressOf(Tokens.USDC), "", false)
-                )
-            })
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())})
         );
 
         uint256 gasBefore = gasleft();
@@ -114,20 +108,8 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                     ICreditFacadeV3Multicall.addCollateral, (tokenTestSuite.addressOf(Tokens.DAI), DAI_ACCOUNT_AMOUNT)
                 )
             }),
-            MultiCall({
-                target: address(adapterMock),
-                callData: abi.encodeCall(
-                    AdapterMock.executeSwapSafeApprove,
-                    (tokenTestSuite.addressOf(Tokens.DAI), tokenTestSuite.addressOf(Tokens.USDC), "", false)
-                )
-            }),
-            MultiCall({
-                target: address(adapterMock),
-                callData: abi.encodeCall(
-                    AdapterMock.executeSwapSafeApprove,
-                    (tokenTestSuite.addressOf(Tokens.USDC), tokenTestSuite.addressOf(Tokens.LINK), "", false)
-                )
-            })
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())}),
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())})
         );
 
         uint256 gasBefore = gasleft();
@@ -224,13 +206,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
                     (tokenTestSuite.addressOf(Tokens.LINK), int96(int256(LINK_ACCOUNT_AMOUNT)), 0)
                 )
             }),
-            MultiCall({
-                target: address(adapterMock),
-                callData: abi.encodeCall(
-                    AdapterMock.executeSwapSafeApprove,
-                    (tokenTestSuite.addressOf(Tokens.DAI), tokenTestSuite.addressOf(Tokens.LINK), "", false)
-                )
-            })
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())})
         );
 
         uint256 gasBefore = gasleft();
@@ -407,13 +383,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
 
         calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(adapterMock),
-                callData: abi.encodeCall(
-                    AdapterMock.executeSwapSafeApprove,
-                    (tokenTestSuite.addressOf(Tokens.DAI), tokenTestSuite.addressOf(Tokens.LINK), "", false)
-                )
-            })
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())})
         );
 
         uint256 gasBefore = gasleft();
@@ -448,20 +418,8 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
 
         calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(adapterMock),
-                callData: abi.encodeCall(
-                    AdapterMock.executeSwapSafeApprove,
-                    (tokenTestSuite.addressOf(Tokens.DAI), tokenTestSuite.addressOf(Tokens.LINK), "", false)
-                )
-            }),
-            MultiCall({
-                target: address(adapterMock),
-                callData: abi.encodeCall(
-                    AdapterMock.executeSwapSafeApprove,
-                    (tokenTestSuite.addressOf(Tokens.LINK), tokenTestSuite.addressOf(Tokens.USDC), "", true)
-                )
-            })
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())}),
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())})
         );
 
         uint256 gasBefore = gasleft();
@@ -503,13 +461,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         tokenTestSuite.mint(Tokens.LINK, creditAccount, LINK_ACCOUNT_AMOUNT * 3);
 
         calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(adapterMock),
-                callData: abi.encodeCall(
-                    AdapterMock.executeSwapSafeApprove,
-                    (tokenTestSuite.addressOf(Tokens.DAI), tokenTestSuite.addressOf(Tokens.LINK), "", true)
-                )
-            }),
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())}),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(
@@ -710,13 +662,7 @@ contract CreditFacadeGasTest is IntegrationTestHelper {
         address linkToken = tokenTestSuite.addressOf(Tokens.LINK);
 
         calls = MultiCallBuilder.build(
-            MultiCall({
-                target: address(adapterMock),
-                callData: abi.encodeCall(
-                    AdapterMock.executeSwapSafeApprove,
-                    (tokenTestSuite.addressOf(Tokens.LINK), tokenTestSuite.addressOf(Tokens.DAI), "", true)
-                )
-            }),
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())}),
             MultiCall({
                 target: address(creditFacade),
                 callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (type(uint256).max))
