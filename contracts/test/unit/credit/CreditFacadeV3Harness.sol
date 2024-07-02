@@ -22,10 +22,6 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
         _reentrancyStatus = _status;
     }
 
-    function setCumulativeLoss(uint128 newLoss) external {
-        lossParams.currentCumulativeLoss = newLoss;
-    }
-
     function multicallInt(address creditAccount, MultiCall[] calldata calls, uint256 enabledTokensMask, uint256 flags)
         external
     {
@@ -62,9 +58,5 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
 
     function isExpired() external view returns (bool) {
         return _isExpired();
-    }
-
-    function setCurrentCumulativeLoss(uint128 _currentCumulativeLoss) external {
-        lossParams.currentCumulativeLoss = _currentCumulativeLoss;
     }
 }

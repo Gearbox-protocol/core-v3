@@ -14,13 +14,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 // INTERFACES
 import {IBotListV3} from "../interfaces/IBotListV3.sol";
 import {AllowanceAction} from "../interfaces/ICreditConfiguratorV3.sol";
-import {
-    CumulativeLossParams,
-    DebtLimits,
-    FullCheckParams,
-    ICreditFacadeV3,
-    MultiCall
-} from "../interfaces/ICreditFacadeV3.sol";
+import {DebtLimits, FullCheckParams, ICreditFacadeV3, MultiCall} from "../interfaces/ICreditFacadeV3.sol";
 import "../interfaces/ICreditFacadeV3Multicall.sol";
 import {
     CollateralCalcTask,
@@ -57,10 +51,12 @@ import {ACLTrait} from "../traits/ACLTrait.sol";
 /// @notice Users can also let external bots manage their accounts via `botMulticall`. Bots can be relatively general,
 ///         the facade only ensures that they can do no harm to the protocol by running the collateral check after the
 ///         multicall and checking the permissions given to them by users. See `BotListV3` for additional details.
-/// @notice Credit facade implements a few safeguards on top of those present in the credit manager, including debt and
-///         quota size validation, pausing on large protocol losses, Degen NFT whitelist mode, and forbidden tokens
-///         (they count towards account value, but having them enabled as collateral restricts available actions and
-///         activates a safer version of collateral check).
+/// @notice Credit facade implements a few safeguards on top of those present in the credit manager, including
+///         - debt and quota size validation
+///         - degen NFT whitelist mode
+///         - policies on how liquidations with loss are performed
+///         - forbidden tokens (they count towards account value, but having them enabled as collateral restricts allowed
+///         actions and triggers a safer version of collateral check, incentivizing users to decrease exposure to them).
 contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
     using Address for address;
     using BitMask for uint256;
@@ -112,8 +108,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
     /// @notice Bit mask encoding a set of forbidden tokens
     uint256 public override forbiddenTokenMask;
 
-    /// @notice Info on bad debt liquidation losses packed into a single slot
-    CumulativeLossParams public override lossParams;
+    /// @notice Contract that enforces a policy on how liquidations with loss are performed
+    address public override lossLiquidator;
 
     /// @dev Set of emergency liquidators
     EnumerableSet.AddressSet internal _emergencyLiquidatorsSet;
@@ -177,9 +173,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
         if (!IBotListV3(_botList).isCreditManagerAdded(_creditManager)) revert CreditManagerNotAddedException(); // U:[FA-1]
     }
 
-    /// @notice Whether `addr` is an approved emergency liquidator
+    /// @notice Whether `addr` is an approved emergency liquidator or the loss liquidator
     function canLiquidateWhilePaused(address addr) public view override returns (bool) {
-        return _emergencyLiquidatorsSet.contains(addr);
+        return _emergencyLiquidatorsSet.contains(addr) || addr == lossLiquidator;
     }
 
     /// @notice Returns emergency liquidators
@@ -276,7 +272,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
     ///         - Liquidates a credit account in the credit manager, which repays debt to the pool, removes quotas, and
     ///           transfers underlying to the liquidator
     ///         - If pool incurs a loss on liquidation, further borrowing through the facade is forbidden
-    ///         - If cumulative loss from bad debt liquidations exceeds the threshold, the facade is paused
     /// @notice The function computes account’s total value (oracle value of enabled tokens), discounts it by liquidator’s
     ///         premium, and uses this value to compute funds due to the pool and owner.
     ///         Debt to the pool must be repaid in underlying, while funds due to owner might be covered by underlying
@@ -289,7 +284,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
     /// @param creditAccount Account to liquidate
     /// @param to Address to transfer underlying left after liquidation
     /// @param calls List of calls to perform before liquidating the account
-    /// @dev When the credit facade is paused, reverts if caller is not an approved emergency liquidator
+    /// @return reportedLoss Loss incurred on liquidation, if any
+    /// @dev If liquidation incurs loss, reverts if caller is not the loss liquidator
+    /// @dev If facade is paused, reverts if caller is not an approved emergency liquidator or the loss liquidator
     /// @dev Reverts if `creditAccount` is not opened in connected credit manager
     /// @dev Reverts if account has no debt or is neither unhealthy nor expired
     /// @dev Reverts if remaining token balances increase during the multicall
@@ -301,6 +298,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
         override
         whenNotPausedOrEmergency // U:[FA-2,12]
         nonReentrant // U:[FA-4]
+        returns (uint256 reportedLoss)
     {
         uint256 flags = LIQUIDATE_CREDIT_ACCOUNT_PERMISSIONS | SKIP_COLLATERAL_CHECK_FLAG;
         if (
@@ -331,7 +329,8 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
 
         collateralDebtData.enabledTokensMask = collateralDebtData.enabledTokensMask.enable(UNDERLYING_TOKEN_MASK); // U:[FA-16]
 
-        (uint256 remainingFunds, uint256 reportedLoss) = ICreditManagerV3(creditManager).liquidateCreditAccount({
+        uint256 remainingFunds;
+        (remainingFunds, reportedLoss) = ICreditManagerV3(creditManager).liquidateCreditAccount({
             creditAccount: creditAccount,
             collateralDebtData: collateralDebtData,
             to: to,
@@ -343,12 +342,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
         if (reportedLoss != 0) {
             maxDebtPerBlockMultiplier = 0; // U:[FA-17]
 
-            // both cast and addition are safe because amounts are of much smaller scale
-            lossParams.currentCumulativeLoss += uint128(reportedLoss); // U:[FA-17]
-
-            // can't pause an already paused contract
-            if (!paused() && lossParams.currentCumulativeLoss > lossParams.maxCumulativeLoss) {
-                _pause(); // U:[FA-17]
+            address lossLiquidator_ = lossLiquidator;
+            if (lossLiquidator_ != address(0) && msg.sender != lossLiquidator_) {
+                revert CallerNotLossLiquidatorException(); // U:[FA-17]
             }
         }
     }
@@ -788,21 +784,6 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
         maxDebtPerBlockMultiplier = newMaxDebtPerBlockMultiplier; // U:[FA-49]
     }
 
-    /// @notice Sets the new max cumulative loss
-    /// @param newMaxCumulativeLoss New max cumulative loss
-    /// @param resetCumulativeLoss Whether to reset the current cumulative loss to zero
-    /// @dev Reverts if caller is not credit configurator
-    function setCumulativeLossParams(uint128 newMaxCumulativeLoss, bool resetCumulativeLoss)
-        external
-        override
-        creditConfiguratorOnly // U:[FA-6]
-    {
-        lossParams.maxCumulativeLoss = newMaxCumulativeLoss; // U:[FA-51]
-        if (resetCumulativeLoss) {
-            lossParams.currentCumulativeLoss = 0; // U:[FA-51]
-        }
-    }
-
     /// @notice Changes token's forbidden status
     /// @param token Token to change the status for
     /// @param allowance Status to set
@@ -817,6 +798,21 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
         forbiddenTokenMask = (allowance == AllowanceAction.ALLOW)
             ? forbiddenTokenMask.disable(tokenMask)
             : forbiddenTokenMask.enable(tokenMask); // U:[FA-52]
+    }
+
+    /// @notice Sets the new loss liquidator
+    /// @param newLossLiquidator New loss liquidator
+    /// @dev Reverts if caller is not credit configurator
+    /// @dev Reverts if `newLossLiquidator` is not a contract, unless it's zero address
+    function setLossLiquidator(address newLossLiquidator)
+        external
+        override
+        creditConfiguratorOnly // U:[FA-6]
+    {
+        if (newLossLiquidator != address(0) && newLossLiquidator.code.length == 0) {
+            revert AddressIsNotContractException(newLossLiquidator); // U:[FA-51]
+        }
+        lossLiquidator = newLossLiquidator; // U:[FA-51]
     }
 
     /// @notice Changes account's status as emergency liquidator

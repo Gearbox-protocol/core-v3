@@ -463,8 +463,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait {
             (uint128 minDebt, uint128 maxDebt) = prevCreditFacade.debtLimits();
             _setLimits({minDebt: minDebt, maxDebt: maxDebt}); // I:[CC-22]
 
-            (, uint128 maxCumulativeLoss) = prevCreditFacade.lossParams();
-            _setMaxCumulativeLoss(maxCumulativeLoss); // I:[CC-22]
+            _setLossLiquidator(prevCreditFacade.lossLiquidator()); // I:[CC-22]
 
             _migrateEmergencyLiquidators(prevCreditFacade); // I:[CC-22C]
 
@@ -475,7 +474,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait {
             }
 
             if (CreditFacadeV3(newCreditFacade).botList() != prevCreditFacade.botList()) {
-                revert IncorrectBotListException(); // U:[CC-22D]
+                revert IncorrectBotListException(); // I:[CC-22D]
             }
         }
 
@@ -598,39 +597,6 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait {
         emit SetMaxDebtPerBlockMultiplier(newMaxDebtLimitPerBlockMultiplier); // I:[CC-1A,24]
     }
 
-    /// @notice Sets the new maximum cumulative loss from bad debt liquidations
-    /// @param newMaxCumulativeLoss New max cumulative lossd
-    function setMaxCumulativeLoss(uint128 newMaxCumulativeLoss)
-        external
-        override
-        controllerOrConfiguratorOnly // I:[CC-2B]
-    {
-        _setMaxCumulativeLoss(newMaxCumulativeLoss); // I:[CC-31]
-    }
-
-    /// @dev `setMaxCumulativeLoss` implementation
-    function _setMaxCumulativeLoss(uint128 _maxCumulativeLoss) internal {
-        CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
-
-        (, uint128 maxCumulativeLossCurrent) = cf.lossParams(); // I:[CC-31]
-        if (_maxCumulativeLoss == maxCumulativeLossCurrent) return;
-
-        cf.setCumulativeLossParams(_maxCumulativeLoss, false); // I:[CC-31]
-        emit SetMaxCumulativeLoss(_maxCumulativeLoss); // I:[CC-31]
-    }
-
-    /// @notice Resets the current cumulative loss from bad debt liquidations to zero
-    function resetCumulativeLoss()
-        external
-        override
-        controllerOrConfiguratorOnly // I:[CC-2B]
-    {
-        CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
-        (, uint128 maxCumulativeLossCurrent) = cf.lossParams(); // I:[CC-32]
-        cf.setCumulativeLossParams(maxCumulativeLossCurrent, true); // I:[CC-32]
-        emit ResetCumulativeLoss(); // I:[CC-32]
-    }
-
     /// @notice Sets a new credit facade expiration timestamp
     /// @param newExpirationDate New expiration timestamp
     /// @dev Reverts if `newExpirationDate` is in the past
@@ -656,6 +622,26 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait {
         emit SetExpirationDate(newExpirationDate); // I:[CC-25]
     }
 
+    /// @notice Sets the new loss liquidator which can enforce policies on how liquidations with loss are performed
+    /// @param newLossLiquidator New loss liquidator, must be a contract or zero address
+    function setLossLiquidator(address newLossLiquidator)
+        external
+        override
+        configuratorOnly // I:[CC-2]
+    {
+        _setLossLiquidator(newLossLiquidator); // I:[CC-26]
+    }
+
+    /// @dev `setLossLiquidator` implementation
+    function _setLossLiquidator(address newLossLiquidator) internal {
+        CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
+
+        if (cf.lossLiquidator() == newLossLiquidator) return;
+
+        cf.setLossLiquidator(newLossLiquidator); // I:[CC-26]
+        emit SetLossLiquidator(newLossLiquidator); // I:[CC-26]
+    }
+
     /// @notice Adds an address to the list of emergency liquidators
     /// @param liquidator Address to add to the list
     function addEmergencyLiquidator(address liquidator)
@@ -670,7 +656,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait {
     function _addEmergencyLiquidator(address liquidator) internal {
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
-        if (cf.canLiquidateWhilePaused(liquidator)) return;
+        if (cf.canLiquidateWhilePaused(liquidator) && liquidator != cf.lossLiquidator()) return;
 
         cf.setEmergencyLiquidator(liquidator, AllowanceAction.ALLOW); // I:[CC-27]
         emit AddEmergencyLiquidator(liquidator); // I:[CC-27]
@@ -685,7 +671,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait {
     {
         CreditFacadeV3 cf = CreditFacadeV3(creditFacade());
 
-        if (cf.canLiquidateWhilePaused(liquidator)) {
+        if (cf.canLiquidateWhilePaused(liquidator) && liquidator != cf.lossLiquidator()) {
             cf.setEmergencyLiquidator(liquidator, AllowanceAction.FORBID); // I:[CC-28]
             emit RemoveEmergencyLiquidator(liquidator); // I:[CC-28]
         }

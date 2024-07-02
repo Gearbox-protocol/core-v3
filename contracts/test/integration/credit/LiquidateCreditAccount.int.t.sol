@@ -121,29 +121,6 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
         assertEq(maxDebtPerBlockMultiplier, 0, "Increase debt wasn't forbidden after loss");
     }
 
-    /// @dev I:[LCA-5]: CreditFacade is paused after too much cumulative loss from liquidations
-    function test_I_LCA_05_liquidateCreditAccount_pauses_CreditFacade_on_too_much_loss()
-        public
-        withAdapterMock
-        creditTest
-    {
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setMaxCumulativeLoss(1);
-
-        (address creditAccount,) = _openTestCreditAccount();
-
-        MultiCall[] memory calls = MultiCallBuilder.build(
-            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())})
-        );
-
-        _makeAccountsLiquitable();
-
-        vm.prank(LIQUIDATOR);
-        creditFacade.liquidateCreditAccount(creditAccount, FRIEND, calls);
-
-        assertTrue(creditFacade.paused(), "Credit manager was not paused");
-    }
-
     /// @dev I:[LCA-6]: liquidateCreditAccount reverts on internal call in multicall on closure
     function test_I_LCA_06_liquidateCreditAccount_reverts_on_internal_call_in_multicall_on_closure()
         public

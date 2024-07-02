@@ -216,6 +216,9 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.setCreditConfigurator(DUMB_ADDRESS);
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
+        creditConfigurator.setLossLiquidator(address(0));
+
+        vm.expectRevert(CallerNotConfiguratorException.selector);
         creditConfigurator.addEmergencyLiquidator(address(0));
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
@@ -258,12 +261,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
         vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         creditConfigurator.setMaxDebtPerBlockMultiplier(0);
-
-        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
-        creditConfigurator.setMaxCumulativeLoss(0);
-
-        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
-        creditConfigurator.resetCumulativeLoss();
     }
 
     //
@@ -797,8 +794,10 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
             creditFacade = initialCf;
         }
 
+        address lossLiquidator = makeAddr("LOSS_LIQUIDATOR");
+        vm.etch(lossLiquidator, "DUMMY_CODE");
         vm.prank(CONFIGURATOR);
-        creditConfigurator.setMaxCumulativeLoss(1e18);
+        creditConfigurator.setLossLiquidator(lossLiquidator);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.setMaxDebtPerBlockMultiplier(DEFAULT_LIMIT_PER_BLOCK_MULTIPLIER + 1);
@@ -811,8 +810,6 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
         uint40 expirationDate = creditFacade.expirationDate();
         (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
-
-        (, uint128 maxCumulativeLoss) = creditFacade.lossParams();
 
         vm.expectEmit(true, false, false, false);
         emit SetCreditFacade(address(cf));
@@ -829,7 +826,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
         (uint128 minDebt2, uint128 maxDebt2) = cf.debtLimits();
 
-        (, uint128 maxCumulativeLoss2) = cf.lossParams();
+        address lossLiquidator2 = cf.lossLiquidator();
 
         assertEq(maxDebtPerBlockMultiplier2, maxDebtPerBlockMultiplier, "Incorrect limitPerBlock");
         assertEq(minDebt2, minDebt, "Incorrect minDebt");
@@ -837,7 +834,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
         assertEq(expirationDate2, expirationDate, "Incorrect expirationDate");
 
-        assertEq(maxCumulativeLoss2, maxCumulativeLoss, "Incorrect maxCumulativeLoss");
+        assertEq(lossLiquidator2, lossLiquidator, "Incorrect lossLiquidator");
     }
 
     /// @dev I:[CC-22B]: setCreditFacade reverts if new facade is adapter or target contract
@@ -988,6 +985,21 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         assertEq(expirationDate, newExpirationDate, "Incorrect new expirationDate");
     }
 
+    /// @dev I:[CC-26]: setLossLiquidator works correctly
+    function test_I_CC_26_setLossLiquidator_works_correctly() public creditTest {
+        address liquidator = makeAddr("LOSS_LIQUIDATOR");
+        vm.etch(liquidator, "DUMMY_CODE");
+
+        vm.expectEmit(true, true, true, true);
+        emit SetLossLiquidator(liquidator);
+
+        vm.prank(CONFIGURATOR);
+        creditConfigurator.setLossLiquidator(liquidator);
+
+        assertEq(creditFacade.lossLiquidator(), liquidator, "Loss liquidator not set");
+        assertTrue(creditFacade.canLiquidateWhilePaused(liquidator), "Loss liquidator can't liquidate on pause");
+    }
+
     /// @dev I:[CC-27]: addEmergencyLiquidator works correctly and emits event
     function test_I_CC_27_addEmergencyLiquidator_works_correctly() public creditTest {
         vm.expectEmit(false, false, false, true);
@@ -1082,40 +1094,5 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.rampLiquidationThreshold(usdc, 9000, uint40(block.timestamp - 1), 1000);
-    }
-
-    /// @dev I:[CC-31] setMaxCumulativeLoss works correctly
-    function test_I_CC_31_setMaxCumulativeLoss_works_correctly() public creditTest {
-        vm.expectEmit(false, false, false, true);
-        emit SetMaxCumulativeLoss(100);
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setMaxCumulativeLoss(100);
-
-        (, uint128 maxCumulativeLoss) = creditFacade.lossParams();
-
-        assertEq(maxCumulativeLoss, 100, "Max cumulative loss set incorrectly");
-    }
-
-    /// @dev I:[CC-32] resetCumulativeLoss works correctly
-    function test_I_CC_32_resetCumulativeLoss_works_correctly() public creditTest {
-        CreditFacadeV3Harness cf = new CreditFacadeV3Harness(
-            address(acl), address(creditManager), address(botList), address(0), address(0), false
-        );
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.setCreditFacade(address(cf));
-
-        cf.setCumulativeLoss(1000);
-
-        vm.expectEmit(false, false, false, false);
-        emit ResetCumulativeLoss();
-
-        vm.prank(CONFIGURATOR);
-        creditConfigurator.resetCumulativeLoss();
-
-        (uint256 loss,) = cf.lossParams();
-
-        assertEq(loss, 0, "Cumulative loss was not reset");
     }
 }
