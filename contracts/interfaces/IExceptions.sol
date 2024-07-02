@@ -272,24 +272,8 @@ error CallerNotExecutorException();
 /// @notice Thrown on attempting to call an access restricted function not as veto admin
 error CallerNotVetoAdminException();
 
-// ------------------- //
-// CONTROLLER TIMELOCK //
-// ------------------- //
-
-/// @notice Thrown when the new parameter values do not satisfy required conditions
-error ParameterChecksFailedException();
-
-/// @notice Thrown when attempting to execute a non-queued transaction
-error TxNotQueuedException();
-
-/// @notice Thrown when attempting to execute a transaction that is either immature or stale
-error TxExecutedOutsideTimeWindowException();
-
-/// @notice Thrown when execution of a transaction fails
-error TxExecutionRevertedException();
-
-/// @notice Thrown when the value of a parameter on execution is different from the value on queue
-error ParameterChangedAfterQueuedTxException();
+/// @notice Thrown on attempting to perform liquidation with loss not through the loss liquidator contract
+error CallerNotLossLiquidatorException();
 
 // -------- //
 // BOT LIST //
