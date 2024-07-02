@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
+import {IACLTrait} from "./base/IACLTrait.sol";
 import {IRateKeeper} from "./base/IRateKeeper.sol";
 
 interface ITumblerV3Events {
@@ -14,16 +15,8 @@ interface ITumblerV3Events {
 }
 
 /// @title Tumbler V3 interface
-interface ITumblerV3 is IRateKeeper, ITumblerV3Events {
-    function pool() external view returns (address);
-
-    function underlying() external view returns (address);
-
-    function poolQuotaKeeper() external view returns (address);
-
+interface ITumblerV3 is IACLTrait, IRateKeeper, ITumblerV3Events {
     function epochLength() external view returns (uint256);
-
-    function getTokens() external view returns (address[] memory);
 
     function getRates(address[] calldata tokens) external view returns (uint16[] memory);
 

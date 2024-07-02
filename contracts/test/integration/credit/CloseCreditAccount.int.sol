@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import "../../interfaces/IAddressProviderV3.sol";
 
 import {BotListV3} from "../../../core/BotListV3.sol";
 
 import {ICreditAccountV3} from "../../../interfaces/ICreditAccountV3.sol";
-import {BOT_PERMISSIONS_SET_FLAG, SECONDS_PER_YEAR} from "../../../libraries/Constants.sol";
+import {SECONDS_PER_YEAR} from "../../../libraries/Constants.sol";
 import {ICreditManagerV3, ICreditManagerV3Events, ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
 
 import "../../../interfaces/ICreditFacadeV3.sol";
@@ -142,10 +142,11 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         bytes memory DUMB_CALLDATA = adapterMock.dumbCallData();
 
         MultiCall[] memory calls = MultiCallBuilder.build(
-            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())})
         );
 
         address bot = address(new BotMock());
+        BotMock(bot).setRequiredPermissions(ADD_COLLATERAL_PERMISSION);
 
         vm.prank(USER);
         creditFacade.multicall(

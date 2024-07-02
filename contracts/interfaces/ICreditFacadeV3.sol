@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {AllowanceAction} from "./ICreditConfiguratorV3.sol";
 import "./ICreditFacadeV3Multicall.sol";
 import {PriceUpdate} from "./IPriceOracleV3.sol";
+import {IACLTrait} from "./base/IACLTrait.sol";
 import {IVersion} from "./base/IVersion.sol";
 
 /// @notice Multicall element
@@ -22,14 +23,6 @@ struct MultiCall {
 struct DebtLimits {
     uint128 minDebt;
     uint128 maxDebt;
-}
-
-/// @notice Info on bad debt liquidation losses packed into a single slot
-/// @param currentCumulativeLoss Current cumulative loss from bad debt liquidations
-/// @param maxCumulativeLoss Max cumulative loss incurred before the facade gets paused
-struct CumulativeLossParams {
-    uint128 currentCumulativeLoss;
-    uint128 maxCumulativeLoss;
 }
 
 /// @notice Collateral check params
@@ -82,7 +75,7 @@ interface ICreditFacadeV3Events {
 }
 
 /// @title Credit facade V3 interface
-interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
+interface ICreditFacadeV3 is IACLTrait, IVersion, ICreditFacadeV3Events {
     function creditManager() external view returns (address);
 
     function underlying() external view returns (address);
@@ -105,9 +98,9 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
 
     function debtLimits() external view returns (uint128 minDebt, uint128 maxDebt);
 
-    function lossParams() external view returns (uint128 currentCumulativeLoss, uint128 maxCumulativeLoss);
-
     function forbiddenTokenMask() external view returns (uint256);
+
+    function lossLiquidator() external view returns (address);
 
     function emergencyLiquidators() external view returns (address[] memory);
 
@@ -124,7 +117,9 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
 
     function closeCreditAccount(address creditAccount, MultiCall[] calldata calls) external payable;
 
-    function liquidateCreditAccount(address creditAccount, address to, MultiCall[] calldata calls) external;
+    function liquidateCreditAccount(address creditAccount, address to, MultiCall[] calldata calls)
+        external
+        returns (uint256 reportedLoss);
 
     function partiallyLiquidateCreditAccount(
         address creditAccount,
@@ -147,11 +142,9 @@ interface ICreditFacadeV3 is IVersion, ICreditFacadeV3Events {
 
     function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt, uint8 newMaxDebtPerBlockMultiplier) external;
 
-    function setBotList(address newBotList) external;
-
-    function setCumulativeLossParams(uint128 newMaxCumulativeLoss, bool resetCumulativeLoss) external;
-
     function setTokenAllowance(address token, AllowanceAction allowance) external;
+
+    function setLossLiquidator(address newLossLiquidator) external;
 
     function setEmergencyLiquidator(address liquidator, AllowanceAction allowance) external;
 }

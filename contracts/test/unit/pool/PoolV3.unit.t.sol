@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -10,7 +10,7 @@ import {MAX_WITHDRAW_FEE, RAY} from "../../../libraries/Constants.sol";
 
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import "../../../interfaces/IExceptions.sol";
-import {ILinearInterestRateModelV3} from "../../../interfaces/ILinearInterestRateModelV3.sol";
+import {LinearInterestRateModelV3} from "../../../pool/LinearInterestRateModelV3.sol";
 import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
 
@@ -54,7 +54,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
     ERC20FeeMock underlying;
     AddressProviderV3ACLMock addressProvider;
 
-    bytes4 constant calcBorrowRateSelector = bytes4(keccak256("calcBorrowRate(uint256,uint256,bool)"));
+    bytes4 constant calcBorrowRateSelector = LinearInterestRateModelV3.calcBorrowRate.selector;
 
     // ----- //
     // SETUP //
@@ -98,7 +98,6 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         vm.mockCall(interestRateModel, abi.encode(calcBorrowRateSelector), abi.encode(RAY / 20)); // 5%
         vm.mockCall(creditManager, abi.encodeCall(ICreditManagerV3.pool, ()), abi.encode(pool));
         vm.mockCall(quotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.pool, ()), abi.encode(pool));
-        vm.mockCall(quotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.poolQuotaRevenue, ()), abi.encode(0));
 
         // connect contracts
         vm.startPrank(configurator);
@@ -199,6 +198,12 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         pool.pause();
 
         vm.expectRevert("Pausable: paused");
+        pool.transfer({to: user, amount: 0});
+
+        vm.expectRevert("Pausable: paused");
+        pool.transferFrom({from: user, to: user, amount: 0});
+
+        vm.expectRevert("Pausable: paused");
         pool.deposit({assets: 1, receiver: user});
 
         vm.expectRevert("Pausable: paused");
@@ -262,7 +267,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
     /// @notice U:[LP-2C]: External function have correct access rights
     function test_U_LP_02C_external_functions_have_correct_access() public {
-        vm.expectRevert(CreditManagerCantBorrowException.selector);
+        vm.expectRevert(CallerNotCreditManagerException.selector);
         pool.lendCreditAccount({borrowedAmount: 1, creditAccount: address(0)});
 
         vm.expectRevert(CallerNotCreditManagerException.selector);
@@ -278,12 +283,12 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         pool.setInterestRateModel({newInterestRateModel: address(0)});
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
-        pool.setPoolQuotaKeeper({newPoolQuotaKeeper: address(0)});
+        pool.setPoolQuotaKeeper({quotaKeeper: address(0)});
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         pool.setTotalDebtLimit({newLimit: 0});
 
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         pool.setCreditManagerDebtLimit({creditManager: address(0), newLimit: 0});
 
         vm.expectRevert(CallerNotConfiguratorException.selector);
@@ -796,7 +801,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
     function test_U_LP_12_creditManagerBorrowable_works_as_expected() public {
         // for the next two cases, `irm.availableToBorrow` should not be called
         vm.mockCallRevert(
-            interestRateModel, abi.encode(ILinearInterestRateModelV3.availableToBorrow.selector), "should not be called"
+            interestRateModel, abi.encode(LinearInterestRateModelV3.availableToBorrow.selector), "should not be called"
         );
 
         // case: total debt limit is fully used
@@ -810,7 +815,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
         // for the next three cases, let `irm.availableToBorrow` always return 500
         vm.mockCall(
-            interestRateModel, abi.encode(ILinearInterestRateModelV3.availableToBorrow.selector), abi.encode(500)
+            interestRateModel, abi.encode(LinearInterestRateModelV3.availableToBorrow.selector), abi.encode(500)
         );
 
         // case: `irm.availableToBorrow` is the smallest
@@ -840,10 +845,6 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
     /// @notice U:[LP-13A]: `lendCreditAccount` reverts on out of debt limits
     function test_U_LP_13A_lendCreditAccount_reverts_on_out_of_debt_limits() public {
-        // case: zero amount
-        vm.expectRevert(CreditManagerCantBorrowException.selector);
-        pool.lendCreditAccount({borrowedAmount: 0, creditAccount: address(0)});
-
         // case: CM debt limit violated
         pool.hackCreditManagerBorrowed(creditManager, 500);
         vm.expectRevert(CreditManagerCantBorrowException.selector);
@@ -872,15 +873,6 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
         assertEq(pool.totalBorrowed(), 1300, "Incorrect totalBorrowed");
         assertEq(pool.creditManagerBorrowed(creditManager), 800, "Incorrect creditManagerBorrowed");
-    }
-
-    /// @notice U:[LP-14A]: `repayCreditAccount` reverts on no debt
-    function test_U_LP_14A_repayCreditAccount_reverts_on_no_debt() public {
-        pool.hackCreditManagerBorrowed(creditManager, 0);
-
-        vm.expectRevert(CallerNotCreditManagerException.selector);
-        vm.prank(creditManager);
-        pool.repayCreditAccount({repaidAmount: 0, profit: 0, loss: 0});
     }
 
     /// @notice U:[LP-14B]: `repayCreditAccount` with profit works as expected
@@ -1078,33 +1070,52 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         pool.setPoolQuotaKeeper(address(0));
     }
 
+    /// @notice U:[LP-23B]: quota keeper initialization works as expected
+    function test_U_LP_23B_quotaKeeper_initialization_works_as_expected() public {
+        pool.hackQuotaKeeper(address(0));
+
+        vm.expectRevert(QuotaKeeperNotInitializedException.selector);
+        pool.poolQuotaKeeper();
+
+        vm.expectRevert(QuotaKeeperNotInitializedException.selector);
+        pool.updateQuotaRevenue(0);
+
+        vm.expectRevert(QuotaKeeperNotInitializedException.selector);
+        pool.setQuotaRevenue(0);
+
+        pool.hackQuotaKeeper(quotaKeeper);
+
+        vm.expectRevert(QuotaKeeperAlreadyInitializedException.selector);
+        vm.prank(configurator);
+        pool.setPoolQuotaKeeper(quotaKeeper);
+    }
+
     /// @notice U:[LP-23C]: `setPoolQuotaKeeper` reverts on incompatible quota keeper
     function test_U_LP_23C_setPoolQuotaKeeper_reverts_on_incompatible_quota_keeper() public {
+        pool.hackQuotaKeeper(address(0));
+
         address newQuotaKeeper = makeAddr("NEW_QUOTA_KEEPER");
         vm.mockCall(newQuotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.pool, ()), abi.encode(makeAddr("WRONG_POOL")));
 
-        vm.expectRevert(IncompatiblePoolQuotaKeeperException.selector);
+        vm.expectRevert(IncompatibleQuotaKeeperException.selector);
         vm.prank(configurator);
         pool.setPoolQuotaKeeper(newQuotaKeeper);
     }
 
     /// @notice U:[LP-23D]: `setPoolQuotaKeeper` works as expected
     function test_U_LP_23D_setPoolQuotaKeeper_works_as_expected() public {
+        pool.hackQuotaKeeper(address(0));
+
         address newQuotaKeeper = makeAddr("NEW_QUOTA_KEEPER");
         vm.mockCall(newQuotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.pool, ()), abi.encode(address(pool)));
-        vm.mockCall(newQuotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.poolQuotaRevenue, ()), abi.encode(100));
 
-        vm.expectEmit(true, false, false, false);
+        vm.expectEmit(true, true, true, true);
         emit SetPoolQuotaKeeper(newQuotaKeeper);
-
-        vm.expectCall(newQuotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.poolQuotaRevenue, ()));
 
         vm.prank(configurator);
         pool.setPoolQuotaKeeper(newQuotaKeeper);
 
         assertEq(pool.poolQuotaKeeper(), newQuotaKeeper, "Incorrect poolQuotaKeeper");
-        // implicitly test that `_setQuotaRevenue` is called with correct parameters
-        assertEq(pool.quotaRevenue(), 100, "Incorrect quotaRevenue");
     }
 
     /// @notice U:[LP-24]: `setTotalDebtLimit` works as expected

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
@@ -62,6 +62,8 @@ struct CreditManagerV3DeployParams {
     uint128 minDebt;
     /// @dev The maximal debt principal amount
     uint128 maxDebt;
+    /// @dev Max enabled tokens
+    uint8 maxEnabledTokens;
     /// @dev Percentage DAO fee on interest
     uint16 feeInterest;
     /// @dev Percentage DAO fee on liquidation amount for normal liquidations

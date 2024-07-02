@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 // TESTS
 import "../../lib/constants.sol";
@@ -30,7 +30,7 @@ contract GaugeGasTest is IntegrationTestHelper {
 
                 vm.startPrank(CONFIGURATOR);
                 gauge.addQuotaToken(address(token), 500, 500);
-                poolQuotaKeeper.setTokenLimit(address(token), type(uint96).max);
+                poolQuotaKeeper.setTokenLimit(address(token), uint96(type(int96).max));
                 vm.stopPrank();
 
                 vm.warp(block.timestamp + 7 days);

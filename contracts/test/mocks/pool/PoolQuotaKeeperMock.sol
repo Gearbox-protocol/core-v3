@@ -1,24 +1,18 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {IPoolQuotaKeeperV3, TokenQuotaParams, AccountQuota} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 
-contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
-    uint256 public constant override version = 3_10;
+contract PoolQuotaKeeperMock {
+    uint256 public constant version = 3_10;
 
     /// @dev Address provider
     address public immutable underlying;
 
     /// @dev Address of the protocol treasury
-    address public immutable override pool;
-
-    /// @dev Mapping from token address to its respective quota parameters
-    TokenQuotaParams public totalQuotaParam;
-
-    /// @dev Mapping from creditAccount => token > quota parameters
-    AccountQuota public accountQuota;
+    address public immutable pool;
 
     /// @dev Address of the gauge that determines quota rates
     address public gauge;
@@ -49,6 +43,12 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
         pool = _pool;
         underlying = _underlying;
     }
+
+    function tokenQuotaParams(address) external pure returns (TokenQuotaParams memory) {}
+
+    function accountQuotas(address, address) external pure returns (AccountQuota memory) {}
+
+    function isCreditManagerAdded(address) external pure returns (bool) {}
 
     function updateQuota(address, address, int96, uint96, uint96)
         external
@@ -98,30 +98,19 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
     function getQuotaAndOutstandingInterest(address, address token)
         external
         view
-        override
         returns (uint96 quoted, uint128 interest)
     {
         quoted = _quoted[token];
         interest = _outstandingInterest[token];
     }
 
-    /// @dev Returns cumulative index in RAY for a quoted token. Returns 0 for non-quoted tokens.
-    function cumulativeIndex(address token) public view override returns (uint192) {
-        //        return totalQuotaParams[token].cumulativeIndexSince(lastQuotaRateUpdate);
-    }
-
-    /// @dev Returns quota rate in PERCENTAGE FORMAT
-    function getQuotaRate(address) external view override returns (uint16) {
-        return totalQuotaParam.rate;
-    }
-
     /// @dev Returns an array of all quoted tokens
-    function quotedTokens() external view override returns (address[] memory) {
+    function quotedTokens() external view returns (address[] memory) {
         //        return quotaTokensSet.values();
     }
 
     /// @dev Returns whether a token is quoted
-    function isQuotedToken(address) external view override returns (bool) {
+    function isQuotedToken(address) external view returns (bool) {
         return return_isQuotedToken;
     }
 
@@ -131,32 +120,6 @@ contract PoolQuotaKeeperMock is IPoolQuotaKeeperV3 {
 
     function set_lastQuotaRateUpdate(uint40 value) external {
         lastQuotaRateUpdate = value;
-    }
-
-    /// @dev Returns quota parameters for a single (account, token) pair
-    function getQuota(address, address) external view returns (uint96 quota, uint192 cumulativeIndexLU) {
-        AccountQuota storage aq = accountQuota;
-        return (aq.quota, aq.cumulativeIndexLU);
-    }
-
-    /// @notice Returns the current annual quota revenue to the pool
-    function poolQuotaRevenue() external view virtual override returns (uint256 quotaRevenue) {
-        return 0;
-    }
-
-    function getTokenQuotaParams(address)
-        external
-        pure
-        returns (
-            uint16 rate,
-            uint192 cumulativeIndexLU,
-            uint16 quotaIncreaseFee,
-            uint96 totalQuoted,
-            uint96 limit,
-            bool isActive
-        )
-    {
-        return (0, 0, 0, 0, 0, false);
     }
 
     function addCreditManager(address _creditManager) external {}

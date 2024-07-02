@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {CreditManagerV3, CreditAccountInfo} from "../../../credit/CreditManagerV3.sol";
 import {USDT_Transfer} from "../../../traits/USDT_Transfer.sol";
@@ -20,11 +20,12 @@ contract CreditManagerV3Harness is CreditManagerV3, USDT_Transfer {
         address _pool,
         address _accountFactory,
         address _priceOracle,
+        uint8 _maxEnabledTokens,
         uint16 _feeInterest,
         string memory _name,
         bool enableTransferFee
     )
-        CreditManagerV3(_pool, _accountFactory, _priceOracle, _feeInterest, _name)
+        CreditManagerV3(_pool, _accountFactory, _priceOracle, _maxEnabledTokens, _feeInterest, _name)
         USDT_Transfer(IPoolV3(_pool).underlyingToken())
     {
         _enableTransferFee = enableTransferFee;
@@ -111,13 +112,12 @@ contract CreditManagerV3Harness is CreditManagerV3, USDT_Transfer {
         _saveEnabledTokensMask(creditAccount, enabledTokensMask);
     }
 
-    function getQuotedTokensData(
-        address creditAccount,
-        uint256 enabledTokensMask,
-        uint256[] memory collateralHints,
-        address _poolQuotaKeeper
-    ) external view returns (address[] memory quotaTokens, uint256 outstandingQuotaInterest, uint256[] memory quotas) {
-        return _getQuotedTokensData(creditAccount, enabledTokensMask, collateralHints, _poolQuotaKeeper);
+    function getQuotedTokensData(address creditAccount, uint256 enabledTokensMask, uint256[] memory collateralHints)
+        external
+        view
+        returns (address[] memory quotaTokens, uint256 outstandingQuotaInterest, uint256[] memory quotas)
+    {
+        return _getQuotedTokensData(creditAccount, enabledTokensMask, collateralHints);
     }
 
     function getCollateralTokensData(uint256 tokenMask) external view returns (CollateralTokenData memory) {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {Test} from "forge-std/Test.sol";
 
@@ -34,7 +34,7 @@ contract QuotaRatesIntegrationTest is Test {
         quotaKeeper = new PoolQuotaKeeperV3(address(addressProvider), address(addressProvider), address(pool));
         pool.setPoolQuotaKeeper(address(quotaKeeper));
 
-        tumbler = new TumblerV3(address(addressProvider), address(pool), 1 days);
+        tumbler = new TumblerV3(address(addressProvider), address(quotaKeeper), 1 days);
         quotaKeeper.setGauge(address(tumbler));
     }
 
@@ -51,7 +51,7 @@ contract QuotaRatesIntegrationTest is Test {
         vm.expectCall(address(tumbler), abi.encodeCall(tumbler.getRates, (tokens)));
 
         tumbler.updateRates();
-        assertEq(quotaKeeper.getQuotaRate(address(token1)), 4200, "Incorrect token1 rate");
-        assertEq(quotaKeeper.getQuotaRate(address(token2)), 12000, "Incorrect token2 rate");
+        assertEq(quotaKeeper.tokenQuotaParams(address(token1)).rate, 4200, "Incorrect token1 rate");
+        assertEq(quotaKeeper.tokenQuotaParams(address(token2)).rate, 12000, "Incorrect token2 rate");
     }
 }

@@ -3,6 +3,6 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.23;
 
-interface IDegenNFT {
-    function burn(address from, uint256 amount) external;
+interface IContractsRegisterTrait {
+    function contractsRegister() external view returns (address);
 }

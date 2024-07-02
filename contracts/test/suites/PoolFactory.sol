@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import "../interfaces/IAddressProviderV3.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -56,22 +56,22 @@ contract PoolFactory is Test {
             symbol_: config.symbol()
         });
 
-        address gearStaking = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_GEAR_STAKING, 3_10);
-        gauge = new GaugeV3(acl, address(pool), gearStaking);
-        vm.prank(CONFIGURATOR);
-        gauge.setFrozenEpoch(false);
-
-        vm.label(address(gauge), string.concat("GaugeV3-", config.symbol()));
-
         poolQuotaKeeper = new PoolQuotaKeeperV3(acl, contractsRegister, payable(address(pool)));
-
-        vm.prank(CONFIGURATOR);
-        poolQuotaKeeper.setGauge(address(gauge));
 
         vm.prank(CONFIGURATOR);
         pool.setPoolQuotaKeeper(address(poolQuotaKeeper));
 
         vm.label(address(poolQuotaKeeper), string.concat("PoolQuotaKeeperV3-", config.symbol()));
+
+        address gearStaking = IAddressProviderV3(addressProvider).getAddressOrRevert(AP_GEAR_STAKING, 3_10);
+        gauge = new GaugeV3(acl, address(poolQuotaKeeper), gearStaking);
+        vm.prank(CONFIGURATOR);
+        gauge.setFrozenEpoch(false);
+
+        vm.label(address(gauge), string.concat("GaugeV3-", config.symbol()));
+
+        vm.prank(CONFIGURATOR);
+        poolQuotaKeeper.setGauge(address(gauge));
 
         GaugeRate[] memory gaugeRates = config.gaugeRates();
 

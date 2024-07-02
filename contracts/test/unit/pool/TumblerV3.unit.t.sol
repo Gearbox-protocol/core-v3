@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {Test} from "forge-std/Test.sol";
 
 import {
-    CallerNotControllerException,
+    CallerNotControllerOrConfiguratorException,
     IncorrectParameterException,
     TokenIsNotQuotedException,
     TokenNotAllowedException,
@@ -40,16 +40,16 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
         poolQuotaKeeper.set_lastQuotaRateUpdate(uint40(block.timestamp));
         pool.setPoolQuotaKeeper(address(poolQuotaKeeper));
 
-        tumbler = new TumblerV3(address(addressProvider), address(pool), 1 days);
+        tumbler = new TumblerV3(address(addressProvider), address(poolQuotaKeeper), 1 days);
     }
 
     /// @notice U:[TU-1]: Constructor works as expected
     function test_U_TU_01_constructor_works_as_expected() public {
-        assertEq(tumbler.pool(), address(pool), "Incorrect pool");
-        assertEq(tumbler.underlying(), underlying, "Incorrect underlying");
-        assertEq(tumbler.poolQuotaKeeper(), address(poolQuotaKeeper), "Incorrect poolQuotaKeeper");
+        assertEq(tumbler.quotaKeeper(), address(poolQuotaKeeper), "Incorrect quotaKeeper");
         assertEq(tumbler.epochLength(), 1 days, "Incorrect epochLength");
-        assertEq(tumbler.getTokens().length, 0, "Non-empty quoted tokens set");
+
+        vm.expectRevert(ZeroAddressException.selector);
+        new TumblerV3(address(addressProvider), address(0), 1 days);
     }
 
     /// @notice U:[TU-2]: `addToken` works as expected
@@ -62,11 +62,7 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
 
         // addToken reverts if token is zero address
         vm.expectRevert(ZeroAddressException.selector);
-        tumbler.addToken(address(0), 0);
-
-        // addToken reverts if token is underlying
-        vm.expectRevert(TokenNotAllowedException.selector);
-        tumbler.addToken(underlying, 0);
+        tumbler.addToken(address(0), 1);
 
         // addToken properly adds token to both rate and quota keeper and sets rate
         poolQuotaKeeper.set_isQuotedToken(false);
@@ -81,13 +77,11 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
 
         tumbler.addToken(token1, 4200);
 
-        address[] memory quotedTokens = tumbler.getTokens();
-        assertEq(quotedTokens.length, 1, "Incorrect getTokens.length");
-        assertEq(quotedTokens[0], token1, "Incorrect getTokens[0]");
+        assertTrue(tumbler.isTokenAdded(token1), "token1 is not added");
 
         // addToken reverts if token is already added
         vm.expectRevert(TokenNotAllowedException.selector);
-        tumbler.addToken(token1, 0);
+        tumbler.addToken(token1, 1);
 
         // addToken adds token to tumbler but skips quota keeper if token is already there
         poolQuotaKeeper.set_isQuotedToken(true);
@@ -97,12 +91,12 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
         vm.expectEmit(true, true, true, true);
         emit AddToken(token2);
 
-        tumbler.addToken(token2, 0);
+        vm.expectEmit(true, true, true, true);
+        emit SetRate(token2, 1);
 
-        quotedTokens = tumbler.getTokens();
-        assertEq(quotedTokens.length, 2, "Incorrect getTokens.length");
-        assertEq(quotedTokens[0], token1, "Incorrect getTokens[0]");
-        assertEq(quotedTokens[1], token2, "Incorrect getTokens[1]");
+        tumbler.addToken(token2, 1);
+
+        assertTrue(tumbler.isTokenAdded(token2), "token2 is not added");
     }
 
     /// @notice U:[TU-3]: `setRate` works as expected
@@ -112,9 +106,9 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
 
         // setRate reverts if token is not added
         vm.expectRevert(TokenIsNotQuotedException.selector);
-        tumbler.setRate(token1, 0);
+        tumbler.setRate(token1, 1);
 
-        tumbler.addToken(token1, 0);
+        tumbler.addToken(token1, 1);
 
         // setRate reverts on zero rate
         vm.expectRevert(IncorrectParameterException.selector);
@@ -135,7 +129,7 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
     /// @notice U:[TU-4]: `updateRates` works as expected
     function test_U_TU_04_updateRates_works_as_expected() public {
         // reverts on unauthorized caller
-        vm.expectRevert(CallerNotControllerException.selector);
+        vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         vm.prank(makeAddr("dude"));
         tumbler.updateRates();
 

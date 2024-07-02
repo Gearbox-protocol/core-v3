@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {CreditLogic} from "../../../libraries/CreditLogic.sol";
 import {CollateralDebtData} from "../../../interfaces/ICreditManagerV3.sol";
@@ -75,7 +75,7 @@ contract CreditLogicUnitTest is TestHelper {
         assertLe(newBaseInterest, baseInterest + newDebt / 1e18, "Base interest increased too much");
     }
 
-    /// @notice U:[CL-3A]: `calcDecrease` works correctly
+    /// @notice U:[CL-3]: `calcDecrease` works correctly
     function test_U_CL_03_calcDecrease_works_correctly(
         uint256 amount,
         uint256 debt,

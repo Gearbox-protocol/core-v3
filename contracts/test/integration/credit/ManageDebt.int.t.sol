@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {ICreditManagerV3, ICreditManagerV3Events, ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
 import "../../../interfaces/ICreditFacadeV3.sol";
@@ -10,7 +10,7 @@ import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // TESTS
 import "../../lib/constants.sol";
-import {BOT_PERMISSIONS_SET_FLAG, PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
+import {PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
 import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 

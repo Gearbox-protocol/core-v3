@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -19,7 +19,7 @@ contract GenesisFactory is Ownable {
     AddressProviderV3ACLMock public addressProvider;
     PriceOracleV3 priceOracle;
 
-    constructor(address wethToken, address treasury) {
+    constructor(address wethToken, address treasury, PriceFeedConfig[] memory priceFeeds) {
         addressProvider = new AddressProviderV3ACLMock();
         addressProvider.setAddress(AP_WETH_TOKEN, wethToken, false);
         addressProvider.setAddress(AP_TREASURY, treasury, false);
@@ -27,6 +27,11 @@ contract GenesisFactory is Ownable {
         addressProvider.setAddress(AP_CONTRACTS_REGISTER, address(addressProvider), false);
 
         priceOracle = new PriceOracleV3(address(addressProvider));
+        uint256 len = priceFeeds.length;
+        for (uint256 i; i < len; ++i) {
+            priceOracle.setPriceFeed(priceFeeds[i].token, priceFeeds[i].priceFeed, priceFeeds[i].stalenessPeriod);
+        }
+
         addressProvider.setAddress(AP_PRICE_ORACLE, address(priceOracle), true);
 
         AccountFactoryV3 accountFactory = new AccountFactoryV3(msg.sender);
@@ -44,12 +49,5 @@ contract GenesisFactory is Ownable {
         addressProvider.addPausableAdmin(msg.sender);
         addressProvider.addUnpausableAdmin(msg.sender);
         addressProvider.transferOwnership(msg.sender);
-    }
-
-    function addPriceFeeds(PriceFeedConfig[] memory priceFeeds) external onlyOwner {
-        uint256 len = priceFeeds.length;
-        for (uint256 i; i < len; ++i) {
-            priceOracle.setPriceFeed(priceFeeds[i].token, priceFeeds[i].priceFeed, priceFeeds[i].stalenessPeriod);
-        }
     }
 }

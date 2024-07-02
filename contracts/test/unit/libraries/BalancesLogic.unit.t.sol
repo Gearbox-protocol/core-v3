@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -32,8 +32,9 @@ contract BalancesLogicUnitTest is TestHelper {
     {
         _setupTokenBalances(balances, 1);
 
-        bool result =
-            BalancesLogic.checkBalance(creditAccount, tokens[0], value, greater ? Comparison.GREATER : Comparison.LESS);
+        bool result = BalancesLogic.checkBalance(
+            creditAccount, tokens[0], value, greater ? Comparison.GREATER_OR_EQUAL : Comparison.LESS_OR_EQUAL
+        );
         if (greater) {
             assertEq(result, balances[0] >= value);
         } else {
@@ -104,8 +105,9 @@ contract BalancesLogicUnitTest is TestHelper {
             storedBalances[i] = Balance({token: tokens[i], balance: expectedBalances[i]});
         }
 
-        address result =
-            BalancesLogic.compareBalances(creditAccount, storedBalances, greater ? Comparison.GREATER : Comparison.LESS);
+        address result = BalancesLogic.compareBalances(
+            creditAccount, storedBalances, greater ? Comparison.GREATER_OR_EQUAL : Comparison.LESS_OR_EQUAL
+        );
         assertEq(result, expectedResult, "Incorrect result");
     }
 
@@ -169,7 +171,7 @@ contract BalancesLogicUnitTest is TestHelper {
         }
 
         address result = BalancesLogic.compareBalances(
-            creditAccount, tokensMask, storedBalances, greater ? Comparison.GREATER : Comparison.LESS
+            creditAccount, tokensMask, storedBalances, greater ? Comparison.GREATER_OR_EQUAL : Comparison.LESS_OR_EQUAL
         );
         assertEq(result, expectedResult, "Incorrect result");
     }

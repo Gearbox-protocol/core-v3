@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {CreditAccountHelper} from "../../../libraries/CreditAccountHelper.sol";
 import {ICreditAccountV3} from "../../../interfaces/ICreditAccountV3.sol";
@@ -19,8 +19,6 @@ import "../../lib/constants.sol";
 /// @title CreditAccountHelper logic test
 /// @notice U:[CAH]: Unit tests for credit account helper
 contract CreditAccountHelperUnitTest is TestHelper, BalanceHelper {
-    using CreditAccountHelper for ICreditAccountV3;
-
     address creditAccount;
 
     function setUp() public {
@@ -35,7 +33,7 @@ contract CreditAccountHelperUnitTest is TestHelper, BalanceHelper {
 
         address dai = tokenTestSuite.addressOf(Tokens.DAI);
 
-        ICreditAccountV3(creditAccount).safeApprove(dai, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
+        CreditAccountHelper.safeApprove(creditAccount, dai, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
 
         expectAllowance(Tokens.DAI, creditAccount, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
     }
@@ -44,17 +42,17 @@ contract CreditAccountHelperUnitTest is TestHelper, BalanceHelper {
     function test_U_CAH_02_safeApprove_works_for_ERC20_with_approve_restrictions() public {
         address approveRevertToken = address(new ERC20ApproveRestrictedRevert());
 
-        ICreditAccountV3(creditAccount).safeApprove(approveRevertToken, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
+        CreditAccountHelper.safeApprove(creditAccount, approveRevertToken, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
 
-        ICreditAccountV3(creditAccount).safeApprove(approveRevertToken, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
+        CreditAccountHelper.safeApprove(creditAccount, approveRevertToken, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
 
         expectAllowance(approveRevertToken, creditAccount, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
 
         address approveFalseToken = address(new ERC20ApproveRestrictedFalse());
 
-        ICreditAccountV3(creditAccount).safeApprove(approveFalseToken, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
+        CreditAccountHelper.safeApprove(creditAccount, approveFalseToken, DUMB_ADDRESS, DAI_EXCHANGE_AMOUNT);
 
-        ICreditAccountV3(creditAccount).safeApprove(approveFalseToken, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
+        CreditAccountHelper.safeApprove(creditAccount, approveFalseToken, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
 
         expectAllowance(approveFalseToken, creditAccount, DUMB_ADDRESS, 2 * DAI_EXCHANGE_AMOUNT);
     }

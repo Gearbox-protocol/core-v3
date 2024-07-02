@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2024.
-pragma solidity ^0.8.17;
-pragma abicoder v1;
+pragma solidity ^0.8.23;
 
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import {IACLTrait} from "./base/IACLTrait.sol";
+import {IContractsRegisterTrait} from "../interfaces/base/IContractsRegisterTrait.sol";
 import {IVersion} from "./base/IVersion.sol";
 
 interface IPoolV3Events {
@@ -24,8 +25,8 @@ interface IPoolV3Events {
     /// @notice Emitted when new interest rate model contract is set
     event SetInterestRateModel(address indexed newInterestRateModel);
 
-    /// @notice Emitted when new pool quota keeper contract is set
-    event SetPoolQuotaKeeper(address indexed newPoolQuotaKeeper);
+    /// @notice Emitted when the quota keeper contract is initialized
+    event SetPoolQuotaKeeper(address indexed quotaKeeper);
 
     /// @notice Emitted when new total debt limit is set
     event SetTotalDebtLimit(uint256 limit);
@@ -41,7 +42,7 @@ interface IPoolV3Events {
 }
 
 /// @title Pool V3 interface
-interface IPoolV3 is IVersion, IPoolV3Events, IERC4626, IERC20Permit {
+interface IPoolV3 is IACLTrait, IContractsRegisterTrait, IVersion, IPoolV3Events, IERC4626, IERC20Permit {
     function underlyingToken() external view returns (address);
 
     function treasury() external view returns (address);
@@ -122,7 +123,7 @@ interface IPoolV3 is IVersion, IPoolV3Events, IERC4626, IERC20Permit {
 
     function setInterestRateModel(address newInterestRateModel) external;
 
-    function setPoolQuotaKeeper(address newPoolQuotaKeeper) external;
+    function setPoolQuotaKeeper(address quotaKeeper) external;
 
     function setTotalDebtLimit(uint256 newLimit) external;
 

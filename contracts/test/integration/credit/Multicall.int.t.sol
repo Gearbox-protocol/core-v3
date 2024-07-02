@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {ICreditAccountV3} from "../../../interfaces/ICreditAccountV3.sol";
 
@@ -13,7 +13,7 @@ import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // CONSTANTS
-import {BOT_PERMISSIONS_SET_FLAG, PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
+import {PERCENTAGE_FACTOR} from "../../../libraries/Constants.sol";
 
 // TESTS
 import "../../lib/constants.sol";
@@ -317,7 +317,7 @@ contract MultiCallIntegrationTest is
         // TODO: add enable / disable cases
 
         MultiCall[] memory calls = MultiCallBuilder.build(
-            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, (0, 0))})
+            MultiCall({target: address(adapterMock), callData: abi.encodeCall(AdapterMock.dumbCall, ())})
         );
 
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount)));

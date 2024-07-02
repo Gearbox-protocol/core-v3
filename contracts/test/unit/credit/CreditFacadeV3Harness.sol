@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import "../../../interfaces/ICreditFacadeV3.sol";
 import {CreditFacadeV3} from "../../../credit/CreditFacadeV3.sol";
@@ -20,10 +20,6 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
 
     function setReentrancy(uint8 _status) external {
         _reentrancyStatus = _status;
-    }
-
-    function setCumulativeLoss(uint128 newLoss) external {
-        lossParams.currentCumulativeLoss = newLoss;
     }
 
     function multicallInt(address creditAccount, MultiCall[] calldata calls, uint256 enabledTokensMask, uint256 flags)
@@ -56,15 +52,11 @@ contract CreditFacadeV3Harness is CreditFacadeV3 {
         return totalBorrowedInBlock;
     }
 
-    function revertIfOutOfDebtLimits(uint256 debt) external view {
-        _revertIfOutOfDebtLimits(debt);
+    function revertIfOutOfDebtLimits(uint256 debt, ManageDebtAction action) external view {
+        _revertIfOutOfDebtLimits(debt, action);
     }
 
     function isExpired() external view returns (bool) {
         return _isExpired();
-    }
-
-    function setCurrentCumulativeLoss(uint128 _currentCumulativeLoss) external {
-        lossParams.currentCumulativeLoss = _currentCumulativeLoss;
     }
 }

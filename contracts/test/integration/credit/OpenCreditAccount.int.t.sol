@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import "../../interfaces/IAddressProviderV3.sol";
 
@@ -360,6 +360,8 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
 
         expectBalance(Tokens.DAI, creditAccount, 0);
 
-        assertEq(creditManager.enabledTokensMaskOf(creditAccount), 0, "Incorrect enabled token mask");
+        assertEq(
+            creditManager.enabledTokensMaskOf(creditAccount), UNDERLYING_TOKEN_MASK, "Incorrect enabled token mask"
+        );
     }
 }

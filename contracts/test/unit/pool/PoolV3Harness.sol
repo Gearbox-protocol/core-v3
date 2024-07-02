@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023.
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.23;
 
 import {PoolV3} from "../../../pool/PoolV3.sol";
 import {ENTERED, NOT_ENTERED} from "../../../traits/ReentrancyGuardTrait.sol";
@@ -75,6 +75,10 @@ contract PoolV3Harness is PoolV3 {
     // ------ //
     // QUOTAS //
     // ------ //
+
+    function hackQuotaKeeper(address quotaKeeper) external {
+        _quotaKeeper = quotaKeeper;
+    }
 
     function hackQuotaRevenue(uint256 value) external {
         _quotaRevenue = uint96(value);
