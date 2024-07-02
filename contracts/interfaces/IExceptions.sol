@@ -274,6 +274,9 @@ error CallerNotExecutorException();
 /// @notice Thrown on attempting to call an access restricted function not as veto admin
 error CallerNotVetoAdminException();
 
+/// @notice Thrown on attempting to perform liquidation with loss not through the loss liquidator contract
+error CallerNotLossLiquidatorException();
+
 // -------- //
 // BOT LIST //
 // -------- //

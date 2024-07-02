@@ -25,14 +25,6 @@ struct DebtLimits {
     uint128 maxDebt;
 }
 
-/// @notice Info on bad debt liquidation losses packed into a single slot
-/// @param currentCumulativeLoss Current cumulative loss from bad debt liquidations
-/// @param maxCumulativeLoss Max cumulative loss incurred before the facade gets paused
-struct CumulativeLossParams {
-    uint128 currentCumulativeLoss;
-    uint128 maxCumulativeLoss;
-}
-
 /// @notice Collateral check params
 /// @param collateralHints Optional array of token masks to check first to reduce the amount of computation
 ///        when known subset of account's collateral tokens covers all the debt
@@ -106,9 +98,9 @@ interface ICreditFacadeV3 is IACLTrait, IVersion, ICreditFacadeV3Events {
 
     function debtLimits() external view returns (uint128 minDebt, uint128 maxDebt);
 
-    function lossParams() external view returns (uint128 currentCumulativeLoss, uint128 maxCumulativeLoss);
-
     function forbiddenTokenMask() external view returns (uint256);
+
+    function lossLiquidator() external view returns (address);
 
     function emergencyLiquidators() external view returns (address[] memory);
 
@@ -125,7 +117,9 @@ interface ICreditFacadeV3 is IACLTrait, IVersion, ICreditFacadeV3Events {
 
     function closeCreditAccount(address creditAccount, MultiCall[] calldata calls) external payable;
 
-    function liquidateCreditAccount(address creditAccount, address to, MultiCall[] calldata calls) external;
+    function liquidateCreditAccount(address creditAccount, address to, MultiCall[] calldata calls)
+        external
+        returns (uint256 reportedLoss);
 
     function partiallyLiquidateCreditAccount(
         address creditAccount,
@@ -148,9 +142,9 @@ interface ICreditFacadeV3 is IACLTrait, IVersion, ICreditFacadeV3Events {
 
     function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt, uint8 newMaxDebtPerBlockMultiplier) external;
 
-    function setCumulativeLossParams(uint128 newMaxCumulativeLoss, bool resetCumulativeLoss) external;
-
     function setTokenAllowance(address token, AllowanceAction allowance) external;
+
+    function setLossLiquidator(address newLossLiquidator) external;
 
     function setEmergencyLiquidator(address liquidator, AllowanceAction allowance) external;
 }
