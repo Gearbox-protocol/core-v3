@@ -3,7 +3,6 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.10;
 
-import {PriceFeedType} from "@gearbox-protocol/sdk-gov/contracts/PriceFeedType.sol";
 import {IPriceFeed} from "../../../interfaces/base/IPriceFeed.sol";
 
 enum FlagState {
@@ -15,7 +14,8 @@ enum FlagState {
 /// @title Price feed mock
 /// @notice Used for test purposes only
 contract PriceFeedMock is IPriceFeed {
-    PriceFeedType public constant override priceFeedType = PriceFeedType.CHAINLINK_ORACLE;
+    uint256 public constant override version = 3_10;
+    bytes32 public constant override contractType = "PRICE_FEED_MOCK";
 
     int256 private price;
     uint8 public immutable override decimals;
@@ -50,10 +50,6 @@ contract PriceFeedMock is IPriceFeed {
 
     function description() external pure override returns (string memory) {
         return "price oracle";
-    }
-
-    function version() external pure override returns (uint256) {
-        return 1;
     }
 
     function setPrice(int256 newPrice) external {

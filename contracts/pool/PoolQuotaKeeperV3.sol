@@ -33,6 +33,9 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLTrait, ContractsRegisterTra
     /// @notice Contract version
     uint256 public constant override version = 3_10;
 
+    /// @notice Contract type
+    bytes32 public constant override contractType = "QK";
+
     /// @notice Address of the underlying token
     address public immutable override underlying;
 

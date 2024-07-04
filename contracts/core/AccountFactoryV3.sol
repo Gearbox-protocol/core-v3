@@ -47,6 +47,9 @@ contract AccountFactoryV3 is IAccountFactoryV3, Ownable {
     /// @notice Contract version
     uint256 public constant override version = 3_10;
 
+    /// @notice Contract type
+    bytes32 public constant override contractType = "AF";
+
     /// @notice Delay after which returned credit accounts can be reused
     uint40 public constant override delay = 3 days;
 

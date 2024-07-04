@@ -18,6 +18,9 @@ contract TumblerV3 is ITumblerV3, ACLTrait {
     /// @notice Contract version
     uint256 public constant override version = 3_10;
 
+    /// @notice Contract type
+    bytes32 public constant override contractType = "RK_TUMBLER";
+
     /// @notice Quota keeper rates are provided for
     address public immutable override quotaKeeper;
 

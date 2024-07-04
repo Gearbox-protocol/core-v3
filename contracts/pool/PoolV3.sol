@@ -144,6 +144,12 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLTrait, ContractsRegisterTrait, IPool
         _setTotalDebtLimit(totalDebtLimit_); // U:[LP-1B]
     }
 
+    /// @notice Contract type
+    /// @dev Not using state variable to allow derived contracts to override this
+    function contractType() external view virtual override returns (bytes32) {
+        return "LP";
+    }
+
     /// @notice Pool's underlying token, same as `asset()`
     /// @dev Exists for backward compatibility
     function underlyingToken() external view override returns (address) {

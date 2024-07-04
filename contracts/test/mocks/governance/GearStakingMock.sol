@@ -9,6 +9,8 @@ import {EPOCHS_TO_WITHDRAW} from "../../../libraries/Constants.sol";
 contract GearStakingMock is IGearStakingV3 {
     uint256 public constant version = 3_10;
 
+    bytes32 public constant contractType = "GS_MOCK";
+
     uint16 public getCurrentEpoch;
 
     function setCurrentEpoch(uint16 epoch) external {
