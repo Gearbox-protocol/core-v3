@@ -22,10 +22,10 @@ import {
     ICreditManagerV3,
     ManageDebtAction
 } from "../interfaces/ICreditManagerV3.sol";
-import {IDegenNFT} from "../interfaces/IDegenNFT.sol";
 import "../interfaces/IExceptions.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IPriceOracleV3, PriceUpdate} from "../interfaces/IPriceOracleV3.sol";
+import {IDegenNFT} from "../interfaces/base/IDegenNFT.sol";
 import {IWETH} from "../interfaces/external/IWETH.sol";
 
 // LIBRARIES
@@ -40,6 +40,7 @@ import {
 
 // TRAITS
 import {ACLTrait} from "../traits/ACLTrait.sol";
+import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
 
 /// @title Credit facade V3
 /// @notice Provides a user interface to open, close and liquidate leveraged positions in the credit manager,
@@ -57,7 +58,7 @@ import {ACLTrait} from "../traits/ACLTrait.sol";
 ///         - policies on how liquidations with loss are performed
 ///         - forbidden tokens (they count towards account value, but having them enabled as collateral restricts allowed
 ///         actions and triggers a safer version of collateral check, incentivizing users to decrease exposure to them).
-contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
+contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait, ReentrancyGuardTrait {
     using Address for address;
     using BitMask for uint256;
     using SafeERC20 for IERC20;

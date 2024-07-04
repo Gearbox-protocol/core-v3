@@ -5,7 +5,6 @@ pragma solidity ^0.8.23;
 
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 
-import {IACL} from "../interfaces/IACL.sol";
 import {
     AddressIsNotContractException,
     CallerNotConfiguratorException,
@@ -13,15 +12,15 @@ import {
     CallerNotPausableAdminException,
     CallerNotUnpausableAdminException
 } from "../interfaces/IExceptions.sol";
+import {IACL} from "../interfaces/base/IACL.sol";
 import {IACLTrait} from "../interfaces/base/IACLTrait.sol";
 
-import {ReentrancyGuardTrait} from "./ReentrancyGuardTrait.sol";
 import {SanityCheckTrait} from "./SanityCheckTrait.sol";
 
 /// @title ACL trait
 /// @notice Utility class for ACL (access-control list) consumers that implements pausable functionality,
 ///         reentrancy protection and external controller role
-abstract contract ACLTrait is IACLTrait, Pausable, ReentrancyGuardTrait, SanityCheckTrait {
+abstract contract ACLTrait is IACLTrait, Pausable, SanityCheckTrait {
     /// @notice ACL contract address
     address public immutable override acl;
 
@@ -60,13 +59,13 @@ abstract contract ACLTrait is IACLTrait, Pausable, ReentrancyGuardTrait, SanityC
 
     /// @notice Pauses contract, can only be called by an account with pausable admin role
     /// @dev Reverts if contract is already paused
-    function pause() external virtual pausableAdminsOnly {
+    function pause() external virtual override pausableAdminsOnly {
         _pause();
     }
 
     /// @notice Unpauses contract, can only be called by an account with unpausable admin role
     /// @dev Reverts if contract is already unpaused
-    function unpause() external virtual unpausableAdminsOnly {
+    function unpause() external virtual override unpausableAdminsOnly {
         _unpause();
     }
 

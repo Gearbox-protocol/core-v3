@@ -26,6 +26,7 @@ import {IInterestRateModel} from "../interfaces/base/IInterestRateModel.sol";
 import {CreditLogic} from "../libraries/CreditLogic.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
+import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
 
 // CONSTANTS
 import {RAY, MAX_WITHDRAW_FEE, PERCENTAGE_FACTOR} from "../libraries/Constants.sol";
@@ -48,7 +49,7 @@ struct DebtParams {
 ///         (nearly all tokens with decimals between 6 and 18 work)
 /// @dev To prevent the first depositor front-running attack, small amount of shares must be minted to some
 ///      dead address before allowing borrowing
-contract PoolV3 is ERC4626, ERC20Permit, ACLTrait, ContractsRegisterTrait, IPoolV3 {
+contract PoolV3 is ERC4626, ERC20Permit, ACLTrait, ContractsRegisterTrait, ReentrancyGuardTrait, IPoolV3 {
     using Math for uint256;
     using SafeCast for int256;
     using SafeCast for uint256;

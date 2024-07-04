@@ -14,7 +14,6 @@ import {CreditLogic} from "../libraries/CreditLogic.sol";
 import {PERCENTAGE_FACTOR, UNDERLYING_TOKEN_MASK, WAD} from "../libraries/Constants.sol";
 
 // CONTRACTS
-import {ACLTrait} from "../traits/ACLTrait.sol";
 import {CreditFacadeV3} from "./CreditFacadeV3.sol";
 import {CreditManagerV3} from "./CreditManagerV3.sol";
 
@@ -24,13 +23,17 @@ import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
 import {IAdapter} from "../interfaces/base/IAdapter.sol";
 
+// TRAITS
+import {ACLTrait} from "../traits/ACLTrait.sol";
+import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
+
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
 
 /// @title Credit configurator V3
 /// @notice Provides funcionality to configure various aspects of credit manager and facade's behavior
 /// @dev Most of the functions can only be accessed by configurator or timelock controller
-contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait {
+contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, ReentrancyGuardTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using Address for address;
     using BitMask for uint256;

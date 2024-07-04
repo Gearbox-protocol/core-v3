@@ -5,7 +5,7 @@ pragma solidity ^0.8.23;
 
 import "../../interfaces/IAddressProviderV3.sol";
 
-import {IDegenNFT} from "../../../interfaces/IDegenNFT.sol";
+import {IDegenNFT} from "../../../interfaces/base/IDegenNFT.sol";
 import {IAccountFactoryV3} from "../../../interfaces/IAccountFactoryV3.sol";
 import {ICreditAccountV3} from "../../../interfaces/ICreditAccountV3.sol";
 import {
