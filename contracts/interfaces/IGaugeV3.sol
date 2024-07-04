@@ -7,6 +7,18 @@ import {IACLTrait} from "./base/IACLTrait.sol";
 import {IRateKeeper} from "./base/IRateKeeper.sol";
 import {IVotingContract} from "./base/IVotingContract.sol";
 
+struct QuotaRateParams {
+    uint16 minRate;
+    uint16 maxRate;
+    uint96 totalVotesLpSide;
+    uint96 totalVotesCaSide;
+}
+
+struct UserTokenVotes {
+    uint96 votesLpSide;
+    uint96 votesCaSide;
+}
+
 interface IGaugeV3Events {
     /// @notice Emitted when epoch is updated
     event UpdateEpoch(uint16 epochNow);
@@ -37,19 +49,9 @@ interface IGaugeV3 is IACLTrait, IVotingContract, IRateKeeper, IGaugeV3Events {
 
     function getRates(address[] calldata tokens) external view override returns (uint16[] memory);
 
-    function vote(address user, uint96 votes, bytes calldata extraData) external override;
+    function userTokenVotes(address user, address token) external view returns (UserTokenVotes memory);
 
-    function unvote(address user, uint96 votes, bytes calldata extraData) external override;
-
-    function userTokenVotes(address user, address token)
-        external
-        view
-        returns (uint96 votesLpSide, uint96 votesCaSide);
-
-    function quotaRateParams(address token)
-        external
-        view
-        returns (uint16 minRate, uint16 maxRate, uint96 totalVotesLpSide, uint96 totalVotesCaSide);
+    function quotaRateParams(address token) external view returns (QuotaRateParams memory);
 
     // ------------- //
     // CONFIGURATION //

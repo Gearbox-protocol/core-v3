@@ -13,7 +13,8 @@ import {
     ICreditManagerV3Events,
     CollateralTokenData,
     ManageDebtAction,
-    CollateralDebtData
+    CollateralDebtData,
+    CreditAccountInfo
 } from "../../../interfaces/ICreditManagerV3.sol";
 
 import "../../../interfaces/ICreditFacadeV3.sol";
@@ -66,18 +67,16 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
 
-        (uint256 debt, uint256 cumulativeIndexLastUpdate,,,,,,) = creditManager.creditAccountInfo(creditAccount);
+        CreditAccountInfo memory info = creditManager.creditAccountInfo(creditAccount);
 
-        assertEq(debt, DAI_ACCOUNT_AMOUNT, "Incorrect borrowed amount set in CA");
-        assertEq(cumulativeIndexLastUpdate, cumulativeAtOpen, "Incorrect cumulativeIndexLastUpdate set in CA");
+        assertEq(info.debt, DAI_ACCOUNT_AMOUNT, "Incorrect borrowed amount set in CA");
+        assertEq(info.cumulativeIndexLastUpdate, cumulativeAtOpen, "Incorrect cumulativeIndexLastUpdate set in CA");
 
         expectBalance(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT + DAI_ACCOUNT_AMOUNT / 2);
         // assertEq(pool.lendAmount(), DAI_ACCOUNT_AMOUNT, "Incorrect DAI_ACCOUNT_AMOUNT in Pool call");
         // assertEq(pool.lendAccount(), creditAccount, "Incorrect credit account in lendCreditAccount call");
         // assertEq(creditManager.creditAccounts(USER), creditAccount, "Credit account is not associated with user");
-        assertEq(
-            creditManager.enabledTokensMaskOf(creditAccount), UNDERLYING_TOKEN_MASK, "Incorrect enabled token mask"
-        );
+        assertEq(info.enabledTokensMask, UNDERLYING_TOKEN_MASK, "Incorrect enabled token mask");
     }
 
     /// @dev I:[OCA-2]: openCreditAccount reverts if user has no NFT for degen mode
@@ -354,14 +353,12 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
 
-        (uint256 debt,,,,,,,) = creditManager.creditAccountInfo(creditAccount);
+        CreditAccountInfo memory info = creditManager.creditAccountInfo(creditAccount);
 
-        assertEq(debt, 0, "Incorrect borrowed amount set in CA");
+        assertEq(info.debt, 0, "Incorrect borrowed amount set in CA");
 
         expectBalance(Tokens.DAI, creditAccount, 0);
 
-        assertEq(
-            creditManager.enabledTokensMaskOf(creditAccount), UNDERLYING_TOKEN_MASK, "Incorrect enabled token mask"
-        );
+        assertEq(info.enabledTokensMask, UNDERLYING_TOKEN_MASK, "Incorrect enabled token mask");
     }
 }

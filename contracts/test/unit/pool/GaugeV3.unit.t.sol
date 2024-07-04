@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.23;
 
-import {GaugeV3Harness, QuotaRateParams, UserVotes} from "./GaugeV3Harness.sol";
+import {GaugeV3Harness, QuotaRateParams, UserTokenVotes} from "./GaugeV3Harness.sol";
 import {IGaugeV3Events, IGaugeV3} from "../../../interfaces/IGaugeV3.sol";
 
 import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
@@ -146,14 +146,13 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         vm.prank(CONFIGURATOR);
         gauge.addQuotaToken(token, minRate, maxRate);
 
-        (uint16 _minRate, uint16 _maxRate, uint96 totalVotesLpSide, uint96 totalVotesCaSide) =
-            gauge.quotaRateParams(token);
+        QuotaRateParams memory qrp = gauge.quotaRateParams(token);
 
-        assertEq(_minRate, minRate, "Incorrect minRate");
-        assertEq(_maxRate, maxRate, "Incorrect maxRate");
+        assertEq(qrp.minRate, minRate, "Incorrect minRate");
+        assertEq(qrp.maxRate, maxRate, "Incorrect maxRate");
 
-        assertEq(totalVotesLpSide, 0, "Incorrect totalVotesLpSide");
-        assertEq(totalVotesCaSide, 0, "Incorrect totalVotesCaSide");
+        assertEq(qrp.totalVotesLpSide, 0, "Incorrect totalVotesLpSide");
+        assertEq(qrp.totalVotesCaSide, 0, "Incorrect totalVotesCaSide");
 
         // must not try to add token to quota keeper in case it's already quoted
         address token2 = makeAddr("TOKEN2");
@@ -196,9 +195,9 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         vm.prank(CONFIGURATOR);
         gauge.changeQuotaMinRate(token, minRate);
 
-        (uint16 _minRate,,,) = gauge.quotaRateParams(token);
+        QuotaRateParams memory qrp = gauge.quotaRateParams(token);
 
-        assertEq(_minRate, minRate, "Incorrect minRate");
+        assertEq(qrp.minRate, minRate, "Incorrect minRate");
     }
 
     /// @dev U:[GA-6B]: changeQuotaMaxRate works as expected
@@ -230,9 +229,9 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         vm.prank(CONFIGURATOR);
         gauge.changeQuotaMaxRate(token, maxRate);
 
-        (, uint16 _maxRate,,) = gauge.quotaRateParams(token);
+        QuotaRateParams memory qrp = gauge.quotaRateParams(token);
 
-        assertEq(_maxRate, maxRate, "Incorrect maxRate");
+        assertEq(qrp.maxRate, maxRate, "Incorrect maxRate");
     }
 
     /// @dev U:[GA-8]: isTokenAdded works as expected
@@ -316,14 +315,14 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
 
         gauge.vote(USER, votes, abi.encode(token, lpSide));
 
-        (,, uint96 totalVotesLpSide, uint96 totalVotesCaSide) = gauge.quotaRateParams(token);
+        QuotaRateParams memory qrp = gauge.quotaRateParams(token);
 
-        assertEq(totalVotesLpSide, 200 + (lpSide ? votes : 0), "Incorrect quotaRateParams totalVotesLpSide update");
-        assertEq(totalVotesCaSide, 200 + (lpSide ? 0 : votes), "Incorrect quotaRateParams totalVotesCaSide update");
+        assertEq(qrp.totalVotesLpSide, 200 + (lpSide ? votes : 0), "Incorrect quotaRateParams totalVotesLpSide update");
+        assertEq(qrp.totalVotesCaSide, 200 + (lpSide ? 0 : votes), "Incorrect quotaRateParams totalVotesCaSide update");
 
-        (uint96 votesLpSide, uint96 votesCaSide) = gauge.userTokenVotes(USER, token);
-        assertEq(votesLpSide, (lpSide ? votes : 0), "Incorrect userTokenVotes votesLpSide update");
-        assertEq(votesCaSide, (lpSide ? 0 : votes), "Incorrect userTokenVotes votesCaSide update");
+        UserTokenVotes memory utv = gauge.userTokenVotes(USER, token);
+        assertEq(utv.votesLpSide, (lpSide ? votes : 0), "Incorrect userTokenVotes votesLpSide update");
+        assertEq(utv.votesCaSide, (lpSide ? 0 : votes), "Incorrect userTokenVotes votesCaSide update");
     }
 
     /// @dev U:[GA-13]: unvote correctly updates votes
@@ -357,22 +356,22 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
 
         gauge.unvote(USER, unvote, abi.encode(token, lpSide));
 
-        (,, uint96 _totalVotesLpSide, uint96 _totalVotesCaSide) = gauge.quotaRateParams(token);
+        QuotaRateParams memory qrp = gauge.quotaRateParams(token);
 
         assertEq(
-            _totalVotesLpSide,
+            qrp.totalVotesLpSide,
             totalVotesLpSide - (lpSide ? unvote : 0),
             "Incorrect quotaRateParams totalVotesLpSide update"
         );
         assertEq(
-            _totalVotesCaSide,
+            qrp.totalVotesCaSide,
             totalVotesCaSide - (lpSide ? 0 : unvote),
             "Incorrect quotaRateParams totalVotesCaSide update"
         );
 
-        (uint96 votesLpSide, uint96 votesCaSide) = gauge.userTokenVotes(USER, token);
-        assertEq(votesLpSide, userLPVotes - (lpSide ? unvote : 0), "Incorrect userTokenVotes votesLpSide update");
-        assertEq(votesCaSide, userCaVotes - (lpSide ? 0 : unvote), "Incorrect userTokenVotes votesCaSide update");
+        UserTokenVotes memory utv = gauge.userTokenVotes(USER, token);
+        assertEq(utv.votesLpSide, userLPVotes - (lpSide ? unvote : 0), "Incorrect userTokenVotes votesLpSide update");
+        assertEq(utv.votesCaSide, userCaVotes - (lpSide ? 0 : unvote), "Incorrect userTokenVotes votesCaSide update");
     }
 
     /// @dev U:[GA-14]: updateEpoch updates epoch

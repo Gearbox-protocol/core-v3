@@ -209,19 +209,7 @@ interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
     // ACCOUNT INFO //
     // ------------ //
 
-    function creditAccountInfo(address creditAccount)
-        external
-        view
-        returns (
-            uint256 debt,
-            uint256 cumulativeIndexLastUpdate,
-            uint128 cumulativeQuotaInterest,
-            uint128 quotaFees,
-            uint256 enabledTokensMask,
-            uint16 flags,
-            uint64 lastDebtUpdate,
-            address borrower
-        );
+    function creditAccountInfo(address creditAccount) external view returns (CreditAccountInfo memory);
 
     function getBorrowerOrRevert(address creditAccount) external view returns (address borrower);
 

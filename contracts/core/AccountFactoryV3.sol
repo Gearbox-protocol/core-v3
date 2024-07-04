@@ -156,8 +156,9 @@ contract AccountFactoryV3 is IAccountFactoryV3, Ownable {
         address creditManager = CreditAccountV3(creditAccount).creditManager();
         if (!_creditManagersSet.contains(creditManager)) revert CreditManagerNotAddedException();
 
-        (,,,,,,, address borrower) = ICreditManagerV3(creditManager).creditAccountInfo(creditAccount);
-        if (borrower != address(0)) revert CreditAccountIsInUseException();
+        if (ICreditManagerV3(creditManager).creditAccountInfo(creditAccount).borrower != address(0)) {
+            revert CreditAccountIsInUseException();
+        }
 
         CreditAccountV3(creditAccount).rescue(target, data);
         emit Rescue({creditAccount: creditAccount, target: target, data: data});

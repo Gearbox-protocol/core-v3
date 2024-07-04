@@ -270,29 +270,6 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         revert("UNKNOWN TASK");
     }
 
-    function _creditAccountInfo(address creditAccount) internal view returns (CreditAccountInfo memory) {
-        (
-            uint256 debt,
-            uint256 cumulativeIndexLastUpdate,
-            uint128 cumulativeQuotaInterest,
-            uint128 quotaFees,
-            uint256 enabledTokensMask,
-            uint16 flags,
-            uint64 lastDebtUpdate,
-            address borrower
-        ) = creditManager.creditAccountInfo(creditAccount);
-        return CreditAccountInfo(
-            debt,
-            cumulativeIndexLastUpdate,
-            cumulativeQuotaInterest,
-            quotaFees,
-            enabledTokensMask,
-            flags,
-            lastDebtUpdate,
-            borrower
-        );
-    }
-
     ///
     ///
     ///  TESTS
@@ -534,23 +511,14 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         assertEq(creditAccount, expectedAccount, _testCaseErr("Incorrect credit account returned"));
 
-        (
-            ,
-            ,
-            uint128 cumulativeQuotaInterest,
-            uint128 quotaFees,
-            uint256 enabledTokensMask,
-            uint16 flags,
-            uint64 lastDebtUpdate,
-            address borrower
-        ) = creditManager.creditAccountInfo(creditAccount);
+        CreditAccountInfo memory info = creditManager.creditAccountInfo(creditAccount);
 
-        assertEq(cumulativeQuotaInterest, 1, _testCaseErr("Incorrect cumulativeQuotaInterest"));
-        assertEq(quotaFees, 0, _testCaseErr("Incorrect quotaFees"));
-        assertEq(enabledTokensMask, UNDERLYING_TOKEN_MASK, _testCaseErr("Incorrect enabledTokensMask"));
-        assertEq(lastDebtUpdate, 0, _testCaseErr("Incorrect lastDebtUpdate"));
-        assertEq(flags, 0, _testCaseErr("Incorrect flags"));
-        assertEq(borrower, USER, _testCaseErr("Incorrect borrower"));
+        assertEq(info.cumulativeQuotaInterest, 1, _testCaseErr("Incorrect cumulativeQuotaInterest"));
+        assertEq(info.quotaFees, 0, _testCaseErr("Incorrect quotaFees"));
+        assertEq(info.enabledTokensMask, UNDERLYING_TOKEN_MASK, _testCaseErr("Incorrect enabledTokensMask"));
+        assertEq(info.lastDebtUpdate, 0, _testCaseErr("Incorrect lastDebtUpdate"));
+        assertEq(info.flags, 0, _testCaseErr("Incorrect flags"));
+        assertEq(info.borrower, USER, _testCaseErr("Incorrect borrower"));
 
         assertEq(creditManager.creditAccountsLen(), 1, _testCaseErr("Incorerct creditAccounts length"));
         assertEq(creditManager.creditAccounts()[0], creditAccount, _testCaseErr("Incorrect creditAccounts[0] value"));
@@ -595,23 +563,14 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         vm.expectCall(address(accountFactory), abi.encodeCall(accountFactory.returnCreditAccount, (creditAccount)));
         creditManager.closeCreditAccount(creditAccount);
 
-        (
-            ,
-            uint256 cumulativeIndexLastUpdate,
-            uint128 cumulativeQuotaInterest,
-            uint128 quotaFees,
-            uint256 enabledTokensMask,
-            uint16 flags,
-            uint64 lastDebtUpdate,
-            address borrower
-        ) = creditManager.creditAccountInfo(creditAccount);
-        assertEq(cumulativeIndexLastUpdate, 0, "cumulativeIndexLastUpdate not cleaned");
-        assertEq(cumulativeQuotaInterest, 1, "cumulativeQuotaInterest not cleaned");
-        assertEq(quotaFees, 0, "quotaFees not cleaned");
-        assertEq(enabledTokensMask, UNDERLYING_TOKEN_MASK, "enabledTokensMask not cleared");
-        assertEq(borrower, address(0), "borrower not cleared");
-        assertEq(lastDebtUpdate, 0, "lastDebtUpdate not cleared");
-        assertEq(flags, 0, "flags not cleared");
+        CreditAccountInfo memory info = creditManager.creditAccountInfo(creditAccount);
+        assertEq(info.cumulativeIndexLastUpdate, 0, "cumulativeIndexLastUpdate not cleaned");
+        assertEq(info.cumulativeQuotaInterest, 1, "cumulativeQuotaInterest not cleaned");
+        assertEq(info.quotaFees, 0, "quotaFees not cleaned");
+        assertEq(info.enabledTokensMask, UNDERLYING_TOKEN_MASK, "enabledTokensMask not cleared");
+        assertEq(info.borrower, address(0), "borrower not cleared");
+        assertEq(info.lastDebtUpdate, 0, "lastDebtUpdate not cleared");
+        assertEq(info.flags, 0, "flags not cleared");
 
         assertEq(creditManager.creditAccountsLen(), 0, _testCaseErr("incorrect creditAccounts length"));
     }
@@ -937,23 +896,13 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 );
             }
 
-            {
-                (uint256 accountDebt,, uint128 cumulativeQuotaInterest, uint128 quotaFees,,,,) =
-                    creditManager.creditAccountInfo(creditAccount);
-
-                assertEq(accountDebt, 0, _testCaseErr("Debt is not zero"));
-                assertEq(cumulativeQuotaInterest, 1, _testCaseErr("cumulativeQuotaInterest is not 1"));
-                assertEq(quotaFees, 0, _testCaseErr("quotaFees is not zero"));
-            }
-
-            {
-                (,,,, uint256 enabledTokensMask,, uint64 lastDebtUpdate, address borrower) =
-                    creditManager.creditAccountInfo(creditAccount);
-
-                assertEq(enabledTokensMask, _case.enabledTokensMaskAfter, _testCaseErr("Incorrect enabled tokensMask"));
-                assertEq(lastDebtUpdate, block.number, _testCaseErr("Incorrect lastDebtUpdate"));
-                assertEq(borrower, USER, _testCaseErr("Incorrect borrower after"));
-            }
+            CreditAccountInfo memory info = creditManager.creditAccountInfo(creditAccount);
+            assertEq(info.debt, 0, _testCaseErr("Debt is not zero"));
+            assertEq(info.cumulativeQuotaInterest, 1, _testCaseErr("cumulativeQuotaInterest is not 1"));
+            assertEq(info.quotaFees, 0, _testCaseErr("quotaFees is not zero"));
+            assertEq(info.enabledTokensMask, _case.enabledTokensMaskAfter, _testCaseErr("Incorrect enabled tokensMask"));
+            assertEq(info.lastDebtUpdate, block.number, _testCaseErr("Incorrect lastDebtUpdate"));
+            assertEq(info.borrower, USER, _testCaseErr("Incorrect borrower after"));
 
             vm.revertTo(snapshot);
         }
@@ -1043,7 +992,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         assertEq(newDebt, expectedNewDebt, _testCaseErr("Incorrect newDebt"));
 
-        CreditAccountInfo memory info = _creditAccountInfo(creditAccount);
+        CreditAccountInfo memory info = creditManager.creditAccountInfo(creditAccount);
         assertEq(info.debt, expectedNewDebt, _testCaseErr("Incorrect creditAccountInfo.debt"));
         assertEq(
             info.cumulativeIndexLastUpdate,
@@ -1135,7 +1084,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
 
         assertEq(newDebt, expectedNewDebt, _testCaseErr("Incorrect newDebt"));
 
-        CreditAccountInfo memory info = _creditAccountInfo(creditAccount);
+        CreditAccountInfo memory info = creditManager.creditAccountInfo(creditAccount);
         assertEq(info.debt, expectedNewDebt, _testCaseErr("Incorrect creditAccountInfo.debt"));
         assertEq(
             info.cumulativeIndexLastUpdate,
@@ -1899,12 +1848,10 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
                 maxQuota: type(uint96).max
             });
 
-            (,, uint128 cumulativeQuotaInterest,,,,,) = creditManager.creditAccountInfo(creditAccount);
-
             assertEq(tokensToEnable, expectedTokensToEnable, _testCaseErr("Incorrect tokensToEnable"));
             assertEq(tokensToDisable, expectedTokensToDisable, _testCaseErr("Incorrect tokensToDisable"));
             assertEq(
-                cumulativeQuotaInterest,
+                creditManager.creditAccountInfo(creditAccount).cumulativeQuotaInterest,
                 INITIAL_INTEREST + caInterestChange,
                 _testCaseErr("Incorrect cumulativeQuotaInterest")
             );

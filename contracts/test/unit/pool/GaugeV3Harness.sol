@@ -4,7 +4,7 @@
 pragma solidity ^0.8.23;
 
 // INTERFACES
-import {GaugeV3, QuotaRateParams, UserVotes} from "../../../pool/GaugeV3.sol";
+import {GaugeV3, QuotaRateParams, UserTokenVotes} from "../../../pool/GaugeV3.sol";
 
 contract GaugeV3Harness is GaugeV3 {
     constructor(address acl, address _pool, address _gearStaking) GaugeV3(acl, _pool, _gearStaking) {}
@@ -16,7 +16,7 @@ contract GaugeV3Harness is GaugeV3 {
         uint96 totalVotesLpSide,
         uint96 totalVotesCaSide
     ) external {
-        quotaRateParams[token] = QuotaRateParams({
+        _quotaRateParams[token] = QuotaRateParams({
             minRate: minRate,
             maxRate: maxRate,
             totalVotesLpSide: totalVotesLpSide,
@@ -25,6 +25,6 @@ contract GaugeV3Harness is GaugeV3 {
     }
 
     function setUserTokenVotes(address user, address token, uint96 votesLpSide, uint96 votesCaSide) external {
-        userTokenVotes[user][token] = UserVotes({votesLpSide: votesLpSide, votesCaSide: votesCaSide});
+        _userTokenVotes[user][token] = UserTokenVotes({votesLpSide: votesLpSide, votesCaSide: votesCaSide});
     }
 }

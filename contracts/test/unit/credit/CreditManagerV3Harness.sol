@@ -35,8 +35,8 @@ contract CreditManagerV3Harness is CreditManagerV3, USDT_Transfer {
         _reentrancyStatus = _status;
     }
 
-    function setDebt(address creditAccount, CreditAccountInfo memory _creditAccountInfo) external {
-        creditAccountInfo[creditAccount] = _creditAccountInfo;
+    function setDebt(address creditAccount, CreditAccountInfo memory info) external {
+        _creditAccountInfo[creditAccount] = info;
     }
 
     function approveSpender(address token, address targetContract, address creditAccount, uint256 amount) external {
@@ -52,15 +52,15 @@ contract CreditManagerV3Harness is CreditManagerV3, USDT_Transfer {
     }
 
     function setBorrower(address creditAccount, address borrower) external {
-        creditAccountInfo[creditAccount].borrower = borrower;
+        _creditAccountInfo[creditAccount].borrower = borrower;
     }
 
     function setLastDebtUpdate(address creditAccount, uint64 lastDebtUpdate) external {
-        creditAccountInfo[creditAccount].lastDebtUpdate = lastDebtUpdate;
+        _creditAccountInfo[creditAccount].lastDebtUpdate = lastDebtUpdate;
     }
 
     function setDebt(address creditAccount, uint256 debt) external {
-        creditAccountInfo[creditAccount].debt = debt;
+        _creditAccountInfo[creditAccount].debt = debt;
     }
 
     function setCreditAccountInfoMap(
@@ -73,13 +73,13 @@ contract CreditManagerV3Harness is CreditManagerV3, USDT_Transfer {
         uint16 flags,
         address borrower
     ) external {
-        creditAccountInfo[creditAccount].debt = debt;
-        creditAccountInfo[creditAccount].cumulativeIndexLastUpdate = cumulativeIndexLastUpdate;
-        creditAccountInfo[creditAccount].cumulativeQuotaInterest = cumulativeQuotaInterest;
-        creditAccountInfo[creditAccount].quotaFees = quotaFees;
-        creditAccountInfo[creditAccount].enabledTokensMask = enabledTokensMask;
-        creditAccountInfo[creditAccount].flags = flags;
-        creditAccountInfo[creditAccount].borrower = borrower;
+        _creditAccountInfo[creditAccount].debt = debt;
+        _creditAccountInfo[creditAccount].cumulativeIndexLastUpdate = cumulativeIndexLastUpdate;
+        _creditAccountInfo[creditAccount].cumulativeQuotaInterest = cumulativeQuotaInterest;
+        _creditAccountInfo[creditAccount].quotaFees = quotaFees;
+        _creditAccountInfo[creditAccount].enabledTokensMask = enabledTokensMask;
+        _creditAccountInfo[creditAccount].flags = flags;
+        _creditAccountInfo[creditAccount].borrower = borrower;
     }
 
     function collateralTokenByMaskCalcLT(uint256 tokenMask, bool calcLT)
