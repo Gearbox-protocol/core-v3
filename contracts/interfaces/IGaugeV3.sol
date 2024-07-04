@@ -19,7 +19,12 @@ struct UserTokenVotes {
     uint96 votesCaSide;
 }
 
-interface IGaugeV3Events {
+/// @title Gauge V3 interface
+interface IGaugeV3 is IACLTrait, IVotingContract, IRateKeeper {
+    // ------ //
+    // EVENTS //
+    // ------ //
+
     /// @notice Emitted when epoch is updated
     event UpdateEpoch(uint16 epochNow);
 
@@ -37,10 +42,11 @@ interface IGaugeV3Events {
 
     /// @notice Emitted when the frozen epoch status changes
     event SetFrozenEpoch(bool status);
-}
 
-/// @title Gauge V3 interface
-interface IGaugeV3 is IACLTrait, IVotingContract, IRateKeeper, IGaugeV3Events {
+    // ------- //
+    // GETTERS //
+    // ------- //
+
     function voter() external view returns (address);
 
     function updateEpoch() external;

@@ -12,7 +12,7 @@ import {
     TokenNotAllowedException,
     ZeroAddressException
 } from "../../../interfaces/IExceptions.sol";
-import {ITumblerV3Events} from "../../../interfaces/ITumblerV3.sol";
+import {ITumblerV3} from "../../../interfaces/ITumblerV3.sol";
 
 import {TumblerV3} from "../../../pool/TumblerV3.sol";
 
@@ -22,7 +22,7 @@ import {PoolQuotaKeeperMock} from "../../mocks/pool/PoolQuotaKeeperMock.sol";
 
 /// @title Tumbler V3 unit test
 /// @notice U:[TU]: Unit tests for tumbler contract
-contract TumblerV3UnitTest is Test, ITumblerV3Events {
+contract TumblerV3UnitTest is Test {
     TumblerV3 tumbler;
 
     PoolMock pool;
@@ -70,10 +70,10 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
         vm.expectCall(address(poolQuotaKeeper), abi.encodeCall(poolQuotaKeeper.addQuotaToken, (token1)));
 
         vm.expectEmit(true, true, true, true);
-        emit AddToken(token1);
+        emit ITumblerV3.AddToken(token1);
 
         vm.expectEmit(true, true, true, true);
-        emit SetRate(token1, 4200);
+        emit ITumblerV3.SetRate(token1, 4200);
 
         tumbler.addToken(token1, 4200);
 
@@ -89,10 +89,10 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
         vm.mockCallRevert(address(poolQuotaKeeper), abi.encodeCall(poolQuotaKeeper.addQuotaToken, (token2)), "");
 
         vm.expectEmit(true, true, true, true);
-        emit AddToken(token2);
+        emit ITumblerV3.AddToken(token2);
 
         vm.expectEmit(true, true, true, true);
-        emit SetRate(token2, 1);
+        emit ITumblerV3.SetRate(token2, 1);
 
         tumbler.addToken(token2, 1);
 
@@ -116,7 +116,7 @@ contract TumblerV3UnitTest is Test, ITumblerV3Events {
 
         // setRate properly sets rate
         vm.expectEmit(true, true, true, true);
-        emit SetRate(token1, 4200);
+        emit ITumblerV3.SetRate(token1, 4200);
 
         tumbler.setRate(token1, 4200);
 

@@ -69,13 +69,19 @@ struct CollateralTokenData {
     uint24 rampDuration;
 }
 
-interface ICreditManagerV3Events {
+/// @title Credit manager V3 interface
+interface ICreditManagerV3 is IVersion {
+    // ------ //
+    // EVENTS //
+    // ------ //
+
     /// @notice Emitted when new credit configurator is set
     event SetCreditConfigurator(address indexed newConfigurator);
-}
 
-/// @title Credit manager V3 interface
-interface ICreditManagerV3 is IVersion, ICreditManagerV3Events {
+    // ------- //
+    // GENERAL //
+    // ------- //
+
     function pool() external view returns (address);
 
     function underlying() external view returns (address);

@@ -12,7 +12,7 @@ import {BotListV3} from "../../../core/BotListV3.sol";
 
 import {CreditConfiguratorV3, AllowanceAction} from "../../../credit/CreditConfiguratorV3.sol";
 import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
-import {ICreditConfiguratorV3Events} from "../../../interfaces/ICreditConfiguratorV3.sol";
+import {ICreditConfiguratorV3} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import {IAdapter} from "../../../interfaces/base/IAdapter.sol";
 
 //
@@ -40,7 +40,7 @@ import {CollateralTokenHuman} from "../../interfaces/ICreditConfig.sol";
 
 import "forge-std/console.sol";
 
-contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConfiguratorV3Events {
+contract CreditConfiguratorIntegrationTest is IntegrationTestHelper {
     using AddressList for address[];
 
     function getAdapterDifferentCM() internal returns (AdapterMock) {
@@ -303,7 +303,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         makeTokenQuoted(newToken, 1, uint96(type(int96).max));
 
         vm.expectEmit(true, false, false, false);
-        emit AddCollateralToken(newToken);
+        emit ICreditConfiguratorV3.AddCollateralToken(newToken);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.addCollateralToken(newToken, 8800);
@@ -344,7 +344,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         uint16 newLT = 24;
 
         vm.expectEmit(true, false, false, true);
-        emit SetTokenLiquidationThreshold(usdcToken, newLT);
+        emit ICreditConfiguratorV3.SetTokenLiquidationThreshold(usdcToken, newLT);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.setLiquidationThreshold(usdcToken, newLT);
@@ -385,7 +385,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.forbidToken(usdcToken);
 
         vm.expectEmit(true, false, false, false);
-        emit AllowToken(usdcToken);
+        emit ICreditConfiguratorV3.AllowToken(usdcToken);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.allowToken(usdcToken);
@@ -399,7 +399,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         uint256 usdcMask = creditManager.getTokenMaskOrRevert(usdcToken);
 
         vm.expectEmit(true, false, false, false);
-        emit ForbidToken(usdcToken);
+        emit ICreditConfiguratorV3.ForbidToken(usdcToken);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.forbidToken(usdcToken);
@@ -496,7 +496,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.prank(CONFIGURATOR);
 
         vm.expectEmit(true, true, false, false);
-        emit AllowAdapter(address(targetMock), address(adapterMock));
+        emit ICreditConfiguratorV3.AllowAdapter(address(targetMock), address(adapterMock));
 
         assertTrue(!allowedAdapters.includes(address(targetMock)), "Contract already added");
 
@@ -570,7 +570,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         assertTrue(allowedAdapters.includes(address(adapterMock)), "Target contract wasnt found");
 
         vm.expectEmit(true, true, false, false);
-        emit ForbidAdapter(address(targetMock), address(adapterMock));
+        emit ICreditConfiguratorV3.ForbidAdapter(address(targetMock), address(adapterMock));
 
         creditConfigurator.forbidAdapter(address(adapterMock));
 
@@ -612,7 +612,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         uint128 newmaxDebt = maxDebtOld + 1000;
 
         vm.expectEmit(false, false, false, true);
-        emit SetBorrowingLimits(newminDebt, maxDebtOld);
+        emit ICreditConfiguratorV3.SetBorrowingLimits(newminDebt, maxDebtOld);
         vm.prank(CONFIGURATOR);
         creditConfigurator.setMinDebtLimit(newminDebt);
         (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
@@ -620,7 +620,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         assertEq(maxDebt, maxDebtOld, "Incorrect maxDebt");
 
         vm.expectEmit(false, false, false, true);
-        emit SetBorrowingLimits(newminDebt, newmaxDebt);
+        emit ICreditConfiguratorV3.SetBorrowingLimits(newminDebt, newmaxDebt);
         vm.prank(CONFIGURATOR);
         creditConfigurator.setMaxDebtLimit(newmaxDebt);
         (minDebt, maxDebt) = creditFacade.debtLimits();
@@ -677,7 +677,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.setLiquidationThreshold(usdc, expectedLT - 1);
 
         vm.expectEmit(true, false, false, true);
-        emit SetTokenLiquidationThreshold(underlying, uint16(expectedLT));
+        emit ICreditConfiguratorV3.SetTokenLiquidationThreshold(underlying, uint16(expectedLT));
 
         creditConfigurator.setFees(
             2 * DEFAULT_FEE_LIQUIDATION,
@@ -705,7 +705,9 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         uint16 newLiquidationPremiumExpired = (PERCENTAGE_FACTOR - liquidationDiscountExpired) * 3 / 2;
 
         vm.expectEmit(false, false, false, true);
-        emit SetFees(newFeeLiquidation, newLiquidationPremium, newFeeLiquidationExpired, newLiquidationPremiumExpired);
+        emit ICreditConfiguratorV3.SetFees(
+            newFeeLiquidation, newLiquidationPremium, newFeeLiquidationExpired, newLiquidationPremiumExpired
+        );
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.setFees(
@@ -767,7 +769,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         }
 
         vm.expectEmit(true, true, true, true);
-        emit SetPriceOracle(address(newPriceOracle));
+        emit ICreditConfiguratorV3.SetPriceOracle(address(newPriceOracle));
 
         creditConfigurator.setPriceOracle(address(newPriceOracle));
 
@@ -812,7 +814,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         (uint128 minDebt, uint128 maxDebt) = creditFacade.debtLimits();
 
         vm.expectEmit(true, false, false, false);
-        emit SetCreditFacade(address(cf));
+        emit ICreditConfiguratorV3.SetCreditFacade(address(cf));
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.setCreditFacade(address(cf));
@@ -927,7 +929,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.setCreditConfigurator(address(cc1));
 
         vm.expectEmit(true, true, true, true);
-        emit SetCreditConfigurator(address(cc2));
+        emit ICreditConfiguratorV3.SetCreditConfigurator(address(cc2));
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.setCreditConfigurator(address(cc2));
@@ -938,7 +940,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     /// @dev I:[CC-24]: setMaxDebtPerBlockMultiplier and forbidBorrowing work correctly
     function test_I_CC_24_setMaxDebtPerBlockMultiplier() public creditTest {
         vm.expectEmit(false, false, false, true);
-        emit SetMaxDebtPerBlockMultiplier(3);
+        emit ICreditConfiguratorV3.SetMaxDebtPerBlockMultiplier(3);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.setMaxDebtPerBlockMultiplier(3);
@@ -946,7 +948,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         assertEq(creditFacade.maxDebtPerBlockMultiplier(), 3, "Multiplier set incorrectly");
 
         vm.expectEmit(false, false, false, true);
-        emit SetMaxDebtPerBlockMultiplier(0);
+        emit ICreditConfiguratorV3.SetMaxDebtPerBlockMultiplier(0);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.forbidBorrowing();
@@ -975,7 +977,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         uint40 newExpirationDate = uint40(block.timestamp + 1);
 
         vm.expectEmit(false, false, false, true);
-        emit SetExpirationDate(newExpirationDate);
+        emit ICreditConfiguratorV3.SetExpirationDate(newExpirationDate);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.setExpirationDate(newExpirationDate);
@@ -991,7 +993,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         vm.etch(liquidator, "DUMMY_CODE");
 
         vm.expectEmit(true, true, true, true);
-        emit SetLossLiquidator(liquidator);
+        emit ICreditConfiguratorV3.SetLossLiquidator(liquidator);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.setLossLiquidator(liquidator);
@@ -1003,7 +1005,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
     /// @dev I:[CC-27]: addEmergencyLiquidator works correctly and emits event
     function test_I_CC_27_addEmergencyLiquidator_works_correctly() public creditTest {
         vm.expectEmit(false, false, false, true);
-        emit AddEmergencyLiquidator(DUMB_ADDRESS);
+        emit ICreditConfiguratorV3.AddEmergencyLiquidator(DUMB_ADDRESS);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS);
@@ -1028,7 +1030,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         creditConfigurator.addEmergencyLiquidator(DUMB_ADDRESS);
 
         vm.expectEmit(false, false, false, true);
-        emit RemoveEmergencyLiquidator(DUMB_ADDRESS);
+        emit ICreditConfiguratorV3.RemoveEmergencyLiquidator(DUMB_ADDRESS);
 
         vm.prank(CONFIGURATOR);
         creditConfigurator.removeEmergencyLiquidator(DUMB_ADDRESS);
@@ -1078,7 +1080,7 @@ contract CreditConfiguratorIntegrationTest is IntegrationTestHelper, ICreditConf
         );
 
         vm.expectEmit(true, false, false, true);
-        emit ScheduleTokenLiquidationThresholdRamp(
+        emit ICreditConfiguratorV3.ScheduleTokenLiquidationThresholdRamp(
             usdc, initialLT, 8900, uint40(block.timestamp + 1), uint40(block.timestamp + 1001)
         );
 

@@ -7,7 +7,6 @@ import "../../../interfaces/ICreditFacadeV3Multicall.sol";
 
 import {
     ICreditManagerV3,
-    ICreditManagerV3Events,
     CollateralTokenData,
     ManageDebtAction,
     CollateralCalcTask,
@@ -37,7 +36,7 @@ import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
-contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events {
+contract QuotasIntegrationTest is IntegrationTestHelper {
     using CreditLogic for CollateralDebtData;
 
     function _setQuotaParams(address token, uint16 rate, uint96 limit) internal {

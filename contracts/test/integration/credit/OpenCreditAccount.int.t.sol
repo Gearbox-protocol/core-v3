@@ -10,7 +10,6 @@ import {IAccountFactoryV3} from "../../../interfaces/IAccountFactoryV3.sol";
 import {ICreditAccountV3} from "../../../interfaces/ICreditAccountV3.sol";
 import {
     ICreditManagerV3,
-    ICreditManagerV3Events,
     CollateralTokenData,
     ManageDebtAction,
     CollateralDebtData,
@@ -39,7 +38,7 @@ import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 uint16 constant REFERRAL_CODE = 23;
 uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
 
-contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
+contract OpenCreditAccountIntegrationTest is IntegrationTestHelper {
     using BitMask for uint256;
 
     /// @dev I:[OCA-1]: openCreditAccount transfers_tokens_from_pool
@@ -205,10 +204,10 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.openCreditAccount, (FRIEND)));
 
         vm.expectEmit(true, true, false, true);
-        emit OpenCreditAccount(expectedCreditAccountAddress, FRIEND, USER, REFERRAL_CODE);
+        emit ICreditFacadeV3.OpenCreditAccount(expectedCreditAccountAddress, FRIEND, USER, REFERRAL_CODE);
 
         vm.expectEmit(true, false, false, false);
-        emit StartMultiCall({creditAccount: expectedCreditAccountAddress, caller: USER});
+        emit ICreditFacadeV3.StartMultiCall({creditAccount: expectedCreditAccountAddress, caller: USER});
 
         vm.expectCall(
             address(creditManager),
@@ -218,10 +217,10 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         );
 
         vm.expectEmit(true, true, false, true);
-        emit AddCollateral(expectedCreditAccountAddress, underlying, DAI_ACCOUNT_AMOUNT);
+        emit ICreditFacadeV3.AddCollateral(expectedCreditAccountAddress, underlying, DAI_ACCOUNT_AMOUNT);
 
         vm.expectEmit(false, false, false, true);
-        emit FinishMultiCall();
+        emit ICreditFacadeV3.FinishMultiCall();
 
         vm.expectCall(
             address(creditManager),

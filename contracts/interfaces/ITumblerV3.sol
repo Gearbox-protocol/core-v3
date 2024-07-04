@@ -6,16 +6,22 @@ pragma solidity ^0.8.23;
 import {IACLTrait} from "./base/IACLTrait.sol";
 import {IRateKeeper} from "./base/IRateKeeper.sol";
 
-interface ITumblerV3Events {
+/// @title Tumbler V3 interface
+interface ITumblerV3 is IACLTrait, IRateKeeper {
+    // ------ //
+    // EVENTS //
+    // ------ //
+
     /// @notice Emitted when new token is added
     event AddToken(address indexed token);
 
     /// @notice Emitted when new quota rate is set for a token
     event SetRate(address indexed token, uint16 rate);
-}
 
-/// @title Tumbler V3 interface
-interface ITumblerV3 is IACLTrait, IRateKeeper, ITumblerV3Events {
+    // --------- //
+    // FUNCTIONS //
+    // -------- //
+
     function epochLength() external view returns (uint256);
 
     function getRates(address[] calldata tokens) external view returns (uint16[] memory);

@@ -4,7 +4,7 @@
 pragma solidity ^0.8.23;
 
 import {GaugeV3Harness, QuotaRateParams, UserTokenVotes} from "./GaugeV3Harness.sol";
-import {IGaugeV3Events, IGaugeV3} from "../../../interfaces/IGaugeV3.sol";
+import {IGaugeV3} from "../../../interfaces/IGaugeV3.sol";
 
 import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {IGearStakingV3} from "../../../interfaces/IGearStakingV3.sol";
@@ -26,7 +26,7 @@ import {TestHelper} from "../../lib/helper.sol";
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
-contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
+contract GauageV3UnitTest is TestHelper {
     address gearToken;
     address underlying;
 
@@ -64,7 +64,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
     /// @dev U:[GA-1]: constructor sets correct values
     function test_U_GA_01_constructor_sets_correct_values() public {
         vm.expectEmit(false, false, false, true);
-        emit SetFrozenEpoch(true);
+        emit IGaugeV3.SetFrozenEpoch(true);
         gauge = new GaugeV3Harness(address(addressProvider), address(poolQuotaKeeperMock), address(gearStakingMock));
 
         assertEq(gauge.quotaKeeper(), address(poolQuotaKeeperMock), "Incorrect quotaKeeper");
@@ -141,7 +141,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         vm.expectCall(poolQuotaKeeperMock, abi.encodeCall(IPoolQuotaKeeperV3.addQuotaToken, (token)));
 
         vm.expectEmit(true, true, false, true);
-        emit AddQuotaToken({token: token, minRate: minRate, maxRate: maxRate});
+        emit IGaugeV3.AddQuotaToken({token: token, minRate: minRate, maxRate: maxRate});
 
         vm.prank(CONFIGURATOR);
         gauge.addQuotaToken(token, minRate, maxRate);
@@ -190,7 +190,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         });
 
         vm.expectEmit(true, true, false, true);
-        emit SetQuotaTokenParams({token: token, minRate: minRate, maxRate: 2000});
+        emit IGaugeV3.SetQuotaTokenParams({token: token, minRate: minRate, maxRate: 2000});
 
         vm.prank(CONFIGURATOR);
         gauge.changeQuotaMinRate(token, minRate);
@@ -224,7 +224,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         });
 
         vm.expectEmit(true, true, false, true);
-        emit SetQuotaTokenParams({token: token, minRate: 500, maxRate: maxRate});
+        emit IGaugeV3.SetQuotaTokenParams({token: token, minRate: 500, maxRate: maxRate});
 
         vm.prank(CONFIGURATOR);
         gauge.changeQuotaMaxRate(token, maxRate);
@@ -311,7 +311,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         bool lpSide = getHash(votes, 22) % 2 == 1;
 
         vm.expectEmit(true, true, false, true);
-        emit Vote(USER, token, votes, lpSide);
+        emit IGaugeV3.Vote(USER, token, votes, lpSide);
 
         gauge.vote(USER, votes, abi.encode(token, lpSide));
 
@@ -352,7 +352,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         vm.prank(address(gearStakingMock));
 
         vm.expectEmit(true, true, false, true);
-        emit Unvote(USER, token, unvote, lpSide);
+        emit IGaugeV3.Unvote(USER, token, unvote, lpSide);
 
         gauge.unvote(USER, unvote, abi.encode(token, lpSide));
 
@@ -391,7 +391,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
                 vm.expectCall(address(poolQuotaKeeperMock), abi.encodeCall(IPoolQuotaKeeperV3.updateRates, ()));
 
                 vm.expectEmit(false, false, false, true);
-                emit UpdateEpoch(epochNow);
+                emit IGaugeV3.UpdateEpoch(epochNow);
             }
 
             gauge.updateEpoch();
@@ -455,7 +455,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         assertEq(gauge.epochLastUpdate(), 900);
 
         vm.expectEmit(false, false, false, true);
-        emit SetFrozenEpoch(true);
+        emit IGaugeV3.SetFrozenEpoch(true);
 
         vm.prank(CONFIGURATOR);
         gauge.setFrozenEpoch(true);

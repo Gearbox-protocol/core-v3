@@ -28,8 +28,7 @@ import {
     ManageDebtAction,
     CreditAccountInfo,
     CollateralDebtData,
-    CollateralCalcTask,
-    ICreditManagerV3Events
+    CollateralCalcTask
 } from "../../../interfaces/ICreditManagerV3.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -60,7 +59,7 @@ import "forge-std/console.sol";
 
 uint16 constant LT_UNDERLYING = uint16(PERCENTAGE_FACTOR - DEFAULT_LIQUIDATION_PREMIUM - DEFAULT_FEE_LIQUIDATION);
 
-contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceHelper, CreditAccountMockEvents {
+contract CreditManagerV3UnitTest is TestHelper, BalanceHelper, CreditAccountMockEvents {
     using BitMask for uint256;
     using CreditLogic for CollateralTokenData;
     using CreditLogic for CollateralDebtData;
@@ -2238,7 +2237,7 @@ contract CreditManagerV3UnitTest is TestHelper, ICreditManagerV3Events, BalanceH
         assertTrue(creditManager.creditConfigurator() != DUMB_ADDRESS, "creditConfigurator is already the same");
 
         vm.expectEmit(true, false, false, false);
-        emit SetCreditConfigurator(DUMB_ADDRESS);
+        emit ICreditManagerV3.SetCreditConfigurator(DUMB_ADDRESS);
 
         creditManager.setCreditConfigurator(DUMB_ADDRESS);
 

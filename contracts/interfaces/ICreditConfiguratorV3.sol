@@ -11,9 +11,10 @@ enum AllowanceAction {
     ALLOW
 }
 
-interface ICreditConfiguratorV3Events {
+/// @title Credit configurator V3 interface
+interface ICreditConfiguratorV3 is IACLTrait, IVersion {
     // ------ //
-    // TOKENS //
+    // EVENTS //
     // ------ //
 
     /// @notice Emitted when a token is made recognizable as collateral in the credit manager
@@ -37,28 +38,16 @@ interface ICreditConfiguratorV3Events {
     /// @notice Emitted when a previously forbidden collateral token is allowed
     event AllowToken(address indexed token);
 
-    // -------- //
-    // ADAPTERS //
-    // -------- //
-
     /// @notice Emitted when a new adapter and its target contract are allowed in the credit manager
     event AllowAdapter(address indexed targetContract, address indexed adapter);
 
     /// @notice Emitted when adapter and its target contract are forbidden in the credit manager
     event ForbidAdapter(address indexed targetContract, address indexed adapter);
 
-    // -------------- //
-    // CREDIT MANAGER //
-    // -------------- //
-
     /// @notice Emitted when new fee parameters are set in the credit manager
     event SetFees(
         uint16 feeLiquidation, uint16 liquidationPremium, uint16 feeLiquidationExpired, uint16 liquidationPremiumExpired
     );
-
-    // -------- //
-    // UPGRADES //
-    // -------- //
 
     /// @notice Emitted when a new price oracle is set in the credit manager
     event SetPriceOracle(address indexed priceOracle);
@@ -68,10 +57,6 @@ interface ICreditConfiguratorV3Events {
 
     /// @notice Emitted when a new configurator is connected to the credit manager
     event SetCreditConfigurator(address indexed creditConfigurator);
-
-    // ------------- //
-    // CREDIT FACADE //
-    // ------------- //
 
     /// @notice Emitted when new debt principal limits are set
     event SetBorrowingLimits(uint256 minDebt, uint256 maxDebt);
@@ -90,10 +75,11 @@ interface ICreditConfiguratorV3Events {
 
     /// @notice Emitted when an address is removed from the list of emergency liquidators
     event RemoveEmergencyLiquidator(address indexed liquidator);
-}
 
-/// @title Credit configurator V3 interface
-interface ICreditConfiguratorV3 is IACLTrait, IVersion, ICreditConfiguratorV3Events {
+    // ------- //
+    // GENERAL //
+    // ------- //
+
     function creditManager() external view returns (address);
 
     function creditFacade() external view returns (address);

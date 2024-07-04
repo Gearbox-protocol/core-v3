@@ -3,9 +3,9 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.23;
 
-import {ICreditManagerV3, ICreditManagerV3Events, ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
+import {ICreditManagerV3, ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
 import "../../../interfaces/ICreditFacadeV3.sol";
-import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
+import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
 // TESTS
@@ -17,7 +17,7 @@ import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
-contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events, IPoolV3Events {
+contract ManegDebtIntegrationTest is IntegrationTestHelper {
     /// @dev I:[MD-1]: increaseDebt executes function as expected
     function test_I_MD_01_increaseDebt_executes_actions_as_expected() public creditTest {
         (address creditAccount,) = _openTestCreditAccount();
@@ -36,7 +36,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
         );
 
         vm.expectEmit(true, true, true, true, address(pool));
-        emit Borrow(address(creditManager), creditAccount, 512);
+        emit IPoolV3.Borrow(address(creditManager), creditAccount, 512);
 
         vm.prank(USER);
         creditFacade.multicall(
@@ -176,7 +176,7 @@ contract ManegDebtIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Event
         );
 
         vm.expectEmit(true, true, true, true, address(pool));
-        emit Repay(address(creditManager), 512, 0, 0);
+        emit IPoolV3.Repay(address(creditManager), 512, 0, 0);
 
         vm.prank(USER);
         creditFacade.multicall(

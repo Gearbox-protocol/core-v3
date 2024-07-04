@@ -9,7 +9,7 @@ import {BotListV3} from "../../../core/BotListV3.sol";
 
 import {ICreditAccountV3} from "../../../interfaces/ICreditAccountV3.sol";
 
-import {ICreditManagerV3, ICreditManagerV3Events, ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
+import {ICreditManagerV3, ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
 
 import "../../../interfaces/ICreditFacadeV3.sol";
 
@@ -40,7 +40,7 @@ uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
 
 /// @title CreditFacadeTest
 /// @notice Designed for unit test purposes only
-contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
+contract BotsIntegrationTest is IntegrationTestHelper {
     /// @dev I:[BOT-01]: botMulticall works correctly
     function test_I_BOT_01_botMulticall_works_correctly() public withAdapterMock creditTest {
         (address creditAccount,) = _openTestCreditAccount();
@@ -67,14 +67,14 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         botList.getBotPermissions({creditAccount: creditAccount, bot: bot});
 
         vm.expectEmit(true, true, false, true);
-        emit StartMultiCall({creditAccount: creditAccount, caller: bot});
+        emit ICreditFacadeV3.StartMultiCall({creditAccount: creditAccount, caller: bot});
 
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount)));
 
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.execute, (DUMB_CALLDATA)));
 
         vm.expectEmit(true, false, false, true);
-        emit Execute(creditAccount, address(targetMock));
+        emit ICreditFacadeV3.Execute(creditAccount, address(targetMock));
 
         vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountV3.execute, (address(targetMock), DUMB_CALLDATA)));
 
@@ -83,7 +83,7 @@ contract BotsIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (address(1))));
 
         vm.expectEmit(false, false, false, true);
-        emit FinishMultiCall();
+        emit ICreditFacadeV3.FinishMultiCall();
 
         vm.expectCall(
             address(creditManager),

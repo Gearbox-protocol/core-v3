@@ -5,29 +5,23 @@ pragma solidity ^0.8.23;
 
 import {IVersion} from "./base/IVersion.sol";
 
-interface IBotListV3Events {
-    // ----------- //
-    // PERMISSIONS //
-    // ----------- //
+/// @title Bot list V3 interface
+interface IBotListV3 is IVersion {
+    // ------ //
+    // EVENTS //
+    // ------ //
 
     /// @notice Emitted when new `bot`'s permissions are set for `creditAccount` in `creditManager`
     event SetBotPermissions(
         address indexed bot, address indexed creditManager, address indexed creditAccount, uint192 permissions
     );
 
-    // ------------- //
-    // CONFIGURATION //
-    // ------------- //
-
     /// @notice Emitted when `bot` is forbidden
     event ForbidBot(address indexed bot);
 
     /// @notice Emitted when `creditManager` is added
     event AddCreditManager(address indexed creditManager);
-}
 
-/// @title Bot list V3 interface
-interface IBotListV3 is IBotListV3Events, IVersion {
     // ----------- //
     // PERMISSIONS //
     // ----------- //

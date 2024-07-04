@@ -5,7 +5,12 @@ pragma solidity ^0.8.23;
 
 import {IVersion} from "./base/IVersion.sol";
 
-interface IAccountFactoryV3Events {
+/// @title Account factory V3 interface
+interface IAccountFactoryV3 is IVersion {
+    // ------ //
+    // EVENTS //
+    // ------ //
+
     /// @notice Emitted when new credit account is deployed
     event DeployCreditAccount(address indexed creditAccount, address indexed creditManager);
 
@@ -20,10 +25,11 @@ interface IAccountFactoryV3Events {
 
     /// @notice Emitted when owner performs a proxy call from credit account to rescue funds
     event Rescue(address indexed creditAccount, address indexed target, bytes data);
-}
 
-/// @title Account factory V3 interface
-interface IAccountFactoryV3 is IVersion, IAccountFactoryV3Events {
+    // --------- //
+    // FUNCTIONS //
+    // --------- //
+
     function delay() external view returns (uint40);
 
     function isCreditManagerAdded(address creditManager) external view returns (bool);
