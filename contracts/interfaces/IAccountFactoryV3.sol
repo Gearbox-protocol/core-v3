@@ -18,7 +18,7 @@ interface IAccountFactoryV3Events {
     /// @notice Emitted when new credit manager is added to the factory
     event AddCreditManager(address indexed creditManager, address masterCreditAccount);
 
-    /// @notice Emitted when the DAO performs a proxy call from Credit Account to rescue funds
+    /// @notice Emitted when owner performs a proxy call from credit account to rescue funds
     event Rescue(address indexed creditAccount, address indexed target, bytes data);
 }
 

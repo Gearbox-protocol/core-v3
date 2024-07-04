@@ -18,7 +18,7 @@ import {
 import {IBot} from "../interfaces/base/IBot.sol";
 
 /// @title  Bot list V3
-/// @notice Stores bot permissions (bit masks dictating which actions can be performed with credit accounts in multicall).
+/// @notice Stores bot permissions (bitmasks dictating which actions can be performed with credit accounts in multicall).
 contract BotListV3 is IBotListV3, Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
 

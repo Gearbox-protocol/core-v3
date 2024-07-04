@@ -11,7 +11,7 @@ import {ACLTrait} from "../traits/ACLTrait.sol";
 
 import "../interfaces/IExceptions.sol";
 
-/// @title Tumbler V3
+/// @title  Tumbler V3
 /// @notice Extremely simplified version of `GaugeV3` contract for quota rates management, which,
 ///         instead of voting, allows controller to set rates directly with custom epoch length
 contract TumblerV3 is ITumblerV3, ACLTrait {
@@ -51,11 +51,9 @@ contract TumblerV3 is ITumblerV3, ACLTrait {
     function getRates(address[] calldata tokens) external view override returns (uint16[] memory rates) {
         uint256 len = tokens.length;
         rates = new uint16[](len);
-        unchecked {
-            for (uint256 i; i < len; ++i) {
-                if (!isTokenAdded(tokens[i])) revert TokenIsNotQuotedException();
-                rates[i] = _rates[tokens[i]];
-            }
+        for (uint256 i; i < len; ++i) {
+            if (!isTokenAdded(tokens[i])) revert TokenIsNotQuotedException();
+            rates[i] = _rates[tokens[i]];
         }
     }
 

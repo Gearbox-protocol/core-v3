@@ -109,7 +109,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait, ReentrancyGuardTrait {
     /// @notice Credit account debt limits packed into a single slot
     DebtLimits public override debtLimits;
 
-    /// @notice Bit mask encoding a set of forbidden tokens
+    /// @notice Bitmask encoding a set of forbidden tokens
     uint256 public override forbiddenTokenMask;
 
     /// @notice Contract that enforces a policy on how liquidations with loss are performed

@@ -828,7 +828,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @dev Returns total value of funds remaining on the credit account after liquidation, which consists of underlying
     ///      token balance and total value of other enabled tokens remaining after transferring specified tokens
     /// @param creditAccount Account to compute value for
-    /// @param enabledTokensMask Bit mask of tokens enabled on the account
+    /// @param enabledTokensMask Bitmask of tokens enabled on the account
     /// @return remainingFunds Remaining funds denominated in underlying
     /// @return underlyingBalance Balance of underlying token
     function _getRemainingFunds(address creditAccount, uint256 enabledTokensMask)
@@ -1056,7 +1056,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         if (borrower == address(0)) revert CreditAccountDoesNotExistException(); // U:[CM-35]
     }
 
-    /// @notice Returns `creditAccount`'s flags as a bit mask
+    /// @notice Returns `creditAccount`'s flags as a bitmask
     /// @dev Does not revert if `creditAccount` is not opened in this credit manager
     function flagsOf(address creditAccount) external view override returns (uint16) {
         return creditAccountInfo[creditAccount].flags; // U:[CM-35]
@@ -1137,7 +1137,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         override
         creditConfiguratorOnly // U:[CM-4]
     {
-        _addToken(token); // U:[CM-38, 39]
+        _addToken(token); // U:[CM-38,39]
     }
 
     /// @dev `addToken` implementation:

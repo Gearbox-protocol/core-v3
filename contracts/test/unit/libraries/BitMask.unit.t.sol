@@ -9,11 +9,11 @@ import {BitMask} from "../../../libraries/BitMask.sol";
 import {TestHelper} from "../../lib/helper.sol";
 
 /// @title BitMask logic test
-/// @notice U:[BM]: Unit tests for bit mask library
+/// @notice U:[BM]: Unit tests for bitmask library
 contract BitMaskUnitTest is TestHelper {
     using BitMask for uint256;
-    /// @notice U:[BM-1]: `calcEnabledBits` works correctly
 
+    /// @notice U:[BM-1]: `calcEnabledBits` works correctly
     function test_U_BM_01_calcEnabledBits_works_correctly(uint8 bitsToEnable, uint256 randomValue) public {
         uint256 bitMask;
 

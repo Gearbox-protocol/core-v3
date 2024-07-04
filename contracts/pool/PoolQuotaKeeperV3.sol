@@ -18,7 +18,7 @@ import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
 
 import "../interfaces/IExceptions.sol";
 
-/// @title Pool quota keeper V3
+/// @title  Pool quota keeper V3
 /// @notice In Gearbox V3, quotas are used to limit the system exposure to risky assets.
 ///         In order for a risky token to be counted towards credit account's collateral, account owner must "purchase"
 ///         a quota for this token, which entails two kinds of payments:
@@ -26,7 +26,6 @@ import "../interfaces/IExceptions.sol";
 ///         * increase fee that is charged when additional quota is purchased (more suited to leveraged trading).
 ///         Quota keeper stores information about quotas of accounts in all credit managers connected to the pool, and
 ///         performs calculations that help to keep pool's expected liquidity and credit managers' debt consistent.
-/// @dev Any contract that implements the `IRateKeeper` interface can be used everywhere where the term "gauge" is used
 contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLTrait, ContractsRegisterTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -55,6 +54,8 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLTrait, ContractsRegisterTra
     mapping(address => mapping(address => AccountQuota)) internal _accountQuotas;
 
     /// @notice Address of the gauge
+    /// @dev    Any contract that implements the `IRateKeeper` interface can be used everywhere where
+    ///         the term "gauge" is mentioned, the older name stays for backward compatibility
     address public override gauge;
 
     /// @notice Timestamp of the last quota rates update
@@ -132,8 +133,8 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLTrait, ContractsRegisterTra
     /// @return fees Quota increase fees, if any
     /// @return enableToken Whether the token needs to be enabled as collateral
     /// @return disableToken Whether the token needs to be disabled as collateral
-    /// @dev Reverts if `token` is not added or not yet initialized via `updateRates`
-    /// @dev Reverts if new quota is not between `minQuota` and `maxQuota`
+    /// @dev    Reverts if `token` is not added or not yet initialized via `updateRates`
+    /// @dev    Reverts if new quota is not between `minQuota` and `maxQuota`
     /// @custom:tests U:[QK-4], U:[QK-11], U:[QK-12]
     function updateQuota(address creditAccount, address token, int96 quotaChange, uint96 minQuota, uint96 maxQuota)
         external
@@ -142,8 +143,9 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLTrait, ContractsRegisterTra
         returns (uint128 outstandingInterest, uint128 fees, bool enableToken, bool disableToken)
     {
         TokenQuotaParams memory tqp = _tokenQuotaParams[token];
-        AccountQuota memory aq = _accountQuotas[creditAccount][token];
         if (tqp.rate == 0) revert TokenIsNotQuotedException();
+
+        AccountQuota memory aq = _accountQuotas[creditAccount][token];
 
         if (quotaChange > 0) {
             // `limit` can be at most `type(int96).max`, so cast is safe
@@ -184,8 +186,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLTrait, ContractsRegisterTra
         _accountQuotas[creditAccount][token] = AccountQuota({quota: newQuota, cumulativeIndexLU: cumulativeIndexNow});
         emit UpdateQuota({creditAccount: creditAccount, token: token, quotaChange: quotaChange});
 
-        int256 quotaRevenueChange = QuotasLogic.calcQuotaRevenueChange({rate: tqp.rate, change: quotaChange});
-        if (quotaRevenueChange != 0) IPoolV3(pool).updateQuotaRevenue(quotaRevenueChange);
+        IPoolV3(pool).updateQuotaRevenue(QuotasLogic.calcQuotaRevenueChange({rate: tqp.rate, change: quotaChange}));
     }
 
     /// @notice Removes `creditAccount`'s quotas for `tokens`
@@ -211,8 +212,9 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLTrait, ContractsRegisterTra
             address token = tokens[i];
 
             uint16 rate = _tokenQuotaParams[token].rate;
-            uint96 quota = _accountQuotas[creditAccount][token].quota;
             if (rate == 0) revert TokenIsNotQuotedException();
+
+            uint96 quota = _accountQuotas[creditAccount][token].quota;
 
             // `quota` can be at most `type(int96).max`, so negation can't underflow
             int96 quotaChange = -int96(quota);
@@ -225,7 +227,7 @@ contract PoolQuotaKeeperV3 is IPoolQuotaKeeperV3, ACLTrait, ContractsRegisterTra
             if (setLimitsToZero) _setTokenLimit(token, 0);
         }
 
-        if (quotaRevenueChange != 0) IPoolV3(pool).updateQuotaRevenue(quotaRevenueChange);
+        IPoolV3(pool).updateQuotaRevenue(quotaRevenueChange);
     }
 
     /// @notice Updates `creditAccount`'s interest indexes for `tokens`
