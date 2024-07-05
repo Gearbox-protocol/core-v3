@@ -17,4 +17,7 @@ interface IRateKeeper is IVersion {
     /// @notice Returns quota rates for a list of tokens, must return non-zero rates for added tokens
     ///         and revert if some tokens are not recognized
     function getRates(address[] calldata tokens) external view returns (uint16[] memory);
+
+    /// @notice Returns time before the next update of rates
+    function getTimeBeforeUpdate() external view returns (uint256);
 }

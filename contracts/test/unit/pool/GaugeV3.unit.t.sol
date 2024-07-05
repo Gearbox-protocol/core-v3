@@ -379,6 +379,8 @@ contract GauageV3UnitTest is TestHelper {
         vm.prank(CONFIGURATOR);
         gauge.setFrozenEpoch(false);
 
+        gearStakingMock.setFirstEpochTimestamp(block.timestamp - 2 days);
+
         vm.mockCall(address(poolQuotaKeeperMock), abi.encodeCall(IPoolQuotaKeeperV3.updateRates, ()), "");
 
         for (uint16 i = 0; i < 2; ++i) {
@@ -393,6 +395,8 @@ contract GauageV3UnitTest is TestHelper {
                 vm.expectEmit(false, false, false, true);
                 emit IGaugeV3.UpdateEpoch(epochNow);
             }
+
+            assertEq(gauge.getTimeBeforeUpdate(), i == 0 ? 5 days : 0, "Incorrect time before update");
 
             gauge.updateEpoch();
 
@@ -470,5 +474,6 @@ contract GauageV3UnitTest is TestHelper {
         gauge.updateEpoch();
 
         assertEq(gauge.epochLastUpdate(), 1000);
+        assertEq(gauge.getTimeBeforeUpdate(), type(uint256).max, "Incorrect time before update");
     }
 }

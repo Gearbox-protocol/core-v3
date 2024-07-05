@@ -7,6 +7,8 @@ import {IGaugeV3, QuotaRateParams, UserTokenVotes} from "../interfaces/IGaugeV3.
 import {IGearStakingV3} from "../interfaces/IGearStakingV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 
+import {EPOCH_LENGTH} from "../libraries/Constants.sol";
+
 import {ACLTrait} from "../traits/ACLTrait.sol";
 
 import "../interfaces/IExceptions.sol";
@@ -63,7 +65,7 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
     {
         quotaKeeper = quotaKeeper_;
         voter = gearStaking_;
-        epochLastUpdate = IGearStakingV3(gearStaking_).getCurrentEpoch();
+        epochLastUpdate = _getCurrentEpoch();
         epochFrozen = true;
         emit SetFrozenEpoch(true);
     }
@@ -85,9 +87,9 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
     }
 
     /// @notice Updates the epoch and, unless frozen, rates in the quota keeper
-    /// @custom:tests U:[GA-14]
+    /// @custom:tests U:[GA-14], U:[GA-16]
     function updateEpoch() public override {
-        uint16 epochNow = IGearStakingV3(voter).getCurrentEpoch();
+        uint16 epochNow = _getCurrentEpoch();
         if (epochNow > epochLastUpdate) {
             epochLastUpdate = epochNow;
             if (!epochFrozen) {
@@ -96,6 +98,14 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
             }
             emit UpdateEpoch(epochNow);
         }
+    }
+
+    /// @notice Returns time before the next update of rates
+    /// @custom:tests U:[GA-14], U:[GA-16]
+    function getTimeBeforeUpdate() external view override returns (uint256) {
+        if (epochFrozen) return type(uint256).max;
+        if (_getCurrentEpoch() > epochLastUpdate) return 0;
+        return EPOCH_LENGTH - (block.timestamp - IGearStakingV3(voter).firstEpochTimestamp()) % EPOCH_LENGTH;
     }
 
     /// @notice Computes rates for an array of tokens based on the current votes
@@ -277,5 +287,10 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
     /// @dev Reverts if `msg.sender` is not voter
     function _revertIfCallerNotVoter() internal view {
         if (msg.sender != voter) revert CallerNotVoterException();
+    }
+
+    /// @dev Internal wrapper for `voter.getCurrentEpoch` call to reduce contract size
+    function _getCurrentEpoch() internal view returns (uint16) {
+        return IGearStakingV3(voter).getCurrentEpoch();
     }
 }

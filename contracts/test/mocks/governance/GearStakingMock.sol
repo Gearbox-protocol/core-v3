@@ -13,11 +13,15 @@ contract GearStakingMock is IGearStakingV3 {
 
     uint16 public getCurrentEpoch;
 
+    uint256 public firstEpochTimestamp;
+
     function setCurrentEpoch(uint16 epoch) external {
         getCurrentEpoch = epoch;
     }
 
-    function firstEpochTimestamp() external view returns (uint256) {}
+    function setFirstEpochTimestamp(uint256 value) external {
+        firstEpochTimestamp = value;
+    }
 
     function deposit(uint96 amount, MultiVote[] calldata votes) external {}
 

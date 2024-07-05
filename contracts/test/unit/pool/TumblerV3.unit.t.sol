@@ -128,6 +128,8 @@ contract TumblerV3UnitTest is Test {
 
     /// @notice U:[TU-4]: `updateRates` works as expected
     function test_U_TU_04_updateRates_works_as_expected() public {
+        assertEq(tumbler.getTimeBeforeUpdate(), 1 days, "Incorrect time before update");
+
         // reverts on unauthorized caller
         vm.expectRevert(CallerNotControllerOrConfiguratorException.selector);
         vm.prank(makeAddr("dude"));
@@ -141,6 +143,8 @@ contract TumblerV3UnitTest is Test {
 
         vm.clearMockedCalls();
         vm.warp(block.timestamp + 1 days);
+
+        assertEq(tumbler.getTimeBeforeUpdate(), 0, "Incorrect time before update");
 
         tumbler.addToken(token1, 4200);
         tumbler.addToken(token2, 12000);
