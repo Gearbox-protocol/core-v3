@@ -124,8 +124,8 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @notice Mapping target contract => adapter
     mapping(address => address) public override contractToAdapter;
 
-    /// @notice Mapping credit account => account info (owner, debt amount, etc.)
-    mapping(address => CreditAccountInfo) public override creditAccountInfo;
+    /// @dev Mapping credit account => account info (owner, debt amount, etc.)
+    mapping(address => CreditAccountInfo) internal _creditAccountInfo;
 
     /// @dev Set of all credit accounts opened in this credit manager
     EnumerableSet.AddressSet internal creditAccountsSet;
@@ -183,6 +183,12 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditConfigurator = msg.sender; // U:[CM-1]
     }
 
+    /// @notice Contract type
+    /// @dev Not using state variable to allow derived contracts to override this
+    function contractType() external view virtual override returns (bytes32) {
+        return "CM";
+    }
+
     // ------------------ //
     // ACCOUNT MANAGEMENT //
     // ------------------ //
@@ -200,7 +206,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     {
         creditAccount = IAccountFactoryV3(accountFactory).takeCreditAccount(0, 0); // U:[CM-6]
 
-        CreditAccountInfo storage newCreditAccountInfo = creditAccountInfo[creditAccount];
+        CreditAccountInfo storage newCreditAccountInfo = _creditAccountInfo[creditAccount];
 
         // newCreditAccountInfo.flags = 0;
         // newCreditAccountInfo.lastDebtUpdate = 0;
@@ -232,7 +238,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         nonReentrant // U:[CM-5]
         creditFacadeOnly // U:[CM-2]
     {
-        CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
+        CreditAccountInfo storage currentCreditAccountInfo = _creditAccountInfo[creditAccount];
         if (currentCreditAccountInfo.debt != 0) {
             revert CloseAccountWithNonZeroDebtException(); // U:[CM-7]
         }
@@ -335,7 +341,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             }
         }
 
-        CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
+        CreditAccountInfo storage currentCreditAccountInfo = _creditAccountInfo[creditAccount];
         if (currentCreditAccountInfo.lastDebtUpdate == block.number) {
             revert DebtUpdatedTwiceInOneBlockException(); // U:[CM-9]
         }
@@ -368,7 +374,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacadeOnly // U:[CM-2]
         returns (uint256 newDebt, uint256, uint256)
     {
-        CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
+        CreditAccountInfo storage currentCreditAccountInfo = _creditAccountInfo[creditAccount];
         if (currentCreditAccountInfo.lastDebtUpdate == block.number) {
             revert DebtUpdatedTwiceInOneBlockException(); // U:[CM-12A]
         }
@@ -691,7 +697,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         CollateralCalcTask task,
         bool useSafePrices
     ) internal view returns (CollateralDebtData memory cdd) {
-        CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
+        CreditAccountInfo storage currentCreditAccountInfo = _creditAccountInfo[creditAccount];
 
         cdd.debt = currentCreditAccountInfo.debt; // U:[CM-20]
         // interest index is meaningless when account has no debt
@@ -822,7 +828,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     /// @dev Returns total value of funds remaining on the credit account after liquidation, which consists of underlying
     ///      token balance and total value of other enabled tokens remaining after transferring specified tokens
     /// @param creditAccount Account to compute value for
-    /// @param enabledTokensMask Bit mask of tokens enabled on the account
+    /// @param enabledTokensMask Bitmask of tokens enabled on the account
     /// @return remainingFunds Remaining funds denominated in underlying
     /// @return underlyingBalance Balance of underlying token
     function _getRemainingFunds(address creditAccount, uint256 enabledTokensMask)
@@ -878,7 +884,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         creditFacadeOnly // U:[CM-2]
         returns (uint256 tokensToEnable, uint256 tokensToDisable)
     {
-        CreditAccountInfo storage currentCreditAccountInfo = creditAccountInfo[creditAccount];
+        CreditAccountInfo storage currentCreditAccountInfo = _creditAccountInfo[creditAccount];
         if (currentCreditAccountInfo.debt == 0) {
             revert UpdateQuotaOnZeroDebtAccountException();
         }
@@ -1044,16 +1050,21 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
     // ACCOUNT INFO //
     // ------------ //
 
+    /// @notice Returns info on `creditAccount`
+    function creditAccountInfo(address creditAccount) external view override returns (CreditAccountInfo memory) {
+        return _creditAccountInfo[creditAccount];
+    }
+
     /// @notice Returns `creditAccount`'s owner or reverts if account is not opened in this credit manager
     function getBorrowerOrRevert(address creditAccount) public view override returns (address borrower) {
-        borrower = creditAccountInfo[creditAccount].borrower; // U:[CM-35]
+        borrower = _creditAccountInfo[creditAccount].borrower; // U:[CM-35]
         if (borrower == address(0)) revert CreditAccountDoesNotExistException(); // U:[CM-35]
     }
 
-    /// @notice Returns `creditAccount`'s flags as a bit mask
+    /// @notice Returns `creditAccount`'s flags as a bitmask
     /// @dev Does not revert if `creditAccount` is not opened in this credit manager
     function flagsOf(address creditAccount) external view override returns (uint16) {
-        return creditAccountInfo[creditAccount].flags; // U:[CM-35]
+        return _creditAccountInfo[creditAccount].flags; // U:[CM-35]
     }
 
     /// @notice Sets `creditAccount`'s flag to a given value
@@ -1076,18 +1087,18 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
 
     /// @dev Enables `creditAccount`'s flag
     function _enableFlag(address creditAccount, uint16 flag) internal {
-        creditAccountInfo[creditAccount].flags |= flag; // U:[CM-36]
+        _creditAccountInfo[creditAccount].flags |= flag; // U:[CM-36]
     }
 
     /// @dev Disables `creditAccount`'s flag
     function _disableFlag(address creditAccount, uint16 flag) internal {
-        creditAccountInfo[creditAccount].flags &= ~flag; // U:[CM-36]
+        _creditAccountInfo[creditAccount].flags &= ~flag; // U:[CM-36]
     }
 
     /// @notice Returns `creditAccount`'s enabled tokens mask
     /// @dev Does not revert if `creditAccount` is not opened to this credit manager
     function enabledTokensMaskOf(address creditAccount) public view override returns (uint256) {
-        return creditAccountInfo[creditAccount].enabledTokensMask; // U:[CM-37]
+        return _creditAccountInfo[creditAccount].enabledTokensMask; // U:[CM-37]
     }
 
     /// @dev Saves `creditAccount`'s `enabledTokensMask` in the storage
@@ -1097,7 +1108,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
             revert TooManyEnabledTokensException(); // U:[CM-37]
         }
 
-        creditAccountInfo[creditAccount].enabledTokensMask = enabledTokensMask; // U:[CM-37]
+        _creditAccountInfo[creditAccount].enabledTokensMask = enabledTokensMask; // U:[CM-37]
     }
 
     /// @notice Returns an array of all credit accounts opened in this credit manager
@@ -1131,7 +1142,7 @@ contract CreditManagerV3 is ICreditManagerV3, SanityCheckTrait, ReentrancyGuardT
         override
         creditConfiguratorOnly // U:[CM-4]
     {
-        _addToken(token); // U:[CM-38, 39]
+        _addToken(token); // U:[CM-38,39]
     }
 
     /// @dev `addToken` implementation:

@@ -34,7 +34,12 @@ struct FullCheckParams {
     uint16 minHealthFactor;
 }
 
-interface ICreditFacadeV3Events {
+/// @title Credit facade V3 interface
+interface ICreditFacadeV3 is IACLTrait, IVersion {
+    // ------ //
+    // EVENTS //
+    // ------ //
+
     /// @notice Emitted when a new credit account is opened
     event OpenCreditAccount(
         address indexed creditAccount, address indexed onBehalfOf, address indexed caller, uint256 referralCode
@@ -72,10 +77,11 @@ interface ICreditFacadeV3Events {
 
     /// @notice Emitted when a multicall is finished
     event FinishMultiCall();
-}
 
-/// @title Credit facade V3 interface
-interface ICreditFacadeV3 is IACLTrait, IVersion, ICreditFacadeV3Events {
+    // ------- //
+    // GETTERS //
+    // ------- //
+
     function creditManager() external view returns (address);
 
     function underlying() external view returns (address);

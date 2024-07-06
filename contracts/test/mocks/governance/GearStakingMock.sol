@@ -9,13 +9,19 @@ import {EPOCHS_TO_WITHDRAW} from "../../../libraries/Constants.sol";
 contract GearStakingMock is IGearStakingV3 {
     uint256 public constant version = 3_10;
 
+    bytes32 public constant contractType = "GS_MOCK";
+
     uint16 public getCurrentEpoch;
+
+    uint256 public firstEpochTimestamp;
 
     function setCurrentEpoch(uint16 epoch) external {
         getCurrentEpoch = epoch;
     }
 
-    function firstEpochTimestamp() external view returns (uint256) {}
+    function setFirstEpochTimestamp(uint256 value) external {
+        firstEpochTimestamp = value;
+    }
 
     function deposit(uint96 amount, MultiVote[] calldata votes) external {}
 

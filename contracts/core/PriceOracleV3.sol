@@ -39,6 +39,9 @@ contract PriceOracleV3 is ACLTrait, PriceFeedValidationTrait, IPriceOracleV3 {
     /// @notice Contract version
     uint256 public constant override version = 3_10;
 
+    /// @notice Contract type
+    bytes32 public constant override contractType = "PO";
+
     /// @dev Mapping from token address to price feed params
     mapping(address => PriceFeedParams) internal _priceFeedsParams;
 

@@ -7,7 +7,7 @@ import {Test} from "forge-std/Test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import "../../../interfaces/IExceptions.sol";
-import {IPriceOracleV3Events, PriceFeedParams, PriceUpdate} from "../../../interfaces/IPriceOracleV3.sol";
+import {IPriceOracleV3, PriceFeedParams, PriceUpdate} from "../../../interfaces/IPriceOracleV3.sol";
 import {IPriceFeed, IUpdatablePriceFeed} from "../../../interfaces/base/IPriceFeed.sol";
 
 import {ERC20Mock} from "../../mocks/token/ERC20Mock.sol";
@@ -19,7 +19,7 @@ import {PriceOracleV3Harness} from "./PriceOracleV3Harness.sol";
 
 /// @title Price oracle V3 unit test
 /// @notice U:[PO]: Unit tests for price oracle
-contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
+contract PriceOracleV3UnitTest is Test {
     PriceOracleV3Harness priceOracle;
 
     address configurator;
@@ -127,7 +127,7 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         vm.expectCall(priceFeed, abi.encodeCall(IPriceFeed.skipPriceCheck, ()));
 
         vm.expectEmit(true, true, true, true);
-        emit SetPriceFeed(token, priceFeed, 3600, false);
+        emit IPriceOracleV3.SetPriceFeed(token, priceFeed, 3600, false);
 
         vm.prank(configurator);
         priceOracle.setPriceFeed(token, priceFeed, 3600);
@@ -151,10 +151,10 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         vm.expectCall(priceFeed, abi.encodeCall(IPriceFeed.skipPriceCheck, ()));
 
         vm.expectEmit(true, true, true, true);
-        emit SetPriceFeed(token, priceFeed, 3600, false);
+        emit IPriceOracleV3.SetPriceFeed(token, priceFeed, 3600, false);
 
         vm.expectEmit(true, true, true, true);
-        emit SetReservePriceFeed(token, address(0), 0, false);
+        emit IPriceOracleV3.SetReservePriceFeed(token, address(0), 0, false);
 
         vm.prank(configurator);
         priceOracle.setPriceFeed(token, priceFeed, 3600);
@@ -200,7 +200,7 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         vm.expectCall(reserveFeed, abi.encodeCall(IPriceFeed.skipPriceCheck, ()));
 
         vm.expectEmit(true, true, true, true);
-        emit SetReservePriceFeed(token, reserveFeed, 3600, false);
+        emit IPriceOracleV3.SetReservePriceFeed(token, reserveFeed, 3600, false);
 
         vm.prank(configurator);
         priceOracle.setReservePriceFeed(token, reserveFeed, 3600);
@@ -237,7 +237,7 @@ contract PriceOracleV3UnitTest is Test, IPriceOracleV3Events {
         priceFeed.setUpdatable(UpdatablePriceFeedMock.FlagState.TRUE);
 
         vm.expectEmit(true, true, true, true);
-        emit AddUpdatablePriceFeed(address(priceFeed));
+        emit IPriceOracleV3.AddUpdatablePriceFeed(address(priceFeed));
 
         vm.prank(configurator);
         priceOracle.addUpdatablePriceFeed(address(priceFeed));

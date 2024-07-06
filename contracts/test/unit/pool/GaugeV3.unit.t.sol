@@ -3,8 +3,8 @@
 // (c) Gearbox Foundation, 2023.
 pragma solidity ^0.8.23;
 
-import {GaugeV3Harness, QuotaRateParams, UserVotes} from "./GaugeV3Harness.sol";
-import {IGaugeV3Events, IGaugeV3} from "../../../interfaces/IGaugeV3.sol";
+import {GaugeV3Harness, QuotaRateParams, UserTokenVotes} from "./GaugeV3Harness.sol";
+import {IGaugeV3} from "../../../interfaces/IGaugeV3.sol";
 
 import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {IGearStakingV3} from "../../../interfaces/IGearStakingV3.sol";
@@ -26,7 +26,7 @@ import {TestHelper} from "../../lib/helper.sol";
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
-contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
+contract GauageV3UnitTest is TestHelper {
     address gearToken;
     address underlying;
 
@@ -64,7 +64,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
     /// @dev U:[GA-1]: constructor sets correct values
     function test_U_GA_01_constructor_sets_correct_values() public {
         vm.expectEmit(false, false, false, true);
-        emit SetFrozenEpoch(true);
+        emit IGaugeV3.SetFrozenEpoch(true);
         gauge = new GaugeV3Harness(address(addressProvider), address(poolQuotaKeeperMock), address(gearStakingMock));
 
         assertEq(gauge.quotaKeeper(), address(poolQuotaKeeperMock), "Incorrect quotaKeeper");
@@ -141,19 +141,18 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         vm.expectCall(poolQuotaKeeperMock, abi.encodeCall(IPoolQuotaKeeperV3.addQuotaToken, (token)));
 
         vm.expectEmit(true, true, false, true);
-        emit AddQuotaToken({token: token, minRate: minRate, maxRate: maxRate});
+        emit IGaugeV3.AddQuotaToken({token: token, minRate: minRate, maxRate: maxRate});
 
         vm.prank(CONFIGURATOR);
         gauge.addQuotaToken(token, minRate, maxRate);
 
-        (uint16 _minRate, uint16 _maxRate, uint96 totalVotesLpSide, uint96 totalVotesCaSide) =
-            gauge.quotaRateParams(token);
+        QuotaRateParams memory qrp = gauge.quotaRateParams(token);
 
-        assertEq(_minRate, minRate, "Incorrect minRate");
-        assertEq(_maxRate, maxRate, "Incorrect maxRate");
+        assertEq(qrp.minRate, minRate, "Incorrect minRate");
+        assertEq(qrp.maxRate, maxRate, "Incorrect maxRate");
 
-        assertEq(totalVotesLpSide, 0, "Incorrect totalVotesLpSide");
-        assertEq(totalVotesCaSide, 0, "Incorrect totalVotesCaSide");
+        assertEq(qrp.totalVotesLpSide, 0, "Incorrect totalVotesLpSide");
+        assertEq(qrp.totalVotesCaSide, 0, "Incorrect totalVotesCaSide");
 
         // must not try to add token to quota keeper in case it's already quoted
         address token2 = makeAddr("TOKEN2");
@@ -191,14 +190,14 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         });
 
         vm.expectEmit(true, true, false, true);
-        emit SetQuotaTokenParams({token: token, minRate: minRate, maxRate: 2000});
+        emit IGaugeV3.SetQuotaTokenParams({token: token, minRate: minRate, maxRate: 2000});
 
         vm.prank(CONFIGURATOR);
         gauge.changeQuotaMinRate(token, minRate);
 
-        (uint16 _minRate,,,) = gauge.quotaRateParams(token);
+        QuotaRateParams memory qrp = gauge.quotaRateParams(token);
 
-        assertEq(_minRate, minRate, "Incorrect minRate");
+        assertEq(qrp.minRate, minRate, "Incorrect minRate");
     }
 
     /// @dev U:[GA-6B]: changeQuotaMaxRate works as expected
@@ -225,14 +224,14 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         });
 
         vm.expectEmit(true, true, false, true);
-        emit SetQuotaTokenParams({token: token, minRate: 500, maxRate: maxRate});
+        emit IGaugeV3.SetQuotaTokenParams({token: token, minRate: 500, maxRate: maxRate});
 
         vm.prank(CONFIGURATOR);
         gauge.changeQuotaMaxRate(token, maxRate);
 
-        (, uint16 _maxRate,,) = gauge.quotaRateParams(token);
+        QuotaRateParams memory qrp = gauge.quotaRateParams(token);
 
-        assertEq(_maxRate, maxRate, "Incorrect maxRate");
+        assertEq(qrp.maxRate, maxRate, "Incorrect maxRate");
     }
 
     /// @dev U:[GA-8]: isTokenAdded works as expected
@@ -312,18 +311,18 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         bool lpSide = getHash(votes, 22) % 2 == 1;
 
         vm.expectEmit(true, true, false, true);
-        emit Vote(USER, token, votes, lpSide);
+        emit IGaugeV3.Vote(USER, token, votes, lpSide);
 
         gauge.vote(USER, votes, abi.encode(token, lpSide));
 
-        (,, uint96 totalVotesLpSide, uint96 totalVotesCaSide) = gauge.quotaRateParams(token);
+        QuotaRateParams memory qrp = gauge.quotaRateParams(token);
 
-        assertEq(totalVotesLpSide, 200 + (lpSide ? votes : 0), "Incorrect quotaRateParams totalVotesLpSide update");
-        assertEq(totalVotesCaSide, 200 + (lpSide ? 0 : votes), "Incorrect quotaRateParams totalVotesCaSide update");
+        assertEq(qrp.totalVotesLpSide, 200 + (lpSide ? votes : 0), "Incorrect quotaRateParams totalVotesLpSide update");
+        assertEq(qrp.totalVotesCaSide, 200 + (lpSide ? 0 : votes), "Incorrect quotaRateParams totalVotesCaSide update");
 
-        (uint96 votesLpSide, uint96 votesCaSide) = gauge.userTokenVotes(USER, token);
-        assertEq(votesLpSide, (lpSide ? votes : 0), "Incorrect userTokenVotes votesLpSide update");
-        assertEq(votesCaSide, (lpSide ? 0 : votes), "Incorrect userTokenVotes votesCaSide update");
+        UserTokenVotes memory utv = gauge.userTokenVotes(USER, token);
+        assertEq(utv.votesLpSide, (lpSide ? votes : 0), "Incorrect userTokenVotes votesLpSide update");
+        assertEq(utv.votesCaSide, (lpSide ? 0 : votes), "Incorrect userTokenVotes votesCaSide update");
     }
 
     /// @dev U:[GA-13]: unvote correctly updates votes
@@ -353,32 +352,34 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         vm.prank(address(gearStakingMock));
 
         vm.expectEmit(true, true, false, true);
-        emit Unvote(USER, token, unvote, lpSide);
+        emit IGaugeV3.Unvote(USER, token, unvote, lpSide);
 
         gauge.unvote(USER, unvote, abi.encode(token, lpSide));
 
-        (,, uint96 _totalVotesLpSide, uint96 _totalVotesCaSide) = gauge.quotaRateParams(token);
+        QuotaRateParams memory qrp = gauge.quotaRateParams(token);
 
         assertEq(
-            _totalVotesLpSide,
+            qrp.totalVotesLpSide,
             totalVotesLpSide - (lpSide ? unvote : 0),
             "Incorrect quotaRateParams totalVotesLpSide update"
         );
         assertEq(
-            _totalVotesCaSide,
+            qrp.totalVotesCaSide,
             totalVotesCaSide - (lpSide ? 0 : unvote),
             "Incorrect quotaRateParams totalVotesCaSide update"
         );
 
-        (uint96 votesLpSide, uint96 votesCaSide) = gauge.userTokenVotes(USER, token);
-        assertEq(votesLpSide, userLPVotes - (lpSide ? unvote : 0), "Incorrect userTokenVotes votesLpSide update");
-        assertEq(votesCaSide, userCaVotes - (lpSide ? 0 : unvote), "Incorrect userTokenVotes votesCaSide update");
+        UserTokenVotes memory utv = gauge.userTokenVotes(USER, token);
+        assertEq(utv.votesLpSide, userLPVotes - (lpSide ? unvote : 0), "Incorrect userTokenVotes votesLpSide update");
+        assertEq(utv.votesCaSide, userCaVotes - (lpSide ? 0 : unvote), "Incorrect userTokenVotes votesCaSide update");
     }
 
     /// @dev U:[GA-14]: updateEpoch updates epoch
     function test_U_GA_14_updateEpoch_updates_epoch() public {
         vm.prank(CONFIGURATOR);
         gauge.setFrozenEpoch(false);
+
+        gearStakingMock.setFirstEpochTimestamp(block.timestamp - 2 days);
 
         vm.mockCall(address(poolQuotaKeeperMock), abi.encodeCall(IPoolQuotaKeeperV3.updateRates, ()), "");
 
@@ -392,8 +393,10 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
                 vm.expectCall(address(poolQuotaKeeperMock), abi.encodeCall(IPoolQuotaKeeperV3.updateRates, ()));
 
                 vm.expectEmit(false, false, false, true);
-                emit UpdateEpoch(epochNow);
+                emit IGaugeV3.UpdateEpoch(epochNow);
             }
+
+            assertEq(gauge.getTimeBeforeUpdate(), i == 0 ? 5 days : 0, "Incorrect time before update");
 
             gauge.updateEpoch();
 
@@ -456,7 +459,7 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         assertEq(gauge.epochLastUpdate(), 900);
 
         vm.expectEmit(false, false, false, true);
-        emit SetFrozenEpoch(true);
+        emit IGaugeV3.SetFrozenEpoch(true);
 
         vm.prank(CONFIGURATOR);
         gauge.setFrozenEpoch(true);
@@ -471,5 +474,6 @@ contract GauageV3UnitTest is TestHelper, IGaugeV3Events {
         gauge.updateEpoch();
 
         assertEq(gauge.epochLastUpdate(), 1000);
+        assertEq(gauge.getTimeBeforeUpdate(), type(uint256).max, "Incorrect time before update");
     }
 }

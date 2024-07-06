@@ -26,7 +26,12 @@ struct PriceUpdate {
     bytes data;
 }
 
-interface IPriceOracleV3Events {
+/// @title Price oracle V3 interface
+interface IPriceOracleV3 is IACLTrait, IVersion {
+    // ------ //
+    // EVENTS //
+    // ------ //
+
     /// @notice Emitted when new price feed is set for token
     event SetPriceFeed(address indexed token, address indexed priceFeed, uint32 stalenessPeriod, bool skipCheck);
 
@@ -35,10 +40,11 @@ interface IPriceOracleV3Events {
 
     /// @notice Emitted when new updatable price feed is added
     event AddUpdatablePriceFeed(address indexed priceFeed);
-}
 
-/// @title Price oracle V3 interface
-interface IPriceOracleV3 is IACLTrait, IVersion, IPriceOracleV3Events {
+    // ------- //
+    // GETTERS //
+    // ------- //
+
     function getTokens() external view returns (address[] memory);
 
     function priceFeeds(address token) external view returns (address priceFeed);

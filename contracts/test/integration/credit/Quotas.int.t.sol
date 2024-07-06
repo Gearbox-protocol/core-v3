@@ -7,11 +7,11 @@ import "../../../interfaces/ICreditFacadeV3Multicall.sol";
 
 import {
     ICreditManagerV3,
-    ICreditManagerV3Events,
     CollateralTokenData,
     ManageDebtAction,
     CollateralCalcTask,
-    CollateralDebtData
+    CollateralDebtData,
+    CreditAccountInfo
 } from "../../../interfaces/ICreditManagerV3.sol";
 import {IPoolQuotaKeeperV3, AccountQuota} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 
@@ -36,7 +36,7 @@ import {IntegrationTestHelper} from "../../helpers/IntegrationTestHelper.sol";
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
-contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events {
+contract QuotasIntegrationTest is IntegrationTestHelper {
     using CreditLogic for CollateralDebtData;
 
     function _setQuotaParams(address token, uint16 rate, uint96 limit) internal {
@@ -63,9 +63,11 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
 
         (address creditAccount,) = _openTestCreditAccount();
 
-        (,, uint128 cumulativeQuotaInterest,,,,,) = creditManager.creditAccountInfo(creditAccount);
-
-        assertEq(cumulativeQuotaInterest, 1, "SETUP: Cumulative quota interest was not updated correctly");
+        assertEq(
+            creditManager.creditAccountInfo(creditAccount).cumulativeQuotaInterest,
+            1,
+            "SETUP: Cumulative quota interest was not updated correctly"
+        );
 
         {
             address link = tokenTestSuite.addressOf(Tokens.LINK);
@@ -121,10 +123,8 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
 
         expectTokenIsEnabled(creditAccount, tokenTestSuite.addressOf(Tokens.LINK), false, "Incorrect tokensToEnble");
 
-        (,, cumulativeQuotaInterest,,,,,) = creditManager.creditAccountInfo(creditAccount);
-
         assertEq(
-            cumulativeQuotaInterest,
+            creditManager.creditAccountInfo(creditAccount).cumulativeQuotaInterest,
             (100000 * 1000) / PERCENTAGE_FACTOR + 1,
             "Cumulative quota interest was not updated correctly"
         );
@@ -260,8 +260,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
 
         (address creditAccount,) = _openTestCreditAccount();
 
-        (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate,,,,,,) =
-            creditManager.creditAccountInfo(creditAccount);
+        CreditAccountInfo memory info = creditManager.creditAccountInfo(creditAccount);
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
@@ -290,13 +289,13 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
 
         (uint16 feeInterest,,,,) = creditManager.fees();
 
-        uint256 interestAccured = (borrowedAmount * cumulativeIndexAtClose / cumulativeIndexLastUpdate - borrowedAmount)
+        uint256 interestAccured = (info.debt * cumulativeIndexAtClose / info.cumulativeIndexLastUpdate - info.debt)
             * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR;
 
         uint256 expectedQuotasInterest = (100 * WAD * 10_00 / PERCENTAGE_FACTOR + 200 * WAD * 5_00 / PERCENTAGE_FACTOR)
             * (PERCENTAGE_FACTOR + feeInterest) / PERCENTAGE_FACTOR;
 
-        tokenTestSuite.mint(Tokens.DAI, creditAccount, borrowedAmount);
+        tokenTestSuite.mint(Tokens.DAI, creditAccount, info.debt);
 
         uint256 poolBalanceBefore = tokenTestSuite.balanceOf(Tokens.DAI, address(pool));
 
@@ -348,7 +347,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
         expectBalance(
             Tokens.DAI,
             address(pool),
-            poolBalanceBefore + borrowedAmount + interestAccured + expectedQuotasInterest,
+            poolBalanceBefore + info.debt + interestAccured + expectedQuotasInterest,
             "Incorrect pool balance"
         );
 
@@ -378,8 +377,7 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
 
         (address creditAccount,) = _openTestCreditAccount();
 
-        (uint256 borrowedAmount, uint256 cumulativeIndexLastUpdate,,,,,,) =
-            creditManager.creditAccountInfo(creditAccount);
+        CreditAccountInfo memory info = creditManager.creditAccountInfo(creditAccount);
 
         MultiCall[] memory calls = MultiCallBuilder.build(
             MultiCall({
@@ -408,10 +406,10 @@ contract QuotasIntegrationTest is IntegrationTestHelper, ICreditManagerV3Events 
         quotaLink = quotaLink > uint96(100_000 * WAD) ? uint96(100_000 * WAD) : quotaLink / 10_000 * 10_000;
         quotaUsdt = quotaUsdt > uint96(100_000 * WAD) ? uint96(100_000 * WAD) : quotaUsdt / 10_000 * 10_000;
 
-        uint256 expectedTotalDebt = (borrowedAmount * cumulativeIndexAtClose) / cumulativeIndexLastUpdate;
+        uint256 expectedTotalDebt = (info.debt * cumulativeIndexAtClose) / info.cumulativeIndexLastUpdate;
         expectedTotalDebt += (quotaLink * 1000) / PERCENTAGE_FACTOR;
         expectedTotalDebt += (quotaUsdt * 500) / PERCENTAGE_FACTOR;
-        expectedTotalDebt += (expectedTotalDebt - borrowedAmount) * feeInterest / PERCENTAGE_FACTOR;
+        expectedTotalDebt += (expectedTotalDebt - info.debt) * feeInterest / PERCENTAGE_FACTOR;
 
         CollateralDebtData memory cdd = creditManager.calcDebtAndCollateral(creditAccount, CollateralCalcTask.DEBT_ONLY);
 

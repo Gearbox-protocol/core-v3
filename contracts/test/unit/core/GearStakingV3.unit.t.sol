@@ -4,7 +4,7 @@
 pragma solidity ^0.8.23;
 
 import {GearStakingV3, EPOCH_LENGTH} from "../../../core/GearStakingV3.sol";
-import {IGearStakingV3Events, MultiVote, VotingContractStatus} from "../../../interfaces/IGearStakingV3.sol";
+import {IGearStakingV3, MultiVote, VotingContractStatus} from "../../../interfaces/IGearStakingV3.sol";
 import {IVotingContract} from "../../../interfaces/base/IVotingContract.sol";
 
 import "../../interfaces/IAddressProviderV3.sol";
@@ -25,7 +25,7 @@ import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 // EXCEPTIONS
 import "../../../interfaces/IExceptions.sol";
 
-contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
+contract GearStakingV3UnitTest is Test {
     address gearToken;
 
     AddressProviderV3ACLMock public addressProvider;
@@ -85,7 +85,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
             bool withPermit = i == 1;
 
             vm.expectEmit(true, false, false, true);
-            emit DepositGear(USER, WAD);
+            emit IGearStakingV3.DepositGear(USER, WAD);
 
             if (withPermit) {
                 vm.mockCall(
@@ -143,7 +143,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
         vm.expectCall(address(votingContract), abi.encodeCall(IVotingContract.unvote, (USER, uint96(WAD / 2), "")));
 
         vm.expectEmit(true, false, false, true);
-        emit ScheduleGearWithdrawal(USER, WAD);
+        emit IGearStakingV3.ScheduleGearWithdrawal(USER, WAD);
 
         vm.prank(USER);
         gearStaking.withdraw(uint96(WAD), FRIEND, votes);
@@ -326,7 +326,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
         vm.warp(block.timestamp + 2 * EPOCH_LENGTH);
 
         vm.expectEmit(true, false, false, true);
-        emit ClaimGearWithdrawal(USER, FRIEND, 3000);
+        emit IGearStakingV3.ClaimGearWithdrawal(USER, FRIEND, 3000);
 
         vm.prank(USER);
         gearStaking.claimWithdrawals(FRIEND);
@@ -352,7 +352,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
         vm.warp(block.timestamp + EPOCH_LENGTH);
 
         vm.expectEmit(true, false, false, true);
-        emit ClaimGearWithdrawal(USER, FRIEND, 3000);
+        emit IGearStakingV3.ClaimGearWithdrawal(USER, FRIEND, 3000);
 
         vm.prank(USER);
         gearStaking.withdraw(10000, FRIEND, votes);
@@ -380,7 +380,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
         gearStaking.setVotingContractStatus(DUMB_ADDRESS, VotingContractStatus.ALLOWED);
 
         vm.expectEmit(true, false, false, true);
-        emit SetVotingContractStatus(DUMB_ADDRESS, VotingContractStatus.UNVOTE_ONLY);
+        emit IGearStakingV3.SetVotingContractStatus(DUMB_ADDRESS, VotingContractStatus.UNVOTE_ONLY);
 
         vm.prank(CONFIGURATOR);
         gearStaking.setVotingContractStatus(DUMB_ADDRESS, VotingContractStatus.UNVOTE_ONLY);
@@ -446,7 +446,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
         vm.expectCall(newVotingContract, abi.encodeCall(IVotingContract.vote, (USER, uint96(WAD / 2), "")));
 
         vm.expectEmit(true, true, true, true);
-        emit MigrateGear(USER, address(gearStakingSuccessor), uint96(WAD / 2));
+        emit IGearStakingV3.MigrateGear(USER, address(gearStakingSuccessor), uint96(WAD / 2));
 
         vm.prank(USER);
         gearStaking.migrate(uint96(WAD / 2), votesBefore, votesAfter);
@@ -474,7 +474,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
         vm.mockCall(DUMB_ADDRESS, abi.encodeWithSignature("migrator()"), abi.encode(address(gearStaking)));
 
         vm.expectEmit(true, false, false, false);
-        emit SetSuccessor(DUMB_ADDRESS);
+        emit IGearStakingV3.SetSuccessor(DUMB_ADDRESS);
 
         vm.prank(CONFIGURATOR);
         gearStaking.setSuccessor(DUMB_ADDRESS);
@@ -488,7 +488,7 @@ contract GearStakingV3UnitTest is Test, IGearStakingV3Events {
         gearStaking.setMigrator(DUMB_ADDRESS);
 
         vm.expectEmit(true, false, false, false);
-        emit SetMigrator(DUMB_ADDRESS);
+        emit IGearStakingV3.SetMigrator(DUMB_ADDRESS);
 
         vm.prank(CONFIGURATOR);
         gearStaking.setMigrator(DUMB_ADDRESS);

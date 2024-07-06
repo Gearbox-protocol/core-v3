@@ -4,6 +4,7 @@
 pragma solidity ^0.8.23;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {MAX_WITHDRAW_FEE, RAY} from "../../../libraries/Constants.sol";
@@ -12,7 +13,7 @@ import {ICreditManagerV3} from "../../../interfaces/ICreditManagerV3.sol";
 import "../../../interfaces/IExceptions.sol";
 import {LinearInterestRateModelV3} from "../../../pool/LinearInterestRateModelV3.sol";
 import {IPoolQuotaKeeperV3} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
-import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
+import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 
 import {TokensTestSuite} from "../../suites/TokensTestSuite.sol";
 import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
@@ -25,17 +26,9 @@ import {ERC20FeeMock} from "../../mocks/token/ERC20FeeMock.sol";
 
 import {PoolV3Harness} from "./PoolV3Harness.sol";
 
-interface IERC4626Events {
-    event Deposit(address indexed sender, address indexed owner, uint256 assets, uint256 shares);
-
-    event Withdraw(
-        address indexed sender, address indexed receiver, address indexed owner, uint256 assets, uint256 shares
-    );
-}
-
 /// @title Pool V3 unit test
 /// @notice U:[LP]: Unit tests for lending pool
-contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
+contract PoolV3UnitTest is TestHelper {
     PoolV3Harness pool;
 
     // accounts
@@ -162,10 +155,10 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
     /// @notice U:[LP-1B]: Constructor sets correct values and emits events
     function test_U_LP_01B_constructor_sets_correct_values_and_emits_events() public {
         vm.expectEmit(true, false, false, false);
-        emit SetInterestRateModel({newInterestRateModel: interestRateModel});
+        emit IPoolV3.SetInterestRateModel({newInterestRateModel: interestRateModel});
 
         vm.expectEmit(false, false, false, true);
-        emit SetTotalDebtLimit({limit: 2000});
+        emit IPoolV3.SetTotalDebtLimit({limit: 2000});
 
         pool = new PoolV3Harness({
             acl: address(addressProvider),
@@ -403,10 +396,10 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
             // emits events
             vm.expectEmit(true, true, false, true);
-            emit Deposit(caller, user, cases[i].assets, cases[i].expectedShares);
+            emit IERC4626.Deposit(caller, user, cases[i].assets, cases[i].expectedShares);
 
             vm.expectEmit(true, true, false, true);
-            emit Refer(user, 123, cases[i].assets);
+            emit IPoolV3.Refer(user, 123, cases[i].assets);
 
             vm.prank(caller);
             uint256 shares = pool.depositWithReferral({assets: cases[i].assets, receiver: user, referralCode: 123});
@@ -482,10 +475,10 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
             // emits events
             vm.expectEmit(true, true, false, true);
-            emit Deposit(caller, user, cases[i].expectedAssets, cases[i].shares);
+            emit IERC4626.Deposit(caller, user, cases[i].expectedAssets, cases[i].shares);
 
             vm.expectEmit(true, true, false, true);
-            emit Refer(user, 123, cases[i].expectedAssets);
+            emit IPoolV3.Refer(user, 123, cases[i].expectedAssets);
 
             vm.prank(caller);
             uint256 assets = pool.mintWithReferral({shares: cases[i].shares, receiver: user, referralCode: 123});
@@ -580,7 +573,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
             // emits event
             vm.expectEmit(true, true, true, true);
-            emit Withdraw(user, owner, owner, cases[i].assets, cases[i].expectedShares);
+            emit IERC4626.Withdraw(user, owner, owner, cases[i].assets, cases[i].expectedShares);
 
             vm.prank(user);
             uint256 shares = pool.withdraw({assets: cases[i].assets, receiver: owner, owner: owner});
@@ -675,7 +668,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
             // emits event
             vm.expectEmit(true, true, true, true);
-            emit Withdraw(user, owner, owner, cases[i].expectedAssets, cases[i].shares);
+            emit IERC4626.Withdraw(user, owner, owner, cases[i].expectedAssets, cases[i].shares);
 
             vm.prank(user);
             uint256 assets = pool.redeem({shares: cases[i].shares, receiver: owner, owner: owner});
@@ -866,7 +859,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         vm.expectCall(address(underlying), abi.encodeCall(IERC20.transfer, (creditAccount, 300)));
 
         vm.expectEmit(true, true, false, true);
-        emit Borrow(creditManager, creditAccount, 300);
+        emit IPoolV3.Borrow(creditManager, creditAccount, 300);
 
         vm.prank(creditManager);
         pool.lendCreditAccount({borrowedAmount: 300, creditAccount: creditAccount});
@@ -881,7 +874,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         vm.expectCall(interestRateModel, abi.encodeWithSelector(calcBorrowRateSelector, 2100, 1000, false));
 
         vm.expectEmit(true, true, false, true);
-        emit Repay(creditManager, 300, 100, 0);
+        emit IPoolV3.Repay(creditManager, 300, 100, 0);
 
         vm.prank(creditManager);
         pool.repayCreditAccount({repaidAmount: 300, profit: 100, loss: 0});
@@ -897,7 +890,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         vm.expectCall(interestRateModel, abi.encodeWithSelector(calcBorrowRateSelector, 1900, 1000, false));
 
         vm.expectEmit(true, true, false, true);
-        emit Repay(creditManager, 300, 0, 100);
+        emit IPoolV3.Repay(creditManager, 300, 0, 100);
 
         vm.prank(creditManager);
         pool.repayCreditAccount({repaidAmount: 300, profit: 0, loss: 100});
@@ -915,10 +908,10 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         vm.expectEmit(true, false, false, true);
         // loss is 200 / 1.25 = 160 shares, but treasury only has 100
         // so, uncovered loss is 75 = (160 - 100) * 1.25
-        emit IncurUncoveredLoss(creditManager, 75);
+        emit IPoolV3.IncurUncoveredLoss(creditManager, 75);
 
         vm.expectEmit(true, true, false, true);
-        emit Repay(creditManager, 300, 0, 200);
+        emit IPoolV3.Repay(creditManager, 300, 0, 200);
 
         vm.prank(creditManager);
         pool.repayCreditAccount({repaidAmount: 300, profit: 0, loss: 200});
@@ -1052,7 +1045,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         vm.mockCall(newInterestRateModel, irmCallData, abi.encode(0));
 
         vm.expectEmit(true, false, false, false);
-        emit SetInterestRateModel(newInterestRateModel);
+        emit IPoolV3.SetInterestRateModel(newInterestRateModel);
 
         // implicitly test that `_updateBaseInterest` is called with correct parameters
         vm.expectCall(newInterestRateModel, irmCallData);
@@ -1110,7 +1103,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         vm.mockCall(newQuotaKeeper, abi.encodeCall(IPoolQuotaKeeperV3.pool, ()), abi.encode(address(pool)));
 
         vm.expectEmit(true, true, true, true);
-        emit SetPoolQuotaKeeper(newQuotaKeeper);
+        emit IPoolV3.SetPoolQuotaKeeper(newQuotaKeeper);
 
         vm.prank(configurator);
         pool.setPoolQuotaKeeper(newQuotaKeeper);
@@ -1122,7 +1115,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
     function test_U_LP_24_setTotalDebtLimit_works_as_expected() public {
         // case: finite limit
         vm.expectEmit(false, false, false, false);
-        emit SetTotalDebtLimit(123);
+        emit IPoolV3.SetTotalDebtLimit(123);
 
         vm.prank(configurator);
         pool.setTotalDebtLimit(123);
@@ -1131,7 +1124,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
 
         // case: no limit
         vm.expectEmit(false, false, false, false);
-        emit SetTotalDebtLimit(type(uint256).max);
+        emit IPoolV3.SetTotalDebtLimit(type(uint256).max);
 
         vm.prank(configurator);
         pool.setTotalDebtLimit(type(uint256).max);
@@ -1178,10 +1171,10 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         vm.mockCall(newCreditManager, abi.encodeCall(ICreditManagerV3.pool, ()), abi.encode(address(pool)));
 
         vm.expectEmit(true, false, false, false);
-        emit AddCreditManager(newCreditManager);
+        emit IPoolV3.AddCreditManager(newCreditManager);
 
         vm.expectEmit(true, false, false, true);
-        emit SetCreditManagerDebtLimit(newCreditManager, 123);
+        emit IPoolV3.SetCreditManagerDebtLimit(newCreditManager, 123);
 
         vm.prank(configurator);
         pool.setCreditManagerDebtLimit(newCreditManager, 123);
@@ -1196,7 +1189,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         vm.mockCallRevert(newCreditManager, abi.encodeCall(ICreditManagerV3.pool, ()), "already added");
 
         vm.expectEmit(true, false, false, true);
-        emit SetCreditManagerDebtLimit(newCreditManager, 456);
+        emit IPoolV3.SetCreditManagerDebtLimit(newCreditManager, 456);
 
         vm.prank(configurator);
         pool.setCreditManagerDebtLimit(newCreditManager, 456);
@@ -1218,7 +1211,7 @@ contract PoolV3UnitTest is TestHelper, IPoolV3Events, IERC4626Events {
         uint256 newWithdrawFee = MAX_WITHDRAW_FEE / 2;
 
         vm.expectEmit(false, false, false, true);
-        emit SetWithdrawFee(newWithdrawFee);
+        emit IPoolV3.SetWithdrawFee(newWithdrawFee);
 
         vm.prank(configurator);
         pool.setWithdrawFee(newWithdrawFee);

@@ -4,7 +4,7 @@
 pragma solidity ^0.8.23;
 
 import {BotListV3} from "../../../core/BotListV3.sol";
-import {IBotListV3Events} from "../../../interfaces/IBotListV3.sol";
+import {IBotListV3} from "../../../interfaces/IBotListV3.sol";
 
 // TEST
 import "../../lib/constants.sol";
@@ -17,7 +17,7 @@ import "../../../interfaces/IExceptions.sol";
 
 /// @title Bot list V3 unit test
 /// @notice U:[BL]: Unit tests for bot list v3
-contract BotListV3UnitTest is Test, IBotListV3Events {
+contract BotListV3UnitTest is Test {
     BotListV3 botList;
 
     address bot;
@@ -65,7 +65,7 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
         vm.expectCall(creditManager, abi.encodeWithSignature("getBorrowerOrRevert(address)", creditAccount));
 
         vm.expectEmit(true, true, true, true);
-        emit SetBotPermissions(bot, creditManager, creditAccount, 1);
+        emit IBotListV3.SetBotPermissions(bot, creditManager, creditAccount, 1);
 
         vm.prank(creditFacade);
         botList.setBotPermissions({bot: bot, creditAccount: creditAccount, permissions: 1});
@@ -104,10 +104,10 @@ contract BotListV3UnitTest is Test, IBotListV3Events {
         vm.expectCall(creditManager, abi.encodeWithSignature("getBorrowerOrRevert(address)", creditAccount));
 
         vm.expectEmit(true, true, true, true);
-        emit SetBotPermissions(otherBot, creditManager, creditAccount, 0);
+        emit IBotListV3.SetBotPermissions(otherBot, creditManager, creditAccount, 0);
 
         vm.expectEmit(true, true, true, true);
-        emit SetBotPermissions(bot, creditManager, creditAccount, 0);
+        emit IBotListV3.SetBotPermissions(bot, creditManager, creditAccount, 0);
 
         vm.prank(creditFacade);
         botList.eraseAllBotPermissions(creditAccount);

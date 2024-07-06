@@ -5,10 +5,10 @@ pragma solidity ^0.8.23;
 
 import {ICreditAccountV3} from "../../../interfaces/ICreditAccountV3.sol";
 
-import {ICreditManagerV3, ICreditManagerV3Events, ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
+import {ICreditManagerV3, ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
 import {AllowanceAction} from "../../../interfaces/ICreditConfiguratorV3.sol";
 import "../../../interfaces/ICreditFacadeV3.sol";
-import {IPoolV3Events} from "../../../interfaces/IPoolV3.sol";
+import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 
 import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 
@@ -31,14 +31,7 @@ import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
 /// @title CreditFacadeTest
 /// @notice Designed for unit test purposes only
-contract MultiCallIntegrationTest is
-    Test,
-    BalanceHelper,
-    IntegrationTestHelper,
-    ICreditManagerV3Events,
-    ICreditFacadeV3Events,
-    IPoolV3Events
-{
+contract MultiCallIntegrationTest is Test, BalanceHelper, IntegrationTestHelper {
     /// @dev I:[MC-1]: multicall reverts if borrower has no account
     function test_I_MC_01_multicall_reverts_if_credit_account_not_exists() public creditTest {
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
@@ -119,7 +112,7 @@ contract MultiCallIntegrationTest is
         );
 
         vm.expectEmit(true, true, false, true);
-        emit AddCollateral(creditAccount, usdcToken, 512);
+        emit ICreditFacadeV3.AddCollateral(creditAccount, usdcToken, 512);
 
         vm.expectCall(
             address(creditManager),
@@ -160,7 +153,7 @@ contract MultiCallIntegrationTest is
         uint256 usdcMask = creditManager.getTokenMaskOrRevert(usdcToken);
 
         vm.expectEmit(true, true, false, true);
-        emit StartMultiCall({creditAccount: creditAccount, caller: USER});
+        emit ICreditFacadeV3.StartMultiCall({creditAccount: creditAccount, caller: USER});
 
         vm.expectCall(
             address(creditManager),
@@ -168,7 +161,7 @@ contract MultiCallIntegrationTest is
         );
 
         vm.expectEmit(true, true, false, true);
-        emit AddCollateral(creditAccount, usdcToken, USDC_EXCHANGE_AMOUNT);
+        emit ICreditFacadeV3.AddCollateral(creditAccount, usdcToken, USDC_EXCHANGE_AMOUNT);
 
         vm.expectCall(
             address(creditManager),
@@ -183,10 +176,10 @@ contract MultiCallIntegrationTest is
         );
 
         vm.expectEmit(true, true, true, true, address(pool));
-        emit Borrow(address(creditManager), creditAccount, 256);
+        emit IPoolV3.Borrow(address(creditManager), creditAccount, 256);
 
         vm.expectEmit(false, false, false, true);
-        emit FinishMultiCall();
+        emit ICreditFacadeV3.FinishMultiCall();
 
         vm.expectCall(
             address(creditManager),
@@ -231,7 +224,7 @@ contract MultiCallIntegrationTest is
         uint256 usdcMask = creditManager.getTokenMaskOrRevert(usdcToken);
 
         vm.expectEmit(true, true, false, true);
-        emit StartMultiCall({creditAccount: creditAccount, caller: USER});
+        emit ICreditFacadeV3.StartMultiCall({creditAccount: creditAccount, caller: USER});
 
         vm.expectCall(
             address(creditManager),
@@ -239,7 +232,7 @@ contract MultiCallIntegrationTest is
         );
 
         vm.expectEmit(true, true, false, true);
-        emit AddCollateral(creditAccount, usdcToken, USDC_EXCHANGE_AMOUNT);
+        emit ICreditFacadeV3.AddCollateral(creditAccount, usdcToken, USDC_EXCHANGE_AMOUNT);
 
         vm.expectCall(
             address(creditManager),
@@ -254,10 +247,10 @@ contract MultiCallIntegrationTest is
         );
 
         vm.expectEmit(true, true, true, true, address(pool));
-        emit Repay(address(creditManager), 256, 0, 0);
+        emit IPoolV3.Repay(address(creditManager), 256, 0, 0);
 
         vm.expectEmit(false, false, false, true);
-        emit FinishMultiCall();
+        emit ICreditFacadeV3.FinishMultiCall();
 
         vm.expectCall(
             address(creditManager),
@@ -323,19 +316,19 @@ contract MultiCallIntegrationTest is
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount)));
 
         vm.expectEmit(true, true, false, true);
-        emit StartMultiCall({creditAccount: creditAccount, caller: USER});
+        emit ICreditFacadeV3.StartMultiCall({creditAccount: creditAccount, caller: USER});
 
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.execute, (DUMB_CALLDATA)));
 
         vm.expectEmit(true, false, false, true);
-        emit Execute(creditAccount, address(targetMock));
+        emit ICreditFacadeV3.Execute(creditAccount, address(targetMock));
 
         vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountV3.execute, (address(targetMock), DUMB_CALLDATA)));
 
         vm.expectCall(address(targetMock), DUMB_CALLDATA);
 
         vm.expectEmit(false, false, false, true);
-        emit FinishMultiCall();
+        emit ICreditFacadeV3.FinishMultiCall();
 
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (address(1))));
 

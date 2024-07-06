@@ -11,12 +11,15 @@ import {ACLTrait} from "../traits/ACLTrait.sol";
 
 import "../interfaces/IExceptions.sol";
 
-/// @title Tumbler V3
+/// @title  Tumbler V3
 /// @notice Extremely simplified version of `GaugeV3` contract for quota rates management, which,
 ///         instead of voting, allows controller to set rates directly with custom epoch length
 contract TumblerV3 is ITumblerV3, ACLTrait {
     /// @notice Contract version
     uint256 public constant override version = 3_10;
+
+    /// @notice Contract type
+    bytes32 public constant override contractType = "RK_TUMBLER";
 
     /// @notice Quota keeper rates are provided for
     address public immutable override quotaKeeper;
@@ -48,11 +51,9 @@ contract TumblerV3 is ITumblerV3, ACLTrait {
     function getRates(address[] calldata tokens) external view override returns (uint16[] memory rates) {
         uint256 len = tokens.length;
         rates = new uint16[](len);
-        unchecked {
-            for (uint256 i; i < len; ++i) {
-                if (!isTokenAdded(tokens[i])) revert TokenIsNotQuotedException();
-                rates[i] = _rates[tokens[i]];
-            }
+        for (uint256 i; i < len; ++i) {
+            if (!isTokenAdded(tokens[i])) revert TokenIsNotQuotedException();
+            rates[i] = _rates[tokens[i]];
         }
     }
 
@@ -84,8 +85,15 @@ contract TumblerV3 is ITumblerV3, ACLTrait {
     /// @dev    Reverts if caller is not controller or configurator
     /// @custom:tests U:[TU-4], I:[QR-1]
     function updateRates() external override controllerOrConfiguratorOnly {
-        if (block.timestamp < IPoolQuotaKeeperV3(quotaKeeper).lastQuotaRateUpdate() + epochLength) return;
+        if (block.timestamp < _lastQuotaRateUpdate() + epochLength) return;
         IPoolQuotaKeeperV3(quotaKeeper).updateRates();
+    }
+
+    /// @notice Returns time before the next update of rates
+    /// @custom:tests U:[TU-4]
+    function getTimeBeforeUpdate() external view override returns (uint256) {
+        uint256 nextUpdate = _lastQuotaRateUpdate() + epochLength;
+        return nextUpdate > block.timestamp ? nextUpdate - block.timestamp : 0;
     }
 
     /// @dev `setRate` implementation
@@ -94,5 +102,10 @@ contract TumblerV3 is ITumblerV3, ACLTrait {
         if (_rates[token] == rate) return;
         _rates[token] = rate;
         emit SetRate(token, rate);
+    }
+
+    /// @dev Internal wrapper for `quotaKeeper.lastQuotaRateUpdate` call to reduce contract size
+    function _lastQuotaRateUpdate() internal view returns (uint256) {
+        return IPoolQuotaKeeperV3(quotaKeeper).lastQuotaRateUpdate();
     }
 }

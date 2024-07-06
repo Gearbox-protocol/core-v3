@@ -3,9 +3,9 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.23;
 
-/// @title  Bit mask library
-/// @notice Implements functions that manipulate bit masks.
-///         Bit masks are utilized extensively by Gearbox to efficiently store token sets (enabled tokens on accounts or
+/// @title  Bitmask library
+/// @notice Implements functions that manipulate bitmasks.
+///         Bitmasks are utilized extensively by Gearbox to efficiently store token sets (enabled tokens on accounts or
 ///         forbidden tokens) and check for set inclusion. A mask is a `uint256` number that has its `i`-th bit set to `1`
 ///         if `i`-th item is included into the set. For example, each token has a mask equal to `2**i`, so set inclusion
 ///         can be checked by computing `tokenMask & setMask != 0`.
