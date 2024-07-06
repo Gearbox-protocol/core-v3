@@ -47,6 +47,9 @@ contract AccountFactoryV3 is IAccountFactoryV3, Ownable {
     /// @notice Contract version
     uint256 public constant override version = 3_10;
 
+    /// @notice Contract type
+    bytes32 public constant override contractType = "AF";
+
     /// @notice Delay after which returned credit accounts can be reused
     uint40 public constant override delay = 3 days;
 
@@ -153,8 +156,9 @@ contract AccountFactoryV3 is IAccountFactoryV3, Ownable {
         address creditManager = CreditAccountV3(creditAccount).creditManager();
         if (!_creditManagersSet.contains(creditManager)) revert CreditManagerNotAddedException();
 
-        (,,,,,,, address borrower) = ICreditManagerV3(creditManager).creditAccountInfo(creditAccount);
-        if (borrower != address(0)) revert CreditAccountIsInUseException();
+        if (ICreditManagerV3(creditManager).creditAccountInfo(creditAccount).borrower != address(0)) {
+            revert CreditAccountIsInUseException();
+        }
 
         CreditAccountV3(creditAccount).rescue(target, data);
         emit Rescue({creditAccount: creditAccount, target: target, data: data});

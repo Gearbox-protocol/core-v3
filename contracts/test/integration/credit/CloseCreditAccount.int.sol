@@ -9,7 +9,7 @@ import {BotListV3} from "../../../core/BotListV3.sol";
 
 import {ICreditAccountV3} from "../../../interfaces/ICreditAccountV3.sol";
 import {SECONDS_PER_YEAR} from "../../../libraries/Constants.sol";
-import {ICreditManagerV3, ICreditManagerV3Events, ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
+import {ICreditManagerV3, ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
 
 import "../../../interfaces/ICreditFacadeV3.sol";
 
@@ -46,7 +46,7 @@ import "forge-std/console.sol";
 uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
 uint16 constant REFERRAL_CODE = 23;
 
-contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
+contract CloseCreditAccountIntegrationTest is IntegrationTestHelper {
     /// @dev I:[CCA-1]: closeCreditAccount reverts if borrower has no account
     function test_I_CCA_01_closeCreditAccount_reverts_if_credit_account_does_not_exist() public creditTest {
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
@@ -164,12 +164,12 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount)));
 
         vm.expectEmit(true, false, false, false);
-        emit StartMultiCall({creditAccount: creditAccount, caller: USER});
+        emit ICreditFacadeV3.StartMultiCall({creditAccount: creditAccount, caller: USER});
 
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.execute, (DUMB_CALLDATA)));
 
         vm.expectEmit(true, false, false, true);
-        emit Execute(creditAccount, address(targetMock));
+        emit ICreditFacadeV3.Execute(creditAccount, address(targetMock));
 
         vm.expectCall(creditAccount, abi.encodeCall(ICreditAccountV3.execute, (address(targetMock), DUMB_CALLDATA)));
 
@@ -178,12 +178,12 @@ contract CloseCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFaca
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (address(1))));
 
         vm.expectEmit(false, false, false, true);
-        emit FinishMultiCall();
+        emit ICreditFacadeV3.FinishMultiCall();
 
         vm.expectCall(address(botList), abi.encodeCall(BotListV3.eraseAllBotPermissions, (creditAccount)));
 
         vm.expectEmit(true, true, false, false);
-        emit CloseCreditAccount(creditAccount, USER);
+        emit ICreditFacadeV3.CloseCreditAccount(creditAccount, USER);
 
         // increase block number, cause it's forbidden to close ca in the same block
         vm.roll(block.number + 1);

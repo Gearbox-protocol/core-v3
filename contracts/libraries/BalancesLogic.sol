@@ -91,7 +91,7 @@ library BalancesLogic {
 
     /// @notice Returns balances of specified tokens on the credit account
     /// @param  creditAccount Credit account to compute balances for
-    /// @param  tokensMask Bit mask of tokens to compute balances for
+    /// @param  tokensMask Bitmask of tokens to compute balances for
     /// @param  getTokenByMaskFn Function that returns token's address by its mask
     /// @custom:tests U:[BLL-4]
     function storeBalances(
@@ -118,7 +118,7 @@ library BalancesLogic {
 
     /// @notice Compares current balances of specified tokens with the previously stored ones
     /// @param  creditAccount Credit account to compare balances for
-    /// @param  tokensMask Bit mask of tokens to compare balances for
+    /// @param  tokensMask Bitmask of tokens to compare balances for
     /// @param  balances Array of previously stored balances
     /// @param  comparison Whether current balances must be greater/less than or equal to stored ones
     /// @return failedToken The first token for which the condition specified by `comparison` fails, if any

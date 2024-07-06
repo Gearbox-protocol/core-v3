@@ -20,7 +20,12 @@ struct AccountQuota {
     uint192 cumulativeIndexLU;
 }
 
-interface IPoolQuotaKeeperV3Events {
+/// @title Pool quota keeper V3 interface
+interface IPoolQuotaKeeperV3 is IACLTrait, IContractsRegisterTrait, IVersion {
+    // ------ //
+    // EVENTS //
+    // ------ //
+
     /// @notice Emitted when account's quota for a token is updated
     event UpdateQuota(address indexed creditAccount, address indexed token, int96 quotaChange);
 
@@ -41,10 +46,11 @@ interface IPoolQuotaKeeperV3Events {
 
     /// @notice Emitted when a new one-time quota increase fee is set for a token
     event SetQuotaIncreaseFee(address indexed token, uint16 fee);
-}
 
-/// @title Pool quota keeper V3 interface
-interface IPoolQuotaKeeperV3 is IACLTrait, IContractsRegisterTrait, IVersion, IPoolQuotaKeeperV3Events {
+    // ------- //
+    // GETTERS //
+    // ------- //
+
     function pool() external view returns (address);
     function underlying() external view returns (address);
     function gauge() external view returns (address);
@@ -59,6 +65,11 @@ interface IPoolQuotaKeeperV3 is IACLTrait, IContractsRegisterTrait, IVersion, IP
     function accountQuotas(address creditAccount, address token) external view returns (AccountQuota memory);
     function lastQuotaRateUpdate() external view returns (uint40);
 
+    function getQuotaAndOutstandingInterest(address creditAccount, address token)
+        external
+        view
+        returns (uint96 quoted, uint128 outstandingInterest);
+
     // ----------------- //
     // QUOTAS MANAGEMENT //
     // ----------------- //
@@ -70,11 +81,6 @@ interface IPoolQuotaKeeperV3 is IACLTrait, IContractsRegisterTrait, IVersion, IP
     function removeQuotas(address creditAccount, address[] calldata tokens, bool setLimitsToZero) external;
 
     function accrueQuotaInterest(address creditAccount, address[] calldata tokens) external;
-
-    function getQuotaAndOutstandingInterest(address creditAccount, address token)
-        external
-        view
-        returns (uint96 quoted, uint128 outstandingInterest);
 
     // ------------- //
     // CONFIGURATION //

@@ -5,15 +5,15 @@ pragma solidity ^0.8.23;
 
 import "../../interfaces/IAddressProviderV3.sol";
 
-import {IDegenNFT} from "../../../interfaces/IDegenNFT.sol";
+import {IDegenNFT} from "../../../interfaces/base/IDegenNFT.sol";
 import {IAccountFactoryV3} from "../../../interfaces/IAccountFactoryV3.sol";
 import {ICreditAccountV3} from "../../../interfaces/ICreditAccountV3.sol";
 import {
     ICreditManagerV3,
-    ICreditManagerV3Events,
     CollateralTokenData,
     ManageDebtAction,
-    CollateralDebtData
+    CollateralDebtData,
+    CreditAccountInfo
 } from "../../../interfaces/ICreditManagerV3.sol";
 
 import "../../../interfaces/ICreditFacadeV3.sol";
@@ -38,7 +38,7 @@ import {MultiCallBuilder} from "../../lib/MultiCallBuilder.sol";
 uint16 constant REFERRAL_CODE = 23;
 uint256 constant WETH_TEST_AMOUNT = 5 * WAD;
 
-contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
+contract OpenCreditAccountIntegrationTest is IntegrationTestHelper {
     using BitMask for uint256;
 
     /// @dev I:[OCA-1]: openCreditAccount transfers_tokens_from_pool
@@ -66,18 +66,16 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
 
-        (uint256 debt, uint256 cumulativeIndexLastUpdate,,,,,,) = creditManager.creditAccountInfo(creditAccount);
+        CreditAccountInfo memory info = creditManager.creditAccountInfo(creditAccount);
 
-        assertEq(debt, DAI_ACCOUNT_AMOUNT, "Incorrect borrowed amount set in CA");
-        assertEq(cumulativeIndexLastUpdate, cumulativeAtOpen, "Incorrect cumulativeIndexLastUpdate set in CA");
+        assertEq(info.debt, DAI_ACCOUNT_AMOUNT, "Incorrect borrowed amount set in CA");
+        assertEq(info.cumulativeIndexLastUpdate, cumulativeAtOpen, "Incorrect cumulativeIndexLastUpdate set in CA");
 
         expectBalance(Tokens.DAI, creditAccount, DAI_ACCOUNT_AMOUNT + DAI_ACCOUNT_AMOUNT / 2);
         // assertEq(pool.lendAmount(), DAI_ACCOUNT_AMOUNT, "Incorrect DAI_ACCOUNT_AMOUNT in Pool call");
         // assertEq(pool.lendAccount(), creditAccount, "Incorrect credit account in lendCreditAccount call");
         // assertEq(creditManager.creditAccounts(USER), creditAccount, "Credit account is not associated with user");
-        assertEq(
-            creditManager.enabledTokensMaskOf(creditAccount), UNDERLYING_TOKEN_MASK, "Incorrect enabled token mask"
-        );
+        assertEq(info.enabledTokensMask, UNDERLYING_TOKEN_MASK, "Incorrect enabled token mask");
     }
 
     /// @dev I:[OCA-2]: openCreditAccount reverts if user has no NFT for degen mode
@@ -206,10 +204,10 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.openCreditAccount, (FRIEND)));
 
         vm.expectEmit(true, true, false, true);
-        emit OpenCreditAccount(expectedCreditAccountAddress, FRIEND, USER, REFERRAL_CODE);
+        emit ICreditFacadeV3.OpenCreditAccount(expectedCreditAccountAddress, FRIEND, USER, REFERRAL_CODE);
 
         vm.expectEmit(true, false, false, false);
-        emit StartMultiCall({creditAccount: expectedCreditAccountAddress, caller: USER});
+        emit ICreditFacadeV3.StartMultiCall({creditAccount: expectedCreditAccountAddress, caller: USER});
 
         vm.expectCall(
             address(creditManager),
@@ -219,10 +217,10 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         );
 
         vm.expectEmit(true, true, false, true);
-        emit AddCollateral(expectedCreditAccountAddress, underlying, DAI_ACCOUNT_AMOUNT);
+        emit ICreditFacadeV3.AddCollateral(expectedCreditAccountAddress, underlying, DAI_ACCOUNT_AMOUNT);
 
         vm.expectEmit(false, false, false, true);
-        emit FinishMultiCall();
+        emit ICreditFacadeV3.FinishMultiCall();
 
         vm.expectCall(
             address(creditManager),
@@ -354,14 +352,12 @@ contract OpenCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacad
         vm.prank(USER);
         address creditAccount = creditFacade.openCreditAccount(USER, calls, 0);
 
-        (uint256 debt,,,,,,,) = creditManager.creditAccountInfo(creditAccount);
+        CreditAccountInfo memory info = creditManager.creditAccountInfo(creditAccount);
 
-        assertEq(debt, 0, "Incorrect borrowed amount set in CA");
+        assertEq(info.debt, 0, "Incorrect borrowed amount set in CA");
 
         expectBalance(Tokens.DAI, creditAccount, 0);
 
-        assertEq(
-            creditManager.enabledTokensMaskOf(creditAccount), UNDERLYING_TOKEN_MASK, "Incorrect enabled token mask"
-        );
+        assertEq(info.enabledTokensMask, UNDERLYING_TOKEN_MASK, "Incorrect enabled token mask");
     }
 }

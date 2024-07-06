@@ -9,7 +9,12 @@ import {IACLTrait} from "./base/IACLTrait.sol";
 import {IContractsRegisterTrait} from "../interfaces/base/IContractsRegisterTrait.sol";
 import {IVersion} from "./base/IVersion.sol";
 
-interface IPoolV3Events {
+/// @title Pool V3 interface
+interface IPoolV3 is IACLTrait, IContractsRegisterTrait, IVersion, IERC4626, IERC20Permit {
+    // ------ //
+    // EVENTS //
+    // ------ //
+
     /// @notice Emitted when depositing liquidity with referral code
     event Refer(address indexed onBehalfOf, uint256 indexed referralCode, uint256 amount);
 
@@ -39,10 +44,11 @@ interface IPoolV3Events {
 
     /// @notice Emitted when new withdrawal fee is set
     event SetWithdrawFee(uint256 fee);
-}
 
-/// @title Pool V3 interface
-interface IPoolV3 is IACLTrait, IContractsRegisterTrait, IVersion, IPoolV3Events, IERC4626, IERC20Permit {
+    // ------- //
+    // GENERAL //
+    // ------- //
+
     function underlyingToken() external view returns (address);
 
     function treasury() external view returns (address);

@@ -64,7 +64,7 @@ import {Tokens} from "@gearbox-protocol/sdk-gov/contracts/Tokens.sol";
 
 uint16 constant REFERRAL_CODE = 23;
 
-contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Events {
+contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper {
     using BitMask for uint256;
 
     IAddressProviderV3 addressProvider;
@@ -373,13 +373,13 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         vm.expectCall(address(creditManagerMock), abi.encodeCall(ICreditManagerV3.openCreditAccount, (FRIEND)));
 
         vm.expectEmit(true, true, true, true);
-        emit OpenCreditAccount(expectedCreditAccount, FRIEND, USER, REFERRAL_CODE);
+        emit ICreditFacadeV3.OpenCreditAccount(expectedCreditAccount, FRIEND, USER, REFERRAL_CODE);
 
         vm.expectEmit(true, true, false, false);
-        emit StartMultiCall({creditAccount: expectedCreditAccount, caller: USER});
+        emit ICreditFacadeV3.StartMultiCall({creditAccount: expectedCreditAccount, caller: USER});
 
         vm.expectEmit(true, false, false, false);
-        emit FinishMultiCall();
+        emit ICreditFacadeV3.FinishMultiCall();
 
         vm.expectCall(
             address(creditManagerMock),
@@ -441,7 +441,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         }
 
         vm.expectEmit(true, true, true, true);
-        emit CloseCreditAccount(creditAccount, USER);
+        emit ICreditFacadeV3.CloseCreditAccount(creditAccount, USER);
 
         vm.prank(USER);
         creditFacade.closeCreditAccount({creditAccount: creditAccount, calls: calls});
@@ -631,7 +631,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         );
 
         vm.expectEmit(true, true, true, true);
-        emit LiquidateCreditAccount(creditAccount, LIQUIDATOR, FRIEND, 123);
+        emit ICreditFacadeV3.LiquidateCreditAccount(creditAccount, LIQUIDATOR, FRIEND, 123);
 
         vm.prank(LIQUIDATOR);
         uint256 loss = creditFacade.liquidateCreditAccount({
@@ -714,10 +714,13 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
             );
 
             vm.expectEmit(true, true, false, false);
-            emit StartMultiCall({creditAccount: creditAccount, caller: botMulticallCase ? address(this) : USER});
+            emit ICreditFacadeV3.StartMultiCall({
+                creditAccount: creditAccount,
+                caller: botMulticallCase ? address(this) : USER
+            });
 
             vm.expectEmit(true, false, false, false);
-            emit FinishMultiCall();
+            emit ICreditFacadeV3.FinishMultiCall();
 
             if (botMulticallCase) {
                 creditFacade.botMulticall(creditAccount, calls);
@@ -1097,7 +1100,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         );
 
         vm.expectEmit(true, true, true, true);
-        emit AddCollateral(creditAccount, token, amount);
+        emit ICreditFacadeV3.AddCollateral(creditAccount, token, amount);
 
         creditFacade.multicallInt({
             creditAccount: creditAccount,
@@ -1140,7 +1143,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         );
 
         vm.expectEmit(true, true, true, true);
-        emit AddCollateral(creditAccount, address(token), amount);
+        emit ICreditFacadeV3.AddCollateral(creditAccount, address(token), amount);
 
         vm.prank(user);
         creditFacade.multicallInt({
@@ -1394,7 +1397,7 @@ contract CreditFacadeV3UnitTest is TestHelper, BalanceHelper, ICreditFacadeV3Eve
         );
 
         vm.expectEmit(true, true, false, true);
-        emit WithdrawCollateral(creditAccount, link, amount, USER);
+        emit ICreditFacadeV3.WithdrawCollateral(creditAccount, link, amount, USER);
 
         vm.expectCall(
             address(creditManagerMock),

@@ -5,7 +5,7 @@ pragma solidity ^0.8.23;
 
 import {CreditAccountV3} from "../../../credit/CreditAccountV3.sol";
 import {CreditAccountInfo, CreditManagerV3} from "../../../credit/CreditManagerV3.sol";
-import {IAccountFactoryV3Events} from "../../../interfaces/IAccountFactoryV3.sol";
+import {IAccountFactoryV3} from "../../../interfaces/IAccountFactoryV3.sol";
 import {
     CallerNotCreditManagerException,
     CreditAccountIsInUseException,
@@ -20,7 +20,7 @@ import {AccountFactoryV3Harness, FactoryParams, QueuedAccount} from "./AccountFa
 
 /// @title Account factory V3 unit test
 /// @notice U:[AF]: Unit tests for account factory
-contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
+contract AccountFactoryV3UnitTest is TestHelper {
     AccountFactoryV3Harness accountFactory;
 
     address configurator;
@@ -71,10 +71,10 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
         }
 
         vm.expectEmit(false, true, false, false);
-        emit DeployCreditAccount(address(0), creditManager);
+        emit IAccountFactoryV3.DeployCreditAccount(address(0), creditManager);
 
         vm.expectEmit(false, true, false, false);
-        emit TakeCreditAccount(address(0), creditManager);
+        emit IAccountFactoryV3.TakeCreditAccount(address(0), creditManager);
 
         vm.prank(creditManager);
         address creditAccount = accountFactory.takeCreditAccount(0, 0);
@@ -100,7 +100,7 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
         accountFactory.setQueuedAccount(creditManager, head, creditAccount, uint40(block.timestamp - 1));
 
         vm.expectEmit(true, true, false, false);
-        emit TakeCreditAccount(creditAccount, creditManager);
+        emit IAccountFactoryV3.TakeCreditAccount(creditAccount, creditManager);
 
         vm.prank(creditManager);
         address result = accountFactory.takeCreditAccount(0, 0);
@@ -115,7 +115,7 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
         accountFactory.setFactoryParams(creditManager, fp.masterCreditAccount, fp.head, tail);
 
         vm.expectEmit(true, true, false, false);
-        emit ReturnCreditAccount(creditAccount, creditManager);
+        emit IAccountFactoryV3.ReturnCreditAccount(creditAccount, creditManager);
 
         vm.prank(creditManager);
         accountFactory.returnCreditAccount(creditAccount);
@@ -148,7 +148,7 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
         assertEq(accountFactory.creditManagers().length, 1, "[before] Incorrect number of added credit managers");
 
         vm.expectEmit(true, false, false, false);
-        emit AddCreditManager(manager, address(0));
+        emit IAccountFactoryV3.AddCreditManager(manager, address(0));
 
         vm.prank(configurator);
         accountFactory.addCreditManager(manager);
@@ -209,7 +209,7 @@ contract AccountFactoryV3UnitTest is TestHelper, IAccountFactoryV3Events {
         vm.mockCall(creditAccount, abi.encodeCall(CreditAccountV3(creditAccount).rescue, (target, data)), bytes(""));
 
         vm.expectEmit(true, true, true, true);
-        emit Rescue(creditAccount, target, data);
+        emit IAccountFactoryV3.Rescue(creditAccount, target, data);
 
         vm.expectCall(creditAccount, abi.encodeCall(CreditAccountV3(creditAccount).rescue, (target, data)));
         vm.prank(configurator);

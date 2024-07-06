@@ -26,6 +26,7 @@ import {IInterestRateModel} from "../interfaces/base/IInterestRateModel.sol";
 import {CreditLogic} from "../libraries/CreditLogic.sol";
 import {ACLTrait} from "../traits/ACLTrait.sol";
 import {ContractsRegisterTrait} from "../traits/ContractsRegisterTrait.sol";
+import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
 
 // CONSTANTS
 import {RAY, MAX_WITHDRAW_FEE, PERCENTAGE_FACTOR} from "../libraries/Constants.sol";
@@ -48,7 +49,7 @@ struct DebtParams {
 ///         (nearly all tokens with decimals between 6 and 18 work)
 /// @dev To prevent the first depositor front-running attack, small amount of shares must be minted to some
 ///      dead address before allowing borrowing
-contract PoolV3 is ERC4626, ERC20Permit, ACLTrait, ContractsRegisterTrait, IPoolV3 {
+contract PoolV3 is ERC4626, ERC20Permit, ACLTrait, ContractsRegisterTrait, ReentrancyGuardTrait, IPoolV3 {
     using Math for uint256;
     using SafeCast for int256;
     using SafeCast for uint256;
@@ -144,6 +145,12 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLTrait, ContractsRegisterTrait, IPool
         _setTotalDebtLimit(totalDebtLimit_); // U:[LP-1B]
     }
 
+    /// @notice Contract type
+    /// @dev Not using state variable to allow derived contracts to override this
+    function contractType() external view virtual override returns (bytes32) {
+        return "LP";
+    }
+
     /// @notice Pool's underlying token, same as `asset()`
     /// @dev Exists for backward compatibility
     function underlyingToken() external view override returns (address) {
@@ -197,6 +204,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLTrait, ContractsRegisterTrait, IPool
         nonZeroAddress(receiver) // U:[LP-5]
         returns (uint256 shares)
     {
+        if (assets == 0) return 0;
         uint256 assetsReceived = _amountMinusFee(assets); // U:[LP-6]
         shares = _convertToShares(assetsReceived, Math.Rounding.Down); // U:[LP-6]
         _deposit(receiver, assets, assetsReceived, shares); // U:[LP-6]
@@ -208,6 +216,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLTrait, ContractsRegisterTrait, IPool
         override
         returns (uint256 shares)
     {
+        if (assets == 0) return 0;
         shares = deposit(assets, receiver); // U:[LP-2A,2B,5,6]
         emit Refer(receiver, referralCode, assets); // U:[LP-6]
     }
@@ -224,6 +233,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLTrait, ContractsRegisterTrait, IPool
         nonZeroAddress(receiver) // U:[LP-5]
         returns (uint256 assets)
     {
+        if (shares == 0) return 0;
         uint256 assetsReceived = _convertToAssets(shares, Math.Rounding.Up); // U:[LP-7]
         assets = _amountWithFee(assetsReceived); // U:[LP-7]
         _deposit(receiver, assets, assetsReceived, shares); // U:[LP-7]
@@ -235,6 +245,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLTrait, ContractsRegisterTrait, IPool
         override
         returns (uint256 assets)
     {
+        if (shares == 0) return 0;
         assets = mint(shares, receiver); // U:[LP-2A,2B,5,7]
         emit Refer(receiver, referralCode, assets); // U:[LP-7]
     }
@@ -252,6 +263,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLTrait, ContractsRegisterTrait, IPool
         nonZeroAddress(receiver) // U:[LP-5]
         returns (uint256 shares)
     {
+        if (assets == 0) return 0;
         uint256 assetsToUser = _amountWithFee(assets);
         uint256 assetsSent = _amountWithWithdrawalFee(assetsToUser); // U:[LP-8]
         shares = _convertToShares(assetsSent, Math.Rounding.Up); // U:[LP-8]
@@ -271,6 +283,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLTrait, ContractsRegisterTrait, IPool
         nonZeroAddress(receiver) // U:[LP-5]
         returns (uint256 assets)
     {
+        if (shares == 0) return 0;
         uint256 assetsSent = _convertToAssets(shares, Math.Rounding.Down); // U:[LP-9]
         uint256 assetsToUser = _amountMinusWithdrawalFee(assetsSent);
         assets = _amountMinusFee(assetsToUser); // U:[LP-9]

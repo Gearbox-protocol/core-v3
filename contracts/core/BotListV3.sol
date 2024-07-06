@@ -18,12 +18,15 @@ import {
 import {IBot} from "../interfaces/base/IBot.sol";
 
 /// @title  Bot list V3
-/// @notice Stores bot permissions (bit masks dictating which actions can be performed with credit accounts in multicall).
+/// @notice Stores bot permissions (bitmasks dictating which actions can be performed with credit accounts in multicall).
 contract BotListV3 is IBotListV3, Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice Contract version
     uint256 public constant override version = 3_10;
+
+    /// @notice Contract type
+    bytes32 public constant override contractType = "BL";
 
     /// @dev Mapping (credit manager, credit account) => set of bots with non-zero permissions
     mapping(address => mapping(address => EnumerableSet.AddressSet)) internal _activeBots;

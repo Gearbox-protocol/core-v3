@@ -4,12 +4,7 @@
 pragma solidity ^0.8.23;
 
 import {ICreditAccountV3} from "../../../interfaces/ICreditAccountV3.sol";
-import {
-    CollateralCalcTask,
-    ICreditManagerV3,
-    ICreditManagerV3Events,
-    ManageDebtAction
-} from "../../../interfaces/ICreditManagerV3.sol";
+import {CollateralCalcTask, ICreditManagerV3, ManageDebtAction} from "../../../interfaces/ICreditManagerV3.sol";
 import {IPriceOracleV3, PriceUpdate} from "../../../interfaces/IPriceOracleV3.sol";
 
 import "../../../interfaces/ICreditFacadeV3.sol";
@@ -25,7 +20,7 @@ import "../../../interfaces/IExceptions.sol";
 // MOCKS
 import {AdapterMock} from "../../mocks/core/AdapterMock.sol";
 
-contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICreditFacadeV3Events {
+contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper {
     /// @dev I:[LCA-1]: liquidateCreditAccount reverts if borrower has no account
     function test_I_LCA_01_liquidateCreditAccount_reverts_if_credit_account_not_exists() public creditTest {
         vm.expectRevert(CreditAccountDoesNotExistException.selector);
@@ -74,7 +69,7 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
         );
 
         vm.expectEmit(true, false, false, false);
-        emit StartMultiCall({creditAccount: creditAccount, caller: LIQUIDATOR});
+        emit ICreditFacadeV3.StartMultiCall({creditAccount: creditAccount, caller: LIQUIDATOR});
 
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (creditAccount)));
 
@@ -85,15 +80,15 @@ contract LiquidateCreditAccountIntegrationTest is IntegrationTestHelper, ICredit
         vm.expectCall(address(targetMock), DUMB_CALLDATA);
 
         vm.expectEmit(true, false, false, false);
-        emit Execute(creditAccount, address(targetMock));
+        emit ICreditFacadeV3.Execute(creditAccount, address(targetMock));
 
         vm.expectCall(address(creditManager), abi.encodeCall(ICreditManagerV3.setActiveCreditAccount, (address(1))));
 
         vm.expectEmit(false, false, false, false);
-        emit FinishMultiCall();
+        emit ICreditFacadeV3.FinishMultiCall();
 
         vm.expectEmit(true, true, true, true);
-        emit LiquidateCreditAccount(creditAccount, LIQUIDATOR, FRIEND, 0);
+        emit ICreditFacadeV3.LiquidateCreditAccount(creditAccount, LIQUIDATOR, FRIEND, 0);
 
         vm.prank(LIQUIDATOR);
         creditFacade.liquidateCreditAccount(creditAccount, FRIEND, calls);

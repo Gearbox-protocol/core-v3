@@ -6,9 +6,7 @@ pragma solidity ^0.8.23;
 import "../../interfaces/IAddressProviderV3.sol";
 import {AddressProviderV3ACLMock} from "../../mocks/core/AddressProviderV3ACLMock.sol";
 
-import {
-    IPoolQuotaKeeperV3, IPoolQuotaKeeperV3Events, TokenQuotaParams
-} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
+import {IPoolQuotaKeeperV3, TokenQuotaParams} from "../../../interfaces/IPoolQuotaKeeperV3.sol";
 import {IGaugeV3} from "../../../interfaces/IGaugeV3.sol";
 import {IPoolV3} from "../../../interfaces/IPoolV3.sol";
 
@@ -37,7 +35,7 @@ import "../../../interfaces/IExceptions.sol";
 
 import {TestHelper} from "../../lib/helper.sol";
 
-contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeeperV3Events {
+contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper {
     using Math for uint256;
 
     AddressProviderV3ACLMock addressProvider;
@@ -157,7 +155,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         assertEq(tokens.length, 0, "SETUP: tokens set unexpectedly has tokens");
 
         vm.expectEmit(true, true, false, false);
-        emit AddQuotaToken(DUMB_ADDRESS);
+        emit IPoolQuotaKeeperV3.AddQuotaToken(DUMB_ADDRESS);
 
         vm.prank(gauge);
         pqk.addQuotaToken(DUMB_ADDRESS);
@@ -239,10 +237,10 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
             vm.expectCall(address(gaugeMock), abi.encodeCall(IGaugeV3.getRates, tokens));
 
             vm.expectEmit(true, true, false, true);
-            emit UpdateTokenQuotaRate(DAI, DAI_QUOTA_RATE);
+            emit IPoolQuotaKeeperV3.UpdateTokenQuotaRate(DAI, DAI_QUOTA_RATE);
 
             vm.expectEmit(true, true, false, true);
-            emit UpdateTokenQuotaRate(USDC, USDC_QUOTA_RATE);
+            emit IPoolQuotaKeeperV3.UpdateTokenQuotaRate(USDC, USDC_QUOTA_RATE);
 
             uint256 expectedQuotaRevenue =
                 (DAI_QUOTA_RATE * uint96(daiQuota) + USDC_QUOTA_RATE * uint96(usdcQuota)) / PERCENTAGE_FACTOR;
@@ -289,7 +287,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         gaugeMock = new GaugeMock(address(addressProvider), address(pqk));
 
         vm.expectEmit(true, true, false, false);
-        emit SetGauge(address(gaugeMock));
+        emit IPoolQuotaKeeperV3.SetGauge(address(gaugeMock));
 
         pqk.setGauge(address(gaugeMock));
         assertEq(pqk.gauge(), address(gaugeMock), "gauge address wasnt updated");
@@ -313,7 +311,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         pqk.addCreditManager(DUMB_ADDRESS);
 
         vm.expectEmit(true, true, false, false);
-        emit AddCreditManager(address(creditManagerMock));
+        emit IPoolQuotaKeeperV3.AddCreditManager(address(creditManagerMock));
 
         pqk.addCreditManager(address(creditManagerMock));
 
@@ -347,7 +345,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         gaugeMock.addQuotaToken(DUMB_ADDRESS, 11);
 
         vm.expectEmit(true, true, false, true);
-        emit SetTokenLimit(DUMB_ADDRESS, limit);
+        emit IPoolQuotaKeeperV3.SetTokenLimit(DUMB_ADDRESS, limit);
 
         pqk.setTokenLimit(DUMB_ADDRESS, limit);
 
@@ -372,7 +370,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
         gaugeMock.addQuotaToken(DUMB_ADDRESS, 11);
 
         vm.expectEmit(true, true, false, true);
-        emit SetQuotaIncreaseFee(DUMB_ADDRESS, fee);
+        emit IPoolQuotaKeeperV3.SetQuotaIncreaseFee(DUMB_ADDRESS, fee);
 
         pqk.setTokenQuotaIncreaseFee(DUMB_ADDRESS, fee);
 
@@ -564,7 +562,7 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
 
             if (_case.expectedRealQuotaChange != 0) {
                 vm.expectEmit(true, true, false, false);
-                emit UpdateQuota(creditAccount, token, _case.expectedRealQuotaChange);
+                emit IPoolQuotaKeeperV3.UpdateQuota(creditAccount, token, _case.expectedRealQuotaChange);
             }
 
             vm.prank(address(creditManagerMock));
@@ -705,12 +703,12 @@ contract PoolQuotaKeeperV3UnitTest is TestHelper, BalanceHelper, IPoolQuotaKeepe
 
             if (cases[i].token1Quota != 0) {
                 vm.expectEmit(true, true, false, false);
-                emit UpdateQuota(creditAccount, token1, -int96(cases[i].token1Quota));
+                emit IPoolQuotaKeeperV3.UpdateQuota(creditAccount, token1, -int96(cases[i].token1Quota));
             }
 
             if (cases[i].token2Quota != 0) {
                 vm.expectEmit(true, true, false, false);
-                emit UpdateQuota(creditAccount, token2, -int96(cases[i].token1Quota));
+                emit IPoolQuotaKeeperV3.UpdateQuota(creditAccount, token2, -int96(cases[i].token1Quota));
             }
 
             vm.prank(address(creditManagerMock));

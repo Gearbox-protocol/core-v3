@@ -21,6 +21,8 @@ contract CreditAccountMock is ICreditAccountV3, CreditAccountMockEvents {
     // Contract version
     uint256 public constant version = 3_00;
 
+    bytes32 public constant contractType = "CA_MOCK";
+
     bytes public return_executeResult;
 
     mapping(address => mapping(address => bool)) public revertsOnTransfer;

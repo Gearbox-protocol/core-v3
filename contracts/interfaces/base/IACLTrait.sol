@@ -3,13 +3,14 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.23;
 
-interface IACLTraitEvents {
+interface IACLTrait {
     /// @notice Emitted when new external controller is set
     event NewController(address indexed newController);
-}
 
-interface IACLTrait is IACLTraitEvents {
     function acl() external view returns (address);
     function controller() external view returns (address);
     function setController(address) external;
+
+    function pause() external;
+    function unpause() external;
 }

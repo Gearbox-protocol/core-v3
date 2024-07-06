@@ -22,10 +22,10 @@ import {
     ICreditManagerV3,
     ManageDebtAction
 } from "../interfaces/ICreditManagerV3.sol";
-import {IDegenNFT} from "../interfaces/IDegenNFT.sol";
 import "../interfaces/IExceptions.sol";
 import {IPoolV3} from "../interfaces/IPoolV3.sol";
 import {IPriceOracleV3, PriceUpdate} from "../interfaces/IPriceOracleV3.sol";
+import {IDegenNFT} from "../interfaces/base/IDegenNFT.sol";
 import {IWETH} from "../interfaces/external/IWETH.sol";
 
 // LIBRARIES
@@ -40,6 +40,7 @@ import {
 
 // TRAITS
 import {ACLTrait} from "../traits/ACLTrait.sol";
+import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
 
 /// @title Credit facade V3
 /// @notice Provides a user interface to open, close and liquidate leveraged positions in the credit manager,
@@ -57,7 +58,7 @@ import {ACLTrait} from "../traits/ACLTrait.sol";
 ///         - policies on how liquidations with loss are performed
 ///         - forbidden tokens (they count towards account value, but having them enabled as collateral restricts allowed
 ///         actions and triggers a safer version of collateral check, incentivizing users to decrease exposure to them).
-contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
+contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait, ReentrancyGuardTrait {
     using Address for address;
     using BitMask for uint256;
     using SafeERC20 for IERC20;
@@ -65,6 +66,9 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
 
     /// @notice Contract version
     uint256 public constant override version = 3_10;
+
+    /// @notice Contract type
+    bytes32 public constant override contractType = "CF";
 
     /// @notice Maximum quota size, as a multiple of `maxDebt`
     uint256 public constant override maxQuotaMultiplier = 2;
@@ -105,7 +109,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
     /// @notice Credit account debt limits packed into a single slot
     DebtLimits public override debtLimits;
 
-    /// @notice Bit mask encoding a set of forbidden tokens
+    /// @notice Bitmask encoding a set of forbidden tokens
     uint256 public override forbiddenTokenMask;
 
     /// @notice Contract that enforces a policy on how liquidations with loss are performed
@@ -654,6 +658,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
 
     /// @dev `ICreditFacadeV3Multicall.addCollateral` implementation
     function _addCollateral(address creditAccount, address token, uint256 amount) internal {
+        if (amount == 0) return;
         ICreditManagerV3(creditManager).addCollateral({
             payer: msg.sender,
             creditAccount: creditAccount,
@@ -668,6 +673,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
     function _addCollateralWithPermit(address creditAccount, bytes calldata callData) internal {
         (address token, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s) =
             abi.decode(callData, (address, uint256, uint256, uint8, bytes32, bytes32)); // U:[FA-26B]
+        if (amount == 0) return;
 
         // `token` is only validated later in `addCollateral`, but to benefit off of it the attacker would have to make
         // it recognizable as collateral in the credit manager, which requires gaining configurator access rights
@@ -680,6 +686,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
     function _manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)
         internal
     {
+        if (amount == 0) return;
         if (action == ManageDebtAction.INCREASE_DEBT) {
             _revertIfOutOfDebtPerBlockLimit(amount); // U:[FA-28]
         }
@@ -701,6 +708,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
 
         if (token == underlying) revert TokenIsNotQuotedException(); // U:[FA-34]
 
+        if (quotaChange == 0) return (enabledTokensMask, forbiddenTokensMask);
         if (quotaChange > 0) {
             forbiddenTokensMask = _forbiddenTokensMaskRoE(forbiddenTokensMask);
             if (forbiddenTokensMask != 0 && _getTokenMaskOrRevert(token) & forbiddenTokensMask != 0) {
@@ -723,6 +731,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait {
 
     /// @dev `ICreditFacadeV3Multicall.withdrawCollateral` implementation
     function _withdrawCollateral(address creditAccount, address token, uint256 amount, address to) internal {
+        if (amount == 0) return;
         if (amount == type(uint256).max) {
             amount = IERC20(token).safeBalanceOf(creditAccount);
             if (amount <= 1) return;

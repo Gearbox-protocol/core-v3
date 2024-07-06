@@ -7,7 +7,24 @@ import {IACLTrait} from "./base/IACLTrait.sol";
 import {IRateKeeper} from "./base/IRateKeeper.sol";
 import {IVotingContract} from "./base/IVotingContract.sol";
 
-interface IGaugeV3Events {
+struct QuotaRateParams {
+    uint16 minRate;
+    uint16 maxRate;
+    uint96 totalVotesLpSide;
+    uint96 totalVotesCaSide;
+}
+
+struct UserTokenVotes {
+    uint96 votesLpSide;
+    uint96 votesCaSide;
+}
+
+/// @title Gauge V3 interface
+interface IGaugeV3 is IACLTrait, IVotingContract, IRateKeeper {
+    // ------ //
+    // EVENTS //
+    // ------ //
+
     /// @notice Emitted when epoch is updated
     event UpdateEpoch(uint16 epochNow);
 
@@ -25,10 +42,11 @@ interface IGaugeV3Events {
 
     /// @notice Emitted when the frozen epoch status changes
     event SetFrozenEpoch(bool status);
-}
 
-/// @title Gauge V3 interface
-interface IGaugeV3 is IACLTrait, IVotingContract, IRateKeeper, IGaugeV3Events {
+    // ------- //
+    // GETTERS //
+    // ------- //
+
     function voter() external view returns (address);
 
     function updateEpoch() external;
@@ -37,19 +55,9 @@ interface IGaugeV3 is IACLTrait, IVotingContract, IRateKeeper, IGaugeV3Events {
 
     function getRates(address[] calldata tokens) external view override returns (uint16[] memory);
 
-    function vote(address user, uint96 votes, bytes calldata extraData) external override;
+    function userTokenVotes(address user, address token) external view returns (UserTokenVotes memory);
 
-    function unvote(address user, uint96 votes, bytes calldata extraData) external override;
-
-    function userTokenVotes(address user, address token)
-        external
-        view
-        returns (uint96 votesLpSide, uint96 votesCaSide);
-
-    function quotaRateParams(address token)
-        external
-        view
-        returns (uint16 minRate, uint16 maxRate, uint96 totalVotesLpSide, uint96 totalVotesCaSide);
+    function quotaRateParams(address token) external view returns (QuotaRateParams memory);
 
     // ------------- //
     // CONFIGURATION //

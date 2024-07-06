@@ -3,8 +3,8 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.23;
 
-import {IContractsRegister} from "../interfaces/IContractsRegister.sol";
 import {RegisteredCreditManagerOnlyException, RegisteredPoolOnlyException} from "../interfaces/IExceptions.sol";
+import {IContractsRegister} from "../interfaces/base/IContractsRegister.sol";
 import {IContractsRegisterTrait} from "../interfaces/base/IContractsRegisterTrait.sol";
 
 import {SanityCheckTrait} from "./SanityCheckTrait.sol";

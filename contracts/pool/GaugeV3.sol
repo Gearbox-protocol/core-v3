@@ -3,27 +3,15 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.23;
 
-import {IGaugeV3} from "../interfaces/IGaugeV3.sol";
+import {IGaugeV3, QuotaRateParams, UserTokenVotes} from "../interfaces/IGaugeV3.sol";
 import {IGearStakingV3} from "../interfaces/IGearStakingV3.sol";
 import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
+
+import {EPOCH_LENGTH} from "../libraries/Constants.sol";
 
 import {ACLTrait} from "../traits/ACLTrait.sol";
 
 import "../interfaces/IExceptions.sol";
-
-/// @dev Stores token quota rate params
-struct QuotaRateParams {
-    uint16 minRate;
-    uint16 maxRate;
-    uint96 totalVotesLpSide;
-    uint96 totalVotesCaSide;
-}
-
-/// @dev Stores user's votes for a particular token
-struct UserVotes {
-    uint96 votesLpSide;
-    uint96 votesCaSide;
-}
 
 /// @title  Gauge V3
 /// @notice In Gearbox V3, quota rates are determined by GEAR holders that vote to move the rate within a given range.
@@ -37,14 +25,17 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
     /// @notice Contract version
     uint256 public constant override version = 3_10;
 
+    /// @notice Contract type
+    bytes32 public constant override contractType = "RK_GAUGE";
+
     /// @notice Quota keeper rates are provided for
     address public immutable override quotaKeeper;
 
-    /// @notice Mapping from token address to its rate parameters
-    mapping(address => QuotaRateParams) public override quotaRateParams;
+    /// @dev Mapping from token address to its rate parameters
+    mapping(address => QuotaRateParams) internal _quotaRateParams;
 
-    /// @notice Mapping from (user, token) to vote amounts submitted by `user` for each side
-    mapping(address => mapping(address => UserVotes)) public override userTokenVotes;
+    /// @dev Mapping from (user, token) to vote amounts submitted by user for each side
+    mapping(address => mapping(address => UserTokenVotes)) internal _userTokenVotes;
 
     /// @notice GEAR staking and voting contract
     address public immutable override voter;
@@ -74,21 +65,31 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
     {
         quotaKeeper = quotaKeeper_;
         voter = gearStaking_;
-        epochLastUpdate = IGearStakingV3(gearStaking_).getCurrentEpoch();
+        epochLastUpdate = _getCurrentEpoch();
         epochFrozen = true;
         emit SetFrozenEpoch(true);
+    }
+
+    /// @notice Returns `token`'s quota rate params
+    function quotaRateParams(address token) external view override returns (QuotaRateParams memory) {
+        return _quotaRateParams[token];
+    }
+
+    /// @notice Returns `user`'s votes for `token`'s LP and CA sides
+    function userTokenVotes(address user, address token) external view override returns (UserTokenVotes memory) {
+        return _userTokenVotes[user][token];
     }
 
     /// @notice Whether token is added to the gauge as quoted
     /// @custom:tests U:[GA-8]
     function isTokenAdded(address token) public view override returns (bool) {
-        return quotaRateParams[token].maxRate != 0;
+        return _quotaRateParams[token].maxRate != 0;
     }
 
     /// @notice Updates the epoch and, unless frozen, rates in the quota keeper
-    /// @custom:tests U:[GA-14]
+    /// @custom:tests U:[GA-14], U:[GA-16]
     function updateEpoch() public override {
-        uint16 epochNow = IGearStakingV3(voter).getCurrentEpoch();
+        uint16 epochNow = _getCurrentEpoch();
         if (epochNow > epochLastUpdate) {
             epochLastUpdate = epochNow;
             if (!epochFrozen) {
@@ -97,6 +98,14 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
             }
             emit UpdateEpoch(epochNow);
         }
+    }
+
+    /// @notice Returns time before the next update of rates
+    /// @custom:tests U:[GA-14], U:[GA-16]
+    function getTimeBeforeUpdate() external view override returns (uint256) {
+        if (epochFrozen) return type(uint256).max;
+        if (_getCurrentEpoch() > epochLastUpdate) return 0;
+        return EPOCH_LENGTH - (block.timestamp - IGearStakingV3(voter).firstEpochTimestamp()) % EPOCH_LENGTH;
     }
 
     /// @notice Computes rates for an array of tokens based on the current votes
@@ -114,7 +123,7 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
                 if (!isTokenAdded(token)) revert TokenIsNotQuotedException();
 
                 // unchecked arithmetics below is safe because of short data types
-                QuotaRateParams memory qrp = quotaRateParams[token];
+                QuotaRateParams memory qrp = _quotaRateParams[token];
                 uint256 votesLpSide = qrp.totalVotesLpSide;
                 uint256 votesCaSide = qrp.totalVotesCaSide;
                 uint256 totalVotes = votesLpSide + votesCaSide;
@@ -141,15 +150,15 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
 
         updateEpoch();
 
-        QuotaRateParams storage qp = quotaRateParams[token];
-        UserVotes storage uv = userTokenVotes[user][token];
+        QuotaRateParams storage qrp = _quotaRateParams[token];
+        UserTokenVotes storage utv = _userTokenVotes[user][token];
 
         if (lpSide) {
-            qp.totalVotesLpSide += votes;
-            uv.votesLpSide += votes;
+            qrp.totalVotesLpSide += votes;
+            utv.votesLpSide += votes;
         } else {
-            qp.totalVotesCaSide += votes;
-            uv.votesCaSide += votes;
+            qrp.totalVotesCaSide += votes;
+            utv.votesCaSide += votes;
         }
 
         emit Vote({user: user, token: token, votes: votes, lpSide: lpSide});
@@ -171,20 +180,20 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
 
         updateEpoch();
 
-        QuotaRateParams storage qp = quotaRateParams[token];
-        UserVotes storage uv = userTokenVotes[user][token];
+        QuotaRateParams storage qrp = _quotaRateParams[token];
+        UserTokenVotes storage utv = _userTokenVotes[user][token];
 
         if (lpSide) {
-            if (uv.votesLpSide < votes) revert InsufficientVotesException();
+            if (utv.votesLpSide < votes) revert InsufficientVotesException();
             unchecked {
-                qp.totalVotesLpSide -= votes;
-                uv.votesLpSide -= votes;
+                qrp.totalVotesLpSide -= votes;
+                utv.votesLpSide -= votes;
             }
         } else {
-            if (uv.votesCaSide < votes) revert InsufficientVotesException();
+            if (utv.votesCaSide < votes) revert InsufficientVotesException();
             unchecked {
-                qp.totalVotesCaSide -= votes;
-                uv.votesCaSide -= votes;
+                qrp.totalVotesCaSide -= votes;
+                utv.votesCaSide -= votes;
             }
         }
 
@@ -223,7 +232,7 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
     {
         if (isTokenAdded(token)) revert TokenNotAllowedException();
         _checkParams({minRate: minRate, maxRate: maxRate});
-        quotaRateParams[token] =
+        _quotaRateParams[token] =
             QuotaRateParams({minRate: minRate, maxRate: maxRate, totalVotesLpSide: 0, totalVotesCaSide: 0});
         if (!IPoolQuotaKeeperV3(quotaKeeper).isQuotedToken(token)) {
             IPoolQuotaKeeperV3(quotaKeeper).addQuotaToken(token);
@@ -239,7 +248,7 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
     /// @dev    Reverts if `minRate` is zero or greater than the current max rate
     /// @custom:tests U:[GA-3], U:[GA-4] U:[GA-6A]
     function changeQuotaMinRate(address token, uint16 minRate) external override controllerOrConfiguratorOnly {
-        _changeQuotaTokenRateParams(token, minRate, quotaRateParams[token].maxRate);
+        _changeQuotaTokenRateParams(token, minRate, _quotaRateParams[token].maxRate);
     }
 
     /// @notice Changes the max rate for a quoted token
@@ -250,7 +259,7 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
     /// @dev    Reverts if `maxRate` is less than the current min rate
     /// @custom:tests U:[GA-3], U:[GA-4] U:[GA-6B]
     function changeQuotaMaxRate(address token, uint16 maxRate) external override controllerOrConfiguratorOnly {
-        _changeQuotaTokenRateParams(token, quotaRateParams[token].minRate, maxRate);
+        _changeQuotaTokenRateParams(token, _quotaRateParams[token].minRate, maxRate);
     }
 
     /// @dev Implementation of `changeQuotaMinRate` and `changeQuotaMaxRate`
@@ -258,7 +267,7 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
         if (!isTokenAdded(token)) revert TokenIsNotQuotedException();
         _checkParams(minRate, maxRate);
 
-        QuotaRateParams storage qrp = quotaRateParams[token];
+        QuotaRateParams storage qrp = _quotaRateParams[token];
         if (minRate == qrp.minRate && maxRate == qrp.maxRate) return;
         qrp.minRate = minRate;
         qrp.maxRate = maxRate;
@@ -278,5 +287,10 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
     /// @dev Reverts if `msg.sender` is not voter
     function _revertIfCallerNotVoter() internal view {
         if (msg.sender != voter) revert CallerNotVoterException();
+    }
+
+    /// @dev Internal wrapper for `voter.getCurrentEpoch` call to reduce contract size
+    function _getCurrentEpoch() internal view returns (uint16) {
+        return IGearStakingV3(voter).getCurrentEpoch();
     }
 }

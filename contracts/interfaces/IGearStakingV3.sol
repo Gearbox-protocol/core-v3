@@ -28,7 +28,12 @@ struct MultiVote {
     bytes extraData;
 }
 
-interface IGearStakingV3Events {
+/// @title Gear staking V3 interface
+interface IGearStakingV3 is IVersion {
+    // ------ //
+    // EVENTS //
+    // ------ //
+
     /// @notice Emitted when the user deposits GEAR into staking contract
     event DepositGear(address indexed user, uint256 amount);
 
@@ -49,10 +54,11 @@ interface IGearStakingV3Events {
 
     /// @notice Emitted when the new migrator contract is set
     event SetMigrator(address indexed migrator);
-}
 
-/// @title Gear staking V3 interface
-interface IGearStakingV3 is IGearStakingV3Events, IVersion {
+    // ------- //
+    // GETTERS //
+    // ------- //
+
     function gear() external view returns (address);
 
     function firstEpochTimestamp() external view returns (uint256);
@@ -67,6 +73,10 @@ interface IGearStakingV3 is IGearStakingV3Events, IVersion {
         external
         view
         returns (uint256 withdrawableNow, uint256[EPOCHS_TO_WITHDRAW] memory withdrawableInEpochs);
+
+    // ------------------ //
+    // STAKING AND VOTING //
+    // ------------------ //
 
     function deposit(uint96 amount, MultiVote[] calldata votes) external;
 
