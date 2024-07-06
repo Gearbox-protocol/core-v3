@@ -26,16 +26,12 @@
     "forge-install": "forge install --no-commit foundry-rs/forge-std"
   },
   "devDependencies": {
-    "@1inch/solidity-utils": "2.4.0",
     "@commitlint/cli": "^17.6.3",
     "@commitlint/config-conventional": "17.6.0",
     "@gearbox-protocol/prettier-config": "^1.5.0",
-    "@gearbox-protocol/sdk-gov": "^1.4.6",
-    "@openzeppelin/contracts": "^4.9.3",
     "husky": "^8.0.3",
     "lint-staged": "^13.0.3",
     "prettier": "^2.7.1",
-    "prettier-plugin-solidity": "^1.0.0-beta.24",
     "rimraf": "^5.0.1"
   },
   "prettier": "@gearbox-protocol/prettier-config",

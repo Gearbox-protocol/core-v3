@@ -1,5 +1,5 @@
 ds-test/=lib/forge-std/lib/ds-test/src/
 forge-std/=lib/forge-std/src/
-@openzeppelin/=node_modules/@openzeppelin/
-@gearbox-protocol=node_modules/@gearbox-protocol/
-@1inch=node_modules/@1inch/
+@openzeppelin/=lib/openzeppelin-contracts/
+@gearbox-protocol/sdk-gov/=lib/gearbox-sdk-gov/
+@1inch/solidity-utils/=lib/solidity-utils/
