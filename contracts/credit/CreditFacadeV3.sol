@@ -658,6 +658,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait, ReentrancyGuardTrait {
 
     /// @dev `ICreditFacadeV3Multicall.addCollateral` implementation
     function _addCollateral(address creditAccount, address token, uint256 amount) internal {
+        if (amount == 0) return;
         ICreditManagerV3(creditManager).addCollateral({
             payer: msg.sender,
             creditAccount: creditAccount,
@@ -672,6 +673,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait, ReentrancyGuardTrait {
     function _addCollateralWithPermit(address creditAccount, bytes calldata callData) internal {
         (address token, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s) =
             abi.decode(callData, (address, uint256, uint256, uint8, bytes32, bytes32)); // U:[FA-26B]
+        if (amount == 0) return;
 
         // `token` is only validated later in `addCollateral`, but to benefit off of it the attacker would have to make
         // it recognizable as collateral in the credit manager, which requires gaining configurator access rights
@@ -684,6 +686,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait, ReentrancyGuardTrait {
     function _manageDebt(address creditAccount, uint256 amount, uint256 enabledTokensMask, ManageDebtAction action)
         internal
     {
+        if (amount == 0) return;
         if (action == ManageDebtAction.INCREASE_DEBT) {
             _revertIfOutOfDebtPerBlockLimit(amount); // U:[FA-28]
         }
@@ -705,6 +708,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait, ReentrancyGuardTrait {
 
         if (token == underlying) revert TokenIsNotQuotedException(); // U:[FA-34]
 
+        if (quotaChange == 0) return (enabledTokensMask, forbiddenTokensMask);
         if (quotaChange > 0) {
             forbiddenTokensMask = _forbiddenTokensMaskRoE(forbiddenTokensMask);
             if (forbiddenTokensMask != 0 && _getTokenMaskOrRevert(token) & forbiddenTokensMask != 0) {
@@ -727,6 +731,7 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait, ReentrancyGuardTrait {
 
     /// @dev `ICreditFacadeV3Multicall.withdrawCollateral` implementation
     function _withdrawCollateral(address creditAccount, address token, uint256 amount, address to) internal {
+        if (amount == 0) return;
         if (amount == type(uint256).max) {
             amount = IERC20(token).safeBalanceOf(creditAccount);
             if (amount <= 1) return;

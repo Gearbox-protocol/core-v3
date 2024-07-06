@@ -204,6 +204,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLTrait, ContractsRegisterTrait, Reent
         nonZeroAddress(receiver) // U:[LP-5]
         returns (uint256 shares)
     {
+        if (assets == 0) return 0;
         uint256 assetsReceived = _amountMinusFee(assets); // U:[LP-6]
         shares = _convertToShares(assetsReceived, Math.Rounding.Down); // U:[LP-6]
         _deposit(receiver, assets, assetsReceived, shares); // U:[LP-6]
@@ -215,6 +216,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLTrait, ContractsRegisterTrait, Reent
         override
         returns (uint256 shares)
     {
+        if (assets == 0) return 0;
         shares = deposit(assets, receiver); // U:[LP-2A,2B,5,6]
         emit Refer(receiver, referralCode, assets); // U:[LP-6]
     }
@@ -231,6 +233,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLTrait, ContractsRegisterTrait, Reent
         nonZeroAddress(receiver) // U:[LP-5]
         returns (uint256 assets)
     {
+        if (shares == 0) return 0;
         uint256 assetsReceived = _convertToAssets(shares, Math.Rounding.Up); // U:[LP-7]
         assets = _amountWithFee(assetsReceived); // U:[LP-7]
         _deposit(receiver, assets, assetsReceived, shares); // U:[LP-7]
@@ -242,6 +245,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLTrait, ContractsRegisterTrait, Reent
         override
         returns (uint256 assets)
     {
+        if (shares == 0) return 0;
         assets = mint(shares, receiver); // U:[LP-2A,2B,5,7]
         emit Refer(receiver, referralCode, assets); // U:[LP-7]
     }
@@ -259,6 +263,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLTrait, ContractsRegisterTrait, Reent
         nonZeroAddress(receiver) // U:[LP-5]
         returns (uint256 shares)
     {
+        if (assets == 0) return 0;
         uint256 assetsToUser = _amountWithFee(assets);
         uint256 assetsSent = _amountWithWithdrawalFee(assetsToUser); // U:[LP-8]
         shares = _convertToShares(assetsSent, Math.Rounding.Up); // U:[LP-8]
@@ -278,6 +283,7 @@ contract PoolV3 is ERC4626, ERC20Permit, ACLTrait, ContractsRegisterTrait, Reent
         nonZeroAddress(receiver) // U:[LP-5]
         returns (uint256 assets)
     {
+        if (shares == 0) return 0;
         uint256 assetsSent = _convertToAssets(shares, Math.Rounding.Down); // U:[LP-9]
         uint256 assetsToUser = _amountMinusWithdrawalFee(assetsSent);
         assets = _amountMinusFee(assetsToUser); // U:[LP-9]

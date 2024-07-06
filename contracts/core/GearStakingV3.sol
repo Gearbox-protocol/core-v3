@@ -91,6 +91,7 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
     /// @dev    Requires approval from `msg.sender` for GEAR to this contract
     /// @custom:tests U:[GS-2]
     function deposit(uint96 amount, MultiVote[] calldata votes) external override nonReentrant {
+        if (amount == 0) return;
         _deposit(amount, msg.sender);
         _multivote(msg.sender, votes);
     }
@@ -109,6 +110,7 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
         bytes32 r,
         bytes32 s
     ) external override nonReentrant {
+        if (amount == 0) return;
         try IERC20Permit(gear).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {}
         _deposit(amount, msg.sender);
         _multivote(msg.sender, votes);
@@ -133,6 +135,7 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
     /// @dev    Reverts if caller's available stake is less than `amount`
     /// @custom:tests U:[GS-3]
     function withdraw(uint96 amount, address to, MultiVote[] calldata votes) external override nonReentrant {
+        if (amount == 0) return;
         _multivote(msg.sender, votes);
 
         // after this, user's `epochLastUpdate` always equals current epoch
@@ -170,6 +173,7 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
         nonReentrant
         nonZeroAddress(successor)
     {
+        if (amount == 0) return;
         _multivote(msg.sender, votesBefore);
 
         UserVoteLockData storage vld = _voteLockData[msg.sender];
@@ -179,7 +183,7 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
             vld.totalStaked -= amount;
         }
 
-        IERC20(gear).approve(successor, uint256(amount));
+        IERC20(gear).approve(successor, amount);
         IGearStakingV3(successor).depositOnMigration(amount, msg.sender, votesAfter);
 
         emit MigrateGear(msg.sender, successor, amount);
@@ -197,6 +201,7 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
         nonReentrant
         migratorOnly
     {
+        if (amount == 0) return;
         _deposit(amount, onBehalfOf);
         _multivote(onBehalfOf, votes);
     }
@@ -259,6 +264,7 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
                     revert VotingContractNotAllowedException();
                 }
 
+                if (currentVote.voteAmount == 0) continue;
                 if (vld.available < currentVote.voteAmount) revert InsufficientBalanceException();
                 unchecked {
                     vld.available -= currentVote.voteAmount;
@@ -270,6 +276,7 @@ contract GearStakingV3 is IGearStakingV3, Ownable, ReentrancyGuardTrait, SanityC
                     revert VotingContractNotAllowedException();
                 }
 
+                if (currentVote.voteAmount == 0) continue;
                 IVotingContract(currentVote.votingContract).unvote(user, currentVote.voteAmount, currentVote.extraData);
                 vld.available += currentVote.voteAmount;
             }
