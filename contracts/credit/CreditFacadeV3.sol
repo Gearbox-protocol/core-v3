@@ -5,6 +5,7 @@ pragma solidity ^0.8.23;
 
 // THIRD-PARTY
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
+import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
@@ -58,7 +59,7 @@ import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
 ///         - policies on how liquidations with loss are performed
 ///         - forbidden tokens (they count towards account value, but having them enabled as collateral restricts allowed
 ///         actions and triggers a safer version of collateral check, incentivizing users to decrease exposure to them).
-contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait, ReentrancyGuardTrait {
+contract CreditFacadeV3 is ICreditFacadeV3, Pausable, ACLTrait, ReentrancyGuardTrait {
     using Address for address;
     using BitMask for uint256;
     using SafeERC20 for IERC20;
@@ -838,6 +839,20 @@ contract CreditFacadeV3 is ICreditFacadeV3, ACLTrait, ReentrancyGuardTrait {
         } else {
             _emergencyLiquidatorsSet.remove(liquidator);
         } // U:[FA-53]
+    }
+
+    /// @notice Pauses contract
+    /// @dev Reverts if caller is not a pausable admin
+    /// @dev Reverts if contract is already paused
+    function pause() external override pausableAdminsOnly {
+        _pause();
+    }
+
+    /// @notice Unpauses contract
+    /// @dev Reverts if caller is not an unpausable admin
+    /// @dev Reverts if contract is already unpaused
+    function unpause() external override unpausableAdminsOnly {
+        _unpause();
     }
 
     // --------- //

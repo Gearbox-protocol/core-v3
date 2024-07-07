@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.23;
 
-import {IACLTrait} from "./base/IACLTrait.sol";
+import {IControlledTrait} from "./base/IControlledTrait.sol";
 import {IRateKeeper} from "./base/IRateKeeper.sol";
 import {IVotingContract} from "./base/IVotingContract.sol";
 
@@ -20,7 +20,7 @@ struct UserTokenVotes {
 }
 
 /// @title Gauge V3 interface
-interface IGaugeV3 is IACLTrait, IVotingContract, IRateKeeper {
+interface IGaugeV3 is IControlledTrait, IVotingContract, IRateKeeper {
     // ------ //
     // EVENTS //
     // ------ //

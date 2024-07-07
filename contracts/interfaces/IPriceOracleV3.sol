@@ -3,7 +3,7 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.23;
 
-import {IACLTrait} from "./base/IACLTrait.sol";
+import {IControlledTrait} from "./base/IControlledTrait.sol";
 import {IVersion} from "./base/IVersion.sol";
 
 /// @notice Price feed params
@@ -27,7 +27,7 @@ struct PriceUpdate {
 }
 
 /// @title Price oracle V3 interface
-interface IPriceOracleV3 is IACLTrait, IVersion {
+interface IPriceOracleV3 is IControlledTrait, IVersion {
     // ------ //
     // EVENTS //
     // ------ //

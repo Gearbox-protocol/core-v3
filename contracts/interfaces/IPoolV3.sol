@@ -5,12 +5,12 @@ pragma solidity ^0.8.23;
 
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
-import {IACLTrait} from "./base/IACLTrait.sol";
 import {IContractsRegisterTrait} from "../interfaces/base/IContractsRegisterTrait.sol";
+import {IControlledTrait} from "./base/IControlledTrait.sol";
 import {IVersion} from "./base/IVersion.sol";
 
 /// @title Pool V3 interface
-interface IPoolV3 is IACLTrait, IContractsRegisterTrait, IVersion, IERC4626, IERC20Permit {
+interface IPoolV3 is IControlledTrait, IContractsRegisterTrait, IVersion, IERC4626, IERC20Permit {
     // ------ //
     // EVENTS //
     // ------ //
@@ -136,4 +136,8 @@ interface IPoolV3 is IACLTrait, IContractsRegisterTrait, IVersion, IERC4626, IER
     function setCreditManagerDebtLimit(address creditManager, uint256 newLimit) external;
 
     function setWithdrawFee(uint256 newWithdrawFee) external;
+
+    function pause() external;
+
+    function unpause() external;
 }

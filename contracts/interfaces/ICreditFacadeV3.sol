@@ -153,4 +153,8 @@ interface ICreditFacadeV3 is IACLTrait, IVersion {
     function setLossLiquidator(address newLossLiquidator) external;
 
     function setEmergencyLiquidator(address liquidator, AllowanceAction allowance) external;
+
+    function pause() external;
+
+    function unpause() external;
 }

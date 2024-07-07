@@ -30,7 +30,7 @@ contract GaugeMock is ACLTrait {
     //
 
     /// @dev Constructor
-    constructor(address acl, address quotaKeeper_) ACLTrait(acl) nonZeroAddress(quotaKeeper_) {
+    constructor(address acl, address quotaKeeper_) ACLTrait(acl) {
         quotaKeeper = quotaKeeper_;
     }
 

@@ -24,8 +24,9 @@ import {IPriceOracleV3} from "../interfaces/IPriceOracleV3.sol";
 import {IAdapter} from "../interfaces/base/IAdapter.sol";
 
 // TRAITS
-import {ACLTrait} from "../traits/ACLTrait.sol";
+import {ControlledTrait} from "../traits/ControlledTrait.sol";
 import {ReentrancyGuardTrait} from "../traits/ReentrancyGuardTrait.sol";
+import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 
 // EXCEPTIONS
 import "../interfaces/IExceptions.sol";
@@ -33,7 +34,7 @@ import "../interfaces/IExceptions.sol";
 /// @title Credit configurator V3
 /// @notice Provides funcionality to configure various aspects of credit manager and facade's behavior
 /// @dev Most of the functions can only be accessed by configurator or timelock controller
-contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, ReentrancyGuardTrait {
+contract CreditConfiguratorV3 is ICreditConfiguratorV3, ControlledTrait, ReentrancyGuardTrait, SanityCheckTrait {
     using EnumerableSet for EnumerableSet.AddressSet;
     using Address for address;
     using BitMask for uint256;
@@ -63,7 +64,7 @@ contract CreditConfiguratorV3 is ICreditConfiguratorV3, ACLTrait, ReentrancyGuar
     /// @param _acl ACL contract address
     /// @param _creditManager Credit manager to connect to
     /// @dev Copies allowed adaprters from the currently connected configurator
-    constructor(address _acl, address _creditManager) ACLTrait(_acl) {
+    constructor(address _acl, address _creditManager) ControlledTrait(_acl) {
         creditManager = _creditManager; // I:[CC-1]
         underlying = CreditManagerV3(_creditManager).underlying(); // I:[CC-1]
 

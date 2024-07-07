@@ -3,39 +3,24 @@
 // (c) Gearbox Foundation, 2024.
 pragma solidity ^0.8.23;
 
-import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
-
 import {
     AddressIsNotContractException,
     CallerNotConfiguratorException,
-    CallerNotControllerOrConfiguratorException,
     CallerNotPausableAdminException,
     CallerNotUnpausableAdminException
 } from "../interfaces/IExceptions.sol";
 import {IACL} from "../interfaces/base/IACL.sol";
 import {IACLTrait} from "../interfaces/base/IACLTrait.sol";
 
-import {SanityCheckTrait} from "./SanityCheckTrait.sol";
-
-/// @title ACL trait
-/// @notice Utility class for ACL (access-control list) consumers that implements pausable functionality,
-///         reentrancy protection and external controller role
-abstract contract ACLTrait is IACLTrait, Pausable, SanityCheckTrait {
+/// @title  ACL trait
+/// @notice Utility class for ACL (access-control list) consumers
+abstract contract ACLTrait is IACLTrait {
     /// @notice ACL contract address
     address public immutable override acl;
-
-    /// @notice External controller address
-    address public override controller;
 
     /// @dev Ensures that function caller is configurator
     modifier configuratorOnly() {
         _ensureCallerIsConfigurator();
-        _;
-    }
-
-    /// @dev Ensures that function caller is external controller or configurator
-    modifier controllerOrConfiguratorOnly() {
-        _ensureCallerIsControllerOrConfigurator();
         _;
     }
 
@@ -52,43 +37,16 @@ abstract contract ACLTrait is IACLTrait, Pausable, SanityCheckTrait {
     }
 
     /// @notice Constructor
-    /// @param acl_ ACL contract address
-    constructor(address acl_) nonZeroAddress(acl_) {
+    /// @param  acl_ ACL contract address
+    constructor(address acl_) {
+        if (acl_.code.length == 0) revert AddressIsNotContractException(acl_);
         acl = acl_;
-    }
-
-    /// @notice Pauses contract, can only be called by an account with pausable admin role
-    /// @dev Reverts if contract is already paused
-    function pause() external virtual override pausableAdminsOnly {
-        _pause();
-    }
-
-    /// @notice Unpauses contract, can only be called by an account with unpausable admin role
-    /// @dev Reverts if contract is already unpaused
-    function unpause() external virtual override unpausableAdminsOnly {
-        _unpause();
-    }
-
-    /// @notice Sets new external controller, can only be called by configurator
-    function setController(address newController) external override configuratorOnly {
-        if (controller == newController) return;
-        if (newController.code.length == 0) revert AddressIsNotContractException(newController);
-        controller = newController;
-        emit NewController(newController);
     }
 
     /// @dev Reverts if the caller is not the configurator
     /// @dev Used to cut contract size on modifiers
     function _ensureCallerIsConfigurator() internal view {
         if (!_isConfigurator(msg.sender)) revert CallerNotConfiguratorException();
-    }
-
-    /// @dev Reverts if the caller is not controller or configurator
-    /// @dev Used to cut contract size on modifiers
-    function _ensureCallerIsControllerOrConfigurator() internal view {
-        if (msg.sender != controller && !_isConfigurator(msg.sender)) {
-            revert CallerNotControllerOrConfiguratorException();
-        }
     }
 
     /// @dev Reverts if the caller is not pausable admin

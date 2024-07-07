@@ -9,7 +9,8 @@ import {IPoolQuotaKeeperV3} from "../interfaces/IPoolQuotaKeeperV3.sol";
 
 import {EPOCH_LENGTH} from "../libraries/Constants.sol";
 
-import {ACLTrait} from "../traits/ACLTrait.sol";
+import {ControlledTrait} from "../traits/ControlledTrait.sol";
+import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 
 import "../interfaces/IExceptions.sol";
 
@@ -21,7 +22,7 @@ import "../interfaces/IExceptions.sol";
 ///         determined by the Gearbox DAO. GEAR holders then vote either for CA side, which moves the rate towards min,
 ///         or for LP side, which moves it towards max.
 ///         Rates are only updated once per epoch (1 week), to avoid manipulation and make strategies more predictable.
-contract GaugeV3 is IGaugeV3, ACLTrait {
+contract GaugeV3 is IGaugeV3, ControlledTrait, SanityCheckTrait {
     /// @notice Contract version
     uint256 public constant override version = 3_10;
 
@@ -59,7 +60,7 @@ contract GaugeV3 is IGaugeV3, ACLTrait {
     /// @dev    Reverts if any of `quotaKeeper_` or `gearStaking_` is zero address
     /// @custom:tests U:[GA-1]
     constructor(address acl_, address quotaKeeper_, address gearStaking_)
-        ACLTrait(acl_)
+        ControlledTrait(acl_)
         nonZeroAddress(quotaKeeper_)
         nonZeroAddress(gearStaking_)
     {

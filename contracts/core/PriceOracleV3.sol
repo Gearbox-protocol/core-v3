@@ -17,8 +17,9 @@ import {
 import {IPriceOracleV3, PriceFeedParams, PriceUpdate} from "../interfaces/IPriceOracleV3.sol";
 import {IUpdatablePriceFeed} from "../interfaces/base/IPriceFeed.sol";
 
-import {ACLTrait} from "../traits/ACLTrait.sol";
+import {ControlledTrait} from "../traits/ControlledTrait.sol";
 import {PriceFeedValidationTrait} from "../traits/PriceFeedValidationTrait.sol";
+import {SanityCheckTrait} from "../traits/SanityCheckTrait.sol";
 
 /// @title  Price oracle V3
 /// @notice Acts as router that dispatches calls to corresponding price feeds.
@@ -33,7 +34,7 @@ import {PriceFeedValidationTrait} from "../traits/PriceFeedValidationTrait.sol";
 ///         not be used for general collateral evaluation, including decisions on whether accounts are liquidatable.
 ///         - Finally, this contract serves as register for updatable price feeds and can be used to apply batched
 ///         on-demand price updates while ensuring that those are not calls to arbitrary contracts.
-contract PriceOracleV3 is ACLTrait, PriceFeedValidationTrait, IPriceOracleV3 {
+contract PriceOracleV3 is ControlledTrait, PriceFeedValidationTrait, SanityCheckTrait, IPriceOracleV3 {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice Contract version
@@ -53,7 +54,7 @@ contract PriceOracleV3 is ACLTrait, PriceFeedValidationTrait, IPriceOracleV3 {
 
     /// @notice Constructor
     /// @param  acl_ ACL contract address
-    constructor(address acl_) ACLTrait(acl_) {}
+    constructor(address acl_) ControlledTrait(acl_) {}
 
     /// @notice Returns all tokens that have price feeds
     function getTokens() external view override returns (address[] memory) {
